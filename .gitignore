@@ -1,0 +1,27 @@
+.DS_Store
+._*
+
+# Build and release artifacts
+build/
+dist/
+*.pkg
+*.dmg
+*.zip
+*.tar.gz
+
+# Local logs and traces
+*.log
+*.trace
+
+# Xcode / macOS local state
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Signing and notarization secrets
+*.cer
+*.p12
+*.provisionprofile
+*.mobileprovision
+notarytool-profile.json

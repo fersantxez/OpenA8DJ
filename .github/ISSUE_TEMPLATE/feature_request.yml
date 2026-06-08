@@ -1,0 +1,64 @@
+name: Feature request
+description: Suggest a new feature, compatibility improvement, control, or validation target.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. OpenA8DJ is a volunteer preservation project, so practical hardware details help a lot.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows 10
+        - Windows 11
+        - Cross-platform
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Audio playback
+        - Audio capture/input
+        - Channel routing
+        - Buffer size / latency
+        - MIDI
+        - Traktor timecode
+        - Installer/package
+        - Windows experimental driver
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      placeholder: "What are you trying to do, and what is currently missing?"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed feature
+      placeholder: "Describe the feature or behavior you would like to see."
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware/software context
+      placeholder: "Mixer, cabling, Traktor version, OS version, sample rate, DVS setup, etc."
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: This request does not require proprietary Native Instruments files, firmware, logos, or copied third-party implementation code under incompatible license terms.
+          required: true

@@ -1,0 +1,29 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools and HAL
+        run: make all
+      - name: Smoke-test HAL bundle
+        run: make smoke-hal
+      - name: Build unsigned macOS package and DMG
+        run: make dist SIGN_IDENTITY=-
+      - name: Upload artifacts
+        if: ${{ github.event.repository.private }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJ-macOS
+          path: |
+            build/OpenA8DJ-*.pkg
+            build/OpenA8DJ-*.dmg
+            build/OpenA8DJ-*-checksums.txt

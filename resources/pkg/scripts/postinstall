@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+
+/usr/sbin/chown -R root:wheel /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/bin/chmod -R go-w /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/usr/bin/xattr -cr /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver 2>/dev/null || true
+/usr/bin/find /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver /usr/local/bin /Library/LaunchAgents -name '._*' -delete 2>/dev/null || true
+
+console_user="$(/usr/bin/stat -f %Su /dev/console 2>/dev/null || echo "")"
+console_uid="$(/usr/bin/stat -f %u /dev/console 2>/dev/null || echo 0)"
+if [ "$console_uid" != "0" ] && [ -n "$console_user" ]; then
+  user_home="$(/usr/bin/dscl . -read "/Users/$console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
+  if [ -n "$user_home" ]; then
+    /bin/launchctl bootout "gui/$console_uid" "$user_home/Library/LaunchAgents/org.opena8dj.midid.plist" 2>/dev/null || true
+    /bin/rm -f "$user_home/Library/LaunchAgents/org.opena8dj.midid.plist"
+  fi
+  /bin/launchctl bootout "gui/$console_uid" /Library/LaunchAgents/org.opena8dj.midid.plist 2>/dev/null || true
+  /bin/launchctl bootstrap "gui/$console_uid" /Library/LaunchAgents/org.opena8dj.midid.plist 2>/dev/null || true
+  /bin/launchctl kickstart -k "gui/$console_uid/org.opena8dj.midid" 2>/dev/null || true
+fi
+
+/usr/bin/killall coreaudiod 2>/dev/null || true
+
+exit 0

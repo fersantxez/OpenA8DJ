@@ -1,0 +1,52 @@
+name: Windows Driver
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-driver.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-driver.yml"
+
+jobs:
+  build:
+    name: Build Windows driver (${{ matrix.platform }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64, ARM64]
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Check WDK
+        shell: pwsh
+        run: |
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          if (-not (Test-Path $kits)) {
+            throw "Windows SDK/WDK is not installed on this runner. Use a WDK-enabled runner or install the WDK before building."
+          }
+          $inf2cat = Get-ChildItem -Path $kits -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $inf2cat) {
+            throw "Inf2Cat.exe was not found. The WDK is required."
+          }
+          Write-Host "Found Inf2Cat at $($inf2cat.FullName)"
+
+      - name: Build
+        shell: pwsh
+        run: .\windows\scripts\build-driver.ps1 -Configuration Release -Platform ${{ matrix.platform }}
+
+      - name: Upload unsigned driver package
+        if: ${{ github.event.repository.private }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}
+          path: windows/dist/Release/${{ matrix.platform }}/

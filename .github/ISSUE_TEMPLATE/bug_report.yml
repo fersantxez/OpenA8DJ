@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a driver, installer, routing, audio, MIDI, or hardware-control problem.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve OpenA8DJ. Please include enough detail for us to reproduce the problem.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows 10
+        - Windows 11
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os_version
+    attributes:
+      label: OS version
+      placeholder: "Example: macOS 26.5 on Apple Silicon, Windows 11 24H2 x64"
+    validations:
+      required: true
+  - type: input
+    id: opena8dj_version
+    attributes:
+      label: OpenA8DJ version or commit
+      placeholder: "Example: main@9b264ae, v0.2.4"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Install/uninstall
+        - Device enumeration
+        - Playback quality
+        - Capture/input
+        - Channel routing
+        - Buffer size / latency
+        - MIDI
+        - Traktor timecode
+        - Windows experimental driver
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: "What did you expect to happen?"
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: "What happened instead?"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Install ...
+        2. Select ...
+        3. Play/capture ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or test output
+      description: Do not include passwords, tokens, serial numbers, or private account details.
+      render: text
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I have not included passwords, tokens, private account details, or proprietary Native Instruments files.
+          required: true

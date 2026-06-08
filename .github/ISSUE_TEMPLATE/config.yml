@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security issue
+    url: https://github.com/fersantxez/OpenA8DJ/security/advisories/new
+    about: Please report security-sensitive issues privately.
