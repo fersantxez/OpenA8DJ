@@ -23,6 +23,10 @@ Native Instruments, Audio 8 DJ, Traktor, and other product names are trademarks
 of their respective owners. Their names are used only to identify compatibility
 with the relevant hardware and software.
 
+The MIT License covers the source code. It does not make modified builds,
+forks, mirrors, support services, or repackaged installers official OpenA8DJ
+releases. Install and use OpenA8DJ at your own risk.
+
 Do not copy third-party implementation code under incompatible license terms,
 proprietary vendor implementation code, firmware, or confidential material into
 this repository. See `docs/LEGAL.md` for the publication and provenance policy.

@@ -60,6 +60,12 @@ Use `Native Instruments`, `Audio 8 DJ`, and `Traktor` only in compatibility
 statements, test notes, and factual documentation. Do not imply official status,
 certification, sponsorship, or endorsement.
 
+The MIT License covers the source code. It does not grant permission to imply
+that modified builds, repackaged installers, mirrors, forks, support services,
+or commercial offerings are official OpenA8DJ releases. Use
+`BRAND_POLICY.md` as the project policy for naming, redistribution, official
+download claims, donations, and risk wording.
+
 Preferred wording:
 
 ```text
@@ -87,6 +93,7 @@ Before publishing a public release, verify that:
   present;
 - release text states that the project is independent and not endorsed by
   Native Instruments;
+- release text and packaged documentation include the brand/risk policy;
 - unvalidated features are described as unvalidated, not certified;
 - macOS packages are signed/notarized when advertised as public-ready;
 - Windows packages are not published unless a real Windows driver package,

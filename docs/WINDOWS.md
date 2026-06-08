@@ -78,7 +78,9 @@ A useful Windows release must provide:
 The Windows implementation must follow the same provenance rules as the macOS
 implementation: no Native Instruments binaries, firmware, installers, logos, or
 proprietary payloads, and no copied third-party implementation code under
-incompatible license terms.
+incompatible license terms. Experimental Windows builds must also include
+`BRAND_POLICY.md` and clearly state that they are not official Native
+Instruments software.
 
 ## Driver Architecture
 

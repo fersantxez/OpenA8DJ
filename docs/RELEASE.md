@@ -54,13 +54,16 @@ as 44.1/48 kHz.
 Before attaching any artifact to a public release, complete the publication
 policy in `docs/LEGAL.md`:
 
-- confirm the release is MIT-licensed and includes `LICENSE` and `NOTICE.md`;
+- confirm the release is MIT-licensed and includes `LICENSE`, `NOTICE.md`, and
+  `BRAND_POLICY.md`;
 - confirm no Native Instruments binaries, firmware, installers, logos, or other
   proprietary payloads are present in Git history or release artifacts;
 - confirm no copied third-party implementation code under incompatible license
   terms is present;
 - confirm product names are used only for compatibility and do not imply
   affiliation, sponsorship, endorsement, certification, or official status;
+- confirm release text says official public binary downloads come from GitHub
+  Releases and that mirrors/repackaged installers are not official;
 - confirm unvalidated features are described as unvalidated;
 - confirm binary artifacts are signed/notarized if advertised as public-ready.
 
@@ -110,8 +113,8 @@ build/OpenA8DJ-<version>-checksums.txt
 The README links to the latest release page and the current versioned assets so
 testers can download the installer without building from source.
 
-The DMG includes `LICENSE`, `NOTICE.md`, and `LEGAL.md`. The PKG installs the
-same files under `/Library/Documentation/OpenA8DJ`.
+The DMG includes `LICENSE`, `NOTICE.md`, `LEGAL.md`, and `BRAND_POLICY.md`.
+The PKG installs the same files under `/Library/Documentation/OpenA8DJ`.
 
 For private validation snapshots, create a draft release and attach the DMG,
 PKG, and checksum file. Publish the release only after the legal/provenance gate

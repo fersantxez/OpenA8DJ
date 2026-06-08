@@ -47,7 +47,8 @@ format state.
 
 Important: the Windows audio endpoint layer is still experimental and has not
 been exhaustively tested on Windows 10/11 with the physical Audio 8 DJ. Expect
-bugs. Feedback and logs are welcome.
+bugs. Feedback and logs are welcome. Install and use experimental Windows builds
+at your own risk.
 
 ## Build Requirements
 

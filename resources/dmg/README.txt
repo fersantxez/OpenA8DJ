@@ -31,6 +31,10 @@ This project is independent and is not affiliated with, endorsed by, sponsored
 by, or certified by Native Instruments. Product names are used only to identify
 compatibility.
 OpenA8DJ is released under the MIT License.
+The MIT License covers the source code. It does not make modified builds,
+forks, mirrors, support services, or repackaged installers official OpenA8DJ
+releases.
+Install and use OpenA8DJ at your own risk.
 
 Current test status:
 

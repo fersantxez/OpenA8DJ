@@ -39,7 +39,7 @@ Current public preview downloads:
 Important: these are public preview builds. The macOS packages are not yet
 Developer ID signed or Apple-notarized, and the Windows packages are
 experimental driver packages, not a production MSI. See the release notes before
-installing.
+installing. Install and use OpenA8DJ at your own risk.
 
 ## Support
 
@@ -206,6 +206,7 @@ original project test results.
 - [Roadmap to production quality](docs/ROADMAP_TO_PRO.md)
 - [Release process](docs/RELEASE.md)
 - [Legal and publication policy](docs/LEGAL.md)
+- [Brand and risk policy](BRAND_POLICY.md)
 - [Feasibility and background](FEASIBILITY.md)
 - [Notice](NOTICE.md)
 - [Contributing](CONTRIBUTING.md)
@@ -232,3 +233,7 @@ Public releases must pass the provenance and trademark checks in
 implementation code under incompatible license terms into this MIT-licensed
 repository, and do not publish binary artifacts that contain proprietary vendor
 payloads.
+
+The MIT License covers the source code, but it does not make modified builds,
+forks, mirrors, support services, or repackaged installers official OpenA8DJ
+releases. See [Brand and Risk Policy](BRAND_POLICY.md).

@@ -181,6 +181,7 @@ package: all sign-hal
 	install -m 644 LICENSE "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LICENSE"
 	install -m 644 NOTICE.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
+	install -m 644 BRAND_POLICY.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/BRAND_POLICY.md"
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
 	xattr -cr "$(PKG_ROOT)" 2>/dev/null || true
 	find "$(PKG_ROOT)" -name '._*' -delete
@@ -195,6 +196,7 @@ dmg: package $(DMG_README)
 	install -m 644 LICENSE "$(DMG_ROOT)/LICENSE"
 	install -m 644 NOTICE.md "$(DMG_ROOT)/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(DMG_ROOT)/LEGAL.md"
+	install -m 644 BRAND_POLICY.md "$(DMG_ROOT)/BRAND_POLICY.md"
 	hdiutil create -volname "OpenA8DJ $(VERSION)" -srcfolder "$(DMG_ROOT)" -ov -format UDZO "$(DMG)"
 	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(DMG)"; fi
 
