@@ -20,10 +20,14 @@ AUDIO_PAIR_TONE := build/audio-pair-tone
 AUDIO_PAIR_TONE_SRC := src/tools/audio-pair-tone.c
 AUDIO_ROUTE := build/audio-route
 AUDIO_ROUTE_SRC := src/tools/audio-route.c
+INPUT_METER := build/audio-input-meter
+INPUT_METER_SRC := src/tools/audio-input-meter.c
 MACBOOK_MIC_RECORD := build/macbook-mic-record
 MACBOOK_MIC_RECORD_SRC := src/tools/macbook-mic-record.c
 USB_PLAY := build/opena8dj-usb-play
 USB_PLAY_SRC := src/tools/opena8dj-usb-play.m
+USB_INPUT_METER := build/opena8dj-usb-input-meter
+USB_INPUT_METER_SRC := src/tools/opena8dj-usb-input-meter.m
 MIDI_BRIDGE := build/opena8dj-midid
 MIDI_BRIDGE_SRC := src/tools/opena8dj-midid.m
 CONTROL_TOOL := build/opena8dj-control
@@ -50,9 +54,9 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal audio-list audio-inspect audio-io-test audio-default audio-pair-tone audio-route macbook-mic-record usb-play midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal audio-list audio-inspect audio-io-test audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record usb-play usb-input-meter midi-list package dmg checksums dist
 
-all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
+all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
 $(TOOL): $(SRC)
 	@mkdir -p build
@@ -117,6 +121,13 @@ $(AUDIO_ROUTE): $(AUDIO_ROUTE_SRC)
 audio-route: $(AUDIO_ROUTE)
 	./$(AUDIO_ROUTE) org.opena8dj.Audio8DJ both
 
+$(INPUT_METER): $(INPUT_METER_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+audio-input-meter: $(INPUT_METER)
+	./$(INPUT_METER) 5
+
 $(MACBOOK_MIC_RECORD): $(MACBOOK_MIC_RECORD_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -o $@ $<
@@ -128,6 +139,13 @@ $(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
 	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m
 
 usb-play: $(USB_PLAY)
+
+$(USB_INPUT_METER): $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m
+
+usb-input-meter: $(USB_INPUT_METER)
+	./$(USB_INPUT_METER) 6 48000
 
 $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build

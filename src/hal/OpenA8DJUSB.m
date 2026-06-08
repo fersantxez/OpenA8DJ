@@ -59,6 +59,12 @@ enum {
     kA8DJControlStateBytes = 6
 };
 
+enum {
+    kInputTransformPairMask = 0x0f
+};
+
+static const uint32_t kInputSourceIdentityMap = 0x3210;
+
 static const char *kIPCSocketPath = "/tmp/opena8dj-control.sock";
 
 enum {
@@ -70,7 +76,9 @@ enum {
     kIPCTypeControlGet = 4,
     kIPCTypeControlSet = 5,
     kIPCTypeControlState = 6,
-    kIPCTypeStatus = 7
+    kIPCTypeStatus = 7,
+    kIPCTypeInputStatsGet = 8,
+    kIPCTypeInputStats = 9
 };
 
 typedef struct OpenA8DJIPCHeader {
@@ -86,7 +94,20 @@ typedef struct OpenA8DJControlPayload {
     uint8_t gndLiftTCCDLine;
     uint8_t gndLiftPhono;
     uint8_t softwareLock;
+    uint8_t inputSwapMask;
+    uint8_t inputInvertLeftMask;
+    uint8_t inputInvertRightMask;
+    uint8_t inputSource[kStreams];
 } __attribute__((packed)) OpenA8DJControlPayload;
+
+typedef struct OpenA8DJInputStatsPayload {
+    uint64_t frames[kStreams];
+    double leftSquare[kStreams];
+    double rightSquare[kStreams];
+    double cross[kStreams];
+    double leftPeak[kStreams];
+    double rightPeak[kStreams];
+} __attribute__((packed)) OpenA8DJInputStatsPayload;
 
 typedef struct CaiaqDeviceSpec {
     uint16_t fwVersion;
@@ -483,6 +504,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint8_t _inputByteCount[kStreams];
     float _pendingInput[kChannels];
     uint8_t _pendingInputMask;
+    OpenA8DJInputStatsPayload _inputStats;
+    pthread_mutex_t _inputStatsMutex;
+    atomic_uint _inputSwapMask;
+    atomic_uint _inputInvertLeftMask;
+    atomic_uint _inputInvertRightMask;
+    atomic_uint _inputSourceMap;
     uint8_t _outputFrameBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _outputByteInFrame;
     bool _outputFrameLoaded;
@@ -521,12 +548,17 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _sampleRate = sampleRate;
         atomic_init(&_running, false);
         atomic_init(&_streaming, false);
+        atomic_init(&_inputSwapMask, 0);
+        atomic_init(&_inputInvertLeftMask, 0);
+        atomic_init(&_inputInvertRightMask, 0);
+        atomic_init(&_inputSourceMap, kInputSourceIdentityMap);
         _queue = dispatch_queue_create("org.opena8dj.driver.usb", DISPATCH_QUEUE_SERIAL);
         _ep1Queue = dispatch_queue_create("org.opena8dj.driver.ep1", DISPATCH_QUEUE_SERIAL);
         _ipcQueue = dispatch_queue_create("org.opena8dj.driver.ipc", DISPATCH_QUEUE_SERIAL);
         pthread_mutex_init(&_bulkOutMutex, NULL);
         pthread_mutex_init(&_ep1Mutex, NULL);
         pthread_cond_init(&_ep1Cond, NULL);
+        pthread_mutex_init(&_inputStatsMutex, NULL);
         pthread_mutex_init(&_ipcClientsMutex, NULL);
         _ipcListenFd = -1;
         for (size_t i = 0; i < sizeof(_ipcClients) / sizeof(_ipcClients[0]); i++) {
@@ -542,6 +574,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 {
     [self close];
     pthread_mutex_destroy(&_ipcClientsMutex);
+    pthread_mutex_destroy(&_inputStatsMutex);
     pthread_cond_destroy(&_ep1Cond);
     pthread_mutex_destroy(&_ep1Mutex);
     pthread_mutex_destroy(&_bulkOutMutex);
@@ -722,6 +755,14 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     payload->gndLiftPhono = (_controlState[3] & (1u << 2)) ? 1 : 0;
     payload->softwareLock = (_controlState[5] & (1u << 0)) ? 1 : 0;
     pthread_mutex_unlock(&_ep1Mutex);
+    payload->inputSwapMask = (uint8_t)(atomic_load(&_inputSwapMask) & kInputTransformPairMask);
+    payload->inputInvertLeftMask = (uint8_t)(atomic_load(&_inputInvertLeftMask) & kInputTransformPairMask);
+    payload->inputInvertRightMask = (uint8_t)(atomic_load(&_inputInvertRightMask) & kInputTransformPairMask);
+    uint32_t sourceMap = atomic_load(&_inputSourceMap);
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        uint8_t source = (uint8_t)((sourceMap >> (stream * 4)) & 0x0f);
+        payload->inputSource[stream] = source < kStreams ? source : (uint8_t)stream;
+    }
 }
 
 - (void)storeControlPayload:(const OpenA8DJControlPayload *)payload
@@ -736,6 +777,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (payload->gndLiftPhono) _controlState[3] |= (1u << 2); else _controlState[3] &= ~(1u << 2);
     if (payload->softwareLock) _controlState[5] |= (1u << 0); else _controlState[5] &= ~(1u << 0);
     pthread_mutex_unlock(&_ep1Mutex);
+    atomic_store(&_inputSwapMask, payload->inputSwapMask & kInputTransformPairMask);
+    atomic_store(&_inputInvertLeftMask, payload->inputInvertLeftMask & kInputTransformPairMask);
+    atomic_store(&_inputInvertRightMask, payload->inputInvertRightMask & kInputTransformPairMask);
+    uint32_t sourceMap = 0;
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        uint8_t source = payload->inputSource[stream] < kStreams ? payload->inputSource[stream] : (uint8_t)stream;
+        sourceMap |= ((uint32_t)source) << (stream * 4);
+    }
+    atomic_store(&_inputSourceMap, sourceMap);
 }
 
 - (BOOL)readControls
@@ -776,6 +826,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         (void)[self sendCommandNoReply:kCommandWriteIO payload:state payloadLength:sizeof(state)];
     }
     return YES;
+}
+
+- (void)applyTimecodeVinylDefaults
+{
+    pthread_mutex_lock(&_ep1Mutex);
+    _controlState[0] = 0;
+    _controlState[3] = (uint8_t)((_controlState[3] & ~(uint8_t)0x07) | (1u << 0));
+    _controlState[5] |= (1u << 0);
+    pthread_mutex_unlock(&_ep1Mutex);
+    (void)[self writeControls];
 }
 
 - (BOOL)writeControls
@@ -860,6 +920,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return NO;
     }
     (void)[self readControls];
+    [self applyTimecodeVinylDefaults];
 
     _capturePipe = [_interface copyPipeWithAddress:kEndpointIsoCapture error:&error];
     if (_capturePipe == nil) {
@@ -969,6 +1030,39 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     (void)IPCSend(fd, kIPCTypeControlState, &state, sizeof(state));
 }
 
+- (void)addInputStatsForStream:(uint32_t)stream left:(float)left right:(float)right
+{
+    if (stream >= kStreams) {
+        return;
+    }
+    double l = left;
+    double r = right;
+    double la = fabs(l);
+    double ra = fabs(r);
+    pthread_mutex_lock(&_inputStatsMutex);
+    _inputStats.frames[stream]++;
+    _inputStats.leftSquare[stream] += l * l;
+    _inputStats.rightSquare[stream] += r * r;
+    _inputStats.cross[stream] += l * r;
+    if (la > _inputStats.leftPeak[stream]) {
+        _inputStats.leftPeak[stream] = la;
+    }
+    if (ra > _inputStats.rightPeak[stream]) {
+        _inputStats.rightPeak[stream] = ra;
+    }
+    pthread_mutex_unlock(&_inputStatsMutex);
+}
+
+- (void)sendInputStatsToClient:(int)fd
+{
+    OpenA8DJInputStatsPayload stats;
+    pthread_mutex_lock(&_inputStatsMutex);
+    stats = _inputStats;
+    memset(&_inputStats, 0, sizeof(_inputStats));
+    pthread_mutex_unlock(&_inputStatsMutex);
+    (void)IPCSend(fd, kIPCTypeInputStats, &stats, sizeof(stats));
+}
+
 - (void)handleIPCMessageType:(uint8_t)type payload:(const uint8_t *)payload length:(NSUInteger)length client:(int)fd
 {
     switch (type) {
@@ -990,6 +1084,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                 (void)[self writeControls];
                 [self sendControlStateToClient:fd];
             }
+            break;
+        case kIPCTypeInputStatsGet:
+            [self sendInputStatsToClient:fd];
             break;
         default:
             break;
@@ -1121,6 +1218,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     RingClear(&_outputRing);
     memset(_inputBytes, 0, sizeof(_inputBytes));
     memset(_inputByteCount, 0, sizeof(_inputByteCount));
+    if (_spec.dataAlignment == 2) {
+        /* Mode 2 capture starts one 24-bit sample into the stereo byte stream. */
+        for (uint32_t stream = 0; stream < kStreams; stream++) {
+            _inputByteCount[stream] = kBytesPerSample;
+        }
+    }
     memset(_pendingInput, 0, sizeof(_pendingInput));
     _pendingInputMask = 0;
     _inputMode2Index = 0;
@@ -1345,12 +1448,37 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
     const uint8_t *left = &_inputBytes[stream][0];
     const uint8_t *right = &_inputBytes[stream][3];
-    _pendingInput[stream * 2] = (float)S24BEToS32(left) / 8388608.0f;
-    _pendingInput[stream * 2 + 1] = (float)S24BEToS32(right) / 8388608.0f;
+    float leftSample = (float)S24BEToS32(left) / 8388608.0f;
+    float rightSample = (float)S24BEToS32(right) / 8388608.0f;
+    uint32_t pairBit = 1u << stream;
+    if ((atomic_load(&_inputSwapMask) & pairBit) != 0) {
+        float tmp = leftSample;
+        leftSample = rightSample;
+        rightSample = tmp;
+    }
+    if ((atomic_load(&_inputInvertLeftMask) & pairBit) != 0) {
+        leftSample = -leftSample;
+    }
+    if ((atomic_load(&_inputInvertRightMask) & pairBit) != 0) {
+        rightSample = -rightSample;
+    }
+    _pendingInput[stream * 2] = leftSample;
+    _pendingInput[stream * 2 + 1] = rightSample;
+    [self addInputStatsForStream:stream left:leftSample right:rightSample];
     _inputByteCount[stream] = 0;
     _pendingInputMask |= (uint8_t)(1u << stream);
     if (_pendingInputMask == 0x0f) {
-        RingWrite(&_inputRing, _pendingInput, 1);
+        float routedInput[kChannels];
+        uint32_t sourceMap = atomic_load(&_inputSourceMap);
+        for (uint32_t destination = 0; destination < kStreams; destination++) {
+            uint32_t source = (sourceMap >> (destination * 4)) & 0x0f;
+            if (source >= kStreams) {
+                source = destination;
+            }
+            routedInput[destination * 2] = _pendingInput[source * 2];
+            routedInput[destination * 2 + 1] = _pendingInput[source * 2 + 1];
+        }
+        RingWrite(&_inputRing, routedInput, 1);
         _pendingInputMask = 0;
     }
 }

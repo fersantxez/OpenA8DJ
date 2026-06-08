@@ -64,11 +64,27 @@ static pthread_mutex_t gClockMutex = PTHREAD_MUTEX_INITIALIZER;
 static Float32 gInputCycleBuffer[kOpenA8DJMaxBufferFrames * kOpenA8DJChannels];
 static Float32 gOutputCycleBuffer[kOpenA8DJMaxBufferFrames * kOpenA8DJChannels];
 static UInt32 gInputCycleFrames = 0;
+static UInt64 gInputCycleCounter = 0;
 static UInt32 gOutputCycleFrames = 0;
 static UInt64 gOutputCycleCounter = 0;
 static UInt32 gOutputCycleStreamMask = 0;
 static bool gInputCycleValid = false;
 static bool gOutputCycleTouched = false;
+
+enum {
+    kOpenA8DJMaxStreamUsageRecords = 32,
+    kOpenA8DJAllStreamUsageMask = (1u << kOpenA8DJStreamCount) - 1u
+};
+
+typedef struct {
+    bool valid;
+    void *ioProc;
+    AudioObjectPropertyScope scope;
+    UInt32 streamMask;
+} OpenA8DJStreamUsageRecord;
+
+static OpenA8DJStreamUsageRecord gStreamUsageRecords[kOpenA8DJMaxStreamUsageRecords];
+static pthread_mutex_t gStreamUsageMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void Trace(const char *format, ...)
 {
@@ -448,6 +464,7 @@ static bool HasDeviceProperty(const AudioObjectPropertyAddress *address)
         case kAudioDevicePropertyBufferFrameSizeRange:
         case kAudioDevicePropertyUsesVariableBufferFrameSizes:
         case kAudioDevicePropertyStreamConfiguration:
+        case kAudioDevicePropertyIOProcStreamUsage:
         case kAudioDevicePropertyPreferredChannelsForStereo:
         case kAudioObjectPropertyControlList:
             return true;
@@ -482,6 +499,11 @@ static UInt32 StreamConfigurationSize(void)
     return offsetof(AudioBufferList, mBuffers) + (sizeof(AudioBuffer) * kOpenA8DJStreamCount);
 }
 
+static UInt32 StreamUsageSize(void)
+{
+    return offsetof(AudioHardwareIOProcStreamUsage, mStreamIsOn) + (sizeof(UInt32) * kOpenA8DJStreamCount);
+}
+
 static OSStatus WriteStreamConfiguration(UInt32 inDataSize, UInt32 *outDataSize, void *outData)
 {
     UInt32 size = StreamConfigurationSize();
@@ -494,6 +516,63 @@ static OSStatus WriteStreamConfiguration(UInt32 inDataSize, UInt32 *outDataSize,
         abl->mBuffers[i].mNumberChannels = kOpenA8DJChannelsPerStream;
         abl->mBuffers[i].mDataByteSize = 0;
         abl->mBuffers[i].mData = NULL;
+    }
+    *outDataSize = size;
+    return kAudioHardwareNoError;
+}
+
+static UInt32 GetStreamUsageMask(void *ioProc, AudioObjectPropertyScope scope)
+{
+    UInt32 mask = kOpenA8DJAllStreamUsageMask;
+    pthread_mutex_lock(&gStreamUsageMutex);
+    for (UInt32 i = 0; i < kOpenA8DJMaxStreamUsageRecords; i++) {
+        OpenA8DJStreamUsageRecord *record = &gStreamUsageRecords[i];
+        if (record->valid && record->ioProc == ioProc && record->scope == scope) {
+            mask = record->streamMask;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&gStreamUsageMutex);
+    return mask;
+}
+
+static void SetStreamUsageMask(void *ioProc, AudioObjectPropertyScope scope, UInt32 mask)
+{
+    pthread_mutex_lock(&gStreamUsageMutex);
+    OpenA8DJStreamUsageRecord *slot = NULL;
+    for (UInt32 i = 0; i < kOpenA8DJMaxStreamUsageRecords; i++) {
+        OpenA8DJStreamUsageRecord *record = &gStreamUsageRecords[i];
+        if (record->valid && record->ioProc == ioProc && record->scope == scope) {
+            slot = record;
+            break;
+        }
+        if (!record->valid && slot == NULL) {
+            slot = record;
+        }
+    }
+    if (slot != NULL) {
+        slot->valid = true;
+        slot->ioProc = ioProc;
+        slot->scope = scope;
+        slot->streamMask = mask & kOpenA8DJAllStreamUsageMask;
+    }
+    pthread_mutex_unlock(&gStreamUsageMutex);
+}
+
+static OSStatus WriteStreamUsage(const AudioObjectPropertyAddress *address,
+                                 UInt32 inDataSize,
+                                 UInt32 *outDataSize,
+                                 void *outData)
+{
+    UInt32 size = StreamUsageSize();
+    if (inDataSize < size) {
+        return kAudioHardwareBadPropertySizeError;
+    }
+    AudioHardwareIOProcStreamUsage *usage = (AudioHardwareIOProcStreamUsage *)outData;
+    UInt32 mask = GetStreamUsageMask(usage->mIOProc, address->mScope);
+    usage->mNumberStreams = kOpenA8DJStreamCount;
+    for (UInt32 i = 0; i < kOpenA8DJStreamCount; i++) {
+        usage->mStreamIsOn[i] = (mask & (1u << i)) ? 1 : 0;
     }
     *outDataSize = size;
     return kAudioHardwareNoError;
@@ -575,6 +654,9 @@ static OSStatus GetDevicePropertyDataSize(const AudioObjectPropertyAddress *addr
             return kAudioHardwareNoError;
         case kAudioDevicePropertyStreamConfiguration:
             *outDataSize = StreamConfigurationSize();
+            return kAudioHardwareNoError;
+        case kAudioDevicePropertyIOProcStreamUsage:
+            *outDataSize = StreamUsageSize();
             return kAudioHardwareNoError;
         case kAudioDevicePropertyPreferredChannelsForStereo:
             *outDataSize = sizeof(UInt32) * 2;
@@ -665,10 +747,19 @@ static bool BufferHasNonZeroFloat32(const Float32 *buffer, UInt32 frameCount, UI
     return false;
 }
 
-static void ResetInputCycle(UInt32 frameCount)
+static void PrepareInputCycle(UInt32 frameCount, UInt64 cycleCounter)
 {
-    gInputCycleFrames = frameCount <= kOpenA8DJMaxBufferFrames ? frameCount : kOpenA8DJMaxBufferFrames;
-    gInputCycleValid = false;
+    UInt32 clampedFrames = frameCount <= kOpenA8DJMaxBufferFrames ? frameCount : kOpenA8DJMaxBufferFrames;
+    if (cycleCounter == 0) {
+        gInputCycleFrames = clampedFrames;
+        gInputCycleValid = false;
+        return;
+    }
+    if (gInputCycleFrames != clampedFrames || gInputCycleCounter != cycleCounter) {
+        gInputCycleFrames = clampedFrames;
+        gInputCycleCounter = cycleCounter;
+        gInputCycleValid = false;
+    }
 }
 
 static UInt64 CycleCounterFromInfo(const AudioServerPlugInIOCycleInfo *cycleInfo)
@@ -935,9 +1026,6 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_Initialize(AudioServerPlugInDriverRef
     pthread_mutex_unlock(&gClockMutex);
     bool present = OpenA8DJUSBDevicePresent();
     atomic_store(&gDevicePresent, present);
-    if (present) {
-        (void)OpenA8DJUSBEnsureOpen(gSampleRate);
-    }
     return kAudioHardwareNoError;
 }
 
@@ -1057,7 +1145,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_IsPropertySettable(AudioServerPlugInD
     *outIsSettable = (inObjectID == kOpenA8DJDeviceObjectID &&
                       (inAddress->mSelector == kAudioDevicePropertyNominalSampleRate ||
                        inAddress->mSelector == kAudioDevicePropertyBufferFrameSize ||
-                       inAddress->mSelector == kAudioDevicePropertyBufferSize));
+                       inAddress->mSelector == kAudioDevicePropertyBufferSize ||
+                       inAddress->mSelector == kAudioDevicePropertyIOProcStreamUsage));
     return kAudioHardwareNoError;
 }
 
@@ -1236,9 +1325,6 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
             {
                 bool present = OpenA8DJUSBDevicePresent();
                 atomic_store(&gDevicePresent, present);
-                if (present) {
-                    (void)OpenA8DJUSBEnsureOpen(gSampleRate);
-                }
                 UInt32 value = present ? 1 : 0;
                 return CopyScalar(&value, sizeof(value), inDataSize, outDataSize, outData);
             }
@@ -1314,6 +1400,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
         }
             case kAudioDevicePropertyStreamConfiguration:
                 return WriteStreamConfiguration(inDataSize, outDataSize, outData);
+            case kAudioDevicePropertyIOProcStreamUsage:
+                return WriteStreamUsage(inAddress, inDataSize, outDataSize, outData);
             case kAudioDevicePropertyPreferredChannelsForStereo: {
                 UInt32 channels[] = {1, 2};
                 return CopyScalar(channels, sizeof(channels), inDataSize, outDataSize, outData);
@@ -1435,6 +1523,26 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         ApplyBufferFrameSize(newSize);
         return kAudioHardwareNoError;
     }
+    if (inAddress->mSelector == kAudioDevicePropertyIOProcStreamUsage) {
+        UInt32 minSize = offsetof(AudioHardwareIOProcStreamUsage, mStreamIsOn);
+        if (inDataSize < minSize) {
+            return kAudioHardwareBadPropertySizeError;
+        }
+        const AudioHardwareIOProcStreamUsage *usage = (const AudioHardwareIOProcStreamUsage *)inData;
+        if (usage->mNumberStreams != kOpenA8DJStreamCount ||
+            inDataSize < minSize + (sizeof(UInt32) * usage->mNumberStreams)) {
+            return kAudioHardwareBadPropertySizeError;
+        }
+        UInt32 mask = 0;
+        for (UInt32 i = 0; i < kOpenA8DJStreamCount; i++) {
+            if (usage->mStreamIsOn[i] != 0) {
+                mask |= (1u << i);
+            }
+        }
+        SetStreamUsageMask(usage->mIOProc, inAddress->mScope, mask);
+        Trace("Set stream usage scope=%u mask=0x%x", inAddress->mScope, mask);
+        return kAudioHardwareNoError;
+    }
     return kAudioHardwareIllegalOperationError;
 }
 
@@ -1547,7 +1655,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_BeginIOOperation(AudioServerPlugInDri
         return kAudioHardwareUnsupportedOperationError;
     }
     if (inOperationID == kAudioServerPlugInIOOperationReadInput) {
-        ResetInputCycle(inIOBufferFrameSize);
+        PrepareInputCycle(inIOBufferFrameSize, CycleCounterFromInfo(inIOCycleInfo));
     } else if (inOperationID == kAudioServerPlugInIOOperationProcessOutput) {
         EnsureOutputCycle(inIOBufferFrameSize, CycleCounterFromInfo(inIOCycleInfo));
     }
@@ -1572,7 +1680,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_DoIOOperation(AudioServerPlugInDriver
     if (inOperationID == kAudioServerPlugInIOOperationReadInput &&
         IsInputStreamObject(inStreamObjectID)) {
         if (gInputCycleFrames == 0) {
-            ResetInputCycle(inIOBufferFrameSize);
+            PrepareInputCycle(inIOBufferFrameSize, CycleCounterFromInfo(inIOCycleInfo));
         }
         CopyInputPairToClient(StreamIndex(inStreamObjectID), (Float32 *)ioMainBuffer);
         return kAudioHardwareNoError;
