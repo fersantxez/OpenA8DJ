@@ -64,6 +64,7 @@ enum {
 };
 
 static const uint32_t kInputSourceIdentityMap = 0x3210;
+static const uint8_t kInputMode2LeftFirstStreamMask = (1u << 1) | (1u << 3);
 
 static const char *kIPCSocketPath = "/tmp/opena8dj-control.sock";
 
@@ -1219,9 +1220,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     memset(_inputBytes, 0, sizeof(_inputBytes));
     memset(_inputByteCount, 0, sizeof(_inputByteCount));
     if (_spec.dataAlignment == 2) {
-        /* Mode 2 capture starts one 24-bit sample into the stereo byte stream. */
         for (uint32_t stream = 0; stream < kStreams; stream++) {
-            _inputByteCount[stream] = kBytesPerSample;
+            bool leftFirst = (kInputMode2LeftFirstStreamMask & (1u << stream)) != 0;
+            _inputByteCount[stream] = leftFirst ? 0 : kBytesPerSample;
         }
     }
     memset(_pendingInput, 0, sizeof(_pendingInput));
