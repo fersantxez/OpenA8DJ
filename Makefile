@@ -1,5 +1,5 @@
 PROJECT := opena8dj
-VERSION := 0.2.5
+VERSION := 0.2.6
 TOOL := build/opena8dj-probe
 SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver

@@ -29,17 +29,15 @@ artifacts are temporary CI files and are not used for distribution.
 
 Current public preview downloads:
 
-- [OpenA8DJ 0.2.5 public preview release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.2.5)
-- [macOS DMG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.5/OpenA8DJ-0.2.5.dmg)
-- [macOS PKG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.5/OpenA8DJ-0.2.5.pkg)
-- [Windows x64 experimental driver ZIP](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.5/OpenA8DJ-Windows-x64-0.2.5-experimental.zip)
-- [Windows ARM64 experimental driver ZIP](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.5/OpenA8DJ-Windows-ARM64-0.2.5-experimental.zip)
-- [SHA-256 checksums](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.5/OpenA8DJ-0.2.5-checksums.txt)
+- [OpenA8DJ 0.2.6 public preview release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.2.6)
+- [macOS DMG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6.dmg)
+- [macOS PKG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6.pkg)
+- [SHA-256 checksums](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6-checksums.txt)
 
 Important: these are public preview builds. The macOS packages are not yet
-Developer ID signed or Apple-notarized, and the Windows packages are
-experimental driver packages, not a production MSI. See the release notes before
-installing. Install and use OpenA8DJ at your own risk.
+Developer ID signed or Apple-notarized. Any Windows packages are experimental
+driver packages, not a production MSI. See the release notes before installing.
+Install and use OpenA8DJ at your own risk.
 
 ## Support
 
@@ -56,7 +54,7 @@ and feature requests:
 
 ## Current Status
 
-OpenA8DJ 0.2.5 is validated locally on Apple Silicon/macOS 26.5:
+OpenA8DJ 0.2.6 is validated locally on Apple Silicon/macOS 26.5:
 
 - macOS enumerates `Open Audio 8 DJ` as 8 inputs and 8 outputs.
 - The HAL exposes 4 stereo input streams and 4 stereo output streams:
@@ -69,7 +67,7 @@ OpenA8DJ 0.2.5 is validated locally on Apple Silicon/macOS 26.5:
 - CoreMIDI endpoints appear as `Open Audio 8 DJ MIDI In` and
   `Open Audio 8 DJ MIDI Out`.
 - The Timecode Vinyl hardware profile has passed initial Traktor operator
-  validation.
+  validation, including a DVS capture phase fix for Input B/D.
 - A macOS DMG/PKG installer is generated and verified locally.
 
 Remaining release gates:
@@ -159,7 +157,7 @@ Use [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the test plan.
 
 ## Windows
 
-OpenA8DJ 0.2.5 is primarily a macOS release. The repository now also contains
+OpenA8DJ 0.2.6 is primarily a macOS release. The repository now also contains
 an experimental Windows 10/11 WDK workstream under `windows/`.
 
 The Windows package builds a test-signed KMDF driver, INF/catalog package, and
@@ -169,6 +167,9 @@ Windows with the physical interface. Treat Windows builds as experimental and
 send feedback/logs.
 
 Windows support is tracked separately in [docs/WINDOWS.md](docs/WINDOWS.md).
+Experimental Windows ZIPs from earlier previews remain available in
+[GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases), but Windows
+artifacts are rebuilt and validated separately from the macOS HAL releases.
 
 ## Architecture
 
