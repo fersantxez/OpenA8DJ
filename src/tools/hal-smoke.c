@@ -265,7 +265,7 @@ int main(int argc, char **argv)
            bufferRange.mMinimum,
            bufferRange.mMaximum);
 
-    if ((streamCount != 1 && streamCount != 4) ||
+    if (streamCount != 5 ||
         bufferFrames != 512 ||
         bufferBytes != 16384 ||
         bufferRange.mMinimum != 512.0) {

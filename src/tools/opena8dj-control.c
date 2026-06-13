@@ -1,3 +1,6 @@
+#include <CoreAudio/AudioHardware.h>
+#include <CoreFoundation/CoreFoundation.h>
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -202,6 +205,17 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackZeroCompleteTransactions;
     uint64_t playbackLayoutSignatureSum;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
+
+typedef struct OpenA8DJWakeState {
+    AudioDeviceID device;
+    AudioDeviceIOProcID ioProcID;
+} OpenA8DJWakeState;
+
+static OpenA8DJWakeState gWakeState = {
+    .device = kAudioObjectUnknown,
+    .ioProcID = NULL
+};
+static bool gWakeCleanupRegistered = false;
 
 static const char *InputModeName(uint8_t mode)
 {
@@ -450,6 +464,161 @@ static int ConnectSocket(void)
         return -1;
     }
     return fd;
+}
+
+static OSStatus WakeIOProc(AudioObjectID deviceID,
+                           const AudioTimeStamp *now,
+                           const AudioBufferList *inputData,
+                           const AudioTimeStamp *inputTime,
+                           AudioBufferList *outputData,
+                           const AudioTimeStamp *outputTime,
+                           void *clientData)
+{
+    (void)deviceID;
+    (void)now;
+    (void)inputData;
+    (void)inputTime;
+    (void)outputTime;
+    (void)clientData;
+    if (outputData != NULL) {
+        for (UInt32 i = 0; i < outputData->mNumberBuffers; i++) {
+            if (outputData->mBuffers[i].mData != NULL) {
+                memset(outputData->mBuffers[i].mData, 0, outputData->mBuffers[i].mDataByteSize);
+            }
+        }
+    }
+    return noErr;
+}
+
+static AudioDeviceID FindOpenA8DJDevice(void)
+{
+    AudioObjectPropertyAddress address = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+    UInt32 size = 0;
+    OSStatus status = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject,
+                                                     &address,
+                                                     0,
+                                                     NULL,
+                                                     &size);
+    if (status != noErr || size == 0) {
+        return kAudioObjectUnknown;
+    }
+
+    UInt32 count = size / sizeof(AudioDeviceID);
+    AudioDeviceID *devices = calloc(count, sizeof(AudioDeviceID));
+    if (devices == NULL) {
+        return kAudioObjectUnknown;
+    }
+
+    status = AudioObjectGetPropertyData(kAudioObjectSystemObject,
+                                        &address,
+                                        0,
+                                        NULL,
+                                        &size,
+                                        devices);
+    if (status != noErr) {
+        free(devices);
+        return kAudioObjectUnknown;
+    }
+
+    AudioDeviceID result = kAudioObjectUnknown;
+    for (UInt32 i = 0; i < count; i++) {
+        CFStringRef uid = NULL;
+        UInt32 uidSize = sizeof(uid);
+        AudioObjectPropertyAddress uidAddress = {
+            kAudioDevicePropertyDeviceUID,
+            kAudioObjectPropertyScopeGlobal,
+            kAudioObjectPropertyElementMain
+        };
+        status = AudioObjectGetPropertyData(devices[i],
+                                            &uidAddress,
+                                            0,
+                                            NULL,
+                                            &uidSize,
+                                            &uid);
+        if (status == noErr && uid != NULL) {
+            if (CFStringCompare(uid, CFSTR("org.opena8dj.Audio8DJ"), 0) == kCFCompareEqualTo) {
+                result = devices[i];
+            }
+            CFRelease(uid);
+        }
+        if (result != kAudioObjectUnknown) {
+            break;
+        }
+    }
+
+    free(devices);
+    return result;
+}
+
+static void StopHALWake(void)
+{
+    if (gWakeState.device != kAudioObjectUnknown && gWakeState.ioProcID != NULL) {
+        AudioDeviceStop(gWakeState.device, gWakeState.ioProcID);
+        AudioDeviceDestroyIOProcID(gWakeState.device, gWakeState.ioProcID);
+    }
+    gWakeState.device = kAudioObjectUnknown;
+    gWakeState.ioProcID = NULL;
+}
+
+static bool StartHALWake(void)
+{
+    if (gWakeState.ioProcID != NULL) {
+        return true;
+    }
+
+    AudioDeviceID device = FindOpenA8DJDevice();
+    if (device == kAudioObjectUnknown) {
+        fprintf(stderr, "OpenA8DJ Core Audio device not found\n");
+        return false;
+    }
+
+    AudioDeviceIOProcID ioProcID = NULL;
+    OSStatus status = AudioDeviceCreateIOProcID(device, WakeIOProc, NULL, &ioProcID);
+    if (status != noErr) {
+        fprintf(stderr, "Could not wake OpenA8DJ HAL bridge: AudioDeviceCreateIOProcID failed: %d\n", (int)status);
+        return false;
+    }
+
+    status = AudioDeviceStart(device, ioProcID);
+    if (status != noErr) {
+        fprintf(stderr, "Could not wake OpenA8DJ HAL bridge: AudioDeviceStart failed: %d\n", (int)status);
+        AudioDeviceDestroyIOProcID(device, ioProcID);
+        return false;
+    }
+
+    gWakeState.device = device;
+    gWakeState.ioProcID = ioProcID;
+    if (!gWakeCleanupRegistered) {
+        atexit(StopHALWake);
+        gWakeCleanupRegistered = true;
+    }
+    return true;
+}
+
+static int ConnectSocketWithWake(void)
+{
+    int fd = ConnectSocket();
+    if (fd >= 0) {
+        return fd;
+    }
+
+    fprintf(stderr, "OpenA8DJ HAL bridge is not available; waking the device...\n");
+    if (!StartHALWake()) {
+        return -1;
+    }
+
+    for (int attempt = 0; attempt < 120; attempt++) {
+        fd = ConnectSocket();
+        if (fd >= 0) {
+            return fd;
+        }
+        usleep(100000);
+    }
+    return -1;
 }
 
 static bool ReadOneState(int fd, OpenA8DJControlPayload *state)
@@ -872,7 +1041,7 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    int fd = ConnectSocket();
+    int fd = ConnectSocketWithWake();
     if (fd < 0) {
         fprintf(stderr, "OpenA8DJ HAL bridge is not available at %s\n", kSocketPath);
         return 1;

@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -198,47 +197,6 @@ static AudioDeviceID FindOpenA8DJDevice(void)
     return result;
 }
 
-static UInt32 StreamCount(AudioDeviceID device, AudioObjectPropertyScope scope)
-{
-    AudioObjectPropertyAddress address = {
-        kAudioDevicePropertyStreams,
-        scope,
-        kAudioObjectPropertyElementMain
-    };
-    UInt32 size = 0;
-    OSStatus status = AudioObjectGetPropertyDataSize(device, &address, 0, NULL, &size);
-    if (status != noErr) {
-        return 0;
-    }
-    return size / sizeof(AudioStreamID);
-}
-
-static void SetIOProcStreamUsage(AudioDeviceID device, AudioObjectPropertyScope scope, bool enabled)
-{
-    UInt32 count = StreamCount(device, scope);
-    if (count == 0) {
-        return;
-    }
-    size_t size = offsetof(AudioHardwareIOProcStreamUsage, mStreamIsOn) + sizeof(UInt32) * count;
-    AudioHardwareIOProcStreamUsage *usage = calloc(1, size);
-    if (usage == NULL) {
-        return;
-    }
-    usage->mIOProc = (void *)KeepaliveIOProc;
-    usage->mNumberStreams = count;
-    for (UInt32 i = 0; i < count; i++) {
-        usage->mStreamIsOn[i] = enabled ? 1 : 0;
-    }
-
-    AudioObjectPropertyAddress address = {
-        kAudioDevicePropertyIOProcStreamUsage,
-        scope,
-        kAudioObjectPropertyElementMain
-    };
-    (void)AudioObjectSetPropertyData(device, &address, 0, NULL, (UInt32)size, usage);
-    free(usage);
-}
-
 static bool StartAudioKeepalive(void)
 {
     if (gAudioIOProcID != NULL) {
@@ -259,9 +217,11 @@ static bool StartAudioKeepalive(void)
         return false;
     }
 
-    SetIOProcStreamUsage(device, kAudioObjectPropertyScopeOutput, true);
-    SetIOProcStreamUsage(device, kAudioObjectPropertyScopeInput, false);
-
+    /*
+     * Do not set kAudioDevicePropertyIOProcStreamUsage here. On macOS 26 the
+     * proxy can report the property and then block while setting it, which
+     * leaves the control bridge running but unusable.
+     */
     status = AudioDeviceStart(device, gAudioIOProcID);
     if (status != noErr) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);

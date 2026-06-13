@@ -4,19 +4,23 @@ This document tracks using OpenA8DJ with Traktor timecode vinyl or CD control.
 
 ## Current readiness
 
-OpenA8DJ 0.3.24 is an output-focused preview. It provides the playback surface
-Traktor needs for output routing, but it does not yet expose Audio 8 DJ input
-streams to Core Audio:
+OpenA8DJ 0.3.25 restores the Core Audio surface Traktor needs for output
+routing and timecode assignment:
 
-- one 8-channel output stream with named pairs: Output A, B, C, and D
-- no public Core Audio input streams in this release
-- 44.1 and 48 kHz playback validated in local listening tests
+- 4 stereo output streams: Output A, B, C, and D
+- one 8-channel input stream with named stereo channel pairs:
+  Input A, B, C, and D
+- 44.1 and 48 kHz playback validated in local listening tests on the tested
+  physical route
 - CAIAQ control access for Audio 8 DJ input mode and ground-lift flags
 - CoreMIDI endpoints published by the installed LaunchAgent
 
-Traktor Scratch/timecode capture is therefore not a supported 0.3.24 feature.
-The remaining release gate is the complete physical matrix: every input pair,
-vinyl mode, CD/line mode, channel order, and low-latency behavior.
+The last public preview with this Traktor-facing channel surface was 0.2.6,
+where initial Timecode Vinyl operator validation had passed. The 0.3.25
+release preserves the 8-input/8-output channel surface, uses a safer macOS
+input-stream shape, and combines it with the later capture-paced output
+transport. The remaining release gate is the complete physical matrix: every
+input pair, vinyl mode, CD/line mode, channel order, and low-latency behavior.
 
 ## Pre-test checklist
 
@@ -49,15 +53,14 @@ software-lock: on
 
 5. Validate at 44.1 kHz and 48 kHz.
 
-6. Keep output routing as already validated:
+6. Start with the currently tested A/B output routing:
 
 ```text
 Deck A -> Output A L/R
 Deck B -> Output B L/R
 ```
 
-7. Assign timecode inputs in Traktor only after a future build exposes validated
-   Audio 8 DJ inputs:
+7. Assign timecode inputs in Traktor:
 
 ```text
 Deck A timecode input -> Input A L/R

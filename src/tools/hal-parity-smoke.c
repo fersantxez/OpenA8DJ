@@ -474,8 +474,8 @@ int main(int argc, char **argv)
                 outputStreamCount, outputChannels);
         failures++;
     }
-    if (inputStreamCount != 0 || inputChannels != 0) {
-        fprintf(stderr, "input topology should be hidden for output-only HAL: streams=%u channels=%u\n",
+    if (inputStreamCount != 1 || inputChannels != 8) {
+        fprintf(stderr, "invalid input topology: streams=%u channels=%u\n",
                 inputStreamCount, inputChannels);
         failures++;
     }

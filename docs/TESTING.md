@@ -53,18 +53,20 @@ The current HAL bundle is installed at:
 After install/restart, device enumeration should show:
 
 ```text
-Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=0 out=8 rate=48000
+Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=8 out=8 rate=48000
 ```
 
-Local validation on 2026-06-13 after the 0.3.24 capture-paced playback tuning:
+Local validation on 2026-06-13 after restoring the Traktor/timecode channel
+surface on top of the 0.3.24 capture-paced playback tuning:
 
 ```text
 Dispositivos Core Audio: 4
-  Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=0 out=8 rate=48000
+  Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=8 out=8 rate=48000
 ```
 
-Detailed channel inspection should show 8 output channels, exposed as one
-8-channel output stream with A/B/C/D left/right names:
+Detailed channel inspection should show 8 input channels and 8 output channels.
+The 0.3.25 macOS-safe topology exposes one 8-channel input stream with A/B/C/D
+left/right channel names, plus four stereo output streams:
 
 ```sh
 ./build/audio-inspect
@@ -73,9 +75,11 @@ Detailed channel inspection should show 8 output channels, exposed as one
 Expected output shape:
 
 ```text
-input buffers: 0 total=0
-output buffers: 1 [8 channels] total=8
-output streams: 1
+input buffers: 1 [8 channels] total=8
+output buffers: 4 [2 channels] total=8
+input streams: 1
+output streams: 4
+input channel names: 1=Input A Left ... 8=Input D Right
 output channel names: 1=Output A Left ... 8=Output D Right
 ```
 
@@ -478,15 +482,17 @@ The profile sets `input-mode` to `0`, enables the timecode vinyl ground-lift
 flag, and enables `software-lock` so the front-panel input switch cannot
 accidentally move the hardware out of DVS mode during a test.
 
-Initial Traktor operator validation for Timecode Vinyl passed after the 0.2.4
-buffer-property fix. Keep the full physical input-pair and CD/line matrix as a
-release regression gate.
+Initial Traktor operator validation for Timecode Vinyl passed in the older
+0.2.x line. For 0.3.25, treat this as a preserved compatibility target: the
+8-input/8-output channel surface and `timecode-vinyl` hardware profile are
+present, but the full physical input-pair and CD/line matrix remains a release
+regression gate.
 
 ## Distribution Limitation
 
-Core Audio enumeration, 8-in/8-out I/O at 44.1/48/88.2/96 kHz, MIDI endpoint
-publication, control read/write, buffer-size negotiation, initial Timecode
-Vinyl operation, and package install have been validated locally. Public
-distribution still requires a Developer ID Installer certificate and Apple
-notarization. Keep human listening across all output pairs as the final release
-matrix.
+Core Audio enumeration, 8-in/8-out topology at 44.1/48 kHz, MIDI endpoint
+publication, control read/write, buffer-size negotiation, and package install
+have been validated locally for 0.3.25. Public distribution still requires a
+Developer ID Installer certificate and Apple notarization. Keep physical
+Traktor timecode validation, 88.2/96 kHz validation, and human listening across
+all output pairs as final release matrix gates.

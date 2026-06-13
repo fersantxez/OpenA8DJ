@@ -42,11 +42,11 @@ Install and use OpenA8DJ at your own risk.
 
 Current preview status:
 
-- Version: 0.3.24
+- Version: 0.3.25
 - Core Audio device: Open Audio 8 DJ
-- Audio channels: output-focused preview, 0 inputs / 8 outputs
+- Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Validated playback rates: 44.1 kHz and 48 kHz
-- Timecode/DVS input capture: not supported in this preview
+- Timecode/DVS input capture: exposed for Traktor validation
 - Windows: not included in this macOS release
 
 This build is not notarized.

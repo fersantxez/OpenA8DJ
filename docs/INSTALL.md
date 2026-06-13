@@ -27,7 +27,8 @@ Installed files:
 ## Verify
 
 After installation, macOS should show `Open Audio 8 DJ` as an audio device with
-0 inputs and 8 outputs in the 0.3.24 preview. The validated release rates are:
+8 inputs and 8 outputs in the 0.3.25 preview. The locally validated
+playback/topology rates are:
 
 ```text
 44100
@@ -69,7 +70,7 @@ This unloads the MIDI bridge, removes installed files, and restarts Core Audio.
 
 ## Signing note
 
-Local and CI builds may be ad-hoc signed. The 0.3.24 public preview is published
+Local and CI builds may be ad-hoc signed. The 0.3.25 public preview is published
 from GitHub Releases but is not Developer ID signed or Apple-notarized, so macOS
 may ask you to approve an unidentified installer. A polished end-user release
 should use a Developer ID Installer certificate and Apple notarization so macOS

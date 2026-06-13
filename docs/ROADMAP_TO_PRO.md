@@ -5,9 +5,10 @@ prototype and a production-quality independent macOS driver.
 
 ## Current evidence
 
-- macOS enumerates `Open Audio 8 DJ` as an output-focused device with 0 inputs
-  and 8 outputs in the 0.3.24 preview.
-- The HAL exposes one 8-channel output stream with named A/B/C/D stereo pairs.
+- macOS enumerates `Open Audio 8 DJ` as an 8-input / 8-output device in the
+  0.3.25 preview.
+- The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
+  pairs and 4 stereo output streams with named Output A/B/C/D pairs.
 - Local listening confirmed substantially cleaner playback at 44.1 and 48 kHz
   after the capture-paced USB transport work.
 - Traktor buffer-size selection no longer reports the invalid sentinel value
@@ -15,7 +16,8 @@ prototype and a production-quality independent macOS driver.
 - Physical iRig loopback gates now include tone sideband checks, music residual
   checks, click outlier checks, and Core Audio CPU guards.
 - Output C/D are exposed and still need the final physical mixer pass.
-- Core Audio input streams and the full vinyl/CD-line input matrix remain open.
+- Core Audio input channels are restored; the full vinyl/CD-line physical
+  matrix remains open.
 
 ## Reference targets
 

@@ -44,16 +44,16 @@ uid: org.opena8dj.Audio8DJ
 
 The device exposes:
 
-- one 8-channel output stream, with named stereo pairs Output A/B/C/D
-- no public Core Audio input streams in the 0.3.24 preview
+- one 8-channel input stream with named Input A/B/C/D channel pairs
+- 4 stereo output streams: Output A/B/C/D
 - 44.1 and 48 kHz validated playback rates
-- `Float32` interleaved Core Audio output buffers
+- `Float32` interleaved Core Audio input and output buffers
 - discrete channel labels and A/B/C/D left/right channel names
 
 Internally, the USB transport converts between Core Audio `Float32` samples and
 the Audio 8 DJ 24-bit big-endian CAIAQ audio stream. The USB capture endpoint is
-used internally for device cadence, but that does not mean Audio 8 DJ inputs are
-exposed to Core Audio clients in this release.
+used both for device cadence and, in the 0.3.25 preview, for the restored Core
+Audio input channel surface needed by Traktor timecode workflows.
 
 ## USB protocol
 
@@ -84,6 +84,11 @@ a local socket.
 - ground lift for timecode CD/line
 - ground lift for phono
 - software lock
+
+If the HAL socket is not already open, `opena8dj-control` temporarily wakes the
+Audio 8 DJ Core Audio device, applies the requested control change, and releases
+the device again. The LaunchAgent does not keep Core Audio I/O open in the
+background.
 
 ## Packaging
 
