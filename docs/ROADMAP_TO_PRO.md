@@ -5,19 +5,17 @@ prototype and a production-quality independent macOS driver.
 
 ## Current evidence
 
-- macOS enumerates `Open Audio 8 DJ` as 8 input and 8 output channels.
-- The HAL exposes four stereo input streams and four stereo output streams.
-- Traktor sees the device and accepts Output A/B routing.
-- Local listening confirmed clean playback at 44.1 and 48 kHz after the
-  asynchronous USB transport and 0.2.4 buffer-property fixes.
+- macOS enumerates `Open Audio 8 DJ` as an output-focused device with 0 inputs
+  and 8 outputs in the 0.3.24 preview.
+- The HAL exposes one 8-channel output stream with named A/B/C/D stereo pairs.
+- Local listening confirmed substantially cleaner playback at 44.1 and 48 kHz
+  after the capture-paced USB transport work.
 - Traktor buffer-size selection no longer reports the invalid sentinel value
   seen in earlier builds.
-- USB traces show no isochronous queue failures or failed transactions during
-  short 44.1/48 kHz tests.
-- Output C/D are exposed and expected to route correctly, but still need the
-  final physical mixer pass.
-- Initial Timecode Vinyl operator validation has passed; full vinyl/CD-line
-  input-matrix validation remains open.
+- Physical iRig loopback gates now include tone sideband checks, music residual
+  checks, click outlier checks, and Core Audio CPU guards.
+- Output C/D are exposed and still need the final physical mixer pass.
+- Core Audio input streams and the full vinyl/CD-line input matrix remain open.
 
 ## Reference targets
 
@@ -31,9 +29,9 @@ prototype and a production-quality independent macOS driver.
 
 ## Priority 0: full timecode/input matrix
 
-Playback quality and initial Timecode Vinyl validation are good enough to move
-to the full DVS matrix. That test depends on clean stereo inputs, correct
-hardware input modes, and stable low-latency capture.
+Playback quality is now good enough to move the next engineering focus to input
+capture and the full DVS matrix. That test depends on clean stereo inputs,
+correct hardware input modes, and stable low-latency capture.
 
 Actions:
 

@@ -95,9 +95,11 @@ Before publishing a public release, verify that:
   Native Instruments;
 - release text and packaged documentation include the brand/risk policy;
 - unvalidated features are described as unvalidated, not certified;
-- macOS packages are signed/notarized when advertised as public-ready;
+- macOS packages are signed/notarized when advertised as polished
+  public-ready releases; unsigned or ad-hoc-signed preview packages must be
+  clearly labeled as previews and must describe the macOS approval step;
 - Windows packages are not published unless a real Windows driver package,
   catalog, INF, and signing flow exist.
 
-If any item is uncertain, publish source only and hold binary artifacts until
-the uncertainty is resolved.
+If provenance, licensing, or proprietary-payload status is uncertain, publish
+source only and hold binary artifacts until the uncertainty is resolved.

@@ -1,5 +1,5 @@
 PROJECT := opena8dj
-VERSION := 0.2.6
+VERSION := 0.3.24
 TOOL := build/opena8dj-probe
 SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
@@ -8,12 +8,20 @@ HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
+HAL_PARITY_SMOKE := build/hal-parity-smoke
+HAL_PARITY_SMOKE_SRC := src/tools/hal-parity-smoke.c
 AUDIO_LIST := build/audio-list
 AUDIO_LIST_SRC := src/tools/audio-list.c
 AUDIO_INSPECT := build/audio-inspect
 AUDIO_INSPECT_SRC := src/tools/audio-inspect.c
 AUDIO_IO_TEST := build/audio-io-test
 AUDIO_IO_TEST_SRC := src/tools/audio-io-test.c
+AUDIO_WAV_PLAY := build/audio-wav-play
+AUDIO_WAV_PLAY_SRC := src/tools/audio-wav-play.c
+AUDIO_RECORD := build/audio-record
+AUDIO_RECORD_SRC := src/tools/audio-record.c
+AUDIO_CONFIG := build/audio-config
+AUDIO_CONFIG_SRC := src/tools/audio-config.c
 AUDIO_DEFAULT := build/audio-default
 AUDIO_DEFAULT_SRC := src/tools/audio-default.c
 AUDIO_PAIR_TONE := build/audio-pair-tone
@@ -43,20 +51,67 @@ DMG_ROOT := build/dmgroot
 DMG := build/OpenA8DJ-$(VERSION).dmg
 DMG_README := resources/dmg/README.txt
 CHECKSUMS := build/OpenA8DJ-$(VERSION)-checksums.txt
+RELEASE_NOTES := docs/RELEASE_NOTES_$(VERSION).md
 SIGN_IDENTITY ?= -
 PKG_SIGN_IDENTITY ?=
 DMG_SIGN_IDENTITY ?=
+HAL_DIAGNOSTIC ?= 0
+HAL_OUTPUT_GAIN ?= 0.50f
+HAL_INPUT_DECODE ?= 0
+HAL_INPUT_CHECKS ?= 0
+HAL_OUTPUT_STREAMS ?= 1
+HAL_ISO_FRAMES ?= 5
+HAL_CAPTURE_QUEUE ?= 64
+HAL_PLAYBACK_QUEUE ?= 64
+HAL_PLAYBACK_CAPTURE_PACED ?= 1
+HAL_CAPTURE_PACED_OUT_LEAD ?= 1
+HAL_USB_CLOCK_ANCHOR ?= 0
+HAL_USB_STABLE_FRAME ?= 0
+HAL_USB_ZERO_TIMESTAMP ?= 0
+HAL_USB_ANCHOR_FILTER ?= 8
+HAL_EXPLICIT_SCHED ?= 0
+HAL_OUTPUT_NATIVE ?= 0
+HAL_STREAM_USAGE ?= 0
+HAL_TRANSFER_POOL ?= 1
+HAL_OUTPUT_SAMPLE_TIME_FOLLOWER ?= 0
+HAL_CADENCE_DIAGNOSTIC ?= 0
+HAL_STREAM_KEEPALIVE ?= 0
+HAL_OUTPUT_AMPLITUDE_STATS ?= 1
+HAL_PROPERTY_BACKOFF_USEC ?= 0
+HAL_OUTPUT_START_BYTE ?= 4
+HAL_VALID_CAPTURE_OUT_LAYOUT ?= 0
+SOUNDCHECK_MUSIC ?=
+SOUNDCHECK_MUSIC_DIR ?= $(HOME)/Music
+SOUNDCHECK_CAPTURE ?=
+SOUNDCHECK_CAPTURE_CHANNELS ?= 1,2
+SOUNDCHECK_PAIR ?= A
+SOUNDCHECK_RATE ?= 48000
+SOUNDCHECK_BUFFER ?= 512
+SOUNDCHECK_SECONDS ?= 20
+SOUNDCHECK_PREFLIGHT_SECONDS ?= 5
+SOUNDCHECK_MODE ?= dense
+SOUNDCHECK_PREFLIGHT_MODE ?= start
+SOUNDCHECK_CPU_STRESS ?= 0
+SOUNDCHECK_CPU_STRESS_AFTER ?= 5
+SOUNDCHECK_CPU_STRESS_SECONDS ?= 8
+SOUNDCHECK_CPU_STRESS_WORKERS ?= auto
+SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO ?= 0.04
+SOUNDCHECK_MAX_MID_BAND_CPU_CORR ?= 0.60
+SIM_OUTPUT_SECONDS ?= 3
+SIM_OUTPUT_MODE ?= dense
+SIM_OUTPUT_PAIR ?= A
+SIM_OUTPUT_GAIN ?= 0.5
 
 CC := xcrun clang
 CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2
-HAL_CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2
+HAL_CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2 -DOPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE=$(HAL_DIAGNOSTIC) -DOPENA8DJ_OUTPUT_GAIN=$(HAL_OUTPUT_GAIN) -DOPENA8DJ_ENABLE_INPUT_DECODE=$(HAL_INPUT_DECODE) -DOPENA8DJ_ENABLE_INPUT_CHECKS=$(HAL_INPUT_CHECKS) -DOPENA8DJ_OUTPUT_STREAM_COUNT=$(HAL_OUTPUT_STREAMS) -DOPENA8DJ_ISO_FRAMES_PER_TRANSFER=$(HAL_ISO_FRAMES) -DOPENA8DJ_CAPTURE_QUEUE_DEPTH=$(HAL_CAPTURE_QUEUE) -DOPENA8DJ_PLAYBACK_QUEUE_TARGET=$(HAL_PLAYBACK_QUEUE) -DOPENA8DJ_PLAYBACK_CAPTURE_PACED=$(HAL_PLAYBACK_CAPTURE_PACED) -DOPENA8DJ_CAPTURE_PACED_OUT_LEAD=$(HAL_CAPTURE_PACED_OUT_LEAD) -DOPENA8DJ_ENABLE_USB_CLOCK_ANCHOR=$(HAL_USB_CLOCK_ANCHOR) -DOPENA8DJ_ENABLE_USB_STABLE_FRAME_POLL=$(HAL_USB_STABLE_FRAME) -DOPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP=$(HAL_USB_ZERO_TIMESTAMP) -DOPENA8DJ_USB_ANCHOR_FILTER=$(HAL_USB_ANCHOR_FILTER) -DOPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING=$(HAL_EXPLICIT_SCHED) -DOPENA8DJ_OUTPUT_NATIVE_I24=$(HAL_OUTPUT_NATIVE) -DOPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY=$(HAL_STREAM_USAGE) -DOPENA8DJ_ENABLE_TRANSFER_POOL=$(HAL_TRANSFER_POOL) -DOPENA8DJ_PROPERTY_BACKOFF_USEC=$(HAL_PROPERTY_BACKOFF_USEC) -DOPENA8DJ_OUTPUT_START_BYTE=$(HAL_OUTPUT_START_BYTE) -DOPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER=$(HAL_OUTPUT_SAMPLE_TIME_FOLLOWER) -DOPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC=$(HAL_CADENCE_DIAGNOSTIC) -DOPENA8DJ_ENABLE_STREAM_KEEPALIVE=$(HAL_STREAM_KEEPALIVE) -DOPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS=$(HAL_OUTPUT_AMPLITUDE_STATS) -DOPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=$(HAL_VALID_CAPTURE_OUT_LAYOUT)
 FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal audio-list audio-inspect audio-io-test audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record usb-play usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
 
-all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
+all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
 $(TOOL): $(SRC)
 	@mkdir -p build
@@ -79,6 +134,13 @@ $(HAL_SMOKE): $(HAL_SMOKE_SRC)
 smoke-hal: $(HAL_BIN) $(HAL_SMOKE)
 	./$(HAL_SMOKE) $(HAL_BUNDLE)
 
+$(HAL_PARITY_SMOKE): $(HAL_PARITY_SMOKE_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+parity-smoke-hal: $(HAL_BIN) $(HAL_PARITY_SMOKE)
+	./$(HAL_PARITY_SMOKE) $(HAL_BUNDLE)
+
 $(AUDIO_LIST): $(AUDIO_LIST_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
@@ -99,6 +161,27 @@ $(AUDIO_IO_TEST): $(AUDIO_IO_TEST_SRC)
 
 audio-io-test: $(AUDIO_IO_TEST)
 	./$(AUDIO_IO_TEST)
+
+$(AUDIO_WAV_PLAY): $(AUDIO_WAV_PLAY_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+audio-wav-play: $(AUDIO_WAV_PLAY)
+	./$(AUDIO_WAV_PLAY)
+
+$(AUDIO_RECORD): $(AUDIO_RECORD_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+audio-record: $(AUDIO_RECORD)
+	./$(AUDIO_RECORD)
+
+$(AUDIO_CONFIG): $(AUDIO_CONFIG_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+audio-config: $(AUDIO_CONFIG)
+	./$(AUDIO_CONFIG) org.opena8dj.Audio8DJ 48000 512
 
 $(AUDIO_DEFAULT): $(AUDIO_DEFAULT_SRC)
 	@mkdir -p build
@@ -133,6 +216,42 @@ $(MACBOOK_MIC_RECORD): $(MACBOOK_MIC_RECORD_SRC)
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -o $@ $<
 
 macbook-mic-record: $(MACBOOK_MIC_RECORD)
+
+audio-stack-health:
+	./scripts/audio-stack-health
+
+audio-stack-guard:
+	./scripts/audio-stack-guard
+
+audio-stack-recover:
+	./scripts/audio-stack-guard --recover --unload-opena8dj
+
+audio-stack-reset:
+	./scripts/audio-stack-guard --recover --unload-opena8dj
+
+soundcheck-preflight: $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(CONTROL_TOOL)
+	./scripts/run-soundcheck --skip-build --prepare-only \
+		$(if $(SOUNDCHECK_MUSIC),--music-file "$(SOUNDCHECK_MUSIC)",--music-dir "$(SOUNDCHECK_MUSIC_DIR)") \
+		--pair "$(SOUNDCHECK_PAIR)" --rate "$(SOUNDCHECK_RATE)" --buffer "$(SOUNDCHECK_BUFFER)" \
+		--seconds "$(SOUNDCHECK_PREFLIGHT_SECONDS)" --mode "$(SOUNDCHECK_PREFLIGHT_MODE)"
+
+soundcheck: $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(CONTROL_TOOL)
+	./scripts/run-soundcheck --skip-build \
+		$(if $(SOUNDCHECK_MUSIC),--music-file "$(SOUNDCHECK_MUSIC)",--music-dir "$(SOUNDCHECK_MUSIC_DIR)") \
+		--pair "$(SOUNDCHECK_PAIR)" --rate "$(SOUNDCHECK_RATE)" --buffer "$(SOUNDCHECK_BUFFER)" \
+		--seconds "$(SOUNDCHECK_SECONDS)" --mode "$(SOUNDCHECK_MODE)" \
+		--capture-device "$(SOUNDCHECK_CAPTURE)" --capture-channels "$(SOUNDCHECK_CAPTURE_CHANNELS)" \
+		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
+		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)" $(if $(filter 1 true yes on,$(SOUNDCHECK_CPU_STRESS)),--cpu-stress --cpu-stress-after "$(SOUNDCHECK_CPU_STRESS_AFTER)" --cpu-stress-seconds "$(SOUNDCHECK_CPU_STRESS_SECONDS)" --cpu-stress-workers "$(SOUNDCHECK_CPU_STRESS_WORKERS)",)
+
+simulated-output-soundcheck:
+	./scripts/run-simulated-output-soundcheck \
+		$(if $(SOUNDCHECK_MUSIC),--music-file "$(SOUNDCHECK_MUSIC)",--music-dir "$(SOUNDCHECK_MUSIC_DIR)") \
+		--pair "$(SIM_OUTPUT_PAIR)" --rate "$(SOUNDCHECK_RATE)" \
+		--seconds "$(SIM_OUTPUT_SECONDS)" --mode "$(SIM_OUTPUT_MODE)" \
+		--gain "$(SIM_OUTPUT_GAIN)" \
+		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
+		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)"
 
 $(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
 	@mkdir -p build
@@ -200,6 +319,7 @@ package: all sign-hal
 	install -m 644 NOTICE.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/BRAND_POLICY.md"
+	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/RELEASE_NOTES.md"; fi
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
 	xattr -cr "$(PKG_ROOT)" 2>/dev/null || true
 	find "$(PKG_ROOT)" -name '._*' -delete
@@ -215,6 +335,7 @@ dmg: package $(DMG_README)
 	install -m 644 NOTICE.md "$(DMG_ROOT)/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(DMG_ROOT)/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(DMG_ROOT)/BRAND_POLICY.md"
+	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(DMG_ROOT)/RELEASE_NOTES.md"; fi
 	hdiutil create -volname "OpenA8DJ $(VERSION)" -srcfolder "$(DMG_ROOT)" -ov -format UDZO "$(DMG)"
 	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(DMG)"; fi
 

@@ -13,6 +13,8 @@ This builds:
 - `build/audio-list`
 - `build/audio-inspect`
 - `build/audio-io-test`
+- `build/audio-config`
+- `build/audio-record`
 - `build/audio-default`
 - `build/audio-pair-tone`
 - `build/audio-route`
@@ -51,18 +53,18 @@ The current HAL bundle is installed at:
 After install/restart, device enumeration should show:
 
 ```text
-Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=8 out=8 rate=48000
+Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=0 out=8 rate=48000
 ```
 
-Local validation on 2026-06-08:
+Local validation on 2026-06-13 after the 0.3.24 capture-paced playback tuning:
 
 ```text
-Dispositivos Core Audio: 3
-  Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=8 out=8 rate=48000
+Dispositivos Core Audio: 4
+  Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=0 out=8 rate=48000
 ```
 
-Detailed channel inspection should show 8 input and 8 output channels, exposed
-as four stereo streams in each direction, with A/B/C/D left/right names:
+Detailed channel inspection should show 8 output channels, exposed as one
+8-channel output stream with A/B/C/D left/right names:
 
 ```sh
 ./build/audio-inspect
@@ -71,8 +73,9 @@ as four stereo streams in each direction, with A/B/C/D left/right names:
 Expected output shape:
 
 ```text
-input buffers: 4 [2 channels] [2 channels] [2 channels] [2 channels] total=8
-output buffers: 4 [2 channels] [2 channels] [2 channels] [2 channels] total=8
+input buffers: 0 total=0
+output buffers: 1 [8 channels] total=8
+output streams: 1
 output channel names: 1=Output A Left ... 8=Output D Right
 ```
 
@@ -87,10 +90,91 @@ The Core Audio I/O path can be tested at each advertised HAL sample rate:
 ./build/audio-io-test 2 96000
 ```
 
-Local Traktor validation confirmed clean playback at 44.1 and 48 kHz on
-2026-06-08. The HAL still exposes 88.2 and 96 kHz because the hardware accepts
-those `AUDIO_PARAMS` values, but they should be treated as probe-level support
-until they receive the same listening validation.
+Local HAL I/O validation on 2026-06-10 completed successfully at 44.1, 48,
+88.2, and 96 kHz. Human listening validation is still the release gate for
+declaring subjective audio quality final, but the automated I/O counters were
+healthy at all advertised rates.
+
+## Automated Real-Music Soundcheck
+
+Audio-path changes should use the automated soundcheck before and after the
+change. This does not replace final human listening forever, but it catches the
+class of regressions where counters look healthy while music sounds metallic,
+clicky, or unstable.
+
+Prepare a repeatable real-music fixture before rebuilding/installing a new
+driver idea:
+
+```sh
+make soundcheck-preflight
+```
+
+The preflight target searches local music, converts a safe excerpt to
+`reference.wav`, and writes the run under:
+
+```text
+local-analysis/soundcheck/<run-id>/
+```
+
+It defaults to a short 5-second `start` excerpt via
+`SOUNDCHECK_PREFLIGHT_SECONDS=5` and `SOUNDCHECK_PREFLIGHT_MODE=start` so it is
+cheap enough to run before trying a driver idea. Use a longer or denser excerpt
+when needed:
+
+```sh
+make soundcheck-preflight SOUNDCHECK_PREFLIGHT_SECONDS=20 SOUNDCHECK_PREFLIGHT_MODE=dense
+```
+
+Use an explicit track when checking the exact song that exposed a problem:
+
+```sh
+make soundcheck-preflight SOUNDCHECK_MUSIC="/path/to/track.mp3" SOUNDCHECK_MODE=dense
+```
+
+Run the full analog loopback when an input recorder is connected:
+
+```sh
+make soundcheck SOUNDCHECK_CAPTURE="External Recorder" SOUNDCHECK_CAPTURE_CHANNELS=1,2
+```
+
+The full soundcheck:
+
+- configures `org.opena8dj.Audio8DJ` to the requested rate/buffer
+- plays the prepared reference WAV through the selected output pair
+- records the selected Core Audio input device/channel pair
+- compares reference vs capture for alignment, SNR, click outliers, lag jumps,
+  high-band residual, 1-5 kHz residual noise, CPU correlation, and clipping
+- samples CPU for Core Audio, the OpenA8DJ driver, audio/UI services, Spotify,
+  Traktor, the player, and the recorder
+- writes `summary.txt`, `metrics.json`, `cpu-profile.tsv`, and
+  `coupling-profile.json`
+
+When checking the specific "radio/vinyl noise that changes with CPU/window
+activity" failure, run the soundcheck with an opt-in CPU pressure phase:
+
+```sh
+make soundcheck \
+  SOUNDCHECK_CAPTURE="External Recorder" \
+  SOUNDCHECK_CAPTURE_CHANNELS=1,2 \
+  SOUNDCHECK_CPU_STRESS=1
+```
+
+The initial rejection gates for that symptom are:
+
+```text
+mid_band_1000_5000_residual_ratio > 0.04
+mid_band_cpu_corr > 0.60 when the windowed mid-band residual ratio is above 0.02
+```
+
+For a driver experiment, use this order:
+
+1. `make soundcheck-preflight`
+2. `make soundcheck ...` on the currently installed driver, if capture is
+   physically connected
+3. rebuild/install the candidate
+4. `make smoke-hal` and the normal transport checks
+5. `make soundcheck SOUNDCHECK_CPU_STRESS=1 ...` again before asking for human
+   listening
 
 Pair routing can be tested with:
 
@@ -157,9 +241,198 @@ AUDIO_PARAMS 48 kHz: reply 09 01, bpp=352
 
 44.1, 48, 88.2, and 96 kHz have all accepted `AUDIO_PARAMS` in probe tests.
 
-The HAL transport now uses an asynchronous isochronous queue. A healthy trace
-shows no queue failures, no failed transactions, and output frame consumption
-close to the active sample rate.
+The HAL transport now uses an asynchronous isochronous queue. Output is paced
+from successful capture transactions and explicit future-frame scheduling
+remains off. The 0.2.13 build also ports stream-start details from the legacy
+macOS kext: a reset-style `AUDIO_PARAMS` call before the real stream parameters,
+64 capture transfers, and 128 maximum playback transfers.
+
+The 0.2.17 output path is timeline-based rather than FIFO-based. The HAL passes
+`mOutputTime.mSampleTime` into the USB engine, and the USB engine stores output
+frames in a circular sample timeline before USB reads them. This is closer to
+the old kext's `clipOutputSamples` model and is intended to remove callback
+ordering jitter from the playback path.
+
+0.2.17 also exposes the Core Audio `cfsz` cycle-size selector observed in
+coreaudiod property probes and keeps the preferred cycle size at the small value
+Core Audio selected after reload. The public `fsiz`/`fsz#` values can still look
+derived through Core Audio's wrapper, so listening tests and `stream-stats` are
+more important than treating those public timing lines as proof of audio health.
+
+Important regression note: 0.2.11 tried mode 2 output packing at byte offset 2
+after reading the old kext's mode 2 input cursor. That was wrong for playback
+and produced loud white noise. The corrected path restores playback
+byte offset 4 and must be validated only with a controlled low-volume listening
+test.
+
+Stream health is also available without enabling trace logging:
+
+```sh
+/usr/local/bin/opena8dj-control stream-stats
+```
+
+During a sustained playback test, watch these fields:
+
+- `clock-anchor`: for the current 0.2.47 playback build, `fallback` is expected
+  because `HAL_USB_CLOCK_ANCHOR=0` avoids expensive `frameNumberWithTime`
+  polling that does not feed the HAL timestamp path. If rebuilding with USB
+  clock anchors enabled, then it should become `valid`.
+- `output-ring`: should remain near the target rather than growing without
+  bound or draining to zero.
+- `output.active-underruns`, `playback.failed`, `playback.qfail`, and
+  `capture.qfail` should stay at zero during steady playback.
+- `capture.failed` can rise because the hardware reports inactive high-speed
+  microframes separately from valid audio payloads; treat it as suspicious only
+  if `capture.bytes`, `playback.bytes`, or output frame consumption stop moving
+  together.
+- `scheduling.too-old`, `scheduling.too-new`, and `out-of-window` should remain
+  at zero during steady playback.
+- `elastic-drops` and `elastic-replays` should remain zero in short 48 kHz
+  tests. Repeated sample replays are audible, so they are not used as normal
+  drift correction in 0.2.13.
+
+Installed 0.2.18 build on 2026-06-10:
+
+```text
+/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+```
+
+Build hash:
+
+```text
+4eac6fada5e2aff6b1770d13e2d753be18c102bfeaefc96a5b658a81e2530a88
+```
+
+The 0.2.18 bundle passed `make all smoke-hal`. After installation, Core Audio
+enumerated `Open Audio 8 DJ` with 8 inputs and 8 outputs, and the system default
+output was explicitly left on MacBook Air Speakers. The next playback validation
+must start with the analog/headphone volume down.
+
+0.2.18 specifically tests active-gap concealment: when USB needs a frame and
+the timeline has a missing active frame, the driver briefly replays the previous
+valid frame with decay instead of injecting an immediate hard zero. Watch
+`output.active-underruns` and `output.elastic-replays` together during the
+Spotify and Codex-microphone tests.
+
+Listening note from the first timeline-based human test: Spotify output was
+still not good enough, but it sounded slightly improved compared with the
+previous build. Pressing the Codex voice/microphone button made the output noise
+increase sharply even though the laptop microphone was selected. Test the base
+playback path first; then repeat with the voice/microphone button as a separate
+second-phase reproduction.
+
+0.2.19 changed the next listening test. The old kext analysis showed an
+IOAudioEngine-style default of `0x200` frames, while the HAL had been exposing
+22 frames as the public Core Audio cycle. Core Audio logs during the microphone
+reproduction showed repeated overloads and `client timeout` entries with a ring
+buffer size of 22. The 0.2.19 HAL therefore restores an app-facing default of
+512 frames and a 512-4096 frame range; USB packet pacing remains internal.
+
+0.2.20 hardens this further: valid buffer requests are normalized to 512, 1024,
+2048, or 4096 frames, so a client cannot leave the device at 192 or another
+small public cycle.
+
+0.2.21 disabled Audio 8 input I/O by default while keeping output I/O active.
+0.2.22 goes further and hides input stream objects unless
+`OPENA8DJ_ENABLE_INPUT_IO=1` is used at build time. This is intentional for the
+microphone reproduction: activating the laptop microphone must not make Core
+Audio run the Audio 8 as a full-duplex device.
+
+For 0.2.22 validation, first confirm:
+
+```sh
+./build/audio-inspect
+./build/audio-config org.opena8dj.Audio8DJ 48000 512
+```
+
+For 0.2.29 and the 0.2.30 diagnostic build, `cfsz` is not a public client
+property. The expected device list is `in=0 out=8`. The expected timing line is
+`buffer=512`, `cycle-error=<nonzero>`, and `buffer-bytes=16384`. If `buffer=22`
+or `buffer=192` appears after reload, the wrong HAL is still loaded or Core
+Audio has cached stale properties.
+
+The microphone-interaction regression test uses output-only Audio 8 playback
+while `BuiltInMicrophoneDevice` records. It should leave
+`output.active-underruns`, `elastic-drops`, `elastic-replays`,
+`timeline-resets`, `playback.failed`, `mode2.input-check-errors`, and
+`mode2.output-panic-flags` at zero.
+
+The diagnostic capture build adds evidence for the part that counters cannot
+prove: what Core Audio wrote into the HAL versus what the USB output path
+actually consumed. A successful diagnostic run must include human listening
+notes and the capture files; clean counters alone are not enough to declare
+Spotify playback fixed.
+
+Before each human playback pass:
+
+1. Confirm the installed diagnostic build identity and record its version,
+   build number, loaded UUID, and binary hash.
+2. Confirm the intended Core Audio shape with `audio-list`, `audio-inspect`, or
+   the equivalent installed tools: `in=0 out=8`, `rate=48000`, `buffer=512`,
+   and `buffer-bytes=16384`.
+3. Use the same physical output pair, mixer/headphone path, macOS volume,
+   Spotify volume, Spotify track, and Spotify timestamp across all comparison
+   passes.
+4. Move aside any existing `/tmp/opena8dj-*` artifacts before starting the
+   pass, because the diagnostic capture files are overwritten by the next
+   stream.
+
+Run the Spotify comparison as two separate passes:
+
+1. `spotify-only`: play the selected Spotify segment through `Open Audio 8 DJ`
+   with no microphone capture active. Record whether playback is clean,
+   crackly, distorted, pitch-shifted, intermittent, or stopped.
+2. `spotify-mic`: restart the same segment from the same timestamp, then
+   activate the selected microphone path while Spotify is already playing. Use
+   the same external microphone that reproduced the issue when applicable; use
+   a separate labeled pass for `BuiltInMicrophoneDevice` if that comparison is
+   also needed.
+
+For both passes, record `opena8dj-control stream-stats` before playback, during
+steady playback, immediately after microphone activation when applicable, and
+after stopping playback. After each pass, stop all clients using
+`Open Audio 8 DJ` long enough for the diagnostic capture to flush, then collect:
+
+```text
+/tmp/opena8dj-output-capture.txt
+/tmp/opena8dj-output-written-f32.raw
+/tmp/opena8dj-output-consumed-f32.raw
+/tmp/opena8dj-output-packed-usb.raw
+/tmp/opena8dj-output-events.tsv
+```
+
+The raw files are little-endian interleaved float32, 8 channels. The metadata
+file records `sample_rate`, `channels`, `written_frames`, `consumed_frames`,
+packed byte counts, and event counts. The packed USB file is the mode-2 output
+payload after float-to-USB conversion; the events file records write,
+consume-anomaly, and packed-transfer points with an explicit `timeline` column
+so sample-time, served-frame, and USB-frame values are not mixed accidentally.
+The capture is bounded, so keep the microphone transition inside the first part
+of the pass. Also collect `/tmp/opena8dj-usb.log`,
+`/tmp/opena8dj-hal-trace.log`, and `/tmp/opena8dj-midid.log` when present, but
+do not collect `/tmp/opena8dj-control.sock`.
+
+For a deterministic source-vs-driver comparison, use a known PCM16 WAV instead
+of Spotify:
+
+```sh
+./build/audio-wav-play path/to/reference.wav A
+python3 scripts/analyze-driver-capture.py path/to/reference.wav --capture-dir /tmp --usb-raw /tmp/opena8dj-output-packed-usb.raw --events /tmp/opena8dj-output-events.tsv --pair A
+```
+
+Interpret the results in this order:
+
+1. If the human listener hears crackle, dropouts, or a full stop, the pass fails
+   even when `stream-stats` looks clean.
+2. If `written` aligns with the reference but `consumed` does not, the problem
+   is after Core Audio handed frames to the HAL.
+3. If `written` and `consumed` both look clean while Spotify still sounds bad,
+   keep the files and the exact listening notes; the failure is still real and
+   needs a reproduction path beyond the current counters.
+
+0.2.25 uses a bounded 3 ms property-probe backoff during startup enumeration.
+This should not create `/tmp/opena8dj-hal-trace.log` and should not affect the
+USB audio callback path.
 
 ## MIDI And Controls
 
@@ -211,9 +484,9 @@ release regression gate.
 
 ## Distribution Limitation
 
-Core Audio enumeration, 8-in/8-out I/O at 44.1/48 kHz, MIDI endpoint
+Core Audio enumeration, 8-in/8-out I/O at 44.1/48/88.2/96 kHz, MIDI endpoint
 publication, control read/write, buffer-size negotiation, initial Timecode
 Vinyl operation, and package install have been validated locally. Public
 distribution still requires a Developer ID Installer certificate and Apple
-notarization. Treat 88.2/96 kHz as extended rates until they pass the same
-release matrix.
+notarization. Keep human listening across all output pairs as the final release
+matrix.

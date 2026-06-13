@@ -116,9 +116,15 @@ testers can download the installer without building from source.
 The DMG includes `LICENSE`, `NOTICE.md`, `LEGAL.md`, and `BRAND_POLICY.md`.
 The PKG installs the same files under `/Library/Documentation/OpenA8DJ`.
 
+For public previews, the release title and notes must say whether the macOS
+package is not notarized or not Developer ID signed. A polished end-user release
+still requires the macOS signing/notarization gate; a preview may be published
+only if it passes the legal/provenance gate and clearly documents the macOS
+approval step.
+
 For private validation snapshots, create a draft release and attach the DMG,
 PKG, and checksum file. Publish the release only after the legal/provenance gate
-and macOS signing/notarization gate are complete.
+and the appropriate preview or signing/notarization gate are complete.
 
 ## Windows release gate
 

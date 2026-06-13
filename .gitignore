@@ -12,6 +12,8 @@ dist/
 # Local logs and traces
 *.log
 *.trace
+local-analysis/
+old driver/
 
 # Xcode / macOS local state
 DerivedData/

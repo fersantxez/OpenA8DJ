@@ -205,10 +205,81 @@ int main(int argc, char **argv)
         CFRelease(bundle);
         return 11;
     }
+    UInt32 streamCount = dataSize / (UInt32)sizeof(AudioObjectID);
+
+    UInt32 bufferFrames = 0;
+    dataSize = 0;
+    status = GetProperty(driver,
+                         devices[0],
+                         kAudioDevicePropertyBufferFrameSize,
+                         kAudioObjectPropertyScopeGlobal,
+                         sizeof(bufferFrames),
+                         &dataSize,
+                         &bufferFrames);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr, "BufferFrameSize fallo: %d\n", (int)status);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 12;
+    }
+
+    UInt32 bufferBytes = 0;
+    dataSize = 0;
+    status = GetProperty(driver,
+                         devices[0],
+                         kAudioDevicePropertyBufferSize,
+                         kAudioObjectPropertyScopeGlobal,
+                         sizeof(bufferBytes),
+                         &dataSize,
+                         &bufferBytes);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr, "BufferSize fallo: %d\n", (int)status);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 13;
+    }
+
+    AudioValueRange bufferRange = {0};
+    dataSize = 0;
+    status = GetProperty(driver,
+                         devices[0],
+                         kAudioDevicePropertyBufferFrameSizeRange,
+                         kAudioObjectPropertyScopeGlobal,
+                         sizeof(bufferRange),
+                         &dataSize,
+                         &bufferRange);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr, "BufferFrameSizeRange fallo: %d\n", (int)status);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 14;
+    }
 
     printf("HAL smoke OK: deviceID=%u name=", devices[0]);
     PrintCFString(name);
-    printf(" sampleRate=%.0f streams=%u\n", sampleRate, dataSize / (UInt32)sizeof(AudioObjectID));
+    printf(" sampleRate=%.0f streams=%u buffer=%u bufferBytes=%u bufferRange=%.0f-%.0f\n",
+           sampleRate,
+           streamCount,
+           bufferFrames,
+           bufferBytes,
+           bufferRange.mMinimum,
+           bufferRange.mMaximum);
+
+    if ((streamCount != 1 && streamCount != 4) ||
+        bufferFrames != 512 ||
+        bufferBytes != 16384 ||
+        bufferRange.mMinimum != 512.0) {
+        fprintf(stderr,
+                "Unexpected HAL properties: streams=%u frames=%u bytes=%u range=%.0f-%.0f\n",
+                streamCount,
+                bufferFrames,
+                bufferBytes,
+                bufferRange.mMinimum,
+                bufferRange.mMaximum);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 15;
+    }
 
     CFRelease(name);
     CFRelease(bundle);

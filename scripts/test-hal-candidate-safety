@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+candidate=""
+cycles="1"
+leave_loaded="0"
+wait_seconds="2"
+enumeration_timeout="5"
+min_idle_pct="20"
+run_dir=""
+required_device_uid="org.opena8dj.Audio8DJ"
+
+usage() {
+  cat <<USAGE
+usage: scripts/test-hal-candidate-safety --candidate PATH [options]
+
+Safely loads an OpenA8DJ HAL bundle, verifies Core Audio can enumerate devices,
+and unloads the candidate by default. This is an install/reload safety gate,
+not an audio-quality test.
+
+Options:
+  --candidate PATH          Candidate OpenA8DJ.driver bundle to test
+  --cycles N                Number of install/restart/enumeration cycles (default: 1)
+  --leave-loaded            Leave candidate active after all cycles pass
+  --wait SECONDS            Wait before health sampling in each cycle (default: 2)
+  --enumeration-timeout S   Core Audio enumeration timeout (default: 5)
+  --min-idle-pct PCT        Minimum global idle CPU after reload (default: 20)
+  --required-device-uid UID Require this Core Audio UID while loaded (default: org.opena8dj.Audio8DJ)
+  --no-required-device      Do not require a specific Core Audio device UID
+  --run-dir DIR             Log directory
+  -h, --help                Show this help
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate)
+      candidate="$2"; shift 2 ;;
+    --cycles)
+      cycles="$2"; shift 2 ;;
+    --leave-loaded)
+      leave_loaded="1"; shift ;;
+    --wait)
+      wait_seconds="$2"; shift 2 ;;
+    --enumeration-timeout)
+      enumeration_timeout="$2"; shift 2 ;;
+    --min-idle-pct)
+      min_idle_pct="$2"; shift 2 ;;
+    --required-device-uid)
+      required_device_uid="$2"; shift 2 ;;
+    --no-required-device)
+      required_device_uid=""; shift ;;
+    --run-dir)
+      run_dir="$2"; shift 2 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ -z "$candidate" ]; then
+  usage >&2
+  exit 2
+fi
+if [ ! -d "$candidate" ]; then
+  echo "candidate bundle not found: $candidate" >&2
+  exit 2
+fi
+
+if [ -z "$run_dir" ]; then
+  run_dir="$ROOT/local-analysis/hal-candidate-safety/safety-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+disabled_hal="/Library/Audio/Plug-Ins/HAL.disabled"
+
+run_guard() {
+  local dir="$1"
+  "$ROOT/scripts/audio-stack-guard" \
+    --wait "$wait_seconds" \
+    --enumeration-timeout "$enumeration_timeout" \
+    --min-idle-pct "$min_idle_pct" \
+    --run-dir "$dir" \
+    > "$dir.log" 2>&1
+}
+
+required_device_check() {
+  local dir="$1"
+  if [ -z "$required_device_uid" ]; then
+    return 0
+  fi
+  if grep -Fq "uid=$required_device_uid" "$dir/audio-list.txt" 2>/dev/null; then
+    echo "required_device=PASS" > "$dir/required-device-status.txt"
+    echo "required_device_uid=$required_device_uid" >> "$dir/required-device-status.txt"
+    return 0
+  fi
+  echo "required_device=FAIL" > "$dir/required-device-status.txt"
+  echo "required_device_uid=$required_device_uid" >> "$dir/required-device-status.txt"
+  return 1
+}
+
+unload_active() {
+  local reason="$1"
+  if [ -d "$active_hal" ]; then
+    sudo -n mkdir -p "$disabled_hal"
+    local target="$disabled_hal/OpenA8DJ.driver.$reason-$(date +%Y%m%d-%H%M%S)"
+    sudo -n mv "$active_hal" "$target"
+    echo "$target"
+  fi
+}
+
+recover_after_failure() {
+  local reason="$1"
+  unload_active "$reason" >> "$run_dir/unloaded-after-failure.txt" 2>&1 || true
+  "$ROOT/scripts/audio-stack-guard" \
+    --recover \
+    --unload-opena8dj \
+    --wait "$wait_seconds" \
+    --enumeration-timeout "$enumeration_timeout" \
+    --min-idle-pct "$min_idle_pct" \
+    --run-dir "$run_dir/recovery" \
+    > "$run_dir/recovery.log" 2>&1 || true
+}
+
+{
+  echo "candidate=$candidate"
+  echo "cycles=$cycles"
+  echo "leave_loaded=$leave_loaded"
+  echo "required_device_uid=${required_device_uid:-none}"
+  echo "run_dir=$run_dir"
+  echo "started=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  echo "candidate_hash=$(shasum -a 256 "$candidate/Contents/MacOS/OpenA8DJHAL" 2>/dev/null | awk '{print $1}')"
+  if [ -f "$candidate/Contents/Info.plist" ]; then
+    echo "candidate_version=$(defaults read "$candidate/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
+    echo "candidate_build=$(defaults read "$candidate/Contents/Info" CFBundleVersion 2>/dev/null || true)"
+  fi
+} > "$run_dir/manifest.txt"
+
+if ! run_guard "$run_dir/preflight-guard"; then
+  echo "preflight_guard=FAIL" | tee "$run_dir/summary.txt"
+  cat "$run_dir/preflight-guard.log" >> "$run_dir/summary.txt" 2>/dev/null || true
+  exit 1
+fi
+
+for cycle in $(seq 1 "$cycles"); do
+  cycle_dir="$run_dir/cycle-$cycle"
+  mkdir -p "$cycle_dir"
+  echo "cycle=$cycle" | tee "$cycle_dir/status.txt"
+
+  unload_active "pre-safety-cycle-$cycle" > "$cycle_dir/pre-existing-active-moved.txt" 2>&1 || true
+  sudo -n mkdir -p /Library/Audio/Plug-Ins/HAL
+  sudo -n cp -R "$candidate" "$active_hal"
+  sudo -n xattr -cr "$active_hal" 2>/dev/null || true
+  sudo -n codesign --force --sign - --timestamp=none "$active_hal" \
+    > "$cycle_dir/codesign.log" 2>&1
+
+  sudo -n killall coreaudiod 2>/dev/null || true
+  sleep 5
+
+  if ! run_guard "$cycle_dir/guard"; then
+    echo "cycle=$cycle result=FAIL" | tee -a "$run_dir/summary.txt"
+    cat "$cycle_dir/guard.log" >> "$run_dir/summary.txt" 2>/dev/null || true
+    recover_after_failure "rejected-safety-cycle-$cycle"
+    exit 1
+  fi
+  if ! required_device_check "$cycle_dir/guard"; then
+    echo "cycle=$cycle result=FAIL reason=required_device_missing" | tee -a "$run_dir/summary.txt"
+    cat "$cycle_dir/guard/required-device-status.txt" >> "$run_dir/summary.txt" 2>/dev/null || true
+    cat "$cycle_dir/guard/audio-list.txt" >> "$run_dir/summary.txt" 2>/dev/null || true
+    recover_after_failure "rejected-missing-device-cycle-$cycle"
+    exit 1
+  fi
+
+  shasum -a 256 "$active_hal/Contents/MacOS/OpenA8DJHAL" \
+    > "$cycle_dir/installed-hash.txt" 2>&1 || true
+  defaults read "$active_hal/Contents/Info" CFBundleShortVersionString \
+    > "$cycle_dir/installed-version.txt" 2>&1 || true
+  defaults read "$active_hal/Contents/Info" CFBundleVersion \
+    > "$cycle_dir/installed-build.txt" 2>&1 || true
+
+  if [ "$cycle" != "$cycles" ] || [ "$leave_loaded" != "1" ]; then
+    unload_active "passed-safety-cycle-$cycle" > "$cycle_dir/unloaded-after-pass.txt" 2>&1 || true
+    sudo -n killall coreaudiod 2>/dev/null || true
+    sleep 5
+    run_guard "$cycle_dir/post-unload-guard" || {
+      echo "cycle=$cycle post_unload=FAIL" | tee -a "$run_dir/summary.txt"
+      recover_after_failure "post-unload-recovery-$cycle"
+      exit 1
+    }
+  fi
+done
+
+{
+  echo "hal_candidate_safety=PASS"
+  echo "candidate=$candidate"
+  echo "cycles=$cycles"
+  echo "leave_loaded=$leave_loaded"
+  echo "run_dir=$run_dir"
+  echo "finished=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+} | tee "$run_dir/summary.txt"

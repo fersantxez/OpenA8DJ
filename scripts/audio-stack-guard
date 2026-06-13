@@ -1,0 +1,295 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+threshold="25"
+total_threshold="120"
+wait_seconds="0"
+enumeration_timeout="5"
+min_idle_pct="20"
+recover="0"
+unload_opena8dj="0"
+close_media_apps="1"
+run_dir=""
+
+usage() {
+  cat <<USAGE
+usage: scripts/audio-stack-guard [options]
+
+Checks that the macOS audio stack is safe before OpenA8DJ testing. It combines
+CPU health, Core Audio enumeration with a timeout, and optional emergency
+recovery.
+
+Options:
+  --threshold PCT             Fail if one watched process group exceeds this CPU pct (default: 25)
+  --total-threshold PCT       Fail if watched process groups exceed this total CPU pct (default: 120)
+  --wait SECONDS              Wait before sampling
+  --enumeration-timeout SEC   Fail if build/audio-list hangs longer than this (default: 5)
+  --min-idle-pct PCT          Fail if instant system idle CPU is below this (default: 20)
+  --run-dir DIR               Directory for logs (default: local-analysis/audio-stack-guard/<timestamp>)
+  --recover                   Try to recover if checks fail
+  --unload-opena8dj           During recovery, move active OpenA8DJ HAL out of the active HAL directory
+  --keep-media-apps           Do not close VLC/Spotify/Traktor/NIHardwareAgent during recovery
+  -h, --help                  Show this help
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --threshold)
+      threshold="$2"; shift 2 ;;
+    --total-threshold)
+      total_threshold="$2"; shift 2 ;;
+    --wait)
+      wait_seconds="$2"; shift 2 ;;
+    --enumeration-timeout)
+      enumeration_timeout="$2"; shift 2 ;;
+    --min-idle-pct)
+      min_idle_pct="$2"; shift 2 ;;
+    --run-dir)
+      run_dir="$2"; shift 2 ;;
+    --recover)
+      recover="1"; shift ;;
+    --unload-opena8dj)
+      unload_opena8dj="1"; shift ;;
+    --keep-media-apps)
+      close_media_apps="0"; shift ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="$ROOT/local-analysis/audio-stack-guard/guard-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+disabled_hal="/Library/Audio/Plug-Ins/HAL.disabled"
+
+log_step() {
+  printf '%s\n' "$*"
+}
+
+hal_state() {
+  if [ -d "$active_hal" ]; then
+    echo "loaded"
+  else
+    echo "unloaded"
+  fi
+}
+
+run_with_timeout() {
+  local timeout="$1"
+  local stdout_path="$2"
+  local stderr_path="$3"
+  shift 3
+  "$@" >"$stdout_path" 2>"$stderr_path" &
+  local pid="$!"
+  local elapsed=0
+  while kill -0 "$pid" 2>/dev/null; do
+    if awk -v e="$elapsed" -v t="$timeout" 'BEGIN {exit !(e >= t)}'; then
+      kill "$pid" 2>/dev/null || true
+      sleep 0.2
+      kill -9 "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  wait "$pid"
+}
+
+top_snapshot() {
+  top -l 2 -s 1 -n 30 -o cpu -stats pid,cpu,state,command \
+    | awk 'BEGIN{s=0} /^Processes:/{s++} s==2{print}' \
+    > "$1" 2>&1 || true
+}
+
+top_idle_pct() {
+  awk '
+    /CPU usage:/ {
+      for (i = 1; i <= NF; i++) {
+        if ($i == "idle") {
+          value = $(i - 1)
+          gsub("%", "", value)
+          print value
+          exit
+        }
+      }
+    }
+  ' "$1"
+}
+
+health_check() {
+  "$ROOT/scripts/audio-stack-health" \
+    --threshold "$threshold" \
+    --total-threshold "$total_threshold" \
+    --wait "$wait_seconds" \
+    > "$run_dir/audio-stack-health.txt" 2>&1
+}
+
+enumeration_check() {
+  if [ ! -x "$ROOT/build/audio-list" ]; then
+    echo "core_audio_enumeration=SKIPPED" > "$run_dir/audio-list-status.txt"
+    echo "reason=missing build/audio-list" >> "$run_dir/audio-list-status.txt"
+    return 0
+  fi
+  if run_with_timeout "$enumeration_timeout" \
+      "$run_dir/audio-list.txt" \
+      "$run_dir/audio-list.err" \
+      "$ROOT/build/audio-list"; then
+    echo "core_audio_enumeration=PASS" > "$run_dir/audio-list-status.txt"
+    return 0
+  fi
+  local rc="$?"
+  if [ "$rc" = "124" ]; then
+    echo "core_audio_enumeration=HUNG" > "$run_dir/audio-list-status.txt"
+  else
+    echo "core_audio_enumeration=FAIL" > "$run_dir/audio-list-status.txt"
+    echo "return_code=$rc" >> "$run_dir/audio-list-status.txt"
+  fi
+  return 1
+}
+
+kill_pattern_force() {
+  local pattern="$1"
+  local pids
+  pids="$(pgrep -f "$pattern" 2>/dev/null || true)"
+  if [ -z "$pids" ]; then
+    return 0
+  fi
+  log_step "kill_pattern=$pattern pids=$(printf '%s' "$pids" | paste -sd, -)"
+  sudo -n kill $pids 2>/dev/null || true
+  sleep 0.5
+  pids="$(pgrep -f "$pattern" 2>/dev/null || true)"
+  if [ -n "$pids" ]; then
+    sudo -n kill -9 $pids 2>/dev/null || true
+  fi
+}
+
+unload_active_hal() {
+  if [ ! -d "$active_hal" ]; then
+    echo "unload_opena8dj=already_unloaded"
+    return 0
+  fi
+  sudo -n mkdir -p "$disabled_hal"
+  local target="$disabled_hal/OpenA8DJ.driver.guard-unloaded-$(date +%Y%m%d-%H%M%S)"
+  sudo -n mv "$active_hal" "$target"
+  echo "unload_opena8dj=moved"
+  echo "unload_opena8dj_target=$target"
+}
+
+recover_stack() {
+  {
+    echo "recovery_started=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "initial_opena8dj_state=$(hal_state)"
+    if [ "$close_media_apps" = "1" ]; then
+      pkill -f '/Applications/VLC.app' 2>/dev/null || true
+      pkill -f '[S]potify' 2>/dev/null || true
+      pkill -f '[T]raktor' 2>/dev/null || true
+      pkill -f '[N]IHardwareAgent' 2>/dev/null || true
+      pkill -f 'audio.mojom.AudioService' 2>/dev/null || true
+      echo "closed_media_apps=1"
+    else
+      echo "closed_media_apps=0"
+    fi
+    if [ "$unload_opena8dj" = "1" ]; then
+      unload_active_hal
+    else
+      echo "unload_opena8dj=skipped"
+    fi
+
+    kill_pattern_force '/usr/sbin/coreaudiod'
+    kill_pattern_force 'Core Audio Driver \(OpenA8DJ.driver\)'
+    kill_pattern_force 'MediaRemote.framework/Support/mediaremoted'
+    kill_pattern_force 'PerfPowerServices'
+    kill_pattern_force 'universalaccessd'
+    kill_pattern_force 'ControlCenter.app'
+    kill_pattern_force 'CoreSpeech.framework/corespeechd'
+    kill_pattern_force 'HearingCore.framework/heard'
+    kill_pattern_force 'CoreServices/audioaccessoryd'
+    kill_pattern_force '/usr/libexec/audiomxd'
+    kill_pattern_force 'systemsoundserverd'
+    kill_pattern_force 'ContinuityCaptureAgent'
+    kill_pattern_force 'avconferenced'
+    kill_pattern_force 'callservicesd'
+    sleep 10
+    echo "recovery_finished=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "final_opena8dj_state=$(hal_state)"
+  } > "$run_dir/recovery.log" 2>&1
+}
+
+evaluate() {
+  top_snapshot "$run_dir/top.txt"
+  local idle_pct
+  idle_pct="$(top_idle_pct "$run_dir/top.txt")"
+  if [ -z "$idle_pct" ]; then
+    idle_pct="0"
+  fi
+  local opena8dj_state
+  local stale_driver_pids
+  opena8dj_state="$(hal_state)"
+  stale_driver_pids="$(pgrep -f '[C]ore Audio Driver \(OpenA8DJ.driver\)' 2>/dev/null || true)"
+  echo "opena8dj_state=$opena8dj_state" > "$run_dir/hal-state.txt"
+  echo "opena8dj_driver_pids=${stale_driver_pids:-none}" >> "$run_dir/hal-state.txt"
+
+  local health_rc=0
+  local enum_rc=0
+  local stale_rc=0
+  health_check || health_rc=$?
+  enumeration_check || enum_rc=$?
+  if [ "$opena8dj_state" = "unloaded" ] && [ -n "$stale_driver_pids" ]; then
+    stale_rc=1
+  fi
+
+  {
+    echo "audio_stack_guard_run_dir=$run_dir"
+    echo "opena8dj_state=$opena8dj_state"
+    echo "opena8dj_driver_pids=${stale_driver_pids:-none}"
+    echo "global_cpu_idle_pct=$idle_pct"
+    echo "min_idle_pct=$min_idle_pct"
+    cat "$run_dir/audio-stack-health.txt"
+    cat "$run_dir/audio-list-status.txt"
+    local idle_ok="0"
+    if awk -v idle="$idle_pct" -v min="$min_idle_pct" 'BEGIN {exit !(idle >= min)}'; then
+      idle_ok="1"
+    fi
+    if [ "$health_rc" = "0" ] && [ "$enum_rc" = "0" ] && [ "$idle_ok" = "1" ] && [ "$stale_rc" = "0" ]; then
+      echo "audio_stack_guard=PASS"
+      return 0
+    fi
+    if [ "$idle_ok" != "1" ]; then
+      echo "error=global_cpu_idle_below_threshold"
+    fi
+    if [ "$stale_rc" != "0" ]; then
+      echo "error=stale_opena8dj_driver_process"
+    fi
+    echo "audio_stack_guard=FAIL"
+    return 1
+  } > "$run_dir/summary.txt"
+}
+
+if evaluate; then
+  cat "$run_dir/summary.txt"
+  exit 0
+fi
+
+if [ "$recover" != "1" ]; then
+  cat "$run_dir/summary.txt"
+  exit 1
+fi
+
+recover_stack
+if evaluate; then
+  cat "$run_dir/summary.txt"
+  exit 0
+fi
+
+cat "$run_dir/summary.txt"
+exit 1

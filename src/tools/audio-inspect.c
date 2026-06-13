@@ -6,6 +6,13 @@
 
 static const CFStringRef kTargetUID = CFSTR("org.opena8dj.Audio8DJ");
 
+#define FourCC(a, b, c, d) \
+    ((((UInt32)(a)) << 24) | (((UInt32)(b)) << 16) | (((UInt32)(c)) << 8) | ((UInt32)(d)))
+
+enum {
+    kOpenA8DJPropertyCycleFrameSize = FourCC('c', 'f', 's', 'z')
+};
+
 static OSStatus GetSize(AudioObjectID objectID,
                         AudioObjectPropertySelector selector,
                         AudioObjectPropertyScope scope,
@@ -302,6 +309,7 @@ static void PrintDeviceTiming(AudioObjectID deviceID)
 {
     Float64 rate = 0.0;
     UInt32 bufferFrames = 0;
+    UInt32 cycleFrames = 0;
     UInt32 bufferBytes = 0;
     AudioValueRange bufferRange;
     AudioValueRange bufferByteRange;
@@ -323,6 +331,14 @@ static void PrintDeviceTiming(AudioObjectID deviceID)
                                     kAudioObjectPropertyElementMain,
                                     &size,
                                     &bufferFrames);
+
+    size = sizeof(cycleFrames);
+    OSStatus cycleStatus = GetData(deviceID,
+                                   kOpenA8DJPropertyCycleFrameSize,
+                                   kAudioObjectPropertyScopeGlobal,
+                                   kAudioObjectPropertyElementMain,
+                                   &size,
+                                   &cycleFrames);
 
     size = sizeof(bufferRange);
     OSStatus rangeStatus = GetData(deviceID,
@@ -358,6 +374,11 @@ static void PrintDeviceTiming(AudioObjectID deviceID)
         printf(" buffer=%u", bufferFrames);
     } else {
         printf(" buffer-error=%d", (int)bufferStatus);
+    }
+    if (cycleStatus == kAudioHardwareNoError) {
+        printf(" cycle=%u", cycleFrames);
+    } else {
+        printf(" cycle-error=%d", (int)cycleStatus);
     }
     if (rangeStatus == kAudioHardwareNoError) {
         printf(" buffer-range=%.0f-%.0f", bufferRange.mMinimum, bufferRange.mMaximum);

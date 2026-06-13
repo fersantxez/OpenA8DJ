@@ -4,17 +4,19 @@ This document tracks using OpenA8DJ with Traktor timecode vinyl or CD control.
 
 ## Current readiness
 
-OpenA8DJ currently provides the Core Audio surface that Traktor needs:
+OpenA8DJ 0.3.24 is an output-focused preview. It provides the playback surface
+Traktor needs for output routing, but it does not yet expose Audio 8 DJ input
+streams to Core Audio:
 
-- 4 stereo output streams: Output A, B, C, and D
-- 4 stereo input streams: Input A, B, C, and D
-- 44.1 and 48 kHz playback validated with Traktor output A/B
+- one 8-channel output stream with named pairs: Output A, B, C, and D
+- no public Core Audio input streams in this release
+- 44.1 and 48 kHz playback validated in local listening tests
 - CAIAQ control access for Audio 8 DJ input mode and ground-lift flags
 - CoreMIDI endpoints published by the installed LaunchAgent
 
-Initial Timecode Vinyl operator validation has passed. The remaining release
-gate is the complete physical matrix: every input pair, vinyl mode, CD/line
-mode, channel order, and low-latency behavior.
+Traktor Scratch/timecode capture is therefore not a supported 0.3.24 feature.
+The remaining release gate is the complete physical matrix: every input pair,
+vinyl mode, CD/line mode, channel order, and low-latency behavior.
 
 ## Pre-test checklist
 
@@ -54,7 +56,8 @@ Deck A -> Output A L/R
 Deck B -> Output B L/R
 ```
 
-7. Assign timecode inputs in Traktor:
+7. Assign timecode inputs in Traktor only after a future build exposes validated
+   Audio 8 DJ inputs:
 
 ```text
 Deck A timecode input -> Input A L/R

@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+threshold="25"
+total_threshold="120"
+reset="0"
+wait_seconds="0"
+
+usage() {
+  cat <<USAGE
+usage: scripts/audio-stack-health [options]
+
+Options:
+  --threshold PCT        Fail if one watched process group exceeds this CPU pct (default: 25)
+  --total-threshold PCT  Fail if watched process groups exceed this total CPU pct (default: 120)
+  --wait SECONDS         Wait before sampling
+  --reset                Restart the audio/media capture stack if unhealthy
+  -h, --help             Show this help
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --threshold)
+      threshold="$2"; shift 2 ;;
+    --total-threshold)
+      total_threshold="$2"; shift 2 ;;
+    --wait)
+      wait_seconds="$2"; shift 2 ;;
+    --reset)
+      reset="1"; shift ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+watch_labels=(
+  "coreaudiod"
+  "opena8dj_driver"
+  "airplay_xpc"
+  "mediaremoted"
+  "audioaccessoryd"
+  "audiomxd"
+  "systemsoundserverd"
+  "controlcenter"
+  "continuity_capture"
+  "callservicesd"
+  "perf_power"
+  "corespeechd"
+  "heard"
+  "avconferenced"
+  "spotify"
+  "ni_hardware_agent"
+)
+
+pattern_for_label() {
+  case "$1" in
+    coreaudiod) echo '[c]oreaudiod' ;;
+    opena8dj_driver) echo '[C]ore Audio Driver \(OpenA8DJ.driver\)' ;;
+    airplay_xpc) echo '[A]irPlayXPCHelper' ;;
+    mediaremoted) echo '[m]ediaremoted' ;;
+    audioaccessoryd) echo '[a]udioaccessoryd' ;;
+    audiomxd) echo '[a]udiomxd' ;;
+    systemsoundserverd) echo '[s]ystemsoundserverd' ;;
+    controlcenter) echo '[C]ontrolCenter.app|[C]ontrolCenter' ;;
+    continuity_capture) echo '[C]ontinuityCaptureAgent' ;;
+    callservicesd) echo '[c]allservicesd' ;;
+    perf_power) echo '[P]erfPowerServices' ;;
+    corespeechd) echo '[c]orespeechd' ;;
+    heard) echo '[h]eard' ;;
+    avconferenced) echo '[a]vconferenced' ;;
+    spotify) echo '[S]potify.app|[S]potify' ;;
+    ni_hardware_agent) echo '[N]IHardwareAgent' ;;
+    *) echo "$1" ;;
+  esac
+}
+
+sum_cpu_for_pids() {
+  local pids="$1"
+  if [ -z "$pids" ]; then
+    printf "0.0"
+    return
+  fi
+  local joined
+  joined="$(printf "%s" "$pids" | paste -sd, -)"
+  ps -p "$joined" -o pcpu= 2>/dev/null | awk '{s += $1} END {printf "%.1f", s + 0}'
+}
+
+print_health() {
+  local status="PASS"
+  local total="0.0"
+  local max_label="none"
+  local max_cpu="0.0"
+  local rows=()
+
+  for label in "${watch_labels[@]}"; do
+    local pattern pids cpu
+    pattern="$(pattern_for_label "$label")"
+    pids="$(pgrep -f "$pattern" 2>/dev/null || true)"
+    pids="$(printf "%s\n" "$pids" | awk -v self="$$" '$1 != "" && $1 != self {print $1}')"
+    cpu="$(sum_cpu_for_pids "$pids")"
+    rows+=("$label|$cpu|$(printf "%s" "$pids" | paste -sd, -)")
+    total="$(awk -v a="$total" -v b="$cpu" 'BEGIN {printf "%.1f", a + b}')"
+    if awk -v c="$cpu" -v m="$max_cpu" 'BEGIN {exit !(c > m)}'; then
+      max_cpu="$cpu"
+      max_label="$label"
+    fi
+  done
+
+  if awk -v c="$max_cpu" -v t="$threshold" 'BEGIN {exit !(c > t)}'; then
+    status="FAIL"
+  fi
+  if awk -v c="$total" -v t="$total_threshold" 'BEGIN {exit !(c > t)}'; then
+    status="FAIL"
+  fi
+
+  echo "audio_stack_health=$status"
+  echo "threshold_cpu_pct=$threshold"
+  echo "total_threshold_cpu_pct=$total_threshold"
+  echo "total_watched_cpu_pct=$total"
+  echo "max_label=$max_label"
+  echo "max_label_cpu_pct=$max_cpu"
+  uptime | sed 's/^/uptime=/'
+  date '+sample_time=%Y-%m-%dT%H:%M:%S%z'
+  for row in "${rows[@]}"; do
+    IFS='|' read -r label cpu pids <<< "$row"
+    echo "process.$label.cpu_pct=$cpu"
+    echo "process.$label.pids=${pids:-none}"
+  done
+
+  [ "$status" = "PASS" ]
+}
+
+reset_stack() {
+  echo "reset_step=coreaudiod"
+  sudo -n killall coreaudiod 2>/dev/null || {
+    echo "reset_error=sudo_required_for_coreaudiod"
+    return 20
+  }
+  sleep 5
+  if print_health >/dev/null; then
+    echo "reset_result=coreaudiod_only"
+    return 0
+  fi
+
+  echo "reset_step=audio_media_capture_cascade"
+  sudo -n killall \
+    AirPlayXPCHelper \
+    mediaremoted \
+    audioaccessoryd \
+    audiomxd \
+    systemsoundserverd \
+    ControlCenter \
+    ContinuityCaptureAgent \
+    callservicesd \
+    PerfPowerServices \
+    corespeechd \
+    heard \
+    avconferenced \
+    Spotify \
+    NIHardwareAgent 2>/dev/null || true
+  sleep 8
+  echo "reset_result=cascade"
+}
+
+if awk -v s="$wait_seconds" 'BEGIN {exit !(s > 0)}'; then
+  sleep "$wait_seconds"
+fi
+
+if print_health; then
+  exit 0
+fi
+
+if [ "$reset" != "1" ]; then
+  exit 1
+fi
+
+reset_stack
+print_health

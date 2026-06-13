@@ -14,6 +14,10 @@ Install:
 2. Follow the macOS Installer prompts.
 3. Reconnect the Audio 8 DJ if it does not appear immediately.
 
+If macOS blocks the installer because it is from an unidentified developer,
+open System Settings > Privacy & Security and approve it, or Control-click the
+package and choose Open. This preview is ad-hoc signed but not Apple-notarized.
+
 The installer adds:
 
 - /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
@@ -36,14 +40,13 @@ forks, mirrors, support services, or repackaged installers official OpenA8DJ
 releases.
 Install and use OpenA8DJ at your own risk.
 
-Current test status:
+Current preview status:
 
+- Version: 0.3.24
 - Core Audio device: Open Audio 8 DJ
-- Audio channels: 4 stereo inputs and 4 stereo outputs
-- Playback: validated locally in Traktor at 44.1 and 48 kHz
-- Traktor output routing: validated locally for Output A and Output B
-- Buffer size control: validated through frame and legacy byte properties
-- Traktor timecode: initial Timecode Vinyl operator validation passed
+- Audio channels: output-focused preview, 0 inputs / 8 outputs
+- Validated playback rates: 44.1 kHz and 48 kHz
+- Timecode/DVS input capture: not supported in this preview
 - Windows: not included in this macOS release
 
 This build is not notarized.

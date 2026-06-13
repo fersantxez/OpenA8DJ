@@ -1,0 +1,769 @@
+#!/usr/bin/env python3
+import argparse
+import datetime as dt
+import json
+import math
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+def repo_root():
+    return Path(__file__).resolve().parents[1]
+
+
+def run(command, cwd, stdout=None, stderr=None, check=True):
+    result = subprocess.run(command, cwd=str(cwd), stdout=stdout, stderr=stderr)
+    if check and result.returncode != 0:
+        raise SystemExit(f"command failed ({result.returncode}): {' '.join(str(part) for part in command)}")
+    return result
+
+
+def make_tools(root, skip_build):
+    if skip_build:
+        return
+    run([
+        "make",
+        "build/audio-wav-play",
+        "build/audio-config",
+        "build/audio-record",
+        "build/opena8dj-control",
+    ], root)
+
+
+def run_id():
+    return dt.datetime.now().strftime("%Y-%m-%dT%H%M%S")
+
+
+def parse_prepare_metadata(path):
+    with open(path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def write_summary(path, lines):
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+VIRTUAL_CAPTURE_HINTS = (
+    "blackhole",
+    "soundflower",
+    "vb-cable",
+    "vbcable",
+    "background music",
+    "loopback audio",
+    "rogue amoeba loopback",
+)
+
+
+def looks_like_virtual_capture(name):
+    if not name:
+        return False
+    normalized = name.strip().lower()
+    return any(hint in normalized for hint in VIRTUAL_CAPTURE_HINTS)
+
+
+CPU_PROFILE_COLUMNS = [
+    "schema_version",
+    "sample_index",
+    "sample_time_epoch",
+    "elapsed_seconds",
+    "stress_active",
+    "active_stress_workers",
+    "coreaudiod",
+    "opena8dj_driver",
+    "windowserver",
+    "controlcenter",
+    "audio_services",
+    "codex_audio_service",
+    "audio_tools",
+    "spotify",
+    "traktor",
+    "top_audio_ui",
+    "total_audio_ui",
+    "system_load1",
+]
+
+
+CPU_ENTITY_PATTERNS = {
+    "coreaudiod": ("coreaudiod",),
+    "opena8dj_driver": ("OpenA8DJ.driver", "Core Audio Driver"),
+    "windowserver": ("WindowServer",),
+    "controlcenter": ("ControlCenter",),
+    "audio_services": (
+        "audiomxd",
+        "systemsoundserverd",
+        "mediaremoted",
+        "audioaccessoryd",
+        "corespeechd",
+        "heard",
+    ),
+    "codex_audio_service": ("audio.mojom.AudioService",),
+    "audio_tools": (
+        "audio-wav-play",
+        "audio-record",
+        "audio-io-test",
+        "opena8dj-control",
+        "run-soundcheck",
+    ),
+    "spotify": ("Spotify",),
+    "traktor": ("Traktor", "Traktor Pro"),
+}
+
+STREAM_STATS_TSV_COLUMNS = [
+    "schema_version",
+    "sample_index",
+    "sample_time_epoch",
+    "elapsed_seconds",
+    "stress_active",
+    "active_stress_workers",
+    "status",
+    "captureTransfersCompleted",
+    "captureTransactionErrors",
+    "playbackTransfersSubmitted",
+    "playbackTransfersCompleted",
+    "playbackTransferErrors",
+    "playbackScheduleErrors",
+    "playbackReschedules",
+    "outputRingFrames",
+    "outputFramesWritten",
+    "outputFramesRead",
+    "outputUnderruns",
+    "outputActiveUnderruns",
+    "outputElasticDrops",
+    "outputElasticReplays",
+    "outputTimelineResets",
+    "outputPanicFlags",
+    "clockAnchorValid",
+    "clockAcceptedAnchors",
+    "clockRejectedAnchors",
+    "clockAnchorResets",
+    "cadenceExpectedTransferTicks",
+    "captureCompletionDeltaOutliers",
+    "playbackCompletionDeltaOutliers",
+    "captureToPlaybackQueueDeltaOutliers",
+    "captureUSBTimestampOutOfOrder",
+    "captureUSBTimestampRepeated",
+    "captureUSBTimestampZero",
+    "playbackZeroCompleteTransactions",
+    "playbackQueueAttempts",
+    "playbackInFlightAtQueueMax",
+    "playbackInFlightAtCompletionMax",
+    "captureLayoutSignatureSum",
+    "playbackQueueLayoutSignatureSum",
+    "playbackLayoutSignatureSum",
+]
+
+
+def capture_stream_stats(root, control, timeout_seconds):
+    try:
+        result = subprocess.run([str(control), "stream-stats"],
+                                cwd=str(root),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                timeout=timeout_seconds)
+        return result.stdout, None
+    except subprocess.TimeoutExpired:
+        return "", f"stream-stats-timeout={timeout_seconds:.3f}s"
+    except OSError as error:
+        return "", f"stream-stats-error={error}"
+
+
+def parse_stream_stats(text):
+    values = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key:
+            values[key] = value
+    return values
+
+
+def write_stream_stats_snapshot(root, base_dir, label, timeout_seconds):
+    control = root / "build" / "opena8dj-control"
+    path = base_dir / f"stream-stats-{label}.txt"
+    text, error = capture_stream_stats(root, control, timeout_seconds)
+    with open(path, "w", encoding="utf-8") as file:
+        file.write(f"# sample_time={time.time():.3f}\n")
+        if error:
+            file.write(f"{error}\n")
+        else:
+            file.write(text)
+            if text and not text.endswith("\n"):
+                file.write("\n")
+    return path
+
+
+def write_stream_stats_tsv_header(file):
+    file.write("\t".join(STREAM_STATS_TSV_COLUMNS) + "\n")
+
+
+def write_stream_stats_tsv_sample(file,
+                                  sample_index,
+                                  playback_start_monotonic,
+                                  stress_active,
+                                  stress_workers,
+                                  stats_text,
+                                  stats_error):
+    now_monotonic = time.monotonic()
+    values = {
+        "schema_version": 1,
+        "sample_index": sample_index,
+        "sample_time_epoch": time.time(),
+        "elapsed_seconds": now_monotonic - playback_start_monotonic,
+        "stress_active": 1 if stress_active else 0,
+        "active_stress_workers": stress_workers if stress_active else 0,
+        "status": "ERROR" if stats_error else "OK",
+    }
+    values.update(parse_stream_stats(stats_text))
+    row = []
+    for column in STREAM_STATS_TSV_COLUMNS:
+        value = str(values.get(column, ""))
+        row.append(value.replace("\t", " ").replace("\n", " "))
+    file.write("\t".join(row) + "\n")
+    file.flush()
+
+
+def stream_stats_once(root, control, file, timeout_seconds):
+    file.write(f"# sample_time={time.time():.3f}\n")
+    text, error = capture_stream_stats(root, control, timeout_seconds)
+    if error:
+        file.write(f"{error}\n")
+    else:
+        file.write(text)
+    file.write("\n")
+    file.flush()
+
+
+def run_audio_stack_health(root, base_dir, args):
+    if args.skip_audio_stack_health or args.prepare_only:
+        return
+    guard_script = root / "scripts" / "audio-stack-guard"
+    health_script = root / "scripts" / "audio-stack-health"
+    if not guard_script.exists() and not health_script.exists():
+        return
+    health_log = base_dir / "audio-stack-health-before.txt"
+    if guard_script.exists():
+        command = [
+            str(guard_script),
+            "--threshold",
+            str(args.audio_stack_threshold),
+            "--total-threshold",
+            str(args.audio_stack_total_threshold),
+            "--wait",
+            str(args.audio_stack_wait),
+            "--enumeration-timeout",
+            str(args.audio_stack_enumeration_timeout),
+            "--min-idle-pct",
+            str(args.audio_stack_min_idle_pct),
+            "--run-dir",
+            str(base_dir / "audio-stack-guard-before"),
+        ]
+        if args.audio_stack_recover_on_fail:
+            command.append("--recover")
+            if args.audio_stack_unload_on_recover:
+                command.append("--unload-opena8dj")
+        with open(health_log, "w", encoding="utf-8") as log:
+            result = subprocess.run(command, cwd=str(root), stdout=log, stderr=subprocess.STDOUT)
+        if result.returncode != 0:
+            write_summary(base_dir / "summary.txt", [
+                "SOUNDCHECK: BLOCKED",
+                "audio stack guard failed before playback",
+                f"health_log={health_log}",
+                f"guard_dir={base_dir / 'audio-stack-guard-before'}",
+                f"run_dir={base_dir}",
+            ])
+            raise SystemExit(f"audio stack guard failed; see {health_log}")
+        return
+
+    with open(health_log, "w", encoding="utf-8") as log:
+        result = subprocess.run([
+            str(health_script),
+            "--threshold",
+            str(args.audio_stack_threshold),
+            "--total-threshold",
+            str(args.audio_stack_total_threshold),
+            "--wait",
+            str(args.audio_stack_wait),
+        ], cwd=str(root), stdout=log, stderr=subprocess.STDOUT)
+    if result.returncode != 0:
+        write_summary(base_dir / "summary.txt", [
+            "SOUNDCHECK: BLOCKED",
+            "audio stack is not idle enough for a reliable pass",
+            f"health_log={health_log}",
+            f"run_dir={base_dir}",
+        ])
+        raise SystemExit(f"audio stack health failed; see {health_log}")
+
+
+def classify_cpu_line(line):
+    parts = line.strip().split(None, 3)
+    if len(parts) < 4:
+        return None
+    try:
+        int(parts[0])
+        cpu = float(parts[1])
+    except ValueError:
+        return None
+    text = parts[3]
+    matches = []
+    for entity, patterns in CPU_ENTITY_PATTERNS.items():
+        if any(pattern in text for pattern in patterns):
+            matches.append(entity)
+    if not matches:
+        return None
+    return cpu, matches
+
+
+def sample_cpu():
+    totals = {entity: 0.0 for entity in CPU_ENTITY_PATTERNS}
+    try:
+        result = subprocess.run(["ps", "-axo", "pid,pcpu,rss,comm,args"],
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                timeout=1.0)
+    except (OSError, subprocess.TimeoutExpired):
+        return totals
+    if result.returncode != 0:
+        return totals
+    for line in result.stdout.splitlines():
+        classified = classify_cpu_line(line)
+        if not classified:
+            continue
+        cpu, matches = classified
+        for entity in matches:
+            totals[entity] += cpu
+    audio_ui_entities = [
+        "coreaudiod",
+        "opena8dj_driver",
+        "windowserver",
+        "controlcenter",
+        "audio_services",
+        "codex_audio_service",
+    ]
+    totals["top_audio_ui"] = max(totals.get(entity, 0.0) for entity in audio_ui_entities)
+    totals["total_audio_ui"] = sum(totals.get(entity, 0.0) for entity in audio_ui_entities)
+    try:
+        totals["system_load1"] = os.getloadavg()[0]
+    except OSError:
+        totals["system_load1"] = 0.0
+    return totals
+
+
+def stress_worker_count(value):
+    if value == "auto":
+        return max(1, min(4, (os.cpu_count() or 2) // 2))
+    try:
+        return max(0, int(value))
+    except ValueError:
+        raise SystemExit(f"invalid --cpu-stress-workers value: {value}")
+
+
+def start_cpu_stress(worker_count, duration_seconds):
+    workers = []
+    code = (
+        "import math,time\n"
+        f"end=time.time()+{max(0.1, duration_seconds):.6f}\n"
+        "x=0.0\n"
+        "while time.time()<end:\n"
+        "    for _ in range(20000):\n"
+        "        x=math.sin(x+1.000001)\n"
+    )
+    for _index in range(worker_count):
+        workers.append(subprocess.Popen([sys.executable, "-c", code],
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL))
+    return workers
+
+
+def stop_cpu_stress(workers):
+    for worker in workers:
+        if worker.poll() is None:
+            worker.terminate()
+    deadline = time.time() + 1.0
+    for worker in workers:
+        while worker.poll() is None and time.time() < deadline:
+            time.sleep(0.02)
+        if worker.poll() is None:
+            worker.kill()
+
+
+def write_cpu_sample(file, sample_index, playback_start_monotonic, stress_active, stress_workers):
+    now_monotonic = time.monotonic()
+    values = {
+        "schema_version": 1,
+        "sample_index": sample_index,
+        "sample_time_epoch": time.time(),
+        "elapsed_seconds": now_monotonic - playback_start_monotonic,
+        "stress_active": 1 if stress_active else 0,
+        "active_stress_workers": stress_workers if stress_active else 0,
+    }
+    values.update(sample_cpu())
+    file.write("\t".join(str(values.get(column, 0.0)) for column in CPU_PROFILE_COLUMNS))
+    file.write("\n")
+    file.flush()
+
+
+def monitor_playback(root, base_dir, playback_process, args, playback_start_monotonic):
+    control = root / "build" / "opena8dj-control"
+    stress_workers = []
+    worker_count = stress_worker_count(args.cpu_stress_workers)
+    stress_started = False
+    stress_finished = False
+    sample_index = 0
+    interval = max(0.05, args.cpu_profile_interval)
+    stream_stats_txt = base_dir / ("stream-stats-during.txt" if args.stream_stats_snapshots else "stream-stats.txt")
+    stream_stats_legacy_txt = base_dir / "stream-stats.txt"
+    with open(stream_stats_txt, "w", encoding="utf-8") as stream_file:
+        legacy_stream_file = None
+        if args.stream_stats_snapshots:
+            legacy_stream_file = open(stream_stats_legacy_txt, "w", encoding="utf-8")
+        stream_tsv_file = None
+        if args.stream_stats_snapshots:
+            stream_tsv_file = open(base_dir / "stream-stats-during.tsv", "w", encoding="utf-8")
+            write_stream_stats_tsv_header(stream_tsv_file)
+        cpu_file = None
+        if args.cpu_profile:
+            cpu_file = open(base_dir / "cpu-profile.tsv", "w", encoding="utf-8")
+            cpu_file.write("\t".join(CPU_PROFILE_COLUMNS) + "\n")
+        try:
+            while playback_process.poll() is None:
+                elapsed = time.monotonic() - playback_start_monotonic
+                if args.cpu_stress and not stress_started and elapsed >= args.cpu_stress_after:
+                    stress_workers = start_cpu_stress(worker_count, args.cpu_stress_seconds)
+                    stress_started = True
+                if (stress_started
+                        and not stress_finished
+                        and elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
+                    stop_cpu_stress(stress_workers)
+                    stress_finished = True
+                stats_text, stats_error = capture_stream_stats(root, control, args.monitor_command_timeout)
+                sample_time = time.time()
+                for file in (stream_file, legacy_stream_file):
+                    if not file:
+                        continue
+                    file.write(f"# sample_time={sample_time:.3f}\n")
+                    if stats_error:
+                        file.write(f"{stats_error}\n")
+                    else:
+                        file.write(stats_text)
+                    file.write("\n")
+                    file.flush()
+                if stream_tsv_file:
+                    write_stream_stats_tsv_sample(stream_tsv_file,
+                                                  sample_index,
+                                                  playback_start_monotonic,
+                                                  stress_started and not stress_finished,
+                                                  worker_count,
+                                                  stats_text,
+                                                  stats_error)
+                if cpu_file:
+                    write_cpu_sample(cpu_file,
+                                     sample_index,
+                                     playback_start_monotonic,
+                                     stress_started and not stress_finished,
+                                     worker_count)
+                sample_index += 1
+                time.sleep(interval)
+        finally:
+            stop_cpu_stress(stress_workers)
+            if stream_tsv_file:
+                stream_tsv_file.close()
+            if legacy_stream_file:
+                legacy_stream_file.close()
+            if cpu_file:
+                cpu_file.close()
+
+
+def build_prepare_command(root, args, fixture_dir):
+    command = [
+        sys.executable,
+        str(root / "scripts" / "prepare-music-fixture.py"),
+        "--out-dir",
+        str(fixture_dir),
+        "--rate",
+        str(args.rate),
+        "--seconds",
+        str(args.seconds),
+        "--mode",
+        args.mode,
+        "--target-peak-db",
+        str(args.target_peak_db),
+    ]
+    if args.music_file:
+        command.extend(["--music-file", args.music_file])
+    else:
+        for music_dir in args.music_dir or [str(Path.home() / "Music"), str(Path.home() / "Downloads")]:
+            command.extend(["--music-dir", music_dir])
+    return command
+
+
+def load_metrics(path):
+    with open(path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def soundcheck_summary(metadata, metrics, args):
+    verdict = metrics.get("verdict", "FAIL")
+    clicks = int(metrics.get("left_click_outliers", 0)) + int(metrics.get("right_click_outliers", 0))
+    min_snr = min(float(metrics.get("left_snr_db", 0.0)), float(metrics.get("right_snr_db", 0.0)))
+    mid_ratio = float(metrics.get("mid_band_residual_ratio", 0.0))
+    mid_dbfs = float(metrics.get("mid_band_residual_dbfs", -240.0))
+    high_ratio = float(metrics.get("high_band_residual_ratio", 0.0))
+    high_dbfs = float(metrics.get("high_band_residual_dbfs", -240.0))
+    quiet_mid_dbfs = float(metrics.get("quiet_mid_band_noise_dbfs", -240.0))
+    cpu_corr = float(metrics.get("mid_band_cpu_corr_max", 0.0))
+    cpu_corr_column = metrics.get("mid_band_cpu_corr_max_column", "")
+    lines = [
+        f"SOUNDCHECK {args.pair} {args.rate}/{args.buffer}: {verdict}",
+        f"source={metadata.get('source_name', '')} offset={metadata.get('start_seconds', 0.0):.3f}s mode={metadata.get('mode', args.mode)}",
+        f"alignment_score={float(metrics.get('alignment_score', 0.0)):.6f}",
+        f"quality_alignment_score={float(metrics.get('quality_alignment_score', 0.0)):.6f}",
+        f"time_warp={int(metrics.get('time_warp_enabled', 0))} drift_frames={int(metrics.get('time_warp_lag_drift_frames', 0))}",
+        f"analog_snr_db={min_snr:.2f}",
+        f"mid_band_1000_5000_residual_ratio={mid_ratio:.6f}",
+        f"mid_band_1000_5000_residual_dbfs={mid_dbfs:.2f}",
+        f"high_band_5000_12000_residual_ratio={high_ratio:.6f}",
+        f"high_band_5000_12000_residual_dbfs={high_dbfs:.2f}",
+        f"quiet_mid_band_noise_dbfs={quiet_mid_dbfs:.2f}",
+        f"mid_band_cpu_corr={cpu_corr:.6f} source={cpu_corr_column}",
+        f"click_outliers={clicks}",
+        f"lag_jumps_gt_2_frames={metrics.get('lag_jumps_gt_2_frames', 0)}",
+        f"capture_clipped_frames={metrics.get('capture_clipped_frames', 0)}",
+    ]
+    for error in metrics.get("errors", []):
+        lines.append(f"error={error}")
+    return lines
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run an OpenA8DJ soundcheck with real local music.")
+    parser.add_argument("--music-file")
+    parser.add_argument("--music-dir", action="append")
+    parser.add_argument("--pair", default="A")
+    parser.add_argument("--rate", type=int, default=48000)
+    parser.add_argument("--buffer", type=int, default=512)
+    parser.add_argument("--seconds", type=float, default=20.0)
+    parser.add_argument("--mode", choices=("dense", "transient", "wideband", "start"), default="dense")
+    parser.add_argument("--target-peak-db", type=float, default=-12.0)
+    parser.add_argument("--capture-device")
+    parser.add_argument("--capture-channels", default="1,2")
+    parser.add_argument("--allow-virtual-capture", action="store_true")
+    parser.add_argument("--run-dir")
+    parser.add_argument("--prepare-only", action="store_true")
+    parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--skip-config", action="store_true")
+    parser.add_argument("--max-lag", type=int, default=1024)
+    parser.add_argument("--drift-profile", action="store_true")
+    parser.add_argument("--time-warp", action="store_true", default=True)
+    parser.add_argument("--no-time-warp", action="store_false", dest="time_warp")
+    parser.add_argument("--time-warp-max-lag", type=int, default=128)
+    parser.add_argument("--min-alignment", type=float, default=0.98)
+    parser.add_argument("--min-snr-db", type=float, default=35.0)
+    parser.add_argument("--max-clicks", type=int, default=10)
+    parser.add_argument("--max-lag-jumps", type=int, default=0)
+    parser.add_argument("--cpu-profile", action="store_true", default=True)
+    parser.add_argument("--no-cpu-profile", action="store_false", dest="cpu_profile")
+    parser.add_argument("--cpu-profile-interval", type=float, default=0.25)
+    parser.add_argument("--cpu-stress", action="store_true")
+    parser.add_argument("--cpu-stress-after", type=float, default=5.0)
+    parser.add_argument("--cpu-stress-seconds", type=float, default=8.0)
+    parser.add_argument("--cpu-stress-workers", default="auto")
+    parser.add_argument("--monitor-command-timeout", type=float, default=1.0)
+    parser.add_argument("--stream-stats-snapshots", action="store_true",
+                        help="write stream-stats-before.txt, stream-stats-during.txt/.tsv, and stream-stats-after.txt")
+    parser.add_argument("--skip-audio-stack-health", action="store_true")
+    parser.add_argument("--audio-stack-threshold", type=float, default=25.0)
+    parser.add_argument("--audio-stack-total-threshold", type=float, default=120.0)
+    parser.add_argument("--audio-stack-wait", type=float, default=2.0)
+    parser.add_argument("--audio-stack-enumeration-timeout", type=float, default=5.0)
+    parser.add_argument("--audio-stack-min-idle-pct", type=float, default=20.0)
+    parser.add_argument("--audio-stack-recover-on-fail", action="store_true")
+    parser.add_argument("--audio-stack-unload-on-recover", action="store_true", default=True)
+    parser.add_argument("--audio-stack-keep-opena8dj-on-recover",
+                        action="store_false",
+                        dest="audio_stack_unload_on_recover")
+    parser.add_argument("--max-mid-band-residual-ratio", type=float, default=0.04)
+    parser.add_argument("--max-high-band-residual-ratio", type=float, default=0.08)
+    parser.add_argument("--max-quiet-mid-band-noise-dbfs", type=float, default=-58.0)
+    parser.add_argument("--max-mid-band-cpu-corr", type=float, default=0.60)
+    args = parser.parse_args()
+
+    root = repo_root()
+    make_tools(root, args.skip_build)
+    base_dir = Path(args.run_dir).expanduser() if args.run_dir else root / "local-analysis" / "soundcheck" / run_id()
+    base_dir.mkdir(parents=True, exist_ok=True)
+    fixture_dir = base_dir / "fixture"
+
+    if not args.prepare_only and not args.capture_device:
+        write_summary(base_dir / "summary.txt", [
+            "SOUNDCHECK: BLOCKED",
+            "capture-device is required for analog loopback",
+            f"run_dir={base_dir}",
+        ])
+        raise SystemExit("provide --capture-device, for example --capture-device default or an external recorder name")
+
+    if (not args.prepare_only
+            and not args.allow_virtual_capture
+            and looks_like_virtual_capture(args.capture_device)):
+        write_summary(base_dir / "summary.txt", [
+            "SOUNDCHECK: BLOCKED",
+            "capture-device appears to be a virtual/pre-device route",
+            "use a real post-device capture input or pass --allow-virtual-capture for diagnostic-only runs",
+            f"capture_device={args.capture_device}",
+            f"run_dir={base_dir}",
+        ])
+        raise SystemExit(
+            "capture-device appears virtual/pre-device; use a real post-device capture input"
+        )
+
+    run_audio_stack_health(root, base_dir, args)
+
+    prepare_log = base_dir / "prepare.log"
+    with open(prepare_log, "w", encoding="utf-8") as log:
+        run(build_prepare_command(root, args, fixture_dir), root, stdout=log, stderr=subprocess.STDOUT)
+    metadata = parse_prepare_metadata(fixture_dir / "source.json")
+    reference = Path(metadata["reference_wav"])
+
+    if args.prepare_only:
+        summary = [
+            f"SOUNDCHECK PREFLIGHT: READY",
+            f"source={metadata.get('source_name', '')}",
+            f"reference={reference}",
+            f"mode={metadata.get('mode', args.mode)}",
+            f"rate={metadata.get('rate', args.rate)}",
+            f"seconds={metadata.get('seconds', args.seconds)}",
+            f"run_dir={base_dir}",
+        ]
+        write_summary(base_dir / "summary.txt", summary)
+        print("\n".join(summary))
+        return 0
+
+    if not args.skip_config:
+        with open(base_dir / "audio-config.log", "w", encoding="utf-8") as log:
+            run([
+                str(root / "build" / "audio-config"),
+                "org.opena8dj.Audio8DJ",
+                str(args.rate),
+                str(args.buffer),
+            ], root, stdout=log, stderr=subprocess.STDOUT)
+
+    if args.stream_stats_snapshots:
+        write_stream_stats_snapshot(root, base_dir, "before", args.monitor_command_timeout)
+
+    capture = base_dir / "captured.wav"
+    record_seconds = int(math.ceil(args.seconds + 2.0))
+    record_log = open(base_dir / "record.log", "w", encoding="utf-8")
+    play_log = open(base_dir / "play.log", "w", encoding="utf-8")
+    try:
+        recorder = subprocess.Popen([
+            str(root / "build" / "audio-record"),
+            str(record_seconds),
+            str(capture),
+            args.capture_device,
+            args.capture_channels,
+        ], cwd=str(root), stdout=record_log, stderr=subprocess.STDOUT)
+        time.sleep(0.6)
+        playback_start_monotonic = time.monotonic()
+        player = subprocess.Popen([
+            str(root / "build" / "audio-wav-play"),
+            str(reference),
+            args.pair,
+        ], cwd=str(root), stdout=play_log, stderr=subprocess.STDOUT)
+        monitor_playback(root, base_dir, player, args, playback_start_monotonic)
+        player_rc = player.wait()
+        recorder_rc = recorder.wait()
+    finally:
+        record_log.close()
+        play_log.close()
+
+    if args.stream_stats_snapshots:
+        write_stream_stats_snapshot(root, base_dir, "after", args.monitor_command_timeout)
+
+    if player_rc != 0 or recorder_rc != 0:
+        write_summary(base_dir / "summary.txt", [
+            "SOUNDCHECK: FAIL",
+            f"player_rc={player_rc}",
+            f"recorder_rc={recorder_rc}",
+            *(["stream_stats_before=stream-stats-before.txt",
+               "stream_stats_during=stream-stats-during.txt",
+               "stream_stats_during_tsv=stream-stats-during.tsv",
+               "stream_stats_after=stream-stats-after.txt"] if args.stream_stats_snapshots else []),
+            f"run_dir={base_dir}",
+        ])
+        raise SystemExit(f"soundcheck playback/record failed; see {base_dir}")
+
+    metrics_json = base_dir / "metrics.json"
+    analysis_txt = base_dir / "analysis.txt"
+    analysis_err = base_dir / "analysis.err"
+    cpu_profile_path = base_dir / "cpu-profile.tsv"
+    coupling_profile_path = base_dir / "coupling-profile.json"
+    with open(analysis_txt, "w", encoding="utf-8") as out, open(analysis_err, "w", encoding="utf-8") as err:
+        analysis = run([
+            sys.executable,
+            str(root / "scripts" / "analyze-soundcheck-capture.py"),
+            str(reference),
+            str(capture),
+            "--max-seconds",
+            str(args.seconds),
+            "--max-lag",
+            str(args.max_lag),
+            *(["--time-warp"] if args.time_warp else []),
+            "--time-warp-max-lag",
+            str(args.time_warp_max_lag),
+            *(["--drift-profile"] if args.drift_profile else []),
+            "--min-alignment",
+            str(args.min_alignment),
+            "--min-snr-db",
+            str(args.min_snr_db),
+            "--max-clicks",
+            str(args.max_clicks),
+            "--max-lag-jumps",
+            str(args.max_lag_jumps),
+            *(["--cpu-profile", str(cpu_profile_path)] if cpu_profile_path.exists() else []),
+            "--coupling-profile-out",
+            str(coupling_profile_path),
+            "--max-mid-band-residual-ratio",
+            str(args.max_mid_band_residual_ratio),
+            "--max-high-band-residual-ratio",
+            str(args.max_high_band_residual_ratio),
+            "--max-quiet-mid-band-noise-dbfs",
+            str(args.max_quiet_mid_band_noise_dbfs),
+            "--max-mid-band-cpu-corr",
+            str(args.max_mid_band_cpu_corr),
+            "--json-out",
+            str(metrics_json),
+        ], root, stdout=out, stderr=err, check=False)
+
+    if metrics_json.exists():
+        metrics = load_metrics(metrics_json)
+    else:
+        analysis_error = "analysis did not produce metrics"
+        if analysis_err.exists():
+            error_text = analysis_err.read_text(encoding="utf-8", errors="replace").strip()
+            if error_text:
+                analysis_error = error_text.splitlines()[0]
+        metrics = {"verdict": "FAIL", "errors": [analysis_error]}
+    summary = soundcheck_summary(metadata, metrics, args)
+    if args.stream_stats_snapshots:
+        summary.extend([
+            "stream_stats_before=stream-stats-before.txt",
+            "stream_stats_during=stream-stats-during.txt",
+            "stream_stats_during_tsv=stream-stats-during.tsv",
+            "stream_stats_after=stream-stats-after.txt",
+        ])
+    summary.append(f"run_dir={base_dir}")
+    write_summary(base_dir / "summary.txt", summary)
+    print("\n".join(summary))
+    return 0 if analysis.returncode == 0 and metrics.get("verdict") == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

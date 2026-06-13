@@ -13,6 +13,11 @@ typedef struct TestState {
     UInt64 inputFrames;
     double inputSquareSum;
     double inputPeak;
+    UInt64 outputBuffers;
+    UInt64 outputSamples;
+    UInt64 outputFrames;
+    double outputPeak;
+    double amplitude;
 } TestState;
 
 static OSStatus GetProperty(AudioObjectID objectID,
@@ -180,14 +185,24 @@ static OSStatus IOProc(AudioObjectID inDevice,
             float *samples = (float *)buffer->mData;
             UInt32 channels = buffer->mNumberChannels;
             UInt32 sampleCount = buffer->mDataByteSize / (UInt32)sizeof(float);
+            if (samples == NULL || channels == 0 || sampleCount == 0) {
+                continue;
+            }
+            state->outputBuffers++;
+            state->outputSamples += sampleCount;
+            state->outputFrames += sampleCount / channels;
             for (UInt32 i = 0; i < sampleCount; i += channels) {
-                float value = (float)(0.02 * sin(state->phase));
+                float value = (float)(state->amplitude * sin(state->phase));
                 state->phase += (2.0 * M_PI * 440.0) / state->sampleRate;
                 if (state->phase >= 2.0 * M_PI) {
                     state->phase -= 2.0 * M_PI;
                 }
                 for (UInt32 channel = 0; channel < channels && i + channel < sampleCount; channel++) {
                     samples[i + channel] = channel < 2 ? value : 0.0f;
+                    double absValue = fabs(samples[i + channel]);
+                    if (absValue > state->outputPeak) {
+                        state->outputPeak = absValue;
+                    }
                 }
             }
         }
@@ -201,10 +216,12 @@ int main(int argc, char **argv)
     double requestedRate = 0.0;
     UInt32 requestedBufferFrames = 0;
     UInt32 requestedBufferBytes = 0;
+    double amplitude = 0.02;
     if (argc > 1) {
         seconds = atoi(argv[1]);
-        if (seconds <= 0 || seconds > 30) {
-            seconds = 3;
+        if (seconds <= 0 || seconds > 120) {
+            fprintf(stderr, "seconds must be between 1 and 120\n");
+            return 11;
         }
     }
     if (argc > 2) {
@@ -218,6 +235,13 @@ int main(int argc, char **argv)
             requestedBufferFrames = (UInt32)strtoul(argv[3], NULL, 10);
         }
     }
+    if (argc > 4) {
+        amplitude = strtod(argv[4], NULL);
+        if (!isfinite(amplitude) || amplitude < 0.0 || amplitude > 1.0) {
+            fprintf(stderr, "amplitude must be between 0.0 and 1.0\n");
+            return 10;
+        }
+    }
 
     AudioObjectID device = FindDeviceByUID(CFSTR("org.opena8dj.Audio8DJ"));
     if (device == kAudioObjectUnknown) {
@@ -228,6 +252,7 @@ int main(int argc, char **argv)
     TestState state;
     memset(&state, 0, sizeof(state));
     state.sampleRate = 48000.0;
+    state.amplitude = amplitude;
     if (requestedRate > 0.0) {
         OSStatus setRate = SetProperty(device,
                                        kAudioDevicePropertyNominalSampleRate,
@@ -303,11 +328,15 @@ int main(int argc, char **argv)
     if (state.inputFrames > 0) {
         rms = sqrt(state.inputSquareSum / ((double)state.inputFrames * 8.0));
     }
-    printf("I/O OK: rate=%.0f callbacks=%llu inputFrames=%llu inputRMS=%.8f inputPeak=%.8f\n",
+    printf("I/O OK: rate=%.0f callbacks=%llu outputBuffers=%llu outputFrames=%llu outputSamples=%llu outputPeak=%.8f inputFrames=%llu inputRMS=%.8f inputPeak=%.8f\n",
            state.sampleRate,
            state.callbacks,
+           state.outputBuffers,
+           state.outputFrames,
+           state.outputSamples,
+           state.outputPeak,
            state.inputFrames,
            rms,
            state.inputPeak);
-    return state.callbacks > 0 ? 0 : 5;
+    return state.callbacks > 0 && state.outputSamples > 0 && state.outputPeak > 0.0 ? 0 : 5;
 }

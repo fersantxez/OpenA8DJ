@@ -29,15 +29,17 @@ artifacts are temporary CI files and are not used for distribution.
 
 Current public preview downloads:
 
-- [OpenA8DJ 0.2.6 public preview release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.2.6)
-- [macOS DMG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6.dmg)
-- [macOS PKG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6.pkg)
-- [SHA-256 checksums](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.2.6/OpenA8DJ-0.2.6-checksums.txt)
+- [OpenA8DJ 0.3.24 public preview release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.3.24)
+- [macOS DMG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.3.24/OpenA8DJ-0.3.24.dmg)
+- [macOS PKG installer](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.3.24/OpenA8DJ-0.3.24.pkg)
+- [SHA-256 checksums](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.3.24/OpenA8DJ-0.3.24-checksums.txt)
 
-Important: these are public preview builds. The macOS packages are not yet
-Developer ID signed or Apple-notarized. Any Windows packages are experimental
-driver packages, not a production MSI. See the release notes before installing.
-Install and use OpenA8DJ at your own risk.
+Important: these are public preview builds. The macOS packages are ad-hoc
+signed for local loading, but they are not yet Developer ID signed or
+Apple-notarized. macOS may require the usual unsigned-package approval step.
+Any Windows packages are experimental driver packages, not a production MSI.
+See the release notes before installing. Install and use OpenA8DJ at your own
+risk.
 
 ## Support
 
@@ -54,29 +56,29 @@ and feature requests:
 
 ## Current Status
 
-OpenA8DJ 0.2.6 is validated locally on Apple Silicon/macOS 26.5:
+OpenA8DJ 0.3.24 is validated locally on Apple Silicon/macOS as an output-focused
+public preview:
 
-- macOS enumerates `Open Audio 8 DJ` as 8 inputs and 8 outputs.
-- The HAL exposes 4 stereo input streams and 4 stereo output streams:
-  Input A/B/C/D and Output A/B/C/D.
-- Traktor sees the driver and accepts it as an audio device.
-- Output A and Output B route independently in Traktor.
+- macOS enumerates `Open Audio 8 DJ` as 0 inputs and 8 outputs.
+- The HAL exposes one 8-channel output stream with named stereo pairs:
+  Output A/B/C/D.
 - 44.1 and 48 kHz playback are working in local listening tests.
+- The current USB transport is capture-paced internally while keeping Core
+  Audio input streams hidden for stability.
+- Physical iRig loopback tests and human listening found 0.3.24 substantially
+  cleaner than earlier crackling builds.
 - Core Audio buffer-size control is implemented through both frame-based and
   legacy byte-based properties.
 - CoreMIDI endpoints appear as `Open Audio 8 DJ MIDI In` and
   `Open Audio 8 DJ MIDI Out`.
-- The Timecode Vinyl hardware profile has passed initial Traktor operator
-  validation, including a DVS capture phase fix for Input B/D.
 - A macOS DMG/PKG installer is generated and verified locally.
 
 Remaining release gates:
 
-- Physical validation of every input pair.
-- Full DVS matrix validation for vinyl and CD/line modes across every input
-  pair.
+- Core Audio input streams and the full DVS/timecode matrix.
+- Physical validation of every output pair beyond the currently tested route.
 - 88.2/96 kHz production-quality validation.
-- Public distribution through Developer ID signing and Apple notarization.
+- Developer ID signing and Apple notarization for a polished end-user release.
 
 ## Install
 
@@ -140,12 +142,12 @@ Pair routing:
 ./build/audio-pair-tone D 3 1100 0.06
 ```
 
-## Traktor Timecode
+## Traktor
 
-The driver exposes the required stereo inputs and hardware control profile for
-Traktor Scratch/timecode use. Initial Timecode Vinyl validation has passed, but
-the full release gate still requires every physical input pair and CD/line mode
-to be tested.
+The 0.3.24 preview is intended for playback/output testing first. Traktor can
+use `Open Audio 8 DJ` as an 8-channel output device, with Output A/B/C/D exposed
+as named channel pairs, but Core Audio input streams are hidden in this release,
+so Traktor Scratch/timecode capture is not a supported 0.3.24 feature yet.
 
 For vinyl timecode testing, put the interface in the hardware DVS profile first:
 
@@ -153,11 +155,12 @@ For vinyl timecode testing, put the interface in the hardware DVS profile first:
 /usr/local/bin/opena8dj-control profile timecode-vinyl
 ```
 
-Use [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the test plan.
+Use [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the DVS roadmap and
+future test plan.
 
 ## Windows
 
-OpenA8DJ 0.2.6 is primarily a macOS release. The repository now also contains
+OpenA8DJ 0.3.24 is primarily a macOS release. The repository also contains
 an experimental Windows 10/11 WDK workstream under `windows/`.
 
 The Windows package builds a test-signed KMDF driver, INF/catalog package, and

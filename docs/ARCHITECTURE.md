@@ -44,14 +44,16 @@ uid: org.opena8dj.Audio8DJ
 
 The device exposes:
 
-- 4 stereo input streams, mapped as Input A/B/C/D
-- 4 stereo output streams, mapped as Output A/B/C/D
-- 44.1, 48, 88.2, and 96 kHz sample rates
-- `Float32` interleaved Core Audio buffers per stereo stream
+- one 8-channel output stream, with named stereo pairs Output A/B/C/D
+- no public Core Audio input streams in the 0.3.24 preview
+- 44.1 and 48 kHz validated playback rates
+- `Float32` interleaved Core Audio output buffers
 - discrete channel labels and A/B/C/D left/right channel names
 
 Internally, the USB transport converts between Core Audio `Float32` samples and
-the Audio 8 DJ 24-bit big-endian CAIAQ audio stream.
+the Audio 8 DJ 24-bit big-endian CAIAQ audio stream. The USB capture endpoint is
+used internally for device cadence, but that does not mean Audio 8 DJ inputs are
+exposed to Core Audio clients in this release.
 
 ## USB protocol
 

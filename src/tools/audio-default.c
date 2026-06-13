@@ -123,10 +123,9 @@ int main(int argc, char **argv)
         PrintCFString(name);
         printf("\n");
 
-        if (selected == kAudioObjectUnknown) {
-            int isOpenA8DJ = StringEqualsCString(uid, "org.opena8dj.Audio8DJ");
-            int matchesRequest = requestedUID != NULL && StringEqualsCString(uid, requestedUID);
-            if ((requestedUID != NULL && matchesRequest) || (requestedUID == NULL && !isOpenA8DJ)) {
+        if (requestedUID != NULL && selected == kAudioObjectUnknown) {
+            int matchesRequest = StringEqualsCString(uid, requestedUID);
+            if (matchesRequest) {
                 selected = devices[i];
             }
         }
@@ -140,15 +139,35 @@ int main(int argc, char **argv)
     }
     free(devices);
 
-    if (selected == kAudioObjectUnknown) {
-        fprintf(stderr, "No encontre una salida alternativa.\n");
-        return 5;
-    }
-
     AudioObjectPropertyAddress defaults[] = {
         {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain},
         {kAudioHardwarePropertyDefaultSystemOutputDevice, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain}
     };
+    AudioObjectID defaultOutput = kAudioObjectUnknown;
+    AudioObjectID defaultSystem = kAudioObjectUnknown;
+    status = GetAudioObjectIDProperty(kAudioObjectSystemObject,
+                                      kAudioHardwarePropertyDefaultOutputDevice,
+                                      &defaultOutput);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr, "No se pudo verificar default output: %d\n", (int)status);
+        return 7;
+    }
+    status = GetAudioObjectIDProperty(kAudioObjectSystemObject,
+                                      kAudioHardwarePropertyDefaultSystemOutputDevice,
+                                      &defaultSystem);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr, "No se pudo verificar default system output: %d\n", (int)status);
+        return 8;
+    }
+    if (requestedUID == NULL) {
+        printf("Default output actual=%u system_actual=%u\n", defaultOutput, defaultSystem);
+        return 0;
+    }
+    if (selected == kAudioObjectUnknown) {
+        fprintf(stderr, "No encontre la salida solicitada: %s\n", requestedUID);
+        return 5;
+    }
+
     for (size_t i = 0; i < sizeof(defaults) / sizeof(defaults[0]); i++) {
         status = AudioObjectSetPropertyData(kAudioObjectSystemObject,
                                             &defaults[i],
@@ -162,8 +181,6 @@ int main(int argc, char **argv)
         }
     }
 
-    AudioObjectID defaultOutput = kAudioObjectUnknown;
-    AudioObjectID defaultSystem = kAudioObjectUnknown;
     status = GetAudioObjectIDProperty(kAudioObjectSystemObject,
                                       kAudioHardwarePropertyDefaultOutputDevice,
                                       &defaultOutput);

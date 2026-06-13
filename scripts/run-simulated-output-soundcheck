@@ -1,0 +1,306 @@
+#!/usr/bin/env python3
+import argparse
+import datetime as dt
+import importlib.util
+import json
+import math
+import subprocess
+import sys
+import wave
+from pathlib import Path
+
+
+def repo_root():
+    return Path(__file__).resolve().parents[1]
+
+
+def run_id():
+    return dt.datetime.now().strftime("%Y-%m-%dT%H%M%S")
+
+
+def run(command, cwd, stdout=None, stderr=None, check=True):
+    result = subprocess.run(command, cwd=str(cwd), stdout=stdout, stderr=stderr, text=False)
+    if check and result.returncode != 0:
+        raise SystemExit(f"command failed ({result.returncode}): {' '.join(str(part) for part in command)}")
+    return result
+
+
+def load_packer_module(root):
+    path = root / "scripts" / "validate-mode2-output-packing.py"
+    spec = importlib.util.spec_from_file_location("mode2_packer", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def build_prepare_command(root, args, fixture_dir):
+    command = [
+        sys.executable,
+        str(root / "scripts" / "prepare-music-fixture.py"),
+        "--out-dir",
+        str(fixture_dir),
+        "--rate",
+        str(args.rate),
+        "--seconds",
+        str(args.seconds),
+        "--mode",
+        args.mode,
+        "--target-peak-db",
+        str(args.target_peak_db),
+    ]
+    if args.music_file:
+        command.extend(["--music-file", args.music_file])
+    else:
+        for music_dir in args.music_dir or [str(Path.home() / "Music"), str(Path.home() / "Downloads")]:
+            command.extend(["--music-dir", music_dir])
+    return command
+
+
+def decode_sample(raw, width):
+    if width == 1:
+        return (raw[0] - 128) / 128.0
+    if width == 2:
+        return int.from_bytes(raw, "little", signed=True) / 32768.0
+    if width == 3:
+        value = raw[0] | (raw[1] << 8) | (raw[2] << 16)
+        if value & 0x800000:
+            value |= ~0xffffff
+        return value / 8388608.0
+    if width == 4:
+        return int.from_bytes(raw, "little", signed=True) / 2147483648.0
+    raise SystemExit(f"unsupported WAV sample width: {width * 8} bits")
+
+
+def read_wav_pair(path):
+    with wave.open(str(path), "rb") as wav:
+        channels = wav.getnchannels()
+        width = wav.getsampwidth()
+        rate = wav.getframerate()
+        raw = wav.readframes(wav.getnframes())
+    pair = []
+    step = channels * width
+    for offset in range(0, len(raw), step):
+        left = decode_sample(raw[offset:offset + width], width)
+        right = left
+        if channels > 1:
+            right = decode_sample(raw[offset + width:offset + 2 * width], width)
+        pair.append((left, right))
+    return rate, pair
+
+
+def write_wav_pair(path, rate, pair):
+    with wave.open(str(path), "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        data = bytearray()
+        for left, right in pair:
+            for sample in (left, right):
+                sample = max(-1.0, min(1.0, sample))
+                data.extend(int(round(sample * 32767.0)).to_bytes(2, "little", signed=True))
+        wav.writeframes(bytes(data))
+
+
+def pair_name_to_index(text):
+    text = text.upper()
+    if text in ("A", "B", "C", "D"):
+        return ord(text) - ord("A")
+    value = int(text)
+    if value < 0 or value > 3:
+        raise SystemExit("pair must be A-D or 0-3")
+    return value
+
+
+def build_8ch_frames(pair, pair_index):
+    frames = []
+    left_channel = pair_index * 2
+    right_channel = left_channel + 1
+    for left, right in pair:
+        frame = [0.0] * 8
+        frame[left_channel] = left
+        frame[right_channel] = right
+        frames.append(tuple(frame))
+    return frames
+
+
+def s24_to_float(value):
+    return max(-1.0, min(1.0, value / 8388608.0))
+
+
+def simulate_output(reference_pair, pair_index, packer_module, args):
+    frames = build_8ch_frames(reference_pair, pair_index)
+    packer = packer_module.Mode2OutputPacker(frames, args.start_byte, args.gain, args.byte_order)
+    packed = bytearray()
+    max_transfers = max(4, math.ceil((len(frames) + 8) * 32 / args.transfer_bytes) + 4)
+    for _index in range(max_transfers):
+        packed.extend(packer.fill(args.transfer_bytes))
+    decoded = packer_module.decode_mode2_usb_bytes(bytes(packed),
+                                                   args.start_byte,
+                                                   args.transfer_bytes,
+                                                   args.byte_order)
+    if len(decoded.frames) < max(1, len(frames) - 1):
+        raise SystemExit("simulated packer did not decode enough frames")
+    decoded_pair = []
+    left_channel = pair_index * 2
+    right_channel = left_channel + 1
+    for frame in decoded.frames:
+        decoded_pair.append((s24_to_float(frame[left_channel]), s24_to_float(frame[right_channel])))
+    return bytes(packed), decoded, decoded_pair
+
+
+def write_cpu_profile(path, seconds):
+    header = [
+        "schema_version",
+        "sample_index",
+        "sample_time_epoch",
+        "elapsed_seconds",
+        "stress_active",
+        "active_stress_workers",
+        "coreaudiod",
+        "opena8dj_driver",
+        "windowserver",
+        "controlcenter",
+        "audio_services",
+        "codex_audio_service",
+        "audio_tools",
+        "spotify",
+        "traktor",
+        "top_audio_ui",
+        "total_audio_ui",
+        "system_load1",
+    ]
+    with open(path, "w", encoding="utf-8") as file:
+        file.write("\t".join(header) + "\n")
+        sample_index = 0
+        t = 0.0
+        while t <= seconds + 0.25:
+            row = [1, sample_index, 1800000000.0 + t, t, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            file.write("\t".join(str(value) for value in row) + "\n")
+            sample_index += 1
+            t += 0.25
+
+
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+def summary_lines(metadata, metrics, args, run_dir, packed_bytes, decoded_frames):
+    verdict = metrics.get("verdict", "FAIL")
+    min_snr = min(float(metrics.get("left_snr_db", 0.0)), float(metrics.get("right_snr_db", 0.0)))
+    return [
+        f"SIMULATED OUTPUT SOUNDCHECK {args.pair} {args.rate}: {verdict}",
+        f"source={metadata.get('source_name', '')} offset={metadata.get('start_seconds', 0.0):.3f}s mode={metadata.get('mode', args.mode)}",
+        f"simulated_output=no_real_speakers_no_microphone",
+        f"gain={args.gain} byte_order={args.byte_order} start_byte={args.start_byte} transfer_bytes={args.transfer_bytes}",
+        f"packed_bytes={packed_bytes}",
+        f"decoded_frames={decoded_frames}",
+        f"alignment_score={float(metrics.get('alignment_score', 0.0)):.6f}",
+        f"simulated_snr_db={min_snr:.2f}",
+        f"mid_band_1000_5000_residual_ratio={float(metrics.get('mid_band_residual_ratio', 0.0)):.6f}",
+        f"mid_band_1000_5000_residual_dbfs={float(metrics.get('mid_band_residual_dbfs', -240.0)):.2f}",
+        f"mid_band_cpu_corr={float(metrics.get('mid_band_cpu_corr_max', 0.0)):.6f} source={metrics.get('mid_band_cpu_corr_max_column', '')}",
+        f"run_dir={run_dir}",
+    ]
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run a software-only OpenA8DJ output simulation soundcheck.")
+    parser.add_argument("--music-file")
+    parser.add_argument("--music-dir", action="append")
+    parser.add_argument("--pair", default="A")
+    parser.add_argument("--rate", type=int, default=48000)
+    parser.add_argument("--seconds", type=float, default=6.0)
+    parser.add_argument("--mode", choices=("dense", "transient", "wideband", "start"), default="dense")
+    parser.add_argument("--target-peak-db", type=float, default=-12.0)
+    parser.add_argument("--gain", type=float, default=0.5)
+    parser.add_argument("--byte-order", choices=("big", "native"), default="big")
+    parser.add_argument("--start-byte", type=int, default=4)
+    parser.add_argument("--transfer-bytes", type=int, default=352)
+    parser.add_argument("--max-mid-band-residual-ratio", type=float, default=0.04)
+    parser.add_argument("--max-mid-band-cpu-corr", type=float, default=0.60)
+    parser.add_argument("--run-dir")
+    args = parser.parse_args()
+
+    root = repo_root()
+    pair_index = pair_name_to_index(args.pair)
+    packer_module = load_packer_module(root)
+    run_dir = Path(args.run_dir).expanduser() if args.run_dir else root / "local-analysis" / "simulated-output" / run_id()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    fixture_dir = run_dir / "fixture"
+
+    with open(run_dir / "prepare.log", "w", encoding="utf-8") as log:
+        run(build_prepare_command(root, args, fixture_dir), root, stdout=log, stderr=subprocess.STDOUT)
+    metadata = load_json(fixture_dir / "source.json")
+    reference = Path(metadata["reference_wav"])
+    rate, reference_pair = read_wav_pair(reference)
+    if rate != args.rate:
+        raise SystemExit(f"prepared reference rate mismatch: {rate} != {args.rate}")
+
+    packed, decoded, decoded_pair = simulate_output(reference_pair, pair_index, packer_module, args)
+    packed_path = run_dir / "simulated-output-packed-usb.raw"
+    decoded_wav = run_dir / "simulated-output-decoded.wav"
+    packed_path.write_bytes(packed)
+    write_wav_pair(decoded_wav, rate, decoded_pair)
+    cpu_profile = run_dir / "cpu-profile.tsv"
+    write_cpu_profile(cpu_profile, len(reference_pair) / rate)
+
+    metrics_json = run_dir / "metrics.json"
+    coupling_json = run_dir / "coupling-profile.json"
+    analysis_txt = run_dir / "analysis.txt"
+    analysis_err = run_dir / "analysis.err"
+    with open(analysis_txt, "w", encoding="utf-8") as out, open(analysis_err, "w", encoding="utf-8") as err:
+        analysis = run([
+            sys.executable,
+            str(root / "scripts" / "analyze-soundcheck-capture.py"),
+            str(reference),
+            str(decoded_wav),
+            "--max-seconds",
+            str(args.seconds),
+            "--max-lag",
+            "256",
+            "--cpu-profile",
+            str(cpu_profile),
+            "--coupling-profile-out",
+            str(coupling_json),
+            "--max-mid-band-residual-ratio",
+            str(args.max_mid_band_residual_ratio),
+            "--max-mid-band-cpu-corr",
+            str(args.max_mid_band_cpu_corr),
+            "--json-out",
+            str(metrics_json),
+        ], root, stdout=out, stderr=err, check=False)
+
+    usb_analysis_txt = run_dir / "usb-raw-analysis.txt"
+    with open(usb_analysis_txt, "w", encoding="utf-8") as out:
+        run([
+            sys.executable,
+            str(root / "scripts" / "analyze-driver-capture.py"),
+            str(reference),
+            "--usb-raw",
+            str(packed_path),
+            "--usb-check-offset",
+            "8",
+            "--usb-start-byte",
+            str(args.start_byte),
+            "--usb-byte-order",
+            args.byte_order,
+            "--pair",
+            args.pair,
+            "--max-seconds",
+            "2",
+            "--max-lag",
+            "256",
+        ], root, stdout=out, stderr=subprocess.STDOUT, check=False)
+
+    metrics = load_json(metrics_json) if metrics_json.exists() else {"verdict": "FAIL", "errors": ["missing metrics"]}
+    lines = summary_lines(metadata, metrics, args, run_dir, len(packed), len(decoded.frames))
+    for error in metrics.get("errors", []):
+        lines.append(f"error={error}")
+    (run_dir / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+    return 0 if analysis.returncode == 0 and metrics.get("verdict") == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
