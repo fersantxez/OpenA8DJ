@@ -13,6 +13,7 @@ dist/
 *.log
 *.trace
 local-analysis/
+local-analysis-rust/
 old driver/
 
 # Xcode / macOS local state

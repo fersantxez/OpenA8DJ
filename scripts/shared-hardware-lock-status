@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+lock_root="${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
+owner_file="$lock_root/owner"
+
+read_key() {
+  local file="$1"
+  local key="$2"
+  local fallback="${3:-}"
+  if [ ! -f "$file" ]; then
+    echo "$fallback"
+    return 0
+  fi
+  awk -F= -v k="$key" -v fallback="$fallback" '
+    $1 == k {print substr($0, index($0, "=") + 1); found=1; exit}
+    END {if (!found) print fallback}
+  ' "$file"
+}
+
+pid_alive() {
+  local pid="$1"
+  case "$pid" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+  ps -p "$pid" >/dev/null 2>&1
+}
+
+if [ ! -d "$lock_root" ]; then
+  echo "shared_hardware_lock=FREE"
+  echo "lock_dir=$lock_root"
+  exit 0
+fi
+
+owner_pid="$(read_key "$owner_file" pid "unknown")"
+owner_gate="$(read_key "$owner_file" gate "unknown")"
+owner_run_dir="$(read_key "$owner_file" run_dir "unknown")"
+owner_cwd="$(read_key "$owner_file" cwd "unknown")"
+owner_started_at="$(read_key "$owner_file" started_at "unknown")"
+
+if pid_alive "$owner_pid"; then
+  status="BUSY"
+else
+  status="STALE"
+fi
+
+echo "shared_hardware_lock=$status"
+echo "lock_dir=$lock_root"
+echo "owner_pid=$owner_pid"
+echo "owner_gate=$owner_gate"
+echo "owner_run_dir=$owner_run_dir"
+echo "owner_cwd=$owner_cwd"
+echo "owner_started_at=$owner_started_at"

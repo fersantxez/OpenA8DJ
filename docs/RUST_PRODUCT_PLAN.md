@@ -45,6 +45,16 @@ The product target is not "Rust parity." The target is a better driver:
   but must not mutate the mainline tree.
 - No Rust command may install, unload, replace, reset, or disturb the active
   HAL driver or hardware state without explicit user approval.
+- Any Rust command that touches shared hardware, physical audio, capture,
+  media-app automation, default devices, sample rate, buffer size, Core
+  Audio/USB services, driver reload/install/unload, physical soundcheck,
+  playback CPU gates, or candidate quality gates must first acquire the global
+  hardware lock at `$HOME/.opena8dj/hardware-gate.lock`, preferably through
+  `scripts/audio-hardware-gate`.
+- A live owner in `$HOME/.opena8dj/hardware-gate.lock/owner` is exclusive.
+  Rust agents must not run the test when the lock is occupied; they must wait
+  or request a hardware window.
+- The hardware coordination policy lives in `docs/HARDWARE_GATE.md`.
 - Mainline physical tests are evidence inputs, not blockers. Rust continues
   with simulation and parity work when physical capture is unavailable.
 - User-visible Rust names must include `-rust`.
@@ -611,6 +621,7 @@ Promotion:
 ### Phase 5: Controlled hardware candidate
 
 Requires explicit user approval.
+Requires the shared hardware lock before every hardware/audio-sensitive step.
 
 Deliverables:
 
@@ -662,7 +673,11 @@ Must pass before every Rust milestone:
 - mainline worktree unchanged by Rust task;
 - no write paths into `/Users/fer/dev/opena8dj`;
 - no `/Library` or LaunchAgent mutation;
-- no hardware reset command.
+- no hardware reset command;
+- no hardware/audio/CPU-sensitive command ran without acquiring
+  `$HOME/.opena8dj/hardware-gate.lock`;
+- live lock owners were treated as exclusive;
+- stale locks were cleaned only when the recorded pid was dead.
 
 ### Gate B: Build/test
 

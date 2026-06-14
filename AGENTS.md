@@ -9,6 +9,42 @@ This worktree is the isolated Rust/modular-core experiment for OpenA8DJ.
 - Agents working here must not edit, format, generate files into, install from, clean, reset, or otherwise mutate `/Users/fer/dev/opena8dj`.
 - Do not run commands from this worktree that install or replace the active OpenA8DJ HAL driver unless the user explicitly asks for a Rust experiment install.
 
+## Shared hardware/audio gate
+
+This MacBook has one shared Audio 8 DJ, iRig Stream, Core Audio stack, USB bus,
+and CPU. The Rust worktree being isolated does not make the hardware isolated.
+
+Before any test that touches hardware, audio routing, physical capture, driver
+installation/reload, Core Audio/USB services, or CPU-sensitive playback gates,
+agents must use the global lock:
+
+```sh
+export AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock"
+scripts/audio-hardware-gate --purpose "short reason" --estimated-duration "5m" \
+  --evidence-dir "local-analysis-rust/<run-id>" -- <command>
+```
+
+The lock owner file is `$AUDIO_GATE_LOCK_ROOT/owner`. A live owner is exclusive.
+Only clean the lock when the recorded pid is dead. If the lock is occupied by a
+live owner, do not run the test; wait or coordinate a hardware window. Inspect
+the current owner with `scripts/shared-hardware-lock-status`.
+
+The lock is mandatory before:
+
+- reproducing audio through Audio 8 DJ;
+- recording with iRig;
+- opening or automating Traktor, VLC, or Spotify for tests;
+- changing default devices, sample rate, or buffer;
+- installing, reloading, or unloading HAL drivers;
+- restarting `coreaudiod`, `audiohald`, `usbaudiod`, or USB services;
+- resetting any USB device;
+- running physical soundcheck, playback CPU gate, or candidate quality gate.
+
+Hardware-window requests must state the desired time, estimated duration,
+whether the run plays audio, records iRig, installs/reloads the driver,
+restarts Core Audio/USB, or changes defaults, and where evidence will be
+written.
+
 ## Purpose
 
 The Rust branch may learn from the C/Objective-C implementation, QA artifacts, and documented experiments, but it must never delay, block, or contaminate mainline driver investigation.
@@ -28,4 +64,4 @@ Mainline remains the source of truth for active audio debugging, hardware gates,
 
 Every Rust-side agent must be told:
 
-> You are working in `/Users/fer/dev/audio8djrust` on branch `rust/modular-core-spike`. `/Users/fer/dev/opena8dj` is strictly read-only reference material. It is forbidden to modify, format, install from, clean, reset, or generate files into the main worktree.
+> You are working in `/Users/fer/dev/audio8djrust` on branch `rust/modular-core-spike`. `/Users/fer/dev/opena8dj` is strictly read-only reference material. It is forbidden to modify, format, install from, clean, reset, or generate files into the main worktree. Before any hardware, audio, driver, Core Audio/USB, Traktor/VLC/Spotify, default-device, sample-rate, buffer, iRig, physical soundcheck, playback CPU gate, or candidate quality gate action, acquire `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock"` and treat a live owner as exclusive.

@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+lock_root="${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
+gate_name=""
+purpose=""
+estimated_duration=""
+evidence_dir=""
+wait_seconds="0"
+status_only="0"
+no_command_ok="0"
+
+usage() {
+  cat <<USAGE
+usage: scripts/audio-hardware-gate [options] -- <command> [args...]
+       scripts/audio-hardware-gate --status
+
+Acquires the shared Audio 8 DJ/iRig/Core Audio/USB/CPU hardware gate before
+running a hardware/audio/CPU-sensitive command.
+
+Options:
+  --gate NAME                 Short gate/test name for owner metadata
+  --purpose TEXT              Short reason for the hardware window
+  --estimated-duration TEXT   Expected duration, for example 5m
+  --evidence-dir DIR          Directory where the run will write evidence
+  --run-dir DIR               Alias for --evidence-dir
+  --wait SECONDS              Wait up to SECONDS for a live owner to exit
+  --status                    Print current owner/status and exit
+  --no-command-ok             Acquire/release even when no command is supplied
+  -h, --help                  Show this help
+
+Environment:
+  AUDIO_GATE_LOCK_ROOT        Lock directory root
+                             (default: \$HOME/.opena8dj/hardware-gate.lock)
+
+Exit codes:
+  0   command succeeded, or lock is free in --status mode
+  75  lock is held by a live owner or has an uncleanable owner state
+  124 wait timed out before acquiring the lock
+USAGE
+}
+
+quote_value() {
+  printf '%s' "$1" | tr '\n' ' '
+}
+
+owner_path() {
+  printf '%s/owner' "$lock_root"
+}
+
+owner_pid() {
+  local owner
+  owner="$(owner_path)"
+  if [ ! -f "$owner" ]; then
+    return 1
+  fi
+  awk -F= '$1 == "pid" {print $2; exit}' "$owner"
+}
+
+read_owner_key() {
+  local key="$1"
+  local fallback="${2:-}"
+  local owner
+  owner="$(owner_path)"
+  if [ ! -f "$owner" ]; then
+    printf '%s\n' "$fallback"
+    return 0
+  fi
+  awk -F= -v k="$key" -v fallback="$fallback" '
+    $1 == k {print substr($0, index($0, "=") + 1); found=1; exit}
+    END {if (!found) print fallback}
+  ' "$owner"
+}
+
+pid_is_live() {
+  local pid="$1"
+  case "$pid" in
+    ''|*[!0-9]*)
+      return 1
+      ;;
+  esac
+  kill -0 "$pid" 2>/dev/null
+}
+
+print_owner() {
+  local owner
+  owner="$(owner_path)"
+  if [ -f "$owner" ]; then
+    sed 's/^/  /' "$owner" >&2
+  else
+    echo "  owner file missing: $owner" >&2
+  fi
+}
+
+status() {
+  local pid=""
+  if [ ! -d "$lock_root" ]; then
+    echo "hardware gate: free"
+    return 0
+  fi
+
+  pid="$(owner_pid || true)"
+  if pid_is_live "$pid"; then
+    echo "hardware gate: locked by live owner pid=$pid"
+    print_owner
+    return 75
+  fi
+
+  if [ -n "$pid" ]; then
+    echo "hardware gate: stale owner pid=$pid"
+    print_owner
+    return 75
+  fi
+
+  echo "hardware gate: locked with missing or invalid owner; not safe to clean automatically"
+  print_owner
+  return 75
+}
+
+cleanup_lock() {
+  local pid=""
+  pid="$(owner_pid || true)"
+  if [ "$pid" = "$$" ]; then
+    rm -rf "$lock_root"
+  fi
+}
+
+write_owner() {
+  local owner
+  owner="$(owner_path)"
+  {
+    printf 'pid=%s\n' "$$"
+    printf 'ppid=%s\n' "$PPID"
+    printf 'gate=%s\n' "$(quote_value "$gate_name")"
+    printf 'run_dir=%s\n' "$(quote_value "$evidence_dir")"
+    printf 'host=%s\n' "$(hostname)"
+    printf 'user=%s\n' "${USER:-unknown}"
+    printf 'started_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf 'cwd=%s\n' "$(pwd)"
+    printf 'purpose=%s\n' "$(quote_value "$purpose")"
+    printf 'estimated_duration=%s\n' "$(quote_value "$estimated_duration")"
+    printf 'evidence_dir=%s\n' "$(quote_value "$evidence_dir")"
+    printf 'command=%s\n' "$(quote_value "$*")"
+  } > "$owner"
+}
+
+write_evidence_lock_state() {
+  local state="$1"
+  if [ -z "$evidence_dir" ]; then
+    return 0
+  fi
+  mkdir -p "$evidence_dir"
+  {
+    printf 'audio_gate_lock=%s\n' "$state"
+    printf 'lock_dir=%s\n' "$lock_root"
+    printf 'gate=%s\n' "$gate_name"
+    printf 'run_dir=%s\n' "$evidence_dir"
+    printf 'owner_pid=%s\n' "$(read_owner_key pid unknown)"
+    printf 'owner_gate=%s\n' "$(read_owner_key gate unknown)"
+    printf 'owner_run_dir=%s\n' "$(read_owner_key run_dir unknown)"
+    printf 'owner_cwd=%s\n' "$(read_owner_key cwd unknown)"
+    printf 'owner_started_at=%s\n' "$(read_owner_key started_at unknown)"
+  } > "$evidence_dir/audio-gate-lock.txt"
+}
+
+clean_dead_owner_or_block() {
+  local pid=""
+  pid="$(owner_pid || true)"
+  if pid_is_live "$pid"; then
+    echo "hardware gate busy: live owner pid=$pid" >&2
+    print_owner
+    write_evidence_lock_state "BUSY"
+    return 75
+  fi
+
+  if [ -n "$pid" ]; then
+    echo "hardware gate stale: removing dead owner pid=$pid" >&2
+    rm -rf "$lock_root"
+    return 0
+  fi
+
+  echo "hardware gate blocked: missing or invalid owner; not safe to clean automatically" >&2
+  print_owner
+  write_evidence_lock_state "BLOCKED_INVALID_OWNER"
+  return 75
+}
+
+acquire() {
+  local start now elapsed
+  start="$(date +%s)"
+  mkdir -p "$(dirname "$lock_root")"
+
+  while true; do
+    if mkdir "$lock_root" 2>/dev/null; then
+      write_owner "$@"
+      write_evidence_lock_state "ACQUIRED"
+      trap cleanup_lock EXIT INT TERM
+      return 0
+    fi
+
+    if clean_dead_owner_or_block; then
+      continue
+    fi
+
+    now="$(date +%s)"
+    elapsed=$((now - start))
+    if [ "$wait_seconds" = "0" ]; then
+      return 75
+    fi
+    if [ "$elapsed" -ge "$wait_seconds" ]; then
+      echo "hardware gate wait timed out after ${wait_seconds}s" >&2
+      return 124
+    fi
+    sleep 2
+  done
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --gate)
+      gate_name="$2"; shift 2 ;;
+    --purpose)
+      purpose="$2"; shift 2 ;;
+    --estimated-duration)
+      estimated_duration="$2"; shift 2 ;;
+    --evidence-dir)
+      evidence_dir="$2"; shift 2 ;;
+    --run-dir)
+      evidence_dir="$2"; shift 2 ;;
+    --wait)
+      wait_seconds="$2"; shift 2 ;;
+    --status)
+      status_only="1"; shift ;;
+    --no-command-ok)
+      no_command_ok="1"; shift ;;
+    -h|--help)
+      usage; exit 0 ;;
+    --)
+      shift
+      break ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ "$status_only" = "1" ]; then
+  status
+  exit $?
+fi
+
+case "$wait_seconds" in
+  ''|*[!0-9]*)
+    echo "--wait must be an integer number of seconds" >&2
+    exit 2
+    ;;
+esac
+
+if [ "$#" -eq 0 ] && [ "$no_command_ok" != "1" ]; then
+  echo "missing command; pass -- <command>, or use --no-command-ok for a dry acquire/release" >&2
+  usage >&2
+  exit 2
+fi
+
+if [ -z "$gate_name" ]; then
+  if [ -n "$purpose" ]; then
+    gate_name="$purpose"
+  else
+    gate_name="audio-hardware-gate"
+  fi
+fi
+if [ -z "$purpose" ]; then
+  purpose="$gate_name"
+fi
+
+acquire "$@"
+
+if [ "$#" -eq 0 ]; then
+  echo "hardware gate acquired and released: $lock_root"
+  exit 0
+fi
+
+"$@"
