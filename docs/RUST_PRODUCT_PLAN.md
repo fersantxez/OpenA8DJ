@@ -4,6 +4,9 @@ This is the product-management plan for the parallel Rust implementation. It
 turns the goal into outcomes, constraints, workstreams, agent responsibilities,
 promotion gates, and kill criteria.
 
+The authoritative PM metrics contract is
+`docs/RUST_PM_SUCCESS_METRICS.md`.
+
 ## Product Role
 
 The product manager for OpenA8DJ-rust owns the system of human and agent work:
@@ -545,6 +548,7 @@ Deliverables:
 - `docs/RUST_DRIVER_ARCHITECTURE.md`;
 - `docs/RUST_PRODUCT_PLAN.md`;
 - `docs/AUDIOPHILE_DRIVER_DESIGN.md`;
+- `docs/RUST_PM_SUCCESS_METRICS.md`;
 - initial agent model;
 - initial no-interference rules.
 

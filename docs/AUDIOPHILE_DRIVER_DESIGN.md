@@ -10,6 +10,9 @@ read-only reference material.
 Current mainline findings imported on 2026-06-14 are tracked in
 `docs/MAINLINE_FINDINGS_2026_06_14.md`.
 
+The authoritative PM metrics contract is
+`docs/RUST_PM_SUCCESS_METRICS.md`.
+
 ## Product Objective
 
 OpenA8DJ-rust should make the Audio 8 DJ feel like high-end supported hardware

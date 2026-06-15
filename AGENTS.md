@@ -51,6 +51,10 @@ The Rust branch may learn from the C/Objective-C implementation, QA artifacts, a
 
 Mainline remains the source of truth for active audio debugging, hardware gates, and release candidates.
 
+The authoritative PM metrics contract for Rust work is
+`docs/RUST_PM_SUCCESS_METRICS.md`. A shared pointer for mainline agents exists at
+`$HOME/.opena8dj/rust-pm-metrics.txt`.
+
 ## Expected workflow
 
 - Work only under `/Users/fer/dev/audio8djrust`.
