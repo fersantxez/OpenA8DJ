@@ -117,6 +117,10 @@ SIM_OUTPUT_SECONDS ?= 3
 SIM_OUTPUT_MODE ?= dense
 SIM_OUTPUT_PAIR ?= A
 SIM_OUTPUT_GAIN ?= 0.5
+RUST_NO_IRIG_SECONDS ?= 6
+RUST_NO_IRIG_MODE ?= dense
+RUST_NO_IRIG_GAIN ?= 0.5
+RUST_NO_IRIG_PAIRS ?= A B C D
 
 CC := xcrun clang
 CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2
@@ -125,7 +129,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal rust-core rust-packet-parity hal-rust sign-hal install-hal install-midid install-tools smoke-hal smoke-hal-rust parity-smoke-hal parity-smoke-hal-rust audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal rust-core rust-packet-parity hal-rust sign-hal install-hal install-midid install-tools smoke-hal smoke-hal-rust parity-smoke-hal parity-smoke-hal-rust audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck rust-no-irig-software-gate usb-play usb-input-meter midi-list package dmg checksums dist
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -293,6 +297,14 @@ simulated-output-soundcheck:
 		--gain "$(SIM_OUTPUT_GAIN)" \
 		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
 		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)"
+
+rust-no-irig-software-gate:
+	./scripts/rust-no-irig-software-gate \
+		$(if $(SOUNDCHECK_MUSIC),--music-file "$(SOUNDCHECK_MUSIC)",) \
+		--seconds "$(RUST_NO_IRIG_SECONDS)" \
+		--mode "$(RUST_NO_IRIG_MODE)" \
+		--gain "$(RUST_NO_IRIG_GAIN)" \
+		--pairs "$(RUST_NO_IRIG_PAIRS)"
 
 $(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
 	@mkdir -p build

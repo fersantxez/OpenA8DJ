@@ -39,6 +39,15 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
   - moves an active `OpenA8DJ.driver` out of HAL during the bounded window;
   - restores the previous mainline HAL bundle and restarts Core Audio on exit
     unless `--keep-installed` is explicitly supplied.
+- `scripts/rust-no-irig-software-gate`
+  - runs the reproducible no-iRig software quality gate;
+  - does not play audio, record audio, install or reload HAL drivers, change
+    default devices, or acquire the hardware lock;
+  - writes a self-contained evidence directory under
+    `local-analysis-rust/software-runs/`;
+  - covers Rust build hygiene, HAL bundle smoke/parity, packet parity,
+    Rust pack-sim matrix behavior, and simulated output quality for all four
+    stereo output pairs.
 
 ## Verified Offline
 
@@ -61,10 +70,12 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
   - covers start bytes `0..5`, transfer sizes `352`, `48`, and `80`, gains
     `1.0` and `0.5`, and big/native signed-24 byte order;
 - `bash -n scripts/rust-hal-hardware-window`;
+- `bash -n scripts/rust-no-irig-software-gate`;
 - `scripts/rust-hal-hardware-window --help`;
 - `make hal-rust`;
 - `make smoke-hal-rust`;
 - `make parity-smoke-hal-rust`.
+- `make rust-no-irig-software-gate`.
 
 ## Current Evidence
 
@@ -85,6 +96,40 @@ The C/Rust packet harness reports:
 
 ```text
 PASS rust_packet_parity cases=72
+```
+
+The latest no-iRig software quality gate reports:
+
+```text
+rust_no_irig_software_gate=PASS
+run_dir=/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T035139Z
+```
+
+It passed `cargo fmt`, `cargo test`, `cargo clippy`, Rust HAL smoke/parity,
+Rust/C packet parity, tool build, a `72`-row Rust pack-sim matrix, and simulated
+output soundchecks for pairs `A/B/C/D`.
+
+The Rust pack-sim matrix reported:
+
+```text
+matrix_rows=72
+matrix_failures=0
+start_bytes=0,1,2,3,4,5
+transfer_bytes=48,80,352
+byte_orders=big,native
+max_check_errors=0
+max_panic_flags=0
+max_mismatches=0
+```
+
+Each simulated output pair reported:
+
+```text
+alignment_score=1.000000
+simulated_snr_db=75.22
+mid_band_1000_5000_residual_ratio=0.000669
+mid_band_1000_5000_residual_dbfs=-108.83
+mid_band_cpu_corr=0.000000
 ```
 
 The current physical/internal candidate is commit `3429796`:
@@ -145,11 +190,13 @@ replays.
 
 ## Next Cut
 
-1. Wait for iRig USB/Core Audio capture readiness.
-2. Under the global lock, run Rust tone and real-music physical capture through
+1. Keep `make rust-no-irig-software-gate` green after each Rust candidate
+   change.
+2. Wait for iRig USB/Core Audio capture readiness.
+3. Under the global lock, run Rust tone and real-music physical capture through
    iRig and compare against a valid mainline baseline.
-3. Run DVS/timecode input gates with `opena8dj-control profile timecode-vinyl`
+4. Run DVS/timecode input gates with `opena8dj-control profile timecode-vinyl`
    or `profile timecode-cd-line`, then verify decode is active only for input
    clients.
-4. Add UI stress parity if mainline raises the no-iRig bar beyond the current
+5. Add UI stress parity if mainline raises the no-iRig bar beyond the current
    CPU-stress filter.

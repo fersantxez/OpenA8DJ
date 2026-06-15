@@ -1,0 +1,288 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEFAULT_MUSIC_FILE="/Users/fer/dev/opena8dj/local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+RUN_DIR="$ROOT/local-analysis-rust/software-runs/rust-no-irig-software-gate-$RUN_ID"
+MUSIC_FILE="${SOUNDCHECK_MUSIC:-}"
+DURATION_SECONDS="${RUST_NO_IRIG_SECONDS:-6}"
+MODE="${RUST_NO_IRIG_MODE:-dense}"
+TARGET_PEAK_DB="${RUST_NO_IRIG_TARGET_PEAK_DB:--12}"
+GAIN="${RUST_NO_IRIG_GAIN:-0.5}"
+RATE="${SOUNDCHECK_RATE:-48000}"
+PAIRS="${RUST_NO_IRIG_PAIRS:-A B C D}"
+RUN_CLIPPY=1
+
+usage() {
+  cat <<'EOF'
+usage: scripts/rust-no-irig-software-gate [options]
+
+Software-only Rust candidate gate. It does not play audio, record audio,
+install/reload HAL drivers, change default devices, or acquire hardware locks.
+
+Options:
+  --run-dir PATH          Evidence directory.
+  --music-file PATH       Real music fixture to use for simulated output.
+  --seconds N             Simulated output duration per pair. Default: 6.
+  --mode MODE             Fixture mode: dense, transient, wideband, start.
+  --target-peak-db DB     Fixture peak target. Default: -12.
+  --gain F                Output gain for simulation. Default: 0.5.
+  --rate HZ               Sample rate. Default: 48000.
+  --pairs "A B C D"       Stereo pairs to simulate. Default: A B C D.
+  --skip-clippy           Skip cargo clippy.
+  -h, --help              Show this help.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir)
+      RUN_DIR="$2"
+      shift 2
+      ;;
+    --music-file)
+      MUSIC_FILE="$2"
+      shift 2
+      ;;
+    --seconds)
+      DURATION_SECONDS="$2"
+      shift 2
+      ;;
+    --mode)
+      MODE="$2"
+      shift 2
+      ;;
+    --target-peak-db)
+      TARGET_PEAK_DB="$2"
+      shift 2
+      ;;
+    --gain)
+      GAIN="$2"
+      shift 2
+      ;;
+    --rate)
+      RATE="$2"
+      shift 2
+      ;;
+    --pairs)
+      PAIRS="$2"
+      shift 2
+      ;;
+    --skip-clippy)
+      RUN_CLIPPY=0
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$MUSIC_FILE" ] && [ -f "$DEFAULT_MUSIC_FILE" ]; then
+  MUSIC_FILE="$DEFAULT_MUSIC_FILE"
+fi
+
+mkdir -p "$RUN_DIR"
+STEPS="$RUN_DIR/steps.tsv"
+RESULT="$RUN_DIR/result.txt"
+FAILURES=0
+
+printf "step\tstatus\tlog\n" > "$STEPS"
+
+mark_step() {
+  local name="$1"
+  local status="$2"
+  local log="$3"
+  printf "%s\t%s\t%s\n" "$name" "$status" "$log" >> "$STEPS"
+}
+
+run_logged() {
+  local name="$1"
+  shift
+  local log="$RUN_DIR/$name.log"
+  echo "[$name] $*" > "$log"
+  if (cd "$ROOT" && "$@") >> "$log" 2>&1; then
+    mark_step "$name" "PASS" "$log"
+    return 0
+  fi
+  mark_step "$name" "FAIL" "$log"
+  FAILURES=$((FAILURES + 1))
+  return 1
+}
+
+{
+  echo "schema=open-a8dj-rust.no-irig-software-gate.v1"
+  echo "run_id=$RUN_ID"
+  echo "run_dir=$RUN_DIR"
+  echo "root=$ROOT"
+  echo "git_head=$(cd "$ROOT" && git rev-parse --short HEAD)"
+  echo "git_branch=$(cd "$ROOT" && git branch --show-current)"
+  echo "software_only=1"
+  echo "touches_hardware=0"
+  echo "plays_audio=0"
+  echo "records_audio=0"
+  echo "installs_or_reloads_hal=0"
+  echo "changes_default_devices=0"
+  echo "music_file=$MUSIC_FILE"
+  echo "seconds=$DURATION_SECONDS"
+  echo "mode=$MODE"
+  echo "target_peak_db=$TARGET_PEAK_DB"
+  echo "gain=$GAIN"
+  echo "rate=$RATE"
+  echo "pairs=$PAIRS"
+} > "$RUN_DIR/metadata.txt"
+
+run_logged cargo-fmt cargo fmt --all -- --check || true
+run_logged cargo-test cargo test --workspace --locked || true
+if [ "$RUN_CLIPPY" -eq 1 ]; then
+  run_logged cargo-clippy cargo clippy --workspace --locked -- -D warnings || true
+else
+  mark_step "cargo-clippy" "SKIP" ""
+fi
+run_logged make-rust-hal-parity make smoke-hal-rust parity-smoke-hal-rust rust-packet-parity || true
+run_logged cargo-build-tools cargo build -p open-a8dj-tools --release --locked || true
+
+PACK_SIM="$ROOT/target/release/opena8dj-rust-pack-sim"
+MATRIX="$RUN_DIR/rust-pack-sim-matrix.jsonl"
+MATRIX_LOG="$RUN_DIR/rust-pack-sim-matrix.log"
+MATRIX_SUMMARY="$RUN_DIR/rust-pack-sim-matrix-summary.txt"
+: > "$MATRIX"
+: > "$MATRIX_LOG"
+
+if [ -x "$PACK_SIM" ]; then
+  MATRIX_FAILURES=0
+  for start_byte in 0 1 2 3 4 5; do
+    for transfer_bytes in 48 80 352; do
+      for byte_order in big native; do
+        for matrix_gain in 1.0 0.5; do
+          if "$PACK_SIM" \
+            --frames 128 \
+            --start-byte "$start_byte" \
+            --transfer-bytes "$transfer_bytes" \
+            --gain "$matrix_gain" \
+            --byte-order "$byte_order" \
+            --json-summary >> "$MATRIX" 2>> "$MATRIX_LOG"; then
+            :
+          else
+            echo "pack-sim command failed start_byte=$start_byte transfer_bytes=$transfer_bytes byte_order=$byte_order gain=$matrix_gain" >> "$MATRIX_LOG"
+            MATRIX_FAILURES=$((MATRIX_FAILURES + 1))
+          fi
+        done
+      done
+    done
+  done
+  if python3 - "$MATRIX" > "$MATRIX_SUMMARY" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+rows = []
+for line in path.read_text(encoding="utf-8").splitlines():
+    if line.strip():
+        rows.append(json.loads(line))
+
+bad = [
+    row for row in rows
+    if row.get("status") != "PASS"
+    or row.get("mismatches") != 0
+    or row.get("check_errors") != 0
+    or row.get("panic_flags") != 0
+]
+
+print(f"matrix_rows={len(rows)}")
+print(f"matrix_failures={len(bad)}")
+if rows:
+    print(f"start_bytes={','.join(str(value) for value in sorted({row['start_byte'] for row in rows}))}")
+    print(f"transfer_bytes={','.join(str(value) for value in sorted({row['transfer_bytes'] for row in rows}))}")
+    print(f"byte_orders={','.join(sorted({row['byte_order'] for row in rows}))}")
+    print(f"max_check_errors={max(row.get('check_errors', 0) for row in rows)}")
+    print(f"max_panic_flags={max(row.get('panic_flags', 0) for row in rows)}")
+    print(f"max_mismatches={max(row.get('mismatches', 0) for row in rows)}")
+if len(rows) != 72 or bad:
+    sys.exit(1)
+PY
+  then
+    if [ "$MATRIX_FAILURES" -eq 0 ]; then
+      mark_step "rust-pack-sim-matrix" "PASS" "$MATRIX_SUMMARY"
+    else
+      mark_step "rust-pack-sim-matrix" "FAIL" "$MATRIX_LOG"
+      FAILURES=$((FAILURES + 1))
+    fi
+  else
+    mark_step "rust-pack-sim-matrix" "FAIL" "$MATRIX_SUMMARY"
+    FAILURES=$((FAILURES + 1))
+  fi
+else
+  echo "missing pack simulator: $PACK_SIM" > "$MATRIX_LOG"
+  mark_step "rust-pack-sim-matrix" "FAIL" "$MATRIX_LOG"
+  FAILURES=$((FAILURES + 1))
+fi
+
+SIM_ROOT="$RUN_DIR/simulated-output"
+SIM_SUMMARY="$RUN_DIR/simulated-output-summary.txt"
+mkdir -p "$SIM_ROOT"
+: > "$SIM_SUMMARY"
+
+for pair in $PAIRS; do
+  PAIR_DIR="$SIM_ROOT/pair-$pair"
+  PAIR_LOG="$RUN_DIR/simulated-output-$pair.log"
+  mkdir -p "$PAIR_DIR"
+  if [ -n "$MUSIC_FILE" ]; then
+    MUSIC_ARGS=(--music-file "$MUSIC_FILE")
+  else
+    MUSIC_ARGS=(--music-dir "$HOME/Music" --music-dir "$HOME/Downloads")
+  fi
+  if (cd "$ROOT" && ./scripts/run-simulated-output-soundcheck \
+      "${MUSIC_ARGS[@]}" \
+      --pair "$pair" \
+      --rate "$RATE" \
+      --seconds "$DURATION_SECONDS" \
+      --mode "$MODE" \
+      --target-peak-db "$TARGET_PEAK_DB" \
+      --gain "$GAIN" \
+      --run-dir "$PAIR_DIR") > "$PAIR_LOG" 2>&1; then
+    mark_step "simulated-output-$pair" "PASS" "$PAIR_DIR/summary.txt"
+  else
+    mark_step "simulated-output-$pair" "FAIL" "$PAIR_LOG"
+    FAILURES=$((FAILURES + 1))
+  fi
+  {
+    echo "pair=$pair"
+    if [ -f "$PAIR_DIR/summary.txt" ]; then
+      sed 's/^/  /' "$PAIR_DIR/summary.txt"
+    else
+      echo "  missing summary; see $PAIR_LOG"
+    fi
+  } >> "$SIM_SUMMARY"
+done
+
+if [ "$FAILURES" -eq 0 ]; then
+  VERDICT="PASS"
+else
+  VERDICT="FAIL"
+fi
+
+{
+  echo "rust_no_irig_software_gate=$VERDICT"
+  echo "failures=$FAILURES"
+  echo "run_dir=$RUN_DIR"
+  echo "metadata=$RUN_DIR/metadata.txt"
+  echo "steps=$STEPS"
+  echo "pack_sim_matrix=$MATRIX"
+  echo "pack_sim_matrix_summary=$MATRIX_SUMMARY"
+  echo "simulated_output_summary=$SIM_SUMMARY"
+  echo "note=software-only gate; analog DAC, physical outputs, iRig capture, and human listening remain outside this evidence."
+} > "$RESULT"
+
+cat "$RESULT"
+if [ "$FAILURES" -ne 0 ]; then
+  exit 1
+fi
