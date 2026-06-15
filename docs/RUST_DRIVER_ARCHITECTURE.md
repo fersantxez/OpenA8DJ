@@ -185,6 +185,12 @@ Responsibilities:
 - produce metrics snapshots;
 - run deterministic simulations.
 
+The `sample` module keeps finite-value parity with the current C/Python
+conversion path, but deliberately defines one stricter safety invariant:
+non-finite `f32` values become flagged silence. That is not an accidental
+protocol difference; it prevents NaN/Inf from reaching realtime integer
+conversion and gives the driver a counter to expose the anomaly.
+
 ### `open-a8dj-ffi`
 
 Stable C ABI around the pure Rust core. The C ABI must be boring and explicit:

@@ -1,0 +1,13 @@
+[package]
+name = "open-a8dj-core"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "Pure Rust core logic for the OpenA8DJ Audio 8 DJ driver experiment"
+
+[lib]
+path = "src/lib.rs"
+

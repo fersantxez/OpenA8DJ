@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "crates/open-a8dj-core",
+    "crates/open-a8dj-ffi",
+    "crates/open-a8dj-tools",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.77"
+homepage = "https://github.com/opena8dj/opena8dj"
+repository = "https://github.com/opena8dj/opena8dj"
