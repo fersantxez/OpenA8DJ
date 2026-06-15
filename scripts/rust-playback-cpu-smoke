@@ -11,6 +11,13 @@ cpu_sample_delay_seconds="20"
 max_device_start_seconds="0.25"
 max_first_callback_seconds="0.30"
 max_coreaudiod_p95="8.0"
+max_driver_p95="8.0"
+max_stress_coreaudiod_p95="8.0"
+max_stress_driver_p95="8.0"
+cpu_stress="0"
+cpu_stress_after_seconds="5"
+cpu_stress_seconds="35"
+cpu_stress_workers="auto"
 
 usage() {
   cat <<USAGE
@@ -27,6 +34,13 @@ Options:
   --max-device-start SECONDS  Default: 0.25
   --max-first-callback SEC    Default: 0.30
   --max-coreaudiod-p95 PCT    Default: 8.0
+  --max-driver-p95 PCT        Default: 8.0
+  --cpu-stress                Run bounded CPU stress during playback
+  --cpu-stress-after SEC      Default: 5
+  --cpu-stress-seconds SEC    Default: 35
+  --cpu-stress-workers N|auto Default: auto
+  --max-stress-coreaudiod-p95 PCT  Default: 8.0
+  --max-stress-driver-p95 PCT      Default: 8.0
 USAGE
 }
 
@@ -48,6 +62,20 @@ while [ "$#" -gt 0 ]; do
       max_first_callback_seconds="$2"; shift 2 ;;
     --max-coreaudiod-p95)
       max_coreaudiod_p95="$2"; shift 2 ;;
+    --max-driver-p95)
+      max_driver_p95="$2"; shift 2 ;;
+    --cpu-stress)
+      cpu_stress="1"; shift ;;
+    --cpu-stress-after)
+      cpu_stress_after_seconds="$2"; shift 2 ;;
+    --cpu-stress-seconds)
+      cpu_stress_seconds="$2"; shift 2 ;;
+    --cpu-stress-workers)
+      cpu_stress_workers="$2"; shift 2 ;;
+    --max-stress-coreaudiod-p95)
+      max_stress_coreaudiod_p95="$2"; shift 2 ;;
+    --max-stress-driver-p95)
+      max_stress_driver_p95="$2"; shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -65,6 +93,25 @@ if [ ! -f "$fixture" ]; then
   echo "missing fixture: $fixture" >&2
   exit 2
 fi
+
+resolve_stress_workers() {
+  local value="$1"
+  if [ "$value" != "auto" ]; then
+    printf '%s\n' "$value"
+    return 0
+  fi
+  local cpu_count
+  cpu_count="$(sysctl -n hw.ncpu 2>/dev/null || printf '2')"
+  awk -v n="$cpu_count" 'BEGIN {w = int(n / 2); if (w < 1) w = 1; if (w > 4) w = 4; print w}'
+}
+
+stress_workers_resolved="$(resolve_stress_workers "$cpu_stress_workers")"
+case "$stress_workers_resolved" in
+  ''|*[!0-9]*)
+    echo "invalid --cpu-stress-workers: $cpu_stress_workers" >&2
+    exit 2
+    ;;
+esac
 
 mkdir -p "$run_dir"
 rm -f "$run_dir/player.done"
@@ -93,15 +140,45 @@ sleep "$preplay_wait_seconds"
 
 "$root/build/audio-wav-play" "$fixture" "$pair" >"$run_dir/play.txt" 2>&1 &
 player_pid=$!
+player_started_epoch="$(date +%s)"
+
+stress_launcher_pid=""
+if [ "$cpu_stress" = "1" ] && [ "$stress_workers_resolved" -gt 0 ]; then
+  (
+    sleep "$cpu_stress_after_seconds"
+    for _worker in $(seq 1 "$stress_workers_resolved"); do
+      python3 -c "import math,time
+end=time.time()+float('$cpu_stress_seconds')
+x=0.0
+while time.time()<end:
+    for _ in range(20000):
+        x=math.sin(x+1.000001)
+" >/dev/null 2>&1 &
+    done
+    wait
+  ) &
+  stress_launcher_pid=$!
+fi
 
 (
-  printf 'timestamp\tpid\tpcpu\tcomm\n'
+  printf 'timestamp\telapsed_seconds\tstress_active\tpid\tpcpu\targs\n'
   sleep "$cpu_sample_delay_seconds"
   while kill -0 "$player_pid" 2>/dev/null; do
     ts="$(date +%s)"
-    ps -axo pid=,pcpu=,comm= | awk -v ts="$ts" '
+    elapsed=$((ts - player_started_epoch))
+    stress_active=0
+    if [ "$cpu_stress" = "1" ] &&
+      awk -v e="$elapsed" -v after="$cpu_stress_after_seconds" -v seconds="$cpu_stress_seconds" \
+        'BEGIN {exit !(e >= after && e <= (after + seconds))}'; then
+      stress_active=1
+    fi
+    ps -axo pid=,pcpu=,args= | awk -v ts="$ts" -v elapsed="$elapsed" -v stress="$stress_active" '
       /coreaudiod|audio-wav-play|OpenA8DJ|opena8dj/ {
-        print ts "\t" $1 "\t" $2 "\t" $3
+        cmd = $3
+        for (i = 4; i <= NF; i++) {
+          cmd = cmd " " $i
+        }
+        print ts "\t" elapsed "\t" stress "\t" $1 "\t" $2 "\t" cmd
       }
     '
     sleep 1
@@ -115,6 +192,9 @@ play_rc=$?
 set -e
 touch "$run_dir/player.done"
 wait "$sampler_pid" || true
+if [ -n "$stress_launcher_pid" ]; then
+  wait "$stress_launcher_pid" || true
+fi
 
 set +e
 "$root/build/opena8dj-control" stream-stats >"$run_dir/stream-stats.txt" 2>&1
@@ -140,15 +220,61 @@ elastic_drops="$(extract_stat outputElasticDrops)"
 elastic_replays="$(extract_stat outputElasticReplays)"
 playback_completed="$(extract_stat playbackTransfersCompleted)"
 
-core_samples="$(awk -F'\t' '$4 ~ /coreaudiod/ {print $3}' "$run_dir/cpu-profile.tsv" | sort -n)"
-core_count="$(printf '%s\n' "$core_samples" | awk 'NF {n++} END {print n+0}')"
-core_avg="0"
-core_p95="0"
-if [ "$core_count" -gt 0 ]; then
-  core_avg="$(printf '%s\n' "$core_samples" | awk '{sum += $1; n++} END {if (n > 0) printf "%.2f", sum / n; else print "0"}')"
-  core_idx="$(awk -v n="$core_count" 'BEGIN {idx = int(n * 0.95 + 0.999); if (idx < 1) idx = 1; print idx}')"
-  core_p95="$(printf '%s\n' "$core_samples" | awk -v idx="$core_idx" 'NR == idx {print; exit}')"
-fi
+cpu_values() {
+  local kind="$1"
+  local stress_filter="$2"
+  awk -F'\t' -v kind="$kind" -v stress_filter="$stress_filter" '
+    NR == 1 {next}
+    stress_filter != "all" && $3 != stress_filter {next}
+    {
+      matched = 0
+      if (kind == "core" && $6 ~ /coreaudiod/) matched = 1
+      if (kind == "driver" && $6 ~ /Core Audio Driver [(]OpenA8DJ-rust[.]driver[)]/) matched = 1
+      if (matched) print $5
+    }
+  ' "$run_dir/cpu-profile.tsv" | sort -n
+}
+
+cpu_summary() {
+  local values="$1"
+  local field="$2"
+  local count
+  count="$(printf '%s\n' "$values" | awk 'NF {n++} END {print n+0}')"
+  case "$field" in
+    count)
+      printf '%s\n' "$count"
+      ;;
+    avg)
+      printf '%s\n' "$values" | awk '{sum += $1; n++} END {if (n > 0) printf "%.2f", sum / n; else print "0"}'
+      ;;
+    p95)
+      if [ "$count" -gt 0 ]; then
+        local idx
+        idx="$(awk -v n="$count" 'BEGIN {idx = int(n * 0.95 + 0.999); if (idx < 1) idx = 1; print idx}')"
+        printf '%s\n' "$values" | awk -v idx="$idx" 'NR == idx {print; exit}'
+      else
+        printf '0\n'
+      fi
+      ;;
+  esac
+}
+
+core_samples="$(cpu_values core all)"
+driver_samples="$(cpu_values driver all)"
+core_stress_samples="$(cpu_values core 1)"
+driver_stress_samples="$(cpu_values driver 1)"
+
+core_count="$(cpu_summary "$core_samples" count)"
+driver_count="$(cpu_summary "$driver_samples" count)"
+core_stress_count="$(cpu_summary "$core_stress_samples" count)"
+driver_stress_count="$(cpu_summary "$driver_stress_samples" count)"
+
+core_avg="$(cpu_summary "$core_samples" avg)"
+core_p95="$(cpu_summary "$core_samples" p95)"
+driver_avg="$(cpu_summary "$driver_samples" avg)"
+driver_p95="$(cpu_summary "$driver_samples" p95)"
+core_stress_p95="$(cpu_summary "$core_stress_samples" p95)"
+driver_stress_p95="$(cpu_summary "$driver_stress_samples" p95)"
 
 status="PASS"
 reason="ok"
@@ -176,6 +302,24 @@ elif [ -z "$first_callback_seconds" ] || ! awk -v value="$first_callback_seconds
 elif [ -n "$core_p95" ] && ! awk -v value="$core_p95" -v max="$max_coreaudiod_p95" 'BEGIN {exit !(value <= max)}'; then
   status="FAIL"
   reason="coreaudiod_p95_too_high"
+elif [ "$driver_count" -le 0 ]; then
+  status="FAIL"
+  reason="missing_driver_cpu_samples"
+elif [ -n "$driver_p95" ] && ! awk -v value="$driver_p95" -v max="$max_driver_p95" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="driver_p95_too_high"
+elif [ "$cpu_stress" = "1" ] && [ "$core_stress_count" -le 0 ]; then
+  status="FAIL"
+  reason="missing_stress_samples"
+elif [ "$cpu_stress" = "1" ] && [ "$driver_stress_count" -le 0 ]; then
+  status="FAIL"
+  reason="missing_driver_stress_samples"
+elif [ "$cpu_stress" = "1" ] && ! awk -v value="$core_stress_p95" -v max="$max_stress_coreaudiod_p95" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="stress_coreaudiod_p95_too_high"
+elif [ "$cpu_stress" = "1" ] && ! awk -v value="$driver_stress_p95" -v max="$max_stress_driver_p95" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="stress_driver_p95_too_high"
 elif [ "${timeline_resets:-1}" != "0" ]; then
   status="FAIL"
   reason="timeline_resets"
@@ -198,6 +342,13 @@ fi
   echo "max_device_start_seconds=$max_device_start_seconds"
   echo "max_first_callback_seconds=$max_first_callback_seconds"
   echo "max_coreaudiod_p95=$max_coreaudiod_p95"
+  echo "max_driver_p95=$max_driver_p95"
+  echo "cpu_stress=$cpu_stress"
+  echo "cpu_stress_after_seconds=$cpu_stress_after_seconds"
+  echo "cpu_stress_seconds=$cpu_stress_seconds"
+  echo "cpu_stress_workers=$stress_workers_resolved"
+  echo "max_stress_coreaudiod_p95=$max_stress_coreaudiod_p95"
+  echo "max_stress_driver_p95=$max_stress_driver_p95"
   echo "control_rc=${control_rc:-unknown}"
   echo "play_rc=$play_rc"
   echo "stats_rc=$stats_rc"
@@ -214,7 +365,14 @@ fi
   echo "playbackTransfersCompleted=${playback_completed:-unknown}"
   echo "coreaudiod_cpu_avg=$core_avg"
   echo "coreaudiod_cpu_p95=$core_p95"
+  echo "driver_cpu_avg=$driver_avg"
+  echo "driver_cpu_p95=$driver_p95"
+  echo "coreaudiod_stress_cpu_p95=$core_stress_p95"
+  echo "driver_stress_cpu_p95=$driver_stress_p95"
   echo "cpu_samples=$core_count"
+  echo "driver_cpu_samples=$driver_count"
+  echo "stress_cpu_samples=$core_stress_count"
+  echo "driver_stress_cpu_samples=$driver_stress_count"
   echo "run_dir=$run_dir"
 } | tee "$run_dir/result.txt"
 
