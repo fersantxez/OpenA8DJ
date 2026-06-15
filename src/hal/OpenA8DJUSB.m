@@ -50,6 +50,10 @@
 #define OPENA8DJ_OUTPUT_GAIN 1.0f
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_PREFETCH_FRAMES
+#define OPENA8DJ_OUTPUT_PREFETCH_FRAMES 256
+#endif
+
 #ifndef OPENA8DJ_ENABLE_INPUT_DECODE
 #define OPENA8DJ_ENABLE_INPUT_DECODE 1
 #endif
@@ -60,6 +64,10 @@
 
 #ifndef OPENA8DJ_OUTPUT_NATIVE_I24
 #define OPENA8DJ_OUTPUT_NATIVE_I24 0
+#endif
+
+#ifndef OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
+#define OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR 0
 #endif
 
 #ifndef OPENA8DJ_ISO_FRAMES_PER_TRANSFER
@@ -122,6 +130,10 @@
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
 #endif
 
+#ifndef OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS
+#define OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS 1
+#endif
+
 static const uint16_t kVendorID = 0x17cc;
 static const uint16_t kProductID = 0x1978;
 static const uint8_t kEndpointControlOut = 0x01;
@@ -152,7 +164,7 @@ enum {
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kRingFrames = 32768,
-    kOutputPrefetchFrames = 256,
+    kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
     kOutputStartLatencyFrames = 8192,
     kOutputRestartLatencyFrames = 4096,
     kOutputTargetLatencyFrames = 8192,
@@ -942,6 +954,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
         return 0;
     }
 
+#if !OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
     memset(frames, 0, (size_t)frameCount * channels * sizeof(float));
     if (outHaveFrame != NULL) {
         memset(outHaveFrame, 0, (size_t)frameCount * sizeof(bool));
@@ -952,6 +965,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
     if (outElasticDropFrames != NULL) {
         memset(outElasticDropFrames, 0, (size_t)frameCount * sizeof(uint32_t));
     }
+#endif
 
     pthread_mutex_lock(&ring->mutex);
     for (uint32_t frameIndex = 0; frameIndex < frameCount; frameIndex++) {
@@ -985,6 +999,11 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
             ring->readFrame++;
         }
 
+#if OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
+        if (!haveFrame) {
+            memset(frame, 0, (size_t)channels * sizeof(float));
+        }
+#endif
         if (outHaveFrame != NULL) {
             outHaveFrame[frameIndex] = haveFrame;
         }
@@ -1448,6 +1467,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OutputTimelineRing _outputTimeline;
     OpenA8DJStreamStatsPayload _streamStats;
     pthread_mutex_t _streamStatsMutex;
+    atomic_uint_fast64_t _outputFramesWrittenAtomic;
     OpenA8DJUSBClockAnchor _clockAnchor;
     pthread_mutex_t _clockAnchorMutex;
     uint64_t _clockAnchorResets;
@@ -1564,6 +1584,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
+        atomic_init(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -2559,6 +2580,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_lock(&_streamStatsMutex);
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
+    atomic_store(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -2571,6 +2593,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats = _streamStats;
     pthread_mutex_unlock(&_streamStatsMutex);
 
+    stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
@@ -4463,8 +4486,11 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                               value:dropped
                               extra:timelineResets];
 #endif
-    [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputFramesWritten)
-                           value:frames];
+#if OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS
+    atomic_fetch_add(&_outputFramesWrittenAtomic, frames);
+#else
+    (void)frames;
+#endif
 #if OPENA8DJ_ENABLE_TRACE
     _debugOutputFramesWritten += frames;
 #endif

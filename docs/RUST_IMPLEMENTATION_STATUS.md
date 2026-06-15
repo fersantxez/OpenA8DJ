@@ -19,12 +19,25 @@ not been installed or run against physical audio hardware.
 - `build/OpenA8DJ-rust.driver`
   - local HAL bundle candidate only;
   - bundle id `org.opena8dj.driver.hal-rust`;
+  - device UID `org.opena8dj.Audio8DJ-rust`;
   - executable `OpenA8DJHALRust`;
   - links the Rust staticlib and uses Rust for full mode-2 playback byte fill
     under `OPENA8DJ_USE_RUST_CORE=1`;
-  - keeps the existing Obj-C output timeline, stats, diagnostic semantics,
-    USB scheduling, and capture decode;
-  - does not have an install target.
+  - uses the current mainline internal candidate transport profile:
+    ISO64, capture queue `8`, playback queue `8`, output prefetch `64`,
+    output amplitude stats off, output write stats on an atomic counter,
+    stop ISO on StopIO, and background pre-open / keep-open USB behavior;
+  - presents as `Open Audio 8 DJ-rust` in HAL smoke tests;
+  - keeps Obj-C for output timeline, stats, diagnostic semantics, USB
+    scheduling, and capture decode while Rust owns playback packet bytes;
+  - does not have an unguarded install target.
+- `scripts/rust-hal-hardware-window`
+  - builds the Rust HAL candidate before acquiring the lock;
+  - acquires `$AUDIO_GATE_LOCK_ROOT` through `scripts/audio-hardware-gate`;
+  - temporarily installs `OpenA8DJ-rust.driver`;
+  - moves an active `OpenA8DJ.driver` out of HAL during the bounded window;
+  - restores the previous mainline HAL bundle and restarts Core Audio on exit
+    unless `--keep-installed` is explicitly supplied.
 
 ## Verified Offline
 
@@ -32,6 +45,8 @@ not been installed or run against physical audio hardware.
 - `cargo test --workspace --locked`
 - `cargo clippy --workspace --locked -- -D warnings`
 - `cargo build --workspace --release --locked`
+- `make smoke-hal-rust parity-smoke-hal-rust rust-packet-parity` after the
+  ISO64/q8 + pre-open candidate update;
 - `python3 scripts/validate-mode2-output-packing.py --start-byte 4 --frames 64 --byte-order big`
 - `opena8dj-rust-pack-sim --frames 64 --start-byte 4 --byte-order big --json-summary`
 - byte-for-byte comparison between Rust mode-2 output and the Python reference
@@ -44,6 +59,8 @@ not been installed or run against physical audio hardware.
     without opening USB;
   - covers start bytes `0..5`, transfer sizes `352`, `48`, and `80`, gains
     `1.0` and `0.5`, and big/native signed-24 byte order;
+- `bash -n scripts/rust-hal-hardware-window`;
+- `scripts/rust-hal-hardware-window --help`;
 - `make hal-rust`;
 - `make smoke-hal-rust`;
 - `make parity-smoke-hal-rust`.
@@ -59,7 +76,7 @@ The release simulator reports:
 The HAL Rust smoke reports the expected local bundle shape:
 
 ```text
-HAL smoke OK: deviceID=2 name=Open Audio 8 DJ sampleRate=48000 streams=5 buffer=512 bufferBytes=16384 bufferRange=512-4096
+HAL smoke OK: deviceID=2 name=Open Audio 8 DJ-rust sampleRate=48000 streams=5 buffer=512 bufferBytes=16384 bufferRange=512-4096
 HAL parity OK
 ```
 
@@ -76,13 +93,18 @@ PASS rust_packet_parity cases=72
   run from this Rust worktree.
 - The HAL candidate now uses Rust for playback packet bytes, but it has not yet
   produced physical sound or been captured through iRig.
+- Its internal transport profile is designed to match the mainline `0.3.135`
+  candidate direction, but Rust has no internal CPU/start-latency evidence until
+  the guarded physical-window wrapper installs it and the playback CPU gate runs
+  under the global hardware lock.
 - It is not yet a physically validated replacement for the mainline driver.
 
 ## Next Cut
 
 1. Acquire a short hardware window under
    `$AUDIO_GATE_LOCK_ROOT` for install/reload and physical capture.
-2. Install/reload only `OpenA8DJ-rust.driver`, collect internal counters, and
-   run a short tone/music capture through iRig.
+2. Run the guarded wrapper, for example
+   `scripts/rust-hal-hardware-window --evidence-dir <run-dir> -- <test-command>`,
+   so `OpenA8DJ-rust.driver` is installed only inside the bounded window.
 3. Compare Rust physical evidence against the current mainline gate before
    making any "as good or better" claim.

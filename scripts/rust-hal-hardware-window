@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+lock_root="${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
+gate="$root/scripts/audio-hardware-gate"
+evidence_dir=""
+wait_seconds="${RUST_HAL_WAIT_SECONDS:-0}"
+keep_installed="0"
+inside_gate="0"
+
+usage() {
+  cat <<USAGE
+usage: scripts/rust-hal-hardware-window [options] -- <command> [args...]
+
+Builds the Rust HAL candidate, acquires the shared hardware gate, temporarily
+installs OpenA8DJ-rust.driver, runs the supplied command, and restores the
+previous mainline HAL bundle before releasing the gate.
+
+Options:
+  --evidence-dir DIR   Evidence directory for lock/install/restore metadata
+  --wait SECONDS       Wait for the hardware gate; default: ${wait_seconds}
+  --keep-installed     Leave OpenA8DJ-rust.driver installed and do not restore
+                       OpenA8DJ.driver automatically. Use only for manual
+                       supervised experiments.
+  -h, --help           Show this help
+
+Environment:
+  AUDIO_GATE_LOCK_ROOT Lock root, default: \$HOME/.opena8dj/hardware-gate.lock
+USAGE
+}
+
+quote_arg() {
+  printf '%q' "$1"
+}
+
+default_evidence_dir() {
+  local commit
+  commit="$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  printf '%s/local-analysis-rust/physical-runs/rust-candidate-%s-%s' \
+    "$root" "$commit" "$(date -u '+%Y%m%dT%H%M%SZ')"
+}
+
+record_command() {
+  local path="$1"
+  shift
+  {
+    printf 'command='
+    local first="1"
+    for arg in "$@"; do
+      if [ "$first" = "0" ]; then
+        printf ' '
+      fi
+      quote_arg "$arg"
+      first="0"
+    done
+    printf '\n'
+  } > "$path"
+}
+
+run_inside_gate() {
+  local candidate="$root/build/OpenA8DJ-rust.driver"
+  local installed_dir="/Library/Audio/Plug-Ins/HAL"
+  local rust_installed="$installed_dir/OpenA8DJ-rust.driver"
+  local mainline_installed="$installed_dir/OpenA8DJ.driver"
+  local disabled_dir="/Library/Audio/Plug-Ins/HAL.disabled"
+  local backup_mainline=""
+  local status=0
+
+  if [ "$#" -eq 0 ]; then
+    echo "missing command for hardware window" >&2
+    exit 2
+  fi
+  if [ ! -d "$candidate" ]; then
+    echo "missing candidate bundle: $candidate" >&2
+    exit 2
+  fi
+
+  mkdir -p "$evidence_dir"
+  record_command "$evidence_dir/window-command.txt" "$@"
+  {
+    printf 'candidate_bundle=%s\n' "$candidate"
+    printf 'candidate_sha256=%s\n' "$(shasum -a 256 "$candidate/Contents/MacOS/OpenA8DJHALRust" | awk '{print $1}')"
+    printf 'candidate_bundle_id=%s\n' "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate/Contents/Info.plist")"
+    printf 'candidate_name=%s\n' "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$candidate/Contents/Info.plist")"
+    printf 'started_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  } > "$evidence_dir/rust-hal-install-state.txt"
+
+  restore() {
+    local restore_status=$?
+    if [ "$keep_installed" = "1" ]; then
+      {
+        printf 'restore_skipped=1\n'
+        printf 'reason=keep-installed\n'
+        printf 'rust_installed=%s\n' "$rust_installed"
+        printf 'mainline_backup=%s\n' "$backup_mainline"
+      } > "$evidence_dir/rust-hal-restore-state.txt"
+      exit "$restore_status"
+    fi
+
+    sudo rm -rf "$rust_installed"
+    if [ -n "$backup_mainline" ] && [ -d "$backup_mainline" ]; then
+      if [ ! -e "$mainline_installed" ]; then
+        sudo mv "$backup_mainline" "$mainline_installed"
+      else
+        echo "restore warning: $mainline_installed already exists; backup remains $backup_mainline" >&2
+      fi
+    fi
+    sudo killall coreaudiod 2>/dev/null || true
+    {
+      printf 'restore_skipped=0\n'
+      printf 'restored_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      printf 'rust_installed_removed=%s\n' "$rust_installed"
+      printf 'mainline_backup=%s\n' "$backup_mainline"
+      printf 'mainline_restored=%s\n' "$mainline_installed"
+      printf 'command_status=%s\n' "$restore_status"
+    } > "$evidence_dir/rust-hal-restore-state.txt"
+    exit "$restore_status"
+  }
+  trap restore EXIT INT TERM
+
+  sudo install -d "$installed_dir" "$disabled_dir"
+  if [ -d "$mainline_installed" ]; then
+    backup_mainline="$disabled_dir/OpenA8DJ.driver.rust-window-$(date '+%Y%m%d-%H%M%S')"
+    sudo mv "$mainline_installed" "$backup_mainline"
+  fi
+
+  sudo rm -rf "$rust_installed"
+  COPYFILE_DISABLE=1 sudo cp -R "$candidate" "$rust_installed"
+  sudo xattr -cr "$rust_installed"
+  sudo codesign --force --sign "-" --timestamp=none "$rust_installed"
+  sudo killall coreaudiod 2>/dev/null || true
+
+  {
+    printf 'installed_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    printf 'rust_installed=%s\n' "$rust_installed"
+    printf 'mainline_backup=%s\n' "$backup_mainline"
+  } >> "$evidence_dir/rust-hal-install-state.txt"
+
+  "$@" || status=$?
+  exit "$status"
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --inside-gate)
+      inside_gate="1"; shift ;;
+    --evidence-dir)
+      evidence_dir="$2"; shift 2 ;;
+    --wait)
+      wait_seconds="$2"; shift 2 ;;
+    --keep-installed)
+      keep_installed="1"; shift ;;
+    -h|--help)
+      usage; exit 0 ;;
+    --)
+      shift
+      break ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ -z "$evidence_dir" ]; then
+  evidence_dir="$(default_evidence_dir)"
+fi
+
+case "$wait_seconds" in
+  ''|*[!0-9]*)
+    echo "--wait must be an integer number of seconds" >&2
+    exit 2
+    ;;
+esac
+
+if [ "$inside_gate" = "1" ]; then
+  run_inside_gate "$@"
+fi
+
+if [ "$#" -eq 0 ]; then
+  echo "missing command for hardware window" >&2
+  usage >&2
+  exit 2
+fi
+
+make -C "$root" hal-rust
+
+export AUDIO_GATE_LOCK_ROOT="$lock_root"
+gate_args=(
+  --gate "opena8dj-rust-hal-physical-window" \
+  --purpose "Install/reload OpenA8DJ-rust.driver for a bounded physical candidate test" \
+  --estimated-duration "${RUST_HAL_ESTIMATED_DURATION:-40m}" \
+  --evidence-dir "$evidence_dir" \
+  --wait "$wait_seconds" \
+  -- "$0" --inside-gate --evidence-dir "$evidence_dir"
+)
+if [ "$keep_installed" = "1" ]; then
+  gate_args+=(--keep-installed)
+fi
+gate_args+=(-- "$@")
+exec "$gate" "${gate_args[@]}"

@@ -32,21 +32,48 @@ physical capture, DVS behavior, and human listening are the product authority.
 
 ### Current mainline reference
 
-`0.3.133` is the current internal-performance reference:
+`0.3.135` is the current internal-performance reference:
 
 - output-pair smoke: PASS;
 - timecode smoke: PASS;
 - playback CPU/UI stress: PASS;
-- driver p95 around `6.8%`;
-- `coreaudiod` p95 around `1.8%` in clean locked runs;
-- stress `coreaudiod` p95 around `1.6%`;
+- strict no-iRig click-risk gate: PASS across three real-music runs;
+- device start around `0.094s`;
+- first callback around `0.101s`;
+- driver p95 around `6.5%`;
+- `coreaudiod` p95 around `1.7%` in clean locked runs;
+- stress driver p95 around `6.0%`;
+- stress `coreaudiod` p95 around `1.5%`;
 - timeline resets: `0`;
 - active underruns: `0`;
+- elastic drops/replays: `0/0`;
+- late write frames/batches: `0/0`;
+- playback completion outliers: `0`;
+- capture-to-playback queue outliers: `0`;
 - candidate status: `NOT_READY` because physical capture is blocked by missing
   iRig USB/Core Audio enumeration.
 
 Rust must treat this as an internal baseline only. It is not an audiophile
 baseline until valid physical capture and listening pass.
+
+Current mainline build-family settings to learn from:
+
+```text
+HAL_ISO_FRAMES=64
+HAL_CAPTURE_QUEUE=8
+HAL_PLAYBACK_QUEUE=8
+HAL_OUTPUT_PREFETCH_FRAMES=64
+HAL_BACKGROUND_PREOPEN_ON_INIT=1
+HAL_STOP_ISOC_ON_STOP=1
+HAL_STOP_GRACE_USEC=10000000
+HAL_FAST_OUTPUT_PREFETCH_CLEAR=1
+HAL_OUTPUT_AMPLITUDE_STATS=0
+atomic outputFramesWritten counter
+```
+
+Do not promote Rust merely for matching this internal profile. Earlier ISO64
+families had physical waveform failures, so Rust still needs valid iRig
+tone/music capture before any audiophile or human-listening claim.
 
 ### Rust target relationship to mainline
 

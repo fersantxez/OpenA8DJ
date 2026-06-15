@@ -19,6 +19,18 @@ scripts/audio-hardware-gate --purpose "short reason" --estimated-duration "5m" \
   --evidence-dir "local-analysis-rust/<run-id>" -- <command>
 ```
 
+For a Rust HAL candidate install/reload window, prefer the higher-level wrapper:
+
+```sh
+scripts/rust-hal-hardware-window --evidence-dir "local-analysis-rust/<run-id>" -- <test-command>
+```
+
+That wrapper builds `OpenA8DJ-rust.driver`, acquires the shared hardware gate,
+temporarily moves an active `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` out
+of HAL, installs `/Library/Audio/Plug-Ins/HAL/OpenA8DJ-rust.driver`, runs the
+test command, then restores the previous mainline HAL bundle on exit unless
+`--keep-installed` is explicitly supplied.
+
 Inspect the current owner with:
 
 ```sh
