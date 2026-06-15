@@ -75,6 +75,39 @@ Do not promote Rust merely for matching this internal profile. Earlier ISO64
 families had physical waveform failures, so Rust still needs valid iRig
 tone/music capture before any audiophile or human-listening claim.
 
+### Current Rust internal evidence
+
+Current Rust candidate: `3429796`.
+
+Evidence directory:
+
+```text
+/Users/fer/dev/audio8djrust/local-analysis-rust/physical-runs/rust-candidate-3429796-stress-drivercpu-3x-20260615T032525Z
+```
+
+This candidate passed three locked, real-music playback runs through
+`Open Audio 8 DJ-rust` with CPU stress enabled and `profile playback`
+forcing `input-decode: off`:
+
+| Run | start | first callback | driver p95 | stress driver p95 | coreaudiod p95 | stress coreaudiod p95 |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | `0.026026s` | `0.033130s` | `6.9%` | `6.2%` | `1.5%` | `1.4%` |
+| 2 | `0.025478s` | `0.032509s` | `6.7%` | `6.1%` | `1.5%` | `1.3%` |
+| 3 | `0.026860s` | `0.032618s` | `6.7%` | `5.8%` | `1.5%` | `1.3%` |
+
+All three runs had `0` timeline resets, `0` active underruns, `0` output panic
+flags, `0` elastic drops, and `0` elastic replays.
+
+Product reading:
+
+- Rust now has a credible no-iRig internal playback/stress candidate.
+- It beats mainline `0.3.135` on start and first-callback latency in these
+  runs.
+- It matches the mainline `coreaudiod` stress target and remains in the
+  mainline driver CPU band.
+- It is still `BLOCKED_PHYSICAL_CAPTURE` for audiophile release, because iRig
+  physical capture and human listening have not run.
+
 ### Rust target relationship to mainline
 
 OpenA8DJ-rust must:
