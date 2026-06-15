@@ -1111,6 +1111,7 @@ static void CopyClientOutputToOutput(UInt32 streamIndex, const Float32 *inInterl
 #if OPENA8DJ_ENABLE_INPUT_IO
 static void PrepareInputCycle(UInt32 frameCount, UInt64 cycleCounter)
 {
+    OpenA8DJUSBSetInputDecodeActive(true);
     UInt32 clampedFrames = frameCount <= kOpenA8DJMaxBufferFrames ? frameCount : kOpenA8DJMaxBufferFrames;
     if (cycleCounter == 0) {
         gInputCycleFrames = clampedFrames;
@@ -1249,6 +1250,7 @@ static void *DelayedCloseThread(void *arg)
     pthread_mutex_lock(&gIOMutex);
     if (gRunningClients == 0 && atomic_load(&gStopGeneration) == generation) {
         FlushOutputCycle();
+        OpenA8DJUSBSetInputDecodeActive(false);
 #if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
         atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
         Trace("StopIO USB kept open after grace");
@@ -1269,6 +1271,7 @@ static void ScheduleDelayedClose(void)
     if (pthread_create(&thread, NULL, DelayedCloseThread, (void *)(uintptr_t)generation) == 0) {
         pthread_detach(thread);
     } else {
+        OpenA8DJUSBSetInputDecodeActive(false);
 #if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
         atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
         Trace("StopIO USB kept open after grace thread failure");
@@ -2041,6 +2044,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inD
     }
     if (gRunningClients == 0) {
         FlushOutputCycle();
+        OpenA8DJUSBSetInputDecodeActive(false);
 #if OPENA8DJ_STOP_ISOC_ON_STOP
         OpenA8DJUSBStop();
 #endif

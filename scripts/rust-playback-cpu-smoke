@@ -84,6 +84,11 @@ if ! grep -Fq "uid=$device_uid" "$run_dir/audio-list-before.txt"; then
   exit 1
 fi
 
+set +e
+"$root/build/opena8dj-control" profile playback >"$run_dir/control-profile-playback.txt" 2>&1
+control_rc=$?
+set -e
+
 sleep "$preplay_wait_seconds"
 
 "$root/build/audio-wav-play" "$fixture" "$pair" >"$run_dir/play.txt" 2>&1 &
@@ -150,6 +155,9 @@ reason="ok"
 if [ "$play_rc" -ne 0 ]; then
   status="FAIL"
   reason="playback_failed"
+elif [ "${control_rc:-1}" -ne 0 ]; then
+  status="FAIL"
+  reason="control_profile_playback_failed"
 elif [ "$stats_rc" -ne 0 ]; then
   status="FAIL"
   reason="stream_stats_failed"
@@ -190,6 +198,7 @@ fi
   echo "max_device_start_seconds=$max_device_start_seconds"
   echo "max_first_callback_seconds=$max_first_callback_seconds"
   echo "max_coreaudiod_p95=$max_coreaudiod_p95"
+  echo "control_rc=${control_rc:-unknown}"
   echo "play_rc=$play_rc"
   echo "stats_rc=$stats_rc"
   echo "device_start_seconds=${device_start_seconds:-unknown}"
