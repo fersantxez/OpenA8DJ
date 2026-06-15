@@ -104,6 +104,12 @@ Latest no-iRig software quality gate:
 /Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T035139Z
 ```
 
+No-iRig quality strategy:
+
+```text
+/Users/fer/dev/audio8djrust/docs/RUST_NO_IRIG_AUDIO_QUALITY.md
+```
+
 This gate passed:
 
 - `cargo fmt --all -- --check`;

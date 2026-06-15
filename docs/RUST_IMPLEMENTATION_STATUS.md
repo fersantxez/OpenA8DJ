@@ -48,6 +48,11 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
   - covers Rust build hygiene, HAL bundle smoke/parity, packet parity,
     Rust pack-sim matrix behavior, and simulated output quality for all four
     stereo output pairs.
+- `docs/RUST_NO_IRIG_AUDIO_QUALITY.md`
+  - makes the software-only gate the official no-iRig audio-quality path;
+  - records driver-internal diagnostic capture, Audio 8 DJ self-loopback, and
+    MacBook microphone smoke as future options rather than current promotion
+    evidence.
 
 ## Verified Offline
 
