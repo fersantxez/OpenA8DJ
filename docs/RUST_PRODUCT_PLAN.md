@@ -538,6 +538,7 @@ Deliverables:
 - `AGENTS.md`;
 - `docs/RUST_DRIVER_ARCHITECTURE.md`;
 - `docs/RUST_PRODUCT_PLAN.md`;
+- `docs/AUDIOPHILE_DRIVER_DESIGN.md`;
 - initial agent model;
 - initial no-interference rules.
 

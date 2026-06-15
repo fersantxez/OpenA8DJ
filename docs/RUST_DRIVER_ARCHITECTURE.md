@@ -5,6 +5,9 @@ implementation of OpenA8DJ. It is intentionally developed in the
 `/Users/fer/dev/audio8djrust` worktree and must not interfere with active
 mainline C/Objective-C driver investigation.
 
+For the product-level audiophile/DVS target design, see
+`docs/AUDIOPHILE_DRIVER_DESIGN.md`.
+
 ## Boundary
 
 The main worktree at `/Users/fer/dev/opena8dj` is read-only reference material.
