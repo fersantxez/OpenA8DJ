@@ -1,8 +1,8 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use open_a8dj_core::mode2::{
-    validate_start_byte, validate_transfer_bytes, Mode2OutputPacker, DEFAULT_START_BYTE,
-    DEFAULT_TRANSFER_BYTES,
+    stream_frame_bytes, validate_start_byte, validate_transfer_bytes, Mode2OutputPacker,
+    DEFAULT_START_BYTE, DEFAULT_TRANSFER_BYTES, FRAME_BYTES_PER_STREAM, STREAMS,
 };
 use open_a8dj_core::sample::I24ByteOrder;
 use open_a8dj_core::topology::CHANNELS;
@@ -156,6 +156,50 @@ pub extern "C" fn opena8dj_rust_default_start_byte() -> u32 {
 #[no_mangle]
 pub extern "C" fn opena8dj_rust_default_transfer_bytes() -> u32 {
     DEFAULT_TRANSFER_BYTES as u32
+}
+
+#[no_mangle]
+/// # Safety
+///
+/// `input_frame` must point to at least `channels` readable `f32` values, with
+/// `channels == 8`. `output_bytes` must point to at least 24 writable bytes:
+/// four streams times six signed-24 sample bytes per stream.
+pub unsafe extern "C" fn opena8dj_rust_stream_frame_bytes(
+    input_frame: *const f32,
+    channels: u32,
+    output_bytes: *mut u8,
+    output_len: usize,
+    output_gain: f32,
+    byte_order_value: u32,
+) -> OpenA8DJRustStatus {
+    ffi_boundary(|| {
+        if input_frame.is_null() || output_bytes.is_null() {
+            return OpenA8DJRustStatus::NullPointer;
+        }
+        if channels as usize != CHANNELS {
+            return OpenA8DJRustStatus::InvalidChannels;
+        }
+        if output_len < STREAMS * FRAME_BYTES_PER_STREAM {
+            return OpenA8DJRustStatus::InvalidBuffer;
+        }
+        if !output_gain.is_finite() || output_gain < 0.0 {
+            return OpenA8DJRustStatus::InvalidConfig;
+        }
+        let Some(order) = byte_order(byte_order_value) else {
+            return OpenA8DJRustStatus::InvalidConfig;
+        };
+
+        let input = unsafe { slice::from_raw_parts(input_frame, CHANNELS) };
+        let mut frame = [0.0; CHANNELS];
+        frame.copy_from_slice(input);
+        let streams = stream_frame_bytes(&frame, output_gain, order);
+        let output = unsafe { slice::from_raw_parts_mut(output_bytes, output_len) };
+        for (stream, bytes) in streams.iter().enumerate() {
+            let dst = stream * FRAME_BYTES_PER_STREAM;
+            output[dst..dst + FRAME_BYTES_PER_STREAM].copy_from_slice(bytes);
+        }
+        OpenA8DJRustStatus::Ok
+    })
 }
 
 #[no_mangle]
@@ -434,5 +478,27 @@ mod tests {
             unsafe { opena8dj_rust_engine_destroy(engine) },
             OpenA8DJRustStatus::Ok
         );
+    }
+
+    #[test]
+    fn stateless_stream_frame_encoder_matches_big_endian_vectors() {
+        let frame = [0.0f32, 1.0, -1.0, 0.5, -0.5, 0.25, -0.25, 0.125];
+        let mut output = [0u8; STREAMS * FRAME_BYTES_PER_STREAM];
+        assert_eq!(
+            unsafe {
+                opena8dj_rust_stream_frame_bytes(
+                    frame.as_ptr(),
+                    CHANNELS as u32,
+                    output.as_mut_ptr(),
+                    output.len(),
+                    1.0,
+                    OPENA8DJ_RUST_BYTE_ORDER_BIG_ENDIAN,
+                )
+            },
+            OpenA8DJRustStatus::Ok
+        );
+
+        assert_eq!(&output[0..6], &[0x00, 0x00, 0x00, 0x7f, 0xff, 0xff]);
+        assert_eq!(&output[6..9], &[0x80, 0x00, 0x00]);
     }
 }

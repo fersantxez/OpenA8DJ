@@ -1,5 +1,13 @@
 #import "OpenA8DJUSB.h"
 
+#ifndef OPENA8DJ_USE_RUST_CORE
+#define OPENA8DJ_USE_RUST_CORE 0
+#endif
+
+#if OPENA8DJ_USE_RUST_CORE
+#include "open_a8dj_rust.h"
+#endif
+
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
 #import <IOKit/usb/AppleUSBDefinitions.h>
@@ -1174,6 +1182,32 @@ static void FloatToOutputI24(float sample, uint8_t *bytes)
     bytes[1] = (uint8_t)((sample24 >> 8) & 0xff);
     bytes[2] = (uint8_t)(sample24 & 0xff);
 #endif
+}
+
+static void EncodeOutputFrameI24(const float *frame,
+                                 uint8_t outputFrameBytes[kStreams][kChannelsPerStream * kBytesPerSample])
+{
+#if OPENA8DJ_USE_RUST_CORE
+#if OPENA8DJ_OUTPUT_NATIVE_I24
+    const uint32_t rustByteOrder = OPENA8DJ_RUST_BYTE_ORDER_NATIVE_LITTLE_ENDIAN;
+#else
+    const uint32_t rustByteOrder = OPENA8DJ_RUST_BYTE_ORDER_BIG_ENDIAN;
+#endif
+    OpenA8DJRustStatus rustStatus =
+        opena8dj_rust_stream_frame_bytes(frame,
+                                         kChannels,
+                                         &outputFrameBytes[0][0],
+                                         kStreams * kChannelsPerStream * kBytesPerSample,
+                                         OPENA8DJ_OUTPUT_GAIN,
+                                         rustByteOrder);
+    if (rustStatus == OPENA8DJ_RUST_OK) {
+        return;
+    }
+#endif
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        FloatToOutputI24(frame[stream * 2], &outputFrameBytes[stream][0]);
+        FloatToOutputI24(frame[stream * 2 + 1], &outputFrameBytes[stream][3]);
+    }
 }
 
 #if OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
@@ -3495,10 +3529,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _debugOutputUnderruns++;
     }
 #endif
-    for (uint32_t stream = 0; stream < kStreams; stream++) {
-        FloatToOutputI24(frame[stream * 2], &_outputFrameBytes[stream][0]);
-        FloatToOutputI24(frame[stream * 2 + 1], &_outputFrameBytes[stream][3]);
-    }
+    EncodeOutputFrameI24(frame, _outputFrameBytes);
 #if OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
     if (haveFrame) {
         OutputFillStatsAccumulateAmplitude(stats, frame);

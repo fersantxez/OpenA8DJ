@@ -49,6 +49,14 @@ uint32_t opena8dj_rust_channels(void);
 uint32_t opena8dj_rust_default_start_byte(void);
 uint32_t opena8dj_rust_default_transfer_bytes(void);
 
+OpenA8DJRustStatus opena8dj_rust_stream_frame_bytes(
+    const float *input_frame,
+    uint32_t channels,
+    uint8_t *output_bytes,
+    size_t output_len,
+    float output_gain,
+    uint32_t byte_order);
+
 OpenA8DJRustStatus opena8dj_rust_engine_create(
     const OpenA8DJRustConfig *config,
     OpenA8DJRustEngine **out_engine);
@@ -75,4 +83,3 @@ OpenA8DJRustStatus opena8dj_rust_engine_reset(
 #ifdef __cplusplus
 }
 #endif
-

@@ -6,6 +6,11 @@ HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
+HAL_RUST_BUNDLE := build/OpenA8DJ-rust.driver
+HAL_RUST_BIN := $(HAL_RUST_BUNDLE)/Contents/MacOS/OpenA8DJHALRust
+HAL_RUST_PLIST := resources/OpenA8DJ-rust.driver/Contents/Info.plist
+RUST_FFI_LIB := target/release/libopen_a8dj_ffi.a
+RUST_FFI_INCLUDE := crates/open-a8dj-ffi/include
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
 HAL_PARITY_SMOKE := build/hal-parity-smoke
@@ -110,7 +115,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal rust-core hal-rust sign-hal install-hal install-midid install-tools smoke-hal smoke-hal-rust parity-smoke-hal parity-smoke-hal-rust audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -125,6 +130,18 @@ $(HAL_BIN): $(HAL_SRC) $(HAL_PLIST)
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	xcrun clang $(HAL_CFLAGS) -bundle $(HAL_FRAMEWORKS) -o $@ $(HAL_SRC)
 
+rust-core: $(RUST_FFI_LIB)
+
+$(RUST_FFI_LIB): Cargo.toml Cargo.lock crates/open-a8dj-core/src/*.rs crates/open-a8dj-ffi/src/lib.rs crates/open-a8dj-ffi/include/open_a8dj_rust.h
+	cargo build -p open-a8dj-ffi --release --locked
+
+hal-rust: $(HAL_RUST_BIN)
+
+$(HAL_RUST_BIN): $(HAL_SRC) $(HAL_RUST_PLIST) $(RUST_FFI_LIB) crates/open-a8dj-ffi/include/open_a8dj_rust.h
+	@mkdir -p $(HAL_RUST_BUNDLE)/Contents/MacOS
+	@cp $(HAL_RUST_PLIST) $(HAL_RUST_BUNDLE)/Contents/Info.plist
+	xcrun clang $(HAL_CFLAGS) -DOPENA8DJ_USE_RUST_CORE=1 -I$(RUST_FFI_INCLUDE) -bundle $(HAL_FRAMEWORKS) -o $@ $(HAL_SRC) $(RUST_FFI_LIB)
+
 sign-hal: $(HAL_BIN)
 	codesign --force --sign "$(SIGN_IDENTITY)" --timestamp=none $(HAL_BUNDLE)
 
@@ -135,12 +152,18 @@ $(HAL_SMOKE): $(HAL_SMOKE_SRC)
 smoke-hal: $(HAL_BIN) $(HAL_SMOKE)
 	./$(HAL_SMOKE) $(HAL_BUNDLE)
 
+smoke-hal-rust: $(HAL_RUST_BIN) $(HAL_SMOKE)
+	./$(HAL_SMOKE) $(HAL_RUST_BUNDLE)
+
 $(HAL_PARITY_SMOKE): $(HAL_PARITY_SMOKE_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 
 parity-smoke-hal: $(HAL_BIN) $(HAL_PARITY_SMOKE)
 	./$(HAL_PARITY_SMOKE) $(HAL_BUNDLE)
+
+parity-smoke-hal-rust: $(HAL_RUST_BIN) $(HAL_PARITY_SMOKE)
+	./$(HAL_PARITY_SMOKE) $(HAL_RUST_BUNDLE)
 
 $(AUDIO_LIST): $(AUDIO_LIST_SRC)
 	@mkdir -p build

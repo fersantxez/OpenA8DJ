@@ -7,6 +7,7 @@ int main(void) {
     OpenA8DJRustEngine *engine = 0;
     float frames[8 * 8] = {0};
     uint8_t output[352] = {0};
+    uint8_t stream_frame[24] = {0};
     uint32_t consumed = 0;
     OpenA8DJRustCounters counters;
 
@@ -21,6 +22,18 @@ int main(void) {
     }
     if (opena8dj_rust_default_transfer_bytes() != sizeof(output)) {
         return 4;
+    }
+    frames[1] = 1.0f;
+    if (opena8dj_rust_stream_frame_bytes(frames,
+                                         8,
+                                         stream_frame,
+                                         sizeof(stream_frame),
+                                         1.0f,
+                                         OPENA8DJ_RUST_BYTE_ORDER_BIG_ENDIAN) != OPENA8DJ_RUST_OK) {
+        return 11;
+    }
+    if (stream_frame[3] != 0x7f || stream_frame[4] != 0xff || stream_frame[5] != 0xff) {
+        return 12;
     }
     if (opena8dj_rust_engine_create(&config, &engine) != OPENA8DJ_RUST_OK || !engine) {
         return 5;
@@ -49,4 +62,3 @@ int main(void) {
 
     return 0;
 }
-
