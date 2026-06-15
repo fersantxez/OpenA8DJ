@@ -36,6 +36,10 @@ pub struct Mode2OutputPacker {
     byte_order: I24ByteOrder,
 }
 
+pub trait OutputFrameProvider {
+    fn next_frame(&mut self) -> [f32; CHANNELS];
+}
+
 impl Mode2OutputPacker {
     pub fn new(start_byte: usize, gain: f32, byte_order: I24ByteOrder) -> Result<Self, Mode2Error> {
         validate_start_byte(start_byte)?;
@@ -122,6 +126,47 @@ impl Mode2OutputPacker {
         (*frame_index).saturating_sub(start_frame)
     }
 
+    pub fn fill_with_provider<P: OutputFrameProvider>(
+        &mut self,
+        provider: &mut P,
+        out: &mut [u8],
+    ) -> usize {
+        let mut frames_loaded = 0;
+        let mut i = 0;
+        while i < out.len() {
+            if (i % GROUP_BYTES) == CHECK_OFFSET {
+                for stream in 0..STREAMS {
+                    if i >= out.len() {
+                        break;
+                    }
+                    out[i] = mode2_check_byte(stream, i);
+                    i += 1;
+                }
+                continue;
+            }
+
+            if self.load_next_provider_frame_if_needed(provider) {
+                frames_loaded += 1;
+            }
+            for stream in 0..STREAMS {
+                if i >= out.len() {
+                    break;
+                }
+                out[i] = self.output_frame_bytes[stream][self.output_byte_in_frame];
+                i += 1;
+            }
+            self.output_byte_in_frame += 1;
+            if self.output_byte_in_frame >= FRAME_BYTES_PER_STREAM {
+                self.output_byte_in_frame = 0;
+            }
+        }
+        frames_loaded
+    }
+
+    pub const fn output_byte_in_frame(&self) -> usize {
+        self.output_byte_in_frame
+    }
+
     fn load_next_output_frame_if_needed(
         &mut self,
         frames: &[[f32; CHANNELS]],
@@ -161,6 +206,20 @@ impl Mode2OutputPacker {
             self.output_frame_bytes = [[0; FRAME_BYTES_PER_STREAM]; STREAMS];
         }
         self.output_frame_loaded = true;
+    }
+
+    fn load_next_provider_frame_if_needed<P: OutputFrameProvider>(
+        &mut self,
+        provider: &mut P,
+    ) -> bool {
+        if self.output_frame_loaded && self.output_byte_in_frame != 0 {
+            return false;
+        }
+
+        let frame = provider.next_frame();
+        self.output_frame_bytes = stream_frame_bytes(&frame, self.gain, self.byte_order);
+        self.output_frame_loaded = true;
+        true
     }
 }
 
@@ -385,6 +444,23 @@ mod tests {
         (0..frame_count).map(synthetic_frame).collect()
     }
 
+    struct SliceProvider {
+        frames: Vec<[f32; CHANNELS]>,
+        next: usize,
+    }
+
+    impl OutputFrameProvider for SliceProvider {
+        fn next_frame(&mut self) -> [f32; CHANNELS] {
+            let frame = self
+                .frames
+                .get(self.next)
+                .copied()
+                .unwrap_or([0.0; CHANNELS]);
+            self.next += 1;
+            frame
+        }
+    }
+
     #[test]
     fn constants_match_mainline_mode2_layout() {
         assert_eq!(STREAMS, 4);
@@ -486,5 +562,32 @@ mod tests {
         assert!(decoded.frames.len() >= expected_count);
         assert_eq!(decoded.check_errors, 0);
         assert_eq!(decoded.panic_flags, 0);
+    }
+
+    #[test]
+    fn callback_provider_matches_slice_packer() {
+        let frames = synthetic_frames(64);
+        let mut provider = SliceProvider {
+            frames: frames.clone(),
+            next: 0,
+        };
+        let mut packer =
+            Mode2OutputPacker::new(DEFAULT_START_BYTE, 1.0, I24ByteOrder::BigEndian).unwrap();
+        let mut callback_packed = vec![0; 2112];
+        let frames_loaded = packer.fill_with_provider(&mut provider, &mut callback_packed);
+
+        let transfer_packed = pack_transfers(
+            &frames,
+            DEFAULT_START_BYTE,
+            DEFAULT_TRANSFER_BYTES,
+            6,
+            1.0,
+            I24ByteOrder::BigEndian,
+        )
+        .unwrap();
+
+        assert_eq!(callback_packed, transfer_packed);
+        assert_eq!(frames_loaded, provider.next);
+        assert_eq!(packer.output_byte_in_frame(), 4);
     }
 }

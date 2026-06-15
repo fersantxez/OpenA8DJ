@@ -1270,6 +1270,16 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 }
 
 @class OpenA8DJIsoTransfer;
+@class OpenA8DJUSBEngine;
+
+#if OPENA8DJ_USE_RUST_CORE
+typedef struct OpenA8DJRustPlaybackContext {
+    __unsafe_unretained OpenA8DJUSBEngine *engine;
+    OpenA8DJOutputFillStats *stats;
+} OpenA8DJRustPlaybackContext;
+
+static uint32_t OpenA8DJRustNextOutputFrame(void *context, float *outFrame, uint32_t channels);
+#endif
 
 @interface OpenA8DJUSBEngine : NSObject
 @property(nonatomic) double sampleRate;
@@ -1293,6 +1303,9 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
                       bytesPerPacket:(uint16_t)bpp
                                 name:(const char *)name;
 - (void)resetAudioParamsBeforeStream;
+- (BOOL)loadNextOutputFrameForRust:(float *)outFrame
+                           channels:(uint32_t)channels
+                              stats:(OpenA8DJOutputFillStats *)stats;
 - (void)startIPCServer;
 - (void)stopIPCServer;
 - (void)broadcastIPCType:(uint8_t)type bytes:(const uint8_t *)bytes length:(NSUInteger)length;
@@ -1328,6 +1341,19 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
                   threshold:(uint64_t)threshold;
 - (void)accumulateOutputFillStats:(const OpenA8DJOutputFillStats *)stats force:(BOOL)force;
 @end
+
+#if OPENA8DJ_USE_RUST_CORE
+static uint32_t OpenA8DJRustNextOutputFrame(void *context, float *outFrame, uint32_t channels)
+{
+    OpenA8DJRustPlaybackContext *playback = (OpenA8DJRustPlaybackContext *)context;
+    if (playback == NULL || playback->engine == nil || outFrame == NULL) {
+        return 0;
+    }
+    return [playback->engine loadNextOutputFrameForRust:outFrame
+                                               channels:channels
+                                                  stats:playback->stats] ? 1u : 0u;
+}
+#endif
 
 @interface OpenA8DJIsoTransfer : NSObject
 @property(nonatomic, strong) NSMutableData *data;
@@ -1439,6 +1465,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint8_t _outputFrameBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _outputByteInFrame;
     bool _outputFrameLoaded;
+#if OPENA8DJ_USE_RUST_CORE
+    OpenA8DJRustEngine *_rustEngine;
+#endif
     bool _outputPlaybackPrimed;
     bool _outputHasStartedPlayback;
     uint64_t _outputFramesServed;
@@ -1585,9 +1614,36 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     return self;
 }
 
+#if OPENA8DJ_USE_RUST_CORE
+- (BOOL)resetRustPlaybackEngine
+{
+    OpenA8DJRustConfig config;
+    if (opena8dj_rust_config_default(&config) != OPENA8DJ_RUST_OK) {
+        return NO;
+    }
+    config.start_byte = OPENA8DJ_OUTPUT_START_BYTE;
+    config.output_gain = OPENA8DJ_OUTPUT_GAIN;
+#if OPENA8DJ_OUTPUT_NATIVE_I24
+    config.byte_order = OPENA8DJ_RUST_BYTE_ORDER_NATIVE_LITTLE_ENDIAN;
+#else
+    config.byte_order = OPENA8DJ_RUST_BYTE_ORDER_BIG_ENDIAN;
+#endif
+    if (_rustEngine == NULL) {
+        return opena8dj_rust_engine_create(&config, &_rustEngine) == OPENA8DJ_RUST_OK;
+    }
+    return opena8dj_rust_engine_reset(_rustEngine, &config) == OPENA8DJ_RUST_OK;
+}
+#endif
+
 - (void)dealloc
 {
     [self close];
+#if OPENA8DJ_USE_RUST_CORE
+    if (_rustEngine != NULL) {
+        (void)opena8dj_rust_engine_destroy(_rustEngine);
+        _rustEngine = NULL;
+    }
+#endif
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     pthread_mutex_lock(&_diagnosticMutex);
     free(_diagnosticWrittenBuffer);
@@ -3063,6 +3119,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
      */
     _outputByteInFrame = OPENA8DJ_OUTPUT_START_BYTE;
     _outputFrameLoaded = false;
+#if OPENA8DJ_USE_RUST_CORE
+    (void)[self resetRustPlaybackEngine];
+#endif
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
     _outputFramesServed = 0;
@@ -3458,9 +3517,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                                     _outputPrefetchElasticDrops);
 }
 
-- (void)loadNextOutputFrameWithStats:(OpenA8DJOutputFillStats *)stats
+- (void)loadNextOutputFloatFrame:(float *)frame stats:(OpenA8DJOutputFillStats *)stats
 {
-    float frame[kChannels] = {0};
+    if (frame == NULL) {
+        return;
+    }
+    memset(frame, 0, sizeof(float) * kChannels);
     bool haveFrame = false;
     bool startupSilence = false;
     bool replayedFrame = false;
@@ -3472,7 +3534,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         uint32_t prefetchIndex = _outputPrefetchIndex++;
         memcpy(frame,
                &_outputPrefetch[(size_t)prefetchIndex * kChannels],
-               sizeof(frame));
+               sizeof(float) * kChannels);
         haveFrame = _outputPrefetchHaveFrame[prefetchIndex];
         startupSilence = _outputPrefetchStartupSilence[prefetchIndex];
         elasticDrops = _outputPrefetchElasticDrops[prefetchIndex];
@@ -3529,7 +3591,6 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _debugOutputUnderruns++;
     }
 #endif
-    EncodeOutputFrameI24(frame, _outputFrameBytes);
 #if OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
     if (haveFrame) {
         OutputFillStatsAccumulateAmplitude(stats, frame);
@@ -3553,6 +3614,24 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             }
         }
     }
+}
+
+- (BOOL)loadNextOutputFrameForRust:(float *)outFrame
+                           channels:(uint32_t)channels
+                              stats:(OpenA8DJOutputFillStats *)stats
+{
+    if (outFrame == NULL || channels != kChannels) {
+        return NO;
+    }
+    [self loadNextOutputFloatFrame:outFrame stats:stats];
+    return YES;
+}
+
+- (void)loadNextOutputFrameWithStats:(OpenA8DJOutputFillStats *)stats
+{
+    float frame[kChannels];
+    [self loadNextOutputFloatFrame:frame stats:stats];
+    EncodeOutputFrameI24(frame, _outputFrameBytes);
     _outputFrameLoaded = true;
 }
 
@@ -3563,6 +3642,44 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 }
 
+#if OPENA8DJ_USE_RUST_CORE
+- (BOOL)fillPlaybackBytesWithRust:(uint8_t *)bytes
+                            length:(NSUInteger)length
+                             stats:(OpenA8DJOutputFillStats *)stats
+{
+    if (_rustEngine == NULL && ![self resetRustPlaybackEngine]) {
+        return NO;
+    }
+    if (_rustEngine == NULL) {
+        return NO;
+    }
+
+    OpenA8DJRustPlaybackContext context = {
+        .engine = self,
+        .stats = stats,
+    };
+    uint32_t framesConsumed = 0;
+    OpenA8DJRustStatus status =
+        opena8dj_rust_engine_fill_playback_bytes_with_callback(_rustEngine,
+                                                               OpenA8DJRustNextOutputFrame,
+                                                               &context,
+                                                               bytes,
+                                                               length,
+                                                               &framesConsumed);
+    if (status != OPENA8DJ_RUST_OK) {
+        return NO;
+    }
+
+    uint32_t outputByte = OPENA8DJ_OUTPUT_START_BYTE;
+    if (opena8dj_rust_engine_output_byte_in_frame(_rustEngine, &outputByte) == OPENA8DJ_RUST_OK &&
+        outputByte < kChannelsPerStream * kBytesPerSample) {
+        _outputByteInFrame = (uint8_t)outputByte;
+    }
+    _outputFrameLoaded = false;
+    return YES;
+}
+#endif
+
 - (void)fillPlaybackBytes:(uint8_t *)bytes length:(NSUInteger)length
 {
     if (_spec.dataAlignment != 2) {
@@ -3570,6 +3687,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return;
     }
     OpenA8DJOutputFillStats stats = {0};
+#if OPENA8DJ_USE_RUST_CORE
+    if ([self fillPlaybackBytesWithRust:bytes length:length stats:&stats]) {
+        [self accumulateOutputFillStats:&stats force:NO];
+        return;
+    }
+#endif
     NSUInteger i = 0;
     while (i < length) {
         if ((i % (kStreams * kBytesPerSampleUSB)) == (kStreams * kChannelsPerStream)) {
@@ -3904,6 +4027,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     memset(_outputLastFrame, 0, sizeof(_outputLastFrame));
     _outputByteInFrame = OPENA8DJ_OUTPUT_START_BYTE;
     _outputFrameLoaded = false;
+#if OPENA8DJ_USE_RUST_CORE
+    (void)[self resetRustPlaybackEngine];
+#endif
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
     _outputLastFrameValid = false;

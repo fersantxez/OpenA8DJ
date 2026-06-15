@@ -2,10 +2,12 @@
 
 use open_a8dj_core::mode2::{
     stream_frame_bytes, validate_start_byte, validate_transfer_bytes, Mode2OutputPacker,
-    DEFAULT_START_BYTE, DEFAULT_TRANSFER_BYTES, FRAME_BYTES_PER_STREAM, STREAMS,
+    OutputFrameProvider, DEFAULT_START_BYTE, DEFAULT_TRANSFER_BYTES, FRAME_BYTES_PER_STREAM,
+    STREAMS,
 };
 use open_a8dj_core::sample::I24ByteOrder;
 use open_a8dj_core::topology::CHANNELS;
+use std::ffi::c_void;
 use std::mem;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
@@ -15,6 +17,9 @@ pub const OPENA8DJ_RUST_CONFIG_VERSION: u32 = 1;
 pub const OPENA8DJ_RUST_COUNTERS_VERSION: u32 = 1;
 pub const OPENA8DJ_RUST_BYTE_ORDER_BIG_ENDIAN: u32 = 0;
 pub const OPENA8DJ_RUST_BYTE_ORDER_NATIVE_LITTLE_ENDIAN: u32 = 1;
+
+pub type OpenA8DJRustNextFrameCallback =
+    Option<unsafe extern "C" fn(context: *mut c_void, out_frame: *mut f32, channels: u32) -> u32>;
 
 #[repr(i32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -79,6 +84,26 @@ pub struct OpenA8DJRustEngine {
     config: OpenA8DJRustConfig,
     packer: Mode2OutputPacker,
     counters: OpenA8DJRustCounters,
+}
+
+struct CallbackFrameProvider {
+    callback: unsafe extern "C" fn(context: *mut c_void, out_frame: *mut f32, channels: u32) -> u32,
+    context: *mut c_void,
+    frames_loaded: u32,
+    failed: bool,
+}
+
+impl OutputFrameProvider for CallbackFrameProvider {
+    fn next_frame(&mut self) -> [f32; CHANNELS] {
+        let mut frame = [0.0; CHANNELS];
+        let ok = unsafe { (self.callback)(self.context, frame.as_mut_ptr(), CHANNELS as u32) };
+        if ok == 0 {
+            self.failed = true;
+        } else {
+            self.frames_loaded = self.frames_loaded.saturating_add(1);
+        }
+        frame
+    }
 }
 
 fn ffi_boundary(function: impl FnOnce() -> OpenA8DJRustStatus) -> OpenA8DJRustStatus {
@@ -343,6 +368,89 @@ pub unsafe extern "C" fn opena8dj_rust_engine_fill_playback_bytes(
 #[no_mangle]
 /// # Safety
 ///
+/// `engine` must be a live engine pointer. `next_frame` must be a valid
+/// callback that writes exactly eight `f32` samples to `out_frame` and returns
+/// nonzero on success. `output_bytes` must point to `output_len` writable bytes
+/// unless `output_len` is zero. `out_frames_consumed` may be null or writable.
+pub unsafe extern "C" fn opena8dj_rust_engine_fill_playback_bytes_with_callback(
+    engine: *mut OpenA8DJRustEngine,
+    next_frame: OpenA8DJRustNextFrameCallback,
+    context: *mut c_void,
+    output_bytes: *mut u8,
+    output_len: usize,
+    out_frames_consumed: *mut u32,
+) -> OpenA8DJRustStatus {
+    ffi_boundary(|| {
+        if engine.is_null() {
+            return OpenA8DJRustStatus::InvalidHandle;
+        }
+        let Some(callback) = next_frame else {
+            return OpenA8DJRustStatus::NullPointer;
+        };
+        let engine = unsafe { &mut *engine };
+        if output_len > 0 && output_bytes.is_null() {
+            return set_status(engine, OpenA8DJRustStatus::NullPointer);
+        }
+
+        let output = if output_len == 0 {
+            &mut []
+        } else {
+            unsafe { slice::from_raw_parts_mut(output_bytes, output_len) }
+        };
+        let mut provider = CallbackFrameProvider {
+            callback,
+            context,
+            frames_loaded: 0,
+            failed: false,
+        };
+        let loaded = engine.packer.fill_with_provider(&mut provider, output);
+        debug_assert_eq!(loaded, provider.frames_loaded as usize);
+        if !out_frames_consumed.is_null() {
+            unsafe {
+                ptr::write(out_frames_consumed, provider.frames_loaded);
+            }
+        }
+
+        engine.counters.fill_calls = engine.counters.fill_calls.saturating_add(1);
+        engine.counters.frames_consumed = engine
+            .counters
+            .frames_consumed
+            .saturating_add(provider.frames_loaded as u64);
+        engine.counters.bytes_packed = engine
+            .counters
+            .bytes_packed
+            .saturating_add(output_len as u64);
+        if provider.failed {
+            return set_status(engine, OpenA8DJRustStatus::InvalidBuffer);
+        }
+        set_status(engine, OpenA8DJRustStatus::Ok)
+    })
+}
+
+#[no_mangle]
+/// # Safety
+///
+/// `engine` must be a live engine pointer. `out_byte` must be non-null and
+/// writable.
+pub unsafe extern "C" fn opena8dj_rust_engine_output_byte_in_frame(
+    engine: *const OpenA8DJRustEngine,
+    out_byte: *mut u32,
+) -> OpenA8DJRustStatus {
+    ffi_boundary(|| {
+        if engine.is_null() || out_byte.is_null() {
+            return OpenA8DJRustStatus::NullPointer;
+        }
+        let engine = unsafe { &*engine };
+        unsafe {
+            ptr::write(out_byte, engine.packer.output_byte_in_frame() as u32);
+        }
+        OpenA8DJRustStatus::Ok
+    })
+}
+
+#[no_mangle]
+/// # Safety
+///
 /// `engine` must be a live engine pointer. `out_counters` must be non-null and
 /// valid for writing one `OpenA8DJRustCounters`.
 pub unsafe extern "C" fn opena8dj_rust_engine_snapshot_counters(
@@ -500,5 +608,60 @@ mod tests {
 
         assert_eq!(&output[0..6], &[0x00, 0x00, 0x00, 0x7f, 0xff, 0xff]);
         assert_eq!(&output[6..9], &[0x80, 0x00, 0x00]);
+    }
+
+    unsafe extern "C" fn next_silent_frame(
+        context: *mut c_void,
+        out_frame: *mut f32,
+        channels: u32,
+    ) -> u32 {
+        if context.is_null() || out_frame.is_null() || channels as usize != CHANNELS {
+            return 0;
+        }
+        let counter = unsafe { &mut *(context as *mut u32) };
+        let frame = unsafe { slice::from_raw_parts_mut(out_frame, channels as usize) };
+        frame.fill(0.0);
+        *counter = counter.saturating_add(1);
+        1
+    }
+
+    #[test]
+    fn callback_playback_fill_requests_frames_from_c_boundary() {
+        let mut engine = ptr::null_mut();
+        assert_eq!(
+            unsafe { opena8dj_rust_engine_create(ptr::null(), &mut engine) },
+            OpenA8DJRustStatus::Ok
+        );
+
+        let mut output = [0u8; DEFAULT_TRANSFER_BYTES];
+        let mut callback_count = 0u32;
+        let mut consumed = 0u32;
+        assert_eq!(
+            unsafe {
+                opena8dj_rust_engine_fill_playback_bytes_with_callback(
+                    engine,
+                    Some(next_silent_frame),
+                    (&mut callback_count as *mut u32).cast(),
+                    output.as_mut_ptr(),
+                    output.len(),
+                    &mut consumed,
+                )
+            },
+            OpenA8DJRustStatus::Ok
+        );
+        assert_eq!(callback_count, consumed);
+        assert!(consumed > 0);
+
+        let mut byte = u32::MAX;
+        assert_eq!(
+            unsafe { opena8dj_rust_engine_output_byte_in_frame(engine, &mut byte) },
+            OpenA8DJRustStatus::Ok
+        );
+        assert!(byte < FRAME_BYTES_PER_STREAM as u32);
+
+        assert_eq!(
+            unsafe { opena8dj_rust_engine_destroy(engine) },
+            OpenA8DJRustStatus::Ok
+        );
     }
 }

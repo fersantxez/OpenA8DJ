@@ -44,6 +44,11 @@ typedef struct OpenA8DJRustCounters {
 
 typedef struct OpenA8DJRustEngine OpenA8DJRustEngine;
 
+typedef uint32_t (*OpenA8DJRustNextFrameCallback)(
+    void *context,
+    float *out_frame,
+    uint32_t channels);
+
 OpenA8DJRustStatus opena8dj_rust_config_default(OpenA8DJRustConfig *out_config);
 uint32_t opena8dj_rust_channels(void);
 uint32_t opena8dj_rust_default_start_byte(void);
@@ -71,6 +76,18 @@ OpenA8DJRustStatus opena8dj_rust_engine_fill_playback_bytes(
     uint8_t *output_bytes,
     size_t output_len,
     uint32_t *out_frames_consumed);
+
+OpenA8DJRustStatus opena8dj_rust_engine_fill_playback_bytes_with_callback(
+    OpenA8DJRustEngine *engine,
+    OpenA8DJRustNextFrameCallback next_frame,
+    void *context,
+    uint8_t *output_bytes,
+    size_t output_len,
+    uint32_t *out_frames_consumed);
+
+OpenA8DJRustStatus opena8dj_rust_engine_output_byte_in_frame(
+    const OpenA8DJRustEngine *engine,
+    uint32_t *out_byte);
 
 OpenA8DJRustStatus opena8dj_rust_engine_snapshot_counters(
     const OpenA8DJRustEngine *engine,
