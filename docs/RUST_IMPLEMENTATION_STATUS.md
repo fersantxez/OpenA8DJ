@@ -39,6 +39,11 @@ not been installed or run against physical audio hardware.
 - C header/staticlib smoke against `open_a8dj_rust.h`;
 - callback-provider parity test proving Rust callback filling matches the
   slice-based mode-2 packer;
+- `make rust-packet-parity`
+  - compares legacy C mode-2 packing against Rust callback-driven filling
+    without opening USB;
+  - covers start bytes `0..5`, transfer sizes `352`, `48`, and `80`, gains
+    `1.0` and `0.5`, and big/native signed-24 byte order;
 - `make hal-rust`;
 - `make smoke-hal-rust`;
 - `make parity-smoke-hal-rust`.
@@ -58,6 +63,12 @@ HAL smoke OK: deviceID=2 name=Open Audio 8 DJ sampleRate=48000 streams=5 buffer=
 HAL parity OK
 ```
 
+The C/Rust packet harness reports:
+
+```text
+PASS rust_packet_parity cases=72
+```
+
 ## Not Yet Claimed
 
 - No hardware playback, iRig capture, Traktor, Spotify, VLC, default-device,
@@ -69,7 +80,9 @@ HAL parity OK
 
 ## Next Cut
 
-1. Add a dry-run HAL packing parity harness that compares C and Rust packet
-   bytes without opening USB.
-2. Only after offline parity is strict, request a short hardware window under
+1. Acquire a short hardware window under
    `$AUDIO_GATE_LOCK_ROOT` for install/reload and physical capture.
+2. Install/reload only `OpenA8DJ-rust.driver`, collect internal counters, and
+   run a short tone/music capture through iRig.
+3. Compare Rust physical evidence against the current mainline gate before
+   making any "as good or better" claim.

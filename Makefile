@@ -15,6 +15,8 @@ HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
 HAL_PARITY_SMOKE := build/hal-parity-smoke
 HAL_PARITY_SMOKE_SRC := src/tools/hal-parity-smoke.c
+RUST_PACKET_PARITY := build/rust-packet-parity
+RUST_PACKET_PARITY_SRC := src/tools/rust-packet-parity.c
 AUDIO_LIST := build/audio-list
 AUDIO_LIST_SRC := src/tools/audio-list.c
 AUDIO_INSPECT := build/audio-inspect
@@ -115,7 +117,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal rust-core hal-rust sign-hal install-hal install-midid install-tools smoke-hal smoke-hal-rust parity-smoke-hal parity-smoke-hal-rust audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal rust-core rust-packet-parity hal-rust sign-hal install-hal install-midid install-tools smoke-hal smoke-hal-rust parity-smoke-hal parity-smoke-hal-rust audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -134,6 +136,13 @@ rust-core: $(RUST_FFI_LIB)
 
 $(RUST_FFI_LIB): Cargo.toml Cargo.lock crates/open-a8dj-core/src/*.rs crates/open-a8dj-ffi/src/lib.rs crates/open-a8dj-ffi/include/open_a8dj_rust.h
 	cargo build -p open-a8dj-ffi --release --locked
+
+$(RUST_PACKET_PARITY): $(RUST_PACKET_PARITY_SRC) $(RUST_FFI_LIB) crates/open-a8dj-ffi/include/open_a8dj_rust.h
+	@mkdir -p build
+	xcrun clang -std=c11 -Wall -Wextra -Werror -O2 -I$(RUST_FFI_INCLUDE) -o $@ $(RUST_PACKET_PARITY_SRC) $(RUST_FFI_LIB)
+
+rust-packet-parity: $(RUST_PACKET_PARITY)
+	./$(RUST_PACKET_PARITY)
 
 hal-rust: $(HAL_RUST_BIN)
 
