@@ -492,6 +492,15 @@ static OSStatus WakeIOProc(AudioObjectID deviceID,
 
 static AudioDeviceID FindOpenA8DJDevice(void)
 {
+    const char *deviceUIDText = getenv("OPENA8DJ_DEVICE_UID");
+    if (deviceUIDText == NULL || deviceUIDText[0] == '\0') {
+        deviceUIDText = "org.opena8dj.Audio8DJ";
+    }
+    CFStringRef targetUID = CFStringCreateWithCString(NULL, deviceUIDText, kCFStringEncodingUTF8);
+    if (targetUID == NULL) {
+        return kAudioObjectUnknown;
+    }
+
     AudioObjectPropertyAddress address = {
         kAudioHardwarePropertyDevices,
         kAudioObjectPropertyScopeGlobal,
@@ -504,12 +513,14 @@ static AudioDeviceID FindOpenA8DJDevice(void)
                                                      NULL,
                                                      &size);
     if (status != noErr || size == 0) {
+        CFRelease(targetUID);
         return kAudioObjectUnknown;
     }
 
     UInt32 count = size / sizeof(AudioDeviceID);
     AudioDeviceID *devices = calloc(count, sizeof(AudioDeviceID));
     if (devices == NULL) {
+        CFRelease(targetUID);
         return kAudioObjectUnknown;
     }
 
@@ -521,6 +532,7 @@ static AudioDeviceID FindOpenA8DJDevice(void)
                                         devices);
     if (status != noErr) {
         free(devices);
+        CFRelease(targetUID);
         return kAudioObjectUnknown;
     }
 
@@ -540,7 +552,7 @@ static AudioDeviceID FindOpenA8DJDevice(void)
                                             &uidSize,
                                             &uid);
         if (status == noErr && uid != NULL) {
-            if (CFStringCompare(uid, CFSTR("org.opena8dj.Audio8DJ"), 0) == kCFCompareEqualTo) {
+            if (CFStringCompare(uid, targetUID, 0) == kCFCompareEqualTo) {
                 result = devices[i];
             }
             CFRelease(uid);
@@ -551,6 +563,7 @@ static AudioDeviceID FindOpenA8DJDevice(void)
     }
 
     free(devices);
+    CFRelease(targetUID);
     return result;
 }
 

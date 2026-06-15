@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <mach/mach_time.h>
 
 typedef struct WavData {
     double sampleRate;
@@ -20,8 +21,19 @@ typedef struct PlayerState {
     UInt32 pairIndex;
     atomic_uint frameIndex;
     atomic_bool done;
+    uint64_t firstCallbackHostTime;
     UInt64 callbacks;
 } PlayerState;
+
+static double HostTicksToSeconds(uint64_t ticks)
+{
+    mach_timebase_info_data_t timebase;
+    if (mach_timebase_info(&timebase) != KERN_SUCCESS || timebase.denom == 0) {
+        return 0.0;
+    }
+    double nanoseconds = (double)ticks * (double)timebase.numer / (double)timebase.denom;
+    return nanoseconds / 1000000000.0;
+}
 
 static uint16_t ReadLE16(const uint8_t *p)
 {
@@ -213,6 +225,9 @@ static OSStatus IOProc(AudioObjectID inDevice,
     (void)inOutputTime;
 
     PlayerState *state = (PlayerState *)inClientData;
+    if (state->callbacks == 0) {
+        state->firstCallbackHostTime = mach_absolute_time();
+    }
     state->callbacks++;
     if (outOutputData == NULL || atomic_load(&state->done)) {
         return kAudioHardwareNoError;
@@ -295,9 +310,20 @@ int main(int argc, char **argv)
     atomic_init(&state.frameIndex, 0);
     atomic_init(&state.done, false);
 
-    AudioObjectID device = FindDeviceByUID(CFSTR("org.opena8dj.Audio8DJ"));
+    const char *deviceUIDText = getenv("OPENA8DJ_DEVICE_UID");
+    if (deviceUIDText == NULL || deviceUIDText[0] == '\0') {
+        deviceUIDText = "org.opena8dj.Audio8DJ";
+    }
+    CFStringRef deviceUID = CFStringCreateWithCString(NULL, deviceUIDText, kCFStringEncodingUTF8);
+    if (deviceUID == NULL) {
+        fprintf(stderr, "Could not create device UID string\n");
+        free(state.wav.samples);
+        return 5;
+    }
+    AudioObjectID device = FindDeviceByUID(deviceUID);
+    CFRelease(deviceUID);
     if (device == kAudioObjectUnknown) {
-        fprintf(stderr, "Open Audio 8 DJ not found\n");
+        fprintf(stderr, "Open Audio 8 DJ not found for uid=%s\n", deviceUIDText);
         free(state.wav.samples);
         return 5;
     }
@@ -316,7 +342,9 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 6;
     }
+    uint64_t startBeginHostTime = mach_absolute_time();
     status = AudioDeviceStart(device, ioProcID);
+    uint64_t startEndHostTime = mach_absolute_time();
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);
         AudioDeviceDestroyIOProcID(device, ioProcID);
@@ -331,11 +359,17 @@ int main(int argc, char **argv)
     AudioDeviceStop(device, ioProcID);
     AudioDeviceDestroyIOProcID(device, ioProcID);
 
-    printf("played path=%s pair=%c frames=%u callbacks=%llu\n",
+    double deviceStartSeconds = HostTicksToSeconds(startEndHostTime - startBeginHostTime);
+    double firstCallbackSeconds = state.firstCallbackHostTime > startBeginHostTime ?
+        HostTicksToSeconds(state.firstCallbackHostTime - startBeginHostTime) : 0.0;
+
+    printf("played path=%s pair=%c frames=%u callbacks=%llu device_start_seconds=%.6f first_callback_seconds=%.6f\n",
            argv[1],
            'A' + state.pairIndex,
            atomic_load(&state.frameIndex),
-           state.callbacks);
+           state.callbacks,
+           deviceStartSeconds,
+           firstCallbackSeconds);
     free(state.wav.samples);
     return state.callbacks > 0 ? 0 : 8;
 }
