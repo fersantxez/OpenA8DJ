@@ -12,6 +12,9 @@ description = "Command-line tools for the OpenA8DJ Rust driver experiment"
 name = "opena8dj-rust-pack-sim"
 path = "src/bin/opena8dj-rust-pack-sim.rs"
 
+[[bin]]
+name = "opena8dj-rust-pack-bench"
+path = "src/bin/opena8dj-rust-pack-bench.rs"
+
 [dependencies]
 open-a8dj-core = { path = "../open-a8dj-core" }
-

@@ -101,7 +101,7 @@ flags, `0` elastic drops, and `0` elastic replays.
 Latest no-iRig software quality gate:
 
 ```text
-/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T035139Z
+/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z
 ```
 
 No-iRig quality strategy:
@@ -117,6 +117,8 @@ This gate passed:
 - `cargo clippy --workspace --locked -- -D warnings`;
 - `make smoke-hal-rust parity-smoke-hal-rust rust-packet-parity`;
 - `cargo build -p open-a8dj-tools --release --locked`;
+- Rust packer throughput benchmark with default floor `>= 100 MiB/s` and
+  `>= 1,000,000 frames/s`;
 - Rust pack-sim matrix: `72` rows, start bytes `0..5`, transfer sizes
   `48/80/352`, big/native byte order, gains `1.0/0.5`, with `0` check
   errors, `0` panic flags, and `0` mismatches;
@@ -133,12 +135,16 @@ mid_band_1000_5000_residual_dbfs=-108.83
 mid_band_cpu_corr=0.000000
 ```
 
+The short offline Rust packer throughput benchmark stores exact values in the
+run-local `rust-pack-bench.json`. The gate threshold is `>= 100 MiB/s` and
+`>= 1,000,000 frames/s`.
+
 Product reading:
 
 - Rust now has a credible no-iRig internal playback/stress candidate.
 - Rust now also has a reproducible no-iRig software quality gate covering
-  offline build hygiene, Rust/C packet parity, Rust packer matrix behavior, and
-  all four stereo output pairs with real-music simulation.
+  offline build hygiene, Rust/C packet parity, Rust packer throughput and
+  matrix behavior, and all four stereo output pairs with real-music simulation.
 - It beats mainline `0.3.135` on start and first-callback latency in these
   runs.
 - It matches the mainline `coreaudiod` stress target and remains in the

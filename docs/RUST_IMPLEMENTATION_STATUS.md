@@ -13,6 +13,10 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
   - offline mode-2 output packing simulator;
   - validates Python/mainline-compatible start byte `4`;
   - emits `open-a8dj-rust.pack-sim.v1` JSON summaries.
+- `target/release/opena8dj-rust-pack-bench`
+  - offline mode-2 output packer throughput benchmark;
+  - measures callback-driven packing without opening audio devices;
+  - emits `open-a8dj-rust.pack-bench.v1` JSON summaries.
 - `target/release/libopen_a8dj_ffi.a`
   - C ABI static library for the Rust core;
   - exposes config, counters, stateless stream-frame signed-24 encoding, and
@@ -81,6 +85,9 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
 - `make smoke-hal-rust`;
 - `make parity-smoke-hal-rust`.
 - `make rust-no-irig-software-gate`.
+- `opena8dj-rust-pack-bench --transfers 20000 --warmup-transfers 1000
+  --transfer-bytes 352 --start-byte 4 --gain 0.5 --byte-order big
+  --json-summary`.
 
 ## Current Evidence
 
@@ -107,12 +114,12 @@ The latest no-iRig software quality gate reports:
 
 ```text
 rust_no_irig_software_gate=PASS
-run_dir=/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T035139Z
+run_dir=/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z
 ```
 
 It passed `cargo fmt`, `cargo test`, `cargo clippy`, Rust HAL smoke/parity,
-Rust/C packet parity, tool build, a `72`-row Rust pack-sim matrix, and simulated
-output soundchecks for pairs `A/B/C/D`.
+Rust/C packet parity, tool build, Rust packer throughput, a `72`-row Rust
+pack-sim matrix, and simulated output soundchecks for pairs `A/B/C/D`.
 
 The Rust pack-sim matrix reported:
 
@@ -126,6 +133,14 @@ max_check_errors=0
 max_panic_flags=0
 max_mismatches=0
 ```
+
+The Rust packer throughput benchmark writes exact run-local values to:
+
+```text
+local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z/rust-pack-bench.json
+```
+
+The gate threshold is `>= 100 MiB/s` and `>= 1,000,000 frames/s`.
 
 Each simulated output pair reported:
 

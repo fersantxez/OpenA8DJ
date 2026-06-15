@@ -13,6 +13,11 @@ GAIN="${RUST_NO_IRIG_GAIN:-0.5}"
 RATE="${SOUNDCHECK_RATE:-48000}"
 PAIRS="${RUST_NO_IRIG_PAIRS:-A B C D}"
 RUN_CLIPPY=1
+RUN_BENCH=1
+PACK_BENCH_TRANSFERS="${RUST_PACK_BENCH_TRANSFERS:-20000}"
+PACK_BENCH_WARMUP_TRANSFERS="${RUST_PACK_BENCH_WARMUP_TRANSFERS:-1000}"
+PACK_BENCH_MIN_MIB_PER_SECOND="${RUST_PACK_BENCH_MIN_MIB_PER_SECOND:-100}"
+PACK_BENCH_MIN_FRAMES_PER_SECOND="${RUST_PACK_BENCH_MIN_FRAMES_PER_SECOND:-1000000}"
 
 usage() {
   cat <<'EOF'
@@ -31,6 +36,7 @@ Options:
   --rate HZ               Sample rate. Default: 48000.
   --pairs "A B C D"       Stereo pairs to simulate. Default: A B C D.
   --skip-clippy           Skip cargo clippy.
+  --skip-bench            Skip the short Rust packer throughput benchmark.
   -h, --help              Show this help.
 EOF
 }
@@ -71,6 +77,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --skip-clippy)
       RUN_CLIPPY=0
+      shift
+      ;;
+    --skip-bench)
+      RUN_BENCH=0
       shift
       ;;
     -h|--help)
@@ -137,6 +147,11 @@ run_logged() {
   echo "gain=$GAIN"
   echo "rate=$RATE"
   echo "pairs=$PAIRS"
+  echo "pack_bench=$RUN_BENCH"
+  echo "pack_bench_transfers=$PACK_BENCH_TRANSFERS"
+  echo "pack_bench_warmup_transfers=$PACK_BENCH_WARMUP_TRANSFERS"
+  echo "pack_bench_min_mib_per_second=$PACK_BENCH_MIN_MIB_PER_SECOND"
+  echo "pack_bench_min_frames_per_second=$PACK_BENCH_MIN_FRAMES_PER_SECOND"
 } > "$RUN_DIR/metadata.txt"
 
 run_logged cargo-fmt cargo fmt --all -- --check || true
@@ -150,6 +165,35 @@ run_logged make-rust-hal-parity make smoke-hal-rust parity-smoke-hal-rust rust-p
 run_logged cargo-build-tools cargo build -p open-a8dj-tools --release --locked || true
 
 PACK_SIM="$ROOT/target/release/opena8dj-rust-pack-sim"
+PACK_BENCH="$ROOT/target/release/opena8dj-rust-pack-bench"
+BENCH_SUMMARY="$RUN_DIR/rust-pack-bench.json"
+
+if [ "$RUN_BENCH" -eq 1 ]; then
+  if [ -x "$PACK_BENCH" ]; then
+    if "$PACK_BENCH" \
+      --transfers "$PACK_BENCH_TRANSFERS" \
+      --warmup-transfers "$PACK_BENCH_WARMUP_TRANSFERS" \
+      --transfer-bytes 352 \
+      --start-byte 4 \
+      --gain "$GAIN" \
+      --byte-order big \
+      --min-mib-per-second "$PACK_BENCH_MIN_MIB_PER_SECOND" \
+      --min-frames-per-second "$PACK_BENCH_MIN_FRAMES_PER_SECOND" \
+      --json-summary > "$BENCH_SUMMARY" 2> "$RUN_DIR/rust-pack-bench.err"; then
+      mark_step "rust-pack-bench" "PASS" "$BENCH_SUMMARY"
+    else
+      mark_step "rust-pack-bench" "FAIL" "$RUN_DIR/rust-pack-bench.err"
+      FAILURES=$((FAILURES + 1))
+    fi
+  else
+    echo "missing pack benchmark: $PACK_BENCH" > "$RUN_DIR/rust-pack-bench.err"
+    mark_step "rust-pack-bench" "FAIL" "$RUN_DIR/rust-pack-bench.err"
+    FAILURES=$((FAILURES + 1))
+  fi
+else
+  mark_step "rust-pack-bench" "SKIP" ""
+fi
+
 MATRIX="$RUN_DIR/rust-pack-sim-matrix.jsonl"
 MATRIX_LOG="$RUN_DIR/rust-pack-sim-matrix.log"
 MATRIX_SUMMARY="$RUN_DIR/rust-pack-sim-matrix-summary.txt"
@@ -276,6 +320,7 @@ fi
   echo "run_dir=$RUN_DIR"
   echo "metadata=$RUN_DIR/metadata.txt"
   echo "steps=$STEPS"
+  echo "pack_bench=$BENCH_SUMMARY"
   echo "pack_sim_matrix=$MATRIX"
   echo "pack_sim_matrix_summary=$MATRIX_SUMMARY"
   echo "simulated_output_summary=$SIM_SUMMARY"

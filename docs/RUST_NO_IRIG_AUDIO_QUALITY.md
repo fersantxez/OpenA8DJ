@@ -36,6 +36,8 @@ It measures:
 - Rust format, tests, and clippy status;
 - Rust HAL bundle smoke/parity;
 - C/Rust packet parity;
+- Rust packer throughput, with a conservative default floor of `100 MiB/s` and
+  `1,000,000 frames/s` for the offline callback-driven output packer;
 - Rust pack-sim matrix behavior across start bytes, transfer sizes, signed-24
   byte orders, and gains;
 - software simulated output quality for stereo pairs `A/B/C/D` using real
@@ -46,7 +48,7 @@ It measures:
 Latest accepted evidence:
 
 ```text
-/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T035139Z
+/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z
 ```
 
 Status vocabulary:
@@ -65,6 +67,8 @@ Product interpretation:
 - Any Rust candidate that changes output packing, gain, routing, sample format,
   HAL stream shape, or playback profile must keep this gate green before it can
   request physical testing.
+- A throughput `PASS` only proves the offline packer is not catastrophically
+  slow. Real CPU acceptance still comes from locked playback/load gates.
 
 ## Future Option: Driver-Internal Diagnostic Capture
 
