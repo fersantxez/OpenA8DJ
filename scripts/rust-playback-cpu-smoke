@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+run_dir=""
+fixture=""
+pair="A"
+device_uid="${OPENA8DJ_DEVICE_UID:-org.opena8dj.Audio8DJ-rust}"
+preplay_wait_seconds="20"
+cpu_sample_delay_seconds="20"
+max_device_start_seconds="0.25"
+max_first_callback_seconds="0.30"
+max_coreaudiod_p95="8.0"
+
+usage() {
+  cat <<USAGE
+usage: scripts/rust-playback-cpu-smoke --run-dir DIR --fixture FILE [options]
+
+Runs a bounded real-music playback/CPU smoke against the currently installed
+OpenA8DJ device. This script plays audio and must be run inside the shared
+hardware gate, normally through scripts/rust-hal-hardware-window.
+
+Options:
+  --pair A                    Output pair, default: A
+  --preplay-wait SECONDS      Wait after enumeration before playback, default: 20
+  --cpu-sample-delay SECONDS  Delay CPU sampling after playback starts, default: 20
+  --max-device-start SECONDS  Default: 0.25
+  --max-first-callback SEC    Default: 0.30
+  --max-coreaudiod-p95 PCT    Default: 8.0
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir)
+      run_dir="$2"; shift 2 ;;
+    --fixture)
+      fixture="$2"; shift 2 ;;
+    --pair)
+      pair="$2"; shift 2 ;;
+    --preplay-wait)
+      preplay_wait_seconds="$2"; shift 2 ;;
+    --cpu-sample-delay)
+      cpu_sample_delay_seconds="$2"; shift 2 ;;
+    --max-device-start)
+      max_device_start_seconds="$2"; shift 2 ;;
+    --max-first-callback)
+      max_first_callback_seconds="$2"; shift 2 ;;
+    --max-coreaudiod-p95)
+      max_coreaudiod_p95="$2"; shift 2 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ] || [ -z "$fixture" ]; then
+  usage >&2
+  exit 2
+fi
+if [ ! -f "$fixture" ]; then
+  echo "missing fixture: $fixture" >&2
+  exit 2
+fi
+
+mkdir -p "$run_dir"
+rm -f "$run_dir/player.done"
+export OPENA8DJ_DEVICE_UID="$device_uid"
+
+make -C "$root" build/audio-list build/audio-wav-play build/opena8dj-control \
+  >"$run_dir/build-tools.txt" 2>&1
+
+"$root/build/audio-list" >"$run_dir/audio-list-before.txt" 2>&1 || true
+if ! grep -Fq "uid=$device_uid" "$run_dir/audio-list-before.txt"; then
+  {
+    echo "rust_playback_cpu_smoke=FAIL"
+    echo "reason=device_uid_missing"
+    echo "device_uid=$device_uid"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 1
+fi
+
+sleep "$preplay_wait_seconds"
+
+"$root/build/audio-wav-play" "$fixture" "$pair" >"$run_dir/play.txt" 2>&1 &
+player_pid=$!
+
+(
+  printf 'timestamp\tpid\tpcpu\tcomm\n'
+  sleep "$cpu_sample_delay_seconds"
+  while kill -0 "$player_pid" 2>/dev/null; do
+    ts="$(date +%s)"
+    ps -axo pid=,pcpu=,comm= | awk -v ts="$ts" '
+      /coreaudiod|audio-wav-play|OpenA8DJ|opena8dj/ {
+        print ts "\t" $1 "\t" $2 "\t" $3
+      }
+    '
+    sleep 1
+  done
+) >"$run_dir/cpu-profile.tsv" &
+sampler_pid=$!
+
+set +e
+wait "$player_pid"
+play_rc=$?
+set -e
+touch "$run_dir/player.done"
+wait "$sampler_pid" || true
+
+set +e
+"$root/build/opena8dj-control" stream-stats >"$run_dir/stream-stats.txt" 2>&1
+stats_rc=$?
+set -e
+"$root/build/audio-list" >"$run_dir/audio-list-after.txt" 2>&1 || true
+
+extract_stat() {
+  local key="$1"
+  awk -F= -v k="$key" '$1 == k {print $2; exit}' "$run_dir/stream-stats.txt"
+}
+
+play_line="$(tr '\n' ' ' < "$run_dir/play.txt")"
+device_start_seconds="$(printf '%s\n' "$play_line" | sed -n 's/.*device_start_seconds=\([0-9.]*\).*/\1/p')"
+first_callback_seconds="$(printf '%s\n' "$play_line" | sed -n 's/.*first_callback_seconds=\([0-9.]*\).*/\1/p')"
+callbacks="$(printf '%s\n' "$play_line" | sed -n 's/.*callbacks=\([0-9][0-9]*\).*/\1/p')"
+output_written="$(extract_stat outputFramesWritten)"
+output_read="$(extract_stat outputFramesRead)"
+timeline_resets="$(extract_stat outputTimelineResets)"
+active_underruns="$(extract_stat outputActiveUnderruns)"
+panic_flags="$(extract_stat outputPanicFlags)"
+elastic_drops="$(extract_stat outputElasticDrops)"
+elastic_replays="$(extract_stat outputElasticReplays)"
+playback_completed="$(extract_stat playbackTransfersCompleted)"
+
+core_samples="$(awk -F'\t' '$4 ~ /coreaudiod/ {print $3}' "$run_dir/cpu-profile.tsv" | sort -n)"
+core_count="$(printf '%s\n' "$core_samples" | awk 'NF {n++} END {print n+0}')"
+core_avg="0"
+core_p95="0"
+if [ "$core_count" -gt 0 ]; then
+  core_avg="$(printf '%s\n' "$core_samples" | awk '{sum += $1; n++} END {if (n > 0) printf "%.2f", sum / n; else print "0"}')"
+  core_idx="$(awk -v n="$core_count" 'BEGIN {idx = int(n * 0.95 + 0.999); if (idx < 1) idx = 1; print idx}')"
+  core_p95="$(printf '%s\n' "$core_samples" | awk -v idx="$core_idx" 'NR == idx {print; exit}')"
+fi
+
+status="PASS"
+reason="ok"
+if [ "$play_rc" -ne 0 ]; then
+  status="FAIL"
+  reason="playback_failed"
+elif [ "$stats_rc" -ne 0 ]; then
+  status="FAIL"
+  reason="stream_stats_failed"
+elif [ -z "$output_written" ] || [ "$output_written" -le 0 ]; then
+  status="FAIL"
+  reason="no_output_written"
+elif [ -z "$output_read" ] || ! awk -v r="$output_read" -v w="$output_written" 'BEGIN {exit !(r >= (w * 0.90))}'; then
+  status="FAIL"
+  reason="output_read_too_low"
+elif [ -z "$device_start_seconds" ] || ! awk -v value="$device_start_seconds" -v max="$max_device_start_seconds" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="device_start_too_slow"
+elif [ -z "$first_callback_seconds" ] || ! awk -v value="$first_callback_seconds" -v max="$max_first_callback_seconds" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="first_callback_too_slow"
+elif [ -n "$core_p95" ] && ! awk -v value="$core_p95" -v max="$max_coreaudiod_p95" 'BEGIN {exit !(value <= max)}'; then
+  status="FAIL"
+  reason="coreaudiod_p95_too_high"
+elif [ "${timeline_resets:-1}" != "0" ]; then
+  status="FAIL"
+  reason="timeline_resets"
+elif [ "${active_underruns:-1}" != "0" ]; then
+  status="FAIL"
+  reason="active_underruns"
+elif [ "${panic_flags:-1}" != "0" ]; then
+  status="FAIL"
+  reason="output_panic_flags"
+fi
+
+{
+  echo "rust_playback_cpu_smoke=$status"
+  echo "reason=$reason"
+  echo "device_uid=$device_uid"
+  echo "fixture=$fixture"
+  echo "pair=$pair"
+  echo "preplay_wait_seconds=$preplay_wait_seconds"
+  echo "cpu_sample_delay_seconds=$cpu_sample_delay_seconds"
+  echo "max_device_start_seconds=$max_device_start_seconds"
+  echo "max_first_callback_seconds=$max_first_callback_seconds"
+  echo "max_coreaudiod_p95=$max_coreaudiod_p95"
+  echo "play_rc=$play_rc"
+  echo "stats_rc=$stats_rc"
+  echo "device_start_seconds=${device_start_seconds:-unknown}"
+  echo "first_callback_seconds=${first_callback_seconds:-unknown}"
+  echo "callbacks=${callbacks:-unknown}"
+  echo "outputFramesWritten=${output_written:-unknown}"
+  echo "outputFramesRead=${output_read:-unknown}"
+  echo "outputTimelineResets=${timeline_resets:-unknown}"
+  echo "outputActiveUnderruns=${active_underruns:-unknown}"
+  echo "outputPanicFlags=${panic_flags:-unknown}"
+  echo "outputElasticDrops=${elastic_drops:-unknown}"
+  echo "outputElasticReplays=${elastic_replays:-unknown}"
+  echo "playbackTransfersCompleted=${playback_completed:-unknown}"
+  echo "coreaudiod_cpu_avg=$core_avg"
+  echo "coreaudiod_cpu_p95=$core_p95"
+  echo "cpu_samples=$core_count"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"
+
+[ "$status" = "PASS" ]
