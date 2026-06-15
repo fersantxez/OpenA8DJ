@@ -7,6 +7,9 @@ flexible routing, low CPU, and stable Traktor/timecode vinyl behavior.
 It is a Rust-worktree design artifact. The C/Objective-C worktree remains
 read-only reference material.
 
+Current mainline findings imported on 2026-06-14 are tracked in
+`docs/MAINLINE_FINDINGS_2026_06_14.md`.
+
 ## Product Objective
 
 OpenA8DJ-rust should make the Audio 8 DJ feel like high-end supported hardware
@@ -360,6 +363,12 @@ The likely CPU win is reducing and stabilizing IOUSBHost enqueue/requeue
 pressure. Packing micro-optimizations help less than queue pressure, transfer
 reuse, and avoiding unnecessary transaction churn.
 
+Mainline `0.3.133` is the current internal-performance reference: locked
+sequential gates passed output-pair smoke, timecode smoke, and playback CPU/UI
+stress with driver p95 around `6.8%`, low `coreaudiod`, zero timeline resets,
+and zero active underruns. It remains blocked as an audiophile/listening
+candidate while iRig physical capture is missing.
+
 ### `metrics`
 
 Exports versioned snapshots in structured form.
@@ -578,6 +587,19 @@ Never in realtime:
 - text formatting;
 - lock waits.
 
+### Supervisor policy
+
+Autonomous recovery and watcher loops are low priority. They must:
+
+- acquire the shared hardware gate before touching Core Audio/USB/audio state;
+- skip as `SKIPPED_BUSY` when another owner holds the lock;
+- poll slowly enough that they do not raise `coreaudiod` during playback CPU or
+  physical quality gates;
+- preserve `ready_streak`, `stable_polls`, USB-port failure details, and
+  `next_recovery_action` in status output;
+- avoid launching physical gates until iRig has remained ready for the required
+  stable-poll count.
+
 ## Rejected Shortcuts
 
 These paths are specifically rejected for the Rust design:
@@ -613,6 +635,14 @@ Must catch:
 
 - tone sidebands;
 - real-music residuals;
+- spectral coloration:
+  - `low_band_capture_to_ref_gain_db`;
+  - `mid_band_capture_to_ref_gain_db`;
+  - `high_band_capture_to_ref_gain_db`;
+  - `mid_vs_low_coloration_delta_db`;
+  - `high_vs_low_coloration_delta_db`;
+  - `high_vs_mid_coloration_delta_db`;
+  - `metallic_coloration_score_db`;
 - click outliers;
 - lag jumps;
 - clipping;
@@ -622,6 +652,15 @@ Must catch:
 - wrong routing;
 - DVS input instability.
 
+Mainline absolute coloration floor:
+
+- `mid_vs_low_coloration_delta_db` must stay within `+/-5 dB`;
+- `high_vs_low_coloration_delta_db` must stay within `+/-6 dB`;
+- `metallic_coloration_score_db <= 6 dB`.
+
+When a valid physical baseline contains the same coloration keys, a candidate
+must also stay within baseline + `0.75 dB`.
+
 ### Readiness language
 
 Allowed statuses:
@@ -629,10 +668,14 @@ Allowed statuses:
 ```text
 PASS
 FAIL
+NOT_READY
 BLOCKED_PHYSICAL_CAPTURE
 BLOCKED_DIRTY_ROUTE
 BLOCKED_LOCK_BUSY
+BLOCKED_USB_ENUMERATION
+BLOCKED_IRIG_UNSTABLE
 BLOCKED_UNVALIDATED_DVS
+SKIPPED_BUSY
 ```
 
 Not allowed:
@@ -652,6 +695,8 @@ Not allowed:
 - `DvsProfile`;
 - `EnginePolicy`;
 - `QualityStatus`;
+- `CaptureReadiness`;
+- `SupervisorStatus`;
 - `MetricsSnapshot`.
 
 No hardware. Unit tests only.

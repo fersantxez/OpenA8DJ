@@ -175,6 +175,8 @@ OpenA8DJ-rust, not just "working".
 - `measurement_status=VALID`.
 - `candidate_quality_status=PASS`.
 - `verdict=PASS`.
+- capture readiness stable for the configured consecutive poll count before
+  any long physical gate starts.
 - alignment `>= 0.970`.
 - capture RMS between `-28` and `-10 dBFS`.
 - clipped frames `0`.
@@ -187,6 +189,8 @@ OpenA8DJ-rust, not just "working".
 - mid-vs-low coloration within `+/-5 dB`.
 - high-vs-low coloration within `+/-6 dB`.
 - metallic score `<= 6 dB`.
+- if the valid physical baseline contains the same coloration keys, coloration
+  deltas must stay within baseline + `0.75 dB`.
 - quiet 1-5 kHz noise `<= -32.5 dBFS`.
 - clicks `0`.
 - window clicks `0`.
@@ -202,6 +206,8 @@ OpenA8DJ-rust, not just "working".
 Any of these blocks promotion:
 
 - missing iRig;
+- unstable iRig readiness;
+- USB enumeration failure on the capture path;
 - dirty or unverified capture route;
 - diagnostic-only bypass;
 - missing CPU profile;
@@ -679,6 +685,8 @@ Must pass before every Rust milestone:
   `$HOME/.opena8dj/hardware-gate.lock`;
 - live lock owners were treated as exclusive;
 - stale locks were cleaned only when the recorded pid was dead.
+- low-priority supervisors skipped instead of polling/recovering during another
+  owner's gate window.
 
 ### Gate B: Build/test
 
@@ -710,11 +718,14 @@ Must pass before every Rust milestone:
 ### Gate E: Physical quality
 
 - capture device visible in USB and Core Audio;
+- capture device stable for the configured consecutive poll count;
+- USB-port failure details and next recovery action recorded when capture is
+  blocked;
 - capture route verified;
 - no clipping or dirty route;
 - `measurement_status=VALID`;
 - tone sidebands pass;
-- real-music residual/click/lag metrics pass;
+- real-music residual/click/lag/coloration metrics pass;
 - CPU/noise correlation acceptable;
 - human listening pass.
 
@@ -788,6 +799,15 @@ rust_implication: internal gates cannot promote OpenA8DJ-rust without valid
                   physical measurement.
 ```
 
+Latest imported finding set:
+
+- `docs/MAINLINE_FINDINGS_2026_06_14.md`
+- `0.3.133` is internally healthy under locked sequential gates but remains
+  `BLOCKED_PHYSICAL_CAPTURE` while iRig is absent.
+- Shared hardware lock ownership, stable iRig polls, USB enumeration failure
+  detail, next recovery action, spectral coloration metrics, and supervisor
+  CPU interference are all Rust design inputs.
+
 ## Immediate Next Steps
 
 1. Add `docs/RUST_PRODUCT_PLAN.md`.
@@ -798,6 +818,8 @@ rust_implication: internal gates cannot promote OpenA8DJ-rust without valid
 6. Add `opena8dj-rust-pack-sim`.
 7. Create `local-analysis-rust/README.md` and artifact schema.
 8. Build the first parity report against read-only mainline behavior.
+9. Add Rust metrics fields for capture readiness, stable polls, USB-port
+   failures, recovery actions, supervisor status, and spectral coloration.
 
 The first code milestone is not a driver install. It is a deterministic Rust
 core that can prove it understands Audio 8 DJ data better than the current

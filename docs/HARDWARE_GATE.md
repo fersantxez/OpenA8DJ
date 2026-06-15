@@ -57,6 +57,25 @@ Use this priority order when coordinating windows:
 3. Autonomous supervisors, low priority. If the lock is busy, they skip the
    cycle.
 
+## Autonomous supervisors
+
+Supervisor loops are part of the shared hardware budget even when they only
+poll Core Audio or USB state. Mainline evidence showed that aggressive polling
+or recovery can raise `coreaudiod` enough to contaminate playback CPU gates.
+
+Any Rust supervisor must:
+
+- acquire the same global lock for each hardware/audio/Core Audio/USB-sensitive
+  cycle;
+- write `SKIPPED_BUSY` or an equivalent status when another owner holds the
+  lock;
+- avoid repeated fast Core Audio/USB enumeration during higher-priority gates;
+- default to slow polling and bounded recovery windows;
+- record `ready_streak`, `stable_polls`, USB enumeration failures,
+  failed-port detail, and `next_recovery_action` when capture is blocked;
+- never start physical gates until the capture path is stable for the required
+  consecutive poll count.
+
 ## Window request format
 
 When asking for a hardware window, state:

@@ -332,6 +332,9 @@ Every core snapshot should separate:
 - output timeline counters;
 - input decode counters;
 - scheduling counters;
+- capture readiness state;
+- supervisor/watch state;
+- spectral-coloration metrics;
 - quality-gate metadata;
 - build/config identity.
 
@@ -354,6 +357,24 @@ Required counters:
 - `input_check_errors`;
 - `output_panic_flags`;
 - `clock_anchor_valid`;
+- `physical_capture_status`;
+- `physical_capture_reason`;
+- `found_irig_usb_by_id`;
+- `found_irig_core_audio`;
+- `usb_enumeration_failures`;
+- `failed_usb_ports`;
+- `next_recovery_action`;
+- `ready_streak`;
+- `stable_polls`;
+- `supervisor_status`;
+- `supervisor_latest_reason`;
+- `low_band_capture_to_ref_gain_db`;
+- `mid_band_capture_to_ref_gain_db`;
+- `high_band_capture_to_ref_gain_db`;
+- `mid_vs_low_coloration_delta_db`;
+- `high_vs_low_coloration_delta_db`;
+- `high_vs_mid_coloration_delta_db`;
+- `metallic_coloration_score_db`;
 - `measurement_status`;
 - `candidate_quality_status`.
 
