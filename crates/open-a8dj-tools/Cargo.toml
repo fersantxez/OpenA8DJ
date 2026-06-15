@@ -16,5 +16,13 @@ path = "src/bin/opena8dj-rust-pack-sim.rs"
 name = "opena8dj-rust-pack-bench"
 path = "src/bin/opena8dj-rust-pack-bench.rs"
 
+[[bin]]
+name = "opena8dj-rust-timecode-analyze"
+path = "src/bin/opena8dj-rust-timecode-analyze.rs"
+
+[[bin]]
+name = "opena8dj-rust-dvs-matrix-smoke"
+path = "src/bin/opena8dj-rust-dvs-matrix-smoke.rs"
+
 [dependencies]
 open-a8dj-core = { path = "../open-a8dj-core" }

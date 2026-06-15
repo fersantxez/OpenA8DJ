@@ -38,6 +38,13 @@ It measures:
 - C/Rust packet parity;
 - Rust packer throughput, with a conservative default floor of `100 MiB/s` and
   `1,000,000 frames/s` for the offline callback-driven output packer;
+- Rust timecode/input signal analysis on a synthetic stereo carrier, covering
+  carrier frequency, edge jitter, channel balance, clipping, and stereo
+  correlation before physical DVS testing is available;
+- Rust DVS matrix smoke at `44.1 kHz` and `48 kHz`, simulating Deck A on
+  Input A and Deck B on Input B, then verifying mode-2 input decode, no packet
+  check errors, no panic flags, no C/D leakage, and DVS profile policy
+  (`input-mode=0`, `input-decode=on`);
 - Rust pack-sim matrix behavior across start bytes, transfer sizes, signed-24
   byte orders, and gains;
 - software simulated output quality for stereo pairs `A/B/C/D` using real
@@ -48,7 +55,7 @@ It measures:
 Latest accepted evidence:
 
 ```text
-/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z
+/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T205923Z
 ```
 
 Status vocabulary:
@@ -69,6 +76,14 @@ Product interpretation:
   request physical testing.
 - A throughput `PASS` only proves the offline packer is not catastrophically
   slow. Real CPU acceptance still comes from locked playback/load gates.
+- A synthetic timecode `PASS` proves the Rust analysis path and thresholds work
+  on known-good stereo carrier material. It does not prove Traktor vinyl/CD-line
+  behavior until a real Audio 8 DJ input capture or Traktor scope validation
+  passes under the hardware lock.
+- A DVS matrix smoke `PASS` proves offline routing/decode policy for synthetic
+  Input A/B timecode at the target rates. It does not prove absolute/relative
+  mode, real control vinyl, Traktor scope, phono/CD-line analog behavior, or
+  low-latency physical capture.
 
 ## Future Option: Driver-Internal Diagnostic Capture
 

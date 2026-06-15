@@ -17,6 +17,18 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
   - offline mode-2 output packer throughput benchmark;
   - measures callback-driven packing without opening audio devices;
   - emits `open-a8dj-rust.pack-bench.v1` JSON summaries.
+- `target/release/opena8dj-rust-timecode-analyze`
+  - offline stereo timecode/input signal analyzer;
+  - accepts synthetic carrier material or future raw f32 capture files;
+  - measures RMS, peak, channel balance, carrier frequency, edge jitter,
+    clipping, and stereo correlation;
+  - emits `open-a8dj-rust.timecode-analyze.v1` JSON summaries.
+- `target/release/opena8dj-rust-dvs-matrix-smoke`
+  - offline DVS input matrix smoke;
+  - simulates Deck A on Input A and Deck B on Input B;
+  - packs and decodes mode-2 USB bytes through the Rust input path;
+  - verifies input profile policy, A/B carrier integrity, C/D leakage, packet
+    check errors, and panic flags at `44.1 kHz` and `48 kHz`.
 - `target/release/libopen_a8dj_ffi.a`
   - C ABI static library for the Rust core;
   - exposes config, counters, stateless stream-frame signed-24 encoding, and
@@ -88,6 +100,10 @@ bounded `OpenA8DJ-rust.driver` install wrapper.
 - `opena8dj-rust-pack-bench --transfers 20000 --warmup-transfers 1000
   --transfer-bytes 352 --start-byte 4 --gain 0.5 --byte-order big
   --json-summary`.
+- `opena8dj-rust-timecode-analyze --seconds 6 --rate 48000 --carrier-hz 1000
+  --json-summary`.
+- `opena8dj-rust-dvs-matrix-smoke --rate 44100 --seconds 6 --json-summary`.
+- `opena8dj-rust-dvs-matrix-smoke --rate 48000 --seconds 6 --json-summary`.
 
 ## Current Evidence
 
@@ -114,12 +130,25 @@ The latest no-iRig software quality gate reports:
 
 ```text
 rust_no_irig_software_gate=PASS
-run_dir=/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z
+run_dir=/Users/fer/dev/audio8djrust/local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T205923Z
 ```
 
 It passed `cargo fmt`, `cargo test`, `cargo clippy`, Rust HAL smoke/parity,
 Rust/C packet parity, tool build, Rust packer throughput, a `72`-row Rust
-pack-sim matrix, and simulated output soundchecks for pairs `A/B/C/D`.
+pack-sim matrix, synthetic timecode/input analysis, and simulated output
+soundchecks for pairs `A/B/C/D`.
+
+The Rust core now includes an offline input/profile model:
+
+- `HardwareInputProfile::playback()` keeps `input_decode_enabled=false`;
+- `HardwareInputProfile::timecode_vinyl()` sets `input_mode=0`,
+  `gnd_vinyl=true`, `software_lock=true`, identity routing, and
+  `input_decode_enabled=true`;
+- `HardwareInputProfile::timecode_cd_line()` sets `input_mode=1`,
+  `gnd_cd_line=true`, identity routing, and `input_decode_enabled=true`;
+- `decode_mode2_input_bytes()` decodes mode-2 S24BE bytes, preserves packet
+  stats, applies identity/remap routing, and publishes no frames when input
+  decode is off.
 
 The Rust pack-sim matrix reported:
 
@@ -137,10 +166,29 @@ max_mismatches=0
 The Rust packer throughput benchmark writes exact run-local values to:
 
 ```text
-local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T152406Z/rust-pack-bench.json
+local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T205923Z/rust-pack-bench.json
 ```
 
 The gate threshold is `>= 100 MiB/s` and `>= 1,000,000 frames/s`.
+
+The synthetic Rust timecode/input gate writes exact values to:
+
+```text
+local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T205923Z/rust-timecode-synthetic.json
+```
+
+It gates carrier frequency, edge jitter, channel balance, clipping, and stereo
+correlation. This is not a physical DVS claim; Traktor scope validation remains
+blocked on real input capture.
+
+The offline DVS matrix smoke writes exact values to:
+
+```text
+local-analysis-rust/software-runs/rust-no-irig-software-gate-20260615T205923Z/rust-dvs-matrix-summary.txt
+```
+
+It currently covers synthetic Deck A/Input A and Deck B/Input B at `44.1 kHz`
+and `48 kHz`, with Input C/D leakage required to stay below `0.0001 RMS`.
 
 Each simulated output pair reported:
 

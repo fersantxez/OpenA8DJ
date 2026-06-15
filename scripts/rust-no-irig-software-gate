@@ -18,6 +18,9 @@ PACK_BENCH_TRANSFERS="${RUST_PACK_BENCH_TRANSFERS:-20000}"
 PACK_BENCH_WARMUP_TRANSFERS="${RUST_PACK_BENCH_WARMUP_TRANSFERS:-1000}"
 PACK_BENCH_MIN_MIB_PER_SECOND="${RUST_PACK_BENCH_MIN_MIB_PER_SECOND:-100}"
 PACK_BENCH_MIN_FRAMES_PER_SECOND="${RUST_PACK_BENCH_MIN_FRAMES_PER_SECOND:-1000000}"
+TIMECODE_CARRIER_HZ="${RUST_TIMECODE_CARRIER_HZ:-1000}"
+TIMECODE_MIN_ABS_CORRELATION="${RUST_TIMECODE_MIN_ABS_CORRELATION:-0.95}"
+DVS_SMOKE_RATES="${RUST_DVS_SMOKE_RATES:-44100 48000}"
 
 usage() {
   cat <<'EOF'
@@ -152,6 +155,9 @@ run_logged() {
   echo "pack_bench_warmup_transfers=$PACK_BENCH_WARMUP_TRANSFERS"
   echo "pack_bench_min_mib_per_second=$PACK_BENCH_MIN_MIB_PER_SECOND"
   echo "pack_bench_min_frames_per_second=$PACK_BENCH_MIN_FRAMES_PER_SECOND"
+  echo "timecode_carrier_hz=$TIMECODE_CARRIER_HZ"
+  echo "timecode_min_abs_correlation=$TIMECODE_MIN_ABS_CORRELATION"
+  echo "dvs_smoke_rates=$DVS_SMOKE_RATES"
 } > "$RUN_DIR/metadata.txt"
 
 run_logged cargo-fmt cargo fmt --all -- --check || true
@@ -166,7 +172,11 @@ run_logged cargo-build-tools cargo build -p open-a8dj-tools --release --locked |
 
 PACK_SIM="$ROOT/target/release/opena8dj-rust-pack-sim"
 PACK_BENCH="$ROOT/target/release/opena8dj-rust-pack-bench"
+TIMECODE_ANALYZE="$ROOT/target/release/opena8dj-rust-timecode-analyze"
+DVS_MATRIX_SMOKE="$ROOT/target/release/opena8dj-rust-dvs-matrix-smoke"
 BENCH_SUMMARY="$RUN_DIR/rust-pack-bench.json"
+TIMECODE_SUMMARY="$RUN_DIR/rust-timecode-synthetic.json"
+DVS_SUMMARY="$RUN_DIR/rust-dvs-matrix-summary.txt"
 
 if [ "$RUN_BENCH" -eq 1 ]; then
   if [ -x "$PACK_BENCH" ]; then
@@ -192,6 +202,55 @@ if [ "$RUN_BENCH" -eq 1 ]; then
   fi
 else
   mark_step "rust-pack-bench" "SKIP" ""
+fi
+
+if [ -x "$TIMECODE_ANALYZE" ]; then
+  if "$TIMECODE_ANALYZE" \
+    --seconds "$DURATION_SECONDS" \
+    --rate "$RATE" \
+    --carrier-hz "$TIMECODE_CARRIER_HZ" \
+    --amplitude 0.7 \
+    --right-gain 1.0 \
+    --right-phase-degrees 0 \
+    --min-abs-correlation "$TIMECODE_MIN_ABS_CORRELATION" \
+    --json-summary > "$TIMECODE_SUMMARY" 2> "$RUN_DIR/rust-timecode-synthetic.err"; then
+    mark_step "rust-timecode-synthetic" "PASS" "$TIMECODE_SUMMARY"
+  else
+    mark_step "rust-timecode-synthetic" "FAIL" "$RUN_DIR/rust-timecode-synthetic.err"
+    FAILURES=$((FAILURES + 1))
+  fi
+else
+  echo "missing timecode analyzer: $TIMECODE_ANALYZE" > "$RUN_DIR/rust-timecode-synthetic.err"
+  mark_step "rust-timecode-synthetic" "FAIL" "$RUN_DIR/rust-timecode-synthetic.err"
+  FAILURES=$((FAILURES + 1))
+fi
+
+: > "$DVS_SUMMARY"
+if [ -x "$DVS_MATRIX_SMOKE" ]; then
+  for dvs_rate in $DVS_SMOKE_RATES; do
+    dvs_out="$RUN_DIR/rust-dvs-matrix-${dvs_rate}.json"
+    if "$DVS_MATRIX_SMOKE" \
+      --rate "$dvs_rate" \
+      --seconds "$DURATION_SECONDS" \
+      --json-summary > "$dvs_out" 2> "$RUN_DIR/rust-dvs-matrix-${dvs_rate}.err"; then
+      mark_step "rust-dvs-matrix-$dvs_rate" "PASS" "$dvs_out"
+    else
+      mark_step "rust-dvs-matrix-$dvs_rate" "FAIL" "$RUN_DIR/rust-dvs-matrix-${dvs_rate}.err"
+      FAILURES=$((FAILURES + 1))
+    fi
+    {
+      echo "rate=$dvs_rate"
+      if [ -s "$dvs_out" ]; then
+        sed 's/^/  /' "$dvs_out"
+      else
+        echo "  missing summary"
+      fi
+    } >> "$DVS_SUMMARY"
+  done
+else
+  echo "missing DVS matrix smoke: $DVS_MATRIX_SMOKE" > "$RUN_DIR/rust-dvs-matrix.err"
+  mark_step "rust-dvs-matrix" "FAIL" "$RUN_DIR/rust-dvs-matrix.err"
+  FAILURES=$((FAILURES + 1))
 fi
 
 MATRIX="$RUN_DIR/rust-pack-sim-matrix.jsonl"
@@ -321,6 +380,8 @@ fi
   echo "metadata=$RUN_DIR/metadata.txt"
   echo "steps=$STEPS"
   echo "pack_bench=$BENCH_SUMMARY"
+  echo "timecode_synthetic=$TIMECODE_SUMMARY"
+  echo "dvs_matrix_summary=$DVS_SUMMARY"
   echo "pack_sim_matrix=$MATRIX"
   echo "pack_sim_matrix_summary=$MATRIX_SUMMARY"
   echo "simulated_output_summary=$SIM_SUMMARY"
