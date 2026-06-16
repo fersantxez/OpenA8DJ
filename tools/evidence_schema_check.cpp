@@ -39,6 +39,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/timecode-matrix.json",
       root / "local-analysis/cpp-offline/timecode-signal-analysis.json",
       root / "local-analysis/cpp-offline/dvs-signal-smoke.json",
+      root / "local-analysis/cpp-offline/dvs-packet-input-decode.json",
       root / "local-analysis/cpp-offline/realtime-audit.json",
       root / "local-analysis/cpp-offline/driverkit-surface-model.json",
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",

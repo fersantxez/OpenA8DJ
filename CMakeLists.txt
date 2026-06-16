@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(opena8djcpp_core
   core/src/audio_model.cpp
   core/src/mode2_packet.cpp
+  core/src/input_decode.cpp
   core/src/input_profile.cpp
   core/src/routing.cpp
   core/src/policies.cpp
@@ -118,6 +119,13 @@ target_link_libraries(opena8djcpp_dvs_signal_smoke
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_dvs_packet_input_decode
+  tools/dvs_packet_input_decode.cpp)
+
+target_link_libraries(opena8djcpp_dvs_packet_input_decode
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_jitter_model
   tools/jitter_model.cpp)
 
@@ -136,6 +144,7 @@ add_test(NAME opena8djcpp_realtime_audit COMMAND opena8djcpp_realtime_audit)
 add_test(NAME opena8djcpp_driverkit_surface_model COMMAND opena8djcpp_driverkit_surface_model)
 add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit_shell_contract)
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
+add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 

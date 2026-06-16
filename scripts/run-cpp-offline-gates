@@ -25,6 +25,7 @@ python3 scripts/validate-mode2-output-packing.py \
 ./build/cpp-release/opena8djcpp_timecode_matrix | tee "$EVIDENCE_DIR/timecode-matrix.json"
 ./build/cpp-release/opena8djcpp_timecode_signal_analysis | tee "$EVIDENCE_DIR/timecode-signal-analysis.json"
 ./build/cpp-release/opena8djcpp_dvs_signal_smoke | tee "$EVIDENCE_DIR/dvs-signal-smoke.json"
+./build/cpp-release/opena8djcpp_dvs_packet_input_decode | tee "$EVIDENCE_DIR/dvs-packet-input-decode.json"
 ./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
@@ -65,6 +66,7 @@ packet = load_json("packet-matrix.json")
 timecode = load_json("timecode-matrix.json")
 timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
+dvs_packet = load_json("dvs-packet-input-decode.json")
 jitter = load_json("jitter-model.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
@@ -117,6 +119,13 @@ summary = {
         "rows": dvs.get("row_count"),
         "failures": dvs.get("failures"),
         "evidence": "local-analysis/cpp-offline/dvs-signal-smoke.json",
+    },
+    "dvs_packet_input_decode": {
+        "status": dvs_packet.get("result"),
+        "rows": dvs_packet.get("row_count"),
+        "failures": dvs_packet.get("failures"),
+        "playback_decode_off": dvs_packet.get("playback_decode_off"),
+        "evidence": "local-analysis/cpp-offline/dvs-packet-input-decode.json",
     },
     "jitter_model": {
         "status": jitter.get("result"),

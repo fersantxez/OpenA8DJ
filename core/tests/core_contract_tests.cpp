@@ -1,5 +1,6 @@
 #include "opena8djcpp/audio_model.hpp"
 #include "opena8djcpp/audio_ring.hpp"
+#include "opena8djcpp/input_decode.hpp"
 #include "opena8djcpp/input_profile.hpp"
 #include "opena8djcpp/metrics.hpp"
 #include "opena8djcpp/mode2_packet.hpp"
@@ -375,6 +376,43 @@ void test_spsc_frame_ring_contract() {
   assert(ring.writable() == 4);
 }
 
+void test_input_profile_decode_contract() {
+  std::vector<S24Frame> frames;
+  for (std::uint32_t frame = 0; frame < 64; ++frame) {
+    frames.push_back(synthetic_s24_frame(frame));
+  }
+
+  Mode2OutputPacker packer(frames, kMode2DefaultStartByte);
+  std::vector<std::uint8_t> packed(kMode2DefaultTransferBytes * 8U);
+  assert(packer.fill_into(packed) == packed.size());
+
+  std::vector<S24Frame> scratch((packed.size() / kMode2GroupBytes) + 4);
+  std::vector<float> output(scratch.size() * kInputChannels, -123.0F);
+
+  const auto playback = decode_input_profile_mode2_into(
+      packed, kMode2DefaultStartByte, kMode2DefaultTransferBytes, playback_input_profile(),
+      scratch, output);
+  assert(playback.profile_valid);
+  assert(!playback.input_decode_enabled);
+  assert(playback.stats.decoded_frames > 0);
+  assert(playback.frames_written == 0);
+  assert(output[0] == -123.0F);
+
+  const auto vinyl = decode_input_profile_mode2_into(
+      packed, kMode2DefaultStartByte, kMode2DefaultTransferBytes,
+      timecode_vinyl_input_profile(), scratch, output);
+  assert(vinyl.profile_valid);
+  assert(vinyl.input_decode_enabled);
+  assert(vinyl.stats.decoded_frames > 0);
+  assert(vinyl.frames_written == vinyl.stats.decoded_frames);
+  assert(vinyl.output_frame_overflows == 0);
+  assert(vinyl.decoded_frame_overflows == 0);
+  assert(vinyl.stats.check_errors == 0);
+  assert(vinyl.stats.panic_flags == 0);
+  assert(std::abs(output[0] - s24_to_float(scratch[0][0])) < 1.0e-7F);
+  assert(std::abs(output[7] - s24_to_float(scratch[0][7])) < 1.0e-7F);
+}
+
 }  // namespace
 
 int main() {
@@ -391,6 +429,7 @@ int main() {
   test_input_profiles();
   test_timecode_signal_analysis();
   test_spsc_frame_ring_contract();
+  test_input_profile_decode_contract();
 
   std::cout << "opena8djcpp_core_contract PASS\n";
   return 0;

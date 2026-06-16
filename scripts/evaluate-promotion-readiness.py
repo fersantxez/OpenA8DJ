@@ -160,6 +160,12 @@ def evaluate(args):
              offline.get("timecode_signal_analysis", {}).get("rows", 0) >= 8 and
              offline.get("timecode_signal_analysis", {}).get("failures", 1) == 0,
              offline.get("timecode_signal_analysis", {})),
+        gate("offline_dvs_packet_input_decode",
+             offline.get("dvs_packet_input_decode", {}).get("status") == "PASS" and
+             offline.get("dvs_packet_input_decode", {}).get("rows", 0) >= 24 and
+             offline.get("dvs_packet_input_decode", {}).get("failures", 1) == 0 and
+             offline.get("dvs_packet_input_decode", {}).get("playback_decode_off") == "PASS",
+             offline.get("dvs_packet_input_decode", {})),
         gate("offline_driverkit_shell_contract",
              offline.get("driverkit_shell_contract", {}).get("status") == "PASS" and
              offline.get("driverkit_shell_contract", {}).get("device_model_valid") is True and
