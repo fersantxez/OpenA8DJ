@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>PayloadType</key>
+      <string>com.apple.applicationaccess</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>PayloadIdentifier</key>
+      <string>org.opena8dj.allow-usb-accessories.restrictions</string>
+      <key>PayloadUUID</key>
+      <string>f756cf1f-6c02-4a3d-9d62-111b6bb6bbd1</string>
+      <key>PayloadDisplayName</key>
+      <string>OpenA8DJ Allow USB Accessories</string>
+      <key>allowUSBRestrictedMode</key>
+      <false/>
+    </dict>
+  </array>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+  <key>PayloadIdentifier</key>
+  <string>org.opena8dj.allow-usb-accessories</string>
+  <key>PayloadUUID</key>
+  <string>ab47de4d-9f3d-41e2-bc77-df14349b6e10</string>
+  <key>PayloadDisplayName</key>
+  <string>OpenA8DJ Allow USB Accessories</string>
+  <key>PayloadDescription</key>
+  <string>Temporarily disables macOS USB Restricted Mode so the connected iRig Stream can register for CoreAudio matching during OpenA8DJ hardware QA.</string>
+  <key>PayloadOrganization</key>
+  <string>OpenA8DJ Local QA</string>
+  <key>PayloadScope</key>
+  <string>System</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+</dict>
+</plist>

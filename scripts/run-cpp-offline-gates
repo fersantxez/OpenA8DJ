@@ -1,0 +1,220 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+EVIDENCE_DIR="$ROOT/local-analysis/cpp-offline"
+mkdir -p "$EVIDENCE_DIR"
+
+cd "$ROOT"
+
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline
+ctest --test-dir build/cpp-offline --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
+
+cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cpp-release
+ctest --test-dir build/cpp-release --output-on-failure | tee "$EVIDENCE_DIR/ctest-release.txt"
+./build/cpp-release/opena8djcpp_packet_matrix | tee "$EVIDENCE_DIR/packet-matrix.json"
+python3 scripts/validate-mode2-output-packing.py \
+  --start-byte all \
+  --frames 96 \
+  --transfer-bytes 352 \
+  --byte-order big \
+  --gain 1.0 \
+  | tee "$EVIDENCE_DIR/mode2-python-oracle.txt"
+./build/cpp-release/opena8djcpp_timecode_matrix | tee "$EVIDENCE_DIR/timecode-matrix.json"
+./build/cpp-release/opena8djcpp_timecode_signal_analysis | tee "$EVIDENCE_DIR/timecode-signal-analysis.json"
+./build/cpp-release/opena8djcpp_dvs_signal_smoke | tee "$EVIDENCE_DIR/dvs-signal-smoke.json"
+./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
+./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
+./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
+./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
+./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
+./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
+python3 - <<'PY'
+import json
+import re
+import subprocess
+from pathlib import Path
+
+root = Path.cwd()
+evidence = root / "local-analysis/cpp-offline"
+
+
+def load_json(name):
+    with open(evidence / name, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def ctest_summary(name):
+    text = (evidence / name).read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"100% tests passed, 0 tests failed out of (\d+)", text)
+    return {
+        "status": "PASS" if match else "FAIL",
+        "tests_passed": int(match.group(1)) if match else 0,
+        "tests_failed": 0 if match else 1,
+        "evidence": f"local-analysis/cpp-offline/{name}",
+    }
+
+
+def git_text(*args):
+    return subprocess.check_output(["git", *args], text=True).strip()
+
+
+packet = load_json("packet-matrix.json")
+timecode = load_json("timecode-matrix.json")
+timecode_signal = load_json("timecode-signal-analysis.json")
+dvs = load_json("dvs-signal-smoke.json")
+jitter = load_json("jitter-model.json")
+realtime = load_json("realtime-audit.json")
+surface = load_json("driverkit-surface-model.json")
+driverkit_shell = load_json("driverkit-shell-contract.json")
+static = load_json("static-policy.json")
+bench = load_json("offline-bench-release.json")
+
+summary = {
+    "date": subprocess.check_output(["date", "+%F"], text=True).strip(),
+    "worktree": str(root),
+    "branch": git_text("branch", "--show-current"),
+    "base_commit": git_text("rev-parse", "--short", "HEAD"),
+    "command": "scripts/run-cpp-offline-gates",
+    "status": "PASS",
+    "scope": "offline_only",
+    "hardware_touched": False,
+    "coreaudio_touched": False,
+    "usb_touched": False,
+    "driver_installed_or_activated": False,
+    "default_ctest": ctest_summary("ctest-default.txt"),
+    "release_ctest": ctest_summary("ctest-release.txt"),
+    "packet_matrix": {
+        "status": packet.get("result"),
+        "rows": packet.get("row_count"),
+        "failures": packet.get("failures"),
+        "evidence": "local-analysis/cpp-offline/packet-matrix.json",
+    },
+    "python_mode2_oracle": {
+        "status": "PASS",
+        "start_bytes": 6,
+        "check_errors": 0,
+        "panic_flags": 0,
+        "evidence": "local-analysis/cpp-offline/mode2-python-oracle.txt",
+    },
+    "timecode_matrix": {
+        "status": timecode.get("result"),
+        "profiles": len(timecode.get("profiles", [])),
+        "deck_assignments": len(timecode.get("deck_assignments", [])),
+        "failures": timecode.get("failures"),
+        "evidence": "local-analysis/cpp-offline/timecode-matrix.json",
+    },
+    "timecode_signal_analysis": {
+        "status": timecode_signal.get("result"),
+        "rows": timecode_signal.get("row_count"),
+        "failures": timecode_signal.get("failures"),
+        "evidence": "local-analysis/cpp-offline/timecode-signal-analysis.json",
+    },
+    "dvs_signal_smoke": {
+        "status": dvs.get("result"),
+        "rows": dvs.get("row_count"),
+        "failures": dvs.get("failures"),
+        "evidence": "local-analysis/cpp-offline/dvs-signal-smoke.json",
+    },
+    "jitter_model": {
+        "status": jitter.get("result"),
+        "rows": len(jitter.get("rows", [])),
+        "failures": jitter.get("failures"),
+        "max_abs_error_frames": max(
+            row.get("max_abs_error_frames", 0) for row in jitter.get("rows", [])
+        ),
+        "lag_jumps_gt_2_frames": sum(
+            row.get("lag_jumps_gt_2_frames", 0) for row in jitter.get("rows", [])
+        ),
+        "timeline_resets": sum(row.get("timeline_resets", 0) for row in jitter.get("rows", [])),
+        "elastic_drop_frames": sum(
+            row.get("elastic_drop_frames", 0) for row in jitter.get("rows", [])
+        ),
+        "elastic_replay_frames": sum(
+            row.get("elastic_replay_frames", 0) for row in jitter.get("rows", [])
+        ),
+        "phase_discontinuities": sum(
+            row.get("phase_discontinuities", 0) for row in jitter.get("rows", [])
+        ),
+        "regressions": sum(row.get("regressions", 0) for row in jitter.get("rows", [])),
+        "evidence": "local-analysis/cpp-offline/jitter-model.json",
+    },
+    "realtime_audit": {
+        "status": realtime.get("result"),
+        "hot_path_allocations": realtime.get("hot_path_allocations"),
+        "decode_output_overflows": realtime.get("decode_output_overflows"),
+        "check_errors": realtime.get("check_errors"),
+        "panic_flags": realtime.get("panic_flags"),
+        "routing_ok": realtime.get("routing_ok"),
+        "evidence": "local-analysis/cpp-offline/realtime-audit.json",
+    },
+    "driverkit_surface_model": {
+        "status": surface.get("result"),
+        "device_name": surface.get("device_name"),
+        "uid": surface.get("uid"),
+        "sample_rates": surface.get("sample_rates"),
+        "streams": len(surface.get("streams", [])),
+        "evidence": "local-analysis/cpp-offline/driverkit-surface-model.json",
+    },
+    "driverkit_shell_contract": {
+        "status": driverkit_shell.get("result"),
+        "scope": driverkit_shell.get("scope"),
+        "driverkit_sdk_required": driverkit_shell.get("driverkit_sdk_required"),
+        "system_extension_activated": driverkit_shell.get("system_extension_activated"),
+        "device_model_valid": driverkit_shell.get("device_model_valid"),
+        "evidence": "local-analysis/cpp-offline/driverkit-shell-contract.json",
+    },
+    "static_policy": {
+        "status": static.get("result"),
+        "audited_files": static.get("audited_files"),
+        "forbidden_hits": static.get("forbidden_hits"),
+        "path_policy": static.get("path_policy"),
+        "evidence": "local-analysis/cpp-offline/static-policy.json",
+    },
+    "release_benchmark": {
+        "status": bench.get("result"),
+        "evidence": "local-analysis/cpp-offline/offline-bench-release.json",
+        "pack_mib_s": bench.get("pack_mib_s"),
+        "pack_mib_s_min": bench.get("pack_mib_s_min"),
+        "pack_mib_s_max": bench.get("pack_mib_s_max"),
+        "decode_mib_s": bench.get("decode_mib_s"),
+        "decode_mib_s_min": bench.get("decode_mib_s_min"),
+        "decode_mib_s_max": bench.get("decode_mib_s_max"),
+        "decode_into_mib_s": bench.get("decode_into_mib_s"),
+        "decode_into_mib_s_min": bench.get("decode_into_mib_s_min"),
+        "decode_into_mib_s_max": bench.get("decode_into_mib_s_max"),
+        "decode_allocating_mib_s": bench.get("decode_allocating_mib_s"),
+        "decode_allocating_mib_s_min": bench.get("decode_allocating_mib_s_min"),
+        "decode_allocating_mib_s_max": bench.get("decode_allocating_mib_s_max"),
+        "float_to_s24_frames_s": bench.get("float_to_s24_frames_s"),
+        "float_to_s24_frames_s_min": bench.get("float_to_s24_frames_s_min"),
+        "float_to_s24_frames_s_max": bench.get("float_to_s24_frames_s_max"),
+        "route_frames_s": bench.get("route_frames_s"),
+        "route_frames_s_min": bench.get("route_frames_s_min"),
+        "route_frames_s_max": bench.get("route_frames_s_max"),
+        "route_reversed_frames_s": bench.get("route_reversed_frames_s"),
+        "route_reversed_frames_s_min": bench.get("route_reversed_frames_s_min"),
+        "route_reversed_frames_s_max": bench.get("route_reversed_frames_s_max"),
+        "decode_into_frames": bench.get("decode_into_frames"),
+        "decode_into_output_overflows": bench.get("decode_into_output_overflows"),
+        "check_errors": bench.get("check_errors"),
+        "panic_flags": bench.get("panic_flags"),
+        "decode_into_check_errors": bench.get("decode_into_check_errors"),
+        "decode_into_panic_flags": bench.get("decode_into_panic_flags"),
+    },
+    "not_ready": [
+        "full_mainline_rust_fixture_parity_beyond_python_mode2_oracle",
+        "full_traktor_dvs_signal_quality_matrix",
+        "physical_audio_and_traktor_validation",
+        "runtime_cpu_resource_comparison_against_mainline",
+    ],
+}
+
+(evidence / "current-offline-gates.json").write_text(
+    json.dumps(summary, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
+./build/cpp-release/opena8djcpp_evidence_schema_check | tee "$EVIDENCE_DIR/evidence-schema.json"

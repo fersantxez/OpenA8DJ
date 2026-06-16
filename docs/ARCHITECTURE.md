@@ -1,103 +1,50 @@
-# Architecture
+# C++/DriverKit Architecture
 
-OpenA8DJ is a user-space macOS driver stack for the Native Instruments Audio 8
-DJ USB audio interface. This project is an independent implementation based on
-public APIs, public USB descriptors, public hardware specifications, and live
-testing against lawfully owned hardware.
+## Principle
 
-## Components
+Greenfield shell, brownfield behavior.
 
-```text
-Core Audio clients
-      |
-      v
-OpenA8DJ HAL plug-in
-      |
-      +-- IOUSBHost transport
-      |     - EP1 CAIAQ command channel
-      |     - isochronous capture endpoint 0x82
-      |     - isochronous playback endpoint 0x06
-      |
-      +-- local IPC socket /tmp/opena8dj-control.sock
-            |
-            v
-       opena8dj-midid LaunchAgent
-            |
-            v
-       CoreMIDI endpoints and control tool
-```
+The C++ line is independent. It learns proven behavior from the C/Objective-C mainline and gates from Rust, but it does not inherit either runtime architecture blindly.
 
-## HAL driver
+## Planes
 
-The HAL bundle lives at:
+### Data Plane
 
-```text
-/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-```
+- Audio frames.
+- USB packet/transfer representation.
+- Timestamps.
+- Routing hot path.
+- Preallocated buffers and SPSC queues where needed.
+- Underrun, overrun, and jitter counters.
 
-It publishes one Core Audio device:
+### Control Plane
 
-```text
-Open Audio 8 DJ
-uid: org.opena8dj.Audio8DJ
-```
+- Sample rate policy.
+- Buffer size policy.
+- Routing configuration.
+- Timecode profile mode.
+- Device state and recovery state.
 
-The device exposes:
+### Observability Plane
 
-- one 8-channel input stream with named Input A/B/C/D channel pairs
-- 4 stereo output streams: Output A/B/C/D
-- 44.1 and 48 kHz validated playback rates
-- `Float32` interleaved Core Audio input and output buffers
-- discrete channel labels and A/B/C/D left/right channel names
+- Atomic counters.
+- Snapshots outside callback.
+- Evidence files written only by tools/gates outside the real-time path.
+- Logs outside per-buffer processing.
 
-Internally, the USB transport converts between Core Audio `Float32` samples and
-the Audio 8 DJ 24-bit big-endian CAIAQ audio stream. The USB capture endpoint is
-used both for device cadence and, in the 0.3.25 preview, for the restored Core
-Audio input channel surface needed by Traktor timecode workflows.
+## Initial Components
 
-## USB protocol
+- `core/`: pure C++20, no macOS dependency.
+- `driverkit/`: DriverKit/AudioDriverKit shell placeholder, not installed or activated.
+- `tools/`: future offline analyzers and evidence generators.
+- `scripts/`: future safe wrappers for offline gates.
+- `docs/`: living architecture and readiness documents.
 
-The hardware uses Native Instruments/CAIAQ vendor-specific USB protocol:
+## Current Core Model
 
-- vendor/product: `17cc:1978`
-- bulk control OUT/IN: `0x01` / `0x81`
-- isochronous capture/playback: `0x82` / `0x06`
-- commands used: `GET_DEVICE_INFO`, `READ_IO`, `WRITE_IO`, `MIDI_READ`,
-  `MIDI_WRITE`, `AUDIO_PARAMS`, `AUTO_MSG`
-
-The low-level transport is implemented with `IOUSBHost` and runs in user space.
-The audio transport keeps a queue of asynchronous isochronous capture requests
-in flight and mirrors the completed input packet layout for playback packets.
-This implementation is written for macOS and must remain independent of GPL or
-proprietary implementation code.
-
-## MIDI and controls
-
-`opena8dj-midid` runs as a user LaunchAgent from `/Library/LaunchAgents`. It
-creates CoreMIDI endpoints and bridges MIDI/control messages to the HAL through
-a local socket.
-
-`opena8dj-control` reads and writes Audio 8 DJ-specific settings:
-
-- input mode
-- ground lift for timecode vinyl
-- ground lift for timecode CD/line
-- ground lift for phono
-- software lock
-
-If the HAL socket is not already open, `opena8dj-control` temporarily wakes the
-Audio 8 DJ Core Audio device, applies the requested control change, and releases
-the device again. The LaunchAgent does not keep Core Audio I/O open in the
-background.
-
-## Packaging
-
-The release package installs:
-
-- HAL bundle
-- MIDI bridge
-- control tool
-- uninstall helper
-- LaunchAgent
-
-The DMG is a distribution container around the PKG installer.
+- 8 input channels.
+- 8 output channels.
+- Stereo pairs A/B/C/D.
+- Host sample placeholder: float32 interleaved.
+- USB sample placeholder: signed 24-bit packed USB.
+- Initial routing: identity A/B/C/D.

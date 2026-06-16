@@ -1,0 +1,195 @@
+# Decision Log
+
+## 2026-06-16: Create Isolated C++/DriverKit Worktree
+
+Decision:
+- Use `/Users/fer/dev/audio8djcpp` on branch `driverkit/cpp-redesign`.
+
+Reason:
+- The C/Objective-C mainline and Rust experiment must remain read-only references.
+
+Alternatives discarded:
+- Editing `/Users/fer/dev/opena8dj`: rejected by isolation rule.
+- Editing `/Users/fer/dev/audio8djrust`: rejected by isolation rule.
+
+Evidence:
+- `git worktree list --porcelain` shows a separate C++ worktree and branch.
+
+## 2026-06-16: Start With Pure C++ Offline Core
+
+Decision:
+- Build a C++20 core first, with DriverKit only as a prepared shell.
+
+Reason:
+- Offline gates can validate packet, routing, metrics, and policy behavior without installing drivers or touching hardware.
+
+Alternatives discarded:
+- Direct DriverKit implementation first: rejected because signing, entitlement, install, and activation risk would obscure core behavior.
+- Blind C port: rejected because the intended strategy is greenfield shell, brownfield behavior.
+
+Evidence:
+- `opena8djcpp_core_contract` validates initial channel/routing/surface contracts offline.
+
+## 2026-06-16: No Readiness Claim From Compile Alone
+
+Decision:
+- A clean build is evidence only for build health, not product readiness.
+
+Reason:
+- Audio quality, jitter, routing, timecode, and physical behavior require measurable gates and later coordinated hardware tests.
+
+Alternatives discarded:
+- Declaring physical readiness after scaffold: rejected.
+
+Evidence:
+- `docs/SUCCESS_METRICS.md` and `docs/TEST_PLAN.md` define required gates.
+
+## 2026-06-16: Split Functional And Performance Gates By Build Type
+
+Decision:
+- Keep the default build as a safe functional contract gate.
+- Run performance/resource gates only in `Release` or `RelWithDebInfo`.
+
+Reason:
+- Debug/no-optimization throughput is not a valid comparison against mainline or Rust oracle performance.
+- Release CTest now includes `opena8djcpp_offline_bench`, which fails if pack/decode are below `100 MiB/s`, routing is below `1,000,000 frames/s`, or Mode 2 check/panic counters are nonzero.
+
+Alternatives discarded:
+- Treat Debug benchmark failure as product failure: rejected because it measures compiler mode more than data-plane design.
+- Hide performance from CTest entirely: rejected because objective performance evidence must block claims.
+
+Evidence:
+- `local-analysis/cpp-offline/offline-bench-release.json` records `pack_mib_s=924.305`, `decode_mib_s=499.804`, `route_frames_s=5.17603e+08`, `check_errors=0`, and `panic_flags=0`.
+
+## 2026-06-16: Keep Start Byte 4 For Physical Output
+
+Decision:
+- Keep `OPENA8DJ_OUTPUT_START_BYTE=4` for the current HAL transport candidate.
+
+Reason:
+- Long physical tone capture with `ISO5/q64/start_byte=4/big/gain0.50` measured
+  a clean 1 kHz tone through iRig: `sideband_ratio=0.000657`, strongest sideband
+  `-64.78 dB`, `click_outliers=0`, no clipping.
+- `start_byte=2` produced much higher output level but worse tone quality:
+  `sideband_ratio=0.080717`, residual ratio `0.985763`, and peak at `1.0`.
+- `ISO64/q8` was rejected immediately for physical output because the same tone
+  worsened to `sideband_ratio=0.791833` and `click_outliers=372`.
+
+Alternatives discarded:
+- `start_byte=2`: rejected because it behaves like malformed audio despite
+  loud signal.
+- `ISO64/q8`: rejected because it catastrophically worsened sidebands/clicks.
+
+Evidence:
+- `local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-4/tone-analysis.txt`
+- `local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-2/tone-analysis.txt`
+- `local-analysis/hardware-quality/20260616-165746-iso64-q8-irig-tone-pairA/tone-analysis.txt`
+
+## 2026-06-16: Do Not Claim Physical Readiness From Current iRig Results
+
+Decision:
+- The current C++/HAL candidate is not ready to claim better-than-mainline
+  physical quality or low-resource operation.
+
+Reason:
+- The best real-music iRig gate still fails strict thresholds:
+  `quality_alignment_score=0.938154`, `analog_snr_db=8.93`,
+  `mid_band_residual_ratio=1.379896`, `high_band_residual_ratio=1.347577`,
+  `lag_jumps_gt_2_frames=24`.
+- CPU evidence is not yet clean: the same run recorded `opena8dj_driver_p95=11.5`
+  and `coreaudiod_p95=95.8` in the profiling window, which is not acceptable as
+  a low-resource claim without a controlled baseline comparison.
+- Removing cadence diagnostics caused a CoreAudio enumeration hang during a tone
+  attempt; the system had to be recovered by reinstalling the cadence-diagnostic
+  variant.
+
+Alternatives discarded:
+- Declaring readiness from clean tone sidebands: rejected because tone quality
+  does not cover real-music residuals, lag jumps, CPU, or Traktor/timecode.
+
+Evidence:
+- `local-analysis/soundcheck/2026-06-16T170237-irig-pairA-16s-maxlag-start4/summary.txt`
+- `local-analysis/hardware-quality/20260616-170759-recover-install-iso5-q64-start4-cadence`
+
+## 2026-06-16: Benchmark Preallocated Mode 2 Decode As The Real-Time Metric
+
+Decision:
+- Treat `decode_mode2_usb_bytes_into` as the primary offline decode performance
+  metric because it writes into caller-owned storage and matches the intended
+  real-time data-plane policy.
+- Keep the allocating wrapper benchmark as informational only.
+
+Reason:
+- The previous benchmark measured `decode_mode2_usb_bytes`, which resizes a
+  `std::vector` and can mix harness allocation cost with decode cost.
+- The real-time path must use preallocated storage, zero hot-loop allocations,
+  and bounded work.
+- The decode hot loop also used per-byte modulo operations for transfer/group
+  position. Replacing them with bounded counters preserves behavior while
+  reducing arithmetic variance.
+
+Alternatives discarded:
+- Continue using the allocating wrapper as the product metric: rejected because
+  it does not model the callback-safe path.
+- Skip the allocating wrapper entirely: rejected because it remains useful for
+  tests and developer tooling.
+
+Evidence:
+- `local-analysis/cpp-offline/offline-bench-release.json` records
+  `decode_into_mib_s=570.085`, `decode_allocating_mib_s=552.130`,
+  `decode_into_output_overflows=0`, `decode_into_check_errors=0`, and
+  `decode_into_panic_flags=0`.
+- `scripts/run-cpp-offline-gates` passed default CTest `8/8`, Release CTest
+  `9/9`, packet matrix `72/72`, Python Mode 2 oracle, timecode matrix, DVS
+  signal smoke, realtime audit, jitter model, static policy, and evidence
+  schema after the change.
+
+## 2026-06-16: Reject Packer Counter Rewrite After Measured Regression
+
+Decision:
+- Keep the original `Mode2OutputPacker::fill_into` modulo/check-byte structure
+  for now.
+
+Reason:
+- A counter-based rewrite looked cleaner but degraded measured pack throughput
+  to about `1149.74 MiB/s` in the same Release benchmark flow, versus the
+  reverted final median of `1602.11 MiB/s`.
+- Real-time code changes must be accepted by evidence, not by aesthetics.
+
+Alternatives discarded:
+- Shipping the counter rewrite: rejected because it made the hot output packer
+  materially slower.
+
+Evidence:
+- Final post-revert `local-analysis/cpp-offline/offline-bench-release.json`
+  records `pack_mib_s=1602.11`, `decode_into_mib_s=570.085`,
+  `float_to_s24_frames_s=85096700`, `route_frames_s=950086000`, and
+  `route_reversed_frames_s=581896000`.
+
+## 2026-06-16: Add Offline DriverKit Shell Contract Without Dext Claim
+
+Decision:
+- Compile and test a DriverKit shell lifecycle contract as ordinary C++ while
+  the machine lacks DriverKit SDK/AudioDriverKit framework support.
+
+Reason:
+- The previous `driverkit/` code was a placeholder with empty start/stop
+  methods. That is not enough for architecture confidence, even though a real
+  dext build is still blocked by local toolchain/entitlement constraints.
+- The offline shell validates device model ownership and bounded lifecycle
+  behavior without installing, activating, or reloading any System Extension.
+
+Alternatives discarded:
+- Declare DriverKit readiness from the surface model alone: rejected because it
+  did not execute any shell code.
+- Attempt real dext install/activation now: rejected because the current
+  toolchain lacks DriverKit SDK and hardware/system-extension operations require
+  a separate authorized window.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-shell-contract.json` records PASS with
+  `system_extension_activated=false`.
+- `local-analysis/promotion-readiness-current.json` now includes
+  `offline_driverkit_shell_contract=PASS` but still returns FAIL overall because
+  physical music quality, runtime CPU, and physical Traktor/timecode vinyl are
+  not proven.

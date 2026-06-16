@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -u
+
+ROOT="/Users/fer/dev/audio8djcpp"
+RUN_ROOT="$ROOT/local-analysis/reboot-resume"
+RUN_DIR="$RUN_ROOT/post-login-$(date +%Y%m%d-%H%M%S)"
+
+mkdir -p "$RUN_DIR"
+ln -sfn "$RUN_DIR" "$RUN_ROOT/latest"
+
+exec >"$RUN_DIR/post-login-codex-resume.log" 2>&1
+
+echo "startup_time=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+echo "root=$ROOT"
+echo "run_dir=$RUN_DIR"
+echo "action=codex_resume_only"
+echo "touches_audio=0"
+echo "touches_usb=0"
+echo "touches_coreaudio=0"
+echo "installs_or_reloads_drivers=0"
+
+cat > "$RUN_DIR/RESUME_FOR_CODEX.md" <<EOF
+# Resume OpenA8DJ C++/DriverKit
+
+Startup run: \`$RUN_DIR\`
+Worktree: \`$ROOT\`
+
+Immediate context:
+
+- Continue in \`/Users/fer/dev/audio8djcpp\`.
+- Mainline \`/Users/fer/dev/opena8dj\` remains READ ONLY.
+- Rust \`/Users/fer/dev/audio8djrust\` remains READ ONLY.
+- No hardware, CoreAudio, USB, dext, kext, HAL, Traktor, VLC, Spotify, default-device, sample-rate, or buffer-size operations without the global audio lock and explicit window.
+- Last known C++ state: offline gates passed; candidate is offline-ready only, not physically better than mainline until measured.
+
+Suggested first commands after resume:
+
+\`\`\`bash
+pwd
+git branch --show-current
+git status --short
+scripts/run-cpp-offline-gates
+\`\`\`
+EOF
+
+if [ -d "/Applications/Codex.app" ]; then
+  /usr/bin/open -a "Codex" "$ROOT" || true
+  /usr/bin/osascript -e 'tell application "Codex" to activate' || true
+else
+  echo "missing_app=/Applications/Codex.app"
+fi

@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo"
+
+seconds="3"
+out_dir=""
+device="Open Audio 8 DJ"
+
+usage() {
+  cat <<USAGE
+usage: scripts/run-audio8dj-direct-gate [options]
+
+Runs a lock-gated Audio 8 DJ direct CoreAudio presence and short-input gate.
+This gate does not use iRig, does not install drivers, and does not change
+default devices, sample rate, or buffer size.
+
+Options:
+  --seconds N       Capture duration per channel pair (default: 3)
+  --out-dir PATH    Evidence directory
+  --device NAME     CoreAudio device selector (default: Open Audio 8 DJ)
+  -h, --help        Show help
+USAGE
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --seconds)
+      seconds="$2"; shift 2 ;;
+    --out-dir)
+      out_dir="$2"; shift 2 ;;
+    --device)
+      device="$2"; shift 2 ;;
+    -h|--help)
+      usage; exit 0 ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2 ;;
+  esac
+done
+
+if [ -z "$out_dir" ]; then
+  out_dir="local-analysis/hardware-quality/$(date +%Y%m%d-%H%M%S)-audio8dj-direct-gate"
+fi
+mkdir -p "$out_dir"
+
+lock_root="${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
+if [ -d "$lock_root" ] && [ -f "$lock_root/owner" ]; then
+  owner_pid="$(awk -F= '/^pid=/{print $2; exit}' "$lock_root/owner" || true)"
+  if [ -n "${owner_pid:-}" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
+    rm -rf "$lock_root"
+  fi
+fi
+
+if ! mkdir "$lock_root" 2>/dev/null; then
+  echo "audio_gate_lock=BUSY"
+  cat "$lock_root/owner" 2>/dev/null || true
+  exit 75
+fi
+
+cleanup() {
+  rm -rf "$lock_root"
+}
+trap cleanup EXIT
+
+{
+  echo "pid=$$"
+  echo "owner=codex"
+  echo "worktree=$repo"
+  echo "purpose=audio8dj-direct-gate-no-irig"
+  echo "started_at=$(date +%Y-%m-%dT%H:%M:%S%z)"
+  echo "actions_authorized=Audio 8 DJ direct CoreAudio I/O, no iRig, no defaults"
+  echo "forbidden=default-device-change,sample-rate-change,buffer-change,driver-install,system-reboot"
+  echo "evidence=$repo/$out_dir"
+} > "$lock_root/owner"
+
+{
+  echo "run_dir=$repo/$out_dir"
+  echo "started=$(date +%Y-%m-%dT%H:%M:%S%z)"
+  echo "git_head=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  echo "git_dirty=$(git status --short | wc -l | tr -d ' ')"
+  echo "device=$device"
+  echo "seconds=$seconds"
+  echo "no_defaults_changed=true"
+  echo "no_sample_rate_changed=true"
+  echo "no_buffer_changed=true"
+  echo "no_driver_install=true"
+} > "$out_dir/manifest.txt"
+
+./build/audio-list > "$out_dir/audio-list-before.txt" 2>&1 || true
+./build/opena8dj-control > "$out_dir/control-before.txt" 2>&1 || true
+./build/opena8dj-control stream-stats > "$out_dir/stream-stats-before.txt" 2>&1 || true
+ioreg -p IOService -l -w0 -r -c IOUSBHostDevice > "$out_dir/ioreg-usbhost-before.txt" 2>&1 || true
+
+set +e
+./build/audio-io-test > "$out_dir/audio-io-test.txt" 2>&1
+aio_status=$?
+./build/audio-record "$seconds" "$out_dir/audio8dj-input-12.wav" "$device" 1,2 \
+  > "$out_dir/audio-record-12.txt" 2>&1
+record12_status=$?
+./build/audio-record "$seconds" "$out_dir/audio8dj-input-78.wav" "$device" 7,8 \
+  > "$out_dir/audio-record-78.txt" 2>&1
+record78_status=$?
+set -e
+
+./build/opena8dj-control stream-stats > "$out_dir/stream-stats-after.txt" 2>&1 || true
+./build/audio-list > "$out_dir/audio-list-after.txt" 2>&1 || true
+shasum -a 256 /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL \
+  > "$out_dir/installed-hal-sha256.txt" 2>&1 || true
+
+{
+  echo "audio_io_test_status=$aio_status"
+  echo "audio_record_12_status=$record12_status"
+  echo "audio_record_78_status=$record78_status"
+  if rg -q "Open Audio 8 DJ.*in=8 out=8" "$out_dir/audio-list-after.txt" &&
+     [ "$aio_status" -eq 0 ] &&
+     [ "$record12_status" -eq 0 ] &&
+     [ "$record78_status" -eq 0 ]; then
+    echo "result=PASS"
+  else
+    echo "result=FAIL"
+  fi
+  echo "finished=$(date +%Y-%m-%dT%H:%M:%S%z)"
+} > "$out_dir/result.txt"
+
+cat "$out_dir/result.txt"
