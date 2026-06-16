@@ -43,7 +43,7 @@ std::int32_t decode_s24_big_endian(std::span<const std::uint8_t, 3> bytes) {
 }
 
 std::int32_t float_to_s24(float sample, float gain) {
-  const float scaled = sample * gain;
+  const float scaled = sample * static_cast<float>(gain);
   if (!std::isfinite(scaled)) {
     return 0;
   }
@@ -53,9 +53,9 @@ std::int32_t float_to_s24(float sample, float gain) {
   if (scaled <= -1.0F) {
     return kS24Min;
   }
-  const auto q31 = static_cast<std::int64_t>(
-      std::lrint(static_cast<double>(scaled) *
-                 static_cast<double>(std::numeric_limits<std::int32_t>::max())));
+  const float q31_float =
+      scaled * static_cast<float>(std::numeric_limits<std::int32_t>::max());
+  const auto q31 = static_cast<std::int64_t>(std::lrint(static_cast<double>(q31_float)));
   return static_cast<std::int32_t>(q31 >> 8);
 }
 

@@ -1,5 +1,34 @@
 # Test Evidence
 
+## 2026-06-16: Mode 2 Cross-Oracle Byte Parity Gate
+
+- Command: `scripts/run-cpp-offline-gates`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Commit: `50105c5` plus current Mode 2 cross-oracle gate changes
+- Result: PASS
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/mode2-cross-oracle-parity.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Change:
+  - C++ Float32-to-S24 quantization now matches the inherited Python oracle's explicit Float32 rounding path before converting to 24-bit output.
+  - Added `opena8djcpp_mode2_cpp_oracle_dump` and `scripts/mode2-cross-oracle-parity`.
+  - Promotion readiness now includes `offline_mode2_cross_oracle_parity`.
+- Cross-oracle result: `72` rows, `0` failures, `0` byte mismatches, `0` length deltas, `0` check errors, `0` panic flags.
+- Full offline gates after the change:
+  - Default CTest: `100% tests passed, 0 tests failed out of 14`
+  - Release CTest: `100% tests passed, 0 tests failed out of 15`
+  - Evidence schema: `21` required files, `0` missing
+  - Release benchmark: `pack_mib_s=1601.31`, `decode_into_mib_s=569.821`, `float_to_s24_frames_s=8.54237e+07`, `route_frames_s=9.78452e+08`, `route_reversed_frames_s=4.99956e+08`, `route_advanced_frames_s=4.91712e+08`
+- Promotion readiness result: FAIL, with `branch_promotion_allowed=false`.
+- Remaining promotion blockers: physical real-music quality, runtime CPU/coreaudiod, and physical Traktor/timecode vinyl lock evidence.
+- Runtime cleanup check before this gate: hardware lock absent; terminated live `git fsmonitor--daemon` holding `/Users/fer/dev/opena8dj`; terminated `NIHardwareAgent`; follow-up `lsof +D /Users/fer/dev/opena8dj` showed no remaining handles.
+- Hardware touched by this gate: no
+- CoreAudio touched by this gate: no
+- USB touched by this gate: no
+- Driver installed or activated by this gate: no
+
 ## 2026-06-16: Initial C++ Offline Core Contract
 
 - Command: `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline && ctest --test-dir build/cpp-offline --output-on-failure`

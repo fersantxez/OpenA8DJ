@@ -183,6 +183,16 @@ def evaluate(args):
              as_float(offline.get("simulated_output_matrix", {}), "max_leakage_dbfs", 999.0) <=
              -120.0,
              offline.get("simulated_output_matrix", {})),
+        gate("offline_mode2_cross_oracle_parity",
+             offline.get("mode2_cross_oracle_parity", {}).get("status") == "PASS" and
+             offline.get("mode2_cross_oracle_parity", {}).get("rows", 0) >= 72 and
+             offline.get("mode2_cross_oracle_parity", {}).get("failures", 1) == 0 and
+             offline.get("mode2_cross_oracle_parity", {}).get("byte_order") == "big" and
+             as_float(offline.get("mode2_cross_oracle_parity", {}), "max_byte_mismatches", 1) == 0 and
+             as_float(offline.get("mode2_cross_oracle_parity", {}), "max_length_delta", 1) == 0 and
+             as_float(offline.get("mode2_cross_oracle_parity", {}), "total_check_errors", 1) == 0 and
+             as_float(offline.get("mode2_cross_oracle_parity", {}), "total_panic_flags", 1) == 0,
+             offline.get("mode2_cross_oracle_parity", {})),
         gate("offline_dvs_packet_input_decode",
              offline.get("dvs_packet_input_decode", {}).get("status") == "PASS" and
              offline.get("dvs_packet_input_decode", {}).get("rows", 0) >= 24 and

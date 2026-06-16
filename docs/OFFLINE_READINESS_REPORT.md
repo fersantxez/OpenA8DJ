@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate commit: `775de71`
+Candidate commit: `50105c5` plus current Mode 2 cross-oracle parity changes
 
 ## Verdict
 
@@ -26,6 +26,17 @@ Current evidence:
 
 Result: PASS, `48` rows, `0` failures, minimum SNR `119.407 dB`, max residual
 ratio `1.07069e-06`, max leakage `-240 dBFS`.
+
+## 2026-06-16 Mode 2 Cross-Oracle Parity Update
+
+The offline gate now includes a byte-for-byte comparison between the C++ Mode 2
+output packer and the inherited Python oracle:
+`local-analysis/cpp-offline/mode2-cross-oracle-parity.json`.
+
+Current result: PASS, `72` rows, `0` failures, `max_byte_mismatches=0`,
+`max_length_delta=0`, `total_check_errors=0`, and `total_panic_flags=0`.
+The C++ Float32-to-S24 conversion now follows the oracle's explicit Float32
+rounding path before quantizing to output S24.
 
 ## 2026-06-16 Routing Fast Path Update
 
@@ -70,7 +81,7 @@ benchmark number.
 | 8 inputs / 8 outputs represented | core contract and surface model | PASS |
 | A/B/C/D routing represented | core contract, packet matrix, DVS smoke | PASS |
 | sample rates 44.1/48 kHz represented | policy, packet matrix, surface model | PASS |
-| Mode 2 packet behavior tested | 72-row C++ matrix plus Python oracle | PASS |
+| Mode 2 packet behavior tested | 72-row C++ matrix plus Python oracle and cross-oracle byte parity | PASS |
 | simulated output matrix | `simulated-output-matrix.json` | PASS |
 | timecode vinyl/CD-line/phono policy | timecode matrix | PASS |
 | DVS/timecode deck isolation proxy | 24-row DVS signal smoke | PASS |
@@ -82,27 +93,28 @@ benchmark number.
 
 ## Current Gate Summary
 
-- Default CTest: 13/13 PASS.
-- Release CTest: 14/14 PASS.
+- Default CTest: 14/14 PASS.
+- Release CTest: 15/15 PASS.
 - Packet matrix: 72 rows, 0 failures.
 - Simulated output matrix: 48 rows, 0 failures.
 - Python Mode 2 oracle: all start bytes PASS, 0 check errors, 0 panic flags.
+- Mode 2 cross-oracle byte parity: 72 rows, 0 byte mismatches.
 - Timecode matrix: 4 profiles, 4 deck assignments, 0 failures.
 - DVS signal smoke: 24 rows, 0 failures, zero leakage.
 - Realtime audit: 0 hot-path allocations.
 - DriverKit surface model: one 8-channel input stream and four stereo output streams.
 - Jitter model: 0 regressions, max error 0.125 frames.
 - Static policy: 0 forbidden hits in official offline gate path.
-- Evidence schema: 20 required files, 0 missing.
+- Evidence schema: 21 required files, 0 missing.
 
 ## Performance Evidence
 
-- Mode 2 pack throughput: `1454.94 MiB/s`.
-- Mode 2 preallocated decode throughput: `546.495 MiB/s`.
-- Identity routing throughput: `854,123,000 frames/s`.
-- Reversed routing throughput: `449,037,000 frames/s`.
+- Mode 2 pack throughput: `1601.31 MiB/s`.
+- Mode 2 preallocated decode throughput: `569.821 MiB/s`.
+- Identity routing throughput: `978,452,000 frames/s`.
+- Reversed routing throughput: `499,956,000 frames/s`.
 - Advanced mute/invert/cross-deck routing throughput:
-  `441,878,000 frames/s`.
+  `491,712,000 frames/s`.
 - Check errors: `0`.
 - Panic flags: `0`.
 

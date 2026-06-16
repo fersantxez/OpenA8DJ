@@ -24,6 +24,10 @@ python3 scripts/validate-mode2-output-packing.py \
   --byte-order big \
   --gain 1.0 \
   | tee "$EVIDENCE_DIR/mode2-python-oracle.txt"
+python3 scripts/mode2-cross-oracle-parity \
+  --binary ./build/cpp-release/opena8djcpp_mode2_cpp_oracle_dump \
+  --frames 96 \
+  | tee "$EVIDENCE_DIR/mode2-cross-oracle-parity.json"
 ./build/cpp-release/opena8djcpp_timecode_matrix | tee "$EVIDENCE_DIR/timecode-matrix.json"
 ./build/cpp-release/opena8djcpp_timecode_signal_analysis | tee "$EVIDENCE_DIR/timecode-signal-analysis.json"
 ./build/cpp-release/opena8djcpp_dvs_signal_smoke | tee "$EVIDENCE_DIR/dvs-signal-smoke.json"
@@ -65,6 +69,7 @@ def git_text(*args):
 
 
 packet = load_json("packet-matrix.json")
+mode2_cross_oracle = load_json("mode2-cross-oracle-parity.json")
 protocol = load_json("protocol-contract.json")
 simulated_output = load_json("simulated-output-matrix.json")
 timecode = load_json("timecode-matrix.json")
@@ -126,6 +131,18 @@ summary = {
         "check_errors": 0,
         "panic_flags": 0,
         "evidence": "local-analysis/cpp-offline/mode2-python-oracle.txt",
+    },
+    "mode2_cross_oracle_parity": {
+        "status": mode2_cross_oracle.get("result"),
+        "rows": mode2_cross_oracle.get("row_count"),
+        "failures": mode2_cross_oracle.get("failures"),
+        "byte_order": mode2_cross_oracle.get("byte_order"),
+        "max_byte_mismatches": mode2_cross_oracle.get("max_byte_mismatches"),
+        "max_length_delta": mode2_cross_oracle.get("max_length_delta"),
+        "total_check_errors": mode2_cross_oracle.get("total_check_errors"),
+        "total_panic_flags": mode2_cross_oracle.get("total_panic_flags"),
+        "oracle": mode2_cross_oracle.get("oracle"),
+        "evidence": "local-analysis/cpp-offline/mode2-cross-oracle-parity.json",
     },
     "timecode_matrix": {
         "status": timecode.get("result"),
@@ -243,7 +260,7 @@ summary = {
         "decode_into_panic_flags": bench.get("decode_into_panic_flags"),
     },
     "not_ready": [
-        "full_mainline_rust_fixture_parity_beyond_python_mode2_oracle",
+        "mainline_runtime_byte_parity_requires physical capture/export evidence",
         "full_traktor_dvs_signal_quality_matrix",
         "physical_audio_and_traktor_validation",
         "runtime_cpu_resource_comparison_against_mainline",

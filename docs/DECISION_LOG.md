@@ -1,5 +1,23 @@
 # Decision Log
 
+## 2026-06-16: Require C++ Mode 2 Bytes To Match The Python Oracle
+
+Decision:
+- Add a cross-oracle gate that compares C++ Mode 2 packed output bytes against the inherited Python oracle for the full 72-row matrix.
+- Match C++ Float32-to-S24 quantization to the oracle's Float32 rounding path.
+
+Reason:
+- The previous C++ packet matrix proved internal round-trip behavior but could still pass if pack and decode shared the same wrong quantization.
+- The Python oracle is independent and was inherited from the proven mainline behavior checks. Byte-for-byte parity is stronger evidence than round-trip alone.
+
+Alternatives discarded:
+- Keep only the Python text oracle: rejected because it did not execute C++.
+- Keep only C++ round-trip tests: rejected because they do not prove parity with the external oracle.
+
+Evidence:
+- `local-analysis/cpp-offline/mode2-cross-oracle-parity.json` records `72` rows, `0` failures, `max_byte_mismatches=0`, `max_length_delta=0`, `total_check_errors=0`, and `total_panic_flags=0`.
+- `local-analysis/promotion-readiness-current.json` includes `offline_mode2_cross_oracle_parity=PASS`.
+
 ## 2026-06-16: Create Isolated C++/DriverKit Worktree
 
 Decision:

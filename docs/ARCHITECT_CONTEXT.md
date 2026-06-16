@@ -21,9 +21,14 @@ Branch: `driverkit/cpp-redesign`
   side swap, and cross-deck pair mapping through a fixed `RouteEntry` array and
   prevalidated `RoutingPlan`. Current advanced routing evidence:
   `route_advanced_frames_s=4.41878e+08`.
+- The Mode 2 output packer now has an external byte-for-byte parity gate
+  against the inherited Python oracle. Current evidence:
+  `local-analysis/cpp-offline/mode2-cross-oracle-parity.json`, `72` rows,
+  `0` failures, `max_byte_mismatches=0`, `max_length_delta=0`,
+  `total_check_errors=0`, `total_panic_flags=0`.
 - The Mode 2 decode benchmark now distinguishes the allocating developer
   wrapper from the preallocated real-time path. Current preallocated decode
-  evidence: `decode_into_mib_s=546.495`, `decode_into_output_overflows=0`,
+  evidence: `decode_into_mib_s=569.821`, `decode_into_output_overflows=0`,
   `decode_into_check_errors=0`, `decode_into_panic_flags=0`.
 - The offline simulated output matrix now covers A/B/C/D at 44.1/48 kHz across
   dense, transient, and wideband deterministic program material at gains `1.0`
@@ -132,6 +137,11 @@ Branch: `driverkit/cpp-redesign`
   - `Lagrange`: completed read-only promotion/readiness gap audit.
 - Current runtime state:
   - Hardware lock is absent.
+  - The live `git fsmonitor--daemon` that had `/Users/fer/dev/opena8dj` open
+    was terminated, and a follow-up `lsof +D /Users/fer/dev/opena8dj` showed no
+    remaining handles.
+  - `NIHardwareAgent` was terminated; no current `NIHardwareAgent`, `OpenA8DJ`,
+    Traktor, ffmpeg, or sox process is detected by the scoped process check.
   - Mainline LaunchAgents `org.opena8dj.midid`,
     `com.fer.opena8dj.autonomous-audio-qa`, and
     `com.fer.opena8dj.safe-replug-watch` are disabled.

@@ -165,6 +165,7 @@ C++ evidence set:
 | protocol constants snapshot | `PASS` | `local-analysis/cpp-offline/protocol-contract.json` |
 | simulated output matrix | `PASS` | `local-analysis/cpp-offline/simulated-output-matrix.json` |
 | Python Mode 2 oracle | `PASS` | `local-analysis/cpp-offline/mode2-python-oracle.txt` |
+| Mode 2 cross-oracle byte parity | `PASS` | `local-analysis/cpp-offline/mode2-cross-oracle-parity.json` |
 | timecode matrix | `PASS` | `local-analysis/cpp-offline/timecode-matrix.json` |
 | timecode signal analysis | `PASS` | `local-analysis/cpp-offline/timecode-signal-analysis.json` |
 | DVS signal smoke | `PASS` | `local-analysis/cpp-offline/dvs-signal-smoke.json` |
@@ -182,13 +183,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1454.94 MiB/s` over `5` repeats, min `1407.95`, max `1594.53` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `546.495 MiB/s` over `5` repeats, min `530.489`, max `549.875` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `516.065 MiB/s` over `5` repeats, min `473.331`, max `539.850` | informational |
-| Float32 to S24 conversion throughput | median `76,538,400 frames/s` over `5` repeats, min `76,501,200`, max `82,625,800` | `1,000,000 frames/s` |
-| identity routing throughput | median `854,123,000 frames/s` over `5` repeats, min `809,504,000`, max `900,065,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `449,037,000 frames/s` over `5` repeats, min `447,759,000`, max `455,704,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `441,878,000 frames/s` over `5` repeats, min `440,671,000`, max `444,815,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1601.31 MiB/s` over `5` repeats, min `1589.64`, max `1603.02` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `569.821 MiB/s` over `5` repeats, min `561.410`, max `570.244` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `559.307 MiB/s` over `5` repeats, min `518.090`, max `564.102` | informational |
+| Float32 to S24 conversion throughput | median `85,423,700 frames/s` over `5` repeats, min `85,370,400`, max `85,546,800` | `1,000,000 frames/s` |
+| identity routing throughput | median `978,452,000 frames/s` over `5` repeats, min `910,090,000`, max `981,813,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `499,956,000 frames/s` over `5` repeats, min `496,602,000`, max `512,751,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `491,712,000 frames/s` over `5` repeats, min `490,869,000`, max `493,487,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -216,6 +217,9 @@ Functional coverage in the current C++ test binary:
   prevalidated `RoutingPlan` and no dynamic routing storage.
 - S24 big-endian conversion vectors.
 - Mode 2 round-trip for start bytes `0..5`.
+- Mode 2 cross-oracle byte parity against
+  `scripts/validate-mode2-output-packing.py`: `72` rows, `0` failures, `0`
+  byte mismatches, `0` length deltas, `0` check errors, `0` panic flags.
 - Packet matrix: 44.1/48 kHz, transfer bytes `48`, `80`, `352`, gains `1.0` and `0.5`, start bytes `0..5`, `72` rows.
 - Simulated output matrix: deterministic dense/transient/wideband program
   material on output pairs A/B/C/D at 44.1/48 kHz, gains `1.0` and `0.5`,

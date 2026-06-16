@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Compare C++ mode-2 output bytes against the inherited Python oracle."""
+
+import argparse
+import hashlib
+import importlib.util
+import json
+import subprocess
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def load_oracle():
+    path = ROOT / "scripts" / "validate-mode2-output-packing.py"
+    spec = importlib.util.spec_from_file_location("mode2_python_oracle", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load oracle from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def run_cpp(binary, row):
+    command = [
+        str(binary),
+        "--sample-rate",
+        str(row["sample_rate"]),
+        "--transfer-bytes",
+        str(row["transfer_bytes"]),
+        "--start-byte",
+        str(row["start_byte"]),
+        "--frames",
+        str(row["frames"]),
+        "--gain",
+        str(row["gain"]),
+    ]
+    completed = subprocess.run(command, check=True, text=True, capture_output=True)
+    return json.loads(completed.stdout)
+
+
+def first_byte_mismatches(left, right, limit=8):
+    mismatches = []
+    for index, (lhs, rhs) in enumerate(zip(left, right)):
+        if lhs != rhs:
+            mismatches.append({"offset": index, "python": lhs, "cpp": rhs})
+            if len(mismatches) >= limit:
+                return mismatches
+    if len(left) != len(right):
+        mismatches.append({"offset": min(len(left), len(right)),
+                           "python": "EOF" if len(left) < len(right) else left[min(len(left), len(right))],
+                           "cpp": "EOF" if len(right) < len(left) else right[min(len(left), len(right))]})
+    return mismatches
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", default=ROOT / "build/cpp-release/opena8djcpp_mode2_cpp_oracle_dump")
+    parser.add_argument("--frames", type=int, default=96)
+    args = parser.parse_args()
+
+    oracle = load_oracle()
+    rows = []
+    failures = 0
+    max_byte_mismatches = 0
+    max_length_delta = 0
+    total_check_errors = 0
+    total_panic_flags = 0
+
+    for sample_rate in (44100, 48000):
+        for transfer_bytes in (48, 80, oracle.DEFAULT_TRANSFER_BYTES):
+            for gain in (1.0, 0.5):
+                frames = oracle.synthetic_frames(args.frames)
+                for start_byte in range(oracle.FRAME_BYTES_PER_STREAM):
+                    source_start_frame = 0 if start_byte == 0 else 1
+                    expected_count = len(frames) - source_start_frame
+                    python_packed, python_decoded = oracle.pack_until_comparable(
+                        frames, start_byte, transfer_bytes, gain, expected_count, "big"
+                    )
+                    cpp = run_cpp(Path(args.binary), {
+                        "sample_rate": sample_rate,
+                        "transfer_bytes": transfer_bytes,
+                        "start_byte": start_byte,
+                        "frames": args.frames,
+                        "gain": gain,
+                    })
+                    cpp_packed = bytes.fromhex(cpp["packed_hex"])
+                    byte_mismatches = sum(
+                        1 for lhs, rhs in zip(python_packed, cpp_packed) if lhs != rhs
+                    ) + abs(len(python_packed) - len(cpp_packed))
+                    length_delta = abs(len(python_packed) - len(cpp_packed))
+                    max_byte_mismatches = max(max_byte_mismatches, byte_mismatches)
+                    max_length_delta = max(max_length_delta, length_delta)
+                    total_check_errors += int(cpp["check_errors"]) + int(python_decoded.check_errors)
+                    total_panic_flags += int(cpp["panic_flags"]) + int(python_decoded.panic_flags)
+                    row_ok = (
+                        cpp["result"] == "PASS"
+                        and python_packed == cpp_packed
+                        and python_decoded.check_errors == 0
+                        and python_decoded.panic_flags == 0
+                    )
+                    if not row_ok:
+                        failures += 1
+                    rows.append({
+                        "sample_rate": sample_rate,
+                        "transfer_bytes": transfer_bytes,
+                        "gain": gain,
+                        "start_byte": start_byte,
+                        "result": "PASS" if row_ok else "FAIL",
+                        "python_packed_bytes": len(python_packed),
+                        "cpp_packed_bytes": len(cpp_packed),
+                        "byte_mismatches": byte_mismatches,
+                        "python_sha256": hashlib.sha256(python_packed).hexdigest(),
+                        "cpp_sha256": hashlib.sha256(cpp_packed).hexdigest(),
+                        "python_decoded_frames": len(python_decoded.frames),
+                        "cpp_decoded_frames": cpp["decoded_frames"],
+                        "check_errors": int(cpp["check_errors"]) + int(python_decoded.check_errors),
+                        "panic_flags": int(cpp["panic_flags"]) + int(python_decoded.panic_flags),
+                        "first_mismatches": first_byte_mismatches(python_packed, cpp_packed),
+                    })
+
+    result = {
+        "schema": "opena8djcpp.mode2-cross-oracle-parity.v1",
+        "result": "PASS" if failures == 0 else "FAIL",
+        "scope": "offline_only",
+        "byte_order": "big",
+        "oracle": "scripts/validate-mode2-output-packing.py",
+        "cpp_binary": str(args.binary),
+        "row_count": len(rows),
+        "failures": failures,
+        "max_byte_mismatches": max_byte_mismatches,
+        "max_length_delta": max_length_delta,
+        "total_check_errors": total_check_errors,
+        "total_panic_flags": total_panic_flags,
+        "rows": rows,
+    }
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0 if failures == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

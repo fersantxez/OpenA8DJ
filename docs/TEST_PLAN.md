@@ -59,6 +59,7 @@ Current evidence files:
 - `local-analysis/cpp-offline/protocol-contract.json`
 - `local-analysis/cpp-offline/simulated-output-matrix.json`
 - `local-analysis/cpp-offline/mode2-python-oracle.txt`
+- `local-analysis/cpp-offline/mode2-cross-oracle-parity.json`
 - `local-analysis/cpp-offline/timecode-matrix.json`
 - `local-analysis/cpp-offline/dvs-signal-smoke.json`
 - `local-analysis/cpp-offline/dvs-packet-input-decode.json`
@@ -81,6 +82,9 @@ Current PASS coverage:
 - S24 big-endian conversion;
 - Mode 2 round-trip for start bytes `0..5`;
 - packet matrix for 44.1/48 kHz, transfer bytes `48`, `80`, `352`, gains `1.0` and `0.5`, start bytes `0..5`;
+- cross-oracle Mode 2 byte parity against the inherited Python oracle:
+  `72` rows, `0` byte mismatches, `0` length deltas, `0` check errors,
+  `0` panic flags;
 - simulated output matrix for A/B/C/D at 44.1/48 kHz over dense, transient,
   and wideband deterministic material with gains `1.0` and `0.5`: `48` rows,
   `0` failures, minimum SNR `119.407 dB`, max residual ratio `1.07069e-06`,
@@ -99,7 +103,7 @@ Current PASS coverage:
 
 Current NOT_READY coverage:
 
-- mainline/Rust fixture byte-for-byte parity;
+- runtime byte parity against real mainline capture/export evidence;
 - full Traktor-grade DVS/timecode signal-quality analyzer;
 - full runtime jitter measurement under CoreAudio/DriverKit;
 - real AudioDriverKit dext stream mapping under DriverKit SDK;

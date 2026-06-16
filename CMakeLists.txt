@@ -77,6 +77,13 @@ target_link_libraries(opena8djcpp_packet_matrix
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_mode2_cpp_oracle_dump
+  tools/mode2_cpp_oracle_dump.cpp)
+
+target_link_libraries(opena8djcpp_mode2_cpp_oracle_dump
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_protocol_contract
   tools/protocol_contract.cpp)
 
@@ -152,6 +159,7 @@ add_executable(opena8djcpp_evidence_schema_check
 enable_testing()
 add_test(NAME opena8djcpp_core_contract COMMAND opena8djcpp_core_tests)
 add_test(NAME opena8djcpp_packet_matrix COMMAND opena8djcpp_packet_matrix)
+add_test(NAME opena8djcpp_mode2_cpp_oracle_dump COMMAND opena8djcpp_mode2_cpp_oracle_dump)
 add_test(NAME opena8djcpp_protocol_contract COMMAND opena8djcpp_protocol_contract)
 add_test(NAME opena8djcpp_simulated_output_matrix COMMAND opena8djcpp_simulated_output_matrix)
 add_test(NAME opena8djcpp_timecode_matrix COMMAND opena8djcpp_timecode_matrix)
