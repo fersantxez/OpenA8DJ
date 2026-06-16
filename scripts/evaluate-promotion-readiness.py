@@ -179,6 +179,8 @@ def evaluate(args):
              as_float(bench, "route_frames_s") >= BASELINE["offline_route_frames_s_floor"] and
              as_float(bench, "route_reversed_frames_s") >=
              BASELINE["offline_route_frames_s_floor"] and
+             as_float(bench, "route_advanced_frames_s") >=
+             BASELINE["offline_route_frames_s_floor"] and
              as_float(bench, "decode_into_output_overflows", 1) == 0 and
              as_float(bench, "decode_into_check_errors", 1) == 0 and
              as_float(bench, "decode_into_panic_flags", 1) == 0 and
@@ -192,6 +194,7 @@ def evaluate(args):
               "float_to_s24_frames_s": bench.get("float_to_s24_frames_s"),
               "route_frames_s": bench.get("route_frames_s"),
               "route_reversed_frames_s": bench.get("route_reversed_frames_s"),
+              "route_advanced_frames_s": bench.get("route_advanced_frames_s"),
               "check_errors": bench.get("check_errors"),
               "panic_flags": bench.get("panic_flags"),
               "decode_into_check_errors": bench.get("decode_into_check_errors"),

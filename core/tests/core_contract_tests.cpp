@@ -81,7 +81,7 @@ void test_custom_and_invalid_routing() {
     }
   }
 
-  const RoutingMatrix reversed({7, 6, 5, 4, 3, 2, 1, 0});
+  const RoutingMatrix reversed(RoutingMatrix::Mapping{7, 6, 5, 4, 3, 2, 1, 0});
   assert(!reversed.is_identity());
   assert(route_interleaved_f32(input, output, frames, reversed));
   for (std::uint32_t frame = 0; frame < frames; ++frame) {
@@ -100,11 +100,64 @@ void test_custom_and_invalid_routing() {
     assert(output[base + 7] == input[base + 0]);
   }
 
-  const RoutingMatrix invalid({0, 1, 2, 3, 4, 5, 6, kInputChannels});
+  const RoutingMatrix invalid(RoutingMatrix::Mapping{0, 1, 2, 3, 4, 5, 6, kInputChannels});
   const RoutingPlan invalid_plan(invalid);
   assert(!invalid_plan.valid());
   assert(!route_interleaved_f32(input, output, frames, invalid));
   assert(!route_interleaved_f32(input, output, frames, invalid_plan));
+}
+
+void test_advanced_routing_matrix() {
+  constexpr std::uint32_t frames = 1;
+  const std::array<float, frames * kInputChannels> input{1.0F, 2.0F, 3.0F, 4.0F,
+                                                         5.0F, 6.0F, 7.0F, 8.0F};
+  std::array<float, frames * kOutputChannels> output{};
+
+  const RoutingMatrix advanced(RoutingMatrix::Routes{
+      RouteEntry::passthrough(channel_index(StereoPair::D, PairSide::Left)),
+      RouteEntry::passthrough(channel_index(StereoPair::D, PairSide::Right)),
+      RouteEntry::muted(),
+      RouteEntry::muted(),
+      RouteEntry::passthrough(channel_index(StereoPair::C, PairSide::Right)),
+      RouteEntry::passthrough(channel_index(StereoPair::C, PairSide::Left)),
+      RouteEntry::passthrough(channel_index(StereoPair::D, PairSide::Left)),
+      RouteEntry::inverted(channel_index(StereoPair::D, PairSide::Right)),
+  });
+
+  const RoutingPlan plan(advanced);
+  assert(plan.valid());
+  assert(!plan.is_identity());
+  assert(!advanced.route_for_output(2).is_inverted());
+  assert(advanced.route_for_output(2).is_muted());
+  assert(advanced.route_for_output(7).is_inverted());
+  assert(RoutingMatrix::dvs_default().is_identity());
+
+  assert(route_interleaved_f32(input, output, frames, plan));
+  const std::array<float, frames * kOutputChannels> expected{7.0F, 8.0F, 0.0F, 0.0F,
+                                                             6.0F, 5.0F, 7.0F, -8.0F};
+  assert(output == expected);
+
+  const RoutingPlan muted_plan(RoutingMatrix::muted());
+  assert(muted_plan.valid());
+  assert(!muted_plan.is_identity());
+  output.fill(123.0F);
+  assert(route_interleaved_f32(input, output, frames, muted_plan));
+  for (const auto value : output) {
+    assert(value == 0.0F);
+  }
+
+  const RoutingMatrix invalid(RoutingMatrix::Routes{
+      RouteEntry::passthrough(0),
+      RouteEntry::passthrough(1),
+      RouteEntry::passthrough(2),
+      RouteEntry::passthrough(3),
+      RouteEntry::passthrough(4),
+      RouteEntry::passthrough(5),
+      RouteEntry::passthrough(6),
+      RouteEntry::inverted(kInputChannels),
+  });
+  assert(!RoutingPlan(invalid).valid());
+  assert(!route_interleaved_f32(input, output, frames, invalid));
 }
 
 S24Frame synthetic_s24_frame(std::uint32_t frame_index) {
@@ -420,6 +473,7 @@ int main() {
   test_sample_format_placeholder();
   test_identity_routing();
   test_custom_and_invalid_routing();
+  test_advanced_routing_matrix();
   test_s24_big_endian_conversion();
   test_mode2_roundtrip_all_start_bytes();
   test_mode2_decode_into_matches_allocating_decoder();

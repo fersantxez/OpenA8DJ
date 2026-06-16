@@ -69,12 +69,14 @@ int main() {
   std::vector<double> float_to_s24_frames_s_values;
   std::vector<double> route_frames_s_values;
   std::vector<double> route_reversed_frames_s_values;
+  std::vector<double> route_advanced_frames_s_values;
   pack_mib_s_values.reserve(kRepeats);
   decode_allocating_mib_s_values.reserve(kRepeats);
   decode_into_mib_s_values.reserve(kRepeats);
   float_to_s24_frames_s_values.reserve(kRepeats);
   route_frames_s_values.reserve(kRepeats);
   route_reversed_frames_s_values.reserve(kRepeats);
+  route_advanced_frames_s_values.reserve(kRepeats);
 
   const double expected_packed_mib = static_cast<double>(packed.size()) / (1024.0 * 1024.0);
   for (std::uint32_t repeat = 0; repeat < kRepeats; ++repeat) {
@@ -138,7 +140,17 @@ int main() {
   }
 
   const RoutingPlan identity_plan(RoutingMatrix::identity());
-  const RoutingPlan reversed_plan(RoutingMatrix({7, 6, 5, 4, 3, 2, 1, 0}));
+  const RoutingPlan reversed_plan(RoutingMatrix(RoutingMatrix::Mapping{7, 6, 5, 4, 3, 2, 1, 0}));
+  const RoutingPlan advanced_plan(RoutingMatrix(RoutingMatrix::Routes{
+      RouteEntry::passthrough(6),
+      RouteEntry::passthrough(7),
+      RouteEntry::muted(),
+      RouteEntry::muted(),
+      RouteEntry::passthrough(5),
+      RouteEntry::passthrough(4),
+      RouteEntry::passthrough(6),
+      RouteEntry::inverted(7),
+  }));
   for (std::uint32_t repeat = 0; repeat < kRepeats; ++repeat) {
     const double route_seconds = seconds_for([&]() {
       const bool routed =
@@ -167,18 +179,34 @@ int main() {
     route_reversed_frames_s_values.push_back(static_cast<double>(kFrames) / route_seconds);
   }
 
+  for (std::uint32_t repeat = 0; repeat < kRepeats; ++repeat) {
+    const double route_seconds = seconds_for([&]() {
+      const bool routed =
+          route_interleaved_f32(route_input,
+                                route_output,
+                                static_cast<std::uint32_t>(kFrames),
+                                advanced_plan);
+      if (!routed) {
+        std::cerr << "advanced routing failed\n";
+      }
+    });
+    route_advanced_frames_s_values.push_back(static_cast<double>(kFrames) / route_seconds);
+  }
+
   const double pack_mib_s = median(pack_mib_s_values);
   const double decode_allocating_mib_s = median(decode_allocating_mib_s_values);
   const double decode_into_mib_s = median(decode_into_mib_s_values);
   const double float_to_s24_frames_s = median(float_to_s24_frames_s_values);
   const double route_frames_s = median(route_frames_s_values);
   const double route_reversed_frames_s = median(route_reversed_frames_s_values);
+  const double route_advanced_frames_s = median(route_advanced_frames_s_values);
 
   const bool pass = pack_mib_s >= 100.0 && decode_into_mib_s >= 100.0 &&
                     float_to_s24_frames_s >= 1000000.0 &&
                     route_frames_s >= 1000000.0 &&
                     route_reversed_frames_s >= 1000000.0 &&
-                    identity_plan.valid() && reversed_plan.valid() &&
+                    route_advanced_frames_s >= 1000000.0 &&
+                    identity_plan.valid() && reversed_plan.valid() && advanced_plan.valid() &&
                     decoded.stats.check_errors == 0 &&
                     decoded.stats.panic_flags == 0 && !decoded.frames.empty() &&
                     decoded_into.stats.check_errors == 0 && decoded_into.stats.panic_flags == 0 &&
@@ -215,6 +243,11 @@ int main() {
             << "  \"route_reversed_frames_s_min\": " << minimum(route_reversed_frames_s_values)
             << ",\n"
             << "  \"route_reversed_frames_s_max\": " << maximum(route_reversed_frames_s_values)
+            << ",\n"
+            << "  \"route_advanced_frames_s\": " << route_advanced_frames_s << ",\n"
+            << "  \"route_advanced_frames_s_min\": " << minimum(route_advanced_frames_s_values)
+            << ",\n"
+            << "  \"route_advanced_frames_s_max\": " << maximum(route_advanced_frames_s_values)
             << ",\n"
             << "  \"decoded_frames\": " << decoded.stats.decoded_frames << ",\n"
             << "  \"decode_into_frames\": " << decoded_into.stats.decoded_frames << ",\n"

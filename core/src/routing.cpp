@@ -4,15 +4,16 @@
 
 namespace opena8djcpp {
 
-RoutingPlan::RoutingPlan(const RoutingMatrix& routing) : mapping_(routing.mapping()) {
+RoutingPlan::RoutingPlan(const RoutingMatrix& routing)
+    : mapping_(routing.mapping()), routes_(routing.routes()) {
   valid_ = true;
   identity_ = true;
   for (std::uint32_t output_channel = 0; output_channel < kOutputChannels; ++output_channel) {
-    const auto input_channel = mapping_[output_channel];
-    if (input_channel >= kInputChannels) {
+    const auto route = routes_[output_channel];
+    if (!route.is_muted() && route.source_channel >= kInputChannels) {
       valid_ = false;
     }
-    if (input_channel != output_channel) {
+    if (route.source_channel != output_channel || route.gain != 1) {
       identity_ = false;
     }
   }
@@ -35,17 +36,18 @@ bool route_interleaved_f32(std::span<const float> input,
     return false;
   }
 
-  const auto& mapping = plan.mapping();
   if (plan.is_identity()) {
     std::copy_n(input.begin(), required, output.begin());
     return true;
   }
 
+  const auto& routes = plan.routes();
   for (std::uint32_t frame = 0; frame < frames; ++frame) {
     const auto base = static_cast<std::size_t>(frame) * kOutputChannels;
     for (std::uint32_t output_channel = 0; output_channel < kOutputChannels; ++output_channel) {
-      const auto input_channel = mapping[output_channel];
-      output[base + output_channel] = input[base + input_channel];
+      const auto route = routes[output_channel];
+      output[base + output_channel] =
+          input[base + route.source_channel] * static_cast<float>(route.gain);
     }
   }
 
