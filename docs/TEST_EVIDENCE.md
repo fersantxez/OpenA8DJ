@@ -885,3 +885,65 @@ Operational note:
 - CoreAudio touched: no
 - USB touched: no
 - Driver installed or activated: no
+
+## 2026-06-16: Mode 2 Input Decode And DVS Packet Gate
+
+- Command:
+  `scripts/run-cpp-offline-gates`
+- Promotion command:
+  `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Code commit: `6058093`
+- Result:
+  - Offline gates: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Change:
+  - Added `decode_input_profile_mode2_into`, which decodes Mode 2 input bytes
+    into caller-owned S24 scratch and optional interleaved Float32 output.
+  - Added `opena8djcpp_dvs_packet_input_decode`, which packs synthetic
+    timecode-like carriers into Mode 2 bytes, decodes by input profile, analyzes
+    the active deck pair, and checks leakage on inactive input channels.
+  - Added promotion gate `offline_dvs_packet_input_decode`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/dvs-packet-input-decode.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/cpp-offline/realtime-audit.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Offline gate status:
+  - Default CTest: `100% tests passed, 0 tests failed out of 11`
+  - Release CTest: `100% tests passed, 0 tests failed out of 12`
+  - DVS packet input decode: PASS, `24` rows, `0` failures
+  - Playback decode-off probe: PASS, packet stats preserved and `0` frames
+    written
+  - Evidence schema: PASS, `18` required files, `0` missing
+- DVS packet metrics:
+  - Profiles: `timecode-vinyl`, `timecode-cd-line`, `phono`
+  - Rates: `44100`, `48000`
+  - Decks: A/B/C/D
+  - Frames written: `22049` at 44.1 kHz rows, `23999` at 48 kHz rows
+  - Leakage failures: `0`
+  - Decode overflows/check errors/panic flags: `0`
+- Release benchmark at code commit `6058093`:
+  - `pack_mib_s=1589.3`
+  - `decode_into_mib_s=550.105`
+  - `decode_allocating_mib_s=520.633`
+  - `float_to_s24_frames_s=8.38492e+07`
+  - `route_frames_s=9.67471e+08`
+  - `route_reversed_frames_s=5.8953e+08`
+  - `decode_into_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Promotion blockers after this change:
+  - physical music quality: `quality_alignment_score=0.938154`,
+    `snr_db_min=8.93`, `lag_jumps_gt_2_frames=24`;
+  - runtime CPU: `opena8dj_driver_p95=11.5`,
+    `coreaudiod_p95=95.8`;
+  - physical Traktor/timecode vinyl: no real lock evidence.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no

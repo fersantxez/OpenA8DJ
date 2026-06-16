@@ -193,3 +193,32 @@ Evidence:
   `offline_driverkit_shell_contract=PASS` but still returns FAIL overall because
   physical music quality, runtime CPU, and physical Traktor/timecode vinyl are
   not proven.
+
+## 2026-06-16: Require DVS Claims To Traverse Mode 2 Input Decode
+
+Decision:
+- Offline DVS/timecode evidence must include a path that packs synthetic input
+  into Mode 2 USB bytes, decodes those bytes through the selected input profile,
+  and then runs the timecode analyzer on the decoded deck pair.
+
+Reason:
+- Direct synthetic signal analysis proves analyzer thresholds, but it does not
+  prove the packet/input decode path feeding Traktor-facing data.
+- Playback mode must keep input decode disabled while still preserving packet
+  stats for observability.
+- Timecode-vinyl, CD-line, and phono modes must explicitly enable decode and
+  preserve A/B/C/D deck isolation.
+
+Alternatives discarded:
+- Treat `dvs-signal-smoke` alone as DVS readiness: rejected because it bypasses
+  Mode 2 input decode.
+- Always decode input in playback profile: rejected because playback mode should
+  not spend data-plane work on timecode capture unless the profile enables it.
+
+Evidence:
+- `local-analysis/cpp-offline/dvs-packet-input-decode.json` records `24` rows,
+  `0` failures, zero leakage, no decode overflows, and playback decode-off PASS.
+- `local-analysis/promotion-readiness-current.json` includes
+  `offline_dvs_packet_input_decode=PASS` but still returns FAIL overall because
+  physical real-music quality, runtime CPU, and physical Traktor/timecode vinyl
+  are not proven.

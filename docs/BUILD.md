@@ -131,6 +131,11 @@ opena8dj_topology_tests
 opena8dj_dvs_tests
   Executable test binary for DVS/timecode profile policy and channel routing
   invariants, using synthetic data only.
+
+opena8djcpp_dvs_packet_input_decode
+  Offline gate executable that packs synthetic DVS carriers into Mode 2 bytes,
+  decodes them through input profiles with caller-owned buffers, and verifies
+  deck isolation without hardware.
 ```
 
 Only after these pass should the build add adapter targets:

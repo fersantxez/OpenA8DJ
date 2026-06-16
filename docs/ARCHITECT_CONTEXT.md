@@ -20,6 +20,11 @@ Branch: `driverkit/cpp-redesign`
   decode and software lock off, while timecode-vinyl/CD-line/phono enable input
   decode with CAIAQ modes `0/1/2`, software lock, ground-lift intent, and
   identity A/B/C/D source map.
+- The core now has a Mode 2 input decode API that writes through caller-owned
+  scratch/output buffers. The offline DVS packet gate packs synthetic
+  quadrature carriers into Mode 2 bytes, decodes them via the selected
+  timecode profile, and verifies `24` profile/rate/deck rows with zero leakage
+  and playback decode-off behavior.
 - Offline timecode analysis now checks Rust-oracle thresholds for synthetic
   stereo carriers: RMS, balance, frequency error ppm, p95 period jitter,
   absolute correlation, and clipping. Current evidence:
@@ -87,7 +92,8 @@ Branch: `driverkit/cpp-redesign`
 - DriverKit shell is only an offline lifecycle/model contract; no real dext is
   installed or activated.
 - Offline tests cover initial surface/routing, Mode 2 packet fidelity,
-  synthetic no-leakage, jitter model, static policy, and Release throughput.
+  synthetic no-leakage, input-profile Mode 2 decode, jitter model, static
+  policy, and Release throughput.
 - Still missing before physical readiness: real-music quality improvement over
   the mainline baseline, stable lag/jitter accounting, CPU/resource comparison
   against mainline, Traktor-grade DVS analyzer gate on real input, DriverKit

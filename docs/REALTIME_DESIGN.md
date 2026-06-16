@@ -139,6 +139,10 @@ Current C++ core status:
   used by offline gates.
 - `opena8djcpp_realtime_audit` verifies decoded-frame push/pop through the ring
   with zero hot-path allocations.
+- `decode_input_profile_mode2_into` decodes Mode 2 capture bytes into
+  caller-owned scratch and optional interleaved Float32 output. Playback profile
+  mode keeps input decode disabled while preserving packet stats; timecode
+  profiles enable decode without allocating output storage internally.
 
 ### OutputTimelineRing
 

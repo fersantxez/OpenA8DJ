@@ -59,6 +59,7 @@ Current evidence files:
 - `local-analysis/cpp-offline/mode2-python-oracle.txt`
 - `local-analysis/cpp-offline/timecode-matrix.json`
 - `local-analysis/cpp-offline/dvs-signal-smoke.json`
+- `local-analysis/cpp-offline/dvs-packet-input-decode.json`
 - `local-analysis/cpp-offline/realtime-audit.json`
 - `local-analysis/cpp-offline/driverkit-surface-model.json`
 - `local-analysis/cpp-offline/jitter-model.json`
@@ -77,6 +78,7 @@ Current PASS coverage:
 - inherited Python Mode 2 oracle;
 - timecode profile/deck assignment matrix;
 - DVS signal smoke across vinyl/CD-line/phono at 44.1/48 kHz;
+- DVS packet input decode across vinyl/CD-line/phono, 44.1/48 kHz, decks A/B/C/D, including playback decode-off behavior;
 - realtime hot-path allocation audit;
 - DriverKit/CoreAudio surface model;
 - jitter/timestamp model;
@@ -480,7 +482,7 @@ Use this checklist before requesting a hardware window.
 - [x] No generated files or writes occurred in mainline C or Rust worktrees.
 - [x] Mainline C baseline id and values are copied into evidence/docs.
 - [x] Rust oracle id and values are copied into evidence/docs.
-- [x] Identity/provenance gate passes for the current committed candidate `8072fc5`.
+- [x] Identity/provenance gate passes for the current committed candidate `6058093`.
 - [x] Build hygiene gate passes for current CMake/CTest scope.
 - [x] Static policy gate passes for the official offline CMake/script/tools path.
 - [ ] Protocol constants snapshot passes.
@@ -488,7 +490,7 @@ Use this checklist before requesting a hardware window.
 - [x] Packer throughput meets Rust oracle floors in Release microbench.
 - [ ] Simulated output fast gate passes.
 - [ ] Simulated output full offline gate passes.
-- [x] Initial DVS signal smoke passes at 44.1 and 48 kHz.
+- [x] Initial DVS signal smoke and DVS packet input-decode gates pass at 44.1 and 48 kHz.
 - [ ] Surface model gate passes.
 - [x] Evidence schema gate passes.
 - [ ] Comparison table has all C/Rust/C++ deltas.

@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate code commit: `8072fc5`
+Candidate code commit: `6058093`
 
 ## Current Verdict
 
@@ -36,9 +36,10 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1591.35`, `decode_into_mib_s=566.408`, `route_frames_s=7.53918e+08`, `route_reversed_frames_s=5.87876e+08`, `float_to_s24_frames_s=8.45376e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1589.3`, `decode_into_mib_s=550.105`, `route_frames_s=9.67471e+08`, `route_reversed_frames_s=5.8953e+08`, `float_to_s24_frames_s=8.38492e+07` |
 | realtime SPSC ring audit | `PASS` | pushed `2815`, popped `2815`, remaining `0`, allocations `0` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
+| offline DVS packet input decode | `PASS` | `24` rows, `0` failures, playback decode-off `PASS` |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
 | simulated output oracle | `PASS` | `local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json` |
 | physical tone beats historical C tone floor | `PASS` | `sideband_ratio=0.000657`, `click_outliers=0` |
