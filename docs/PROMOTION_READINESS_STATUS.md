@@ -82,8 +82,11 @@ Interpretation:
 - No physical Traktor/timecode vinyl lock evidence exists.
 - A no-diagnostic HAL variant caused an operational hang; that variant remains
   rejected until reproduced safely with a watchdog.
-- The global hardware lock is currently held by the mainline autonomous QA
-  supervisor, so no hardware command should run from this worktree.
+- Current runtime state is intentionally quiesced: the hardware lock is absent,
+  mainline OpenA8DJ LaunchAgents are disabled, no OpenA8DJ process is detected,
+  and the active HAL path is absent. This is safe for idle state, but it means
+  physical tests require an explicit HAL restore/reinstall under lock before
+  any capture or playback.
 - Latest promotion evaluation evidence is
   `local-analysis/promotion-readiness-current.json`; it returns `FAIL` with
   `branch_promotion_allowed=false`.
@@ -96,4 +99,6 @@ Interpretation:
   comparison.
 - Controlled CPU profile with C++ at or below C `0.3.135`.
 - Physical Traktor/timecode vinyl validation with no deck leakage.
+- Runtime isolation audit PASS before any physical window:
+  `scripts/runtime-isolation-audit --expect-hal active`.
 - User authorization for the final branch move after evidence is archived.

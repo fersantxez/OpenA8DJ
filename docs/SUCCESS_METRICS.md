@@ -174,6 +174,7 @@ C++ evidence set:
 | static policy | `PASS` | `local-analysis/cpp-offline/static-policy.json` |
 | Release packet/routing benchmark | `PASS` | `local-analysis/cpp-offline/offline-bench-release.json` |
 | evidence schema | `PASS` | `local-analysis/cpp-offline/evidence-schema.json` |
+| runtime isolation quiescence | `PASS` | `local-analysis/runtime-isolation/current.json` |
 
 Current Release benchmark values:
 
@@ -231,6 +232,10 @@ Functional coverage in the current C++ test binary:
   push/pop of all decoded frames with zero hot-path allocations.
 - Evidence schema: required evidence files exist and declare offline/no-hardware state.
 - Synthetic no-leakage check: pair A signal does not appear on B/C/D.
+- Runtime isolation quiescence: lock absent, mainline OpenA8DJ LaunchAgents
+  disabled, active HAL absent, no OpenA8DJ process detected. This is not an
+  audio-quality gate; it is a safety precondition before restoring the HAL for
+  physical tests.
 
 This is objective evidence for packet/routing correctness and software
 throughput only. It is not yet evidence for physical sound quality, Traktor DVS

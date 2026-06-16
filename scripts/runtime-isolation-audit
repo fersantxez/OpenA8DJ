@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""Audit OpenA8DJ runtime isolation before hardware-sensitive work.
+
+This script is read-only: it does not kill processes, unload drivers, mutate
+launchd state, touch CoreAudio defaults, or access USB devices. It verifies that
+known mainline services are stopped/disabled, the global hardware lock is in an
+expected state, and the OpenA8DJ HAL bundle is either active or inactive as
+requested by the caller.
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+LOCK = Path(os.environ.get("AUDIO_GATE_LOCK_ROOT", str(Path.home() / ".opena8dj/hardware-gate.lock")))
+ACTIVE_HAL = Path("/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver")
+HAL_PARENT = ACTIVE_HAL.parent
+
+FORBIDDEN_LABELS = [
+    "org.opena8dj.midid",
+    "com.fer.opena8dj.autonomous-audio-qa",
+    "com.fer.opena8dj.safe-replug-watch",
+    "com.fer.opena8dj.audio-qa-startup",
+    "com.fer.opena8dj.codex-resume",
+]
+
+ALLOWED_LABELS = [
+    "com.fer.audio8djcpp.codex-resume",
+]
+
+PROCESS_PROBES = [
+    ("opena8dj_midid", ["pgrep", "-x", "opena8dj-midid"]),
+    ("mainline_qa_supervisor", ["pgrep", "-f", "autonomous-audio-qa-supervisor"]),
+    ("mainline_run_supervisor", ["pgrep", "-f", "run-supervisor.sh"]),
+    ("mainline_safe_replug", ["pgrep", "-f", "opena8dj.safe-replug"]),
+    ("opena8dj_coreaudio_driver", ["pgrep", "-f", r"Core Audio Driver \(OpenA8DJ.driver\)"]),
+]
+
+
+def run_command(argv, timeout=2.0):
+    try:
+        completed = subprocess.run(
+            argv,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+        return {
+            "argv": argv,
+            "timed_out": False,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout.strip(),
+            "stderr": completed.stderr.strip(),
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "argv": argv,
+            "timed_out": True,
+            "returncode": None,
+            "stdout": "",
+            "stderr": "timeout",
+        }
+
+
+def pid_alive(pid_text):
+    try:
+        pid = int(pid_text)
+    except (TypeError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def lock_status():
+    if not LOCK.exists():
+        return {
+            "path": str(LOCK),
+            "state": "absent",
+            "owner": {},
+            "pass": True,
+        }
+    owner_path = LOCK / "owner"
+    owner = {}
+    if owner_path.is_file():
+        for line in owner_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                owner[key] = value
+    owner_pid = owner.get("pid")
+    alive = pid_alive(owner_pid)
+    return {
+        "path": str(LOCK),
+        "state": "held_alive" if alive else "stale_or_unknown",
+        "owner": owner,
+        "owner_pid_alive": alive,
+        "pass": False,
+    }
+
+
+def disabled_labels(uid):
+    result = run_command(["launchctl", "print-disabled", f"gui/{uid}"], timeout=3.0)
+    disabled = {}
+    if not result["timed_out"]:
+        for line in result["stdout"].splitlines():
+            stripped = line.strip()
+            if "=>" not in stripped:
+                continue
+            label, value = stripped.split("=>", 1)
+            label = label.strip().strip('"')
+            disabled[label] = "disabled" in value
+    return result, disabled
+
+
+def label_status(uid, label, disabled_map):
+    result = run_command(["launchctl", "print", f"gui/{uid}/{label}"], timeout=3.0)
+    running_pid = None
+    if not result["timed_out"] and result["returncode"] == 0:
+        for line in result["stdout"].splitlines():
+            stripped = line.strip()
+            if stripped.startswith("pid ="):
+                running_pid = stripped.split("=", 1)[1].strip()
+                break
+    return {
+        "label": label,
+        "disabled": disabled_map.get(label, False),
+        "loaded": result["returncode"] == 0 if not result["timed_out"] else None,
+        "pid": running_pid,
+        "timed_out": result["timed_out"],
+    }
+
+
+def process_probe_status():
+    rows = []
+    for name, argv in PROCESS_PROBES:
+        result = run_command(argv, timeout=2.0)
+        pids = [line.strip() for line in result["stdout"].splitlines() if line.strip()]
+        rows.append({
+            "name": name,
+            "pids": pids,
+            "timed_out": result["timed_out"],
+            "returncode": result["returncode"],
+            "pass": (not result["timed_out"]) and len(pids) == 0,
+        })
+    return rows
+
+
+def hal_status(expect_hal):
+    disabled = sorted(path.name for path in HAL_PARENT.glob("OpenA8DJ.driver.disabled-*"))
+    active = ACTIVE_HAL.exists()
+    if expect_hal == "active":
+        passed = active
+    elif expect_hal == "inactive":
+        passed = not active
+    else:
+        passed = True
+    return {
+        "active_path": str(ACTIVE_HAL),
+        "active": active,
+        "disabled_artifacts": disabled,
+        "expectation": expect_hal,
+        "pass": passed,
+    }
+
+
+def evaluate(args):
+    uid = os.getuid()
+    disabled_result, disabled_map = disabled_labels(uid)
+    forbidden_labels = [label_status(uid, label, disabled_map) for label in FORBIDDEN_LABELS]
+    allowed_labels = [label_status(uid, label, disabled_map) for label in ALLOWED_LABELS]
+    lock = lock_status()
+    hal = hal_status(args.expect_hal)
+    probes = process_probe_status()
+
+    forbidden_ok = all(row["disabled"] and not row["pid"] and not row["timed_out"] for row in forbidden_labels)
+    allowed_ok = all(not row["timed_out"] for row in allowed_labels)
+    probes_ok = all(row["pass"] for row in probes)
+    passed = lock["pass"] and hal["pass"] and forbidden_ok and allowed_ok and probes_ok and not disabled_result["timed_out"]
+
+    return {
+        "schema": "opena8djcpp.runtime-isolation-audit.v1",
+        "result": "PASS" if passed else "FAIL",
+        "worktree": str(ROOT),
+        "lock": lock,
+        "hal": hal,
+        "launchctl_disabled_query": {
+            "timed_out": disabled_result["timed_out"],
+            "returncode": disabled_result["returncode"],
+        },
+        "forbidden_labels": forbidden_labels,
+        "allowed_labels": allowed_labels,
+        "process_probes": probes,
+        "hardware_touched": False,
+        "coreaudio_touched": False,
+        "usb_touched": False,
+        "mutated_system_state": False,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--expect-hal", choices=("active", "inactive", "any"), default="any")
+    parser.add_argument("--json-out", type=Path)
+    args = parser.parse_args()
+
+    report = evaluate(args)
+    text = json.dumps(report, indent=2, sort_keys=True)
+    if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(text + "\n", encoding="utf-8")
+    print(text)
+    return 0 if report["result"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

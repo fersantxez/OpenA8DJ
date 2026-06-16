@@ -37,6 +37,8 @@ If the lock is occupied:
 
 - `scripts/run-cpp-offline-gates` passes.
 - Candidate source diff is frozen or committed.
+- Runtime quiescence has been checked before installing/restoring anything:
+  `scripts/runtime-isolation-audit --expect-hal inactive`.
 - DriverKit toolchain blocker is resolved if the test includes a real dext.
 - Rollback target is named.
 - User grants an explicit coordinated window.
@@ -65,6 +67,12 @@ Purpose:
 
 Preconditions:
 
+- Mainline OpenA8DJ LaunchAgents are disabled and no mainline QA process is
+  running.
+- The OpenA8DJ HAL has been restored/reinstalled under lock if this window will
+  play or capture through `Open Audio 8 DJ`.
+- `scripts/runtime-isolation-audit --expect-hal active` passes immediately
+  before capture/playback.
 - `iRig Stream` visible in CoreAudio.
 - `Open Audio 8 DJ` visible in CoreAudio with `8 in / 8 out`.
 - Global hardware lock acquired by this C++ worktree.

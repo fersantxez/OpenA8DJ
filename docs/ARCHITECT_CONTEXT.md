@@ -14,7 +14,7 @@ Branch: `driverkit/cpp-redesign`
 - The core now has executable Mode 2 packet gates: S24 big-endian conversion, all-start-byte round trip, no deck leakage for pair-A-only data, and Release throughput gates.
 - The Mode 2 decode benchmark now distinguishes the allocating developer
   wrapper from the preallocated real-time path. Current preallocated decode
-  evidence: `decode_into_mib_s=564.905`, `decode_into_output_overflows=0`,
+  evidence: `decode_into_mib_s=506.054`, `decode_into_output_overflows=0`,
   `decode_into_check_errors=0`, `decode_into_panic_flags=0`.
 - The core now has explicit input-profile contracts: playback leaves input
   decode and software lock off, while timecode-vinyl/CD-line/phono enable input
@@ -37,9 +37,13 @@ Branch: `driverkit/cpp-redesign`
 - The core now includes a fixed-capacity SPSC frame ring contract for the
   realtime data plane. Current realtime audit pushes and pops all `2815`
   decoded frames with `0` allocations and `0` remaining frames.
-- The current installed HAL from this worktree enumerates as `Open Audio 8 DJ`
-  with `8 in / 8 out` at `48000`. Direct CoreAudio I/O and short input
-  captures on channels `1/2` and `7/8` passed under lock.
+- The HAL from this worktree previously enumerated as `Open Audio 8 DJ` with
+  `8 in / 8 out` at `48000`, and direct CoreAudio I/O plus short input captures
+  on channels `1/2` and `7/8` passed under lock. As of the runtime cleanup, the
+  active HAL path is intentionally absent and the bundle is parked at
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260616T215913Z`, so
+  no physical C++ test can run until the HAL is explicitly restored/reinstalled
+  under lock.
 - iRig Stream was recovered after macOS showed the accessory authorization
   prompt. The prompt was not exposed through Accessibility, but a CGEvent click
   at logical screen coordinate `(900,407)` pressed `Allow`; CoreAudio then
@@ -89,6 +93,10 @@ Branch: `driverkit/cpp-redesign`
   reinstalling the `ISO5/q64/start_byte=4` cadence-diagnostic variant and
   restarting `coreaudiod`. Treat the no-diagnostic build as suspect until
   reproduced with a watchdog.
+- Runtime isolation audit now exists at `scripts/runtime-isolation-audit`.
+  Current quiescent evidence:
+  `local-analysis/runtime-isolation/current.json`, result `PASS`, lock absent,
+  mainline services disabled, active HAL absent, no OpenA8DJ process detected.
 - DriverKit shell is only an offline lifecycle/model contract; no real dext is
   installed or activated.
 - Offline tests cover initial surface/routing, Mode 2 packet fidelity,
@@ -103,9 +111,14 @@ Branch: `driverkit/cpp-redesign`
   - `Linnaeus`: completed read-only analysis of existing physical music failure
     evidence.
   - `Lagrange`: completed read-only promotion/readiness gap audit.
-- Current hardware lock:
-  - Owned by `/Users/fer/dev/opena8dj` autonomous supervisor `pid=662`.
-  - Do not run C++ hardware tests while this lock remains live.
+- Current runtime state:
+  - Hardware lock is absent.
+  - Mainline LaunchAgents `org.opena8dj.midid`,
+    `com.fer.opena8dj.autonomous-audio-qa`, and
+    `com.fer.opena8dj.safe-replug-watch` are disabled.
+  - Active OpenA8DJ HAL bundle is absent. Run
+    `scripts/runtime-isolation-audit --expect-hal active` after any authorized
+    reinstall/restore and before physical testing.
 - Physical validation must follow `docs/PHYSICAL_TEST_WINDOW_PLAN.md`, use the
   global hardware lock, and avoid default-device/sample-rate/buffer changes
   unless explicitly part of a documented window.

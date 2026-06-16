@@ -947,3 +947,36 @@ Operational note:
 - CoreAudio touched: no
 - USB touched: no
 - Driver installed or activated: no
+
+## 2026-06-16: Runtime Isolation Quiescence Audit
+
+- Command:
+  `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result: PASS
+- Evidence path:
+  `local-analysis/runtime-isolation/current.json`
+- Verified state:
+  - Global hardware lock: absent.
+  - Active HAL path `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`: absent.
+  - Disabled HAL artifact:
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260616T215913Z`.
+  - Forbidden mainline labels disabled and not running:
+    `org.opena8dj.midid`,
+    `com.fer.opena8dj.autonomous-audio-qa`,
+    `com.fer.opena8dj.safe-replug-watch`,
+    `com.fer.opena8dj.audio-qa-startup`,
+    `com.fer.opena8dj.codex-resume`.
+  - Allowed C++ resume label present:
+    `com.fer.audio8djcpp.codex-resume`.
+  - OpenA8DJ process probes: no PIDs.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no
+- Readiness note:
+  - This proves the machine is quiesced and mainline is not interfering.
+  - It also proves physical C++ audio tests cannot run in this state; the HAL
+    must be explicitly restored or reinstalled under lock, then
+    `scripts/runtime-isolation-audit --expect-hal active` must pass.
