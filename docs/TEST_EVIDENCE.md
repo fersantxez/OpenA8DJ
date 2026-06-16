@@ -5,7 +5,7 @@
 - Command: `scripts/run-cpp-offline-gates`
 - Worktree: `/Users/fer/dev/audio8djcpp`
 - Branch: `driverkit/cpp-redesign`
-- Commit: `389b59f` plus current hardware-lock policy changes
+- Commit: `2f80d08`
 - Result: PASS
 - Evidence paths:
   - `local-analysis/cpp-offline/current-offline-gates.json`

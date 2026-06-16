@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate commit: `389b59f` plus current mandatory hardware-lock policy changes
+Candidate code commit: `2f80d08`
 
 ## Verdict
 
