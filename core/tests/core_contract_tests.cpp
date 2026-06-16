@@ -5,6 +5,7 @@
 #include "opena8djcpp/metrics.hpp"
 #include "opena8djcpp/mode2_packet.hpp"
 #include "opena8djcpp/policies.hpp"
+#include "opena8djcpp/protocol.hpp"
 #include "opena8djcpp/routing.hpp"
 #include "opena8djcpp/timecode.hpp"
 #include "opena8djcpp/timecode_analysis.hpp"
@@ -44,6 +45,31 @@ void test_sample_format_placeholder() {
   assert(SampleRatePolicy::is_supported(48000));
   assert(!SampleRatePolicy::is_supported(32000));
 }
+
+void test_protocol_constants() {
+  assert(kNativeInstrumentsVendorId == 0x17cc);
+  assert(kAudio8DjProductId == 0x1978);
+  assert(kUsbInterfaceNumber == 0);
+  assert(kUsbConfigurationValue == 1);
+  assert(kUsbAlternateSetting == 1);
+  assert(kEndpointControlOut == 0x01);
+  assert(kEndpointControlIn == 0x81);
+  assert(kEndpointIsoCapture == 0x82);
+  assert(kEndpointIsoPlayback == 0x06);
+  assert(kCommandGetDeviceInfo == 0x01);
+  assert(kCommandReadIo == 0x04);
+  assert(kCommandWriteIo == 0x05);
+  assert(kCommandAudioParams == 0x09);
+  assert(kCommandMidiRead == 0x06);
+  assert(kCommandMidiWrite == 0x07);
+  assert(kCommandAutoMsg == 0x0b);
+  assert(caiaq_rate_code(44100) == 0);
+  assert(caiaq_rate_code(48000) == 1);
+  assert(caiaq_rate_code(96000) == 2);
+  assert(caiaq_rate_code(88200) == 4);
+  assert(caiaq_rate_code(32000) == 0xff);
+}
+
 
 void test_identity_routing() {
   constexpr std::uint32_t frames = 4;
@@ -471,6 +497,7 @@ void test_input_profile_decode_contract() {
 int main() {
   test_device_surface();
   test_sample_format_placeholder();
+  test_protocol_constants();
   test_identity_routing();
   test_custom_and_invalid_routing();
   test_advanced_routing_matrix();

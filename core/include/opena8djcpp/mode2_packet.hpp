@@ -16,6 +16,8 @@ inline constexpr std::uint32_t kMode2UsbBytesPerSample = 4;
 inline constexpr std::uint32_t kMode2FrameBytesPerStream =
     kChannelsPerPair * kMode2BytesPerSample;
 inline constexpr std::uint32_t kMode2GroupBytes = kMode2Streams * kMode2UsbBytesPerSample;
+inline constexpr std::uint32_t kMode2FullFrameBytes =
+    kMode2Streams * (kMode2FrameBytesPerStream + kChannelsPerPair);
 inline constexpr std::uint32_t kMode2CheckOffset = kMode2Streams * kChannelsPerPair;
 inline constexpr std::uint32_t kMode2DefaultStartByte = kMode2BytesPerSample + 1;
 inline constexpr std::uint32_t kMode2DefaultTransferBytes = 352;

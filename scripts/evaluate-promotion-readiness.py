@@ -160,6 +160,16 @@ def evaluate(args):
              offline.get("timecode_signal_analysis", {}).get("rows", 0) >= 8 and
              offline.get("timecode_signal_analysis", {}).get("failures", 1) == 0,
              offline.get("timecode_signal_analysis", {})),
+        gate("offline_protocol_contract",
+             offline.get("protocol_contract", {}).get("status") == "PASS" and
+             offline.get("protocol_contract", {}).get("vendor_id") == "0x17cc" and
+             offline.get("protocol_contract", {}).get("product_id") == "0x1978" and
+             offline.get("protocol_contract", {}).get("input_channels") == 8 and
+             offline.get("protocol_contract", {}).get("output_channels") == 8 and
+             offline.get("protocol_contract", {}).get("mode2_check_cadence_bytes") == 16 and
+             offline.get("protocol_contract", {}).get("mode2_full_frame_bytes") == 32 and
+             offline.get("protocol_contract", {}).get("default_start_byte") == 4,
+             offline.get("protocol_contract", {})),
         gate("offline_dvs_packet_input_decode",
              offline.get("dvs_packet_input_decode", {}).get("status") == "PASS" and
              offline.get("dvs_packet_input_decode", {}).get("rows", 0) >= 24 and

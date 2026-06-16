@@ -15,6 +15,7 @@ cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build/cpp-release
 ctest --test-dir build/cpp-release --output-on-failure | tee "$EVIDENCE_DIR/ctest-release.txt"
 ./build/cpp-release/opena8djcpp_packet_matrix | tee "$EVIDENCE_DIR/packet-matrix.json"
+./build/cpp-release/opena8djcpp_protocol_contract | tee "$EVIDENCE_DIR/protocol-contract.json"
 python3 scripts/validate-mode2-output-packing.py \
   --start-byte all \
   --frames 96 \
@@ -63,6 +64,7 @@ def git_text(*args):
 
 
 packet = load_json("packet-matrix.json")
+protocol = load_json("protocol-contract.json")
 timecode = load_json("timecode-matrix.json")
 timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
@@ -93,6 +95,18 @@ summary = {
         "rows": packet.get("row_count"),
         "failures": packet.get("failures"),
         "evidence": "local-analysis/cpp-offline/packet-matrix.json",
+    },
+    "protocol_contract": {
+        "status": protocol.get("result"),
+        "vendor_id": protocol.get("usb", {}).get("vendor_id"),
+        "product_id": protocol.get("usb", {}).get("product_id"),
+        "input_channels": protocol.get("surface", {}).get("input_channels"),
+        "output_channels": protocol.get("surface", {}).get("output_channels"),
+        "mode2_check_cadence_bytes": protocol.get("mode2", {}).get("check_cadence_bytes"),
+        "mode2_full_frame_bytes": protocol.get("mode2", {}).get("full_frame_bytes"),
+        "default_start_byte": protocol.get("mode2", {}).get("default_start_byte"),
+        "deferred_rates_reason": protocol.get("deferred_rates_reason"),
+        "evidence": "local-analysis/cpp-offline/protocol-contract.json",
     },
     "python_mode2_oracle": {
         "status": "PASS",
