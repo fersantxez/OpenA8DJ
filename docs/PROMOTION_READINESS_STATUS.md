@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate code commit: `25de786`
+Candidate code commit: `775de71`
 
 ## Current Verdict
 
@@ -36,10 +36,11 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1410.11`, `decode_into_mib_s=511.536`, `route_frames_s=7.86433e+08`, `route_reversed_frames_s=5.00155e+08`, `route_advanced_frames_s=4.43810e+08`, `float_to_s24_frames_s=8.25390e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1454.94`, `decode_into_mib_s=546.495`, `route_frames_s=8.54123e+08`, `route_reversed_frames_s=4.49037e+08`, `route_advanced_frames_s=4.41878e+08`, `float_to_s24_frames_s=7.65384e+07` |
 | realtime SPSC ring audit | `PASS` | pushed `2815`, popped `2815`, remaining `0`, allocations `0` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline protocol contract | `PASS` | VID/PID `0x17cc:0x1978`, endpoints `0x01/0x81/0x82/0x06`, 8-in/8-out, Mode 2 check cadence `16`, full frame `32` |
+| offline simulated output matrix | `PASS` | `48` rows, `0` failures, SNR min `119.407 dB`, residual max `1.07069e-06`, leakage max `-240 dBFS` |
 | offline DVS packet input decode | `PASS` | `24` rows, `0` failures, playback decode-off `PASS` |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
 | simulated output oracle | `PASS` | `local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json` |

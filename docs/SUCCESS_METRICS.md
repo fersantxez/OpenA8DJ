@@ -163,6 +163,7 @@ C++ evidence set:
 | Release functional + matrix + performance CTest | `PASS` | `local-analysis/cpp-offline/ctest-release.txt` |
 | packet matrix | `PASS` | `local-analysis/cpp-offline/packet-matrix.json` |
 | protocol constants snapshot | `PASS` | `local-analysis/cpp-offline/protocol-contract.json` |
+| simulated output matrix | `PASS` | `local-analysis/cpp-offline/simulated-output-matrix.json` |
 | Python Mode 2 oracle | `PASS` | `local-analysis/cpp-offline/mode2-python-oracle.txt` |
 | timecode matrix | `PASS` | `local-analysis/cpp-offline/timecode-matrix.json` |
 | timecode signal analysis | `PASS` | `local-analysis/cpp-offline/timecode-signal-analysis.json` |
@@ -181,13 +182,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1410.11 MiB/s` over `5` repeats, min `1331.41`, max `1431.66` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `511.536 MiB/s` over `5` repeats, min `501.151`, max `540.571` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `487.085 MiB/s` over `5` repeats, min `451.223`, max `527.589` | informational |
-| Float32 to S24 conversion throughput | median `82,539,000 frames/s` over `5` repeats, min `76,421,300`, max `85,232,800` | `1,000,000 frames/s` |
-| identity routing throughput | median `786,433,000 frames/s` over `5` repeats, min `779,223,000`, max `849,165,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `500,155,000 frames/s` over `5` repeats, min `498,847,000`, max `501,551,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `443,810,000 frames/s` over `5` repeats, min `385,506,000`, max `492,559,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1454.94 MiB/s` over `5` repeats, min `1407.95`, max `1594.53` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `546.495 MiB/s` over `5` repeats, min `530.489`, max `549.875` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `516.065 MiB/s` over `5` repeats, min `473.331`, max `539.850` | informational |
+| Float32 to S24 conversion throughput | median `76,538,400 frames/s` over `5` repeats, min `76,501,200`, max `82,625,800` | `1,000,000 frames/s` |
+| identity routing throughput | median `854,123,000 frames/s` over `5` repeats, min `809,504,000`, max `900,065,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `449,037,000 frames/s` over `5` repeats, min `447,759,000`, max `455,704,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `441,878,000 frames/s` over `5` repeats, min `440,671,000`, max `444,815,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -216,6 +217,10 @@ Functional coverage in the current C++ test binary:
 - S24 big-endian conversion vectors.
 - Mode 2 round-trip for start bytes `0..5`.
 - Packet matrix: 44.1/48 kHz, transfer bytes `48`, `80`, `352`, gains `1.0` and `0.5`, start bytes `0..5`, `72` rows.
+- Simulated output matrix: deterministic dense/transient/wideband program
+  material on output pairs A/B/C/D at 44.1/48 kHz, gains `1.0` and `0.5`,
+  `48` rows, `0` failures, minimum SNR `119.407 dB`, max residual ratio
+  `1.07069e-06`, max leakage `-240 dBFS`.
 - Python Mode 2 oracle: inherited validator passes all start bytes at 352-byte transfers.
 - Timecode policy matrix: `timecode-vinyl`, `timecode-cd-line`, `phono`, `disabled`.
 - Input profile matrix: playback decode off/software lock off; timecode-vinyl,
@@ -268,6 +273,7 @@ Current status as of 2026-06-16:
 | offline all gates | `PASS` | no hardware/CoreAudio/USB touched |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline protocol contract | `PASS` | VID/PID, endpoints, 8-in/8-out, Mode 2 cadence/full-frame constants |
+| offline simulated output matrix | `PASS` | `48` rows, SNR min `119.407 dB`, residual max `1.07069e-06`, leakage max `-240 dBFS` |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
 | offline throughput | `PASS` | pack/decode/routing exceed offline floors |
 | simulated output oracle | `PASS` | alignment/SNR/residual match oracle expectations |
@@ -569,7 +575,7 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 
 ## Readiness Checklist
 
-- [x] Candidate id is immutable for current offline evidence: code commit `25de786`.
+- [x] Candidate id is immutable for current offline evidence: code commit `775de71`.
 - [x] No writes occurred outside `/Users/fer/dev/audio8djcpp`.
 - [x] Offline-only policy is recorded.
 - [x] Mainline C baseline id and values are recorded in docs.
@@ -580,7 +586,7 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 - [x] Protocol constants snapshot passes.
 - [ ] Packet parity matrix passes against C and Rust expectations.
 - [x] Packer throughput meets Rust oracle floors in Release microbench.
-- [ ] Simulated output matrix passes all pairs and required rates.
+- [x] Simulated output matrix passes all pairs and required rates.
 - [x] Initial synthetic timecode profile/deck matrix passes.
 - [x] DriverKit surface model gate passes.
 - [ ] Surface model matches the 8-in/8-out Traktor-facing contract.

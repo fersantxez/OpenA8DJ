@@ -57,6 +57,7 @@ Current evidence files:
 - `local-analysis/cpp-offline/ctest-release.txt`
 - `local-analysis/cpp-offline/packet-matrix.json`
 - `local-analysis/cpp-offline/protocol-contract.json`
+- `local-analysis/cpp-offline/simulated-output-matrix.json`
 - `local-analysis/cpp-offline/mode2-python-oracle.txt`
 - `local-analysis/cpp-offline/timecode-matrix.json`
 - `local-analysis/cpp-offline/dvs-signal-smoke.json`
@@ -80,6 +81,10 @@ Current PASS coverage:
 - S24 big-endian conversion;
 - Mode 2 round-trip for start bytes `0..5`;
 - packet matrix for 44.1/48 kHz, transfer bytes `48`, `80`, `352`, gains `1.0` and `0.5`, start bytes `0..5`;
+- simulated output matrix for A/B/C/D at 44.1/48 kHz over dense, transient,
+  and wideband deterministic material with gains `1.0` and `0.5`: `48` rows,
+  `0` failures, minimum SNR `119.407 dB`, max residual ratio `1.07069e-06`,
+  max leakage `-240 dBFS`;
 - inherited Python Mode 2 oracle;
 - timecode profile/deck assignment matrix;
 - DVS signal smoke across vinyl/CD-line/phono at 44.1/48 kHz;
@@ -267,9 +272,9 @@ Comparison:
 
 Current implementation status:
 
-- Release pack throughput: latest median `1410.11 MiB/s`.
-- Release preallocated decode throughput: latest median `511.536 MiB/s`.
-- Release routing throughput: latest identity median `786,433,000 frames/s`, reversed median `500,155,000 frames/s`, advanced mute/invert/cross-deck median `443,810,000 frames/s`.
+- Release pack throughput: latest median `1454.94 MiB/s`.
+- Release preallocated decode throughput: latest median `546.495 MiB/s`.
+- Release routing throughput: latest identity median `854,123,000 frames/s`, reversed median `449,037,000 frames/s`, advanced mute/invert/cross-deck median `441,878,000 frames/s`.
 - Allocation count inside the audited pack/decode/routing hot loop: `0`.
 
 ## Lane G: Simulated Output Matrix
@@ -487,14 +492,14 @@ Use this checklist before requesting a hardware window.
 - [x] No generated files or writes occurred in mainline C or Rust worktrees.
 - [x] Mainline C baseline id and values are copied into evidence/docs.
 - [x] Rust oracle id and values are copied into evidence/docs.
-- [x] Identity/provenance gate passes for the current committed candidate `25de786`.
+- [x] Identity/provenance gate passes for the current committed candidate `775de71`.
 - [x] Build hygiene gate passes for current CMake/CTest scope.
 - [x] Static policy gate passes for the official offline CMake/script/tools path.
 - [x] Protocol constants snapshot passes.
 - [x] Packet matrix passes for current C++ fixtures.
 - [x] Packer throughput meets Rust oracle floors in Release microbench.
-- [ ] Simulated output fast gate passes.
-- [ ] Simulated output full offline gate passes.
+- [x] Simulated output fast gate passes.
+- [x] Simulated output full offline gate passes.
 - [x] Initial DVS signal smoke and DVS packet input-decode gates pass at 44.1 and 48 kHz.
 - [x] Surface model gate passes.
 - [x] Evidence schema gate passes.

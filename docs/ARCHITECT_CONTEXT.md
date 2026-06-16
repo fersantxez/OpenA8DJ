@@ -20,11 +20,17 @@ Branch: `driverkit/cpp-redesign`
 - Routing now supports the Rust-oracle shape of passthrough, mute, inversion,
   side swap, and cross-deck pair mapping through a fixed `RouteEntry` array and
   prevalidated `RoutingPlan`. Current advanced routing evidence:
-  `route_advanced_frames_s=4.43810e+08`.
+  `route_advanced_frames_s=4.41878e+08`.
 - The Mode 2 decode benchmark now distinguishes the allocating developer
   wrapper from the preallocated real-time path. Current preallocated decode
-  evidence: `decode_into_mib_s=511.536`, `decode_into_output_overflows=0`,
+  evidence: `decode_into_mib_s=546.495`, `decode_into_output_overflows=0`,
   `decode_into_check_errors=0`, `decode_into_panic_flags=0`.
+- The offline simulated output matrix now covers A/B/C/D at 44.1/48 kHz across
+  dense, transient, and wideband deterministic program material at gains `1.0`
+  and `0.5`. Current evidence:
+  `local-analysis/cpp-offline/simulated-output-matrix.json`, `48` rows,
+  `0` failures, minimum SNR `119.407 dB`, max residual ratio `1.07069e-06`,
+  max leakage `-240 dBFS`.
 - The core now has explicit input-profile contracts: playback leaves input
   decode and software lock off, while timecode-vinyl/CD-line/phono enable input
   decode with CAIAQ modes `0/1/2`, software lock, ground-lift intent, and

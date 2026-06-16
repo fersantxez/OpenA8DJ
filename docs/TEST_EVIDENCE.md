@@ -1132,3 +1132,79 @@ Operational note:
 - Readiness note:
   - This is stronger offline protocol evidence, not product readiness.
   - Branch promotion remains forbidden until the promotion gate returns PASS.
+
+## 2026-06-16: Full Simulated Output Matrix Gate
+
+- Command:
+  `scripts/run-cpp-offline-gates`
+- Promotion command:
+  `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Runtime isolation command:
+  `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Code commit: `775de71`
+- Result:
+  - Runtime isolation: PASS
+  - Offline gates: PASS
+  - Full simulated output matrix: PASS
+  - Evidence schema: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Evidence paths:
+  - `local-analysis/runtime-isolation/current.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/simulated-output-matrix.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Offline gate status:
+  - Default CTest: `100% tests passed, 0 tests failed out of 13`
+  - Release CTest: `100% tests passed, 0 tests failed out of 14`
+  - Evidence schema: PASS, `20` required files, `0` missing
+- Simulated output matrix:
+  - rows: `48`
+  - failures: `0`
+  - pairs: A/B/C/D
+  - sample rates: `44100`, `48000`
+  - modes: dense, transient, wideband
+  - gains: `1.0`, `0.5`
+  - minimum alignment: `1.0`
+  - minimum SNR: `119.407 dB`
+  - max residual ratio: `1.07069e-06`
+  - max leakage: `-240 dBFS`
+  - check errors: `0`
+  - panic flags: `0`
+- Release benchmark:
+  - `pack_mib_s=1454.94`
+  - `decode_mib_s=546.495`
+  - `decode_into_mib_s=546.495`
+  - `decode_allocating_mib_s=516.065`
+  - `float_to_s24_frames_s=7.65384e+07`
+  - `route_frames_s=8.54123e+08`
+  - `route_reversed_frames_s=4.49037e+08`
+  - `route_advanced_frames_s=4.41878e+08`
+  - `decode_into_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Runtime isolation state:
+  - Global hardware lock: absent.
+  - Mainline OpenA8DJ LaunchAgents: disabled and not running.
+  - Active OpenA8DJ HAL path: absent.
+  - OpenA8DJ process probes: no PIDs.
+  - Allowed C++ resume LaunchAgent: present, no PID.
+- Promotion blockers after this change:
+  - physical music quality: `quality_alignment_score=0.938154`,
+    `snr_db_min=8.93`, `quiet_mid_band_noise_dbfs=-31.17`,
+    `lag_jumps_gt_2_frames=24`;
+  - runtime CPU: `opena8dj_driver_p95=11.5`,
+    `coreaudiod_p95=95.8`;
+  - physical Traktor/timecode vinyl: no real lock evidence.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no
+- Readiness note:
+  - This closes the current full offline simulated-output matrix gap.
+  - It does not prove physical DAC/mixer/iRig quality, Traktor lock, or actual
+    runtime CPU. Branch promotion remains forbidden.

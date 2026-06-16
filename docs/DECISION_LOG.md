@@ -277,3 +277,32 @@ Evidence:
   `0x01/0x81/0x82/0x06`, and 8 input/output channels.
 - `scripts/evaluate-promotion-readiness.py` now requires this protocol
   contract before branch promotion can pass.
+
+## 2026-06-16: Require Full Simulated Output Matrix Before Promotion
+
+Decision:
+- Add a deterministic C++ simulated-output matrix gate covering output pairs
+  A/B/C/D at 44.1/48 kHz with dense, transient, and wideband material at gains
+  `1.0` and `0.5`.
+
+Reason:
+- The previous simulated output oracle was one strong software-output fixture,
+  but it did not prove all output pairs and required rates through the C++ Mode
+  2 pack/decode path.
+- A deterministic in-process C++ gate avoids dependence on local music files
+  while still checking alignment, quantization residual, SNR, check bytes,
+  panic flags, and wrong-pair leakage.
+
+Alternatives discarded:
+- Depend on `scripts/run-simulated-output-soundcheck` inside the core offline
+  gate: rejected because it may depend on local music discovery/conversion and
+  is slower/noisier than a deterministic core contract.
+- Treat packet matrix as sufficient output-quality evidence: rejected because
+  it checks byte parity but not program-material SNR/residual/leakage metrics.
+
+Evidence:
+- `local-analysis/cpp-offline/simulated-output-matrix.json` records PASS with
+  `48` rows, `0` failures, minimum SNR `119.407 dB`, max residual ratio
+  `1.07069e-06`, and max leakage `-240 dBFS`.
+- `scripts/evaluate-promotion-readiness.py` now requires
+  `offline_simulated_output_matrix=PASS` before branch promotion can pass.

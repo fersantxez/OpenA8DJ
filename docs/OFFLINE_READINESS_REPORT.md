@@ -3,15 +3,29 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate commit: `837461c`
+Candidate commit: `775de71`
 
 ## Verdict
 
-`OFFLINE_READY_FOR_PHYSICAL_WINDOW_REQUEST`
+`OFFLINE_READY_FOR_LOCKED_PHYSICAL_WINDOW_REQUEST`
 
 This candidate is ready to request a coordinated physical test window. It is not
 claimed to be physically better than mainline until hardware capture, Traktor
-validation, and listening evidence exist.
+validation, runtime CPU evidence, and listening evidence exist. The active HAL
+is currently intentionally absent, so any physical window must first restore or
+reinstall the candidate HAL under the global hardware lock.
+
+## 2026-06-16 Full Simulated Output Matrix Update
+
+The offline gate now includes a deterministic C++ simulated-output matrix
+covering output pairs A/B/C/D at 44.1/48 kHz with dense, transient, and
+wideband program material at gains `1.0` and `0.5`.
+
+Current evidence:
+`local-analysis/cpp-offline/simulated-output-matrix.json`
+
+Result: PASS, `48` rows, `0` failures, minimum SNR `119.407 dB`, max residual
+ratio `1.07069e-06`, max leakage `-240 dBFS`.
 
 ## 2026-06-16 Routing Fast Path Update
 
@@ -57,6 +71,7 @@ benchmark number.
 | A/B/C/D routing represented | core contract, packet matrix, DVS smoke | PASS |
 | sample rates 44.1/48 kHz represented | policy, packet matrix, surface model | PASS |
 | Mode 2 packet behavior tested | 72-row C++ matrix plus Python oracle | PASS |
+| simulated output matrix | `simulated-output-matrix.json` | PASS |
 | timecode vinyl/CD-line/phono policy | timecode matrix | PASS |
 | DVS/timecode deck isolation proxy | 24-row DVS signal smoke | PASS |
 | realtime hot path allocation check | `realtime-audit.json` | PASS |
@@ -67,9 +82,10 @@ benchmark number.
 
 ## Current Gate Summary
 
-- Default CTest: 8/8 PASS.
-- Release CTest: 11/11 PASS.
+- Default CTest: 13/13 PASS.
+- Release CTest: 14/14 PASS.
 - Packet matrix: 72 rows, 0 failures.
+- Simulated output matrix: 48 rows, 0 failures.
 - Python Mode 2 oracle: all start bytes PASS, 0 check errors, 0 panic flags.
 - Timecode matrix: 4 profiles, 4 deck assignments, 0 failures.
 - DVS signal smoke: 24 rows, 0 failures, zero leakage.
@@ -77,16 +93,16 @@ benchmark number.
 - DriverKit surface model: one 8-channel input stream and four stereo output streams.
 - Jitter model: 0 regressions, max error 0.125 frames.
 - Static policy: 0 forbidden hits in official offline gate path.
-- Evidence schema: 15 required files, 0 missing.
+- Evidence schema: 20 required files, 0 missing.
 
 ## Performance Evidence
 
-- Mode 2 pack throughput: `1653.83 MiB/s` in the latest preallocated-buffer
-  gate run; nine-run median `1634.35 MiB/s`.
-- Mode 2 decode throughput: `577.374 MiB/s` in the latest gate run; nine-run
-  post-change median `570.726 MiB/s`.
-- Routing throughput: `961,852,000 frames/s` in the latest gate run; seven-run
-  post-change median `949,223,000 frames/s`.
+- Mode 2 pack throughput: `1454.94 MiB/s`.
+- Mode 2 preallocated decode throughput: `546.495 MiB/s`.
+- Identity routing throughput: `854,123,000 frames/s`.
+- Reversed routing throughput: `449,037,000 frames/s`.
+- Advanced mute/invert/cross-deck routing throughput:
+  `441,878,000 frames/s`.
 - Check errors: `0`.
 - Panic flags: `0`.
 
@@ -97,7 +113,9 @@ readiness claim:
 
 - Full Xcode with DriverKit SDK is not installed/active on this machine.
 - AudioDriverKit/DriverKit entitlements are not available in this environment.
-- No hardware/CoreAudio/USB/Traktor/iRig/listening test has been authorized or run.
+- The active OpenA8DJ HAL is intentionally absent after runtime cleanup.
+- Physical real-music quality, runtime CPU against C `0.3.135`, and physical
+  Traktor/timecode vinyl are still failing or missing in the promotion gate.
 
 ## Claim Boundary
 
