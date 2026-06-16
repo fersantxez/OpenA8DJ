@@ -847,3 +847,41 @@ Operational note:
 - CoreAudio touched by this frozen-candidate gate: no
 - USB touched by this frozen-candidate gate: no
 - Driver installed or activated by this frozen-candidate gate: no
+
+## 2026-06-16: Fixed SPSC Audio Ring Contract
+
+- Command:
+  `scripts/run-cpp-offline-gates && scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Code commit: `8072fc5`
+- Result:
+  - Offline gates: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Change:
+  - Added `SpscFrameRing<Frame, Capacity>` with fixed storage, atomic read/write
+    cursors, `push`, `pop`, `push_many`, `pop_many`, and `clear`.
+  - Core contract tests cover capacity, full/empty behavior, FIFO order,
+    batch push/pop, and clear.
+  - Realtime audit now includes fixed-ring push/pop after Mode 2 decode.
+- Realtime audit evidence:
+  - `hot_path_allocations=0`
+  - `decoded_frames=2815`
+  - `ring_pushed_frames=2815`
+  - `ring_popped_frames=2815`
+  - `ring_remaining_frames=0`
+  - `decode_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Release benchmark at code commit `8072fc5`:
+  - `pack_mib_s=1591.35`
+  - `decode_into_mib_s=566.408`
+  - `decode_allocating_mib_s=542.220`
+  - `float_to_s24_frames_s=8.45376e+07`
+  - `route_frames_s=7.53918e+08`
+  - `route_reversed_frames_s=5.87876e+08`
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no

@@ -3,7 +3,7 @@
     "name": "OpenA8DJ C++/DriverKit offline candidate",
     "worktree": "/Users/fer/dev/audio8djcpp",
     "branch": "driverkit/cpp-redesign",
-    "base_commit": "837461c",
+    "base_commit": "8072fc5",
     "scope": "offline_only",
     "hardware_policy": "forbidden_without_global_lock_and_explicit_window"
   },

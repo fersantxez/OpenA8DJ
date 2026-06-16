@@ -178,16 +178,17 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1265.89 MiB/s` over `5` repeats, min `1229.27`, max `1339.27` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `468.364 MiB/s` over `5` repeats, min `454.968`, max `474.709` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `448.797 MiB/s` over `5` repeats, min `420.234`, max `467.274` | informational |
-| Float32 to S24 conversion throughput | median `71,562,100 frames/s` over `5` repeats, min `71,510,900`, max `71,607,700` | `1,000,000 frames/s` |
-| identity routing throughput | median `965,685,000 frames/s` over `5` repeats, min `893,802,000`, max `984,272,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `499,639,000 frames/s` over `5` repeats, min `493,951,000`, max `505,663,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1591.35 MiB/s` over `5` repeats, min `1571.76`, max `1593.76` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `566.408 MiB/s` over `5` repeats, min `549.121`, max `567.587` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `542.220 MiB/s` over `5` repeats, min `506.947`, max `556.922` | informational |
+| Float32 to S24 conversion throughput | median `84,537,600 frames/s` over `5` repeats, min `82,434,100`, max `85,520,100` | `1,000,000 frames/s` |
+| identity routing throughput | median `753,918,000 frames/s` over `5` repeats, min `651,154,000`, max `893,674,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `587,876,000 frames/s` over `5` repeats, min `574,458,000`, max `594,992,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
 | hot path allocations | `0` | `0` |
+| SPSC ring pushed/popped frames in realtime audit | `2815/2815`, remaining `0` | pushed equals popped, remaining `0` |
 | jitter model rows | `8` | `>= 8` |
 | jitter model lag jumps | `4` across modeled recovery scenarios | scenario-bounded |
 | jitter model timeline resets | `4` across modeled recovery scenarios | scenario-bounded |
@@ -220,6 +221,8 @@ Functional coverage in the current C++ test binary:
   DriverKit SDK or activating a System Extension.
 - Jitter model: 44.1/48 kHz, 64-frame period, no timestamp regressions.
 - Static policy: official offline gate path contains no audited system-mutation commands.
+- SPSC frame ring: fixed-capacity push/pop/clear contract and realtime audit
+  push/pop of all decoded frames with zero hot-path allocations.
 - Evidence schema: required evidence files exist and declare offline/no-hardware state.
 - Synthetic no-leakage check: pair A signal does not appear on B/C/D.
 
@@ -545,7 +548,7 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 
 ## Readiness Checklist
 
-- [x] Candidate id is immutable for current offline evidence: commit `837461c`.
+- [x] Candidate id is immutable for current offline evidence: code commit `8072fc5`.
 - [x] No writes occurred outside `/Users/fer/dev/audio8djcpp`.
 - [x] Offline-only policy is recorded.
 - [x] Mainline C baseline id and values are recorded in docs.

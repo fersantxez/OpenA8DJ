@@ -133,6 +133,13 @@ Rules:
 The capture ring carries audio frames only. Input RMS/peak/correlation stats use
 separate per-stream accumulators on the USB thread and are published later.
 
+Current C++ core status:
+
+- `SpscFrameRing<Frame, Capacity>` provides the fixed-capacity SPSC contract
+  used by offline gates.
+- `opena8djcpp_realtime_audit` verifies decoded-frame push/pop through the ring
+  with zero hot-path allocations.
+
 ### OutputTimelineRing
 
 Producer: Core Audio output callback.

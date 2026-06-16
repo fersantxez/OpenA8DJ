@@ -29,6 +29,9 @@ Branch: `driverkit/cpp-redesign`
   code. It validates lifecycle start/stop idempotency and the device model
   without requiring DriverKit SDK or activating a System Extension. Current
   evidence: `local-analysis/cpp-offline/driverkit-shell-contract.json`.
+- The core now includes a fixed-capacity SPSC frame ring contract for the
+  realtime data plane. Current realtime audit pushes and pops all `2815`
+  decoded frames with `0` allocations and `0` remaining frames.
 - The current installed HAL from this worktree enumerates as `Open Audio 8 DJ`
   with `8 in / 8 out` at `48000`. Direct CoreAudio I/O and short input
   captures on channels `1/2` and `7/8` passed under lock.
