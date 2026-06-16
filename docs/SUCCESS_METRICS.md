@@ -180,12 +180,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1413.3 MiB/s` over `5` repeats, min `1408.04`, max `1417.04` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `506.054 MiB/s` over `5` repeats, min `502.881`, max `508.337` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `487.822 MiB/s` over `5` repeats, min `451.395`, max `536.91` | informational |
-| Float32 to S24 conversion throughput | median `75,958,100 frames/s` over `5` repeats, min `75,739,500`, max `76,424,000` | `1,000,000 frames/s` |
-| identity routing throughput | median `826,517,000 frames/s` over `5` repeats, min `674,109,000`, max `863,026,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `532,678,000 frames/s` over `5` repeats, min `520,472,000`, max `542,227,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1130.97 MiB/s` over `5` repeats, min `1129.45`, max `1131.71` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `216.238 MiB/s` over `5` repeats, min `184.743`, max `350.863` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `231.136 MiB/s` over `5` repeats, min `71.4623`, max `372.798` | informational |
+| Float32 to S24 conversion throughput | median `37,175,000 frames/s` over `5` repeats, min `33,609,800`, max `37,780,600` | `1,000,000 frames/s` |
+| identity routing throughput | median `487,408,000 frames/s` over `5` repeats, min `439,716,000`, max `539,345,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `270,938,000 frames/s` over `5` repeats, min `167,193,000`, max `279,000,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `271,652,000 frames/s` over `5` repeats, min `265,474,000`, max `281,019,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -204,6 +205,9 @@ Functional coverage in the current C++ test binary:
 - Sample format distinction: host Float32 interleaved vs signed 24-bit packed USB.
 - Sample-rate policy: 44.1 kHz and 48 kHz accepted, unsupported rates rejected.
 - Identity routing for A/B/C/D.
+- Advanced routing contract matching the Rust oracle shape: pair A from D,
+  pair B muted, pair C side-swapped, and output D right inverted, with
+  prevalidated `RoutingPlan` and no dynamic routing storage.
 - S24 big-endian conversion vectors.
 - Mode 2 round-trip for start bytes `0..5`.
 - Packet matrix: 44.1/48 kHz, transfer bytes `48`, `80`, `352`, gains `1.0` and `0.5`, start bytes `0..5`, `72` rows.
@@ -559,7 +563,7 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 
 ## Readiness Checklist
 
-- [x] Candidate id is immutable for current offline evidence: code commit `6058093`.
+- [x] Candidate id is immutable for current offline evidence: code commit `4d4c927`.
 - [x] No writes occurred outside `/Users/fer/dev/audio8djcpp`.
 - [x] Offline-only policy is recorded.
 - [x] Mainline C baseline id and values are recorded in docs.

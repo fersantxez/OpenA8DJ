@@ -12,9 +12,13 @@ Branch: `driverkit/cpp-redesign`
 - The first implementation target is an offline C++20 core with no macOS, CoreAudio, USB, HAL, kext, dext, or hardware side effects.
 - The initial core models the Audio 8 DJ surface as 8 inputs and 8 outputs arranged as stereo pairs A/B/C/D.
 - The core now has executable Mode 2 packet gates: S24 big-endian conversion, all-start-byte round trip, no deck leakage for pair-A-only data, and Release throughput gates.
+- Routing now supports the Rust-oracle shape of passthrough, mute, inversion,
+  side swap, and cross-deck pair mapping through a fixed `RouteEntry` array and
+  prevalidated `RoutingPlan`. Current advanced routing evidence:
+  `route_advanced_frames_s=2.71652e+08`.
 - The Mode 2 decode benchmark now distinguishes the allocating developer
   wrapper from the preallocated real-time path. Current preallocated decode
-  evidence: `decode_into_mib_s=506.054`, `decode_into_output_overflows=0`,
+  evidence: `decode_into_mib_s=216.238`, `decode_into_output_overflows=0`,
   `decode_into_check_errors=0`, `decode_into_panic_flags=0`.
 - The core now has explicit input-profile contracts: playback leaves input
   decode and software lock off, while timecode-vinyl/CD-line/phono enable input

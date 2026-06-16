@@ -482,7 +482,7 @@ Use this checklist before requesting a hardware window.
 - [x] No generated files or writes occurred in mainline C or Rust worktrees.
 - [x] Mainline C baseline id and values are copied into evidence/docs.
 - [x] Rust oracle id and values are copied into evidence/docs.
-- [x] Identity/provenance gate passes for the current committed candidate `6058093`.
+- [x] Identity/provenance gate passes for the current committed candidate `4d4c927`.
 - [x] Build hygiene gate passes for current CMake/CTest scope.
 - [x] Static policy gate passes for the official offline CMake/script/tools path.
 - [ ] Protocol constants snapshot passes.

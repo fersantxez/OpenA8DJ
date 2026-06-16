@@ -980,3 +980,54 @@ Operational note:
   - It also proves physical C++ audio tests cannot run in this state; the HAL
     must be explicitly restored or reinstalled under lock, then
     `scripts/runtime-isolation-audit --expect-hal active` must pass.
+
+## 2026-06-16: Advanced Routing Matrix Contract
+
+- Command:
+  `scripts/run-cpp-offline-gates`
+- Promotion command:
+  `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Code commit: `4d4c927`
+- Result:
+  - Offline gates: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Change:
+  - Extended `RoutingMatrix` with fixed `RouteEntry` rows containing source
+    channel and precomputed gain `1`, `0`, or `-1`.
+  - Kept existing source-mapping constructor and identity fast path.
+  - Added Rust-oracle compound routing test: pair A from D, pair B muted, pair C
+    side-swapped, and output D right inverted.
+  - Added `route_advanced_frames_s` to the Release benchmark, offline summary,
+    and promotion readiness throughput gate.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Offline gate status:
+  - Default CTest: `100% tests passed, 0 tests failed out of 11`
+  - Release CTest: `100% tests passed, 0 tests failed out of 12`
+  - Evidence schema: PASS, `18` required files, `0` missing
+- Release benchmark:
+  - `pack_mib_s=1130.97`
+  - `decode_into_mib_s=216.238`
+  - `decode_allocating_mib_s=231.136`
+  - `float_to_s24_frames_s=3.7175e+07`
+  - `route_frames_s=4.87408e+08`
+  - `route_reversed_frames_s=2.70938e+08`
+  - `route_advanced_frames_s=2.71652e+08`
+  - `decode_into_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Promotion blockers after this change:
+  - physical music quality: `quality_alignment_score=0.938154`,
+    `snr_db_min=8.93`, `lag_jumps_gt_2_frames=24`;
+  - runtime CPU: `opena8dj_driver_p95=11.5`,
+    `coreaudiod_p95=95.8`;
+  - physical Traktor/timecode vinyl: no real lock evidence.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no

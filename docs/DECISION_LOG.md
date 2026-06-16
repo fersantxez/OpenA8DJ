@@ -222,3 +222,29 @@ Evidence:
   `offline_dvs_packet_input_decode=PASS` but still returns FAIL overall because
   physical real-music quality, runtime CPU, and physical Traktor/timecode vinyl
   are not proven.
+
+## 2026-06-16: Represent Full Routing As Fixed Route Entries
+
+Decision:
+- Extend C++ `RoutingMatrix` from source-channel-only mapping to fixed
+  `RouteEntry` rows with source channel and precomputed gain `1`, `0`, or `-1`.
+
+Reason:
+- The Rust oracle explicitly covers identity, muted channels, pair remap,
+  side swap, and inversion. C++ had only identity/reversed source mapping.
+- Full A/B/C/D routing and DVS workflows need mute/invert/cross-deck behavior
+  without introducing dynamic storage in the hot path.
+
+Alternatives discarded:
+- Keep source-only routing: rejected because it cannot represent mute or
+  inversion.
+- Add per-frame dynamic routing decisions: rejected because routing policy must
+  be prevalidated outside the real-time path.
+
+Evidence:
+- `opena8djcpp_core_contract` passes the Rust-oracle compound case: A from D,
+  B muted, C side-swapped, and D right inverted.
+- `local-analysis/cpp-offline/offline-bench-release.json` records
+  `route_advanced_frames_s=2.71652e+08`.
+- `scripts/evaluate-promotion-readiness.py` now requires advanced routing
+  throughput above the offline floor before promotion can pass.

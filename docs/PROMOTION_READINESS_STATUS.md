@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate code commit: `6058093`
+Candidate code commit: `4d4c927`
 
 ## Current Verdict
 
@@ -36,7 +36,7 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1413.3`, `decode_into_mib_s=506.054`, `route_frames_s=8.26517e+08`, `route_reversed_frames_s=5.32678e+08`, `float_to_s24_frames_s=7.59581e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1130.97`, `decode_into_mib_s=216.238`, `route_frames_s=4.87408e+08`, `route_reversed_frames_s=2.70938e+08`, `route_advanced_frames_s=2.71652e+08`, `float_to_s24_frames_s=3.7175e+07` |
 | realtime SPSC ring audit | `PASS` | pushed `2815`, popped `2815`, remaining `0`, allocations `0` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline DVS packet input decode | `PASS` | `24` rows, `0` failures, playback decode-off `PASS` |
