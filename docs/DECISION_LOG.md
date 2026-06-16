@@ -443,3 +443,40 @@ Evidence:
 - `local-analysis/soundcheck/20260616-iso64-irig-pairA-16s-cpp-hal`
 - `local-analysis/runtime-isolation/post-iso64-failed-unload.json`
 - `local-analysis/audio-stack-guard/20260616-iso64-force-unload/force-unload.log`
+
+## 2026-06-16: Add HAL Transport Lifecycle Parity Knobs Before More Physical Sweeps
+
+Decision:
+- Add C++ HAL build-time support for playback request coalescing, configurable
+  playback-before-capture-requeue ordering, and transfer-pool cursor checkout.
+- Keep all new lifecycle knobs neutral by default:
+  `HAL_PLAYBACK_COALESCE_TRANSFERS=1`,
+  `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=0`, and
+  `HAL_TRANSFER_POOL_CURSOR=0`.
+
+Reason:
+- Read-only mainline comparison found lifecycle-level transport behavior that
+  C++ did not yet model, while ISO64/8/8/prefetch64 was already physically
+  rejected in the C++ implementation.
+- More byte/start/check sweeps are low-value until the C++ transport can test
+  the same lifecycle degrees of freedom mainline uses.
+- Neutral defaults preserve the current less-bad measured profile while making
+  future physical variants explicit and reproducible.
+
+Alternatives discarded:
+- Promote because offline gates pass: rejected; physical music quality and CPU
+  still fail.
+- Keep changing USB packet offsets first: rejected; recent physical sweeps did
+  not produce a passing analog result.
+- Enable coalescing/cursor by default immediately: rejected; those variants need
+  locked physical evidence before becoming candidate defaults.
+
+Evidence:
+- Build: `make usb-play hal` passed.
+- Offline gates: `scripts/run-cpp-offline-gates` passed Debug `15/15` and
+  Release `16/16`.
+- Promotion gate: `scripts/evaluate-promotion-readiness.py --json-out
+  local-analysis/promotion-readiness-current.json` returned `FAIL` as expected.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`

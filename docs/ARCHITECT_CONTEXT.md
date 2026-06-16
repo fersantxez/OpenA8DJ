@@ -178,3 +178,28 @@ Branch: `driverkit/cpp-redesign`
 - Physical validation must follow `docs/PHYSICAL_TEST_WINDOW_PLAN.md`, use the
   global hardware lock, and avoid default-device/sample-rate/buffer changes
   unless explicitly part of a documented window.
+
+## 2026-06-16 Current Iteration: Lifecycle Parity Candidate
+
+- The HAL/USB transport now has the mainline lifecycle knobs needed for the next
+  controlled physical test without changing the current less-bad default
+  profile: playback request coalescing, capture-vs-playback queue order, and
+  transfer-pool cursor selection are build-time parameters.
+- Defaults remain conservative after ISO64 was physically rejected:
+  `ISO5`, capture queue `64`, playback queue `64`, output prefetch `256`,
+  start byte `4`, check offset `8`, gain `0.50`, output amplitude stats on.
+- Build and offline gates passed after the lifecycle changes:
+  `make usb-play hal`, `scripts/run-cpp-offline-gates` with Debug `15/15` and
+  Release `16/16`.
+- Promotion remains blocked by evidence, not opinion. Current evaluator result:
+  `FAIL`, `branch_promotion_allowed=false`, because physical music quality,
+  runtime CPU, latest physical investigation, and physical Traktor/timecode
+  validation still fail.
+- Hardware/process status before this iteration: hardware lock absent; no
+  OpenA8DJ process detected; only normal `coreaudiod` and `usbaudiod` daemons
+  were alive, so no process was killed.
+
+Next technical target:
+- Run one locked physical HAL candidate after committing this lifecycle parity
+  work. If quality remains bad, prioritize input-decode activation parity and
+  capture-paced playback request accounting before another byte-layout sweep.

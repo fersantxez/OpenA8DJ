@@ -1392,3 +1392,34 @@ Operational note:
   - ISO64/8/8/prefetch64 is rejected as a C++ default with the current
     lifecycle implementation. The next work item is lifecycle parity, not more
     layout/start-byte sweeping.
+
+## 2026-06-16: HAL Lifecycle Parity Build And Offline Gates
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Base commit before new commit: `aac8491`
+- Result:
+  - HAL/direct USB build: PASS.
+  - Debug CTest: PASS, `15/15`.
+  - Release CTest: PASS, `16/16`, including release benchmark.
+  - Release benchmark: PASS; `pack_mib_s=1625.55`,
+    `decode_mib_s=577.357`, `route_frames_s=977540000`,
+    `check_errors=0`, `panic_flags=0`.
+  - Promotion gate: FAIL, `branch_promotion_allowed=false`, expected because
+    physical music quality, runtime CPU, latest physical investigation, and
+    physical Traktor/timecode evidence still fail.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Hardware/process note:
+  - Hardware lock was absent before this work.
+  - No OpenA8DJ process was alive; only normal `coreaudiod` and `usbaudiod`
+    daemons were detected, so no process was killed.
+- Readiness note:
+  - This validates a buildable/offline lifecycle-parity candidate only. It does
+    not supersede failed physical quality evidence and does not authorize branch
+    promotion or Traktor/timecode claims.

@@ -197,6 +197,41 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     physical Traktor scope/lock, iRig music capture, runtime CPU, or a real
     DriverKit dext.
 
+### Maxwell
+
+- Mission: compare C++ HAL transport behavior against mainline read-only and
+  identify high-value divergences after the ISO64 C++ physical regression.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed and integrated by architect.
+- Result:
+  - Confirmed ISO64/8/8/prefetch64 matched the mainline baseline profile, but
+    C++ physical evidence rejected it with the current lifecycle code.
+  - Identified missing lifecycle parity in C++: transfer-pool cursor selection,
+    optional playback request coalescing, and configurable capture/playback
+    queue ordering.
+  - Recommended keeping start byte `4`, check offset `8`, big-endian packing,
+    and gain `0.50` while lifecycle parity is tested.
+- Integrated action:
+  - Added build knobs:
+    `HAL_PLAYBACK_COALESCE_TRANSFERS`,
+    `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE`, and
+    `HAL_TRANSFER_POOL_CURSOR`.
+  - Added `queueCapturePacedPlaybackWithRequests` and pending playback request
+    reset state in the C++ HAL.
+  - Kept new knobs neutral by default pending locked physical evidence.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Risk:
+  - This work prepares a better-controlled physical candidate. It does not by
+    itself improve the failed analog music quality, runtime CPU, or physical
+    Traktor/timecode evidence.
+
 ## Integration Notes
 
 - No subagent may declare readiness independently.
