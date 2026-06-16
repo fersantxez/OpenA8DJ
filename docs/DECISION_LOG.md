@@ -521,3 +521,18 @@ Evidence:
 - Offline gates: `scripts/run-cpp-offline-gates` passed Debug `15/15` and
   Release `16/16`.
 - Evidence path: `local-analysis/cpp-offline/current-offline-gates.json`
+
+Follow-up:
+- Locked physical retest of active input decode gating failed worse than the
+  lifecycle candidate: `quality_alignment_score=0.028314`,
+  `analog_snr_db=-28.18`, `lag_jumps_gt_2_frames=52`, OpenA8DJ driver CPU p95
+  `41.8%`, CoreAudio p95 `21.8%`.
+- Decision amended: keep the API/knob for explicit future experiments, but set
+  `HAL_INPUT_DECODE_ACTIVE_GATING=0` by default. The current default candidate
+  must not include this physically rejected behavior.
+
+Evidence:
+- `local-analysis/soundcheck/20260616-inputdecode-irig-pairA-16s-cpp-hal`
+- `local-analysis/audio-stack-guard/20260616-inputdecode-force-unload/force-unload.log`
+- `local-analysis/runtime-isolation/post-inputdecode-failed-unload.json`
+- `local-analysis/promotion-readiness-current.json`

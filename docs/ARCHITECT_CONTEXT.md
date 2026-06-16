@@ -224,3 +224,10 @@ Next technical target:
 - This is a CPU/work-reduction candidate for output-only playback. It is not a
   readiness claim until a locked iRig run proves lower CPU and better or equal
   analog quality.
+- Locked physical retest with active gating enabled was a regression:
+  `quality_alignment_score=0.028314`, `analog_snr_db=-28.18`,
+  `lag_jumps_gt_2_frames=52`, OpenA8DJ driver CPU p95 `41.8%`,
+  CoreAudio p95 `21.8%`. The HAL was unloaded and post-unload isolation passed.
+- Therefore `HAL_INPUT_DECODE_ACTIVE_GATING` now defaults to `0`. The API stays
+  in the tree as an explicit experiment only; it is not part of the current
+  physical candidate.

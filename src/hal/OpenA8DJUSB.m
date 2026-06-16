@@ -58,6 +58,10 @@
 #define OPENA8DJ_ENABLE_INPUT_CHECKS 1
 #endif
 
+#ifndef OPENA8DJ_INPUT_DECODE_ACTIVE_GATING
+#define OPENA8DJ_INPUT_DECODE_ACTIVE_GATING 0
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_NATIVE_I24
 #define OPENA8DJ_OUTPUT_NATIVE_I24 0
 #endif
@@ -3397,7 +3401,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint32_t decodedFrames = 0;
     uint64_t inputCheckErrors = 0;
     uint64_t outputPanicFlags = 0;
-#if OPENA8DJ_ENABLE_INPUT_DECODE && !OPENA8DJ_ENABLE_INPUT_CHECKS
+#if OPENA8DJ_ENABLE_INPUT_DECODE && OPENA8DJ_INPUT_DECODE_ACTIVE_GATING && !OPENA8DJ_ENABLE_INPUT_CHECKS
     if (!atomic_load(&_inputDecodeActive)) {
         const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
         _inputMode2Index += length;

@@ -1478,3 +1478,59 @@ Operational note:
   - This proves only compile/offline correctness for input decode activation
     parity. It must be followed by locked physical CPU and music-quality
     measurement before any claim.
+
+## 2026-06-16: Input Decode Active Gating Physical Rejection
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-inputdecode-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-inputdecode-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-inputdecode-failed-unload.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Commit: `6c46059`
+- Result:
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL, severe regression.
+  - Post-unload runtime isolation: PASS; active HAL absent, lock absent, no
+    OpenA8DJ process, iRig still visible.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-inputdecode-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-inputdecode-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-inputdecode-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-inputdecode-failed-unload.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Key metrics:
+  - `quality_alignment_score=0.028314`
+  - `analog_snr_db=-28.18`
+  - `lag_jumps_gt_2_frames=52`
+  - `mid_band_residual_ratio=25.174635`
+  - `high_band_residual_ratio=22.018063`
+  - `quiet_mid_band_noise_dbfs=-34.11`
+  - OpenA8DJ driver CPU p95 `41.8%`
+  - CoreAudio p95 `21.8%`
+- Readiness note:
+  - Active input-decode gating is rejected as a default candidate. It remains
+    available only behind `HAL_INPUT_DECODE_ACTIVE_GATING=1` for controlled
+    experiments.
+
+## 2026-06-16: Input Decode Gating Disabled By Default
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make usb-play hal && scripts/run-cpp-offline-gates`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - HAL/direct USB build: PASS with
+    `OPENA8DJ_INPUT_DECODE_ACTIVE_GATING=0`.
+  - Debug CTest: PASS, `15/15`.
+  - Release CTest: PASS, `16/16`, including release benchmark.
+  - Release benchmark: PASS; `pack_mib_s=1645.53`,
+    `decode_mib_s=587.602`, `route_frames_s=980131000`,
+    `check_errors=0`, `panic_flags=0`.
+- Evidence path:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Readiness note:
+  - The current default candidate is back to the less-bad physical profile plus
+    inert experimental knobs. It still fails physical music quality and CPU
+    gates, so no readiness or promotion claim is allowed.
