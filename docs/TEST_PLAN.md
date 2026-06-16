@@ -56,6 +56,7 @@ Current evidence files:
 - `local-analysis/cpp-offline/ctest-default.txt`
 - `local-analysis/cpp-offline/ctest-release.txt`
 - `local-analysis/cpp-offline/packet-matrix.json`
+- `local-analysis/cpp-offline/protocol-contract.json`
 - `local-analysis/cpp-offline/mode2-python-oracle.txt`
 - `local-analysis/cpp-offline/timecode-matrix.json`
 - `local-analysis/cpp-offline/dvs-signal-smoke.json`
@@ -70,6 +71,10 @@ Current evidence files:
 Current PASS coverage:
 
 - surface and channel ordering;
+- protocol constants snapshot: VID/PID `0x17cc:0x1978`, endpoints
+  `0x01/0x81/0x82/0x06`, 8 input/output channels, required `44100/48000`
+  rates, deferred `88200/96000` CAIAQ codes, Mode 2 check cadence `16`
+  bytes, and full frame `32` bytes;
 - sample format and sample-rate policy;
 - identity routing;
 - S24 big-endian conversion;
@@ -262,9 +267,9 @@ Comparison:
 
 Current implementation status:
 
-- Release pack throughput: latest preallocated-buffer gate `1653.83 MiB/s`, repeat median `1634.35 MiB/s`.
-- Release decode throughput: latest gate `577.374 MiB/s`, repeat median `570.726 MiB/s`.
-- Release routing throughput: latest gate `948,649,000 frames/s`, repeat median after fast path `949,223,000 frames/s`.
+- Release pack throughput: latest median `1410.11 MiB/s`.
+- Release preallocated decode throughput: latest median `511.536 MiB/s`.
+- Release routing throughput: latest identity median `786,433,000 frames/s`, reversed median `500,155,000 frames/s`, advanced mute/invert/cross-deck median `443,810,000 frames/s`.
 - Allocation count inside the audited pack/decode/routing hot loop: `0`.
 
 ## Lane G: Simulated Output Matrix
@@ -482,16 +487,16 @@ Use this checklist before requesting a hardware window.
 - [x] No generated files or writes occurred in mainline C or Rust worktrees.
 - [x] Mainline C baseline id and values are copied into evidence/docs.
 - [x] Rust oracle id and values are copied into evidence/docs.
-- [x] Identity/provenance gate passes for the current committed candidate `4d4c927`.
+- [x] Identity/provenance gate passes for the current committed candidate `25de786`.
 - [x] Build hygiene gate passes for current CMake/CTest scope.
 - [x] Static policy gate passes for the official offline CMake/script/tools path.
-- [ ] Protocol constants snapshot passes.
+- [x] Protocol constants snapshot passes.
 - [x] Packet matrix passes for current C++ fixtures.
 - [x] Packer throughput meets Rust oracle floors in Release microbench.
 - [ ] Simulated output fast gate passes.
 - [ ] Simulated output full offline gate passes.
 - [x] Initial DVS signal smoke and DVS packet input-decode gates pass at 44.1 and 48 kHz.
-- [ ] Surface model gate passes.
+- [x] Surface model gate passes.
 - [x] Evidence schema gate passes.
 - [ ] Comparison table has all C/Rust/C++ deltas.
 - [ ] Physical lanes are explicitly blocked, not passed.

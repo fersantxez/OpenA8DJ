@@ -248,3 +248,32 @@ Evidence:
   `route_advanced_frames_s=2.71652e+08`.
 - `scripts/evaluate-promotion-readiness.py` now requires advanced routing
   throughput above the offline floor before promotion can pass.
+
+## 2026-06-16: Distinguish Mode 2 Check Cadence From Full Frame Bytes
+
+Decision:
+- Keep two separate constants in the C++ protocol model: Mode 2 check cadence
+  is `16` bytes, while one full 8-channel audio frame is `32` bytes.
+
+Reason:
+- Mainline behavior and packet checks operate on a 16-byte cadence, but the
+  product data model still represents a full 8-channel frame as 32 USB bytes.
+- The new protocol contract initially caught this ambiguity. Keeping both
+  names prevents later code from treating the check cadence as the whole audio
+  frame or vice versa.
+
+Alternatives discarded:
+- Collapse both meanings into `kMode2GroupBytes`: rejected because it hides a
+  real protocol distinction and would make future DriverKit/USB transport code
+  easier to misread.
+- Advertise 88.2/96 kHz as supported now: rejected until physical quality
+  evidence exists for those rates; the CAIAQ rate codes are modeled but marked
+  deferred.
+
+Evidence:
+- `local-analysis/cpp-offline/protocol-contract.json` records PASS with
+  `check_cadence_bytes=16`, `full_frame_bytes=32`,
+  `default_start_byte=4`, VID/PID `0x17cc:0x1978`, endpoints
+  `0x01/0x81/0x82/0x06`, and 8 input/output channels.
+- `scripts/evaluate-promotion-readiness.py` now requires this protocol
+  contract before branch promotion can pass.

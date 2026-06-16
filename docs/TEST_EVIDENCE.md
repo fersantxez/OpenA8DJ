@@ -1060,3 +1060,75 @@ Operational note:
   - Real dext compilation is blocked until full Xcode with DriverKit/
     AudioDriverKit SDK support is selected and signing/entitlements are
     prepared.
+
+## 2026-06-16: Protocol Constants Snapshot Gate
+
+- Command:
+  `scripts/run-cpp-offline-gates`
+- Promotion command:
+  `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Runtime isolation command:
+  `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Code commit: `25de786`
+- Result:
+  - Runtime isolation: PASS
+  - Offline gates: PASS
+  - Protocol contract: PASS
+  - Evidence schema: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Evidence paths:
+  - `local-analysis/runtime-isolation/current.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/protocol-contract.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Offline gate status:
+  - Default CTest: `100% tests passed, 0 tests failed out of 12`
+  - Release CTest: `100% tests passed, 0 tests failed out of 13`
+  - Evidence schema: PASS, `19` required files, `0` missing
+- Protocol contract:
+  - VID/PID: `0x17cc:0x1978`
+  - endpoints: control OUT `0x01`, control IN `0x81`, ISO capture `0x82`,
+    ISO playback `0x06`
+  - channel surface: `8` inputs, `8` outputs, pairs A/B/C/D
+  - Mode 2 check cadence: `16` bytes
+  - Mode 2 full frame: `32` bytes
+  - default start byte: `4`
+  - rates advertised by current policy: `44100`, `48000`
+  - known but deferred rate codes: `88200`, `96000`
+- Release benchmark:
+  - `pack_mib_s=1410.11`
+  - `decode_mib_s=511.536`
+  - `decode_into_mib_s=511.536`
+  - `decode_allocating_mib_s=487.085`
+  - `float_to_s24_frames_s=8.25390e+07`
+  - `route_frames_s=7.86433e+08`
+  - `route_reversed_frames_s=5.00155e+08`
+  - `route_advanced_frames_s=4.43810e+08`
+  - `decode_into_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Runtime isolation state:
+  - Global hardware lock: absent.
+  - Mainline OpenA8DJ LaunchAgents: disabled and not running.
+  - Active OpenA8DJ HAL path: absent.
+  - OpenA8DJ process probes: no PIDs.
+  - Allowed C++ resume LaunchAgent: present, no PID.
+- Promotion blockers after this change:
+  - physical music quality: `quality_alignment_score=0.938154`,
+    `snr_db_min=8.93`, `quiet_mid_band_noise_dbfs=-31.17`,
+    `lag_jumps_gt_2_frames=24`;
+  - runtime CPU: `opena8dj_driver_p95=11.5`,
+    `coreaudiod_p95=95.8`;
+  - physical Traktor/timecode vinyl: no real lock evidence.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no
+- Readiness note:
+  - This is stronger offline protocol evidence, not product readiness.
+  - Branch promotion remains forbidden until the promotion gate returns PASS.
