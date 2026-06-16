@@ -1361,3 +1361,34 @@ Operational note:
   - This only creates an ISO64 candidate matching the current mainline
     transport profile. It does not supersede the latest failed physical
     evidence until a new locked hardware run passes.
+
+## 2026-06-16: ISO64 Transport Physical Rejection
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded ...`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots ...`
+  - Locked HAL unload and CoreAudio restart after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-iso64-failed-unload.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - HAL install safety after rebuilding `audio-list`: PASS.
+  - Physical music soundcheck: FAIL, worse than prior ISO5 evidence.
+  - HAL removed from active HAL directory after the failed run.
+  - Runtime isolation after cleanup: PASS, active HAL absent, lock absent.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-iso64-cpp-lockpolicy-leave-loaded-2`
+  - `local-analysis/soundcheck/20260616-iso64-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-iso64-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-iso64-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=0.051643`
+  - `analog_snr_db=-31.90`
+  - `mid_band_residual_ratio=63.039942`
+  - `high_band_residual_ratio=38.249010`
+  - `lag_jumps_gt_2_frames=60`
+  - `capture_clipped_frames=0`
+- Readiness note:
+  - ISO64/8/8/prefetch64 is rejected as a C++ default with the current
+    lifecycle implementation. The next work item is lifecycle parity, not more
+    layout/start-byte sweeping.

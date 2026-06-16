@@ -430,3 +430,16 @@ Evidence:
   `0.3.135` CPU/digital stability baseline using ISO64/8/8.
 - `local-analysis/usb-physical-investigation-summary.json` records the C++
   ISO5-era physical failure.
+
+Follow-up:
+- The locked ISO64 C++ HAL run failed worse than the prior ISO5 run:
+  `quality_alignment_score=0.051643`, `analog_snr_db=-31.90`,
+  `lag_jumps_gt_2_frames=60`.
+- ISO64/8/8 is rejected as a C++ default until the remaining lifecycle
+  differences are ported and retested. The C++ default returns to ISO5/64/64,
+  the less-bad measured profile.
+
+Evidence:
+- `local-analysis/soundcheck/20260616-iso64-irig-pairA-16s-cpp-hal`
+- `local-analysis/runtime-isolation/post-iso64-failed-unload.json`
+- `local-analysis/audio-stack-guard/20260616-iso64-force-unload/force-unload.log`
