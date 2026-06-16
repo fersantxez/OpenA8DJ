@@ -536,3 +536,21 @@ Evidence:
 - `local-analysis/audio-stack-guard/20260616-inputdecode-force-unload/force-unload.log`
 - `local-analysis/runtime-isolation/post-inputdecode-failed-unload.json`
 - `local-analysis/promotion-readiness-current.json`
+
+## 2026-06-16: Reject Playback-Before-Capture-Requeue Variant
+
+Decision:
+- Keep `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=0` as the default.
+
+Reason:
+- The variant compiled and passed offline gates, but locked physical evidence
+  was worse than the lifecycle baseline and still far below product thresholds.
+- It did not solve runtime CPU: OpenA8DJ driver p95 remained `36.0%`, while
+  CoreAudio p95 spiked to `74.0%` in the measured run.
+
+Evidence:
+- `local-analysis/hal-candidate-safety/20260616-queue-before-cpp-lockpolicy-leave-loaded`
+- `local-analysis/soundcheck/20260616-queue-before-irig-pairA-16s-cpp-hal`
+- `local-analysis/audio-stack-guard/20260616-queue-before-force-unload/force-unload.log`
+- `local-analysis/runtime-isolation/post-queue-before-failed-unload.json`
+- `local-analysis/promotion-readiness-current.json`

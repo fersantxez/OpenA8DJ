@@ -1534,3 +1534,41 @@ Operational note:
   - The current default candidate is back to the less-bad physical profile plus
     inert experimental knobs. It still fails physical music quality and CPU
     gates, so no readiness or promotion claim is allowed.
+
+## 2026-06-16: Queue Playback Before Capture Requeue Physical Rejection
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1 usb-play hal && scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-queue-before-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-queue-before-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-queue-before-failed-unload.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Source commit: `de5ebf6`
+- Variant flags:
+  - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1`
+  - `HAL_INPUT_DECODE_ACTIVE_GATING=0`
+- Result:
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL.
+  - Post-unload runtime isolation: PASS; active HAL absent, lock absent, no
+    OpenA8DJ process, iRig still visible.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-queue-before-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-queue-before-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-queue-before-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-queue-before-failed-unload.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Key metrics:
+  - `quality_alignment_score=0.674742`
+  - `analog_snr_db=-0.41`
+  - `lag_jumps_gt_2_frames=21`
+  - `mid_band_residual_ratio=1.690489`
+  - `high_band_residual_ratio=1.598638`
+  - `quiet_mid_band_noise_dbfs=-32.02`
+  - OpenA8DJ driver CPU p95 `36.0%`
+  - CoreAudio p95 `74.0%`
+- Readiness note:
+  - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` is rejected as a default.

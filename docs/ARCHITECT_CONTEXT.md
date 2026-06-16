@@ -231,3 +231,7 @@ Next technical target:
 - Therefore `HAL_INPUT_DECODE_ACTIVE_GATING` now defaults to `0`. The API stays
   in the tree as an explicit experiment only; it is not part of the current
   physical candidate.
+- Lifecycle experiment `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` also
+  failed physically: `quality_alignment_score=0.674742`,
+  `analog_snr_db=-0.41`, `lag_jumps_gt_2_frames=21`, OpenA8DJ driver CPU p95
+  `36.0%`, CoreAudio p95 `74.0%`. Keep the default at `0`.
