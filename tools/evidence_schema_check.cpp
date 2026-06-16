@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/ctest-release.txt",
       root / "local-analysis/cpp-offline/packet-matrix.json",
       root / "local-analysis/cpp-offline/protocol-contract.json",
+      root / "local-analysis/cpp-offline/simulated-output-matrix.json",
       root / "local-analysis/cpp-offline/mode2-python-oracle.txt",
       root / "local-analysis/cpp-offline/timecode-matrix.json",
       root / "local-analysis/cpp-offline/timecode-signal-analysis.json",

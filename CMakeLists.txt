@@ -84,6 +84,13 @@ target_link_libraries(opena8djcpp_protocol_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_simulated_output_matrix
+  tools/simulated_output_matrix.cpp)
+
+target_link_libraries(opena8djcpp_simulated_output_matrix
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_timecode_matrix
   tools/timecode_matrix.cpp)
 
@@ -146,6 +153,7 @@ enable_testing()
 add_test(NAME opena8djcpp_core_contract COMMAND opena8djcpp_core_tests)
 add_test(NAME opena8djcpp_packet_matrix COMMAND opena8djcpp_packet_matrix)
 add_test(NAME opena8djcpp_protocol_contract COMMAND opena8djcpp_protocol_contract)
+add_test(NAME opena8djcpp_simulated_output_matrix COMMAND opena8djcpp_simulated_output_matrix)
 add_test(NAME opena8djcpp_timecode_matrix COMMAND opena8djcpp_timecode_matrix)
 add_test(NAME opena8djcpp_timecode_signal_analysis COMMAND opena8djcpp_timecode_signal_analysis)
 add_test(NAME opena8djcpp_realtime_audit COMMAND opena8djcpp_realtime_audit)

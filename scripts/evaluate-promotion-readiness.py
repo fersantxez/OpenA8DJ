@@ -170,6 +170,19 @@ def evaluate(args):
              offline.get("protocol_contract", {}).get("mode2_full_frame_bytes") == 32 and
              offline.get("protocol_contract", {}).get("default_start_byte") == 4,
              offline.get("protocol_contract", {})),
+        gate("offline_simulated_output_matrix",
+             offline.get("simulated_output_matrix", {}).get("status") == "PASS" and
+             offline.get("simulated_output_matrix", {}).get("rows", 0) >= 48 and
+             offline.get("simulated_output_matrix", {}).get("failures", 1) == 0 and
+             as_float(offline.get("simulated_output_matrix", {}), "min_alignment_score") >=
+             BASELINE["simulated_alignment_min"] and
+             as_float(offline.get("simulated_output_matrix", {}), "min_snr_db") >=
+             BASELINE["simulated_snr_db_min"] and
+             as_float(offline.get("simulated_output_matrix", {}), "max_residual_ratio", 1.0) <=
+             0.001 and
+             as_float(offline.get("simulated_output_matrix", {}), "max_leakage_dbfs", 999.0) <=
+             -120.0,
+             offline.get("simulated_output_matrix", {})),
         gate("offline_dvs_packet_input_decode",
              offline.get("dvs_packet_input_decode", {}).get("status") == "PASS" and
              offline.get("dvs_packet_input_decode", {}).get("rows", 0) >= 24 and

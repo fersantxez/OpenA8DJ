@@ -16,6 +16,7 @@ cmake --build build/cpp-release
 ctest --test-dir build/cpp-release --output-on-failure | tee "$EVIDENCE_DIR/ctest-release.txt"
 ./build/cpp-release/opena8djcpp_packet_matrix | tee "$EVIDENCE_DIR/packet-matrix.json"
 ./build/cpp-release/opena8djcpp_protocol_contract | tee "$EVIDENCE_DIR/protocol-contract.json"
+./build/cpp-release/opena8djcpp_simulated_output_matrix | tee "$EVIDENCE_DIR/simulated-output-matrix.json"
 python3 scripts/validate-mode2-output-packing.py \
   --start-byte all \
   --frames 96 \
@@ -65,6 +66,7 @@ def git_text(*args):
 
 packet = load_json("packet-matrix.json")
 protocol = load_json("protocol-contract.json")
+simulated_output = load_json("simulated-output-matrix.json")
 timecode = load_json("timecode-matrix.json")
 timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
@@ -107,6 +109,16 @@ summary = {
         "default_start_byte": protocol.get("mode2", {}).get("default_start_byte"),
         "deferred_rates_reason": protocol.get("deferred_rates_reason"),
         "evidence": "local-analysis/cpp-offline/protocol-contract.json",
+    },
+    "simulated_output_matrix": {
+        "status": simulated_output.get("result"),
+        "rows": simulated_output.get("row_count"),
+        "failures": simulated_output.get("failures"),
+        "min_alignment_score": simulated_output.get("min_alignment_score"),
+        "min_snr_db": simulated_output.get("min_snr_db"),
+        "max_residual_ratio": simulated_output.get("max_residual_ratio"),
+        "max_leakage_dbfs": simulated_output.get("max_leakage_dbfs"),
+        "evidence": "local-analysis/cpp-offline/simulated-output-matrix.json",
     },
     "python_mode2_oracle": {
         "status": "PASS",
