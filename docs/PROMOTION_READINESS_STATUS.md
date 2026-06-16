@@ -3,6 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
+Candidate commit: `837461c`
 
 ## Current Verdict
 
@@ -35,7 +36,7 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1609.85`, `decode_into_mib_s=552.591`, `route_frames_s=9.28216e+08`, `route_reversed_frames_s=5.72887e+08`, `float_to_s24_frames_s=8.53148e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1265.89`, `decode_into_mib_s=468.364`, `route_frames_s=9.65685e+08`, `route_reversed_frames_s=4.99639e+08`, `float_to_s24_frames_s=7.15621e+07` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
 | simulated output oracle | `PASS` | `local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json` |

@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Base commit: `08745b7`
+Candidate commit: `837461c`
 
 ## Verdict
 
@@ -68,7 +68,7 @@ benchmark number.
 ## Current Gate Summary
 
 - Default CTest: 8/8 PASS.
-- Release CTest: 9/9 PASS.
+- Release CTest: 11/11 PASS.
 - Packet matrix: 72 rows, 0 failures.
 - Python Mode 2 oracle: all start bytes PASS, 0 check errors, 0 panic flags.
 - Timecode matrix: 4 profiles, 4 deck assignments, 0 failures.

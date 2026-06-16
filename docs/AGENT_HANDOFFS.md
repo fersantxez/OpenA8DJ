@@ -176,10 +176,10 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Confirmed promotion blockers are objective, not subjective: physical music
     quality fails, runtime CPU does not beat mainline, and Traktor/timecode
     vinyl has no physical lock evidence.
-  - Identified additional non-promotion gaps: DriverKit shell is still not a
-    real executable dext driver, full 0.3.25 Traktor-facing parity is not
-    proven, cadence/timing is still insufficiently explained, and the candidate
-    is not frozen because many files remain uncommitted.
+  - Identified additional non-promotion gaps: DriverKit shell was not yet a
+    real dext driver, full 0.3.25 Traktor-facing parity was not proven, cadence
+    and timing were still insufficiently explained, and the candidate still
+    needed a reproducible commit.
 - Integrated action:
   - Added pure C++ input-profile contracts for playback/timecode-vinyl/CD-line/
     phono, including CAIAQ input mode, decode enablement, software lock, ground
@@ -187,6 +187,7 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Added `opena8djcpp_timecode_signal_analysis` using Rust-oracle thresholds:
     RMS, balance, frequency error, jitter p95, absolute correlation, and
     clipping.
+  - Candidate was later frozen as commit `837461c`.
 - Evidence:
   - `local-analysis/cpp-offline/timecode-matrix.json`
   - `local-analysis/cpp-offline/timecode-signal-analysis.json`

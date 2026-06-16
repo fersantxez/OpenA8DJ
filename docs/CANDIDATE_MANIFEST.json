@@ -3,7 +3,7 @@
     "name": "OpenA8DJ C++/DriverKit offline candidate",
     "worktree": "/Users/fer/dev/audio8djcpp",
     "branch": "driverkit/cpp-redesign",
-    "base_commit": "08745b7",
+    "base_commit": "837461c",
     "scope": "offline_only",
     "hardware_policy": "forbidden_without_global_lock_and_explicit_window"
   },
@@ -28,7 +28,9 @@
     "report": "docs/OFFLINE_READINESS_REPORT.md",
     "physical_test_plan": "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
     "promotion_gate": "local-analysis/promotion-readiness-current.json",
-    "branch_promotion_allowed": false
+    "branch_promotion_allowed": false,
+    "latest_offline_gate_status": "PASS",
+    "latest_promotion_gate_status": "FAIL"
   },
   "blocked_until_external_change": [
     "real AudioDriverKit dext build requires full Xcode with DriverKit SDK",

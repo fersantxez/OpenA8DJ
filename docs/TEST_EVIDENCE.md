@@ -802,3 +802,48 @@ Operational note:
 - CoreAudio touched: no
 - USB touched: no
 - Driver installed or activated: no
+
+## 2026-06-16: Frozen Offline Candidate Commit
+
+- Command:
+  `scripts/run-cpp-offline-gates && scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Commit: `837461c`
+- Result:
+  - Offline gates: PASS
+  - Promotion gate: FAIL
+  - `branch_promotion_allowed=false`
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/cpp-offline/driverkit-shell-contract.json`
+  - `local-analysis/cpp-offline/timecode-signal-analysis.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Offline gate status:
+  - Default CTest: `100% tests passed, 0 tests failed out of 10`
+  - Release CTest: `100% tests passed, 0 tests failed out of 11`
+  - Packet matrix: PASS, `72` rows
+  - Timecode signal analysis: PASS, `8` rows
+  - DriverKit shell contract: PASS
+  - Evidence schema: PASS, `17` required files
+- Release benchmark at commit `837461c`:
+  - `pack_mib_s=1265.89`
+  - `decode_into_mib_s=468.364`
+  - `decode_allocating_mib_s=448.797`
+  - `float_to_s24_frames_s=7.15621e+07`
+  - `route_frames_s=9.65685e+08`
+  - `route_reversed_frames_s=4.99639e+08`
+  - `check_errors=0`
+  - `panic_flags=0`
+  - `decode_into_output_overflows=0`
+- Promotion blockers:
+  - physical music quality: `quality_alignment_score=0.938154`,
+    `snr_db_min=8.93`, `lag_jumps_gt_2_frames=24`;
+  - runtime CPU: `opena8dj_driver_p95=11.5`,
+    `coreaudiod_p95=95.8`;
+  - physical Traktor/timecode vinyl: no real lock evidence.
+- Hardware touched by this frozen-candidate gate: no
+- CoreAudio touched by this frozen-candidate gate: no
+- USB touched by this frozen-candidate gate: no
+- Driver installed or activated by this frozen-candidate gate: no
