@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate commit: `50105c5` plus current Mode 2 cross-oracle parity changes
+Candidate commit: `389b59f` plus current mandatory hardware-lock policy changes
 
 ## Verdict
 
@@ -37,6 +37,18 @@ Current result: PASS, `72` rows, `0` failures, `max_byte_mismatches=0`,
 `max_length_delta=0`, `total_check_errors=0`, and `total_panic_flags=0`.
 The C++ Float32-to-S24 conversion now follows the oracle's explicit Float32
 rounding path before quantizing to output S24.
+
+## 2026-06-16 Mandatory Hardware Lock Policy Update
+
+The offline gate now includes `opena8djcpp_hardware_lock_policy_check`, which
+verifies that hardware-sensitive scripts cannot bypass the global lock.
+
+Current evidence:
+`local-analysis/cpp-offline/hardware-lock-policy.json`
+
+Result: PASS, `4` audited scripts, `0` missing requirements. Covered scripts
+include HAL candidate safety, direct Audio 8 DJ CoreAudio gates, and physical
+soundcheck.
 
 ## 2026-06-16 Routing Fast Path Update
 
@@ -93,8 +105,8 @@ benchmark number.
 
 ## Current Gate Summary
 
-- Default CTest: 14/14 PASS.
-- Release CTest: 15/15 PASS.
+- Default CTest: 15/15 PASS.
+- Release CTest: 16/16 PASS.
 - Packet matrix: 72 rows, 0 failures.
 - Simulated output matrix: 48 rows, 0 failures.
 - Python Mode 2 oracle: all start bytes PASS, 0 check errors, 0 panic flags.
@@ -105,16 +117,17 @@ benchmark number.
 - DriverKit surface model: one 8-channel input stream and four stereo output streams.
 - Jitter model: 0 regressions, max error 0.125 frames.
 - Static policy: 0 forbidden hits in official offline gate path.
-- Evidence schema: 21 required files, 0 missing.
+- Hardware lock policy: 4 audited scripts, 0 missing requirements.
+- Evidence schema: 22 required files, 0 missing.
 
 ## Performance Evidence
 
-- Mode 2 pack throughput: `1601.31 MiB/s`.
-- Mode 2 preallocated decode throughput: `569.821 MiB/s`.
-- Identity routing throughput: `978,452,000 frames/s`.
-- Reversed routing throughput: `499,956,000 frames/s`.
+- Mode 2 pack throughput: `1546.09 MiB/s`.
+- Mode 2 preallocated decode throughput: `565.894 MiB/s`.
+- Identity routing throughput: `999,440,000 frames/s`.
+- Reversed routing throughput: `481,809,000 frames/s`.
 - Advanced mute/invert/cross-deck routing throughput:
-  `491,712,000 frames/s`.
+  `472,260,000 frames/s`.
 - Check errors: `0`.
 - Panic flags: `0`.
 

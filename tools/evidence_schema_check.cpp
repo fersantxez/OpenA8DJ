@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
       root / "local-analysis/cpp-offline/static-policy.json",
+      root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",

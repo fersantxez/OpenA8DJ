@@ -37,6 +37,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
+./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -81,6 +82,7 @@ realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
 static = load_json("static-policy.json")
+hardware_lock_policy = load_json("hardware-lock-policy.json")
 bench = load_json("offline-bench-release.json")
 
 summary = {
@@ -224,6 +226,13 @@ summary = {
         "forbidden_hits": static.get("forbidden_hits"),
         "path_policy": static.get("path_policy"),
         "evidence": "local-analysis/cpp-offline/static-policy.json",
+    },
+    "hardware_lock_policy": {
+        "status": hardware_lock_policy.get("result"),
+        "audited_scripts": hardware_lock_policy.get("audited_scripts"),
+        "missing_requirements": hardware_lock_policy.get("missing_requirements"),
+        "sensitive_paths": hardware_lock_policy.get("sensitive_paths"),
+        "evidence": "local-analysis/cpp-offline/hardware-lock-policy.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

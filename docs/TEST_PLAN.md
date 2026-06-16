@@ -67,6 +67,7 @@ Current evidence files:
 - `local-analysis/cpp-offline/driverkit-surface-model.json`
 - `local-analysis/cpp-offline/jitter-model.json`
 - `local-analysis/cpp-offline/static-policy.json`
+- `local-analysis/cpp-offline/hardware-lock-policy.json`
 - `local-analysis/cpp-offline/offline-bench-release.json`
 - `local-analysis/cpp-offline/evidence-schema.json`
 
@@ -97,6 +98,8 @@ Current PASS coverage:
 - DriverKit/CoreAudio surface model;
 - jitter/timestamp model;
 - static policy check;
+- hardware lock policy check for HAL candidate safety, direct hardware gates,
+  and physical soundcheck;
 - evidence schema check;
 - synthetic pair-A no-leakage;
 - Release pack/decode/routing throughput floors.

@@ -46,6 +46,86 @@ def write_summary(path, lines):
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+class HardwareLock:
+    def __init__(self, root, purpose, evidence, actions, forbidden):
+        self.root = Path(os.environ.get(
+            "AUDIO_GATE_LOCK_ROOT",
+            str(Path.home() / ".opena8dj" / "hardware-gate.lock"),
+        ))
+        self.repo_root = root
+        self.purpose = purpose
+        self.evidence = evidence
+        self.actions = actions
+        self.forbidden = forbidden
+        self.acquired = False
+
+    @staticmethod
+    def _pid_alive(pid_text):
+        try:
+            pid = int(pid_text)
+        except (TypeError, ValueError):
+            return False
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _owner_pid(self):
+        owner = self.root / "owner"
+        if not owner.is_file():
+            return ""
+        for line in owner.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("pid="):
+                return line.split("=", 1)[1]
+        return ""
+
+    def _cleanup_stale(self):
+        if not self.root.exists():
+            return
+        owner_pid = self._owner_pid()
+        if owner_pid and not self._pid_alive(owner_pid):
+            import shutil
+            shutil.rmtree(self.root)
+
+    def __enter__(self):
+        self._cleanup_stale()
+        if os.environ.get("OPENA8DJ_HARDWARE_LOCK_HELD") == "1":
+            owner_pid = self._owner_pid()
+            if owner_pid and self._pid_alive(owner_pid):
+                return self
+        try:
+            self.root.mkdir()
+        except FileExistsError:
+            print("audio_gate_lock=BUSY", file=sys.stderr)
+            owner = self.root / "owner"
+            if owner.is_file():
+                print(owner.read_text(encoding="utf-8", errors="replace"), file=sys.stderr)
+            raise SystemExit(75)
+        self.acquired = True
+        os.environ["OPENA8DJ_HARDWARE_LOCK_HELD"] = "1"
+        owner_lines = [
+            f"pid={os.getpid()}",
+            "owner=codex",
+            f"worktree={self.repo_root}",
+            f"purpose={self.purpose}",
+            f"started_at={dt.datetime.now().strftime('%Y-%m-%dT%H:%M:%S%z')}",
+            f"actions_authorized={self.actions}",
+            f"forbidden={self.forbidden}",
+            f"evidence={self.evidence}",
+        ]
+        (self.root / "owner").write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self.acquired:
+            import shutil
+            shutil.rmtree(self.root, ignore_errors=True)
+        return False
+
+
 VIRTUAL_CAPTURE_HINTS = (
     "blackhole",
     "soundflower",
@@ -597,7 +677,6 @@ def main():
     args = parser.parse_args()
 
     root = repo_root()
-    make_tools(root, args.skip_build)
     base_dir = Path(args.run_dir).expanduser() if args.run_dir else root / "local-analysis" / "soundcheck" / run_id()
     base_dir.mkdir(parents=True, exist_ok=True)
     fixture_dir = base_dir / "fixture"
@@ -624,7 +703,32 @@ def main():
             "capture-device appears virtual/pre-device; use a real post-device capture input"
         )
 
-    run_audio_stack_health(root, base_dir, args)
+    lock_context = (
+        HardwareLock(
+            root,
+            "physical-soundcheck",
+            base_dir,
+            "Open Audio 8 DJ playback, external capture, CoreAudio config for candidate device",
+            "default-device-change,USB-reset,driver-install,system-reboot",
+        )
+        if not args.prepare_only
+        else None
+    )
+
+    def run_locked():
+        make_tools(root, args.skip_build)
+        run_audio_stack_health(root, base_dir, args)
+        return run_soundcheck_body(root, base_dir, fixture_dir, args)
+
+    if lock_context is None:
+        make_tools(root, args.skip_build)
+        run_audio_stack_health(root, base_dir, args)
+        return run_soundcheck_body(root, base_dir, fixture_dir, args)
+    with lock_context:
+        return run_locked()
+
+
+def run_soundcheck_body(root, base_dir, fixture_dir, args):
 
     prepare_log = base_dir / "prepare.log"
     with open(prepare_log, "w", encoding="utf-8") as log:

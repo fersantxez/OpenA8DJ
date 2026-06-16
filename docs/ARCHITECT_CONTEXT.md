@@ -54,6 +54,11 @@ Branch: `driverkit/cpp-redesign`
   code. It validates lifecycle start/stop idempotency and the device model
   without requiring DriverKit SDK or activating a System Extension. Current
   evidence: `local-analysis/cpp-offline/driverkit-shell-contract.json`.
+- Hardware-sensitive scripts now have mandatory lock enforcement before they
+  can install/reload HAL, restart `coreaudiod`, play through Audio 8 DJ, or
+  capture through an external recorder. Current evidence:
+  `local-analysis/cpp-offline/hardware-lock-policy.json`, result `PASS`,
+  `4` audited scripts, `0` missing requirements.
 - Current local toolchain check confirms no DriverKit SDK/AudioDriverKit path
   is available under the active Command Line Tools developer directory or the
   searched Xcode path, so real dext compilation remains blocked on full Xcode
@@ -148,6 +153,8 @@ Branch: `driverkit/cpp-redesign`
   - Active OpenA8DJ HAL bundle is absent. Run
     `scripts/runtime-isolation-audit --expect-hal active` after any authorized
     reinstall/restore and before physical testing.
+  - Current inactive-state runtime isolation evidence:
+    `local-analysis/runtime-isolation/current.json`, result `PASS`.
 - Physical validation must follow `docs/PHYSICAL_TEST_WINDOW_PLAN.md`, use the
   global hardware lock, and avoid default-device/sample-rate/buffer changes
   unless explicitly part of a documented window.

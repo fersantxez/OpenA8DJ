@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo"
+. "$repo/scripts/hardware-lock-lib.sh"
 
 seconds="3"
 out_dir=""
@@ -46,35 +47,13 @@ if [ -z "$out_dir" ]; then
 fi
 mkdir -p "$out_dir"
 
-lock_root="${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
-if [ -d "$lock_root" ] && [ -f "$lock_root/owner" ]; then
-  owner_pid="$(awk -F= '/^pid=/{print $2; exit}' "$lock_root/owner" || true)"
-  if [ -n "${owner_pid:-}" ] && ! kill -0 "$owner_pid" 2>/dev/null; then
-    rm -rf "$lock_root"
-  fi
-fi
-
-if ! mkdir "$lock_root" 2>/dev/null; then
-  echo "audio_gate_lock=BUSY"
-  cat "$lock_root/owner" 2>/dev/null || true
-  exit 75
-fi
-
-cleanup() {
-  rm -rf "$lock_root"
-}
-trap cleanup EXIT
-
-{
-  echo "pid=$$"
-  echo "owner=codex"
-  echo "worktree=$repo"
-  echo "purpose=audio8dj-direct-gate-no-irig"
-  echo "started_at=$(date +%Y-%m-%dT%H:%M:%S%z)"
-  echo "actions_authorized=Audio 8 DJ direct CoreAudio I/O, no iRig, no defaults"
-  echo "forbidden=default-device-change,sample-rate-change,buffer-change,driver-install,system-reboot"
-  echo "evidence=$repo/$out_dir"
-} > "$lock_root/owner"
+opena8dj_acquire_hardware_lock \
+  "$repo" \
+  "audio8dj-direct-gate-no-irig" \
+  "$repo/$out_dir" \
+  "Audio 8 DJ direct CoreAudio I/O, no iRig, no defaults" \
+  "default-device-change,sample-rate-change,buffer-change,driver-install,system-reboot" || exit $?
+trap opena8dj_release_hardware_lock EXIT
 
 {
   echo "run_dir=$repo/$out_dir"

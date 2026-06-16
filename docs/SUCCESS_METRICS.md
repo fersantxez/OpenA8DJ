@@ -175,6 +175,7 @@ C++ evidence set:
 | DriverKit shell contract | `PASS` | `local-analysis/cpp-offline/driverkit-shell-contract.json` |
 | jitter model | `PASS` | `local-analysis/cpp-offline/jitter-model.json` |
 | static policy | `PASS` | `local-analysis/cpp-offline/static-policy.json` |
+| hardware lock policy | `PASS` | `local-analysis/cpp-offline/hardware-lock-policy.json` |
 | Release packet/routing benchmark | `PASS` | `local-analysis/cpp-offline/offline-bench-release.json` |
 | evidence schema | `PASS` | `local-analysis/cpp-offline/evidence-schema.json` |
 | runtime isolation quiescence | `PASS` | `local-analysis/runtime-isolation/current.json` |
@@ -183,13 +184,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1601.31 MiB/s` over `5` repeats, min `1589.64`, max `1603.02` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `569.821 MiB/s` over `5` repeats, min `561.410`, max `570.244` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `559.307 MiB/s` over `5` repeats, min `518.090`, max `564.102` | informational |
-| Float32 to S24 conversion throughput | median `85,423,700 frames/s` over `5` repeats, min `85,370,400`, max `85,546,800` | `1,000,000 frames/s` |
-| identity routing throughput | median `978,452,000 frames/s` over `5` repeats, min `910,090,000`, max `981,813,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `499,956,000 frames/s` over `5` repeats, min `496,602,000`, max `512,751,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `491,712,000 frames/s` over `5` repeats, min `490,869,000`, max `493,487,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1546.09 MiB/s` over `5` repeats, min `1541.60`, max `1603.37` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `565.894 MiB/s` over `5` repeats, min `561.880`, max `570.159` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `560.702 MiB/s` over `5` repeats, min `502.531`, max `564.367` | informational |
+| Float32 to S24 conversion throughput | median `85,450,400 frames/s` over `5` repeats, min `84,446,800`, max `85,565,500` | `1,000,000 frames/s` |
+| identity routing throughput | median `999,440,000 frames/s` over `5` repeats, min `766,037,000`, max `1,010,510,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `481,809,000 frames/s` over `5` repeats, min `481,219,000`, max `492,135,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `472,260,000 frames/s` over `5` repeats, min `470,987,000`, max `475,401,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -227,6 +228,9 @@ Functional coverage in the current C++ test binary:
   `1.07069e-06`, max leakage `-240 dBFS`.
 - Python Mode 2 oracle: inherited validator passes all start bytes at 352-byte transfers.
 - Timecode policy matrix: `timecode-vinyl`, `timecode-cd-line`, `phono`, `disabled`.
+- Hardware lock policy: HAL candidate install/reload, direct Audio 8 DJ gate,
+  and physical soundcheck scripts must acquire the global hardware lock and
+  record owner/evidence metadata before hardware-sensitive work.
 - Input profile matrix: playback decode off/software lock off; timecode-vinyl,
   CD-line, and phono decode on/software lock on with CAIAQ modes `0`, `1`, and
   `2`, identity A/B/C/D source map, and ground-lift intent.

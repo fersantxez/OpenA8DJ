@@ -3,7 +3,7 @@
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
-Candidate code commit: `50105c5` plus current Mode 2 cross-oracle parity changes
+Candidate code commit: `389b59f` plus current mandatory hardware-lock policy changes
 
 ## Current Verdict
 
@@ -36,7 +36,7 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1601.31`, `decode_into_mib_s=569.821`, `route_frames_s=9.78452e+08`, `route_reversed_frames_s=4.99956e+08`, `route_advanced_frames_s=4.91712e+08`, `float_to_s24_frames_s=8.54237e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1546.09`, `decode_into_mib_s=565.894`, `route_frames_s=9.99440e+08`, `route_reversed_frames_s=4.81809e+08`, `route_advanced_frames_s=4.72260e+08`, `float_to_s24_frames_s=8.54504e+07` |
 | realtime SPSC ring audit | `PASS` | pushed `2815`, popped `2815`, remaining `0`, allocations `0` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline protocol contract | `PASS` | VID/PID `0x17cc:0x1978`, endpoints `0x01/0x81/0x82/0x06`, 8-in/8-out, Mode 2 check cadence `16`, full frame `32` |
@@ -44,6 +44,7 @@ mainline run:
 | offline Mode 2 cross-oracle byte parity | `PASS` | `72` rows, `0` failures, `max_byte_mismatches=0`, `max_length_delta=0`, `total_check_errors=0`, `total_panic_flags=0` |
 | offline DVS packet input decode | `PASS` | `24` rows, `0` failures, playback decode-off `PASS` |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
+| offline hardware lock policy | `PASS` | `4` audited scripts, `0` missing requirements; HAL candidate safety, direct Audio 8 DJ gate, and physical soundcheck require lock |
 | simulated output oracle | `PASS` | `local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json` |
 | physical tone beats historical C tone floor | `PASS` | `sideband_ratio=0.000657`, `click_outliers=0` |
 | physical real-music quality | `FAIL` | `quality_alignment_score=0.938154`, `snr_db_min=8.93`, `lag_jumps_gt_2_frames=24` |
@@ -85,6 +86,9 @@ Interpretation:
 - No physical Traktor/timecode vinyl lock evidence exists.
 - A no-diagnostic HAL variant caused an operational hang; that variant remains
   rejected until reproduced safely with a watchdog.
+- Physical-script lock discipline now has offline evidence, but this does not
+  replace the need to acquire the lock and record active HAL isolation before
+  each physical run.
 - Current runtime state is intentionally quiesced: the hardware lock is absent,
   mainline OpenA8DJ LaunchAgents are disabled, no OpenA8DJ process is detected,
   and the active HAL path is absent. This is safe for idle state, but it means

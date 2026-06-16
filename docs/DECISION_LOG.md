@@ -1,5 +1,33 @@
 # Decision Log
 
+## 2026-06-16: Make The Hardware Lock Mandatory In Physical Scripts
+
+Decision:
+- Add a shared hardware-lock helper and require it in HAL candidate safety,
+  direct Audio 8 DJ gates, and physical soundcheck.
+- Add an offline CTest policy gate so removing that lock discipline fails the
+  normal offline gate path.
+
+Reason:
+- The goal requires more physical testing, but physical tests are only useful
+  if they cannot race mainline QA, other agents, CoreAudio reloads, or USB
+  recovery work.
+- `test-hal-candidate-safety` performs HAL install/reload and `coreaudiod`
+  restart, and `run-soundcheck` plays/captures audio; both must be gated before
+  any further physical evidence can be trusted.
+
+Alternatives discarded:
+- Rely on operator discipline or docs only: rejected because previous hardware
+  work already exposed lock/process coordination risk.
+- Put lock only in outer manual commands: rejected because direct script
+  invocation would still be unsafe.
+
+Evidence:
+- `local-analysis/cpp-offline/hardware-lock-policy.json` records `PASS`,
+  `4` audited scripts, and `0` missing requirements.
+- `local-analysis/cpp-offline/current-offline-gates.json` records
+  `hardware_lock_policy=PASS`.
+
 ## 2026-06-16: Require C++ Mode 2 Bytes To Match The Python Oracle
 
 Decision:

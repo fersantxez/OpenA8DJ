@@ -1,5 +1,37 @@
 # Test Evidence
 
+## 2026-06-16: Mandatory Hardware Lock Policy For Physical Scripts
+
+- Command: `scripts/run-cpp-offline-gates`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Commit: `389b59f` plus current hardware-lock policy changes
+- Result: PASS
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/hardware-lock-policy.json`
+  - `local-analysis/runtime-isolation/current.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Change:
+  - Added `scripts/hardware-lock-lib.sh`.
+  - `scripts/test-hal-candidate-safety` now acquires the global hardware lock before HAL install/reload and `coreaudiod` restart.
+  - `scripts/run-audio8dj-direct-gate` now uses the shared lock helper.
+  - `scripts/run-soundcheck` now acquires the global hardware lock before physical playback/capture/config work.
+  - Added `opena8djcpp_hardware_lock_policy_check` and wired it into CTest, offline gates, evidence schema, and promotion readiness.
+- Hardware lock policy result: `PASS`, `4` audited scripts, `0` missing requirements.
+- Full offline gates after the change:
+  - Default CTest: `100% tests passed, 0 tests failed out of 15`
+  - Release CTest: `100% tests passed, 0 tests failed out of 16`
+  - Evidence schema: `22` required files, `0` missing
+  - Release benchmark: `pack_mib_s=1546.09`, `decode_into_mib_s=565.894`, `float_to_s24_frames_s=8.54504e+07`, `route_frames_s=9.99440e+08`, `route_reversed_frames_s=4.81809e+08`, `route_advanced_frames_s=4.72260e+08`
+- Runtime isolation after the change: PASS with HAL inactive, lock absent, forbidden mainline LaunchAgents disabled, and no OpenA8DJ process detected.
+- Promotion readiness result: FAIL, with `branch_promotion_allowed=false`.
+- Remaining promotion blockers: physical real-music quality, runtime CPU/coreaudiod, and physical Traktor/timecode vinyl lock evidence.
+- Hardware touched by this gate: no
+- CoreAudio touched by this gate: no
+- USB touched by this gate: no
+- Driver installed or activated by this gate: no
+
 ## 2026-06-16: Mode 2 Cross-Oracle Byte Parity Gate
 
 - Command: `scripts/run-cpp-offline-gates`

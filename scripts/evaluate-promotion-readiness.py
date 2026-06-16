@@ -204,6 +204,11 @@ def evaluate(args):
              offline.get("driverkit_shell_contract", {}).get("device_model_valid") is True and
              offline.get("driverkit_shell_contract", {}).get("system_extension_activated") is False,
              offline.get("driverkit_shell_contract", {})),
+        gate("offline_hardware_lock_policy",
+             offline.get("hardware_lock_policy", {}).get("status") == "PASS" and
+             offline.get("hardware_lock_policy", {}).get("audited_scripts", 0) >= 4 and
+             offline.get("hardware_lock_policy", {}).get("missing_requirements", 1) == 0,
+             offline.get("hardware_lock_policy", {})),
         gate("offline_throughput_beats_floor",
              as_float(bench, "pack_mib_s") >= BASELINE["offline_pack_mib_s_floor"] and
              as_float(bench, "decode_mib_s") >= BASELINE["offline_decode_mib_s_floor"] and

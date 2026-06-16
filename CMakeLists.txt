@@ -153,6 +153,9 @@ add_executable(opena8djcpp_jitter_model
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
+add_executable(opena8djcpp_hardware_lock_policy_check
+  tools/hardware_lock_policy_check.cpp)
+
 add_executable(opena8djcpp_evidence_schema_check
   tools/evidence_schema_check.cpp)
 
@@ -171,6 +174,7 @@ add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
 add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
+add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME opena8djcpp_offline_bench COMMAND opena8djcpp_offline_bench)

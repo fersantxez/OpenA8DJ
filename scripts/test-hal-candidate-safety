@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/hardware-lock-lib.sh"
 candidate=""
 cycles="1"
 leave_loaded="0"
@@ -75,6 +76,14 @@ if [ -z "$run_dir" ]; then
   run_dir="$ROOT/local-analysis/hal-candidate-safety/safety-$(date +%Y%m%d-%H%M%S)"
 fi
 mkdir -p "$run_dir"
+
+opena8dj_acquire_hardware_lock \
+  "$ROOT" \
+  "hal-candidate-safety" \
+  "$run_dir" \
+  "HAL install/reload, coreaudiod restart, CoreAudio enumeration" \
+  "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot" || exit $?
+trap opena8dj_release_hardware_lock EXIT
 
 active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
 disabled_hal="/Library/Audio/Plug-Ins/HAL.disabled"
