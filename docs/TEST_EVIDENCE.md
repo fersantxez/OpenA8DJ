@@ -1423,3 +1423,58 @@ Operational note:
   - This validates a buildable/offline lifecycle-parity candidate only. It does
     not supersede failed physical quality evidence and does not authorize branch
     promotion or Traktor/timecode claims.
+
+## 2026-06-16: Lifecycle Parity Physical Retest
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-lifecycle-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-lifecycle-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-lifecycle-failed-unload.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Commit: `e0ad0a0`
+- Result:
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL.
+  - Post-unload runtime isolation: PASS; active HAL absent, lock absent, no
+    OpenA8DJ process.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-lifecycle-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-lifecycle-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-lifecycle-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-lifecycle-failed-unload.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Key metrics:
+  - `quality_alignment_score=0.934891`
+  - `analog_snr_db=8.73`
+  - `lag_jumps_gt_2_frames=25`
+  - `mid_band_residual_ratio=1.397074`
+  - `high_band_residual_ratio=1.352348`
+  - `quiet_mid_band_noise_dbfs=-31.10`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver CPU p95 `36.0%`
+- Readiness note:
+  - Still not ready for listening, Traktor/timecode validation, branch
+    promotion, or any claim of beating mainline.
+
+## 2026-06-16: Input Decode Activation Parity Offline Gates
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - HAL/direct USB build: PASS.
+  - Debug CTest: PASS, `15/15`.
+  - Release CTest: PASS, `16/16`, including release benchmark.
+  - Release benchmark: PASS; `pack_mib_s=1627.01`,
+    `decode_mib_s=575.412`, `route_frames_s=991404000`,
+    `check_errors=0`, `panic_flags=0`.
+- Evidence path:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Readiness note:
+  - This proves only compile/offline correctness for input decode activation
+    parity. It must be followed by locked physical CPU and music-quality
+    measurement before any claim.

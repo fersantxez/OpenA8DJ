@@ -1077,6 +1077,7 @@ static void CopyClientOutputToOutput(UInt32 streamIndex, const Float32 *inInterl
 #if OPENA8DJ_ENABLE_INPUT_IO
 static void PrepareInputCycle(UInt32 frameCount, UInt64 cycleCounter)
 {
+    OpenA8DJUSBSetInputDecodeActive(true);
     UInt32 clampedFrames = frameCount <= kOpenA8DJMaxBufferFrames ? frameCount : kOpenA8DJMaxBufferFrames;
     if (cycleCounter == 0) {
         gInputCycleFrames = clampedFrames;
@@ -1897,6 +1898,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inD
     }
     if (gRunningClients == 0) {
         FlushOutputCycle();
+        OpenA8DJUSBSetInputDecodeActive(false);
         OpenA8DJUSBClose();
         atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
         StopClock();

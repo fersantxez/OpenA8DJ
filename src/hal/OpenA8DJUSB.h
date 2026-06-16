@@ -31,6 +31,7 @@ bool OpenA8DJUSBSetSampleRate(double sampleRate);
 void OpenA8DJUSBStop(void);
 void OpenA8DJUSBClose(void);
 bool OpenA8DJUSBGetClockAnchor(OpenA8DJUSBClockAnchor *outAnchor);
+void OpenA8DJUSBSetInputDecodeActive(bool active);
 uint32_t OpenA8DJUSBReadInput(float *outInterleaved, uint32_t frames, uint32_t channels);
 void OpenA8DJUSBWriteOutput(const float *inInterleaved, uint32_t frames, uint32_t channels);
 void OpenA8DJUSBWriteOutputAtSampleTime(const float *inInterleaved,

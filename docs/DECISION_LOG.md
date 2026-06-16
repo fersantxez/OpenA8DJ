@@ -480,3 +480,44 @@ Evidence:
 - Evidence paths:
   - `local-analysis/cpp-offline/current-offline-gates.json`
   - `local-analysis/promotion-readiness-current.json`
+
+Follow-up:
+- Locked physical evidence at commit `e0ad0a0` improved from the ISO64
+  regression but still failed product thresholds:
+  `quality_alignment_score=0.934891`, `analog_snr_db=8.73`,
+  `lag_jumps_gt_2_frames=25`, driver CPU p95 `36.0%`.
+
+Evidence:
+- `local-analysis/soundcheck/20260616-lifecycle-irig-pairA-16s-cpp-hal`
+- `local-analysis/runtime-isolation/post-lifecycle-failed-unload.json`
+- `local-analysis/audio-stack-guard/20260616-lifecycle-force-unload/force-unload.log`
+- `local-analysis/promotion-readiness-current.json`
+
+## 2026-06-16: Gate USB Input Decode On Actual Input IO
+
+Decision:
+- Port mainline-style input decode activation to the C++ HAL/USB bridge:
+  `OpenA8DJUSBSetInputDecodeActive`, activation from HAL `PrepareInputCycle`,
+  deactivation on final `StopIO`, and capture decode bypass when no input
+  client is active.
+
+Reason:
+- The failed lifecycle candidate still showed OpenA8DJ driver CPU p95 around
+  `36%` during output-only soundcheck. C++ was decoding input traffic even when
+  the active physical test only used Audio 8 DJ output and iRig capture.
+- Mainline gates input decode from HAL input cycles, so this is behavior parity
+  and a plausible resource reduction without changing packet layout or output
+  format.
+
+Alternatives discarded:
+- Continue with packet byte sweeps: rejected because the latest failure is now
+  dominated by CPU/resource waste plus residual analog quality, and recent
+  offset/layout sweeps did not pass.
+- Disable input decode globally: rejected because timecode vinyl and Traktor
+  require input routing and DVS capture once those tests run.
+
+Evidence:
+- Build: `make usb-play hal` passed.
+- Offline gates: `scripts/run-cpp-offline-gates` passed Debug `15/15` and
+  Release `16/16`.
+- Evidence path: `local-analysis/cpp-offline/current-offline-gates.json`

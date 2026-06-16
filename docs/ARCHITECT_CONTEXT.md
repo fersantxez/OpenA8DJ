@@ -203,3 +203,24 @@ Next technical target:
 - Run one locked physical HAL candidate after committing this lifecycle parity
   work. If quality remains bad, prioritize input-decode activation parity and
   capture-paced playback request accounting before another byte-layout sweep.
+
+## 2026-06-16 Current Iteration: Input Decode Activation Parity
+
+- Locked lifecycle-parity physical soundcheck at commit `e0ad0a0` still failed:
+  `quality_alignment_score=0.934891`, `analog_snr_db=8.73`,
+  `lag_jumps_gt_2_frames=25`, mid-band residual ratio `1.397074`,
+  high-band residual ratio `1.352348`, quiet mid-band noise `-31.10 dBFS`,
+  OpenA8DJ driver CPU p95 `36.0%`.
+- The lifecycle candidate was unloaded after failure; post-unload isolation
+  passed with HAL inactive, lock absent, no OpenA8DJ process, and iRig still
+  visible.
+- C++ now ports mainline-style input decode activation:
+  `OpenA8DJUSBSetInputDecodeActive`, HAL `PrepareInputCycle` activation,
+  StopIO deactivation, and USB capture decode bypass while no input client is
+  active.
+- Build and offline gates passed after this change:
+  `make usb-play hal`, `scripts/run-cpp-offline-gates` with Debug `15/15` and
+  Release `16/16`.
+- This is a CPU/work-reduction candidate for output-only playback. It is not a
+  readiness claim until a locked iRig run proves lower CPU and better or equal
+  analog quality.
