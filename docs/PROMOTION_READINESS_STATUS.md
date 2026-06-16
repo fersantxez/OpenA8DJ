@@ -36,7 +36,7 @@ mainline run:
 | Gate | Result | Evidence |
 |---|---|---|
 | offline C++ gates | `PASS` | `local-analysis/cpp-offline/current-offline-gates.json` |
-| offline throughput | `PASS` | `pack_mib_s=1589.3`, `decode_into_mib_s=550.105`, `route_frames_s=9.67471e+08`, `route_reversed_frames_s=5.8953e+08`, `float_to_s24_frames_s=8.38492e+07` |
+| offline throughput | `PASS` | `pack_mib_s=1413.3`, `decode_into_mib_s=506.054`, `route_frames_s=8.26517e+08`, `route_reversed_frames_s=5.32678e+08`, `float_to_s24_frames_s=7.59581e+07` |
 | realtime SPSC ring audit | `PASS` | pushed `2815`, popped `2815`, remaining `0`, allocations `0` |
 | offline timecode signal analysis | `PASS` | `8` rows, `0` failures |
 | offline DVS packet input decode | `PASS` | `24` rows, `0` failures, playback decode-off `PASS` |

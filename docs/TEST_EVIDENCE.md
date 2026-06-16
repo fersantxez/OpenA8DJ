@@ -927,13 +927,13 @@ Operational note:
   - Frames written: `22049` at 44.1 kHz rows, `23999` at 48 kHz rows
   - Leakage failures: `0`
   - Decode overflows/check errors/panic flags: `0`
-- Release benchmark at code commit `6058093`:
-  - `pack_mib_s=1589.3`
-  - `decode_into_mib_s=550.105`
-  - `decode_allocating_mib_s=520.633`
-  - `float_to_s24_frames_s=8.38492e+07`
-  - `route_frames_s=9.67471e+08`
-  - `route_reversed_frames_s=5.8953e+08`
+- Release benchmark at code commit `6058093` from the final post-doc rerun:
+  - `pack_mib_s=1413.3`
+  - `decode_into_mib_s=506.054`
+  - `decode_allocating_mib_s=487.822`
+  - `float_to_s24_frames_s=7.59581e+07`
+  - `route_frames_s=8.26517e+08`
+  - `route_reversed_frames_s=5.32678e+08`
   - `decode_into_output_overflows=0`
   - `check_errors=0`
   - `panic_flags=0`

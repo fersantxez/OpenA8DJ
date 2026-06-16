@@ -179,12 +179,12 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1589.3 MiB/s` over `5` repeats, min `1574.22`, max `1613.11` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `550.105 MiB/s` over `5` repeats, min `547.261`, max `564.593` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `520.633 MiB/s` over `5` repeats, min `501.028`, max `549.561` | informational |
-| Float32 to S24 conversion throughput | median `83,849,200 frames/s` over `5` repeats, min `82,324,100`, max `85,410,900` | `1,000,000 frames/s` |
-| identity routing throughput | median `967,471,000 frames/s` over `5` repeats, min `894,689,000`, max `973,908,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `589,530,000 frames/s` over `5` repeats, min `587,327,000`, max `602,284,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1413.3 MiB/s` over `5` repeats, min `1408.04`, max `1417.04` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `506.054 MiB/s` over `5` repeats, min `502.881`, max `508.337` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `487.822 MiB/s` over `5` repeats, min `451.395`, max `536.91` | informational |
+| Float32 to S24 conversion throughput | median `75,958,100 frames/s` over `5` repeats, min `75,739,500`, max `76,424,000` | `1,000,000 frames/s` |
+| identity routing throughput | median `826,517,000 frames/s` over `5` repeats, min `674,109,000`, max `863,026,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `532,678,000 frames/s` over `5` repeats, min `520,472,000`, max `542,227,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
