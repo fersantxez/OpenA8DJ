@@ -1,4 +1,5 @@
 #include "opena8djcpp/audio_model.hpp"
+#include "opena8djcpp/audio_ring.hpp"
 #include "opena8djcpp/input_profile.hpp"
 #include "opena8djcpp/metrics.hpp"
 #include "opena8djcpp/mode2_packet.hpp"
@@ -335,6 +336,45 @@ void test_timecode_signal_analysis() {
   assert(!bad_frequency.frequency_ok);
 }
 
+void test_spsc_frame_ring_contract() {
+  SpscFrameRing<S24Frame, 4> ring;
+  assert(ring.capacity() == 4);
+  assert(ring.readable() == 0);
+  assert(ring.writable() == 4);
+
+  const auto frame0 = synthetic_s24_frame(0);
+  const auto frame1 = synthetic_s24_frame(1);
+  const auto frame2 = synthetic_s24_frame(2);
+  const auto frame3 = synthetic_s24_frame(3);
+  const auto frame4 = synthetic_s24_frame(4);
+  assert(ring.push(frame0));
+  assert(ring.push(frame1));
+  assert(ring.push(frame2));
+  assert(ring.push(frame3));
+  assert(!ring.push(frame4));
+  assert(ring.readable() == 4);
+  assert(ring.writable() == 0);
+
+  S24Frame out{};
+  assert(ring.pop(out));
+  assert(out == frame0);
+  assert(ring.push(frame4));
+
+  std::array<S24Frame, 4> popped{};
+  assert(ring.pop_many(popped) == 4);
+  assert(popped[0] == frame1);
+  assert(popped[1] == frame2);
+  assert(popped[2] == frame3);
+  assert(popped[3] == frame4);
+  assert(!ring.pop(out));
+
+  std::array<S24Frame, 3> batch{frame0, frame1, frame2};
+  assert(ring.push_many(batch) == batch.size());
+  ring.clear();
+  assert(ring.readable() == 0);
+  assert(ring.writable() == 4);
+}
+
 }  // namespace
 
 int main() {
@@ -350,6 +390,7 @@ int main() {
   test_timecode_profile_policy();
   test_input_profiles();
   test_timecode_signal_analysis();
+  test_spsc_frame_ring_contract();
 
   std::cout << "opena8djcpp_core_contract PASS\n";
   return 0;

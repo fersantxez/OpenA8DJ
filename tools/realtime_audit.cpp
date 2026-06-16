@@ -1,4 +1,5 @@
 #include "opena8djcpp/mode2_packet.hpp"
+#include "opena8djcpp/audio_ring.hpp"
 #include "opena8djcpp/routing.hpp"
 
 #include <atomic>
@@ -78,6 +79,7 @@ int main() {
 
   std::vector<std::uint8_t> packed(static_cast<std::size_t>(kTransferCount) * kTransferBytes);
   std::vector<S24Frame> decoded(kFrames + 1024);
+  std::vector<S24Frame> ring_output(kFrames + 1024);
   std::vector<float> route_input(static_cast<std::size_t>(kFrames) * kInputChannels, 0.0F);
   std::vector<float> route_output(static_cast<std::size_t>(kFrames) * kOutputChannels, 0.0F);
   for (std::size_t index = 0; index < route_input.size(); ++index) {
@@ -104,12 +106,20 @@ int main() {
   const RoutingPlan identity_plan(RoutingMatrix::identity());
   const bool routed =
       route_interleaved_f32(route_input, route_output, kFrames, identity_plan);
+  SpscFrameRing<S24Frame, 8192> capture_ring;
+  const auto ring_pushed =
+      capture_ring.push_many(std::span<const S24Frame>(decoded.data(),
+                                                       static_cast<std::size_t>(
+                                                           decode.stats.decoded_frames)));
+  const auto ring_popped = capture_ring.pop_many(ring_output);
 
   g_count_allocations.store(false, std::memory_order_relaxed);
 
   const auto allocations = g_allocations.load(std::memory_order_relaxed);
   const bool pass = allocations == 0 && decode.output_overflows == 0 &&
-                    decode.stats.check_errors == 0 && decode.stats.panic_flags == 0 && routed;
+                    decode.stats.check_errors == 0 && decode.stats.panic_flags == 0 && routed &&
+                    ring_pushed == decode.stats.decoded_frames &&
+                    ring_popped == decode.stats.decoded_frames;
 
   std::cout << "{\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
@@ -118,6 +128,9 @@ int main() {
             << "  \"decoded_frames\": " << decode.stats.decoded_frames << ",\n"
             << "  \"check_errors\": " << decode.stats.check_errors << ",\n"
             << "  \"panic_flags\": " << decode.stats.panic_flags << ",\n"
+            << "  \"ring_pushed_frames\": " << ring_pushed << ",\n"
+            << "  \"ring_popped_frames\": " << ring_popped << ",\n"
+            << "  \"ring_remaining_frames\": " << capture_ring.readable() << ",\n"
             << "  \"routing_ok\": " << (routed ? "true" : "false") << "\n"
             << "}\n";
 
