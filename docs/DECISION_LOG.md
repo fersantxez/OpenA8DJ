@@ -397,3 +397,36 @@ Evidence:
 - `local-analysis/direct-usb-soundcheck/20260616-191931-halflags-tone1k-minus18db`
 - `local-analysis/runtime-isolation/current-after-usb-investigation.json`
 - `local-analysis/promotion-readiness-current.json`
+
+## 2026-06-16: Align C++ HAL Transport Defaults With Mainline 0.3.135 Baseline
+
+Decision:
+- Change C++ HAL build defaults from ISO5 with 64/64 capture/playback queues to
+  ISO64 with 8/8 queues, and expose `OPENA8DJ_OUTPUT_PREFETCH_FRAMES` with a
+  default build value of 64.
+
+Reason:
+- The latest mainline physical/CPU baseline documented for `0.3.135` used
+  `HAL_ISO_FRAMES=64`, `HAL_CAPTURE_QUEUE=8`, `HAL_PLAYBACK_QUEUE=8`, and
+  `HAL_OUTPUT_PREFETCH_FRAMES=64`.
+- The C++ candidate had diverged to ISO5 and 64/64 queues, which changes USB
+  cadence, transfer size, in-flight behavior, and callback load. Given the
+  latest physical C++ failure plus driver CPU around `33-35%`, the next
+  candidate should first match the known mainline transport profile before more
+  speculative packet experiments.
+
+Alternatives discarded:
+- Keep ISO5 because one direct tone comparison beat ISO8: rejected because that
+  result was still a severe physical FAIL and did not compare against the
+  actual mainline ISO64 baseline.
+- Continue changing packet byte offsets first: rejected because offset/endian
+  sweeps did not find a passing physical tone.
+
+Evidence:
+- `/Users/fer/dev/opena8dj/Makefile` read-only defaults:
+  `HAL_ISO_FRAMES=64`, `HAL_CAPTURE_QUEUE=8`, `HAL_PLAYBACK_QUEUE=8`,
+  `HAL_OUTPUT_PREFETCH_FRAMES=64`.
+- `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-14.md` documents the
+  `0.3.135` CPU/digital stability baseline using ISO64/8/8.
+- `local-analysis/usb-physical-investigation-summary.json` records the C++
+  ISO5-era physical failure.

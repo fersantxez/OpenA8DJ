@@ -1334,3 +1334,30 @@ Operational note:
   - This is negative physical evidence. The candidate is not ready for
     listening, Traktor/timecode validation, branch promotion, or any claim of
     beating mainline.
+
+## 2026-06-16: ISO64 Transport Profile Offline Rebuild
+
+- Commands:
+  - `make clean && make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - HAL/direct USB rebuilt with `OPENA8DJ_ISO_FRAMES_PER_TRANSFER=64`,
+    `OPENA8DJ_CAPTURE_QUEUE_DEPTH=8`, `OPENA8DJ_PLAYBACK_QUEUE_TARGET=8`,
+    `OPENA8DJ_OUTPUT_PREFETCH_FRAMES=64`.
+  - Offline gates: PASS (`15/15` default CTest, `16/16` release CTest).
+  - Release benchmark: PASS; `pack_mib_s=1623.02`,
+    `decode_mib_s=575.229`, `route_frames_s=976179000`,
+    `check_errors=0`, `panic_flags=0`.
+  - Promotion gate: still FAIL, `branch_promotion_allowed=false`, because
+    latest physical music quality, runtime CPU, latest physical investigation,
+    and physical Traktor/timecode evidence are not passing.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Readiness note:
+  - This only creates an ISO64 candidate matching the current mainline
+    transport profile. It does not supersede the latest failed physical
+    evidence until a new locked hardware run passes.

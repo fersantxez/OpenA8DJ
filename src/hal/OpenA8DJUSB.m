@@ -46,6 +46,10 @@
 #define OPENA8DJ_OUTPUT_GAIN 1.0f
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_PREFETCH_FRAMES
+#define OPENA8DJ_OUTPUT_PREFETCH_FRAMES 256
+#endif
+
 #ifndef OPENA8DJ_ENABLE_INPUT_DECODE
 #define OPENA8DJ_ENABLE_INPUT_DECODE 1
 #endif
@@ -148,7 +152,7 @@ enum {
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kRingFrames = 32768,
-    kOutputPrefetchFrames = 256,
+    kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
     kOutputStartLatencyFrames = 8192,
     kOutputRestartLatencyFrames = 4096,
     kOutputTargetLatencyFrames = 8192,

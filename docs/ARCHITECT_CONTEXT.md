@@ -104,6 +104,12 @@ Branch: `driverkit/cpp-redesign`
   `HAL_CFLAGS` as the HAL bundle and parameterizes
   `OPENA8DJ_OUTPUT_CHECK_OFFSET` with default `8`. This improves diagnostic
   fidelity only; it is not an audio-quality fix.
+- 2026-06-16 follow-up comparison found the C++ HAL transport defaults had
+  diverged from the latest mainline physical baseline: C++ used ISO5 with
+  64/64 capture/playback queues, while mainline `0.3.135` uses ISO64 with 8/8
+  queues and output prefetch 64. C++ defaults now match that transport profile
+  for the next candidate build. This is only a testable hypothesis; physical
+  quality remains FAIL until a locked HAL run proves otherwise.
 - Offline window-trace analysis of the failed physical music run shows
   `lag_jumps_gt_2_frames=24`, local lag from `3` to `-27` frames, and only
   `2.1%` median mid-band residual improvement after per-window lag correction.
