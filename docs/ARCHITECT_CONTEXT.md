@@ -38,6 +38,10 @@ Branch: `driverkit/cpp-redesign`
   code. It validates lifecycle start/stop idempotency and the device model
   without requiring DriverKit SDK or activating a System Extension. Current
   evidence: `local-analysis/cpp-offline/driverkit-shell-contract.json`.
+- Current local toolchain check confirms no DriverKit SDK/AudioDriverKit path
+  is available under the active Command Line Tools developer directory or the
+  searched Xcode path, so real dext compilation remains blocked on full Xcode
+  plus signing/entitlement setup.
 - The core now includes a fixed-capacity SPSC frame ring contract for the
   realtime data plane. Current realtime audit pushes and pops all `2815`
   decoded frames with `0` allocations and `0` remaining frames.
@@ -102,7 +106,7 @@ Branch: `driverkit/cpp-redesign`
   `local-analysis/runtime-isolation/current.json`, result `PASS`, lock absent,
   mainline services disabled, active HAL absent, no OpenA8DJ process detected.
 - DriverKit shell is only an offline lifecycle/model contract; no real dext is
-  installed or activated.
+  installed, activated, or currently buildable on this machine.
 - Offline tests cover initial surface/routing, Mode 2 packet fidelity,
   synthetic no-leakage, input-profile Mode 2 decode, jitter model, static
   policy, and Release throughput.

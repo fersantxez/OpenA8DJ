@@ -1031,3 +1031,32 @@ Operational note:
 - CoreAudio touched: no
 - USB touched: no
 - Driver installed or activated: no
+
+## 2026-06-16: DriverKit SDK Availability Check
+
+- Commands:
+  - `xcrun --sdk driverkit --show-sdk-path`
+  - `xcrun --show-sdk-path`
+  - `xcodebuild -showsdks`
+  - `find /Applications/Xcode.app /Library/Developer/CommandLineTools -path '*DriverKit*.sdk'`
+  - `find /Applications/Xcode.app /Library/Developer/CommandLineTools -path '*AudioDriverKit*'`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result: BLOCKED_DRIVERKIT_SDK
+- Findings:
+  - Active SDK path: `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
+  - `xcrun --sdk driverkit --show-sdk-path` failed because SDK `driverkit`
+    cannot be located.
+  - `xcodebuild -showsdks` failed because active developer directory is Command
+    Line Tools, not full Xcode.
+  - No `DriverKit*.sdk` or `AudioDriverKit` path was found in the searched
+    developer locations.
+- Hardware touched: no
+- CoreAudio touched: no
+- USB touched: no
+- Driver installed or activated: no
+- Readiness note:
+  - Current DriverKit work remains an offline C++ shell/model contract.
+  - Real dext compilation is blocked until full Xcode with DriverKit/
+    AudioDriverKit SDK support is selected and signing/entitlements are
+    prepared.

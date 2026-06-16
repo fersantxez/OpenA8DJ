@@ -250,6 +250,16 @@ The default preset should be `dev-safe`.
 
 DriverKit should be prepared structurally, not activated operationally.
 
+Current local blocker:
+
+- The active developer directory is Command Line Tools, not full Xcode.
+- `xcrun --sdk driverkit --show-sdk-path` cannot locate the DriverKit SDK.
+- No local `DriverKit*.sdk` or `AudioDriverKit` path is present under the
+  checked developer locations.
+
+Until that changes, the DriverKit target remains an offline C++ shell contract
+and must not be described as a real dext build.
+
 Acceptable early structure:
 
 ```text

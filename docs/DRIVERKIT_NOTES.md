@@ -42,16 +42,21 @@ Date: 2026-06-16
 
 Observed on 2026-06-16:
 
-- `xcrun --sdk macosx --show-sdk-path` works and points to Command Line Tools.
-- `xcodebuild -showsdks` fails because the active developer directory is `/Library/Developer/CommandLineTools`, not a full Xcode install.
+- `xcrun --show-sdk-path` works and points to
+  `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
+- `xcodebuild -showsdks` fails because the active developer directory is
+  `/Library/Developer/CommandLineTools`, not a full Xcode install.
 - `xcrun --sdk driverkit --show-sdk-path` cannot locate a DriverKit SDK.
-- No `AudioDriverKit.framework` or `DriverKit.framework` was found under `/Applications`.
+- No `DriverKit*.sdk` or `AudioDriverKit` path was found under
+  `/Applications/Xcode.app` or `/Library/Developer/CommandLineTools`.
 
 Conclusion:
 
 - A real AudioDriverKit dext target cannot be compiled on this machine in the current toolchain state.
 - This is an environment/toolchain blocker, not a reason to touch system extensions or install anything automatically.
-- The current substitute gate is `opena8djcpp_driverkit_surface_model`, which validates the intended device/stream/sample-rate model offline.
+- The current substitute gates are `opena8djcpp_driverkit_surface_model` and
+  `opena8djcpp_driverkit_shell_contract`, which validate the intended
+  device/stream/sample-rate model and bounded lifecycle offline.
 
 Required before real dext build:
 
