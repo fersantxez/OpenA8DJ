@@ -1269,3 +1269,68 @@ Operational note:
   - This closes the current full offline simulated-output matrix gap.
   - It does not prove physical DAC/mixer/iRig quality, Traktor lock, or actual
     runtime CPU. Branch promotion remains forbidden.
+
+## 2026-06-16: Locked Physical USB Investigation After Audio Client Cleanup
+
+- Commands:
+  - `scripts/audio-stack-guard --recover --unload-opena8dj ...`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded ...`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 24 --mode dense --stream-stats-snapshots ...`
+  - Direct USB tone sweeps using `build/opena8dj-usb-play*` variants.
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current-after-usb-investigation.json`
+  - `scripts/evaluate-promotion-readiness.py > local-analysis/promotion-readiness-current.json`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - Spotify stuck at about `99%` CPU was terminated under lock.
+  - CoreAudio health recovered; `iRig Stream` and `Open Audio 8 DJ` both
+    enumerated before HAL testing.
+  - HAL install/reload safety: PASS.
+  - Physical music soundcheck: FAIL.
+  - Direct USB tone sweeps: FAIL, no start-byte/endian/check-offset variant
+    produced a passing analog tone.
+  - iRig no-playback baseline: clean enough to continue using the route.
+  - Runtime isolation after cleanup: PASS, active HAL absent, lock absent.
+  - Offline gates after build/tooling changes: PASS.
+  - Promotion gate: FAIL, `branch_promotion_allowed=false`.
+  - Promotion evaluator updated after this run so its default music/CPU evidence
+    points at the latest failed HAL soundcheck, and it now requires
+    `local-analysis/usb-physical-investigation-summary.json` to report
+    `PASS_READY`. Current result remains FAIL.
+- Evidence paths:
+  - `local-analysis/usb-physical-investigation-summary.json`
+  - `local-analysis/audio-stack-guard/20260616-185419-kill-spotify-explicit/post-kill-guard`
+  - `local-analysis/hal-candidate-safety/20260616-185450-cpp-lockpolicy-leave-loaded-post-clean`
+  - `local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal`
+  - `local-analysis/irig-baseline/20260616-191203-no-playback-9s`
+  - `local-analysis/start-byte-sweep/20260616-190418-tone1k-minus36db`
+  - `local-analysis/start-byte-sweep/20260616-190657-tone1k-minus36db-native-i24`
+  - `local-analysis/check-offset-sweep/20260616-191616-validlayout-tone1k-minus18db`
+  - `local-analysis/direct-usb-soundcheck/20260616-191418-validlayout-tone1k-minus18db`
+  - `local-analysis/direct-usb-soundcheck/20260616-191931-halflags-tone1k-minus18db`
+  - `local-analysis/runtime-isolation/current-after-usb-investigation.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`
+- Key metrics:
+  - HAL music run: `quality_alignment_score=0.670637`,
+    `analog_snr_db=-0.59`, `lag_jumps_gt_2_frames=46`,
+    `outputUnderruns=0`, `outputPanicFlags=0`.
+  - Runtime CPU during HAL playback: OpenA8DJ driver observed around
+    `33-35%`, not better than mainline.
+  - iRig no-playback baseline: `rms=0.00057519`, `peak=0.00790405`.
+  - Best start/endian sweep result remained big-endian start byte `4`, but
+    tone SNR was only about `-19.5 dB`.
+  - Valid-capture-layout at `-18 dBFS` tone improved only marginally over
+    HAL flags: about `-17.0 dB` tone SNR vs `-17.27 dB`.
+- Code/build change validated:
+  - `OPENA8DJ_OUTPUT_CHECK_OFFSET` is now parameterized with default `8`.
+  - `make usb-play` now builds the direct USB tool with `HAL_CFLAGS`, so direct
+    USB diagnostics match the HAL candidate flags.
+  - `scripts/evaluate-promotion-readiness.py` now blocks promotion on the latest
+    negative physical investigation instead of relying on older positive
+    evidence.
+- Readiness note:
+  - This is negative physical evidence. The candidate is not ready for
+    listening, Traktor/timecode validation, branch promotion, or any claim of
+    beating mainline.

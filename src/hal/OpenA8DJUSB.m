@@ -38,6 +38,10 @@
 #define OPENA8DJ_OUTPUT_START_BYTE (kBytesPerSample + 1)
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_CHECK_OFFSET
+#define OPENA8DJ_OUTPUT_CHECK_OFFSET (kStreams * kChannelsPerStream)
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_GAIN
 #define OPENA8DJ_OUTPUT_GAIN 1.0f
 #endif
@@ -3541,7 +3545,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJOutputFillStats stats = {0};
     NSUInteger i = 0;
     while (i < length) {
-        if ((i % (kStreams * kBytesPerSampleUSB)) == (kStreams * kChannelsPerStream)) {
+        if ((i % (kStreams * kBytesPerSampleUSB)) == OPENA8DJ_OUTPUT_CHECK_OFFSET) {
             for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
                 bytes[i] = Mode2CheckByte(stream, i);
             }

@@ -352,3 +352,48 @@ Evidence:
   `1.07069e-06`, and max leakage `-240 dBFS`.
 - `scripts/evaluate-promotion-readiness.py` now requires
   `offline_simulated_output_matrix=PASS` before branch promotion can pass.
+
+## 2026-06-16: Keep Physical Readiness Blocked After USB Tone/Music Failure
+
+Decision:
+- Do not promote the C++ candidate and do not claim hardware/listening
+  readiness. Keep Mode 2 output defaults at big-endian, start byte `4`, check
+  offset `8`, but make the direct USB diagnostic tool build with the same
+  `HAL_CFLAGS` as the HAL bundle. Promotion evaluation must also consume the
+  latest physical investigation summary, so negative current evidence overrides
+  older passing runs.
+
+Reason:
+- Locked physical evidence showed the iRig route is available and clean when
+  idle, but Audio 8 playback through the C++ HAL/direct USB path produces
+  severe analog mismatch/noise.
+- Start-byte, endian, check-offset, valid-capture-layout, and ISO-frame sweeps
+  did not produce a passing physical tone. The best meaningful direct tone
+  evidence remains far below product threshold, around `-17 dB` to `-19.5 dB`
+  tone SNR depending on variant.
+- The prior direct USB tool was not compiled with HAL flags, so its evidence
+  could mislead future debugging unless the build was fixed.
+- The previous promotion evaluator defaulted to an older physical music run;
+  that made the report less conservative than the actual latest hardware state.
+
+Alternatives discarded:
+- Promote because offline gates pass: rejected because physical music quality,
+  runtime CPU, and Traktor/timecode physical evidence still fail.
+- Change default check offset away from `8`: rejected because the sweep did not
+  improve quality and mainline notes still identify offset `8` as the least bad
+  playback-compatible value.
+- Enable valid-capture-layout by default immediately: rejected because the
+  same-amplitude comparison improved tone SNR by only about `0.25 dB`, not a
+  defensible product improvement.
+
+Evidence:
+- `local-analysis/usb-physical-investigation-summary.json`
+- `local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal`
+- `local-analysis/irig-baseline/20260616-191203-no-playback-9s`
+- `local-analysis/start-byte-sweep/20260616-190418-tone1k-minus36db`
+- `local-analysis/start-byte-sweep/20260616-190657-tone1k-minus36db-native-i24`
+- `local-analysis/check-offset-sweep/20260616-191616-validlayout-tone1k-minus18db`
+- `local-analysis/direct-usb-soundcheck/20260616-191418-validlayout-tone1k-minus18db`
+- `local-analysis/direct-usb-soundcheck/20260616-191931-halflags-tone1k-minus18db`
+- `local-analysis/runtime-isolation/current-after-usb-investigation.json`
+- `local-analysis/promotion-readiness-current.json`

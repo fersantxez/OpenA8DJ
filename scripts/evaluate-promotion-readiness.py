@@ -20,8 +20,9 @@ DEFAULTS = {
     "offline": ROOT / "local-analysis/cpp-offline/current-offline-gates.json",
     "simulated": ROOT / "local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json",
     "tone": ROOT / "local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-4/tone-analysis.txt",
-    "music": ROOT / "local-analysis/soundcheck/2026-06-16T170237-irig-pairA-16s-maxlag-start4/metrics.json",
-    "cpu": ROOT / "local-analysis/soundcheck/2026-06-16T170237-irig-pairA-16s-maxlag-start4/cpu-profile.tsv",
+    "music": ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/metrics.json",
+    "cpu": ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/cpu-profile.tsv",
+    "physical_investigation": ROOT / "local-analysis/usb-physical-investigation-summary.json",
 }
 
 
@@ -122,6 +123,7 @@ def evaluate(args):
         "tone": Path(args.tone),
         "music": Path(args.music),
         "cpu": Path(args.cpu),
+        "physical_investigation": Path(args.physical_investigation),
     }
     gates = []
     for name, path in paths.items():
@@ -139,6 +141,7 @@ def evaluate(args):
     simulated = load_json(paths["simulated"])
     tone = parse_key_values(paths["tone"])
     music = load_json(paths["music"])
+    physical_investigation = load_json(paths["physical_investigation"])
     cpu = cpu_profile(paths["cpu"])
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
@@ -282,6 +285,14 @@ def evaluate(args):
               "coreaudiod_p95": cpu.get("coreaudiod_p95"),
               "driver_cpu_p95_max": BASELINE["driver_cpu_p95_max"],
               "coreaudiod_p95_max": BASELINE["coreaudiod_p95_max"]}),
+        gate("latest_physical_investigation",
+             physical_investigation.get("result") == "PASS_READY",
+             {"result": physical_investigation.get("result"),
+              "date": physical_investigation.get("date"),
+              "decision": physical_investigation.get("decision"),
+              "hal_final_state": physical_investigation.get("hal_final_state"),
+              "lock_final_state": physical_investigation.get("lock_final_state")},
+             "latest physical investigation has not cleared hardware readiness"),
         gate("traktor_timecode_physical",
              False,
              {"status": "BLOCKED_UNVALIDATED_DVS"},
@@ -305,6 +316,7 @@ def main():
     parser.add_argument("--tone", default=str(DEFAULTS["tone"]))
     parser.add_argument("--music", default=str(DEFAULTS["music"]))
     parser.add_argument("--cpu", default=str(DEFAULTS["cpu"]))
+    parser.add_argument("--physical-investigation", default=str(DEFAULTS["physical_investigation"]))
     parser.add_argument("--json-out")
     args = parser.parse_args()
 

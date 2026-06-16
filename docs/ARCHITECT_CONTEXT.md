@@ -91,6 +91,19 @@ Branch: `driverkit/cpp-redesign`
   `branch_promotion_allowed=false`. C++ must not be moved to `main`, and C
   must not be moved to `Legacy`, until the gate returns PASS and the user
   authorizes the branch operation.
+- 2026-06-16 locked physical USB investigation recovered the audio stack after
+  a stuck Spotify process, installed the HAL candidate safely, and confirmed
+  `iRig Stream` plus `Open Audio 8 DJ` visibility. The HAL music soundcheck
+  then failed badly (`quality_alignment_score=0.670637`, `analog_snr_db=-0.59`,
+  `lag_jumps_gt_2_frames=46`) despite zero underruns and zero panic flags.
+  Direct USB tone sweeps also failed; iRig no-playback noise was low, so the
+  failure is introduced by Audio 8 USB/playback transport rather than by an
+  idle iRig/mixer noise floor. Runtime state after cleanup is safe: HAL
+  inactive, lock absent, isolation audit PASS.
+- The latest build/tooling correction makes `make usb-play` use the same
+  `HAL_CFLAGS` as the HAL bundle and parameterizes
+  `OPENA8DJ_OUTPUT_CHECK_OFFSET` with default `8`. This improves diagnostic
+  fidelity only; it is not an audio-quality fix.
 - Offline window-trace analysis of the failed physical music run shows
   `lag_jumps_gt_2_frames=24`, local lag from `3` to `-27` frames, and only
   `2.1%` median mid-band residual improvement after per-window lag correction.
