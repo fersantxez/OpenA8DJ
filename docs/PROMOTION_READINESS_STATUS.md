@@ -463,3 +463,41 @@ Latest native WAV reanalysis evidence:
   `1.685303/1.580494`, lag jumps `32`, and clipping `0`.
 - This strengthens the evidence chain but does not change promotion status:
   C++ remains not ready to replace mainline.
+
+## 2026-06-17 Native Attribution Promotion Status
+
+Latest offline evidence:
+`local-analysis/cpp-offline/current-offline-gates.json`.
+
+- Offline gate bundle: PASS.
+- Product comparator:
+  `local-analysis/cpp-offline/physical-run-product-superiority.json`.
+- Comparator result: FAIL.
+- Branch promotion support: `false`.
+- Native WAV reanalysis is now used for the selected candidate instead of
+  merely marked available.
+- Native gates fail:
+  - native quality `0.953641 < 0.980`.
+  - native SNR floor `8.797298 dB < 35 dB`.
+  - native mid/high residual `1.685303/1.580494`, both above limits.
+  - native quiet residual `-34.694516 dBFS > -58 dBFS`.
+  - native lag jumps `32 > 0`.
+- Residual attribution:
+  `uncorrelated_residual_or_capture_path_dominant`.
+- CPU:
+  - driver p95 total `16.6%`, after 5s `16.6%`.
+  - `coreaudiod` p95 total `35.4%`, after 5s `2.1%`.
+
+Decision:
+- Do not move C mainline to Legacy.
+- Do not move C++ to `main`.
+- Do not declare hardware readiness, Traktor/timecode readiness, or audiophile
+  quality superiority.
+
+Required before this can change:
+- Same-run physical product evidence where native and recorded quality gates
+  both pass.
+- Sustained driver CPU at or below the mainline target.
+- Decorrelated routing/capture fixture proving no leakage and no capture-path
+  contamination.
+- Promotion evaluator returns `branch_promotion_allowed=true`.

@@ -1939,3 +1939,33 @@ Current status:
 Readiness rule:
 - Physical readiness requires both routing/leakage and quality metrics to beat
   mainline in a same-session run. A leakage-only pass is not enough.
+
+## 2026-06-17 Native Residual Attribution Gate
+
+Required for any future audiophile-readiness claim:
+- `opena8djcpp_soundcheck_wav_quality` must emit `residual_attribution`.
+- Native WAV reanalysis must match the selected product run and be consumed by
+  `opena8djcpp_physical_run_compare`.
+- A candidate cannot pass promotion if native attribution reports
+  `uncorrelated_residual_or_capture_path_dominant` while SNR, quiet residual,
+  or residual-ratio gates fail.
+- Timing may only be called dominant when `timing_explain_db > 3`.
+- Routing/matrix may only be called dominant when:
+  - `routing_matrix_explain_db > 3`;
+  - source L/R correlation is low enough for a stable matrix fixture;
+  - matrix condition is stable;
+  - decorrelated physical routing evidence agrees.
+
+Current status:
+- Latest selected product run classifies as
+  `uncorrelated_residual_or_capture_path_dominant`.
+- Timing explain is `0.728741 dB`.
+- Routing matrix explain is `0.150521 dB`.
+- Source L/R correlation is `0.986751`, which means the stored stereo music is
+  not sufficient to prove routing matrix behavior.
+
+Readiness rule:
+- This attribution is a blocker, not a workaround. The next candidate must
+  either remove the residual/capture-path failure or provide stronger
+  decorrelated physical evidence showing that the failure was not produced by
+  the C++ driver path.

@@ -1660,3 +1660,42 @@ Next technical target:
   still fail.
 - Offline gates pass, but this does not improve physical sound; it improves the
   integrity of the readiness claim.
+
+### 2026-06-17 Current Evidence After Native Attribution
+
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Latest offline bundle command: `scripts/run-cpp-offline-gates`.
+- Offline bundle: PASS.
+- Debug CTest: `30/30` passed.
+- Release CTest: `31/31` passed.
+- Product comparator: FAIL, `branch_promotion_supported=false`.
+- Selected product run:
+  `20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+- Native WAV reanalysis is now used by the comparator for the selected run.
+- Native WAV metrics:
+  quality `0.953641`, SNR floor `8.797298 dB`, mid/high residual
+  `1.685303/1.580494`, quiet residual `-34.694516 dBFS`, lag jumps `32`,
+  clicks `0`, clipping `0`.
+- Residual attribution:
+  `uncorrelated_residual_or_capture_path_dominant`.
+  Timing explain is only `0.728741 dB`; routing matrix explain is only
+  `0.150521 dB`; source L/R correlation is `0.986751`.
+- CPU split:
+  driver p95 total and after 5s are both `16.6%`.
+  `coreaudiod` p95 total is `35.4%`, but after 5s is `2.1%`.
+
+Current technical truth:
+- The line is stronger as an evidence system, but not as a product candidate.
+- The sustained driver CPU issue is real.
+- The stored WAV failure is not explained by simple timing correction or a
+  simple L/R matrix.
+- Branch promotion, hardware readiness, and Traktor/timecode readiness remain
+  blocked.
+
+Next highest-value work:
+- Reduce sustained driver CPU with callback/hot-path attribution.
+- Generate or reuse decorrelated physical evidence to separate routing/capture
+  path from stereo-music correlation.
+- Keep native WAV attribution in the promotion path and tighten parity only
+  after it matches Python behavior across multiple stored runs.

@@ -44,6 +44,20 @@ struct ChannelMetrics {
   std::vector<double> residual;
 };
 
+struct ResidualAttribution {
+  double timing_explain_db = 0.0;
+  double routing_matrix_explain_db = 0.0;
+  double distortion_model_explain_db = 0.0;
+  double mid_high_coherence = 0.0;
+  double uncorrelated_residual_dbfs = -240.0;
+  double quiet_residual_dbfs = -240.0;
+  double matrix_condition_number = std::numeric_limits<double>::infinity();
+  double source_lr_correlation = 0.0;
+  std::string classification = "not_evaluated";
+  std::string timing_status = "not_evaluated";
+  std::string routing_status = "not_evaluated";
+};
+
 struct NativeMetrics {
   std::filesystem::path run_dir;
   std::uint32_t sample_rate = 0;
@@ -63,6 +77,7 @@ struct NativeMetrics {
   std::uint32_t click_outliers = 0;
   double click_threshold = 0.0;
   std::uint32_t capture_clipped_frames = 0;
+  ResidualAttribution residual_attribution;
 };
 
 struct Comparison {
@@ -407,6 +422,12 @@ double rms(std::span<const double> values) {
   return std::sqrt(sum / static_cast<double>(values.size()));
 }
 
+double snr_db_from_rms(double signal_rms, double residual_rms) {
+  return signal_rms > 0.0 && residual_rms > 0.0
+             ? 20.0 * std::log10(signal_rms / residual_rms)
+             : 999.0;
+}
+
 double dbfs(double value) {
   if (value <= 0.0) {
     return -240.0;
@@ -580,6 +601,191 @@ std::uint32_t clipped_count(const std::vector<std::array<double, 2>>& capture) {
   return clipped;
 }
 
+double source_lr_correlation(const std::vector<std::array<double, 2>>& frames) {
+  std::vector<double> left;
+  std::vector<double> right;
+  left.reserve(frames.size());
+  right.reserve(frames.size());
+  for (const auto& frame : frames) {
+    left.push_back(frame[0]);
+    right.push_back(frame[1]);
+  }
+  return correlation(left, right, 0U, 0U, left.size());
+}
+
+double matrix_condition_number_2x2(double a, double b, double c, double d) {
+  const double s1 = a * a + b * b + c * c + d * d;
+  const double det = a * d - b * c;
+  const double discriminant = std::max(0.0, s1 * s1 - 4.0 * det * det);
+  const double lambda_max = 0.5 * (s1 + std::sqrt(discriminant));
+  const double lambda_min = 0.5 * (s1 - std::sqrt(discriminant));
+  if (lambda_min <= 1.0e-18) {
+    return std::numeric_limits<double>::infinity();
+  }
+  return std::sqrt(lambda_max / lambda_min);
+}
+
+std::pair<double, double> matrix_fit_snr_and_condition(
+    const std::vector<std::array<double, 2>>& reference,
+    const std::vector<std::array<double, 2>>& capture) {
+  const auto count = std::min(reference.size(), capture.size());
+  if (count == 0U) {
+    return {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()};
+  }
+  double rr00 = 0.0;
+  double rr01 = 0.0;
+  double rr11 = 0.0;
+  double cr00 = 0.0;
+  double cr01 = 0.0;
+  double cr10 = 0.0;
+  double cr11 = 0.0;
+  for (std::size_t index = 0; index < count; ++index) {
+    const double l = reference[index][0];
+    const double r = reference[index][1];
+    rr00 += l * l;
+    rr01 += l * r;
+    rr11 += r * r;
+    cr00 += capture[index][0] * l;
+    cr01 += capture[index][0] * r;
+    cr10 += capture[index][1] * l;
+    cr11 += capture[index][1] * r;
+  }
+  const double det = rr00 * rr11 - rr01 * rr01;
+  if (std::abs(det) <= 1.0e-18) {
+    return {std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity()};
+  }
+  const double inv00 = rr11 / det;
+  const double inv01 = -rr01 / det;
+  const double inv11 = rr00 / det;
+  const double m00 = cr00 * inv00 + cr01 * inv01;
+  const double m01 = cr00 * inv01 + cr01 * inv11;
+  const double m10 = cr10 * inv00 + cr11 * inv01;
+  const double m11 = cr10 * inv01 + cr11 * inv11;
+  std::vector<double> left_signal;
+  std::vector<double> right_signal;
+  std::vector<double> left_residual;
+  std::vector<double> right_residual;
+  left_signal.reserve(count);
+  right_signal.reserve(count);
+  left_residual.reserve(count);
+  right_residual.reserve(count);
+  for (std::size_t index = 0; index < count; ++index) {
+    const double l = reference[index][0];
+    const double r = reference[index][1];
+    const double pred_l = m00 * l + m01 * r;
+    const double pred_r = m10 * l + m11 * r;
+    left_signal.push_back(pred_l);
+    right_signal.push_back(pred_r);
+    left_residual.push_back(capture[index][0] - pred_l);
+    right_residual.push_back(capture[index][1] - pred_r);
+  }
+  const double left_snr = snr_db_from_rms(rms(left_signal), rms(left_residual));
+  const double right_snr = snr_db_from_rms(rms(right_signal), rms(right_residual));
+  return {std::min(left_snr, right_snr), matrix_condition_number_2x2(m00, m01, m10, m11)};
+}
+
+double lag_corrected_min_snr(const std::vector<std::array<double, 2>>& reference,
+                             const std::vector<std::array<double, 2>>& capture,
+                             std::uint32_t rate) {
+  const auto count = std::min(reference.size(), capture.size());
+  const auto window = std::max<std::size_t>(64U, rate / 2U);
+  const auto hop = std::max<std::size_t>(1U, rate / 4U);
+  if (count < window) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  const auto ref_mono = mono(reference);
+  const auto cap_mono = mono(capture);
+  std::vector<double> left_signal;
+  std::vector<double> right_signal;
+  std::vector<double> left_residual;
+  std::vector<double> right_residual;
+  for (std::size_t start = 0; start + window <= count; start += hop) {
+    const auto [lag, _score] = scan_lags(ref_mono,
+                                         cap_mono,
+                                         start,
+                                         start,
+                                         -32,
+                                         32,
+                                         1,
+                                         32,
+                                         window,
+                                         std::max<std::size_t>(1U, window / 256U));
+    (void)_score;
+    std::vector<std::array<double, 2>> ref_shifted;
+    std::vector<std::array<double, 2>> cap_segment;
+    ref_shifted.reserve(window);
+    cap_segment.reserve(window);
+    for (std::size_t n = 0; n < window; ++n) {
+      const auto ri = static_cast<std::int64_t>(start + n) - static_cast<std::int64_t>(lag);
+      const auto ci = start + n;
+      if (ri < 0 || ri >= static_cast<std::int64_t>(count)) {
+        continue;
+      }
+      ref_shifted.push_back(reference[static_cast<std::size_t>(ri)]);
+      cap_segment.push_back(capture[ci]);
+    }
+    if (ref_shifted.size() < window / 2U) {
+      continue;
+    }
+    const auto left = channel_metrics(ref_shifted, cap_segment, rate, 0U);
+    const auto right = channel_metrics(ref_shifted, cap_segment, rate, 1U);
+    left_signal.insert(left_signal.end(), left.signal.begin(), left.signal.end());
+    right_signal.insert(right_signal.end(), right.signal.begin(), right.signal.end());
+    left_residual.insert(left_residual.end(), left.residual.begin(), left.residual.end());
+    right_residual.insert(right_residual.end(), right.residual.begin(), right.residual.end());
+  }
+  if (left_signal.empty() || right_signal.empty()) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  const double left_snr = snr_db_from_rms(rms(left_signal), rms(left_residual));
+  const double right_snr = snr_db_from_rms(rms(right_signal), rms(right_residual));
+  return std::min(left_snr, right_snr);
+}
+
+ResidualAttribution residual_attribution(const std::vector<std::array<double, 2>>& reference,
+                                         const std::vector<std::array<double, 2>>& capture,
+                                         std::uint32_t rate,
+                                         const NativeMetrics& metrics) {
+  ResidualAttribution out;
+  const double native_min_snr = std::min(metrics.left_snr_db, metrics.right_snr_db);
+  out.source_lr_correlation = source_lr_correlation(reference);
+  const auto [matrix_snr, condition] = matrix_fit_snr_and_condition(reference, capture);
+  out.matrix_condition_number = condition;
+  if (std::isfinite(matrix_snr) && std::isfinite(native_min_snr)) {
+    out.routing_matrix_explain_db = std::max(0.0, matrix_snr - native_min_snr);
+  }
+  const double corrected_snr = lag_corrected_min_snr(reference, capture, rate);
+  if (std::isfinite(corrected_snr) && std::isfinite(native_min_snr)) {
+    out.timing_explain_db = std::max(0.0, corrected_snr - native_min_snr);
+  }
+  const double residual_rms_value = std::max(metrics.left.residual_rms, metrics.right.residual_rms);
+  out.uncorrelated_residual_dbfs = dbfs(residual_rms_value);
+  out.quiet_residual_dbfs = metrics.quiet_mid_band_noise_dbfs;
+  const double mid = metrics.mid_band_residual_ratio;
+  const double high = metrics.high_band_residual_ratio;
+  out.mid_high_coherence = std::min(mid, high) / std::max(std::max(mid, high), 1.0e-9);
+
+  out.timing_status =
+      out.timing_explain_db > 3.0 ? "timing_explains_material_residual"
+                                  : "timing_present_but_not_dominant";
+  const bool source_decorrelated = std::abs(out.source_lr_correlation) < 0.95;
+  const bool matrix_stable = std::isfinite(out.matrix_condition_number) &&
+                             out.matrix_condition_number < 10.0;
+  out.routing_status = out.routing_matrix_explain_db > 3.0 && source_decorrelated && matrix_stable
+                           ? "routing_matrix_explains_material_residual"
+                           : "routing_matrix_not_sufficient_or_fixture_correlated";
+  if (out.routing_status == "routing_matrix_explains_material_residual") {
+    out.classification = "routing_matrix_dominant";
+  } else if (out.timing_status == "timing_explains_material_residual") {
+    out.classification = "timing_instability_dominant";
+  } else if (native_min_snr < 20.0 && out.quiet_residual_dbfs > -45.0) {
+    out.classification = "uncorrelated_residual_or_capture_path_dominant";
+  } else {
+    out.classification = "mixed_or_low_confidence";
+  }
+  return out;
+}
+
 NativeMetrics analyze(const std::filesystem::path& run_dir,
                       const StereoBuffer& reference,
                       const StereoBuffer& capture) {
@@ -685,6 +891,7 @@ NativeMetrics analyze(const std::filesystem::path& run_dir,
       metrics.lag_jumps_gt_2_frames += 1U;
     }
   }
+  metrics.residual_attribution = residual_attribution(ref_window, cap_window, rate, metrics);
   return metrics;
 }
 
@@ -831,6 +1038,34 @@ int main(int argc, char** argv) {
     std::cout << "  \"click_outliers\": " << native.click_outliers << ",\n";
     std::cout << "  \"click_threshold\": " << native.click_threshold << ",\n";
     std::cout << "  \"capture_clipped_frames\": " << native.capture_clipped_frames << ",\n";
+    std::cout << "  \"residual_attribution\": {\n";
+    std::cout << "    \"classification\": ";
+    print_json_string(native.residual_attribution.classification);
+    std::cout << ",\n";
+    std::cout << "    \"timing_status\": ";
+    print_json_string(native.residual_attribution.timing_status);
+    std::cout << ",\n";
+    std::cout << "    \"routing_status\": ";
+    print_json_string(native.residual_attribution.routing_status);
+    std::cout << ",\n";
+    std::cout << "    \"timing_explain_db\": " << native.residual_attribution.timing_explain_db
+              << ",\n";
+    std::cout << "    \"routing_matrix_explain_db\": "
+              << native.residual_attribution.routing_matrix_explain_db << ",\n";
+    std::cout << "    \"distortion_model_explain_db\": "
+              << native.residual_attribution.distortion_model_explain_db << ",\n";
+    std::cout << "    \"mid_high_coherence\": " << native.residual_attribution.mid_high_coherence
+              << ",\n";
+    std::cout << "    \"uncorrelated_residual_dbfs\": "
+              << native.residual_attribution.uncorrelated_residual_dbfs << ",\n";
+    std::cout << "    \"quiet_residual_dbfs\": "
+              << native.residual_attribution.quiet_residual_dbfs << ",\n";
+    std::cout << "    \"matrix_condition_number\": ";
+    print_json_number(native.residual_attribution.matrix_condition_number);
+    std::cout << ",\n";
+    std::cout << "    \"source_lr_correlation\": "
+              << native.residual_attribution.source_lr_correlation << "\n";
+    std::cout << "  },\n";
     std::cout << "  \"parity\": {\n";
     std::cout << "    \"result\": \"" << (comparison_failures == 0U ? "PASS" : "WARN") << "\",\n";
     std::cout << "    \"comparison_count\": " << comparisons.size() << ",\n";

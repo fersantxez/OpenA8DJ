@@ -26,6 +26,20 @@ struct CpuStats {
   std::size_t samples = 0;
 };
 
+struct NativeWavStats {
+  bool evidence_present = false;
+  bool matched_candidate = false;
+  std::string run_dir;
+  double quality = std::numeric_limits<double>::quiet_NaN();
+  double snr = std::numeric_limits<double>::quiet_NaN();
+  double mid = std::numeric_limits<double>::quiet_NaN();
+  double high = std::numeric_limits<double>::quiet_NaN();
+  double quiet_mid = std::numeric_limits<double>::quiet_NaN();
+  double lag_jumps = std::numeric_limits<double>::quiet_NaN();
+  double click_outliers = std::numeric_limits<double>::quiet_NaN();
+  double clipping = std::numeric_limits<double>::quiet_NaN();
+};
+
 struct RunStats {
   std::filesystem::path path;
   bool metrics_present = false;
@@ -42,6 +56,9 @@ struct RunStats {
   double clipping = std::numeric_limits<double>::quiet_NaN();
   CpuStats driver;
   CpuStats coreaudiod;
+  CpuStats driver_after_5s;
+  CpuStats coreaudiod_after_5s;
+  NativeWavStats native_wav;
 };
 
 struct FixedBaseline {
@@ -115,6 +132,45 @@ std::optional<double> json_number(const std::string& json, const std::string& ke
   } catch (const std::exception&) {
     return std::nullopt;
   }
+}
+
+std::optional<std::string> json_string(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return std::nullopt;
+  }
+  const std::size_t colon = json.find(':', key_pos + needle.size());
+  if (colon == std::string::npos) {
+    return std::nullopt;
+  }
+  std::size_t start = colon + 1;
+  while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+    ++start;
+  }
+  if (start >= json.size() || json[start] != '"') {
+    return std::nullopt;
+  }
+  ++start;
+  std::string value;
+  bool escaped = false;
+  for (std::size_t index = start; index < json.size(); ++index) {
+    const char c = json[index];
+    if (escaped) {
+      value.push_back(c);
+      escaped = false;
+      continue;
+    }
+    if (c == '\\') {
+      escaped = true;
+      continue;
+    }
+    if (c == '"') {
+      return value;
+    }
+    value.push_back(c);
+  }
+  return std::nullopt;
 }
 
 std::vector<std::string> split_tab(const std::string& line) {
@@ -191,6 +247,42 @@ CpuStats read_cpu_column(const std::filesystem::path& tsv, const std::string& co
   return summarize_values(std::move(values));
 }
 
+CpuStats read_cpu_column_after(const std::filesystem::path& tsv,
+                               const std::string& column,
+                               double min_elapsed_seconds) {
+  std::ifstream input(tsv);
+  if (!input) {
+    return {};
+  }
+  std::string header_line;
+  if (!std::getline(input, header_line)) {
+    return {};
+  }
+  const auto header = split_tab(header_line);
+  const auto value_it = std::find(header.begin(), header.end(), column);
+  const auto elapsed_it = std::find(header.begin(), header.end(), "elapsed_seconds");
+  if (value_it == header.end() || elapsed_it == header.end()) {
+    return {};
+  }
+  const std::size_t value_index = static_cast<std::size_t>(std::distance(header.begin(), value_it));
+  const std::size_t elapsed_index =
+      static_cast<std::size_t>(std::distance(header.begin(), elapsed_it));
+  std::vector<double> values;
+  std::string line;
+  while (std::getline(input, line)) {
+    const auto row = split_tab(line);
+    if (value_index >= row.size() || elapsed_index >= row.size()) {
+      continue;
+    }
+    const auto elapsed = parse_double(row[elapsed_index]);
+    const auto parsed = parse_double(row[value_index]);
+    if (elapsed && parsed && *elapsed >= min_elapsed_seconds) {
+      values.push_back(*parsed);
+    }
+  }
+  return summarize_values(std::move(values));
+}
+
 double number_or_nan(const std::optional<double>& value) {
   return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
@@ -209,7 +301,43 @@ std::optional<double> max_present(std::optional<double> lhs, std::optional<doubl
   return lhs ? lhs : rhs;
 }
 
-RunStats read_run(const std::filesystem::path& path) {
+std::filesystem::path normalized_path(const std::filesystem::path& path) {
+  try {
+    return std::filesystem::weakly_canonical(path);
+  } catch (const std::exception&) {
+    return std::filesystem::absolute(path).lexically_normal();
+  }
+}
+
+NativeWavStats read_native_wav_stats(const std::filesystem::path& root,
+                                     const std::filesystem::path& candidate) {
+  NativeWavStats stats;
+  const auto json = read_file(root / "local-analysis/cpp-offline/soundcheck-wav-quality.json");
+  if (json.empty()) {
+    return stats;
+  }
+  stats.evidence_present = true;
+  stats.run_dir = json_string(json, "run_dir").value_or("");
+  if (!stats.run_dir.empty()) {
+    stats.matched_candidate =
+        normalized_path(stats.run_dir) == normalized_path(std::filesystem::absolute(candidate));
+  }
+  if (!stats.matched_candidate) {
+    return stats;
+  }
+  stats.quality = number_or_nan(json_number(json, "quality_alignment_score"));
+  stats.snr = number_or_nan(min_present(json_number(json, "left_snr_db"),
+                                        json_number(json, "right_snr_db")));
+  stats.mid = number_or_nan(json_number(json, "mid_band_residual_ratio"));
+  stats.high = number_or_nan(json_number(json, "high_band_residual_ratio"));
+  stats.quiet_mid = number_or_nan(json_number(json, "quiet_mid_band_noise_dbfs"));
+  stats.lag_jumps = number_or_nan(json_number(json, "lag_jumps_gt_2_frames"));
+  stats.click_outliers = number_or_nan(json_number(json, "click_outliers"));
+  stats.clipping = number_or_nan(json_number(json, "capture_clipped_frames"));
+  return stats;
+}
+
+RunStats read_run(const std::filesystem::path& path, const std::filesystem::path& root) {
   RunStats run;
   run.path = path;
   const std::filesystem::path metrics_path = path / "metrics.json";
@@ -233,6 +361,9 @@ RunStats read_run(const std::filesystem::path& path) {
   run.clipping = number_or_nan(json_number(metrics, "capture_clipped_frames"));
   run.driver = read_cpu_column(cpu_path, "opena8dj_driver");
   run.coreaudiod = read_cpu_column(cpu_path, "coreaudiod");
+  run.driver_after_5s = read_cpu_column_after(cpu_path, "opena8dj_driver", 5.0);
+  run.coreaudiod_after_5s = read_cpu_column_after(cpu_path, "coreaudiod", 5.0);
+  run.native_wav = read_native_wav_stats(root, path);
   return run;
 }
 
@@ -309,6 +440,44 @@ std::vector<GateResult> fixed_baseline_gates(const RunStats& candidate,
       {"coreaudiod_cpu_p95", Direction::LessOrEqual, candidate.coreaudiod.p95,
        baseline.coreaudiod_p95},
   };
+  if (candidate.native_wav.matched_candidate) {
+    gates.push_back({"native_music_quality_alignment",
+                     Direction::GreaterOrEqual,
+                     candidate.native_wav.quality,
+                     baseline.quality});
+    gates.push_back(
+        {"native_music_snr_floor_db", Direction::GreaterOrEqual, candidate.native_wav.snr,
+         baseline.snr});
+    gates.push_back({"native_music_mid_residual_ratio",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.mid,
+                     baseline.mid});
+    gates.push_back({"native_music_high_residual_ratio",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.high,
+                     baseline.high});
+    gates.push_back({"native_music_quiet_mid_noise_dbfs",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.quiet_mid,
+                     baseline.quiet_mid});
+    gates.push_back({"native_music_lag_jumps_gt_2_frames",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.lag_jumps,
+                     baseline.lag_jumps});
+    gates.push_back({"native_music_click_outliers",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.click_outliers,
+                     baseline.click_outliers});
+    gates.push_back({"native_music_capture_clipped_frames",
+                     Direction::LessOrEqual,
+                     candidate.native_wav.clipping,
+                     baseline.clipping});
+  } else if (candidate.reference_wav_present && candidate.captured_wav_present) {
+    gates.push_back({"native_wav_reanalysis_present_for_candidate",
+                     Direction::GreaterOrEqual,
+                     candidate.native_wav.matched_candidate ? 1.0 : 0.0,
+                     1.0});
+  }
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
   }
@@ -386,9 +555,17 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"captured_wav_present\": "
             << (run.captured_wav_present ? "true" : "false") << ",\n";
   std::cout << indent << "  \"native_wav_reanalysis\": \""
-            << (run.reference_wav_present && run.captured_wav_present ? "AVAILABLE_NOT_YET_USED"
-                                                                       : "BLOCKED_MISSING_WAV")
+            << (run.native_wav.matched_candidate
+                    ? "AVAILABLE_USED_FOR_CURRENT_OFFLINE_GATE"
+                    : (run.reference_wav_present && run.captured_wav_present
+                           ? "AVAILABLE_NOT_MATCHED_TO_CURRENT_COMPARATOR"
+                           : "BLOCKED_MISSING_WAV"))
             << "\",\n";
+  std::cout << indent << "  \"native_wav_evidence_present\": "
+            << (run.native_wav.evidence_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"native_wav_run_dir\": ";
+  print_json_string(run.native_wav.run_dir);
+  std::cout << ",\n";
   std::cout << indent << "  \"practical_pass\": " << (practical_pass(run) ? "true" : "false")
             << ",\n";
   std::cout << indent << "  \"quality_alignment_score\": ";
@@ -415,6 +592,30 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"capture_clipped_frames\": ";
   print_json_number(run.clipping);
   std::cout << ",\n";
+  std::cout << indent << "  \"native_quality_alignment_score\": ";
+  print_json_number(run.native_wav.quality);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_snr_floor_db\": ";
+  print_json_number(run.native_wav.snr);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_mid_band_residual_ratio\": ";
+  print_json_number(run.native_wav.mid);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_high_band_residual_ratio\": ";
+  print_json_number(run.native_wav.high);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_quiet_mid_band_dbfs\": ";
+  print_json_number(run.native_wav.quiet_mid);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_lag_jumps_gt_2_frames\": ";
+  print_json_number(run.native_wav.lag_jumps);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_click_outliers\": ";
+  print_json_number(run.native_wav.click_outliers);
+  std::cout << ",\n";
+  std::cout << indent << "  \"native_capture_clipped_frames\": ";
+  print_json_number(run.native_wav.clipping);
+  std::cout << ",\n";
   std::cout << indent << "  \"driver_cpu_p95\": ";
   print_json_number(run.driver.p95);
   std::cout << ",\n";
@@ -424,9 +625,19 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"driver_cpu_max\": ";
   print_json_number(run.driver.max);
   std::cout << ",\n";
+  std::cout << indent << "  \"driver_cpu_p95_after_5s\": ";
+  print_json_number(run.driver_after_5s.p95);
+  std::cout << ",\n";
+  std::cout << indent << "  \"driver_cpu_samples_after_5s\": " << run.driver_after_5s.samples
+            << ",\n";
   std::cout << indent << "  \"coreaudiod_cpu_p95\": ";
   print_json_number(run.coreaudiod.p95);
   std::cout << ",\n";
+  std::cout << indent << "  \"coreaudiod_cpu_p95_after_5s\": ";
+  print_json_number(run.coreaudiod_after_5s.p95);
+  std::cout << ",\n";
+  std::cout << indent << "  \"coreaudiod_cpu_samples_after_5s\": "
+            << run.coreaudiod_after_5s.samples << ",\n";
   std::cout << indent << "  \"cpu_samples\": " << run.driver.samples << "\n";
   std::cout << indent << "}";
 }
@@ -490,8 +701,11 @@ void print_superiority_report(const RunStats& candidate,
   std::cout << "  \"branch_promotion_supported\": " << (result ? "true" : "false") << ",\n";
   std::cout << "  \"candidate_evidence_present\": "
             << (candidate_evidence_present ? "true" : "false") << ",\n";
-  std::cout << "  \"analysis_source\": \"metrics_json_and_cpu_profile_tsv\",\n";
-  std::cout << "  \"native_wav_reanalysis_required_before_promotion\": true,\n";
+  std::cout
+      << "  \"analysis_source\": "
+         "\"metrics_json_cpu_profile_tsv_and_native_wav_reanalysis_when_matching\",\n";
+  std::cout << "  \"native_wav_reanalysis_required_before_promotion\": "
+            << (!candidate.native_wav.matched_candidate ? "true" : "false") << ",\n";
   if (baseline_run) {
     std::cout << "  \"baseline\": ";
     print_run(*baseline_run, "  ");
@@ -565,7 +779,7 @@ int main(int argc, char** argv) {
     std::vector<RunStats> runs;
     runs.reserve(positional.size());
     for (const auto& path : positional) {
-      runs.push_back(read_run(path));
+      runs.push_back(read_run(path, root));
     }
     print_summary_report(runs);
     return 0;
@@ -583,7 +797,7 @@ int main(int argc, char** argv) {
     return 0;
   }
 
-  const RunStats candidate = read_run(*candidate_path);
+  const RunStats candidate = read_run(*candidate_path, root);
   if (compare_to_mainline_reference) {
     print_superiority_report(candidate, fixed_baseline_gates(candidate, FixedBaseline{}),
                              "candidate_vs_mainline_reference");
@@ -594,7 +808,7 @@ int main(int argc, char** argv) {
     std::cerr << "--baseline requires a RUN_DIR\n";
     return 2;
   }
-  const RunStats baseline = read_run(*baseline_path);
+  const RunStats baseline = read_run(*baseline_path, root);
   print_superiority_report(candidate, run_to_run_gates(candidate, baseline),
                            "candidate_vs_baseline_run", baseline);
   return 0;

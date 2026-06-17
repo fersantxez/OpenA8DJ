@@ -7663,3 +7663,46 @@ Operational note:
     click parity still need to be unified.
   - The analyzed run still fails product quality and CPU gates; this does not
     change readiness.
+
+## 2026-06-17 Native Residual Attribution And Comparator Tightening
+
+- Scope:
+  - Offline-only analysis over stored WAV/TSV/JSON evidence.
+  - No hardware, CoreAudio, USB, driver install, defaults, or service state
+    touched.
+- Changes:
+  - `tools/soundcheck_wav_quality.cpp` now emits `residual_attribution`.
+  - `tools/physical_run_compare.cpp` now consumes matching native WAV
+    reanalysis, adds native music gates, and reports stable CPU after 5s.
+  - `scripts/run-cpp-offline-gates` now includes attribution and stable CPU
+    fields in `current-offline-gates.json`.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Offline gate bundle: PASS.
+  - Debug CTest: `30/30` passed.
+  - Release CTest: `31/31` passed.
+  - Evidence schema: PASS, `required_files=31`, missing `0`.
+  - Product comparator remains FAIL:
+    `branch_promotion_supported=false`.
+- Native residual attribution for
+  `20260617-iso12q8-irig-pairA-12s-cpp-hal`:
+  - classification: `uncorrelated_residual_or_capture_path_dominant`.
+  - timing explain: `0.728741 dB`.
+  - routing matrix explain: `0.150521 dB`.
+  - source L/R correlation: `0.986751`.
+  - uncorrelated residual: `-27.930476 dBFS`.
+  - quiet residual: `-34.694516 dBFS`.
+- CPU split:
+  - driver p95 total: `16.6%`.
+  - driver p95 after 5s: `16.6%`.
+  - `coreaudiod` p95 total: `35.4%`.
+  - `coreaudiod` p95 after 5s: `2.1%`.
+- Interpretation:
+  - The driver CPU failure is sustained, not just a startup spike.
+  - The `coreaudiod` failure is dominated by early transients but still exceeds
+    the strict total-run gate.
+  - Timing and simple L/R routing are measured as non-dominant explanations for
+    the stored WAV failure.
+  - C++ remains not ready for branch promotion, Traktor/timecode readiness
+    claims, or hardware-readiness claims.

@@ -4760,3 +4760,69 @@ Evidence:
 Next implication:
 - Tighten the parity tolerances and port remaining Python logic: time-warp,
   CPU coupling, exact quiet/noise windows, and click-count semantics.
+
+## 2026-06-17: Use Native WAV Reanalysis In Product Comparator
+
+Decision:
+- Make `tools/physical_run_compare.cpp` consume matching
+  `local-analysis/cpp-offline/soundcheck-wav-quality.json` evidence.
+- Add native music gates alongside recorded `metrics.json` gates when the WAV
+  reanalysis matches the selected candidate run.
+- Add stable CPU reporting after 5s without relaxing the strict total-run CPU
+  gates.
+
+Reason:
+- Promotion cannot depend on Python-only quality metrics once native WAV
+  evidence exists.
+- The selected ISO12/q8 run remains bad under native analysis:
+  quality `0.953641`, SNR floor `8.797298 dB`, mid/high residual
+  `1.685303/1.580494`, quiet residual `-34.694516 dBFS`, and lag jumps `32`.
+- CPU needed phase separation: `coreaudiod` has early transient spikes, but
+  OpenA8DJ driver CPU is sustained at `16.6%` even after 5s.
+
+Alternatives discarded:
+- Replace recorded metrics with native metrics immediately: rejected because
+  the native analyzer is still a first-slice port with broad parity tolerance.
+- Relax CPU gates using post-5s `coreaudiod`: rejected because strict product
+  evidence must still account for total-run behavior and because driver CPU is
+  the larger sustained problem.
+
+Evidence:
+- `local-analysis/cpp-offline/soundcheck-wav-quality.json`
+- `local-analysis/cpp-offline/physical-run-product-superiority.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- Do not promote or request readiness from ISO12/q8. The next implementation
+  target is reducing sustained driver CPU and isolating the
+  residual/capture-path failure with decorrelated physical evidence.
+
+## 2026-06-17: Add Native Residual Attribution
+
+Decision:
+- Add `residual_attribution` to `tools/soundcheck_wav_quality.cpp`.
+- Classify the selected stored failure as
+  `uncorrelated_residual_or_capture_path_dominant`.
+
+Reason:
+- External offline analysis and native reanalysis agree that simple timing,
+  simple L/R matrix/routing, clipping, and click outliers do not explain the
+  failed physical WAV.
+- Native measurements show timing explain `0.728741 dB` and routing matrix
+  explain `0.150521 dB`, both far below the `3 dB` material-explanation bar.
+- Source L/R correlation is `0.986751`, so stereo music is a poor fixture for
+  proving routing matrix behavior; decorrelated physical tones remain required.
+
+Alternatives discarded:
+- Keep a single SNR gate as the only audio-quality explanation: rejected
+  because it hides whether the failure is timing, routing, distortion, or
+  capture-path residual.
+- Declare timing dominant from `32` lag jumps alone: rejected because the
+  measured timing correction explains less than `1 dB`.
+
+Evidence:
+- `local-analysis/cpp-offline/soundcheck-wav-quality.json`
+
+Next implication:
+- The next physical window should use a decorrelated fixture and capture-path
+  controls before any Traktor/timecode or branch-promotion claim.

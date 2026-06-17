@@ -2647,3 +2647,44 @@ Risk:
 - Next action:
   - Tighten parity and port remaining `analyze-soundcheck-capture.py` logic
     into a reusable C++ audio-quality module.
+
+## 2026-06-17 Subagent Integration: Residual And CPU Failure Analysis
+
+- Agents:
+  - Jason (`019ed694-1165-74f3-884b-2b4b432919df`), Sound Quality Failure
+    Analyst.
+  - Beauvoir (`019ed694-369c-78f2-8ee9-3fc4a64182b8`),
+    Real-Time/CPU Evidence Analyst.
+- Mandatory warning included for both:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar
+    hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.
+- Jason findings:
+  - The stored ISO12/q8 failure is not explained by clipping, click outliers,
+    L/R swap, polarity, simple L/R matrix, or simple nonlinear distortion.
+  - Timing instability exists, but available offline analysis shows it does not
+    explain the dominant residual.
+  - Recommended native `residual_attribution` with explicit timing, routing,
+    residual/capture-path, and fixture-correlation metrics.
+- Beauvoir findings:
+  - `opena8dj_driver` CPU p95 around `16.6%` is sustained; after 5s it remains
+    about `16.6%`.
+  - `coreaudiod` p95 around `35.4%` is dominated by an early transient; after
+    5s it drops near `2.1%`.
+  - Existing evidence is process-level CPU, not direct callback attribution,
+    so future work needs hot-path timing or equivalent callback breakdown.
+- Integrated action:
+  - Added `residual_attribution` to
+    `tools/soundcheck_wav_quality.cpp`.
+  - Updated `tools/physical_run_compare.cpp` to use matching native WAV
+    reanalysis and report post-5s CPU.
+  - Added attribution and stable CPU fields to
+    `scripts/run-cpp-offline-gates`.
+- Result:
+  - Full offline gates PASS.
+  - Product comparator remains FAIL and branch promotion remains unsupported.
+- Next action:
+  - Reduce sustained driver CPU and obtain decorrelated physical evidence before
+    any further readiness or branch-promotion claim.
