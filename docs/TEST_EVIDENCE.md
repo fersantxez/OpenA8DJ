@@ -7698,6 +7698,11 @@ Operational note:
   - driver p95 after 5s: `16.6%`.
   - `coreaudiod` p95 total: `35.4%`.
   - `coreaudiod` p95 after 5s: `2.1%`.
+- Callback attribution:
+  - `external_process_cpu_only_hot_path_timing_absent`.
+  - The CPU failure is real process-level evidence, but this run does not have
+    per-callback hot-path timing samples to assign the cost to fill, queue,
+    enqueue, completion, capture decode, or USB requeue.
 - Interpretation:
   - The driver CPU failure is sustained, not just a startup spike.
   - The `coreaudiod` failure is dominated by early transients but still exceeds

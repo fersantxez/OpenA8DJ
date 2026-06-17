@@ -4779,6 +4779,10 @@ Reason:
   `1.685303/1.580494`, quiet residual `-34.694516 dBFS`, and lag jumps `32`.
 - CPU needed phase separation: `coreaudiod` has early transient spikes, but
   OpenA8DJ driver CPU is sustained at `16.6%` even after 5s.
+- The selected run has process-level CPU evidence only:
+  `callback_attribution_status=external_process_cpu_only_hot_path_timing_absent`.
+  This blocks precise callback root-cause claims until hot-path timing is
+  captured.
 
 Alternatives discarded:
 - Replace recorded metrics with native metrics immediately: rejected because
@@ -4796,6 +4800,8 @@ Next implication:
 - Do not promote or request readiness from ISO12/q8. The next implementation
   target is reducing sustained driver CPU and isolating the
   residual/capture-path failure with decorrelated physical evidence.
+- Future CPU candidates need hot-path timing or equivalent callback attribution
+  before claiming why CPU improved.
 
 ## 2026-06-17: Add Native Residual Attribution
 

@@ -487,6 +487,8 @@ Latest offline evidence:
 - CPU:
   - driver p95 total `16.6%`, after 5s `16.6%`.
   - `coreaudiod` p95 total `35.4%`, after 5s `2.1%`.
+- Callback attribution:
+  `external_process_cpu_only_hot_path_timing_absent`.
 
 Decision:
 - Do not move C mainline to Legacy.

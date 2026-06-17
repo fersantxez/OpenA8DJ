@@ -30,6 +30,9 @@ struct NativeWavStats {
   bool evidence_present = false;
   bool matched_candidate = false;
   std::string run_dir;
+  std::string residual_classification;
+  std::string timing_status;
+  std::string routing_status;
   double quality = std::numeric_limits<double>::quiet_NaN();
   double snr = std::numeric_limits<double>::quiet_NaN();
   double mid = std::numeric_limits<double>::quiet_NaN();
@@ -38,12 +41,20 @@ struct NativeWavStats {
   double lag_jumps = std::numeric_limits<double>::quiet_NaN();
   double click_outliers = std::numeric_limits<double>::quiet_NaN();
   double clipping = std::numeric_limits<double>::quiet_NaN();
+  double timing_explain_db = std::numeric_limits<double>::quiet_NaN();
+  double routing_matrix_explain_db = std::numeric_limits<double>::quiet_NaN();
+  double uncorrelated_residual_dbfs = std::numeric_limits<double>::quiet_NaN();
+  double quiet_residual_dbfs = std::numeric_limits<double>::quiet_NaN();
+  double source_lr_correlation = std::numeric_limits<double>::quiet_NaN();
+  double matrix_condition_number = std::numeric_limits<double>::quiet_NaN();
 };
 
 struct RunStats {
   std::filesystem::path path;
   bool metrics_present = false;
   bool cpu_present = false;
+  bool stream_summary_present = false;
+  bool hot_path_timing_present = false;
   bool reference_wav_present = false;
   bool captured_wav_present = false;
   double quality = std::numeric_limits<double>::quiet_NaN();
@@ -301,6 +312,24 @@ std::optional<double> max_present(std::optional<double> lhs, std::optional<doubl
   return lhs ? lhs : rhs;
 }
 
+bool stream_summary_has_hot_path_timing(const std::string& json) {
+  const char* keys[] = {
+      "hotPathCaptureDecodeTicksSamples",
+      "hotPathCaptureHandlerTicksSamples",
+      "hotPathCaptureRequeueTicksSamples",
+      "hotPathPlaybackCompletionTicksSamples",
+      "hotPathPlaybackEnqueueTicksSamples",
+      "hotPathPlaybackFillTicksSamples",
+      "hotPathPlaybackQueueTicksSamples",
+  };
+  for (const char* key : keys) {
+    if (auto samples = json_number(json, key); samples && *samples > 0.0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::filesystem::path normalized_path(const std::filesystem::path& path) {
   try {
     return std::filesystem::weakly_canonical(path);
@@ -334,6 +363,15 @@ NativeWavStats read_native_wav_stats(const std::filesystem::path& root,
   stats.lag_jumps = number_or_nan(json_number(json, "lag_jumps_gt_2_frames"));
   stats.click_outliers = number_or_nan(json_number(json, "click_outliers"));
   stats.clipping = number_or_nan(json_number(json, "capture_clipped_frames"));
+  stats.residual_classification = json_string(json, "classification").value_or("");
+  stats.timing_status = json_string(json, "timing_status").value_or("");
+  stats.routing_status = json_string(json, "routing_status").value_or("");
+  stats.timing_explain_db = number_or_nan(json_number(json, "timing_explain_db"));
+  stats.routing_matrix_explain_db = number_or_nan(json_number(json, "routing_matrix_explain_db"));
+  stats.uncorrelated_residual_dbfs = number_or_nan(json_number(json, "uncorrelated_residual_dbfs"));
+  stats.quiet_residual_dbfs = number_or_nan(json_number(json, "quiet_residual_dbfs"));
+  stats.source_lr_correlation = number_or_nan(json_number(json, "source_lr_correlation"));
+  stats.matrix_condition_number = number_or_nan(json_number(json, "matrix_condition_number"));
   return stats;
 }
 
@@ -342,9 +380,13 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
   run.path = path;
   const std::filesystem::path metrics_path = path / "metrics.json";
   const std::filesystem::path cpu_path = path / "cpu-profile.tsv";
+  const std::filesystem::path stream_summary_path = path / "stream-stats-summary.json";
   const std::string metrics = read_file(metrics_path);
+  const std::string stream_summary = read_file(stream_summary_path);
   run.metrics_present = !metrics.empty();
   run.cpu_present = std::filesystem::is_regular_file(cpu_path);
+  run.stream_summary_present = !stream_summary.empty();
+  run.hot_path_timing_present = stream_summary_has_hot_path_timing(stream_summary);
   run.reference_wav_present = std::filesystem::is_regular_file(path / "fixture/reference.wav");
   run.captured_wav_present = std::filesystem::is_regular_file(path / "captured.wav");
   run.quality = number_or_nan(json_number(metrics, "quality_alignment_score"));
@@ -566,6 +608,12 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"native_wav_run_dir\": ";
   print_json_string(run.native_wav.run_dir);
   std::cout << ",\n";
+  std::cout << indent << "  \"stream_summary_present\": "
+            << (run.stream_summary_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"callback_attribution_status\": ";
+  print_json_string(run.hot_path_timing_present ? "hot_path_timing_present"
+                                                : "external_process_cpu_only_hot_path_timing_absent");
+  std::cout << ",\n";
   std::cout << indent << "  \"practical_pass\": " << (practical_pass(run) ? "true" : "false")
             << ",\n";
   std::cout << indent << "  \"quality_alignment_score\": ";
@@ -615,6 +663,27 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << ",\n";
   std::cout << indent << "  \"native_capture_clipped_frames\": ";
   print_json_number(run.native_wav.clipping);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_classification\": ";
+  print_json_string(run.native_wav.residual_classification);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_timing_status\": ";
+  print_json_string(run.native_wav.timing_status);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_routing_status\": ";
+  print_json_string(run.native_wav.routing_status);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_timing_explain_db\": ";
+  print_json_number(run.native_wav.timing_explain_db);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_routing_matrix_explain_db\": ";
+  print_json_number(run.native_wav.routing_matrix_explain_db);
+  std::cout << ",\n";
+  std::cout << indent << "  \"uncorrelated_residual_dbfs\": ";
+  print_json_number(run.native_wav.uncorrelated_residual_dbfs);
+  std::cout << ",\n";
+  std::cout << indent << "  \"residual_source_lr_correlation\": ";
+  print_json_number(run.native_wav.source_lr_correlation);
   std::cout << ",\n";
   std::cout << indent << "  \"driver_cpu_p95\": ";
   print_json_number(run.driver.p95);
