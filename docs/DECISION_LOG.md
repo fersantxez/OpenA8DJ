@@ -2094,3 +2094,70 @@ Next decision pressure:
   must target post-packed-byte behavior: USB/device scheduling/state, analog
   route/reference mismatch, or a controlled comparison against the mainline
   physical path, not another blind byte-order/start-byte sweep.
+
+## 2026-06-17: Runtime CPU Hotspot Is IOUSBHost Transfer Enqueue Cadence
+
+Decision:
+- Do not spend more physical windows on already rejected transport knobs
+  (`coalesce2`, `pool cursor`, input-decode active gating, ISO64/q8) unless the
+  underlying implementation changes.
+- Keep `HAL_TRANSFER_LEDGER=0` for product CPU measurement.
+- Treat the current HAL transport as CPU-blocked: the next candidate must
+  reduce IOUSBHost/Objective-C hot-path cost without increasing playback
+  completion gaps or damaging physical music quality.
+- Enable `HAL_STREAM_USAGE=1` and have `audio-wav-play` set output stream usage
+  for its selected A/B/C/D pair. This is architecturally correct and slightly
+  reduces deferred output-cycle flushing, but it is not a readiness improvement.
+
+Reason:
+- Product ledger-off and stream-usage physical runs still fail strict music
+  quality and CPU gates. Stream usage only changed
+  `quality_alignment_score` from `0.971414` to `0.971648`; both are below
+  `0.98`, both keep SNR near `10.5 dB`, and both retain lag jumps.
+- `sudo sample` during playback-only showed the hot CPU path is not DSP,
+  routing, sample conversion, or transfer ledger. The active thread is
+  `org.opena8dj.driver.usb`; dominant stacks are capture and playback
+  `IOUSBHostPipe enqueueIORequest...` calls from isochronous completions.
+- The sample also shows smaller but real costs in input decode and output
+  packing, but previous input-decode active gating and playback coalescing
+  physical runs were rejected. Optimizing those by toggling old knobs would
+  repeat known bad evidence.
+
+Alternatives discarded:
+- Promote stream usage as an improvement: rejected because the quality/CPU
+  deltas are marginal and still fail all product gates.
+- Use `sudo sample` failure as a blocker: rejected because noninteractive sudo
+  is available and produced usable symbol evidence.
+- Re-test `HAL_PLAYBACK_COALESCE_TRANSFERS=2`: rejected because it already
+  reduced CPU at the cost of physical music quality and is modeled as unsafe.
+- Re-enable input-decode active gating: rejected because the prior physical run
+  was a severe quality and CPU regression.
+
+Evidence:
+- Product ledger-off soundcheck:
+  `local-analysis/soundcheck/20260617-product-ledgeroff-irig-pairA-12s-cpp-hal`.
+- Stream-usage soundcheck:
+  `local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal`,
+  `quality_alignment_score=0.971648`, `analog_snr_db=10.52`,
+  `lag_jumps_gt_2_frames=28`, `opena8dj_driver_p95=37.2%`,
+  `coreaudiod_p95=35.0%`.
+- Playback-only symbol profile:
+  `local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only/opena8dj-driver.sample.txt`.
+  Key sample counts in the USB queue:
+  capture requeue via `queueCaptureTransfer`/`IOConnectCallAsyncMethod`
+  dominates, playback requeue is the second large bucket, while
+  `fillPlaybackBytes` and `decodeCaptureBytes` are much smaller.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-streamusage-sample.json`,
+  result `FAIL`; branch promotion remains forbidden.
+- Cleanup:
+  `local-analysis/runtime-isolation/after-streamusage-soundcheck.json` and
+  `local-analysis/runtime-isolation/after-sudo-sample-playback-only.json`,
+  both PASS with HAL inactive and lock absent.
+
+Next decision pressure:
+- The credible path is a transport/hot-path redesign: preprepared transfers,
+  less Objective-C allocation/weak-block work per completion, less pool
+  scanning, or a DriverKit/USBDriverKit transport that can keep cadence fine
+  while reducing enqueue overhead. Any candidate must prove unchanged or better
+  physical music quality before using a CPU win.

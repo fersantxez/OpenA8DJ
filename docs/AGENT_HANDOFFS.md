@@ -877,3 +877,54 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - `run-soundcheck` saves ledger evidence but does not yet make ledger analysis
     a hard integrated subgate. This should be added once the active-playback
     window model is explicit.
+
+### Hume
+
+- Mission: read-only performance audit after product ledger-off physical CPU
+  failure.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Identified capture-paced USB playback with many small IOUSBHost transfers
+    as the dominant CPU candidate.
+  - Warned that coalescing proves transfer/completion frequency matters but is
+    already rejected as a quality candidate.
+  - Recommended symbol profiling and a future transport redesign that removes
+    work from completion callbacks without coarsening playback cadence.
+- Integrated action:
+  - Ran a locked playback-only `sudo sample` window. The sample confirmed
+    dominant CPU in `org.opena8dj.driver.usb`, especially capture and playback
+    `IOUSBHostPipe enqueueIORequest...` stacks.
+- Remaining risk:
+  - No current knob both lowers CPU and preserves physical music quality. A new
+    transport design is needed before another promotion attempt.
+
+### Carver
+
+- Mission: read-only quality/capture audit of latest product ledger-off Pair
+  A/iRig evidence.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Classified the physical failure as unlikely to be simple DSP/packing/channel
+    corruption because both channels fail similarly, capture is unclipped, and
+    offline packed-byte gates already pass.
+  - Recommended a controlled same-chain bypass comparison through a known-good
+    output path to separate Audio 8 DJ USB/device behavior from analog
+    capture/reference-route issues.
+- Integrated action:
+  - The architect did not run the bypass comparison yet; it remains a candidate
+    future physical window after the CPU/hot-path design decision is clearer.
+- Remaining risk:
+  - Without a controlled mainline/C++ or known-good output A/B on the exact
+    iRig route, analog/reference contribution is not fully isolated.

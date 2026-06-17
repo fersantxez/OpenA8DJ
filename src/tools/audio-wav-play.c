@@ -155,6 +155,33 @@ static OSStatus SetProperty(AudioObjectID objectID,
     return AudioObjectSetPropertyData(objectID, &address, 0, NULL, dataSize, data);
 }
 
+static void ConfigureOutputStreamUsage(AudioObjectID device,
+                                       AudioDeviceIOProcID ioProcID,
+                                       UInt32 pairIndex)
+{
+    struct UsagePayload {
+        AudioDeviceIOProcID ioProcID;
+        UInt32 numberStreams;
+        UInt32 streamIsOn[4];
+    } usage;
+    memset(&usage, 0, sizeof(usage));
+    usage.ioProcID = ioProcID;
+    usage.numberStreams = 4;
+    if (pairIndex < 4) {
+        usage.streamIsOn[pairIndex] = 1;
+    }
+    OSStatus status = SetProperty(device,
+                                  kAudioDevicePropertyIOProcStreamUsage,
+                                  kAudioObjectPropertyScopeOutput,
+                                  sizeof(usage),
+                                  &usage);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr,
+                "warning: output stream usage was not accepted: %d\n",
+                (int)status);
+    }
+}
+
 static AudioObjectID FindDeviceByUID(CFStringRef targetUID)
 {
     AudioObjectPropertyAddress address = {
@@ -316,6 +343,7 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 6;
     }
+    ConfigureOutputStreamUsage(device, ioProcID, state.pairIndex);
     status = AudioDeviceStart(device, ioProcID);
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);

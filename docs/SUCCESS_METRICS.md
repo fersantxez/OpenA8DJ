@@ -722,3 +722,29 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 - [ ] Comparison deltas are recorded for every comparable metric.
 - [ ] Hardware-sensitive gates are blocked, not passed.
 - [x] Physical-window plan names lock owner, rollback, and stop conditions.
+
+## 2026-06-17 Current Gate Snapshot
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-streamusage-sample.json`.
+
+- Offline gates: PASS.
+- Simulated output matrix: PASS.
+- Physical tone evidence: PASS against the stored sideband floor, but this is
+  not enough for product readiness.
+- Physical music quality: FAIL. Latest Pair A/iRig run
+  `local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal`
+  reports `quality_alignment_score=0.971648`, SNR `10.52 dB`, `28` lag jumps,
+  mid/high residual ratios `1.399655/1.358543`, quiet mid noise
+  `-35.20 dBFS`, and `0` clipped frames.
+- Runtime CPU beats mainline: FAIL. Latest paired profile reports
+  `opena8dj_driver_p95=37.2%` and `coreaudiod_p95=35.0%`, versus mainline
+  budget `driver <= 6.5%`, `coreaudiod <= 1.7%`.
+- Traktor/timecode physical validation: FAIL/BLOCKED, no physical DVS evidence.
+- Branch promotion: forbidden. Do not move C mainline to Legacy and do not move
+  C++ to main until these gates pass with reproducible evidence.
+
+CPU-root-cause evidence:
+`local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only/opena8dj-driver.sample.txt`
+shows the active CPU hotspot is IOUSBHost async enqueue cadence in the USB
+completion path, not transfer-ledger diagnostics or pure sample conversion.

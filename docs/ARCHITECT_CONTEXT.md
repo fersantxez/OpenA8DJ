@@ -718,3 +718,24 @@ Next technical target:
   - `scripts/runtime-isolation-audit --expect-hal inactive --json-out
     local-analysis/runtime-isolation/after-transfer-ledger-run-soundcheck-hook.json`:
     PASS, HAL inactive, lock absent, no OpenA8DJ HAL process.
+
+## 2026-06-17 Runtime CPU And Stream-Usage Update
+
+- Product ledger-off physical run proves the diagnostic transfer ledger is not
+  the CPU root cause. With `HAL_TRANSFER_LEDGER=0`, Pair A/iRig music still
+  fails: `quality_alignment_score=0.971414`, SNR `10.52 dB`, `27` lag jumps,
+  and driver p95 about `36.9%`.
+- Stream-usage support was enabled and `audio-wav-play` now declares its
+  selected output pair through `IOProcStreamUsage`. This is correct HAL
+  behavior, but it only moved music alignment to `0.971648` and did not clear
+  CPU or residual gates.
+- `sudo -n sample` during playback-only produced the first useful symbol
+  profile. The active CPU is dominated by the USB dispatch queue and IOUSBHost
+  async enqueue work from capture/playback completions, not by routing, sample
+  conversion, transfer ledger, or generic DSP.
+- Already rejected knobs remain rejected: playback coalesce2 lowers CPU but
+  damages physical quality; input-decode active gating regressed badly; pool
+  cursor failed HAL safety; ISO64/q8 was physically catastrophic.
+- Current decision pressure is a transport/hot-path redesign that preserves
+  fine playback cadence while reducing IOUSBHost/Objective-C enqueue cost.
+  CPU-only wins are not acceptable without physical music quality proof.

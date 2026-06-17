@@ -3637,3 +3637,65 @@ Operational note:
   - `FAIL_NOT_READY`. Clean transaction transport evidence is not enough:
     physical music quality is still far below thresholds and still does not
     objectively beat mainline.
+
+## 2026-06-17: Product Ledger-Off, Stream Usage, And CPU Symbol Profile
+
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - Locked product install:
+    `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-product/20260617-product-ledgeroff/hal-candidate-safety`
+  - Product ledger-off soundcheck:
+    `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-product-ledgeroff-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-product-ledgeroff-irig-pairA-12s-cpp-hal/stream-stats-during.tsv --json-out local-analysis/stream-stats/product-ledgeroff-soundcheck-summary.json`
+  - Changed `HAL_STREAM_USAGE ?= 1` and updated `build/audio-wav-play` to set
+    `kAudioDevicePropertyIOProcStreamUsage` for the selected output pair.
+  - Rebuild and offline gates:
+    `make -B hal build/audio-wav-play build/opena8dj-control`,
+    `ctest --test-dir build/cpp-release --output-on-failure`.
+  - Locked stream-usage soundcheck:
+    `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Playback-only CPU symbol profile:
+    `sudo -n sample <Core Audio Driver (OpenA8DJ.driver) pid> 7 -file local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only/opena8dj-driver.sample.txt`.
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-streamusage-sample.json`
+- Result:
+  - Product ledger-off HAL built with `OPENA8DJ_ENABLE_TRANSFER_LEDGER=0`.
+  - Product ledger-off physical soundcheck: FAIL,
+    `quality_alignment_score=0.971414`, `analog_snr_db=10.52`,
+    `lag_jumps_gt_2_frames=27`, mid/high residual ratios
+    `1.409378/1.365051`, quiet mid noise `-35.04 dBFS`,
+    `capture_clipped_frames=0`.
+  - Stream-stats product summary confirmed `transferLedgerEntriesWritten=0`,
+    no output underruns, no active underruns, no timeline resets, no playback
+    transfer errors, no transfer-pool fallback allocations. Capture
+    zero-complete slots remained the known packetization warning, not a hard
+    transport failure.
+  - Stream-usage physical soundcheck: FAIL,
+    `quality_alignment_score=0.971648`, `analog_snr_db=10.52`,
+    `lag_jumps_gt_2_frames=28`, mid/high residual ratios
+    `1.399655/1.358543`, quiet mid noise `-35.20 dBFS`,
+    `capture_clipped_frames=0`.
+  - Stream usage is not a product-quality unlock. It is a small correctness
+    change for clients that explicitly declare active streams.
+  - CPU remains far above mainline: latest stream-usage run reports
+    `opena8dj_driver_p95=37.2%` and `coreaudiod_p95=35.0%` in promotion
+    readiness.
+  - Initial unprivileged `sample` failed with privilege error; `sudo -n sample`
+    succeeded without user interaction.
+  - Playback-only symbol profile shows the dominant active CPU path is
+    `org.opena8dj.driver.usb`, specifically IOUSBHost async enqueue from
+    capture and playback completion paths. Audio pack/decode/routing are much
+    smaller in the profile.
+  - Final runtime isolation after each locked window: PASS, HAL inactive, lock
+    absent, no OpenA8DJ driver process.
+- Evidence paths:
+  - `local-analysis/soundcheck/20260617-product-ledgeroff-irig-pairA-12s-cpp-hal`
+  - `local-analysis/stream-stats/product-ledgeroff-soundcheck-summary.json`
+  - `local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal`
+  - `local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only`
+  - `local-analysis/runtime-isolation/after-streamusage-soundcheck.json`
+  - `local-analysis/runtime-isolation/after-sudo-sample-playback-only.json`
+  - `local-analysis/promotion-readiness-after-streamusage-sample.json`
+- Readiness note:
+  - `FAIL_NOT_READY`. The candidate still does not beat mainline in music
+    quality or CPU, and Traktor/timecode vinyl physical validation remains
+    absent. Do not move C to Legacy or C++ to main.
