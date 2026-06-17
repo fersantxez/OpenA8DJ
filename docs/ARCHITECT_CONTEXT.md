@@ -143,6 +143,12 @@ Branch: `driverkit/cpp-redesign`
   rows, `0` failures, with `capture_pool_leak_rejected` and
   `playback_pool_leak_rejected` proving fallback-allocation scenarios are
   rejected before hardware testing.
+- The HAL now has aggregate transfer-ledger instrumentation for the next
+  physical diagnostic run. It records capture/playback queue and completion
+  events into a fixed POD ring and exports aggregate counters through
+  `opena8dj-control stream-stats` and `stream-stats-during.tsv`. This is
+  observability only; CPU/readiness claims must account for instrumentation
+  overhead.
 
 ## Known Baseline Inputs
 

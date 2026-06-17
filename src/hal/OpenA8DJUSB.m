@@ -166,6 +166,10 @@
 #define OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM 1
 #endif
 
+#ifndef OPENA8DJ_ENABLE_TRANSFER_LEDGER
+#define OPENA8DJ_ENABLE_TRANSFER_LEDGER 1
+#endif
+
 static const uint16_t kVendorID = 0x17cc;
 static const uint16_t kProductID = 0x1978;
 static const uint8_t kEndpointControlOut = 0x01;
@@ -206,6 +210,7 @@ enum {
     kOutputReplayHoldFrames = 8,
     kOutputMaxReplayFrames = 192,
     kOutputStatsFlushTransferInterval = 16,
+    kTransferLedgerCapacity = 4096,
     kOutputSampleTimeJitterToleranceFrames = 1024,
     kPlaybackScheduleLeadFrames = 100,
     kPlaybackScheduleMaxLeadFrames = kPlaybackScheduleLeadFrames + (kPlaybackQueueTarget * kIsoFramesPerTransfer) + 64,
@@ -476,6 +481,21 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t outputLateWriteBatches;
     uint64_t captureTransferPoolFallbackAllocations;
     uint64_t playbackTransferPoolFallbackAllocations;
+    uint64_t transferLedgerCapacity;
+    uint64_t transferLedgerEntriesWritten;
+    uint64_t transferLedgerEntriesOverwritten;
+    uint64_t transferLedgerCaptureQueueEntries;
+    uint64_t transferLedgerCaptureCompleteEntries;
+    uint64_t transferLedgerPlaybackQueueEntries;
+    uint64_t transferLedgerPlaybackCompleteEntries;
+    uint64_t transferLedgerPlaybackImplicitFirstFrameNumbers;
+    uint64_t transferLedgerPlaybackFirstFrameMin;
+    uint64_t transferLedgerPlaybackFirstFrameMax;
+    uint64_t transferLedgerOutputReadFrames;
+    uint64_t transferLedgerOutputStartupSilenceFrames;
+    uint64_t transferLedgerOutputActiveUnderrunFrames;
+    uint64_t transferLedgerOutputElasticDropFrames;
+    uint64_t transferLedgerOutputElasticReplayFrames;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -489,6 +509,53 @@ typedef struct OpenA8DJOutputFillStats {
     uint64_t nearClipSamples;
     uint64_t clippedSamples;
 } OpenA8DJOutputFillStats;
+
+typedef enum OpenA8DJTransferLedgerEvent {
+    kTransferLedgerCaptureQueue = 1,
+    kTransferLedgerCaptureComplete = 2,
+    kTransferLedgerPlaybackQueue = 3,
+    kTransferLedgerPlaybackComplete = 4
+} OpenA8DJTransferLedgerEvent;
+
+typedef struct OpenA8DJTransferLedgerEntry {
+    uint64_t sequence;
+    uint64_t hostTime;
+    uint64_t firstFrameNumber;
+    uint64_t outputReadStartFrame;
+    uint64_t outputReadEndFrame;
+    uint64_t transferBytes;
+    uint64_t completedBytes;
+    uint64_t failedTransactions;
+    uint64_t shortTransactions;
+    uint64_t outputFramesRead;
+    uint64_t outputStartupSilenceFrames;
+    uint64_t outputActiveUnderrunFrames;
+    uint64_t outputElasticDropFrames;
+    uint64_t outputElasticReplayFrames;
+    uint32_t event;
+    uint32_t transactionCount;
+    uint32_t inFlight;
+    uint32_t status;
+    uint32_t pooled;
+    uint32_t reserved;
+} OpenA8DJTransferLedgerEntry;
+
+typedef struct OpenA8DJTransferLedgerSnapshot {
+    uint64_t sequence;
+    uint64_t overwritten;
+    uint64_t captureQueueEntries;
+    uint64_t captureCompleteEntries;
+    uint64_t playbackQueueEntries;
+    uint64_t playbackCompleteEntries;
+    uint64_t playbackImplicitFirstFrameNumbers;
+    uint64_t playbackFirstFrameMin;
+    uint64_t playbackFirstFrameMax;
+    uint64_t outputReadFrames;
+    uint64_t outputStartupSilenceFrames;
+    uint64_t outputActiveUnderrunFrames;
+    uint64_t outputElasticDropFrames;
+    uint64_t outputElasticReplayFrames;
+} OpenA8DJTransferLedgerSnapshot;
 
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
 typedef struct OpenA8DJDiagnosticEvent {
@@ -639,6 +706,37 @@ static uint64_t ExpectedCaptureIsoTransferTicks(void)
 static uint64_t __attribute__((unused)) ExpectedPlaybackIsoTransferTicks(void)
 {
     return ExpectedIsoTransferTicksForFrames(kPlaybackIsoFramesPerTransfer);
+}
+
+static void AtomicMaxValue(atomic_uint_fast64_t *value, uint64_t candidate)
+{
+    uint_fast64_t current = atomic_load_explicit(value, memory_order_relaxed);
+    while (candidate > current &&
+           !atomic_compare_exchange_weak_explicit(value,
+                                                  &current,
+                                                  candidate,
+                                                  memory_order_relaxed,
+                                                  memory_order_relaxed)) {
+    }
+}
+
+static void AtomicMinObservedValue(atomic_uint_fast64_t *value,
+                                   atomic_uint_fast64_t *samples,
+                                   uint64_t candidate)
+{
+    uint_fast64_t oldSamples = atomic_fetch_add_explicit(samples, 1, memory_order_relaxed);
+    if (oldSamples == 0) {
+        atomic_store_explicit(value, candidate, memory_order_relaxed);
+        return;
+    }
+    uint_fast64_t current = atomic_load_explicit(value, memory_order_relaxed);
+    while (candidate < current &&
+           !atomic_compare_exchange_weak_explicit(value,
+                                                  &current,
+                                                  candidate,
+                                                  memory_order_relaxed,
+                                                  memory_order_relaxed)) {
+    }
 }
 
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
@@ -1615,6 +1713,18 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
                      delta:(uint64_t)delta
                   threshold:(uint64_t)threshold;
 - (void)accumulateOutputFillStats:(const OpenA8DJOutputFillStats *)stats force:(BOOL)force;
+- (void)resetTransferLedger;
+- (uint64_t)recordTransferLedgerEvent:(OpenA8DJTransferLedgerEvent)event
+                              transfer:(OpenA8DJIsoTransfer *)transfer
+                      firstFrameNumber:(uint64_t)firstFrameNumber
+                               inFlight:(uint32_t)inFlight
+                            statusValue:(uint32_t)statusValue
+                         transferBytes:(uint64_t)transferBytes
+                        completedBytes:(uint64_t)completedBytes
+                    failedTransactions:(uint64_t)failedTransactions
+                     shortTransactions:(uint64_t)shortTransactions
+                            outputStats:(const OpenA8DJOutputFillStats *)outputStats;
+- (OpenA8DJTransferLedgerSnapshot)transferLedgerSnapshot;
 @end
 
 @interface OpenA8DJIsoTransfer : NSObject
@@ -1625,6 +1735,8 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 @property(nonatomic) NSUInteger capacityTransactions;
 @property(nonatomic) BOOL pooled;
 @property(nonatomic) BOOL inUse;
+@property(nonatomic) uint64_t ledgerSequence;
+@property(nonatomic) uint64_t ledgerFirstFrameNumber;
 @end
 
 @implementation OpenA8DJIsoTransfer
@@ -1759,6 +1871,23 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t _lastCaptureTransactionUSBTime;
     atomic_ullong _captureHotStreamStatsCounter;
     atomic_ullong _playbackHotStreamStatsCounter;
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+    OpenA8DJTransferLedgerEntry _transferLedger[kTransferLedgerCapacity];
+    atomic_uint_fast64_t _transferLedgerSequence;
+    atomic_uint_fast64_t _transferLedgerCaptureQueueEntries;
+    atomic_uint_fast64_t _transferLedgerCaptureCompleteEntries;
+    atomic_uint_fast64_t _transferLedgerPlaybackQueueEntries;
+    atomic_uint_fast64_t _transferLedgerPlaybackCompleteEntries;
+    atomic_uint_fast64_t _transferLedgerPlaybackImplicitFirstFrameNumbers;
+    atomic_uint_fast64_t _transferLedgerPlaybackFirstFrameMin;
+    atomic_uint_fast64_t _transferLedgerPlaybackFirstFrameSamples;
+    atomic_uint_fast64_t _transferLedgerPlaybackFirstFrameMax;
+    atomic_uint_fast64_t _transferLedgerOutputReadFrames;
+    atomic_uint_fast64_t _transferLedgerOutputStartupSilenceFrames;
+    atomic_uint_fast64_t _transferLedgerOutputActiveUnderrunFrames;
+    atomic_uint_fast64_t _transferLedgerOutputElasticDropFrames;
+    atomic_uint_fast64_t _transferLedgerOutputElasticReplayFrames;
+#endif
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     OpenA8DJCadenceDiagnostics _cadenceDiagnostics;
 #endif
@@ -1841,6 +1970,23 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #endif
         atomic_init(&_captureHotStreamStatsCounter, 0);
         atomic_init(&_playbackHotStreamStatsCounter, 0);
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+        atomic_init(&_transferLedgerSequence, 0);
+        atomic_init(&_transferLedgerCaptureQueueEntries, 0);
+        atomic_init(&_transferLedgerCaptureCompleteEntries, 0);
+        atomic_init(&_transferLedgerPlaybackQueueEntries, 0);
+        atomic_init(&_transferLedgerPlaybackCompleteEntries, 0);
+        atomic_init(&_transferLedgerPlaybackImplicitFirstFrameNumbers, 0);
+        atomic_init(&_transferLedgerPlaybackFirstFrameMin, 0);
+        atomic_init(&_transferLedgerPlaybackFirstFrameSamples, 0);
+        atomic_init(&_transferLedgerPlaybackFirstFrameMax, 0);
+        atomic_init(&_transferLedgerOutputReadFrames, 0);
+        atomic_init(&_transferLedgerOutputStartupSilenceFrames, 0);
+        atomic_init(&_transferLedgerOutputActiveUnderrunFrames, 0);
+        atomic_init(&_transferLedgerOutputElasticDropFrames, 0);
+        atomic_init(&_transferLedgerOutputElasticReplayFrames, 0);
+        memset(_transferLedger, 0, sizeof(_transferLedger));
+#endif
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -2768,6 +2914,165 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     [self addOutputFillStats:&flushStats];
 }
 
+- (void)resetTransferLedger
+{
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+    memset(_transferLedger, 0, sizeof(_transferLedger));
+    atomic_store_explicit(&_transferLedgerSequence, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerCaptureQueueEntries, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerCaptureCompleteEntries, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackQueueEntries, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackCompleteEntries, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackImplicitFirstFrameNumbers, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackFirstFrameMin, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackFirstFrameSamples, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerPlaybackFirstFrameMax, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerOutputReadFrames, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerOutputStartupSilenceFrames, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerOutputActiveUnderrunFrames, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerOutputElasticDropFrames, 0, memory_order_relaxed);
+    atomic_store_explicit(&_transferLedgerOutputElasticReplayFrames, 0, memory_order_relaxed);
+#endif
+}
+
+- (uint64_t)recordTransferLedgerEvent:(OpenA8DJTransferLedgerEvent)event
+                              transfer:(OpenA8DJIsoTransfer *)transfer
+                      firstFrameNumber:(uint64_t)firstFrameNumber
+                               inFlight:(uint32_t)inFlight
+                            statusValue:(uint32_t)statusValue
+                         transferBytes:(uint64_t)transferBytes
+                        completedBytes:(uint64_t)completedBytes
+                    failedTransactions:(uint64_t)failedTransactions
+                     shortTransactions:(uint64_t)shortTransactions
+                            outputStats:(const OpenA8DJOutputFillStats *)outputStats
+{
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+    uint64_t sequence = atomic_fetch_add_explicit(&_transferLedgerSequence, 1, memory_order_relaxed) + 1;
+    size_t index = (size_t)((sequence - 1) % kTransferLedgerCapacity);
+    OpenA8DJTransferLedgerEntry entry;
+    memset(&entry, 0, sizeof(entry));
+    entry.sequence = sequence;
+    entry.hostTime = mach_absolute_time();
+    entry.firstFrameNumber = firstFrameNumber;
+    entry.transferBytes = transferBytes;
+    entry.completedBytes = completedBytes;
+    entry.failedTransactions = failedTransactions;
+    entry.shortTransactions = shortTransactions;
+    entry.event = (uint32_t)event;
+    entry.transactionCount = transfer != nil ? (uint32_t)transfer.transactionCount : 0;
+    entry.inFlight = inFlight;
+    entry.status = statusValue;
+    entry.pooled = (transfer != nil && transfer.pooled) ? 1 : 0;
+    if (outputStats != NULL) {
+        uint64_t startFrame = _outputFramesServed >= outputStats->framesRead ?
+            _outputFramesServed - outputStats->framesRead : 0;
+        entry.outputReadStartFrame = startFrame;
+        entry.outputReadEndFrame = outputStats->framesRead > 0 ?
+            startFrame + outputStats->framesRead - 1 : startFrame;
+        entry.outputFramesRead = outputStats->framesRead;
+        entry.outputStartupSilenceFrames = outputStats->startupSilenceFrames;
+        entry.outputActiveUnderrunFrames = outputStats->activeUnderruns;
+        entry.outputElasticDropFrames = outputStats->elasticDrops;
+        entry.outputElasticReplayFrames = outputStats->elasticReplays;
+        atomic_fetch_add_explicit(&_transferLedgerOutputReadFrames,
+                                  outputStats->framesRead,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_transferLedgerOutputStartupSilenceFrames,
+                                  outputStats->startupSilenceFrames,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_transferLedgerOutputActiveUnderrunFrames,
+                                  outputStats->activeUnderruns,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_transferLedgerOutputElasticDropFrames,
+                                  outputStats->elasticDrops,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_transferLedgerOutputElasticReplayFrames,
+                                  outputStats->elasticReplays,
+                                  memory_order_relaxed);
+    }
+
+    switch (event) {
+        case kTransferLedgerCaptureQueue:
+            atomic_fetch_add_explicit(&_transferLedgerCaptureQueueEntries, 1, memory_order_relaxed);
+            break;
+        case kTransferLedgerCaptureComplete:
+            atomic_fetch_add_explicit(&_transferLedgerCaptureCompleteEntries, 1, memory_order_relaxed);
+            break;
+        case kTransferLedgerPlaybackQueue:
+            atomic_fetch_add_explicit(&_transferLedgerPlaybackQueueEntries, 1, memory_order_relaxed);
+            if (firstFrameNumber == 0) {
+                atomic_fetch_add_explicit(&_transferLedgerPlaybackImplicitFirstFrameNumbers,
+                                          1,
+                                          memory_order_relaxed);
+            } else {
+                AtomicMinObservedValue(&_transferLedgerPlaybackFirstFrameMin,
+                                       &_transferLedgerPlaybackFirstFrameSamples,
+                                       firstFrameNumber);
+                AtomicMaxValue(&_transferLedgerPlaybackFirstFrameMax, firstFrameNumber);
+            }
+            break;
+        case kTransferLedgerPlaybackComplete:
+            atomic_fetch_add_explicit(&_transferLedgerPlaybackCompleteEntries, 1, memory_order_relaxed);
+            break;
+    }
+
+    _transferLedger[index] = entry;
+    if (transfer != nil) {
+        transfer.ledgerSequence = sequence;
+        transfer.ledgerFirstFrameNumber = firstFrameNumber;
+    }
+    return sequence;
+#else
+    (void)event;
+    (void)transfer;
+    (void)firstFrameNumber;
+    (void)inFlight;
+    (void)statusValue;
+    (void)transferBytes;
+    (void)completedBytes;
+    (void)failedTransactions;
+    (void)shortTransactions;
+    (void)outputStats;
+    return 0;
+#endif
+}
+
+- (OpenA8DJTransferLedgerSnapshot)transferLedgerSnapshot
+{
+    OpenA8DJTransferLedgerSnapshot snapshot;
+    memset(&snapshot, 0, sizeof(snapshot));
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+    snapshot.sequence = atomic_load_explicit(&_transferLedgerSequence, memory_order_relaxed);
+    snapshot.overwritten = snapshot.sequence > kTransferLedgerCapacity ?
+        snapshot.sequence - kTransferLedgerCapacity : 0;
+    snapshot.captureQueueEntries =
+        atomic_load_explicit(&_transferLedgerCaptureQueueEntries, memory_order_relaxed);
+    snapshot.captureCompleteEntries =
+        atomic_load_explicit(&_transferLedgerCaptureCompleteEntries, memory_order_relaxed);
+    snapshot.playbackQueueEntries =
+        atomic_load_explicit(&_transferLedgerPlaybackQueueEntries, memory_order_relaxed);
+    snapshot.playbackCompleteEntries =
+        atomic_load_explicit(&_transferLedgerPlaybackCompleteEntries, memory_order_relaxed);
+    snapshot.playbackImplicitFirstFrameNumbers =
+        atomic_load_explicit(&_transferLedgerPlaybackImplicitFirstFrameNumbers, memory_order_relaxed);
+    snapshot.playbackFirstFrameMin =
+        atomic_load_explicit(&_transferLedgerPlaybackFirstFrameMin, memory_order_relaxed);
+    snapshot.playbackFirstFrameMax =
+        atomic_load_explicit(&_transferLedgerPlaybackFirstFrameMax, memory_order_relaxed);
+    snapshot.outputReadFrames =
+        atomic_load_explicit(&_transferLedgerOutputReadFrames, memory_order_relaxed);
+    snapshot.outputStartupSilenceFrames =
+        atomic_load_explicit(&_transferLedgerOutputStartupSilenceFrames, memory_order_relaxed);
+    snapshot.outputActiveUnderrunFrames =
+        atomic_load_explicit(&_transferLedgerOutputActiveUnderrunFrames, memory_order_relaxed);
+    snapshot.outputElasticDropFrames =
+        atomic_load_explicit(&_transferLedgerOutputElasticDropFrames, memory_order_relaxed);
+    snapshot.outputElasticReplayFrames =
+        atomic_load_explicit(&_transferLedgerOutputElasticReplayFrames, memory_order_relaxed);
+#endif
+    return snapshot;
+}
+
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
@@ -2884,6 +3189,24 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_unlock(&_clockAnchorMutex);
 
     stats.playbackNextFrameNumber = _nextPlaybackFrameNumber;
+
+    OpenA8DJTransferLedgerSnapshot ledgerSnapshot = [self transferLedgerSnapshot];
+    stats.transferLedgerCapacity = kTransferLedgerCapacity;
+    stats.transferLedgerEntriesWritten = ledgerSnapshot.sequence;
+    stats.transferLedgerEntriesOverwritten = ledgerSnapshot.overwritten;
+    stats.transferLedgerCaptureQueueEntries = ledgerSnapshot.captureQueueEntries;
+    stats.transferLedgerCaptureCompleteEntries = ledgerSnapshot.captureCompleteEntries;
+    stats.transferLedgerPlaybackQueueEntries = ledgerSnapshot.playbackQueueEntries;
+    stats.transferLedgerPlaybackCompleteEntries = ledgerSnapshot.playbackCompleteEntries;
+    stats.transferLedgerPlaybackImplicitFirstFrameNumbers =
+        ledgerSnapshot.playbackImplicitFirstFrameNumbers;
+    stats.transferLedgerPlaybackFirstFrameMin = ledgerSnapshot.playbackFirstFrameMin;
+    stats.transferLedgerPlaybackFirstFrameMax = ledgerSnapshot.playbackFirstFrameMax;
+    stats.transferLedgerOutputReadFrames = ledgerSnapshot.outputReadFrames;
+    stats.transferLedgerOutputStartupSilenceFrames = ledgerSnapshot.outputStartupSilenceFrames;
+    stats.transferLedgerOutputActiveUnderrunFrames = ledgerSnapshot.outputActiveUnderrunFrames;
+    stats.transferLedgerOutputElasticDropFrames = ledgerSnapshot.outputElasticDropFrames;
+    stats.transferLedgerOutputElasticReplayFrames = ledgerSnapshot.outputElasticReplayFrames;
 
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     OpenA8DJCadenceRangeSnapshot cadenceSnapshot =
@@ -3368,6 +3691,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return NO;
     }
     [self resetStreamStats];
+    [self resetTransferLedger];
     [self resetClockAnchorForNewStream];
     RingClear(&_inputRing);
     atomic_store(&_inputDecodeActive, false);
@@ -3907,10 +4231,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 }
 
-- (void)fillPlaybackBytes:(uint8_t *)bytes length:(NSUInteger)length
+- (void)fillPlaybackBytes:(uint8_t *)bytes
+                   length:(NSUInteger)length
+              outputStats:(OpenA8DJOutputFillStats *)outStats
 {
     if (_spec.dataAlignment != 2) {
         memset(bytes, 0, length);
+        if (outStats != NULL) {
+            memset(outStats, 0, sizeof(*outStats));
+        }
         return;
     }
     OpenA8DJOutputFillStats stats = {0};
@@ -4000,6 +4329,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         }
     }
 #endif
+    if (outStats != NULL) {
+        *outStats = stats;
+    }
     [self accumulateOutputFillStats:&stats force:NO];
 }
 
@@ -4044,6 +4376,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
     __weak OpenA8DJUSBEngine *weakSelf = self;
     NSError *error = nil;
+    [self recordTransferLedgerEvent:kTransferLedgerCaptureQueue
+                            transfer:transfer
+                    firstFrameNumber:0
+                             inFlight:kCaptureQueueDepth
+                          statusValue:(uint32_t)kIOReturnInvalid
+                       transferBytes:(uint64_t)transfer.data.length
+                      completedBytes:0
+                  failedTransactions:0
+                   shortTransactions:0
+                          outputStats:NULL];
     BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
                                          transactionList:transactions
                                     transactionListCount:transfer.transactionCount
@@ -4212,6 +4554,17 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         failedTransactions++;
         USBTrace("isoc IN complete status=0x%08x", status);
     }
+
+    [self recordTransferLedgerEvent:kTransferLedgerCaptureComplete
+                            transfer:transfer
+                    firstFrameNumber:0
+                             inFlight:kCaptureQueueDepth
+                          statusValue:(uint32_t)status
+                       transferBytes:(uint64_t)transfer.data.length
+                      completedBytes:captureByteCount
+                  failedTransactions:failedTransactions
+                   shortTransactions:shortTransfers
+                          outputStats:NULL];
 
 #if OPENA8DJ_ENABLE_TRACE
     _debugCaptureTransfers++;
@@ -4601,7 +4954,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return NO;
     }
     uint64_t firstFrameNumber = [self nextPlaybackFirstFrameNumberForCount:count];
-    [self fillPlaybackBytes:transfer.data.mutableBytes length:transfer.data.length];
+    OpenA8DJOutputFillStats outputStats = {0};
+    [self fillPlaybackBytes:transfer.data.mutableBytes
+                     length:transfer.data.length
+                outputStats:&outputStats];
 
     IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -4629,6 +4985,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #else
     (void)inFlightAfterQueue;
 #endif
+    [self recordTransferLedgerEvent:kTransferLedgerPlaybackQueue
+                            transfer:transfer
+                    firstFrameNumber:firstFrameNumber
+                             inFlight:inFlightAfterQueue
+                          statusValue:(uint32_t)kIOReturnInvalid
+                       transferBytes:(uint64_t)transfer.data.length
+                      completedBytes:0
+                  failedTransactions:0
+                   shortTransactions:0
+                          outputStats:&outputStats];
     BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
                                           transactionList:transactions
                                      transactionListCount:transfer.transactionCount
@@ -4688,8 +5054,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     _lastPlaybackCompletionHostTime = playbackCompletionTime;
 
-#if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     uint32_t inFlightAtCompletion = atomic_load(&_playbackTransfersInFlight);
+#if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     CadenceRecordRange(&_cadenceDiagnostics.playbackInFlightAtCompletion, inFlightAtCompletion);
 #endif
     if (atomic_load(&_playbackTransfersInFlight) > 0) {
@@ -4736,6 +5102,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     } else if (status != kIOReturnAborted) {
         failedTransactions++;
     }
+    [self recordTransferLedgerEvent:kTransferLedgerPlaybackComplete
+                            transfer:transfer
+                    firstFrameNumber:transfer.ledgerFirstFrameNumber
+                             inFlight:inFlightAtCompletion
+                          statusValue:(uint32_t)status
+                       transferBytes:(uint64_t)transfer.data.length
+                      completedBytes:playbackBytes
+                  failedTransactions:failedTransactions
+                   shortTransactions:shortTransfers
+                          outputStats:NULL];
     if (status == kIOReturnSuccess && failedTransactions == 0 && shortTransfers == 0) {
         atomic_store(&_playbackScheduleFailureStreak, 0);
     }

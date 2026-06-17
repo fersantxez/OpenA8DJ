@@ -664,3 +664,33 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     still be blocked until there is a new transport/cadence/device-state
     hypothesis, and any fallback allocations found during streaming must be
     treated as a CPU/latency defect.
+
+### Pauli
+
+- Mission: read-only HAL/USB transport audit for exact transfer-ledger
+  instrumentation points.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Identified `queueCaptureTransfer`, `handleCaptureTransfer`,
+    `queuePlaybackWithRequests`, and `handlePlaybackTransfer` as the exact
+    transfer-ledger hooks.
+  - Confirmed queue timestamps were missing, while completion timestamps,
+    request/complete byte counts, in-flight playback count, output timeline
+    read stats, fallback allocations, and drop/replay counters already existed.
+  - Recommended a preallocated POD ring with atomic index and post-run export,
+    avoiding `_streamStatsMutex`, `_diagnosticMutex`, logging, file I/O, and
+    Objective-C allocation in the hot path.
+- Integrated action:
+  - Added fixed-size transfer-ledger instrumentation to the HAL and exported
+    aggregate ledger counters through `opena8dj-control stream-stats`,
+    `scripts/run-soundcheck`, and `scripts/analyze-stream-stats.py`.
+- Risk:
+  - The ledger is diagnostic instrumentation. It improves observability for the
+    next physical run, but any final low-CPU claim must be repeated or
+    controlled with instrumentation overhead accounted for.

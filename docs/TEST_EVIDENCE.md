@@ -231,6 +231,60 @@
   - This improves objective analysis coverage only. It does not prove physical
     sound quality, low runtime CPU, or Traktor/timecode vinyl readiness.
 
+## 2026-06-17: Aggregate Transfer Ledger Instrumentation
+
+- Change:
+  - Added a fixed-size HAL transfer-ledger ring and aggregate counters for
+    capture queue, capture completion, playback queue, playback completion,
+    implicit playback first-frame scheduling, ring overwrite count, and output
+    read/silence/underrun/drop/replay frames consumed while filling playback
+    transfers.
+  - `opena8dj-control stream-stats` now prints the ledger summary and emits
+    `key=value` fields for `run-soundcheck`.
+  - `scripts/run-soundcheck` records the new fields in
+    `stream-stats-during.tsv`.
+  - `scripts/analyze-stream-stats.py` now reports ledger rates and flags
+    ledger overwrite, capture/playback queue-completion gaps, and ledger
+    active underruns.
+- Reason:
+  - Physical failures are not explained by existing underrun, late-write, or
+    packet parity evidence. The next hardware run needs transfer-level
+    observability without logging, allocation, file I/O, or locks per event.
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/hotpath-lock-056d29b-summary-with-ledger-fields.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-transfer-ledger-build.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-transfer-ledger-instrumentation.json`
+- Result:
+  - HAL/control build PASS.
+  - Python syntax PASS.
+  - Existing stream-stats evidence remains readable; missing ledger fields are
+    represented as null/0 and do not create new failure flags.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`, evidence schema PASS.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Latest Release benchmark:
+  - `pack_mib_s=1626.84`.
+  - `decode_into_mib_s=575.412`.
+  - `route_frames_s=1.00486e+09`.
+  - `route_advanced_frames_s=4.86541e+08`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/stream-stats/hotpath-lock-056d29b-summary-with-ledger-fields.json`.
+  - `local-analysis/promotion-readiness-current.json`.
+  - `local-analysis/runtime-isolation/final-after-transfer-ledger-instrumentation.json`.
+- Readiness note:
+  - This is diagnostic instrumentation, not a fix. A future physical run with
+    this ledger can identify hidden transport defects, but final CPU claims
+    must account for ledger overhead.
+
 ## 2026-06-17: Playback Burst Cadence Model Gate
 
 - Change:

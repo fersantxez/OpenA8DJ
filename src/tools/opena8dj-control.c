@@ -208,6 +208,21 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t outputLateWriteBatches;
     uint64_t captureTransferPoolFallbackAllocations;
     uint64_t playbackTransferPoolFallbackAllocations;
+    uint64_t transferLedgerCapacity;
+    uint64_t transferLedgerEntriesWritten;
+    uint64_t transferLedgerEntriesOverwritten;
+    uint64_t transferLedgerCaptureQueueEntries;
+    uint64_t transferLedgerCaptureCompleteEntries;
+    uint64_t transferLedgerPlaybackQueueEntries;
+    uint64_t transferLedgerPlaybackCompleteEntries;
+    uint64_t transferLedgerPlaybackImplicitFirstFrameNumbers;
+    uint64_t transferLedgerPlaybackFirstFrameMin;
+    uint64_t transferLedgerPlaybackFirstFrameMax;
+    uint64_t transferLedgerOutputReadFrames;
+    uint64_t transferLedgerOutputStartupSilenceFrames;
+    uint64_t transferLedgerOutputActiveUnderrunFrames;
+    uint64_t transferLedgerOutputElasticDropFrames;
+    uint64_t transferLedgerOutputElasticReplayFrames;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -836,6 +851,25 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                (unsigned long long)stats->captureTransferPoolFallbackAllocations,
                (unsigned long long)stats->playbackTransferPoolFallbackAllocations);
     }
+    if (STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames)) {
+        printf("  transfer-ledger:        capacity=%llu written=%llu overwritten=%llu cap-q=%llu cap-c=%llu play-q=%llu play-c=%llu implicit-first-frame=%llu first-frame-min=%llu first-frame-max=%llu\n",
+               (unsigned long long)stats->transferLedgerCapacity,
+               (unsigned long long)stats->transferLedgerEntriesWritten,
+               (unsigned long long)stats->transferLedgerEntriesOverwritten,
+               (unsigned long long)stats->transferLedgerCaptureQueueEntries,
+               (unsigned long long)stats->transferLedgerCaptureCompleteEntries,
+               (unsigned long long)stats->transferLedgerPlaybackQueueEntries,
+               (unsigned long long)stats->transferLedgerPlaybackCompleteEntries,
+               (unsigned long long)stats->transferLedgerPlaybackImplicitFirstFrameNumbers,
+               (unsigned long long)stats->transferLedgerPlaybackFirstFrameMin,
+               (unsigned long long)stats->transferLedgerPlaybackFirstFrameMax);
+        printf("  transfer-ledger-output: read=%llu startup-silence=%llu active-underrun=%llu elastic-drop=%llu elastic-replay=%llu\n",
+               (unsigned long long)stats->transferLedgerOutputReadFrames,
+               (unsigned long long)stats->transferLedgerOutputStartupSilenceFrames,
+               (unsigned long long)stats->transferLedgerOutputActiveUnderrunFrames,
+               (unsigned long long)stats->transferLedgerOutputElasticDropFrames,
+               (unsigned long long)stats->transferLedgerOutputElasticReplayFrames);
+    }
     printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu late-write-frames=%llu late-write-batches=%llu\n",
            (unsigned long long)stats->outputFramesWritten,
            (unsigned long long)stats->outputFramesRead,
@@ -993,6 +1027,51 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("playbackTransferPoolFallbackAllocations=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?
                                 stats->playbackTransferPoolFallbackAllocations : 0));
+    printf("transferLedgerCapacity=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerCapacity : 0));
+    printf("transferLedgerEntriesWritten=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerEntriesWritten : 0));
+    printf("transferLedgerEntriesOverwritten=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerEntriesOverwritten : 0));
+    printf("transferLedgerCaptureQueueEntries=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerCaptureQueueEntries : 0));
+    printf("transferLedgerCaptureCompleteEntries=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerCaptureCompleteEntries : 0));
+    printf("transferLedgerPlaybackQueueEntries=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerPlaybackQueueEntries : 0));
+    printf("transferLedgerPlaybackCompleteEntries=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerPlaybackCompleteEntries : 0));
+    printf("transferLedgerPlaybackImplicitFirstFrameNumbers=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerPlaybackImplicitFirstFrameNumbers : 0));
+    printf("transferLedgerPlaybackFirstFrameMin=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerPlaybackFirstFrameMin : 0));
+    printf("transferLedgerPlaybackFirstFrameMax=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerPlaybackFirstFrameMax : 0));
+    printf("transferLedgerOutputReadFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerOutputReadFrames : 0));
+    printf("transferLedgerOutputStartupSilenceFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerOutputStartupSilenceFrames : 0));
+    printf("transferLedgerOutputActiveUnderrunFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerOutputActiveUnderrunFrames : 0));
+    printf("transferLedgerOutputElasticDropFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerOutputElasticDropFrames : 0));
+    printf("transferLedgerOutputElasticReplayFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
+                                stats->transferLedgerOutputElasticReplayFrames : 0));
     printf("playbackScheduleErrors=%llu\n", (unsigned long long)playbackScheduleErrors);
     printf("playbackReschedules=%llu\n", (unsigned long long)stats->playbackReschedules);
     printf("outputRingFrames=%u\n", stats->outputRingFrames);

@@ -185,13 +185,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1656.23 MiB/s` over `5` repeats, min `1644.96`, max `1657.32` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `588.188 MiB/s` over `5` repeats, min `583.229`, max `589.167` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `569.723 MiB/s` over `5` repeats, min `524.785`, max `582.935` | informational |
-| Float32 to S24 conversion throughput | median `88,524,800 frames/s` over `5` repeats, min `88,462,500`, max `88,613,300` | `1,000,000 frames/s` |
-| identity routing throughput | median `914,455,000 frames/s` over `5` repeats, min `850,540,000`, max `938,323,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `513,840,000 frames/s` over `5` repeats, min `510,380,000`, max `530,790,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `507,130,000 frames/s` over `5` repeats, min `506,476,000`, max `511,376,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1626.84 MiB/s` over `5` repeats, min `1622.01`, max `1644.65` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `575.412 MiB/s` over `5` repeats, min `568.916`, max `576.667` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `567.326 MiB/s` over `5` repeats, min `530.519`, max `572.134` | informational |
+| Float32 to S24 conversion throughput | median `86,641,300 frames/s` over `5` repeats, min `85,809,300`, max `86,763,100` | `1,000,000 frames/s` |
+| identity routing throughput | median `1,004,860,000 frames/s` over `5` repeats, min `847,564,000`, max `1,015,900,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `500,315,000 frames/s` over `5` repeats, min `494,222,000`, max `523,459,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `486,541,000 frames/s` over `5` repeats, min `482,067,000`, max `492,097,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -207,6 +207,7 @@ Current Release benchmark values:
 | unsafe burst scenarios | `coalesce2`, `coalesce4` rejected by model | unsafe CPU-only burst wins rejected |
 | transfer-pool model rows | `6`, failures `0` | `>= 6`, failures `0` |
 | transfer-pool fallback rejected scenarios | `capture_pool_leak_rejected`, `playback_pool_leak_rejected` | both required |
+| transfer-ledger compatibility | old stream-stats evidence still parses; new fields null/0 when absent | no parser breakage |
 
 Functional coverage in the current C++ test binary:
 

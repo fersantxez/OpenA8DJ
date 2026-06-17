@@ -27,6 +27,18 @@ COUNTERS = [
     "playbackTransferErrors",
     "captureTransferPoolFallbackAllocations",
     "playbackTransferPoolFallbackAllocations",
+    "transferLedgerEntriesWritten",
+    "transferLedgerEntriesOverwritten",
+    "transferLedgerCaptureQueueEntries",
+    "transferLedgerCaptureCompleteEntries",
+    "transferLedgerPlaybackQueueEntries",
+    "transferLedgerPlaybackCompleteEntries",
+    "transferLedgerPlaybackImplicitFirstFrameNumbers",
+    "transferLedgerOutputReadFrames",
+    "transferLedgerOutputStartupSilenceFrames",
+    "transferLedgerOutputActiveUnderrunFrames",
+    "transferLedgerOutputElasticDropFrames",
+    "transferLedgerOutputElasticReplayFrames",
     "playbackScheduleErrors",
     "playbackReschedules",
     "outputFramesWritten",
@@ -55,6 +67,9 @@ COUNTERS = [
 
 GAUGES = [
     "outputRingFrames",
+    "transferLedgerCapacity",
+    "transferLedgerPlaybackFirstFrameMin",
+    "transferLedgerPlaybackFirstFrameMax",
     "playbackInFlightAtQueueMax",
     "playbackInFlightAtCompletionMax",
 ]
@@ -177,6 +192,14 @@ def analyze(path):
         flags.append("capture_transfer_pool_fallback_allocations")
     if counters["playbackTransferPoolFallbackAllocations"]["delta"] > 0:
         flags.append("playback_transfer_pool_fallback_allocations")
+    if counters["transferLedgerEntriesOverwritten"]["delta"] > 0:
+        flags.append("transfer_ledger_overwritten")
+    if counters["transferLedgerCaptureQueueEntries"]["delta"] > counters["transferLedgerCaptureCompleteEntries"]["delta"] + 1:
+        flags.append("transfer_ledger_capture_completion_gap")
+    if counters["transferLedgerPlaybackQueueEntries"]["delta"] > counters["transferLedgerPlaybackCompleteEntries"]["delta"] + 1:
+        flags.append("transfer_ledger_playback_completion_gap")
+    if counters["transferLedgerOutputActiveUnderrunFrames"]["delta"] > 0:
+        flags.append("transfer_ledger_active_underruns")
     if counters["playbackScheduleErrors"]["delta"] > 0:
         flags.append("playback_schedule_errors")
 
@@ -200,6 +223,16 @@ def analyze(path):
             counters["captureTransferPoolFallbackAllocations"]["per_second"],
         "playback_transfer_pool_fallback_allocations_per_second":
             counters["playbackTransferPoolFallbackAllocations"]["per_second"],
+        "transfer_ledger_entries_per_second":
+            counters["transferLedgerEntriesWritten"]["per_second"],
+        "transfer_ledger_capture_queue_minus_complete_delta":
+            counters["transferLedgerCaptureQueueEntries"]["delta"] -
+            counters["transferLedgerCaptureCompleteEntries"]["delta"],
+        "transfer_ledger_playback_queue_minus_complete_delta":
+            counters["transferLedgerPlaybackQueueEntries"]["delta"] -
+            counters["transferLedgerPlaybackCompleteEntries"]["delta"],
+        "transfer_ledger_output_read_frames_per_second":
+            counters["transferLedgerOutputReadFrames"]["per_second"],
         "capture_transaction_errors_per_capture_transfer": capture_error_per_transfer,
         "capture_status_failures_per_capture_transfer": (
             counters["captureStatusFailures"]["delta"] / capture_tx_delta

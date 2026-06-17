@@ -1822,3 +1822,48 @@ Evidence:
   `local-analysis/promotion-readiness-current.json`, still FAIL because
   physical music quality, runtime CPU, latest physical investigation, and
   physical Traktor/timecode vinyl gates remain unresolved.
+
+## 2026-06-17: Add Aggregate Transfer Ledger Instrumentation
+
+Decision:
+- Add an always-preallocated transfer-ledger ring in the HAL USB engine and
+  export aggregate counters through stream stats.
+- Capture queue/complete and playback queue/complete events with host time,
+  first frame number, transfer bytes, completion bytes, in-flight count, pool
+  status, and output-read/drop/replay/silence counters.
+- Do not add a large IPC dump command yet; use aggregate stream-stats fields
+  for the next physical diagnostic run.
+
+Reason:
+- Existing physical failures have clean underrun/late-write counters but bad
+  music quality and high CPU. We need transfer-level observability to prove
+  whether queue/completion gaps, implicit scheduling, active silence, replay,
+  drops, or completion imbalance are hiding under aggregate counters.
+- A fixed POD ring with relaxed atomic counters is lower risk than logging or
+  file I/O in the callback.
+- Appending aggregate fields to the existing stream-stats payload preserves
+  backward compatibility with older evidence.
+
+Alternatives discarded:
+- Log every transfer: rejected because logging in the audio/USB path is itself
+  a glitch and CPU risk.
+- Export full raw ledger over IPC immediately: deferred because the next run
+  first needs aggregate evidence, and the current 4 KiB IPC payload model is
+  not designed for large dumps.
+- Reuse `_streamStatsMutex` per transfer: rejected because it would add a lock
+  to the hot path and contaminate CPU measurements.
+
+Evidence:
+- `make -B hal build/opena8dj-control`: PASS.
+- `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`:
+  PASS.
+- Existing-run compatibility check:
+  `local-analysis/stream-stats/hotpath-lock-056d29b-summary-with-ledger-fields.json`.
+- Offline gates:
+  `scripts/run-cpp-offline-gates`, Debug `17/17`, Release `18/18`, evidence
+  schema PASS.
+- Runtime isolation:
+  `local-analysis/runtime-isolation/final-after-transfer-ledger-instrumentation.json`,
+  PASS, HAL inactive, lock absent.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-current.json`, FAIL, promotion forbidden.
