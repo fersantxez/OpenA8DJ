@@ -17,6 +17,7 @@ add_library(opena8djcpp_core
   core/src/routing.cpp
   core/src/policies.cpp
   core/src/metrics.cpp
+  core/src/prepared_transport.cpp
   core/src/timecode.cpp
   core/src/timecode_analysis.cpp
   core/src/driverkit_model.cpp)
@@ -142,6 +143,10 @@ target_link_libraries(opena8djcpp_driverkit_shell_contract
 
 add_executable(opena8djcpp_driverkit_prepared_transport_contract
   tools/driverkit_prepared_transport_contract.cpp)
+
+target_link_libraries(opena8djcpp_driverkit_prepared_transport_contract
+  PRIVATE
+    opena8djcpp_core)
 
 add_executable(opena8djcpp_dvs_signal_smoke
   tools/dvs_signal_smoke.cpp)

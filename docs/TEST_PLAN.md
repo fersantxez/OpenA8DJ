@@ -733,5 +733,7 @@ PASS/FAIL semantics:
 
 - PASS means the offline transport model enforces the intended architecture and
   catches known unsafe variants.
+- The contract must be backed by the core `PreparedTransportBackend`; a
+  tool-local simulation is no longer sufficient.
 - PASS does not mean a dext exists, installs, runs, or beats mainline.
 - FAIL blocks any physical prepared-transport candidate.

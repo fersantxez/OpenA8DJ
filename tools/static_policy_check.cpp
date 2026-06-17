@@ -107,6 +107,8 @@ int main(int argc, char** argv) {
       root / "tools/driverkit_surface_model.cpp",
       root / "tools/evidence_schema_check.cpp",
       root / "tools/static_policy_check.cpp",
+      root / "core/include/opena8djcpp/prepared_transport.hpp",
+      root / "core/src/prepared_transport.cpp",
   };
   const auto join = [](const char* left, const char* right) {
     return std::string(left) + std::string(right);

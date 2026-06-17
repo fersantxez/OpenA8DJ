@@ -438,6 +438,9 @@ Offline gate:
 - Required safe scenarios have `hal_steady_requeues=0`, no fallback
   allocations, no timestamp regressions, no routing failures, no timecode
   profile failures, and completion gap ratio `<=1.25`.
+- The gate is backed by `PreparedTransportBackend` in the pure C++ core, so the
+  contract now exercises the reusable ring/counter abstraction rather than a
+  tool-local sketch.
 
 This is still weaker than physical readiness. It is the contract a real
 DriverKit/USB backend must satisfy before another hardware window is justified.

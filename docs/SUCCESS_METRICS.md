@@ -1754,3 +1754,13 @@ Current meaning:
   better-than-mainline performance.
 - It is required before implementing or physically testing a prepared transport
   candidate because the current HAL enqueue path is CPU-blocked.
+
+Implementation status:
+- `PreparedTransportBackend` now exists in core C++ and is covered by
+  `opena8djcpp_core_tests`.
+- `opena8djcpp_driverkit_prepared_transport_contract` uses that core backend
+  directly and reports schema
+  `opena8djcpp.driverkit-prepared-transport-contract.v2`.
+- Product readiness remains blocked until packet/routing batches are integrated
+  into the backend and physical same-session quality/CPU evidence beats
+  mainline.

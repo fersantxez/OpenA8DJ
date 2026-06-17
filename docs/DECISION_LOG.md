@@ -4296,3 +4296,40 @@ Next implication:
 - The next implementation target is an actual C++ transport abstraction that
   can satisfy this contract with the real packet/ring types, then a locked
   physical A/B only after the offline suite remains green.
+
+## 2026-06-17: Promote Prepared Transport Contract Into Core
+
+Decision:
+- Add `PreparedTransportBackend` in `core/include/opena8djcpp/prepared_transport.hpp`
+  and `core/src/prepared_transport.cpp`.
+- Update `opena8djcpp_driverkit_prepared_transport_contract` to use that core
+  type instead of a local one-off simulation.
+
+Reason:
+- The previous contract encoded the right architecture, but it was still
+  tool-local. That made it too easy for future implementation code to diverge
+  from the gate.
+- The new core type owns prepared-slot counters, capture/playback SPSC rings,
+  timestamp ordering, channel identity validation, HAL-facing read/write calls,
+  and safety snapshots.
+- This is the first reusable C++ bridge toward a future DriverKit/USB backend
+  while preserving the offline-only safety boundary.
+
+Alternatives discarded:
+- Keep the contract as a standalone tool: rejected because the product path
+  needs reusable core code, not just a JSON-producing model.
+- Jump directly into macOS DriverKit SDK code: rejected because the local
+  DriverKit SDK is unavailable and system-extension work still requires an
+  explicit locked window.
+
+Evidence:
+- `opena8djcpp_core_tests` now validates `PreparedTransportBackend`.
+- `opena8djcpp_driverkit_prepared_transport_contract` now reports schema
+  `opena8djcpp.driverkit-prepared-transport-contract.v2`, backed by the core
+  backend.
+
+Next implication:
+- The next implementation step is to connect packet packing/decode and routing
+  batches to `PreparedTransportBackend`, then replace the model-only backend
+  with a real DriverKit/USB adapter when the toolchain and hardware window are
+  ready.

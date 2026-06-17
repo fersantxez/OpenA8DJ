@@ -5,6 +5,7 @@
 #include "opena8djcpp/metrics.hpp"
 #include "opena8djcpp/mode2_packet.hpp"
 #include "opena8djcpp/policies.hpp"
+#include "opena8djcpp/prepared_transport.hpp"
 #include "opena8djcpp/protocol.hpp"
 #include "opena8djcpp/routing.hpp"
 #include "opena8djcpp/timecode.hpp"
@@ -492,6 +493,62 @@ void test_input_profile_decode_contract() {
   assert(std::abs(output[7] - s24_to_float(scratch[0][7])) < 1.0e-7F);
 }
 
+void test_prepared_transport_backend_contract() {
+  PreparedTransportBackend transport;
+  assert(transport.start(PreparedTransportConfig{.iso_frames = 8,
+                                                 .capture_slots = 8,
+                                                 .playback_slots = 8}));
+
+  for (std::uint32_t period = 0; period < 32; ++period) {
+    const auto frame = synthetic_s24_frame(period);
+    assert(transport.hal_write_playback(frame));
+    assert(transport.backend_complete_period(
+        frame, static_cast<std::uint64_t>(period + 1U) * 8U));
+    S24Frame captured{};
+    assert(transport.hal_read_capture(captured));
+    assert(captured == frame);
+  }
+
+  const auto counters = transport.counters();
+  assert(counters.backend_prepare_enqueues == 16);
+  assert(counters.backend_steady_requeues == 64);
+  assert(counters.hal_steady_requeues == 0);
+  assert(counters.fallback_allocations == 0);
+  assert(counters.capture_ring_overruns == 0);
+  assert(counters.capture_ring_underruns == 0);
+  assert(counters.playback_ring_overruns == 0);
+  assert(counters.playback_ring_underruns == 0);
+  assert(counters.timestamp_regressions == 0);
+  assert(counters.channel_identity_failures == 0);
+  assert(counters.hal_capture_reads == 32);
+  assert(counters.hal_playback_writes == 32);
+  const auto safety = transport.safety();
+  assert(safety.prepared_slots_only);
+  assert(safety.cadence_safe);
+  assert(safety.routing_safe);
+  assert(safety.timecode_safe);
+  assert(safety.hal_hot_path_safe);
+  assert(safety.product_safe);
+
+  PreparedTransportBackend bad_transport;
+  assert(bad_transport.start(PreparedTransportConfig{}));
+  const auto frame = synthetic_s24_frame(0);
+  assert(bad_transport.hal_write_playback(frame));
+  assert(bad_transport.backend_complete_period(
+      frame, 8, PreparedTransportStepOptions{.completion_gap_periods = 2,
+                                             .hal_direct_requeue_attempt = true,
+                                             .fallback_allocation_attempt = true}));
+  S24Frame captured{};
+  assert(bad_transport.hal_read_capture(captured));
+  const auto bad = bad_transport.safety();
+  assert(!bad.prepared_slots_only);
+  assert(!bad.cadence_safe);
+  assert(!bad.hal_hot_path_safe);
+  assert(!bad.product_safe);
+  bad_transport.stop();
+  assert(!bad_transport.started());
+}
+
 }  // namespace
 
 int main() {
@@ -511,6 +568,7 @@ int main() {
   test_timecode_signal_analysis();
   test_spsc_frame_ring_contract();
   test_input_profile_decode_contract();
+  test_prepared_transport_backend_contract();
 
   std::cout << "opena8djcpp_core_contract PASS\n";
   return 0;

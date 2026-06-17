@@ -1531,3 +1531,14 @@ Next technical target:
     allocations, coalesced completion gaps, and timestamp reorder.
   - This is offline architecture evidence only. It is not a real DriverKit dext,
     not a hardware pass, and not better-than-mainline proof.
+- Core prepared transport backend:
+  - Added `PreparedTransportBackend` to the pure C++ core.
+  - It models HAL-facing playback writes and capture reads through SPSC rings,
+    while backend completions own prepared-slot requeue counters and timestamp
+    ordering.
+  - `opena8djcpp_driverkit_prepared_transport_contract` now uses this core type
+    directly, so the gate validates reusable product-path code instead of a
+    standalone simulation.
+  - Still missing:
+    packet batch integration, real USB/DriverKit adapter, physical CPU/quality
+    evidence, and same-session mainline comparison.
