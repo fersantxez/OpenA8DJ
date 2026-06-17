@@ -6473,3 +6473,52 @@ Operational note:
 - Interpretation:
   - Current evidence shows a transport tradeoff, not a promotable candidate.
   - Product readiness still requires simultaneous physical music quality, low CPU, routing, recovery, and Traktor/timecode evidence.
+
+## 2026-06-17 Locked ISO12/q8 Physical Rejection
+
+- Candidate:
+  - Commit `3dca9ac`.
+  - Build flags: `HAL_ISO_FRAMES=12 HAL_PLAYBACK_ISO_FRAMES=12
+    HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_QUEUE=8`.
+- Commands:
+  - `make -B hal build/audio-wav-play build/audio-record build/audio-config build/opena8dj-control HAL_ISO_FRAMES=12 HAL_PLAYBACK_ISO_FRAMES=12 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_QUEUE=8`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-iso12q8/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal/window-trace.json`
+  - `python3 scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal/stream-stats-during.tsv --json-out local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `python3 scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-iso12q8.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --wait 4 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/after-iso12q8-force-unload`
+- Safety result:
+  - HAL candidate safety PASS.
+  - Post-run forced unload PASS: `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`, `audio_stack_health=PASS`.
+  - Lock final state: free.
+  - Local build restored to default flags:
+    `OPENA8DJ_ISO_FRAMES_PER_TRANSFER=8`,
+    `OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER=8`,
+    `OPENA8DJ_CAPTURE_QUEUE_DEPTH=8`,
+    `OPENA8DJ_PLAYBACK_QUEUE_TARGET=8`.
+- Physical result:
+  - Soundcheck FAIL.
+  - `quality_alignment_score=0.963395 < 0.980`.
+  - SNR floor `9.68 dB < 35 dB`.
+  - `lag_jumps_gt_2_frames=32 > 0`.
+  - Mid/high residual ratios `1.653871/1.494546`, both over strict gates.
+  - Quiet mid noise `-34.53 dBFS > -58 dBFS`.
+  - No clipping.
+- Window/timebase result:
+  - Corrected mid residual median `1.660459`.
+  - Local lag range `-34..5` frames, p95 `26` frames.
+- CPU/transport result:
+  - OpenA8DJ driver p95 about `16.55%`; this is lower than ISO8/q8 but still
+    above the mainline target.
+  - Capture/playback transfers about `666.81/s`.
+  - Output read rate about `48003.69` frames/s.
+  - No output underruns, active underruns, timeline resets, late writes, panic
+    flags, or transfer-pool fallback allocations.
+- Promotion readiness:
+  - `local-analysis/promotion-readiness-after-iso12q8.json` reports
+    `result=FAIL`, `branch_promotion_allowed=false`.
+- Interpretation:
+  - ISO12/q8 is rejected. It improves CPU directionally but worsens physical
+    residual/quality, so cadence alone is not a solution.

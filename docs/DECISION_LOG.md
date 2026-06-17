@@ -4062,3 +4062,46 @@ Evidence:
 
 Next implication:
 - The next candidate should test a bounded intermediate cadence such as `ISO12/q8` only under lock, same fixture, same iRig route, same metrics, and must beat both prior C++ quality and mainline-relative CPU gates before any readiness claim.
+
+## 2026-06-17: Reject ISO12/q8 Intermediate Cadence
+
+Decision:
+- Reject `HAL_ISO_FRAMES=12 HAL_PLAYBACK_ISO_FRAMES=12 HAL_CAPTURE_QUEUE=8
+  HAL_PLAYBACK_QUEUE=8` as a product candidate.
+- Do not continue the simple "increase ISO until CPU passes" ladder without a
+  new quality mechanism; ISO12 lowered driver CPU versus ISO8/ISO10 but made
+  residual and lag stability worse.
+
+Reason:
+- Locked Pair A/iRig soundcheck failed strict physical music gates:
+  quality `0.963395`, SNR floor `9.68 dB`, `32` lag jumps, mid/high residual
+  `1.653871/1.494546`, quiet mid noise `-34.53 dBFS`, clipping `0`.
+- Window trace confirmed the quality problem survives local lag correction:
+  corrected mid residual median `1.660459`, local lag range `-34..5` frames,
+  local lag p95 `26` frames.
+- Runtime improved but still failed the mainline-relative CPU gate:
+  OpenA8DJ driver p95 about `16.55%`, above the `<= 6.5%` target.
+- Stream stats showed transport cadence behaved as the candidate requested:
+  capture/playback about `666.81` transfers/s, classified `12`
+  transactions per sampled capture transfer, output read rate about
+  `48003.69` frames/s, no output underruns/resets/panic flags.
+
+Alternatives discarded:
+- Promote ISO12 because CPU improved: rejected because physical music quality
+  and residual are worse than ISO8/ISO10 and far from strict gates.
+- Keep sweeping upward blindly: rejected because ISO64/q8 already shows the
+  high-ISO endpoint can hit CPU-near-mainline while destroying physical music
+  quality.
+
+Evidence:
+- `local-analysis/physical-product/20260617-iso12q8/hal-candidate-safety`
+- `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal`
+- `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal/window-trace.json`
+- `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/promotion-readiness-after-iso12q8.json`
+- `local-analysis/audio-stack-guard/after-iso12q8-force-unload`
+
+Next implication:
+- The blocker is not solved by transport cadence alone. The next useful work
+  should explain the persistent analog residual/lag mechanism, or split the
+  route/capture baseline from driver behavior before more physical probes.

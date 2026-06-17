@@ -1584,3 +1584,27 @@ Required gate update:
 - Every physical candidate report must name its effective ISO/queue family when evidence can infer it.
 - A family cannot be promoted unless it simultaneously beats the strict physical music gate and the mainline-relative CPU gate.
 - Existing evidence does not contain a family that satisfies both; branch promotion and hardware-readiness claims remain blocked.
+
+## 2026-06-17 ISO12/q8 Candidate Status
+
+Latest ISO12/q8 evidence:
+`local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+
+Result: rejected.
+
+| metric | ISO12/q8 result | required |
+| --- | ---: | ---: |
+| quality alignment | `0.963395` | `>= 0.980000` |
+| SNR floor | `9.68 dB` | `>= 35 dB` |
+| lag jumps > 2 frames | `32` | `0` |
+| mid residual ratio | `1.653871` | `<= 1.36` practical / stricter product gate |
+| high residual ratio | `1.494546` | `<= 1.35` practical / stricter product gate |
+| quiet mid noise | `-34.53 dBFS` | `<= -58 dBFS` |
+| driver CPU p95 | `16.55%` | `<= 6.5%` |
+| output underruns/resets/panic | `0/0/0` | `0/0/0` |
+
+Meaning:
+- ISO12/q8 improves CPU versus ISO8/q8 but makes physical residual/quality
+  worse. It is not a valid product path.
+- Transport cadence remains a necessary variable to record, but it is not
+  sufficient to solve the audiophile quality gate.
