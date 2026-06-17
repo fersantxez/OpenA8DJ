@@ -2057,3 +2057,31 @@ Current implication:
   active HAL when `--leave-loaded` is absent.
 - Do not continue to C++ superiority claims until the known-good route is
   valid and the runner completes same-session mainline/C++ evidence.
+
+### 2026-06-17 C++ Bundle And Direct USB Diagnostics
+
+- Found that `build/OpenA8DJ.driver` could exist without
+  `Contents/MacOS/OpenA8DJHAL`.
+- Added `scripts/check-hal-bundle-complete` and made the offline gate build
+  and verify the HAL bundle.
+- Split Makefile flag stamps so rebuilding `build/opena8dj-usb-play` with
+  diagnostic HAL flags does not delete the HAL executable.
+- After `make hal`, the C++ HAL bundle loads and enumerates `Open Audio 8 DJ`
+  as `8 in / 8 out`.
+- C++ candidate-only physical diagnostic still fails quality:
+  - `quality_alignment_score=0.074422`;
+  - `analog_snr_db=-7.07`;
+  - `lag_jumps_gt_2_frames=37`;
+  - `mid_band_cpu_corr=0.474238 source=coreaudiod`.
+- Direct USB playback diagnostics, with no HAL install/load, show internally
+  perfect USB payload (`alignment=1.0`, check errors `0`, panic flags `0`) but
+  failing external iRig capture (`quality_alignment_score` about `0.72-0.74`).
+
+Current implication:
+- C++ has moved from "bundle not executable" to "physically loadable but
+  quality-failing".
+- Packet packing is not the current dominant explanation; direct USB payload
+  evidence is clean.
+- The next meaningful work is to separate physical route/analog capture
+  failure from HAL runtime scheduling, then improve the C++ HAL only against
+  a validated capture path.

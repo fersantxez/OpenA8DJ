@@ -21,6 +21,9 @@ Options:
   --seconds N                Capture/reference seconds, default from WAV
   --postroll-seconds N       Capture tail after playback, default 2
   --max-lag N                Analyzer max lag frames, default 360000
+  --allow-same-device-loopback-diagnostic
+                              Allow output and capture device names to match;
+                              diagnostic only, never promotion evidence
   --skip-build               Do not build tools before running
   -h, --help                 Show this help
 USAGE
@@ -72,6 +75,7 @@ reference_wav=""
 seconds=""
 postroll_seconds="2"
 max_lag="360000"
+allow_same_device_loopback_diagnostic=0
 skip_build=0
 
 while [ "$#" -gt 0 ]; do
@@ -85,6 +89,7 @@ while [ "$#" -gt 0 ]; do
     --seconds) seconds="$2"; shift 2 ;;
     --postroll-seconds) postroll_seconds="$2"; shift 2 ;;
     --max-lag) max_lag="$2"; shift 2 ;;
+    --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
     --skip-build) skip_build=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -108,6 +113,12 @@ fi
 if looks_virtual_capture "$capture_device"; then
   echo "capture-device appears virtual/pre-device: $capture_device" >&2
   exit 2
+fi
+if [ "$allow_same_device_loopback_diagnostic" -ne 1 ] && [ -n "$output_device" ]; then
+  if [ "$(printf '%s' "$output_device" | tr '[:upper:]' '[:lower:]')" = "$(printf '%s' "$capture_device" | tr '[:upper:]' '[:lower:]')" ]; then
+    echo "known-good output source must not be the same device as capture device: $output_device" >&2
+    exit 2
+  fi
 fi
 if [ -z "$reference_wav" ]; then
   echo "--reference-wav is required" >&2

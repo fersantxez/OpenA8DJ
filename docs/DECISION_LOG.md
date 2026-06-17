@@ -5442,3 +5442,66 @@ Next implication:
   left loaded.
 - This diagnostic strengthens the need for same-session, route-validated
   physical evidence. It does not make C++ better than mainline by itself.
+
+## 2026-06-17: Gate HAL Bundle Completeness
+
+Decision:
+- Add an offline HAL bundle completeness check and include it in
+  `scripts/run-cpp-offline-gates`.
+- Require physical preflight and HAL candidate safety to verify
+  `Contents/MacOS/OpenA8DJHAL`, not just the `.driver` directory.
+- Split Makefile flag stamps so USB diagnostic player rebuilds do not delete
+  the HAL executable.
+
+Reason:
+- A directory-only `build/OpenA8DJ.driver` passed earlier checks while missing
+  its executable, causing a C++ candidate safety failure at hardware time.
+- Direct USB diagnostic builds use different HAL flags for shared USB code;
+  they must not invalidate the installable HAL bundle.
+
+Evidence:
+- `scripts/check-hal-bundle-complete` failed before `make hal` because
+  `hal_executable_exists=FAIL`.
+- After `make hal`, the checker passed with executable size `151464` bytes.
+- Rebuilding `build/opena8dj-usb-play` with `HAL_DIAGNOSTIC=1` preserved the
+  HAL executable hash
+  `844810597df79df54cc08040fc4867cfe7f2efdac7877317085307cd761f0071`.
+
+Next implication:
+- Future offline gates must fail before hardware if the C++ HAL bundle is not
+  structurally installable.
+
+## 2026-06-17: Direct USB Clean Internally, External Capture Still Fails
+
+Decision:
+- Treat direct USB diagnostics as route/analog attribution evidence, not HAL
+  readiness.
+- Do not spend the next iteration on packet packing unless new evidence
+  contradicts the clean internal USB payload.
+
+Reason:
+- Direct USB playback bypasses HAL install/load and writes the Audio 8 DJ
+  payload directly.
+- The internal written, consumed, and packed USB artifacts aligned perfectly
+  with the reference, while the iRig capture still failed quality thresholds.
+
+Evidence:
+- Direct USB default run:
+  `local-analysis/direct-usb-soundcheck/20260617T195548Z-audio8-to-irig-route-bundle-complete-context`.
+- Internal USB diagnostics:
+  - written/consumed alignment `1.000000`;
+  - packed USB alignment `1.000000`;
+  - USB check errors `0`;
+  - USB panic flags `0`.
+- External capture:
+  - `quality_alignment_score=0.723444`;
+  - `snr_db_min=-1.154967`;
+  - `lag_jumps_gt_2_frames=0`.
+- Playback-profile variant remained FAIL with
+  `quality_alignment_score=0.738457` and `snr_db_min=-0.637949`.
+
+Next implication:
+- Current physical blocker is after clean internal USB payload: Audio 8 analog
+  output, mixer/REC OUT, iRig capture, or timing attribution.
+- C++ HAL optimization must not claim superiority until this route is
+  controlled and a same-session mainline/C++ comparison passes.

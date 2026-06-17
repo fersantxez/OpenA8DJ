@@ -9,6 +9,10 @@ cd "$ROOT"
 
 cmake -S . -B build/cpp-offline
 cmake --build build/cpp-offline
+make -C "$ROOT" hal >/dev/null
+python3 scripts/check-hal-bundle-complete \
+  --candidate build/OpenA8DJ.driver \
+  --json-out "$EVIDENCE_DIR/hal-bundle-complete.json"
 ctest --test-dir build/cpp-offline --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
 
 cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
@@ -64,6 +68,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 python3 -m py_compile \
+  scripts/check-hal-bundle-complete \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
   scripts/evaluate-promotion-readiness.py \
@@ -149,6 +154,7 @@ prepared_transport_pressure = load_json("prepared-transport-pressure-gate.json")
 prepared_transport_migration = load_json("prepared-transport-migration-gate.json")
 static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
+hal_bundle_complete = load_json("hal-bundle-complete.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
@@ -699,6 +705,11 @@ summary = {
         "missing_requirements": hardware_lock_policy.get("missing_requirements"),
         "sensitive_paths": hardware_lock_policy.get("sensitive_paths"),
         "evidence": "local-analysis/cpp-offline/hardware-lock-policy.json",
+    },
+    "hal_bundle_complete": {
+        "status": hal_bundle_complete.get("result"),
+        "candidate": hal_bundle_complete.get("candidate"),
+        "evidence": "local-analysis/cpp-offline/hal-bundle-complete.json",
     },
     "stream_stats_contract": {
         "status": stream_stats_contract.get("result"),

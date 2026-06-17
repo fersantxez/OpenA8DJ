@@ -5,6 +5,7 @@ SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
 HAL_FLAGS_STAMP := build/.hal-cflags.stamp
+USB_PLAY_FLAGS_STAMP := build/.usb-play-cflags.stamp
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
@@ -191,7 +192,17 @@ $(HAL_FLAGS_STAMP): FORCE
 	@tmp="$@.tmp"; printf '%s\n' '$(HAL_CFLAGS)' > "$$tmp"; \
 	if ! cmp -s "$$tmp" "$@"; then \
 		mv "$$tmp" "$@"; \
-		rm -f $(HAL_BIN) $(USB_PLAY); \
+		rm -f $(HAL_BIN); \
+	else \
+		rm "$$tmp"; \
+	fi
+
+$(USB_PLAY_FLAGS_STAMP): FORCE
+	@mkdir -p build
+	@tmp="$@.tmp"; printf '%s\n' '$(HAL_CFLAGS)' > "$$tmp"; \
+	if ! cmp -s "$$tmp" "$@"; then \
+		mv "$$tmp" "$@"; \
+		rm -f $(USB_PLAY); \
 	else \
 		rm "$$tmp"; \
 	fi
@@ -345,7 +356,7 @@ channel-matrix-prepare:
 		--pair "$(CHANNEL_MATRIX_PAIR)" --rate "$(CHANNEL_MATRIX_RATE)" \
 		--seconds "$(CHANNEL_MATRIX_SECONDS)" --peak "$(CHANNEL_MATRIX_PEAK)"
 
-$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h $(HAL_FLAGS_STAMP)
+$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h $(USB_PLAY_FLAGS_STAMP)
 	@mkdir -p build
 	$(CC) $(HAL_CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m
 

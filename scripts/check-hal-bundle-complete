@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Verify that a HAL candidate bundle is structurally installable.
+
+This is an offline filesystem check. It does not install, load, unload,
+restart CoreAudio, enumerate devices, or touch hardware.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ.driver")
+    parser.add_argument("--json-out", default="")
+    args = parser.parse_args()
+
+    candidate = resolve_path(args.candidate)
+    info_plist = candidate / "Contents/Info.plist"
+    executable = candidate / "Contents/MacOS/OpenA8DJHAL"
+    gates = [
+        {
+            "name": "bundle_directory_exists",
+            "result": "PASS" if candidate.is_dir() else "FAIL",
+            "path": str(candidate),
+        },
+        {
+            "name": "info_plist_exists",
+            "result": "PASS" if info_plist.is_file() else "FAIL",
+            "path": str(info_plist),
+        },
+        {
+            "name": "hal_executable_exists",
+            "result": "PASS" if executable.is_file() else "FAIL",
+            "path": str(executable),
+        },
+        {
+            "name": "hal_executable_nonempty",
+            "result": "PASS" if executable.is_file() and executable.stat().st_size > 0 else "FAIL",
+            "bytes": executable.stat().st_size if executable.is_file() else 0,
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report = {
+        "schema": "opena8djcpp.hal-bundle-complete.v1",
+        "safety": "offline_filesystem_only_no_audio_coreaudio_usb_or_hardware_touch",
+        "result": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "gates": gates,
+    }
+    text = json.dumps(report, indent=2, sort_keys=True)
+    print(text)
+    if args.json_out:
+        output = resolve_path(args.json_out)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text + "\n", encoding="utf-8")
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

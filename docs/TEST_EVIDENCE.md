@@ -8495,3 +8495,82 @@ Full offline gate rerun:
     product claims.
   - The physical runner cleanup was fixed to force-unload when
     `--leave-loaded` is absent, even if the health guard itself passes.
+
+## 2026-06-17 C++ Bundle Completeness And Diagnostic Candidate Run
+
+- Scope:
+  - Offline bundle validation plus lock-gated C++ candidate-only diagnostic.
+  - No mainline write, no Rust write.
+  - Candidate-only and skipped known-good route remain non-promotable.
+- Findings:
+  - `build/OpenA8DJ.driver` initially contained `Contents/Info.plist` but no
+    `Contents/MacOS/OpenA8DJHAL`, so the C++ candidate safety gate could not
+    enumerate `Open Audio 8 DJ`.
+  - After `make hal`, the C++ bundle contained a Mach-O arm64 bundle:
+    `sha256=844810597df79df54cc08040fc4867cfe7f2efdac7877317085307cd761f0071`.
+  - Added `scripts/check-hal-bundle-complete` and integrated it into
+    `scripts/run-cpp-offline-gates`.
+  - Fixed Makefile flag-stamp separation so `HAL_DIAGNOSTIC=1
+    build/opena8dj-usb-play` no longer deletes the HAL executable.
+- Focused verification:
+  - `scripts/check-hal-bundle-complete --candidate build/OpenA8DJ.driver`
+    returned PASS after `make hal`.
+  - Rebuilding `build/opena8dj-usb-play` with `HAL_DIAGNOSTIC=1` preserved the
+    HAL executable hash.
+- C++ candidate-only diagnostic:
+  - Run directory:
+    `local-analysis/physical-superiority-window/20260617T195414Z-diagnostic-cpp-candidate-only-bundle-complete`.
+  - HAL candidate safety PASS with `Open Audio 8 DJ` enumerated as `8 in /
+    8 out`.
+  - Soundcheck FAIL:
+    - `quality_alignment_score=0.074422`;
+    - `alignment_score=0.014749`;
+    - `analog_snr_db=-7.07`;
+    - `lag_jumps_gt_2_frames=37`;
+    - `mid_band_cpu_corr=0.474238 source=coreaudiod`;
+    - `capture_clipped_frames=0`.
+  - Final cleanup force-unloaded the active HAL and ended with
+    `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`, and
+    `audio_stack_guard=PASS`.
+- Interpretation:
+  - The C++ candidate is now physically loadable/enumerable, but not
+    physically quality-ready.
+  - The diagnostic result cannot support superiority because it skipped
+    known-good route validation and same-session mainline comparison.
+
+## 2026-06-17 Direct USB Route Diagnostics After Bundle Fix
+
+- Scope:
+  - Lock-gated direct USB playback through Audio 8 DJ into the current iRig
+    capture route.
+  - No HAL install/load, no default-device changes, no USB reset, no CoreAudio
+    restart.
+- Runs:
+  - `local-analysis/direct-usb-soundcheck/20260617T195548Z-audio8-to-irig-route-bundle-complete-context`
+  - `local-analysis/direct-usb-soundcheck/20260617T195756Z-audio8-to-irig-route-playback-profile`
+- Results:
+  - Default direct USB run FAIL:
+    - external capture `quality_alignment_score=0.723444`;
+    - `snr_db_min=-1.154967`;
+    - `mid_band_residual_ratio=2.055962`;
+    - `high_band_residual_ratio=1.782725`;
+    - `lag_jumps_gt_2_frames=0`.
+  - Forced playback-profile direct USB run FAIL:
+    - external capture `quality_alignment_score=0.738457`;
+    - `snr_db_min=-0.637949`;
+    - `mid_band_residual_ratio=1.681576`;
+    - `high_band_residual_ratio=1.664308`;
+    - `lag_jumps_gt_2_frames=0`.
+  - Internal direct USB diagnostics for the default run were clean:
+    - written and consumed alignment score `1.000000`;
+    - packed USB alignment score `1.000000`;
+    - USB check errors `0`;
+    - USB panic flags `0`.
+- Interpretation:
+  - Direct USB proves the generated USB payload can be bit-perfect internally.
+  - The current failure is dominated after the internal USB payload: Audio 8
+    analog path, mixer/REC OUT path, iRig capture path, or route/timing
+    attribution.
+  - This still does not validate C++ HAL audio quality, but it narrows the
+    next work away from packet packing and toward physical route/analog timing
+    plus HAL runtime scheduling.

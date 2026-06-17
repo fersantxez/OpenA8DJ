@@ -71,6 +71,10 @@ if [ ! -d "$candidate" ]; then
   echo "candidate bundle not found: $candidate" >&2
   exit 2
 fi
+if [ ! -s "$candidate/Contents/MacOS/OpenA8DJHAL" ]; then
+  echo "candidate executable not found or empty: $candidate/Contents/MacOS/OpenA8DJHAL" >&2
+  exit 2
+fi
 
 if [ -z "$run_dir" ]; then
   run_dir="$ROOT/local-analysis/hal-candidate-safety/safety-$(date +%Y%m%d-%H%M%S)"
