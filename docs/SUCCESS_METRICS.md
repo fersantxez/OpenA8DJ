@@ -1128,3 +1128,27 @@ Latest promotion evaluation:
   - If corrected residual remains around `1.4`, the fault should be treated as
     route/capture-chain, analog/device-state, or deeper USB transport behavior,
     not simple sample-time alignment.
+
+## 2026-06-17 Practical Mainline Music Floor Tracking
+
+- Evidence:
+  `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`.
+- Mainline route context:
+  - The read-only mainline docs mark the Audio 8 DJ -> mixer REC OUT -> iRig
+    Stream route as valid for QA.
+  - That valid route still produced music SNR around `10 dB` after time-warp in
+    documented mainline runs, so SNR alone must not be the only diagnostic
+    signal for route validity.
+- Current C++ status against the practical floor:
+  - Best current-family run:
+    `20260617-streamusage-irig-pairA-12s-cpp-hal`.
+  - PASS within practical floor for:
+    quality `0.971648 >= 0.925`, mid residual `1.399655 <= 1.45`,
+    quiet mid `-35.20 <= -32.5 dBFS`, lag jumps `28 <= 45`, clipping `0`.
+  - FAIL within practical floor for:
+    high residual `1.358543 > 1.355`.
+- Readiness implication:
+  - Practical floor near-pass is not promotion evidence.
+  - C++ still needs high residual below floor, CPU below mainline, strict
+    physical tone/music improvement, and physical Traktor/timecode validation
+    before any branch move.

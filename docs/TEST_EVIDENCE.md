@@ -4951,3 +4951,47 @@ Operational note:
   - `local-analysis/timebase-window-comparison/20260617-current-family/runtime-discontinuities.json`
   - `local-analysis/timebase-window-comparison/20260617-current-family/lti-transfer-quality.json`
   - `local-analysis/timebase-window-comparison/20260617-current-family/window-trace-1.json`
+
+## 2026-06-17: Mainline Practical Music Floor Comparison
+
+- Purpose:
+  - Compare current C++ physical music runs against the practical physical
+    thresholds extracted from the read-only mainline docs, separately from the
+    stricter experimental promotion gate.
+  - Avoid overstating the absolute `35 dB` SNR gate when the documented
+    mainline mixer REC OUT/iRig route historically produced about `10 dB` music
+    SNR even when the route was considered valid.
+- Mainline references:
+  - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:7-12`
+    documents the physical path:
+    Audio 8 DJ -> mixer REC OUT -> iRig Stream.
+  - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:55-59`
+    says the REC OUT capture was real, strong enough for QA, and valid.
+  - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:133-139`
+    reports a valid-route Pair A recheck still failing after time-warp with
+    quality `0.962043`, SNR `9.97 dB`, mid residual `1.637216`, high residual
+    `1.412494`, and quiet mid `-46.16 dBFS`.
+  - `docs/MAINLINE_BASELINE_METRICS.md:48-67` carries forward the practical
+    physical music thresholds.
+- Command:
+  - Local offline summary over existing C++ `metrics.json` files, written to
+    `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`.
+- Result:
+  - No current C++ run fully passes the practical physical music floor.
+  - Best current-family result is the stream-usage run:
+    quality `0.971648`, mid residual `1.399655`, quiet mid `-35.20 dBFS`,
+    lag jumps `28`, clipping `0`; it fails only high residual
+    `1.358543 > 1.355` among the practical music metrics summarized here.
+  - Other recent CPU/timing probes fail high residual and sometimes mid
+    residual as well.
+  - CPU remains a separate hard blocker versus mainline even when a music run
+    is close to the practical floor.
+- Interpretation:
+  - The strict promotion gate remains valid as an aspirational audiophile gate,
+    but C++ should also be tracked against the historical/practical mainline
+    floor to avoid chasing impossible route artifacts blindly.
+  - Current C++ still cannot claim better sound quality than mainline:
+    it has not fully passed the practical music floor, has not beaten mainline
+    CPU, and has no physical Traktor/timecode evidence.
+- Evidence path:
+  - `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`

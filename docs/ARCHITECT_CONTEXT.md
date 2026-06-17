@@ -1132,3 +1132,17 @@ Next technical target:
     the current failure is not just slow drift or a local offset problem. The
     next useful evidence must validate the physical route or expose a deeper
     USB/device transport-state mechanism.
+- Practical mainline physical music floor comparison:
+  `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`.
+  - Read-only mainline docs show the mixer REC OUT/iRig route was considered
+    valid even though a time-warped Pair A music recheck measured quality
+    `0.962043`, SNR `9.97 dB`, mid/high residual `1.637216/1.412494`.
+  - Best current C++ streamusage run is close to the practical music floor:
+    quality `0.971648`, mid residual `1.399655`, quiet mid `-35.20 dBFS`,
+    lag jumps `28`, clipping `0`.
+  - It still fails high residual:
+    `1.358543` versus threshold `1.355`.
+  - CPU remains a hard blocker independent of music-floor proximity.
+  - Interpretation:
+    track the practical floor to avoid chasing route artifacts blindly, but keep
+    strict audiophile and better-than-mainline promotion gates closed.

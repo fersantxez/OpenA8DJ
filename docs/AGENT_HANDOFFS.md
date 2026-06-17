@@ -1508,3 +1508,35 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Prefer known-good route validation if physically possible.
   - Otherwise add observability or redesign around the USB/device transport
     state that occurs after byte payload preparation.
+
+### Architect Practical Mainline Music Floor Comparison
+
+- Status:
+  - Completed offline only using C++ evidence and read-only mainline docs.
+  - No hardware, no CoreAudio/USB mutation, no mainline writes.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Mainline docs consider the mixer REC OUT/iRig route valid, but valid-route
+    time-warped music still measured around quality `0.962` and SNR `10 dB`.
+  - Best current C++ streamusage run nearly reaches the practical music floor:
+    quality, mid residual, quiet noise, lag jumps, and clipping pass the
+    practical thresholds.
+  - It still fails high residual by a narrow margin:
+    `1.358543 > 1.355`.
+  - CPU remains far above mainline, so near music-floor performance cannot
+    justify promotion.
+- Risks:
+  - Overweighting the strict absolute SNR gate can hide useful relative
+    progress.
+  - Overweighting the practical floor can undercut the audiophile goal.
+- Next recommended action:
+  - Track both gates:
+    strict audiophile gate for readiness, practical floor for regression and
+    prioritization.
+  - Focus next on high-band residual and CPU, with route validation still
+    required before any final sound-quality claim.

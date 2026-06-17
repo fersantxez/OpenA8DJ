@@ -2946,3 +2946,40 @@ Evidence:
 - `local-analysis/timebase-window-comparison/20260617-current-family/failure-modes.json`
 - `local-analysis/timebase-window-comparison/20260617-current-family/runtime-discontinuities.json`
 - `local-analysis/timebase-window-comparison/20260617-current-family/lti-transfer-quality.json`
+
+## 2026-06-17: Track Practical Mainline Music Floor Separately From Strict Audiophile Gate
+
+Decision:
+- Keep the strict promotion gate for audiophile/readiness claims.
+- Also track current C++ physical music against the practical mainline floor
+  documented from the valid mixer REC OUT/iRig route.
+- Do not claim C++ sound-quality superiority until it passes both the practical
+  floor and the broader promotion requirements.
+
+Reason:
+- Read-only mainline docs state the physical route was valid, but a valid-route
+  time-warped Pair A music recheck still measured quality `0.962043`, SNR
+  `9.97 dB`, mid residual `1.637216`, high residual `1.412494`, and quiet mid
+  `-46.16 dBFS`.
+- The best current C++ run in the current-family comparison is close to the
+  practical floor but still fails high residual:
+  streamusage quality `0.971648`, mid residual `1.399655`, high residual
+  `1.358543` versus threshold `1.355`, quiet mid `-35.20 dBFS`, `28` lag jumps,
+  and no clipping.
+- CPU remains an independent hard failure versus mainline, so a near-pass on
+  physical music cannot justify promotion.
+
+Alternatives discarded:
+- Treat the strict `35 dB` SNR failure alone as proof that every run is equally
+  useless: rejected because the historical valid route also measured about
+  `10 dB` SNR on music.
+- Lower readiness to the practical floor only: rejected because the user goal
+  is better-than-mainline, not merely comparable to a noisy historical route.
+- Promote the streamusage run because it is close: rejected because it still
+  fails high residual and CPU.
+
+Evidence:
+- `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`
+- `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:7-12`
+- `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:55-59`
+- `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:133-139`
