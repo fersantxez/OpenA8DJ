@@ -102,6 +102,33 @@
   - `local-analysis/audio-stack-guard/20260617T183615Z-post-soundcheck-unload`.
   - `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`.
 
+## 2026-06-17: C++ Direct USB Path Attribution Gate
+
+- Change:
+  - Added `opena8djcpp_direct_usb_path_attribution`.
+  - Integrated it into CMake, CTest, `scripts/run-cpp-offline-gates`, and the
+    evidence schema.
+- Command:
+  - `./build/cpp-offline/opena8djcpp_direct_usb_path_attribution | tee local-analysis/cpp-offline/direct-usb-path-attribution.json`
+- Result:
+  - Gate PASS as diagnostic attribution, not product readiness.
+  - Direct USB runs with required artifacts: `1`.
+  - Internal clean runs: `1`.
+  - Product candidate runs: `0`.
+  - Latest run attribution:
+    `post_usb_device_analog_or_capture_route_dominant`.
+  - Clean internal evidence: USB alignment `1.000000`, USB SNR floor
+    `999 dB`, USB check errors `0`, panic flags `0`.
+  - Failed physical evidence: quality `0.959037`, SNR floor `9.697139 dB`,
+    mid/high residual `1.420546/1.410032`, native lag jumps `20`.
+- Interpretation:
+  - Packer/output buffer corruption is not supported by the latest Direct USB
+    evidence.
+  - The dominant residual appears after the packed USB payload, in the device,
+    analog route, mixer, or iRig capture path.
+- Evidence:
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+
 ## 2026-06-17: Direct USB Timeline Instrumentation And Reset No-Wait Rejection
 
 - Change:

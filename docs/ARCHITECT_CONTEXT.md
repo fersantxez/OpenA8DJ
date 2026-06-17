@@ -35,6 +35,12 @@ Branch: `driverkit/cpp-redesign`
   classification `uncorrelated_residual_or_capture_path_dominant`. This
   separates the problem: strong residual/noise exists even outside HAL, while
   HAL/CoreAudio still adds unacceptable CPU and lag behavior.
+- Direct USB path attribution is now a compiled C++ gate. For the latest
+  diagnostics run it proves the internal audio path is clean before the device:
+  written/consumed/packed-USB alignment `1.000000`, USB SNR floor `999 dB`,
+  USB check errors `0`, and panic flags `0`. The same run's iRig capture still
+  fails quality and SNR, so the current dominant physical residual is after the
+  packed USB payload: Audio 8 DJ hardware/DAC/analog route/mixer/iRig capture.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
   `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the

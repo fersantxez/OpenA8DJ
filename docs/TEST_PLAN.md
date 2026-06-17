@@ -1168,6 +1168,18 @@ Physical capture forensics:
   candidates; best run classified as
   `variable_timebase_or_route_capture_instability`.
 
+Direct USB path attribution:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It consumes existing Direct USB diagnostics only.
+- It verifies whether written audio, consumed audio, and packed USB payload are
+  clean before comparing that against physical iRig capture quality.
+- PASS means the diagnostic separation is valid. It does not mean Direct USB or
+  the C++ driver is product-ready.
+- Current result: latest Direct USB run has clean internal/USB payload
+  (`alignment=1.000000`, USB SNR floor `999 dB`, USB errors `0`) while the
+  physical iRig capture still fails quality/SNR. This blocks packet/packer
+  churn as the next explanation.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.

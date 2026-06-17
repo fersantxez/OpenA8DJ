@@ -43,6 +43,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - The latest lock-gated HAL and direct USB runs both fail this metric:
   HAL quality `0.962986` / SNR floor `10.317819 dB`; direct USB quality
   `0.959037` / SNR floor `9.697139 dB`.
+- Direct USB path attribution must show either a clean physical capture after a
+  clean packed USB payload or a clearly identified non-product route fault. The
+  current result is diagnostic-only: packed USB is clean, but physical capture
+  still fails after the device/analog/capture boundary.
 
 ### Mainline C Reference
 

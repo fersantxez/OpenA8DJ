@@ -76,6 +76,44 @@ Next implication:
   non-Audio8 source or a loopback fixture, and separately reduce HAL CPU/lag.
   Do not claim C++ is better than mainline.
 
+## 2026-06-17: Attribute Direct USB Failure After Clean Packed USB Payload
+
+Decision:
+- Add `opena8djcpp_direct_usb_path_attribution` as a compiled C++ evidence
+  gate.
+- Treat Direct USB as a diagnostic splitter, not as a product-quality
+  candidate.
+- Prioritize isolating the post-USB physical path before further packet-format
+  or packer changes.
+
+Reason:
+- Latest Direct USB diagnostics prove the data delivered to the device is
+  internally clean: written, consumed, and packed USB alignment all `1.000000`;
+  USB SNR floor `999 dB`; USB check errors `0`; panic flags `0`.
+- The same run's physical iRig capture fails badly: quality `0.959037`, SNR
+  floor `9.697139 dB`, mid/high residual `1.420546/1.410032`, and native lag
+  jumps `20`.
+- Static matrix, polynomial, and LTI explanations are insufficient:
+  matrix improvement `0.241057 dB`, polynomial improvement `0.010168 dB`,
+  low/mid coherence around `0.234650`, and LTI SNR delta negative.
+
+Alternatives discarded:
+- Keep changing the USB packer: rejected because packed USB evidence is clean
+  in the current diagnostic run.
+- Blame the HAL only: rejected because Direct USB bypasses HAL playback and
+  still shows the same low-SNR residual family.
+
+Evidence:
+- `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+- `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`.
+
+Next implication:
+- The next useful physical experiment is not another HAL rebuild. It is a
+  controlled route/capture isolation test: known-good non-Audio8 source into
+  the same mixer/iRig path, or a direct Audio 8 output-to-iRig fixture that
+  removes mixer/EQ ambiguity. Only after the post-USB route is understood do
+  HAL CPU/lag optimizations become product-decisive.
+
 ## 2026-06-17: Instrument Direct USB Timeline, Keep Reset Reply Wait Default
 
 Decision:
