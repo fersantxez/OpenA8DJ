@@ -2391,3 +2391,65 @@ Operational note:
     remaining blocker is not simple alignment; it is persistent coloration,
     distortion, wrong mixed signal, or another below-HAL analog/transport issue
     plus high CPU.
+
+## 2026-06-17: Offline Linear Matrix Classification And Decorrelated Gate Prep
+
+- Commands:
+  - `python3 -m py_compile scripts/analyze-soundcheck-linear-matrix.py`
+  - `scripts/analyze-soundcheck-linear-matrix.py local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal --analysis-seconds 8 --json-out local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`
+  - `scripts/run-channel-matrix-gate --run-id offline-prepare-smoke --pair A --rate 48000 --seconds 2 --peak 0.25`
+  - `make channel-matrix-prepare CHANNEL_MATRIX_SECONDS=1 CHANNEL_MATRIX_PEAK=0.20`
+- Result:
+  - Linear matrix tool PASS_DIAGNOSTIC over existing evidence only; no hardware,
+    CoreAudio, USB, install, service restart, or default-device change.
+  - All existing music runs are classified as
+    `needs_decorrelated_physical_matrix_fixture`.
+  - Prepare-only channel-matrix gate generated a deterministic stereo fixture
+    and plan without touching audio devices.
+- Key metrics:
+  - Existing music source L/R correlation `0.985848`, condition number
+    `140.322901`, so the matrix is ill-conditioned and cannot prove crosstalk.
+  - default-after-unrolled matrix diagnostic residual/predicted `0.303950`.
+  - hotstats-write-late residual/predicted `0.306780`.
+  - queue8 residual/predicted `0.503410`.
+  - unrolled-pack residual/capture `0.999913` and mono correlation
+    `-0.182678`, confirming severe unrelated regression.
+  - Decorrelated fixture smoke correlation: `0.0005635458408516207`.
+- Evidence paths:
+  - `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`
+  - `local-analysis/channel-matrix/offline-prepare-smoke/plan.txt`
+  - `local-analysis/channel-matrix/offline-prepare-smoke/fixture/reference.wav`
+  - `local-analysis/channel-matrix/20260617T014008Z-pairA-decorrelated-matrix`
+- Interpretation:
+  - The next physical check should be a lock-gated decorrelated Pair A matrix
+    capture through iRig, not another ambiguous correlated music capture.
+  - This does not improve readiness; it narrows the blocker and creates the
+    evidence format needed to distinguish wrong channel mix/routing from
+    coloration/noise.
+
+## 2026-06-17: Offline Gates After Channel-Matrix Lock Policy Integration
+
+- Commands:
+  - `bash -n scripts/run-channel-matrix-gate`
+  - `python3 -m py_compile scripts/analyze-soundcheck-linear-matrix.py`
+  - `scripts/run-channel-matrix-gate --run-id physical-reject-smoke --run-physical --seconds 1 --peak 0.1`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-channel-matrix-prep.json`
+- Result:
+  - Physical-mode rejection smoke PASS: missing `--capture-device` exits `2`
+    before acquiring the hardware lock.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+  - Hardware-lock policy now audits `5` sensitive scripts and includes
+    `scripts/run-channel-matrix-gate`.
+  - Promotion readiness remains FAIL.
+- Blocking readiness gates:
+  - `physical_music_quality` still fails with latest selected run
+    `20260616-default-after-unrolled-irig-pairA-16s-cpp-hal`.
+  - `runtime_cpu_beats_mainline` still fails: OpenA8DJ driver p95 `38.5%`
+    versus mainline threshold `6.5%`; coreaudiod p95 `3.1%` versus `1.7%`.
+  - `latest_physical_investigation` remains `FAIL_NOT_READY`.
+  - `traktor_timecode_physical` remains `BLOCKED_UNVALIDATED_DVS`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/hardware-lock-policy.json`
+  - `local-analysis/promotion-readiness-after-channel-matrix-prep.json`

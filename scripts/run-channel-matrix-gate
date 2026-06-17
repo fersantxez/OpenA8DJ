@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT/scripts/hardware-lock-lib.sh"
+LOCK_ROOT="$(opena8dj_lock_root)"
+
+RUN_ID=""
+PAIR="A"
+RATE="48000"
+SECONDS="8"
+PEAK="0.30"
+CAPTURE_DEVICE=""
+CAPTURE_CHANNELS="1,2"
+PRE_ROLL_SECONDS="1"
+POST_ROLL_SECONDS="1"
+RUN_PHYSICAL=0
+
+usage() {
+  cat <<'USAGE'
+usage: scripts/run-channel-matrix-gate [options]
+
+Default mode is prepare-only: generate a decorrelated stereo reference and a
+run plan without touching audio hardware.
+
+Options:
+  --run-id NAME              Evidence directory name.
+  --pair A|B|C|D             OpenA8DJ output pair to exercise (default: A).
+  --rate HZ                  Reference sample rate (default: 48000).
+  --seconds N                Reference duration seconds (default: 8).
+  --peak FLOAT               Reference peak amplitude (default: 0.30).
+  --capture-device TEXT      Physical capture device UID/name/substr.
+  --capture-channels L,R     1-based capture channels (default: 1,2).
+  --pre-roll-seconds N       Capture lead-in before playback (default: 1).
+  --post-roll-seconds N      Capture tail after playback (default: 1).
+  --run-physical             Acquire hardware lock and run capture/playback.
+  -h, --help                 Show this help.
+
+Physical mode touches CoreAudio/audio devices and requires the global hardware
+lock. It does not install/unload drivers, reset USB, restart services, or
+change default devices.
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --run-id) RUN_ID="$2"; shift 2 ;;
+    --pair) PAIR="$2"; shift 2 ;;
+    --rate) RATE="$2"; shift 2 ;;
+    --seconds) SECONDS="$2"; shift 2 ;;
+    --peak) PEAK="$2"; shift 2 ;;
+    --capture-device) CAPTURE_DEVICE="$2"; shift 2 ;;
+    --capture-channels) CAPTURE_CHANNELS="$2"; shift 2 ;;
+    --pre-roll-seconds) PRE_ROLL_SECONDS="$2"; shift 2 ;;
+    --post-roll-seconds) POST_ROLL_SECONDS="$2"; shift 2 ;;
+    --run-physical) RUN_PHYSICAL=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+case "$PAIR" in
+  A|B|C|D|a|b|c|d) ;;
+  *) echo "pair must be A-D" >&2; exit 2 ;;
+esac
+PAIR_UPPER="$(printf '%s' "$PAIR" | tr '[:lower:]' '[:upper:]')"
+
+if [[ -z "$RUN_ID" ]]; then
+  RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-pair${PAIR}-decorrelated-matrix"
+fi
+RUN_DIR="$ROOT/local-analysis/channel-matrix/$RUN_ID"
+FIXTURE_DIR="$RUN_DIR/fixture"
+REFERENCE="$FIXTURE_DIR/reference.wav"
+CAPTURE="$RUN_DIR/captured.wav"
+mkdir -p "$FIXTURE_DIR"
+
+python3 "$ROOT/scripts/generate-loopback-reference.py" \
+  "$REFERENCE" \
+  --rate "$RATE" \
+  --seconds "$SECONDS" \
+  --peak "$PEAK" | tee "$RUN_DIR/reference.txt"
+
+python3 - "$RUN_DIR/fixture/source.json" "$PAIR" "$RATE" "$SECONDS" "$PEAK" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = {
+    "schema": "opena8djcpp.channel-matrix-source.v1",
+    "pair": sys.argv[2].upper(),
+    "rate": int(float(sys.argv[3])),
+    "seconds": float(sys.argv[4]),
+    "peak": float(sys.argv[5]),
+    "left": "decorrelated multitone plus sparse transients",
+    "right": "different decorrelated multitone plus offset sparse transients",
+}
+path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
+cat > "$RUN_DIR/plan.txt" <<PLAN
+schema=opena8djcpp.channel-matrix-gate-plan.v1
+mode=$([[ "$RUN_PHYSICAL" == 1 ]] && echo physical || echo prepare-only)
+run_dir=$RUN_DIR
+reference=$REFERENCE
+capture=$CAPTURE
+pair=$PAIR_UPPER
+rate=$RATE
+seconds=$SECONDS
+peak=$PEAK
+capture_device=$CAPTURE_DEVICE
+capture_channels=$CAPTURE_CHANNELS
+lock_root=$LOCK_ROOT
+
+Physical command shape:
+  AUDIO_GATE_LOCK_ROOT="$LOCK_ROOT" scripts/run-channel-matrix-gate --run-physical --run-id "$RUN_ID" --pair "$PAIR" --rate "$RATE" --seconds "$SECONDS" --peak "$PEAK" --capture-device "<physical capture device>" --capture-channels "$CAPTURE_CHANNELS"
+
+Expected evidence:
+  fixture/reference.wav
+  fixture/source.json
+  captured.wav
+  record.log
+  play.log
+  metrics.json
+  linear-matrix.json
+PLAN
+
+if [[ "$RUN_PHYSICAL" != 1 ]]; then
+  echo "result=PREPARE_ONLY"
+  echo "run_dir=$RUN_DIR"
+  echo "reference=$REFERENCE"
+  echo "plan=$RUN_DIR/plan.txt"
+  exit 0
+fi
+
+if [[ -z "$CAPTURE_DEVICE" ]]; then
+  echo "--capture-device is required in --run-physical mode" >&2
+  exit 2
+fi
+
+opena8dj_acquire_hardware_lock \
+  "$ROOT" \
+  "physical-channel-matrix" \
+  "$RUN_DIR" \
+  "Open Audio 8 DJ playback, external capture" \
+  "no install, no unload, no USB reset, no service restart, no default-device change"
+trap opena8dj_release_hardware_lock EXIT
+
+if [[ ! -x "$ROOT/build/audio-record" || ! -x "$ROOT/build/audio-wav-play" ]]; then
+  echo "build/audio-record and build/audio-wav-play must exist; run make audio-record audio-wav-play offline first" >&2
+  exit 3
+fi
+
+record_seconds="$(python3 - "$SECONDS" "$PRE_ROLL_SECONDS" "$POST_ROLL_SECONDS" <<'PY'
+import math
+import sys
+print(int(math.ceil(float(sys.argv[1]) + float(sys.argv[2]) + float(sys.argv[3]))))
+PY
+)"
+
+"$ROOT/build/audio-record" "$record_seconds" "$CAPTURE" "$CAPTURE_DEVICE" "$CAPTURE_CHANNELS" > "$RUN_DIR/record.log" 2>&1 &
+record_pid=$!
+sleep "$PRE_ROLL_SECONDS"
+"$ROOT/build/audio-wav-play" "$REFERENCE" "$PAIR" > "$RUN_DIR/play.log" 2>&1 || {
+  status=$?
+  wait "$record_pid" || true
+  exit "$status"
+}
+wait "$record_pid"
+
+python3 - "$RUN_DIR/metrics.json" "$RATE" "$SECONDS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+rate = int(float(sys.argv[2]))
+seconds = float(sys.argv[3])
+payload = {
+    "schema": "opena8djcpp.channel-matrix-capture-metrics.v1",
+    "reference_start": 0,
+    "capture_start": 0,
+    "compared_frames": int(round(rate * seconds)),
+}
+path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
+"$ROOT/scripts/analyze-soundcheck-linear-matrix.py" "$RUN_DIR" \
+  --max-lag "$((RATE * 2))" \
+  --analysis-seconds "$SECONDS" \
+  --json-out "$RUN_DIR/linear-matrix.json"
+
+echo "result=PHYSICAL_COMPLETE"
+echo "run_dir=$RUN_DIR"
+echo "linear_matrix=$RUN_DIR/linear-matrix.json"

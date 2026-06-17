@@ -551,6 +551,34 @@ Required artifact set:
 Generated audio fixtures must remain local and must not contain redistributed
 user music in committed files.
 
+## Physical Channel Matrix Metric
+
+Existing music captures are not enough to prove routing or crosstalk because
+the current reference music has highly correlated stereo channels. A release or
+promotion candidate must therefore include a decorrelated physical matrix gate
+before any claim that A/B/C/D routing, deck isolation, or timecode capture
+topology is better than mainline.
+
+Minimum future PASS requirements:
+
+- generated reference L/R correlation near zero, recorded in evidence;
+- valid iRig or equivalent physical post-DAC capture, no clipping, no silence;
+- fitted L/R matrix is well conditioned;
+- expected channel terms dominate opposite-channel terms;
+- opposite-channel leakage cannot explain audible deck leakage or the current
+  music residual;
+- all artifacts are under `/Users/fer/dev/audio8djcpp/local-analysis`;
+- run is protected by `$HOME/.opena8dj/hardware-gate.lock`;
+- this gate passes before Traktor/timecode physical claims or branch promotion.
+
+Current status:
+
+- `BLOCKED_HARDWARE_FORBIDDEN` for physical execution.
+- Offline prep PASS:
+  `local-analysis/channel-matrix/offline-prepare-smoke`.
+- Existing correlated-music matrix classification:
+  `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`.
+
 ## Readiness Levels
 
 ### `OFFLINE_BASELINE_READY`

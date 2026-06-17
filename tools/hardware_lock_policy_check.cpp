@@ -47,6 +47,7 @@ int main(int argc, char** argv) {
   const auto safety = read_file(root / "scripts/test-hal-candidate-safety");
   const auto direct = read_file(root / "scripts/run-audio8dj-direct-gate");
   const auto soundcheck = read_file(root / "scripts/run-soundcheck");
+  const auto matrix = read_file(root / "scripts/run-channel-matrix-gate");
 
   const bool lib_ok = contains_all(lib,
                                    {
@@ -94,16 +95,31 @@ int main(int argc, char** argv) {
                                           missing,
                                           "scripts/run-soundcheck");
 
-  const bool pass = lib_ok && safety_ok && direct_ok && soundcheck_ok;
+  const bool matrix_ok = contains_all(matrix,
+                                      {
+                                          "hardware-lock-lib.sh",
+                                          "opena8dj_acquire_hardware_lock",
+                                          "physical-channel-matrix",
+                                          "Open Audio 8 DJ playback, external capture",
+                                          "no install, no unload, no USB reset, no service restart, no default-device change",
+                                          "trap opena8dj_release_hardware_lock EXIT",
+                                          "--run-physical",
+                                          "--capture-device is required",
+                                      },
+                                      missing,
+                                      "scripts/run-channel-matrix-gate");
+
+  const bool pass = lib_ok && safety_ok && direct_ok && soundcheck_ok && matrix_ok;
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.hardware-lock-policy.v1\",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-            << "  \"audited_scripts\": 4,\n"
+            << "  \"audited_scripts\": 5,\n"
             << "  \"missing_requirements\": " << missing.size() << ",\n"
             << "  \"sensitive_paths\": [\n"
             << "    \"scripts/test-hal-candidate-safety\",\n"
             << "    \"scripts/run-audio8dj-direct-gate\",\n"
-            << "    \"scripts/run-soundcheck\"\n"
+            << "    \"scripts/run-soundcheck\",\n"
+            << "    \"scripts/run-channel-matrix-gate\"\n"
             << "  ],\n"
             << "  \"missing\": [";
   for (std::size_t index = 0; index < missing.size(); ++index) {

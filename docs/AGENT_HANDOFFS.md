@@ -408,3 +408,64 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Risk:
   - This is not a quality fix. The remaining blocker is analog residual/lag and
     high driver CPU versus mainline.
+
+### Raman
+
+- Mission: inspect existing C++ tools and identify a safe lock-gated path for a
+  Pair A decorrelated L/R matrix and crosstalk test.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Confirmed `scripts/run-soundcheck` is the existing lock-gated wrapper but
+    is optimized for music/global quality, not L/R matrix reporting.
+  - Confirmed `audio-wav-play` preserves stereo L/R when routing to A/B/C/D.
+  - Confirmed `audio-record` captures a selected physical stereo input pair.
+  - Identified `scripts/generate-loopback-reference.py` as the right
+    decorrelated stereo fixture source.
+  - Identified gaps: `audio-pair-tone` emits same-tone L/R, and
+    `analyze-tone-capture.py` collapses to mono, so neither can prove L/R
+    crosstalk.
+- Integrated action:
+  - Added `scripts/run-channel-matrix-gate`.
+  - Added `make channel-matrix-prepare`.
+  - Added `scripts/analyze-soundcheck-linear-matrix.py`.
+- Evidence:
+  - `local-analysis/channel-matrix/offline-prepare-smoke`
+  - `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`
+- Risk:
+  - The physical matrix run still requires explicit hardware window, iRig route
+    confirmation, and hardware lock. No physical matrix evidence exists yet.
+
+### Tesla
+
+- Mission: read-only scout for next low-risk CPU/quality improvements without
+  repeating rejected knobs.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Do not repeat already rejected knobs: input decode active gating, queue
+    before capture requeue, transfer-pool cursor, preopen/stop-ISOC, fast
+    prefetch clear, unrolled output pack, queue 8/8, prefetch 64, and reset-off.
+  - Recommended next CPU order:
+    1. `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1` to remove completion-path mutex
+       while preserving observability;
+    2. `HAL_OUTPUT_TIMELINE_CHUNK_IO=1` to reduce per-frame timeline work under
+       lock;
+    3. `HAL_INPUT_DECODE_COUNTER_FASTPATH=1` for modulo-free input decode,
+       guarded by DVS/timecode evidence.
+- Integrated action:
+  - No CPU code change yet. The immediate integration was the matrix gate,
+    because current quality evidence is ambiguous about physical mix/routing.
+- Risk:
+  - `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS` is the lowest-risk CPU candidate, but
+    it still needs offline monotonicity/snapshot checks before any physical run.

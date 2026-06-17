@@ -441,6 +441,7 @@ These lanes are part of release readiness but must not run during offline QA.
 |---|---|---|
 | physical tone | valid post-DAC capture, sidebands/clicks within threshold | `BLOCKED_HARDWARE_FORBIDDEN` |
 | physical real music | valid capture, residual/coloration/click gates pass | `BLOCKED_HARDWARE_FORBIDDEN` |
+| physical decorrelated channel matrix | Pair A L/R decorrelated fixture captured through iRig; expected channel gains/polarity valid and opposite-channel leakage below threshold | `BLOCKED_HARDWARE_FORBIDDEN` |
 | Traktor scope | stable scope, absolute/relative behavior, no dropouts | `BLOCKED_HARDWARE_FORBIDDEN` |
 | MIDI loopback | no dropped bytes, stable endpoints | `BLOCKED_HARDWARE_FORBIDDEN` |
 | hotplug | idle/playback recovery without machine restart | `BLOCKED_HARDWARE_FORBIDDEN` |
@@ -532,6 +533,53 @@ Stop future physical QA immediately when:
 - global hardware lock is unavailable;
 - capture route is dirty or ambiguous;
 - iRig/Core Audio capture is unstable;
+- decorrelated matrix capture clips, records silence, or shows the capture
+  route is crosswired before candidate evaluation;
 - the installed candidate hash differs from the frozen offline candidate;
 - output is audibly unsafe, distorted, or unexpectedly loud;
 - rollback command is missing or fails.
+
+## Decorrelated Channel Matrix Gate
+
+Purpose:
+
+- distinguish physical route crosstalk/mix from candidate output/routing bugs;
+- avoid drawing crosstalk conclusions from highly correlated stereo music;
+- produce a small locked evidence bundle before another full music gate.
+
+Offline preparation:
+
+```sh
+make channel-matrix-prepare CHANNEL_MATRIX_PAIR=A CHANNEL_MATRIX_RATE=48000 CHANNEL_MATRIX_SECONDS=8 CHANNEL_MATRIX_PEAK=0.30
+```
+
+Future physical command shape, only inside an authorized window and with the
+global hardware lock:
+
+```sh
+AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" \
+  scripts/run-channel-matrix-gate --run-physical \
+  --pair A --rate 48000 --seconds 8 --peak 0.30 \
+  --capture-device "iRig Stream" --capture-channels 1,2
+```
+
+Expected artifacts:
+
+- `fixture/reference.wav`
+- `fixture/source.json`
+- `captured.wav`
+- `record.log`
+- `play.log`
+- `metrics.json`
+- `linear-matrix.json`
+
+PASS semantics are intentionally strict and not yet promotion semantics:
+
+- reference L/R correlation must be near zero;
+- captured audio must not clip or be silent;
+- fitted matrix must be well conditioned;
+- expected L->L and R->R terms must dominate;
+- opposite-channel leakage must be low enough to explain neither the current
+  residual nor audible deck leakage;
+- if the run fails, do not run Traktor/timecode or branch promotion from that
+  candidate.

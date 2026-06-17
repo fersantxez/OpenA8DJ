@@ -432,3 +432,14 @@ Next technical target:
   about `1.43x`. The main blocker is therefore not a simple alignment/drift
   issue; it is persistent coloration/distortion/mixed signal plus high driver
   CPU.
+- Linear matrix analysis over the existing music captures is now reproducible:
+  `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`.
+  It shows the music source L/R channels are too correlated
+  (`input_lr_correlation=0.985848`, condition number `140.3`) to prove
+  crosstalk. Default-like runs still leave large residual after a 2x2 fit
+  (`0.30x` to `0.50x` residual/predicted), so the next physical evidence must
+  be a decorrelated channel-matrix capture.
+- Added `scripts/run-channel-matrix-gate` and `make channel-matrix-prepare`.
+  The default mode is prepare-only and does not touch audio hardware. The
+  generated fixture smoke has L/R correlation about `0.00056`, suitable for a
+  future lock-gated iRig Pair A matrix/crosstalk test.

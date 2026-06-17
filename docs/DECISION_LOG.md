@@ -1155,3 +1155,39 @@ Evidence:
 - `local-analysis/soundcheck-window-trace/default-after-unrolled-v2.json`
 - `local-analysis/soundcheck-window-trace/hotstats-write-late-v2.json`
 - `local-analysis/soundcheck-window-trace/queue8-v2.json`
+
+## 2026-06-17: Require Decorrelated Physical Matrix Before Blaming Crosstalk
+
+Decision:
+- Treat music-based 2x2 L/R matrix fits as diagnostic only.
+- Add a dedicated decorrelated channel-matrix gate for the next physical
+  iRig route check, rather than claiming that the existing music captures prove
+  crosstalk or routing leakage.
+
+Reason:
+- Existing physical music captures use a stereo source whose L/R channels are
+  too correlated for a stable crosstalk estimate: `input_lr_correlation` is
+  `0.985848` and the fit condition number is about `140.3`.
+- Default-like runs fit an apparent mixed L/R matrix but still leave large
+  full-band residual after the linear model:
+  - default-after-unrolled residual/predicted `0.303950`;
+  - hotstats-write-late residual/predicted `0.306780`;
+  - queue8 residual/predicted `0.503410`.
+- The rejected unrolled-pack run is essentially unrelated to the reference
+  (`global_mono_correlation=-0.182678`, residual/capture `0.999913`), which
+  confirms that this tool can classify severe payload regressions but does not
+  rescue that candidate.
+
+Alternatives discarded:
+- Declare the analog path has crosstalk based on correlated stereo music:
+  rejected because the fit is ill-conditioned.
+- Continue more music-only soundchecks before a matrix/crosstalk check:
+  rejected because the next blocker is whether the physical route or candidate
+  emits a wrong mixed signal.
+
+Evidence:
+- `scripts/analyze-soundcheck-linear-matrix.py`
+- `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`
+- `scripts/run-channel-matrix-gate`
+- `local-analysis/channel-matrix/offline-prepare-smoke`
+- `local-analysis/channel-matrix/20260617T014008Z-pairA-decorrelated-matrix`

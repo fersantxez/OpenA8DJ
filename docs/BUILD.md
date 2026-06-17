@@ -352,6 +352,18 @@ behavior. They cannot prove analog audio quality, Traktor behavior, physical
 capture quality, or human listening quality. Those remain separate authorized
 validation gates.
 
+The decorrelated channel-matrix fixture can be prepared offline without audio
+hardware:
+
+```sh
+make channel-matrix-prepare CHANNEL_MATRIX_PAIR=A CHANNEL_MATRIX_RATE=48000 CHANNEL_MATRIX_SECONDS=8 CHANNEL_MATRIX_PEAK=0.30
+```
+
+This command only writes evidence under `local-analysis/channel-matrix`. The
+matching `scripts/run-channel-matrix-gate --run-physical` path is a hardware
+gate, not a build step, and requires the global audio lock plus an authorized
+physical window.
+
 ## Migration Order
 
 1. Add CMake core/test skeleton.

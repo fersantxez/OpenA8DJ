@@ -117,6 +117,10 @@ SOUNDCHECK_CPU_STRESS_SECONDS ?= 8
 SOUNDCHECK_CPU_STRESS_WORKERS ?= auto
 SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO ?= 0.04
 SOUNDCHECK_MAX_MID_BAND_CPU_CORR ?= 0.60
+CHANNEL_MATRIX_PAIR ?= A
+CHANNEL_MATRIX_RATE ?= 48000
+CHANNEL_MATRIX_SECONDS ?= 8
+CHANNEL_MATRIX_PEAK ?= 0.30
 SIM_OUTPUT_SECONDS ?= 3
 SIM_OUTPUT_MODE ?= dense
 SIM_OUTPUT_PAIR ?= A
@@ -282,6 +286,11 @@ simulated-output-soundcheck:
 		--gain "$(SIM_OUTPUT_GAIN)" \
 		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
 		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)"
+
+channel-matrix-prepare:
+	./scripts/run-channel-matrix-gate \
+		--pair "$(CHANNEL_MATRIX_PAIR)" --rate "$(CHANNEL_MATRIX_RATE)" \
+		--seconds "$(CHANNEL_MATRIX_SECONDS)" --peak "$(CHANNEL_MATRIX_PEAK)"
 
 $(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h $(HAL_FLAGS_STAMP)
 	@mkdir -p build
