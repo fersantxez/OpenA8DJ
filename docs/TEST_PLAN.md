@@ -998,3 +998,47 @@ PASS/FAIL semantics:
   both validated sample rates.
 - PASS does not mean physical deck isolation is proven.
 - FAIL blocks physical routing/no-leakage claims until fixed.
+
+## Offline C++ Capture Matrix Quality Analyzer
+
+Purpose:
+
+- analyze stored capture directories with `fixture/reference.wav` and
+  `captured.wav` without touching hardware.
+- report both loopback quality and decorrelated-tone leakage in one JSON.
+- keep routing/leakage evidence separate from full quality readiness.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_capture_matrix_quality_analysis
+./build/cpp-offline/opena8djcpp_capture_matrix_quality_analysis
+```
+
+For existing stored captures:
+
+```sh
+./build/cpp-offline/opena8djcpp_capture_matrix_quality_analysis \
+  --analysis-seconds 8 \
+  --min-snr-db 45 \
+  --min-correlation 0.98 \
+  --max-clicks 0 \
+  --max-leakage-db -45 \
+  --min-expected-amplitude 0.005 \
+  /path/to/run-dir
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/capture-matrix-quality-analysis.json`;
+- `capture_matrix_quality_analysis` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS in selftest mode means the analyzer accepts a clean synthetic capture
+  and rejects a degraded synthetic capture.
+- PASS on a stored physical run means that run met the supplied thresholds. It
+  does not by itself prove the candidate beats mainline.
+- FAIL blocks any claim tied to the failed threshold dimension.

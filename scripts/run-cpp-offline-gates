@@ -45,6 +45,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
+./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
@@ -97,6 +98,7 @@ jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
+capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
@@ -274,6 +276,17 @@ summary = {
         "clean_min_snr_db": loopback_quality.get("rows", [{}])[0].get("min_snr_db"),
         "degraded_failures": loopback_quality.get("rows", [{}, {}])[1].get("failures"),
         "evidence": "local-analysis/cpp-offline/loopback-quality-analysis.json",
+    },
+    "capture_matrix_quality_analysis": {
+        "status": capture_matrix_quality.get("result"),
+        "mode": capture_matrix_quality.get("mode"),
+        "runs": capture_matrix_quality.get("run_count"),
+        "failures": capture_matrix_quality.get("failures"),
+        "thresholds": capture_matrix_quality.get("thresholds"),
+        "clean_min_snr_db": capture_matrix_quality.get("runs", [{}])[0].get("metrics", {}).get("min_snr_db"),
+        "clean_max_wrong_source_leakage_db": capture_matrix_quality.get("runs", [{}])[0].get("metrics", {}).get("max_wrong_source_leakage_db"),
+        "degraded_failures": capture_matrix_quality.get("runs", [{}, {}])[1].get("failures"),
+        "evidence": "local-analysis/cpp-offline/capture-matrix-quality-analysis.json",
     },
     "channel_leakage_tone_contract": {
         "status": channel_leakage_tone.get("result"),

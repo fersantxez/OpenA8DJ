@@ -1912,3 +1912,30 @@ Readiness rule:
 - This proves the digital Mode 2 pack/decode path and tone-domain detector can
   enforce no-leakage offline. Physical A/B/C/D routing still requires locked
   same-session capture evidence and comparison against mainline.
+
+## 2026-06-17 C++ Capture Matrix Quality Analyzer
+
+Required for stored physical-capture analysis:
+- `opena8djcpp_capture_matrix_quality_analysis` must PASS in selftest mode.
+- Selftest clean row must pass SNR, correlation, click, leakage, expected
+  amplitude, and clipping thresholds.
+- Selftest degraded row must be rejected.
+- Capture mode must report, per run:
+  - alignment score and lag;
+  - per-channel fitted gain, correlation, SNR, residual RMS/peak;
+  - click outliers;
+  - clipped frame count;
+  - expected tone floor;
+  - left-to-right leakage dB;
+  - right-to-left leakage dB;
+  - max wrong-source leakage dB.
+
+Current status:
+- PASS offline selftest.
+- Existing stored physical routing analysis can pass leakage while still
+  failing global SNR/correlation, which proves these are separate readiness
+  dimensions.
+
+Readiness rule:
+- Physical readiness requires both routing/leakage and quality metrics to beat
+  mainline in a same-session run. A leakage-only pass is not enough.

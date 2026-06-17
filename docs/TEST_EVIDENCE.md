@@ -7387,3 +7387,74 @@ Operational note:
   - full Traktor DVS signal quality matrix;
   - physical audio and Traktor validation;
   - runtime CPU/resource comparison against mainline.
+
+## 2026-06-17 C++ Capture Matrix Quality Analyzer Focused Run
+
+- Purpose:
+  - Add and verify a compiled analyzer for stored capture directories.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_capture_matrix_quality_analysis`
+  - `./build/cpp-offline/opena8djcpp_capture_matrix_quality_analysis`
+  - `ctest --test-dir build/cpp-offline -R opena8djcpp_capture_matrix_quality_analysis --output-on-failure`
+- Result:
+  - PASS.
+  - Clean synthetic capture accepted:
+    min SNR about `274.613 dB`, max wrong-source leakage about `-59.0433 dB`,
+    click outliers `0`, clipped frames `0`.
+  - Degraded synthetic capture correctly rejected for `snr_db`, `correlation`,
+    `clicks`, `leakage`, and `clipped_frames`.
+- Evidence:
+  - `local-analysis/cpp-offline/capture-matrix-quality-analysis.json`
+- Safety:
+  - Offline synthetic/stored-file analysis only.
+  - No hardware, USB, CoreAudio, default device, service restart, driver
+    install, or system-extension activation.
+
+## 2026-06-17 Stored Physical Capture Read-Only Analysis
+
+- Purpose:
+  - Verify the new C++ analyzer can read an existing physical run directory
+    without touching hardware.
+- Command:
+  - `./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis --analysis-seconds 8 --min-snr-db -10 --min-correlation 0.5 --max-leakage-db -45 --min-expected-amplitude 0.005 --max-clicks 10 local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag`
+- Result:
+  - PASS for routing-oriented thresholds.
+  - Alignment score `0.834716`.
+  - Min SNR `-1.06188 dB`.
+  - Min correlation `0.662703`.
+  - Max wrong-source leakage `-59.5282 dB`.
+  - Click outliers `4`.
+- Evidence:
+  - `local-analysis/cpp-offline/capture-matrix-quality-real-existing-routing.json`
+- Interpretation:
+  - Stored real capture can pass leakage while still showing weak global
+    SNR/correlation. This is evidence that routing and audiophile quality must
+    remain separate gates.
+
+## 2026-06-17 Offline Gates After Capture Matrix Quality Analyzer
+
+- Purpose:
+  - Verify the complete offline gate surface after adding the compiled stored
+    capture analyzer.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `27/27` passed.
+  - Release CTest: `28/28` passed.
+  - Capture matrix quality analyzer: PASS selftest, `2` runs, failures `0`.
+  - Evidence schema: PASS, `required_files=27`, missing `0`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/capture-matrix-quality-analysis.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Not-ready blockers still present:
+  - mainline runtime byte parity requires physical capture/export evidence;
+  - full Traktor DVS signal quality matrix;
+  - physical audio and Traktor validation;
+  - runtime CPU/resource comparison against mainline.

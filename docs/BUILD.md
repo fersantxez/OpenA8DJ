@@ -674,3 +674,29 @@ The full offline gate runs it automatically and writes:
 
 This is a digital Mode 2 pack/decode and tone-analysis contract. It does not
 replace physical A/B/C/D external-loopback evidence.
+
+## C++ Capture Matrix Quality Analyzer
+
+The offline build includes `opena8djcpp_capture_matrix_quality_analysis`.
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_capture_matrix_quality_analysis
+./build/cpp-offline/opena8djcpp_capture_matrix_quality_analysis
+```
+
+The full offline gate runs it automatically and writes:
+
+- `local-analysis/cpp-offline/capture-matrix-quality-analysis.json`
+- the `capture_matrix_quality_analysis` summary in
+  `local-analysis/cpp-offline/current-offline-gates.json`
+
+Capture mode reads stored run directories only:
+
+```sh
+./build/cpp-offline/opena8djcpp_capture_matrix_quality_analysis /path/to/run-dir
+```
+
+It expects `fixture/reference.wav` and `captured.wav` in each run directory.
+It does not open audio devices, touch USB, install drivers, or activate system
+extensions.

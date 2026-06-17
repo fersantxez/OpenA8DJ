@@ -1616,3 +1616,13 @@ Next technical target:
   - Highest-value next metric is a C++ analyzer over stored physical capture
     directories, porting the Python tone-matrix/quality fields into a compiled
     offline tool without opening audio devices.
+- C++ capture matrix quality analyzer:
+  - Added `opena8djcpp_capture_matrix_quality_analysis`.
+  - It reads stored `fixture/reference.wav` and `captured.wav` directories,
+    then reports alignment, per-channel gain/correlation/SNR, residuals,
+    clicks, clipping, expected tone floor, and decorrelated-tone leakage.
+  - Selftest PASSes: clean synthetic capture accepted, degraded capture
+    rejected for SNR/correlation/click/leakage/clipping.
+  - A stored physical direct-USB capture can pass routing/leakage while failing
+    global SNR/correlation, reinforcing that no single metric is enough for
+    audiophile readiness.

@@ -2557,7 +2557,32 @@ Files affected by subagent:
 
 Integration:
 - Added a narrower C++ digital tone-leakage contract in this pass.
-- Next recommended implementation remains:
-  `opena8djcpp_capture_matrix_quality_analysis`, reading existing
-  `fixture/reference.wav`, `captured.wav`, `metrics.json`, and optional CPU
-  profile files without touching hardware.
+- Implemented the next recommended analyzer as
+  `opena8djcpp_capture_matrix_quality_analysis`.
+- The first version reads existing `fixture/reference.wav` and `captured.wav`
+  without touching hardware and reports alignment, SNR/correlation, clicks,
+  clipping, and tone-domain leakage.
+
+## 2026-06-17: Dalton - Capture Matrix Analyzer Worker
+
+Prompt summary:
+- Implement a bounded C++ analyzer over stored run directories with
+  `fixture/reference.wav` and `captured.wav`.
+- Same mandatory safety warning: no mutation in `/Users/fer/dev/opena8dj` or
+  `/Users/fer/dev/audio8djrust`; no hardware/audio/CoreAudio/USB.
+
+Files affected by subagent:
+- `CMakeLists.txt`
+- `tools/capture_matrix_quality_analysis.cpp`
+
+Integration:
+- Reviewed the patch, ran focused compile/selftest/CTest, wired it into the
+  full offline gate and evidence schema, and added documentation.
+- The analyzer selftest PASSes and the full gate includes it.
+
+Risk:
+- The tool duplicates some WAV parsing and alignment logic from
+  `tools/loopback_quality_analysis.cpp`; a later cleanup should extract a
+  shared offline WAV/quality helper after behavior settles.
+- Current real-capture analysis can pass routing/leakage while failing global
+  SNR/correlation. That is expected and must not be over-interpreted.

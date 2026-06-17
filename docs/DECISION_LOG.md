@@ -4591,3 +4591,36 @@ Next implication:
   still not physical routing proof; the next analyzer should consume stored
   `fixture/reference.wav` and `captured.wav` runs and report the physical
   leakage fields used by the current Python tone-matrix gate.
+
+## 2026-06-17: Add C++ Capture Matrix Quality Analyzer
+
+Decision:
+- Add `tools/capture_matrix_quality_analysis.cpp` and wire it into CMake,
+  CTest, `scripts/run-cpp-offline-gates`, and evidence schema.
+
+Reason:
+- Objective sound-quality work needs a compiled analyzer that can read stored
+  physical capture directories without opening audio devices or touching USB.
+- The tool reports alignment, per-channel fitted gain/correlation/SNR,
+  residual RMS/peak, click outliers, clipped frames, and decorrelated-tone
+  leakage fields:
+  `left_to_right_leakage_db`, `right_to_left_leakage_db`, and
+  `max_wrong_source_leakage_db`.
+- The selftest accepts a clean synthetic capture and rejects a degraded capture
+  with leakage, clipping, click, poor SNR, and poor correlation.
+
+Alternatives discarded:
+- Keep this logic only in Python: rejected because the C++ candidate needs a
+  compiled, reproducible evidence path.
+- Treat tone leakage as sufficient product quality: rejected because existing
+  captures can pass leakage while still failing SNR/correlation/residual
+  quality.
+
+Evidence:
+- `local-analysis/cpp-offline/capture-matrix-quality-analysis.json`
+- `local-analysis/cpp-offline/capture-matrix-quality-real-existing-routing.json`
+
+Next implication:
+- The next physical window should use this analyzer on same-session C++ and
+  mainline captures, but readiness still requires the full quality/CPU/jitter
+  comparison, not just leakage PASS.
