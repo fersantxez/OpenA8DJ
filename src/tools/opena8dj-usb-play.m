@@ -85,11 +85,17 @@ static void PrintDiagnostics(const char *label)
             "audio_reset_rate=0x%02x audio_reset_depth=%u audio_reset_bpp=%u audio_reset_ok=%u "
             "audio_stream_rate=0x%02x audio_stream_depth=%u audio_stream_bpp=%u audio_stream_ok=%u "
             "output_byte=%u ring_frames=%u target_latency=%u lead=%u queue_target=%u in_flight=%u "
+            "select_alt0_before_alt1=%u "
             "capture_transfers=%" PRIu64 " playback_transfers=%" PRIu64 " "
             "frames_written=%" PRIu64 " frames_read=%" PRIu64 " startup_silence=%" PRIu64 " "
             "underruns=%" PRIu64 " active_underruns=%" PRIu64 " elastic_drops=%" PRIu64 " "
             "elastic_replays=%" PRIu64 " timeline_resets=%" PRIu64 " late_frames=%" PRIu64 " "
-            "late_batches=%" PRIu64 " queue_failures=%" PRIu64 " "
+            "late_batches=%" PRIu64 " next_frame=%" PRIu64 " sched_resets=%" PRIu64 " "
+            "sched_too_old=%" PRIu64 " sched_too_new=%" PRIu64 " sched_out_of_window=%" PRIu64 " "
+            "sched_fallbacks=%" PRIu64 " queue_failures=%" PRIu64 " qfail_last=0x%08" PRIx64 " "
+            "qfail_no_error=%" PRIu64 " qfail_too_old=%" PRIu64 " qfail_too_new=%" PRIu64 " "
+            "qfail_other=%" PRIu64 " qfail_explicit=%" PRIu64 " qfail_consumed=%" PRIu64 " "
+            "qfail_startup_silence=%" PRIu64 " "
             "queue_bytes_min=%" PRIu64 " queue_bytes_max=%" PRIu64 " queue_bytes_sum=%" PRIu64 " "
             "queue_bytes_samples=%" PRIu64 " queue_tx_min=%" PRIu64 " queue_tx_max=%" PRIu64 " "
             "queue_tx_sum=%" PRIu64 " queue_tx_samples=%" PRIu64 " "
@@ -125,6 +131,7 @@ static void PrintDiagnostics(const char *label)
             diagnostics.playbackLeadFrames,
             diagnostics.playbackQueueTarget,
             diagnostics.playbackTransfersInFlight,
+            diagnostics.selectAlt0BeforeAlt1,
             diagnostics.captureTransfers,
             diagnostics.playbackTransfers,
             diagnostics.outputFramesWritten,
@@ -137,7 +144,21 @@ static void PrintDiagnostics(const char *label)
             diagnostics.outputTimelineResets,
             diagnostics.outputLateWriteFrames,
             diagnostics.outputLateWriteBatches,
+            diagnostics.playbackNextFrameNumber,
+            diagnostics.playbackScheduleResets,
+            diagnostics.playbackScheduleTooOld,
+            diagnostics.playbackScheduleTooNew,
+            diagnostics.playbackScheduleOutOfWindow,
+            diagnostics.playbackScheduleFallbacks,
             diagnostics.playbackQueueFailures,
+            diagnostics.playbackQueueFailureLastStatus,
+            diagnostics.playbackQueueFailureNoError,
+            diagnostics.playbackQueueFailureTooOld,
+            diagnostics.playbackQueueFailureTooNew,
+            diagnostics.playbackQueueFailureOther,
+            diagnostics.playbackQueueFailureExplicit,
+            diagnostics.playbackQueueFailureConsumedFrames,
+            diagnostics.playbackQueueFailureStartupSilenceFrames,
             diagnostics.playbackQueueBytesMin,
             diagnostics.playbackQueueBytesMax,
             diagnostics.playbackQueueBytesSum,
@@ -164,10 +185,11 @@ int main(int argc, char **argv)
         const char *path = argc > 1 ? argv[1] : "build/test-recordings/opena8dj-reference.wav";
         int selectedPair = -1;
         uint32_t leadFrames = 0;
+        bool applyPlaybackProfile = false;
         if (argc > 2) {
             selectedPair = ParsePair(argv[2]);
             if (selectedPair < -1) {
-                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames]\n", argv[0]);
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
                 return 2;
             }
         }
@@ -175,10 +197,17 @@ int main(int argc, char **argv)
             char *end = NULL;
             unsigned long parsed = strtoul(argv[3], &end, 10);
             if (end == argv[3] || *end != '\0' || parsed > UINT32_MAX) {
-                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames]\n", argv[0]);
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
                 return 2;
             }
             leadFrames = (uint32_t)parsed;
+        }
+        if (argc > 4) {
+            if (argc != 5 || strcmp(argv[4], "--playback-profile") != 0) {
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
+                return 2;
+            }
+            applyPlaybackProfile = true;
         }
         NSData *data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path]];
         if (data == nil || data.length < 44) {
@@ -229,10 +258,22 @@ int main(int argc, char **argv)
             return 5;
         }
 
+        if (applyPlaybackProfile) {
+            if (!OpenA8DJUSBEnsureOpen((double)sampleRate)) {
+                fprintf(stderr, "OpenA8DJUSBEnsureOpen failed\n");
+                return 6;
+            }
+            if (!OpenA8DJUSBApplyPlaybackProfile()) {
+                fprintf(stderr, "OpenA8DJUSBApplyPlaybackProfile failed\n");
+                return 6;
+            }
+            PrintDiagnostics("after-playback-profile");
+        }
         if (!OpenA8DJUSBStart((double)sampleRate)) {
             fprintf(stderr, "OpenA8DJUSBStart failed\n");
             return 6;
         }
+        uint64_t startDoneNsec = MonotonicNsec();
         PrintDiagnostics("after-start");
 
         const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
@@ -279,11 +320,16 @@ int main(int argc, char **argv)
         }
 
         PrintDiagnostics("after-play");
+        uint64_t afterPlayNsec = MonotonicNsec();
         SleepFrames(sampleRate / 2, sampleRate);
         PrintDiagnostics("before-stop");
         OpenA8DJUSBStop();
         PrintDiagnostics("after-stop");
-        fprintf(stderr, "usb_play completed frames=%u\n", sourceFrames);
+        fprintf(stderr,
+                "usb_play completed frames=%u start_to_before_play_seconds=%.6f play_loop_seconds=%.6f\n",
+                sourceFrames,
+                (double)(playbackStartNsec - startDoneNsec) / 1000000000.0,
+                (double)(afterPlayNsec - playbackStartNsec) / 1000000000.0);
         fflush(stderr);
     }
     return 0;

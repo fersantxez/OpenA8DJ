@@ -1574,3 +1574,625 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     counters, driver p95 moving materially toward `<=12%`, no underruns/late
     writes/fallback allocations, and physical music not worse than the
     practical floor.
+
+### Architect Ignore HAL Output Sample-Time Experiment
+
+- Status:
+  - Completed and physically rejected.
+  - Mainline and Rust remained read-only.
+  - Hardware lock was used through the safety/soundcheck scripts.
+- Mission:
+  - Test whether the direct USB abs-deadline/contiguous-write behavior could be
+    approximated in HAL by ignoring CoreAudio `mOutputTime.mSampleTime`.
+- Files affected:
+  - `Makefile`
+  - `src/hal/OpenA8DJHAL.c`
+  - `docs/BUILD.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1` builds and passes HAL candidate safety.
+  - Locked Pair A/iRig music still fails:
+    quality `0.963508`, SNR floor `10.20 dB`, mid/high residual
+    `1.440572/1.369361`, `32` lag jumps.
+  - CPU still fails:
+    driver p95 `22.6%`, coreaudiod p95 `44.7%`.
+  - Failure-mode analysis remains `timebase_or_alignment_instability`; LTI,
+    polarity, matrix, and simple nonlinear fits do not explain the capture.
+- Risks:
+  - Keeping this as anything but an explicit diagnostic would mislead future
+    readiness claims.
+  - The direct USB matrix success still needs a deeper explanation than
+    sample-time validity alone.
+- Next recommended action:
+  - Keep `HAL_IGNORE_OUTPUT_SAMPLE_TIME=0`.
+  - Focus next on deeper USB/device transport timing or independent route
+    validation, not another local `sampleTime` tweak.
+
+### Carver Direct-USB/HAL Pacing Differential Audit
+
+- Status:
+  - Completed read-only.
+  - No hardware, audio, CoreAudio, USB mutation, or file edits.
+- Mission:
+  - Explain why direct USB `absdeadline-gain05` passes Pair A matrix while HAL
+    ISO8/ISO10 still fails physical music and CPU.
+- Findings:
+  - `absdeadline` alone is not proven as the winning factor: direct
+    `absdeadline-halflags` also uses absolute deadline but fails matrix.
+  - The direct winner differs by more than pacing:
+    direct USB outside HAL/CoreAudio, `plain-gain05`, queue target `64`,
+    large lead, and startup/prefetch margin.
+  - HAL ISO8/ISO10 already pass Pair A matrix; product failure is physical music
+    continuity/residual/CPU, not static routing.
+- Recommended experiment:
+  - Test HAL with capture-paced playback retained but direct-like margin:
+    `HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64
+    HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256
+    HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.
+- Risk:
+  - Queue/prefetch margin may increase latency and may not reduce CPU.
+  - If it only improves matrix, it does not solve product readiness.
+
+### Architect ISO8 Queue64 Prefetch256 Follow-Up
+
+- Status:
+  - Completed and physically rejected.
+  - Mainline and Rust remained read-only.
+  - Hardware lock was used through the physical safety and gate scripts.
+- Mission:
+  - Execute Carver's direct-like margin recommendation with capture-paced HAL
+    playback retained.
+- Files affected:
+  - `docs/DECISION_LOG.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - HAL candidate safety PASS.
+  - Pair A matrix PASS:
+    max wrong-source leakage `-53.079 dB`, L->R leakage `-58.221 dB`, R->L
+    leakage `-51.442 dB`.
+  - Physical music FAIL:
+    quality `0.966043`, SNR floor `10.15 dB`, mid/high residual
+    `1.442529/1.373910`, `25` lag jumps.
+  - CPU FAIL:
+    driver p95 `23.7%`, coreaudiod p95 `86.6%`.
+  - Stream stats did not show underruns, timeline resets, late writes, elastic
+    drops/replays, or pool fallback allocations.
+- Risk:
+  - Matrix PASS can be misleading if treated as product quality; the music and
+    CPU gates remain failing.
+- Next recommended action:
+  - Stop sweeping queue/prefetch margin blindly.
+  - Next useful evidence is either an independent direct-vs-HAL music capture
+    using the same fixture/reference, or a transport scheduler/profile change
+    that reduces USB/CoreAudio enqueue overhead while preserving music quality.
+
+### Architect Direct USB Music Diagnostic
+
+- Status:
+  - Completed and rejected as readiness evidence.
+  - Hardware lock was used.
+  - Mainline and Rust remained read-only.
+- Mission:
+  - Build a same-route iRig music wrapper for direct USB playback so direct
+    tone-matrix success cannot be over-interpreted.
+- Files affected:
+  - `scripts/run-direct-usb-soundcheck`
+  - `Makefile`
+  - `tools/hardware_lock_policy_check.cpp`
+  - `docs/DECISION_LOG.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Direct USB selected Pair A with `plain-gain05`, lead `8192`, real music,
+    and iRig capture fails:
+    quality `0.103211`, worst-channel SNR `-24.31 dB`, mid/high residual
+    `17.114359/16.212469`, no clipping.
+  - Direct playback completed and captured, so this is not simply missing
+    device visibility or recorder failure.
+  - Failure-mode/LTI analysis rejects simple matrix/polarity/nonlinear/LTI
+    explanations.
+- Risk:
+  - Direct tone-matrix results remain easy to misuse. They are only static
+    routing diagnostics unless a real-music soundcheck also passes.
+- Next recommended action:
+  - Keep optimizing the HAL product path against real music and CPU gates.
+  - Use direct USB only for narrow falsification, not as a product fallback.
+
+### Gibbs USB Scheduling Explorer
+
+- Status:
+  - Completed read-only.
+  - No files edited; no hardware/audio/CoreAudio/USB actions.
+- Mission:
+  - Explain explicit scheduling failure and direct USB physical latency.
+- Findings:
+  - Explicit scheduling uses nonzero `firstFrameNumber` based on
+    `frameNumberWithTime` plus a small lead.
+  - The observed failure family is not `too-old`/`too-new`; later
+    instrumentation showed `qfail_last=0xe00002be`, `qfail_other`, and queue
+    saturation.
+  - Direct USB process timing is immediate, so the several-second physical
+    latency is not explained by process startup or recorder startup.
+- Files affected by architect follow-up:
+  - `src/hal/OpenA8DJUSB.h`
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/opena8dj-usb-play.m`
+  - `src/tools/opena8dj-control.c`
+  - `Makefile`
+  - `scripts/analyze-physical-latency.py`
+  - `scripts/evaluate-promotion-readiness.py`
+- Risks:
+  - Explicit scheduling fallback reduces queue-failure storms but can hide the
+    underlying transport failure if treated as a product fix.
+- Next recommended action:
+  - Do not sweep explicit scheduling further until the physical route/timebase
+    failure is isolated with a prompt, high-SNR latency gate.
+
+### Leibniz QA/Metrics Evidence Explorer
+
+- Status:
+  - Completed read-only.
+  - No files edited; no hardware/audio/CoreAudio/USB actions.
+- Mission:
+  - Identify gaps in evidence/documentation around latest latency and readiness
+    blockers.
+- Findings:
+  - Physical latency findings were not formalized as a gate.
+  - Promotion-readiness evidence needed to include physical latency, not only
+    old physical music/CPU/investigation JSON.
+  - Traktor/timecode physical evidence remains absent and must block promotion.
+- Files affected by architect follow-up:
+  - `scripts/analyze-physical-latency.py`
+  - `scripts/evaluate-promotion-readiness.py`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+- Next recommended action:
+  - Keep `branch_promotion_allowed=false` until physical latency, physical
+    music, CPU, and Traktor/timecode all pass with current evidence.
+
+### Boole Physical Latency Explorer
+
+- Status:
+  - Completed read-only.
+  - No files edited; no hardware/audio/CoreAudio/USB actions.
+- Mission:
+  - Determine whether direct-player lead, target latency, or startup silence
+    can explain the stable multi-second marker delay.
+- Findings:
+  - `lead_frames=8192` is about `0.1707s` at 48 kHz.
+  - `target_latency=8192` is about `0.1707s`.
+  - Observed `startup_silence=4544` is about `0.0947s`.
+  - Even with the wrapper's `0.6s` recorder pre-roll, these terms are far
+    below the observed `4.646s` marker offset.
+  - The next useful discriminator is to collect internal USB diagnostics for
+    the same marker and compare consumed/packed buffers against the iRig
+    capture.
+- Files affected by architect follow-up:
+  - `scripts/analyze-latency-marker-peaks.py`
+  - `scripts/evaluate-promotion-readiness.py`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+- Next recommended action:
+  - Run one lock-gated marker probe with `--collect-usb-diagnostics`.
+  - If internal raw buffers are aligned while iRig is delayed, move diagnosis
+    downstream of software timeline/packing.
+
+### Turing Mainline Baseline Evidence Explorer
+
+- Status:
+  - Completed read-only.
+  - No files edited; no hardware/audio/CoreAudio/USB actions.
+- Mission:
+  - Confirm historical iRig/mixer capture route and extract comparable
+    mainline physical metrics.
+- Findings:
+  - Historical physical route is confirmed:
+    Open Audio 8 DJ output -> external mixer -> mixer REC OUT -> iRig Stream
+    input -> macOS capture.
+  - Mainline baseline also failed strict audiophile music thresholds even when
+    the route was working:
+    music SNR around `10..11 dB`, alignment below `0.98`, and lag jumps above
+    `0`.
+  - Later mainline docs also show real iRig availability failures after reset,
+    so route/device availability and audio-quality failure must be separated.
+- Risk:
+  - A C++ candidate can be better than recent mainline in isolated tone metrics
+    but still not be acceptable product quality.
+- Next recommended action:
+  - Require same-day A/B physical evidence or a stronger route-independent
+    oracle before any claim that C++ beats mainline.
+
+### Poincare USB Device-State Explorer
+
+- Status:
+  - Completed read-only.
+  - No files edited; no hardware/audio/CoreAudio/USB actions.
+- Mission:
+  - Identify remaining state/control/USB hypotheses after internal marker
+    buffers and packed Mode 2 bytes aligned perfectly.
+- Findings:
+  - Remaining high-value hypotheses are downstream of PCM packing:
+    ISO OUT cadence/layout, USB alternate-setting/device state reset,
+    transport policy differences, playback control bytes, and physical route.
+  - `HAL_VALID_CAPTURE_OUT_LAYOUT=1` and prior offset-fix runs already reject
+    simple output-layout changes.
+  - Playback control state was inconsistent: the C++ offline playback profile
+    expected CAIAQ input mode `1` and software lock off, while direct USB ran
+    markers with control bytes `00:02:03:01:02:01`.
+- Files affected by architect follow-up:
+  - `src/tools/opena8dj-control.c`
+  - `src/hal/OpenA8DJUSB.h`
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/opena8dj-usb-play.m`
+  - `scripts/run-direct-usb-soundcheck`
+  - `scripts/summarize-physical-runs.py`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+- Follow-up result:
+  - Forced playback-profile marker applied control bytes
+    `01:02:03:00:02:00`, but still failed:
+    marker mean `4.667208s`, physical latency FAIL, quality FAIL.
+- Next recommended action:
+  - Test USB alternate-setting reset/close-open state behavior under lock with
+    a marker, then compare against same-day mainline C if the route still
+    fails.
+
+### Noether Same-Day Mainline A/B Safety Planner
+
+- Status:
+  - Completed planning only.
+  - No hardware/audio/CoreAudio/USB action executed.
+  - No HAL installed, unloaded, or reloaded.
+  - No defaults, sample rates, buffer sizes, USB devices, or services changed.
+  - Mainline `/Users/fer/dev/opena8dj` was read only; Rust was not touched.
+- Mandatory warning given:
+  - "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana."
+- Mission:
+  - Prepare an exact, reversible plan for a physical same-day A/B comparison
+    against the C/Obj-C mainline if the architect chooses to temporarily activate
+    mainline under the global hardware lock.
+- Mainline read-only findings:
+  - `make install-hal` delegates to `scripts/test-hal-candidate-safety` and can
+    install a HAL bundle with safety checks, but its default evidence path is
+    inside mainline `local-analysis`; do not run it directly for the C++ A/B
+    campaign.
+  - `scripts/install-signed-build.sh` mutates system state directly:
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`,
+    `/usr/local/bin/opena8dj-control`, `/usr/local/bin/opena8dj-midid`,
+    `/Library/LaunchAgents/org.opena8dj.midid.plist`, and restarts
+    `coreaudiod`. Do not use it for the A/B because it writes mainline evidence
+    and has broader mutations than needed.
+  - Package install/uninstall scripts also mutate `/usr/local/bin`,
+    `/Library/LaunchAgents`, `/Library/Documentation/OpenA8DJ`, active HAL, and
+    restart `coreaudiod`; avoid the PKG path for a measurement-only same-day A/B.
+  - `scripts/test-hal-candidate-safety` shows the minimal safe system mutation
+    model: move any active OpenA8DJ HAL to `/Library/Audio/Plug-Ins/HAL.disabled`,
+    copy candidate to `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`, ad-hoc sign
+    in place, restart `coreaudiod`, enumerate, run guard, then unload unless
+    explicitly leaving loaded.
+  - `scripts/run-soundcheck` records from a named capture device and plays via
+    Core Audio, but it writes under its repo root by default. For this plan, use
+    only C++ worktree tools/wrappers and evidence paths.
+- Required evidence root:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/mainline-ab/<timestamp>/`
+- Safe plan, no execution in this subagent:
+  1. Preflight while unlocked or under a short lock check: confirm no active
+     OpenA8DJ HAL, or record exact active HAL hash/version and destination where
+     it will be parked. Confirm Audio 8 DJ and iRig Stream are visible using
+     passive enumeration only.
+  2. Create the A/B evidence root in the C++ worktree only. Write `manifest.txt`
+     with timestamp, operator, machine, branch names, git hashes, iRig route,
+     cable route, capture channels, requested sample rate, buffer size, and
+     exact no-default-change policy.
+  3. Snapshot the mainline candidate read-only by copying
+     `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver` or an explicitly selected
+     archived mainline `OpenA8DJ.driver` into
+     `<evidence>/inputs/mainline/OpenA8DJ.driver`. If no trustworthy built
+     bundle exists, abort; do not build inside mainline.
+  4. Snapshot the C++ candidate into `<evidence>/inputs/cpp/`, using a C++ built
+     artifact or direct USB tool manifest. Do not install C++ HAL unless the
+     architect explicitly changes this A/B to HAL-vs-HAL.
+  5. Acquire the global lock:
+     `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock"`.
+     If busy and owner PID is alive, abort and report owner; do not wait while
+     holding the lock.
+  6. Record pre-install state in `<evidence>/preflight/`: current HAL presence,
+     active HAL hash/version if present, Core Audio device list, iRig visibility,
+     Audio 8 DJ USB visibility, watched CPU, and current default input/output
+     names for audit only. Do not change defaults.
+  7. Install mainline from the C++ evidence snapshot with the minimal safety
+     model: move active OpenA8DJ HAL to `<evidence>/system-backup/` metadata plus
+     `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.ab-preexisting-*`,
+     copy snapshot to `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`, strip xattrs,
+     ad-hoc sign in place if required, restart `coreaudiod`, then wait for
+     enumeration. Do not install mainline tools or LaunchAgent unless the exact
+     test requires them.
+  8. Run mainline HAL physical measurements from the C++ worktree:
+     marker latency, real music soundcheck, CPU profile, stream/status snapshot
+     if available, and physical music quality gate. Store everything under
+     `<evidence>/mainline/`.
+  9. Unload mainline immediately after measurement: move active
+     `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` to
+     `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.ab-mainline-*`, restart
+     `coreaudiod`, and verify Core Audio enumeration/CPU recovery.
+  10. Run the C++ candidate measurement in the same lock window and same physical
+      route. Prefer direct USB C++ if that is the candidate under test; only
+      install C++ HAL if the architect chooses a HAL-vs-HAL comparison. Store
+      everything under `<evidence>/cpp/`.
+  11. Run postflight: unload any OpenA8DJ HAL unless the architect explicitly
+      requests leaving one active, restart Core Audio once if a HAL was active,
+      verify iRig and Audio 8 DJ visibility, verify watched CPU is back to idle,
+      and write `postflight/state.json`.
+  12. Release the lock immediately.
+  13. Run offline comparison after lock release: normalize by fixture hash,
+      capture device, capture channels, sample rate, duration, and same-day
+      timestamp; write `comparison.json`, `comparison.md`, and PASS/FAIL fields.
+- Mutations that would occur during the authorized A/B:
+  - System HAL directory:
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` copied/moved/removed.
+  - Disabled HAL parking directory:
+    `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.*` created.
+  - Active HAL bundle xattrs/signature may be changed after copying.
+  - `coreaudiod` restarted after install and after unload.
+  - Audio 8 DJ playback and iRig capture consume physical audio route.
+  - CPU measurements are sensitive while playback/capture are running.
+- Mutations intentionally avoided:
+  - No writes to `/Users/fer/dev/opena8dj`.
+  - No writes to `/Users/fer/dev/audio8djrust`.
+  - No mainline `local-analysis` artifacts.
+  - No package install.
+  - No `/usr/local/bin` tool overwrite unless separately authorized.
+  - No LaunchAgent install/bootstrap unless separately authorized.
+  - No default input/output change.
+  - No sample-rate/buffer change except what the candidate driver exposes for
+    its own stream during the test.
+  - No USB reset unless a separate recovery window is authorized.
+- Evidence to capture for each side:
+  - Candidate source path, copied snapshot hash, active installed hash, version,
+    build string, signing status, and git status/hash from source repo.
+  - Passive USB inventory proving Audio 8 DJ and iRig Stream visibility.
+  - Core Audio enumeration before install, after install, after measurement, and
+    after unload.
+  - Marker latency metrics: first energy, marker offset mean/std, paired peaks,
+    correlation, linear-fit SNR, residual/capture RMS.
+  - Real music metrics: quality alignment, SNR floor, mid/high residual ratios,
+    click outliers, lag jumps, clipping, quiet-window noise, coloration, and
+    CPU/residual coupling.
+  - CPU profile: OpenA8DJ driver avg/p95, coreaudiod p95, audio services,
+    player, recorder, WindowServer, and total watched CPU.
+  - Transport/driver counters when available: underruns/overruns, queue
+    failures, transfer errors, stream stats, control bytes/profile.
+  - Raw artifacts: reference WAV hash, captured WAV, play log, record log,
+    metrics JSON, summary text, lock owner record, install/unload logs.
+- PASS condition for a claim that C++ beats mainline:
+  - Same-day route-valid measurements exist for both sides.
+  - C++ passes absolute product gates.
+  - C++ is not merely less bad than a failing mainline; it must pass the
+    audiophile thresholds in `docs/SUCCESS_METRICS.md`.
+  - C++ beats or matches mainline on CPU, jitter/latency stability, underruns,
+    channel/routing correctness, and timecode-relevant signal integrity.
+  - Postflight leaves Core Audio, USB visibility, and iRig capture healthy.
+- Risks:
+  - Mainline source tree is dirty and may not correspond to a known release.
+    Use an explicitly selected built/archived bundle and record hash, or abort.
+  - Installing HAL can hang enumeration or drive `coreaudiod` hot; recovery must
+    unload OpenA8DJ and re-check audio stack before continuing.
+  - Running mainline wrappers would write into mainline; do not use them.
+  - Installing `/usr/local/bin/opena8dj-control` from mainline can overwrite C++
+    tools or alter later diagnostics; avoid for the minimal A/B.
+  - Physical route can drift between tests; keep both measurements in one lock
+    window with unchanged cabling, gain, capture channels, and fixture.
+  - A HAL-vs-direct-USB comparison is useful diagnostically but not a fair driver
+    product comparison. Label it clearly unless both candidates use the same
+    Core Audio path.
+- Restoration policy:
+  - Default final state after the A/B is OpenA8DJ HAL unloaded unless the
+    architect explicitly requests otherwise.
+  - Any pre-existing active HAL is parked with hash/version metadata, not
+    destroyed.
+  - If postflight health fails, unload active OpenA8DJ, restart `coreaudiod`,
+    collect guard logs, and stop; do not proceed to more audio tests.
+- Recommended architect decision:
+  - Only run this if the next C++ candidate has already passed offline gates and
+    a direct physical route sanity check. The A/B is expensive and mutates
+    system audio state; it should answer promotion-readiness, not debug basic
+    route failure.
+
+## Subagent: Offline Music/Marker Failure Analyst - 2026-06-17
+
+- Mandatory warning received and followed:
+  `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana.`
+- Scope:
+  - Read-only offline analysis of existing evidence under
+    `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/`
+    and
+    `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/`.
+  - No hardware, USB, Core Audio, HAL install/reload, defaults, or mainline/Rust
+    mutation.
+- Findings:
+  - The alt0+playback-profile marker gate is a latency-only partial pass:
+    `marker-peak-summary.json` has `offset_mean_seconds=0.405589`,
+    `offset_std_seconds=0.001256`, and `paired_peaks=4`, but
+    `physical-latency.json` still fails signal integrity with
+    `best_correlation=0.414578`, `aligned_snr_db=-3.99`,
+    `linear_fit_snr_db=-6.76`, and
+    `linear_residual_over_capture_rms=0.908807`.
+  - The music gate's stored global alignment is wrong for this dense/repetitive
+    track. `metrics.json` uses `capture_start=34316`, `reference_start=81`, but
+    an offline local scan of the existing WAVs finds the best mono correlation
+    at `capture_start=21852`, i.e. `-12464` frames / `-0.259667s` from the
+    stored start. At the stored alignment mono correlation is only `0.062356`;
+    at the corrected start it rises to `0.943492`.
+  - The corrected music alignment is close to the marker timing:
+    `(21852 - 81) / 48000 = 0.4536s`, versus marker mean `0.4056s`.
+    Therefore the apparent music failure is partly an analyzer alignment
+    failure, not purely transport failure.
+  - Correcting alignment is not enough for audiophile readiness. At the best
+    corrected start, a 2x2 static matrix fit still gives only
+    `snr_matrix=8.84dB`, residual/capture RMS `0.340`, and predicted/capture
+    RMS `0.941`. This is far below the product threshold and still points to
+    analog transfer, route/capture, gain/EQ, or remaining device-state quality
+    problems.
+  - Polarity and simple L/R swap are not sufficient explanations. Existing
+    `failure-modes.json` already reports
+    `static_lr_mix_or_polarity_not_sufficient` and
+    `simple_memoryless_nonlinearity_not_sufficient`; the offline scan agrees.
+  - Clipping is not the cause: music `capture_clipped_frames=0`, marker
+    `capture_clipped_frames=0`, and capture peaks remain below full scale.
+  - The music capture is strongly mono-correlated (`capture LR corr=0.9872`,
+    reference LR corr `0.9868`) and the track itself is highly repetitive, which
+    makes the current global music alignment fragile. Use decorrelated or
+    watermarked music/test content for alignment before judging residuals.
+- Next minimal tests:
+  1. Offline first: add or run an analyzer mode that anchors music alignment
+     from marker timing or from a wide normalized correlation scan, then reports
+     both raw and corrected quality.
+  2. Offline first: create a deterministic decorrelated music-like fixture with
+     low-level watermark/transients every few seconds, so L/R route, polarity,
+     drift, and residual can be measured without ambiguous dance-music loops.
+  3. Hardware only after lock: rerun direct USB alt0+playback-profile with
+     `--collect-usb-diagnostics` on the same deterministic fixture to prove
+     whether USB packed/consumed audio is clean while analog/iRig residual
+     remains high.
+  4. If residual remains high with corrected alignment and clean USB diagnostics,
+     isolate the external route: same iRig/mixer gain with a known non-Audio8
+     source, then same direct Audio 8 output with a simple swept/decorrelated
+     fixture.
+
+## Architect Integration: Continuous Timeline Reset Fix - 2026-06-17
+
+- Trigger:
+  - Darwin's offline analysis showed that music alignment was fragile but not
+    sufficient to explain the poor residual.
+  - Architect reran alt0/playback-profile music with USB diagnostics and found
+    a 12-second internal mismatch despite short packed probes passing.
+- Root cause:
+  - `OutputTimelineWrite` reset continuous writes when producer lead exceeded
+    half the ring. The failing run reset at write frame `162048` and inserted
+    mid-music silence/underrun gaps around served frame `145600`.
+- Integrated code change:
+  - Continuous writes at `ring->maxWrittenFrame + 1` no longer trigger the
+    future-gap reset.
+  - File changed: `src/hal/OpenA8DJUSB.m`.
+- Verification:
+  - Post-fix direct USB diagnostic run:
+    `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/`.
+  - Internal written/consumed/packed USB all pass for 12 seconds:
+    alignment `1.000000`, lag `0`, SNR `999.00 dB`, USB check errors `0`,
+    panic flags `0`.
+  - Physical iRig music improved but remains product FAIL:
+    quality `0.957628`, SNR `9.38 dB`, mid/high residual
+    `1.422297/1.413835`.
+  - Runtime isolation PASS:
+    `local-analysis/runtime-isolation/20260617-after-continuous-reset-fix.json`.
+- Risk:
+  - The fixed direct USB path proves packet/data-plane integrity, but not
+    audiophile physical readiness.
+  - The HAL CPU and same-day mainline comparison still need fresh evidence on
+    the fixed candidate.
+- Next recommended action:
+  - Run a same-day mainline/C++ physical A/B only from C++ evidence snapshots
+    and under lock, or first isolate the iRig/mixer route with a known-good
+    source. Do not promote to main.
+
+## Architect Integration: Decorrelated Direct USB Boundary - 2026-06-17
+
+- Trigger:
+  - After the continuous timeline reset fix, direct USB real-music diagnostics
+    were internally perfect but physical iRig quality still failed. A
+    decorrelated fixture was needed to remove ambiguous dense-music alignment.
+- Evidence:
+  - Run:
+    `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag`.
+  - Promotion:
+    `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`.
+  - Isolation:
+    `local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`.
+- Integrated finding:
+  - Internal written, consumed, and packed USB outputs are exact for 12 seconds:
+    alignment `1.000000`, lag `0`, SNR `999.00 dB`, USB `check_errors=0`,
+    USB `panic_flags=0`.
+  - Physical Pair A routing/crosstalk passes on the decorrelated fixture:
+    `max_wrong_source_leakage_db=-57.447168`, with no clipping.
+  - Physical waveform quality still fails badly:
+    quality `0.721193`, SNR floor `-2.96 dB`, mid/high residual
+    `2.117458/2.018361`.
+- Risk:
+  - Do not let the Pair A routing PASS become a readiness claim. It is a useful
+    isolation result, not proof that the product HAL beats mainline or that DVS
+    is ready.
+  - Same-day mainline A/B and fixed-candidate HAL CPU remain mandatory before
+    any branch promotion discussion.
+- Next recommended action:
+  - If hardware is available, run a lock-gated same-day product HAL A/B with the
+    same decorrelated fixture and music gate against mainline, using evidence
+    rooted in `/Users/fer/dev/audio8djcpp/local-analysis` and leaving
+    `/Users/fer/dev/opena8dj` read-only.
+  - If avoiding system mutation, improve offline/C++ analysis only; it cannot
+    close the physical quality, CPU, or Traktor/timecode gates.
+
+## Rawls: Post-Decorrelated Evidence Audit - 2026-06-17
+
+- Mission:
+  - Independently audit the current evidence after
+    `20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag`.
+  - Scope was read-only/offline; no hardware, CoreAudio, USB reset, driver
+    install, or mainline/Rust mutation.
+- Findings:
+  - Confirms direct USB data-plane PASS:
+    `written_alignment_score=1.000000`,
+    `consumed_alignment_score=1.000000`,
+    `usb_alignment_score=1.000000`, SNR `999.00 dB`,
+    `usb_check_errors=0`, `usb_panic_flags=0`.
+  - Confirms physical Pair A routing PASS:
+    `max_wrong_source_leakage_db=-57.447168`,
+    `left_to_right_leakage_db=-61.527228`,
+    `right_to_left_leakage_db=-55.793274`,
+    `expected_floor_amplitude=0.147371`, clipping `0`.
+  - Confirms physical quality FAIL:
+    `quality_alignment_score=0.721193`, SNR `-2.96 dB`,
+    mid/high residual `2.117458/2.018361`,
+    quiet mid-band noise `-21.77 dBFS`.
+  - Confirms promotion blockers:
+    `latest_music_cpu_pair`, `physical_latency_alignment`,
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, and `traktor_timecode_physical`.
+- Risks noted:
+  - `evaluate-promotion-readiness.py` selects some evidence by latest mtime.
+    `latest_music_cpu_pair` catches music/CPU family mismatch, but latency,
+    marker, USB, and matrix evidence can still come from different candidate
+    families.
+  - `evidence:*` gates mostly prove file existence; semantic gates must remain
+    the authority for readiness.
+  - `metrics.json` should persist `result` or `verdict` consistently instead of
+    relying on wrapper output plus threshold inference.
+- Minimum objective next measurement:
+  - Same-day C++ vs mainline product HAL A/B in the same physical route, using
+    the same fixture/music, sample rate, buffer/capture device, and comparator.
+  - Required artifacts for both drivers: music `metrics.json`, same-run
+    `cpu-profile.tsv`, decorrelated `tone-matrix.json`, runtime isolation, and
+    a comparison report proving C++ quality is at least mainline and CPU is no
+    worse than mainline.

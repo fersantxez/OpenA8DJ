@@ -23,12 +23,24 @@ def latest_file(pattern, fallback):
     return max(matches, key=lambda path: (path.stat().st_mtime, str(path)))
 
 
+def latest_file_any(patterns, fallback):
+    matches = []
+    for pattern in patterns:
+        matches.extend(path for path in ROOT.glob(pattern) if path.is_file())
+    if not matches:
+        return fallback
+    return max(matches, key=lambda path: (path.stat().st_mtime, str(path)))
+
+
 DEFAULTS = {
     "offline": ROOT / "local-analysis/cpp-offline/current-offline-gates.json",
     "simulated": ROOT / "local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json",
     "tone": ROOT / "local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-4/tone-analysis.txt",
-    "music": latest_file(
-        "local-analysis/soundcheck/*/metrics.json",
+    "music": latest_file_any(
+        [
+            "local-analysis/soundcheck/*/metrics.json",
+            "local-analysis/direct-usb-soundcheck/*/metrics.json",
+        ],
         ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/metrics.json",
     ),
     "cpu": latest_file(
@@ -36,6 +48,25 @@ DEFAULTS = {
         ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/cpu-profile.tsv",
     ),
     "physical_investigation": ROOT / "local-analysis/usb-physical-investigation-summary.json",
+    "physical_latency": latest_file(
+        "local-analysis/**/physical-latency.json",
+        ROOT / "local-analysis/channel-matrix/20260617-latency-measure-pairA-postroll8-3s/physical-latency.json",
+    ),
+    "physical_marker": latest_file(
+        "local-analysis/**/marker-peak-summary.json",
+        ROOT / "local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/marker-peak-summary.json",
+    ),
+    "usb_integrity": latest_file(
+        "local-analysis/direct-usb-soundcheck/*/driver-diagnostics-analysis.txt",
+        ROOT / "local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/driver-capture-analysis-explicit-usb-12s.txt",
+    ),
+    "physical_matrix": latest_file_any(
+        [
+            "local-analysis/direct-usb-soundcheck/*/tone-matrix.json",
+            "local-analysis/channel-matrix/*/tone-matrix.json",
+        ],
+        ROOT / "local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json",
+    ),
 }
 
 
@@ -62,6 +93,18 @@ BASELINE = {
     "music_capture_clipped_frames_max": 0,
     "driver_cpu_p95_max": 6.5,
     "coreaudiod_p95_max": 1.7,
+    "physical_latency_first_energy_seconds_max": 1.5,
+    "physical_latency_abs_correlation_min": 0.98,
+    "physical_latency_aligned_snr_db_min": 35.0,
+    "physical_latency_linear_fit_snr_db_min": 35.0,
+    "physical_latency_linear_residual_over_capture_rms_max": 0.10,
+    "physical_marker_min_paired_peaks": 4,
+    "physical_marker_offset_std_seconds_max": 0.025,
+    "physical_marker_mean_offset_seconds_max": 1.5,
+    "usb_integrity_alignment_min": 0.999999,
+    "usb_integrity_snr_db_min": 90.0,
+    "physical_matrix_max_wrong_source_leakage_db_max": -45.0,
+    "physical_matrix_expected_floor_amplitude_min": 0.005,
 }
 
 
@@ -148,6 +191,10 @@ def evaluate(args):
         "music": Path(args.music),
         "cpu": Path(args.cpu),
         "physical_investigation": Path(args.physical_investigation),
+        "physical_latency": Path(args.physical_latency),
+        "physical_marker": Path(args.physical_marker),
+        "usb_integrity": Path(args.usb_integrity),
+        "physical_matrix": Path(args.physical_matrix),
     }
     gates = []
     for name, path in paths.items():
@@ -170,6 +217,10 @@ def evaluate(args):
     tone = parse_key_values(paths["tone"])
     music = load_json(paths["music"])
     physical_investigation = load_json(paths["physical_investigation"])
+    physical_latency = load_json(paths["physical_latency"])
+    physical_marker = load_json(paths["physical_marker"])
+    usb_integrity = parse_key_values(paths["usb_integrity"])
+    physical_matrix = load_json(paths["physical_matrix"])
     cpu = cpu_profile(paths["cpu"])
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
@@ -298,6 +349,105 @@ def evaluate(args):
               "click_outliers": tone.get("click_outliers"),
               "peak": tone.get("peak"),
               "baseline_sideband_ratio_max": BASELINE["tone_sideband_ratio_max"]}),
+        gate("physical_latency_alignment",
+             physical_latency.get("result") == "PASS" and
+             as_float(physical_latency, "first_energy_seconds", 999.0) <=
+             BASELINE["physical_latency_first_energy_seconds_max"] and
+             abs(as_float(physical_latency, "best_correlation", 0.0)) >=
+             BASELINE["physical_latency_abs_correlation_min"] and
+             as_float(physical_latency, "aligned_snr_db") >=
+             BASELINE["physical_latency_aligned_snr_db_min"] and
+             as_float(physical_latency, "linear_fit_snr_db") >=
+             BASELINE["physical_latency_linear_fit_snr_db_min"] and
+             as_float(physical_latency, "linear_residual_over_capture_rms", 999.0) <=
+             BASELINE["physical_latency_linear_residual_over_capture_rms_max"],
+             {"result": physical_latency.get("result"),
+              "first_energy_seconds": physical_latency.get("first_energy_seconds"),
+              "first_energy_seconds_max": BASELINE["physical_latency_first_energy_seconds_max"],
+              "best_correlation": physical_latency.get("best_correlation"),
+              "abs_correlation_min": BASELINE["physical_latency_abs_correlation_min"],
+              "aligned_snr_db": physical_latency.get("aligned_snr_db"),
+              "aligned_snr_db_min": BASELINE["physical_latency_aligned_snr_db_min"],
+              "linear_fit_snr_db": physical_latency.get("linear_fit_snr_db"),
+              "linear_fit_snr_db_min": BASELINE["physical_latency_linear_fit_snr_db_min"],
+              "linear_residual_over_capture_rms": physical_latency.get("linear_residual_over_capture_rms"),
+              "linear_residual_over_capture_rms_max":
+              BASELINE["physical_latency_linear_residual_over_capture_rms_max"],
+              "path": str(paths["physical_latency"])},
+             "physical output must align promptly and cleanly before branch promotion"),
+        gate("physical_marker_latency",
+             physical_marker.get("result") == "PASS" and
+             physical_marker.get("readiness_result", physical_marker.get("result")) == "PASS" and
+             as_float(physical_marker, "paired_peaks") >=
+             BASELINE["physical_marker_min_paired_peaks"] and
+             as_float(physical_marker, "offset_std_seconds", 999.0) <=
+             BASELINE["physical_marker_offset_std_seconds_max"] and
+             abs(as_float(physical_marker, "offset_mean_seconds", 999.0)) <=
+             BASELINE["physical_marker_mean_offset_seconds_max"],
+             {"result": physical_marker.get("result"),
+              "stability_result": physical_marker.get("stability_result"),
+              "readiness_result": physical_marker.get("readiness_result"),
+              "paired_peaks": physical_marker.get("paired_peaks"),
+              "paired_peaks_min": BASELINE["physical_marker_min_paired_peaks"],
+              "offset_mean_seconds": physical_marker.get("offset_mean_seconds"),
+              "offset_mean_seconds_abs_max": BASELINE["physical_marker_mean_offset_seconds_max"],
+              "offset_std_seconds": physical_marker.get("offset_std_seconds"),
+              "offset_std_seconds_max": BASELINE["physical_marker_offset_std_seconds_max"],
+              "path": str(paths["physical_marker"])},
+             "stable marker offset is useful diagnosis, but large stable latency blocks readiness"),
+        gate("direct_usb_internal_integrity",
+             as_float(usb_integrity, "written_alignment_score") >=
+             BASELINE["usb_integrity_alignment_min"] and
+             as_float(usb_integrity, "consumed_alignment_score") >=
+             BASELINE["usb_integrity_alignment_min"] and
+             as_float(usb_integrity, "usb_alignment_score") >=
+             BASELINE["usb_integrity_alignment_min"] and
+             as_float(usb_integrity, "written_left_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "written_right_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "consumed_left_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "consumed_right_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "usb_left_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "usb_right_snr_db") >=
+             BASELINE["usb_integrity_snr_db_min"] and
+             as_float(usb_integrity, "usb_check_errors", 1) == 0 and
+             as_float(usb_integrity, "usb_panic_flags", 1) == 0,
+             {"path": str(paths["usb_integrity"]),
+              "written_alignment_score": usb_integrity.get("written_alignment_score"),
+              "consumed_alignment_score": usb_integrity.get("consumed_alignment_score"),
+              "usb_alignment_score": usb_integrity.get("usb_alignment_score"),
+              "written_left_snr_db": usb_integrity.get("written_left_snr_db"),
+              "written_right_snr_db": usb_integrity.get("written_right_snr_db"),
+              "consumed_left_snr_db": usb_integrity.get("consumed_left_snr_db"),
+              "consumed_right_snr_db": usb_integrity.get("consumed_right_snr_db"),
+              "usb_left_snr_db": usb_integrity.get("usb_left_snr_db"),
+              "usb_right_snr_db": usb_integrity.get("usb_right_snr_db"),
+              "usb_check_errors": usb_integrity.get("usb_check_errors"),
+              "usb_panic_flags": usb_integrity.get("usb_panic_flags")}),
+        gate("physical_decorrelated_matrix_routing",
+             physical_matrix.get("result") == "PASS" and
+             as_float(physical_matrix.get("metrics", {}), "max_wrong_source_leakage_db", 999.0) <=
+             BASELINE["physical_matrix_max_wrong_source_leakage_db_max"] and
+             as_float(physical_matrix.get("metrics", {}), "expected_floor_amplitude", 0.0) >=
+             BASELINE["physical_matrix_expected_floor_amplitude_min"] and
+             as_float(physical_matrix.get("metrics", {}), "capture_clipped_frames", 999.0) <=
+             BASELINE["music_capture_clipped_frames_max"],
+             {"path": str(paths["physical_matrix"]),
+              "result": physical_matrix.get("result"),
+              "max_wrong_source_leakage_db":
+              physical_matrix.get("metrics", {}).get("max_wrong_source_leakage_db"),
+              "max_wrong_source_leakage_db_max":
+              BASELINE["physical_matrix_max_wrong_source_leakage_db_max"],
+              "expected_floor_amplitude":
+              physical_matrix.get("metrics", {}).get("expected_floor_amplitude"),
+              "expected_floor_amplitude_min":
+              BASELINE["physical_matrix_expected_floor_amplitude_min"],
+              "capture_clipped_frames":
+              physical_matrix.get("metrics", {}).get("capture_clipped_frames")}),
         gate("physical_music_quality",
              as_float(music, "quality_alignment_score") >= BASELINE["music_quality_alignment_min"] and
              music_snr >= BASELINE["music_snr_db_min"] and
@@ -364,6 +514,10 @@ def main():
     parser.add_argument("--music", default=str(DEFAULTS["music"]))
     parser.add_argument("--cpu", default=str(DEFAULTS["cpu"]))
     parser.add_argument("--physical-investigation", default=str(DEFAULTS["physical_investigation"]))
+    parser.add_argument("--physical-latency", default=str(DEFAULTS["physical_latency"]))
+    parser.add_argument("--physical-marker", default=str(DEFAULTS["physical_marker"]))
+    parser.add_argument("--usb-integrity", default=str(DEFAULTS["usb_integrity"]))
+    parser.add_argument("--physical-matrix", default=str(DEFAULTS["physical_matrix"]))
     parser.add_argument("--json-out")
     args = parser.parse_args()
 
@@ -371,7 +525,9 @@ def main():
     text = json.dumps(result, indent=2, sort_keys=True)
     print(text)
     if args.json_out:
-        Path(args.json_out).write_text(text + "\n", encoding="utf-8")
+        output_path = Path(args.json_out)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text + "\n", encoding="utf-8")
     return 0 if result["result"] == "PASS" else 1
 
 

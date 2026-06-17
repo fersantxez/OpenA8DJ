@@ -166,6 +166,9 @@ add_executable(opena8djcpp_static_policy_check
 add_executable(opena8djcpp_hardware_lock_policy_check
   tools/hardware_lock_policy_check.cpp)
 
+add_executable(opena8djcpp_packed_usb_audio_probe
+  tools/packed_usb_audio_probe.cpp)
+
 add_executable(opena8djcpp_evidence_schema_check
   tools/evidence_schema_check.cpp)
 

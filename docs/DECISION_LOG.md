@@ -3083,3 +3083,471 @@ Evidence:
 - `local-analysis/soundcheck/20260617-output-only-no-capture-optin-fillfix-irig-pairA-12s-cpp-hal/`
 - `local-analysis/physical-run-compare/20260617-output-only-no-capture-optin-fillfix-reject.json`
 - `local-analysis/runtime-isolation/after-output-only-no-capture-optin-fillfix-reject.json`
+
+## 2026-06-17: Reject Ignoring HAL Output Sample Time
+
+Decision:
+- Add `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1` as an opt-in diagnostic flag only.
+- Keep the product default at `0`.
+- Reject the flag as a product quality or CPU improvement based on locked
+  physical evidence.
+
+Reason:
+- The direct USB tool that passed Pair A matrix writes contiguous output chunks
+  with `sampleTimeValid=false`, so this was a small falsifiable HAL experiment:
+  force the HAL path to write contiguous output into `OutputTimelineRing` instead
+  of using CoreAudio `mOutputTime.mSampleTime`.
+- Offline gates still passed, and HAL candidate safety passed, but the locked
+  physical soundcheck still failed product quality:
+  `quality_alignment_score=0.963508`, SNR floor `10.20 dB`, mid/high residual
+  `1.440572/1.369361`, quiet mid noise `-35.12 dBFS`, and `32` lag jumps.
+- CPU still failed the mainline target: driver p95 `22.6%`, coreaudiod p95
+  `44.7%`.
+- Failure analysis still classifies the run as
+  `timebase_or_alignment_instability`; simple polarity/matrix/LTI corrections
+  remain insufficient.
+
+Alternatives discarded:
+- Promote contiguous HAL output writes because direct USB abs-deadline passed a
+  tone matrix: rejected because the HAL physical music run did not improve
+  quality or CPU.
+- Treat the absence of underruns/resets as success: rejected because the audible
+  quality metrics and lag-jump gate still fail.
+
+Evidence:
+- `local-analysis/physical-product/20260617-ignore-output-sample-time/hal-candidate-safety/`
+- `local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/`
+- `local-analysis/physical-run-compare/20260617-ignore-output-sample-time-reject.json`
+- `local-analysis/audio-stack-guard/after-ignore-output-sample-time-unload/`
+- `local-analysis/runtime-isolation/after-ignore-output-sample-time-unload.json`
+- `local-analysis/promotion-readiness-after-ignore-output-sample-time.json`
+
+## 2026-06-17: Reject ISO8 Queue64 Prefetch256 As Product Candidate
+
+Decision:
+- Reject the direct-like margin experiment
+  `HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64
+  HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256` as a product
+  candidate.
+- Keep the default HAL at ISO8/q8/prefetch64 until a later candidate improves
+  physical music quality and runtime CPU together.
+
+Reason:
+- Carver's direct-USB/HAL differential audit showed the direct USB matrix
+  winner had more startup/queue margin than HAL ISO8/q8, so this was the next
+  falsifiable physical experiment.
+- The locked Pair A matrix passed, proving static A routing and channel
+  separation are still healthy:
+  max wrong-source leakage `-53.079 dB`, left-to-right leakage `-58.221 dB`,
+  right-to-left leakage `-51.442 dB`, no clipping.
+- The locked Pair A/iRig music run still failed product quality:
+  `quality_alignment_score=0.966043`, SNR floor `10.15 dB`, mid/high residual
+  `1.442529/1.373910`, quiet mid noise `-34.87 dBFS`, and `25` lag jumps.
+- Compared with ISO8/q8, lag jumps improved, but high-band residual and total
+  CPU worsened. `build/physical-run-compare` reported driver p95 `23.7%` and
+  coreaudiod p95 `86.6%`.
+- Stream stats still showed no output active underruns, timeline resets, late
+  writes, elastic drops/replays, or transfer-pool fallback allocations. Clean
+  transport counters are therefore still insufficient as an audio-quality
+  readiness claim.
+
+Alternatives discarded:
+- Promote q64/prefetch256 because the channel matrix passed: rejected because
+  the music-quality and CPU gates are the product gates for audiophile use.
+- Keep increasing queue/prefetch margin blindly: rejected because this variant
+  increased resource cost and did not explain or remove the music residual.
+
+Evidence:
+- `local-analysis/physical-product/20260617-iso8q64-prefetch256/hal-candidate-safety/`
+- `local-analysis/channel-matrix/20260617-iso8q64-prefetch256-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/`
+- `local-analysis/physical-run-compare/20260617-iso8q64-prefetch256-reject.json`
+- `local-analysis/runtime-isolation/after-iso8q64-prefetch256-unload.json`
+- `local-analysis/promotion-readiness-after-iso8q64-prefetch256.json`
+
+## 2026-06-17: Keep Direct USB Music Soundcheck Diagnostic-Only
+
+Decision:
+- Add `scripts/run-direct-usb-soundcheck` and `make direct-usb-soundcheck` as
+  lock-gated diagnostic tooling only.
+- Do not use direct USB tone-matrix success as evidence that HAL music quality
+  or product readiness is solved.
+
+Reason:
+- A same-route Pair A/iRig direct USB music run with
+  `build/opena8dj-usb-play-plain-gain05`, selected Pair A, and lead `8192`
+  failed much worse than the current HAL music candidates:
+  `quality_alignment_score=0.103211`, worst-channel SNR `-24.31 dB`,
+  mid/high residual `17.114359/16.212469`, and no clipping.
+- The direct tool did complete playback and capture with Audio 8 DJ streaming:
+  `frames_written=576000`, `frames_read=567535` after playback, no queue
+  failures, and no late frames. Underruns appeared after the source ended while
+  the wrapper was still waiting for capture/drain.
+- Failure-mode analysis again classifies the run as
+  `timebase_or_alignment_instability` with unstable music-window alignment;
+  simple polarity, static matrix, memoryless nonlinear, and LTI explanations
+  are insufficient.
+- Therefore the direct USB selected-pair/lead tone result is useful for static
+  routing experiments, but not an audiophile music oracle.
+
+Alternatives discarded:
+- Treat direct USB as a fallback product path: rejected because direct music
+  quality is currently worse than HAL and fails the same objective gates.
+- Use the direct tone matrix as proof of physical route correctness for music:
+  rejected because the music run on the same iRig route fails catastrophically.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s/`
+- `local-analysis/runtime-isolation/after-direct-usb-soundcheck.json`
+
+## 2026-06-17: Formalize Physical Latency As A Promotion Blocker
+
+Decision:
+- Add a formal physical latency/alignment gate to
+  `scripts/analyze-physical-latency.py` and
+  `scripts/evaluate-promotion-readiness.py`.
+- Reject all current physical latency evidence for promotion.
+
+Reason:
+- Current physical captures can contain signal, but it appears seconds late and
+  does not align cleanly to the reference. Representative direct USB Pair A:
+  `first_energy_seconds=5.25`, `best_correlation=-0.623648`,
+  `aligned_snr_db=-7.78`, `linear_fit_snr_db=-1.74`, and
+  `linear_residual_over_capture_rms=0.773905`.
+- These values are incompatible with timecode/DVS and audiophile playback even
+  if static tone routing or offline packet gates pass.
+- Treating this as a gate prevents branch promotion from depending on memory or
+  interpretation of old logs.
+
+Alternatives discarded:
+- Continue tracking latency as a note in physical investigation only: rejected
+  because promotion readiness needs machine-checkable blockers.
+- Accept negative correlation as a simple polarity issue: rejected because the
+  absolute correlation and linear-fit SNR are also far below thresholds.
+
+Evidence:
+- `local-analysis/direct-usb-latency-separation/20260617-direct-usb-pairA-postroll8-3s/physical-latency.json`
+- `local-analysis/promotion-readiness/20260617-after-physical-latency-gate.json`
+
+## 2026-06-17: Keep Explicit Isochronous Scheduling Disabled
+
+Decision:
+- Keep `HAL_EXPLICIT_SCHED=0` as the default.
+- Add `HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1` as diagnostic-only; default remains
+  `0`.
+- Do not promote explicit scheduling or fallback scheduling as a product path.
+
+Reason:
+- Explicit scheduling without fallback fails with queue saturation:
+  `queue_failures=2805`, `qfail_last=0xe00002be`, `qfail_other=2805`,
+  `qfail_explicit=2805`, `sched_fallbacks=0`, capture RMS `0.000380`, and
+  physical music quality `0.041196`.
+- The failures are not `too-old`/`too-new`; they are host/queue saturation
+  while explicit scheduling remains active.
+- Fallback-on-queue-full reduces the failure storm:
+  `sched_fallbacks=1`, `queue_failures=135`, `qfail_explicit=1`, and
+  `frames_read=153671`.
+- Fallback still fails physical quality:
+  quality `0.005597`, SNR floor `-52.51 dB`, capture RMS `0.001699`, and
+  physical latency FAIL.
+
+Alternatives discarded:
+- Enable fallback by default: rejected because it is a recovery observation,
+  not a quality or CPU win.
+- Continue explicit scheduling lead sweeps before route/timebase proof:
+  rejected because current explicit mode cannot produce useful physical output.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260617-explicit-sched-instrumented-pairA-3s/`
+- `local-analysis/direct-usb-soundcheck/20260617-explicit-sched-fallback2-instrumented-pairA-3s/`
+- `local-analysis/runtime-isolation/20260617-after-explicit-sched-fallback2-instrumented.json`
+
+## 2026-06-17: Stable Marker Latency Is Not Enough For Readiness
+
+Decision:
+- Add deterministic marker tooling for latency probes.
+- Do not loosen physical latency or music gates based on marker offset
+  stability alone.
+
+Reason:
+- Direct USB marker capture shows a stable physical delay:
+  offset mean `4.646000s`, std `0.001237s` across four bursts after merging
+  split capture peaks.
+- The direct USB transport counters were clean (`queue_failures=0`,
+  `playback_transfers=396`, `frames_written=288000`), and iRig captured strong
+  signal without clipping.
+- A lead `0` rerun shifted only the small expected internal margin and still
+  showed a stable delayed marker: mean `4.900115s`, std `0.001250s`.
+- After subtracting the wrapper record pre-roll plus expected lead/startup
+  silence, the residual delay remains `3.780667s..4.129448s`.
+- Even after selecting the best aligned window, quality remains bad:
+  `aligned_snr_db=-2.33`, `linear_fit_snr_db=-0.64`, and
+  `linear_residual_over_capture_rms=0.732560`.
+
+Alternatives discarded:
+- Treat this as only a constant-latency compensation problem: rejected because
+  SNR and residual gates still fail after alignment.
+- Use marker success to claim route validity: rejected because the route has
+  signal but not audiophile-valid transfer quality.
+
+Evidence:
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/marker-peak-summary.json`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/physical-latency.json`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/marker-peak-summary.json`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/physical-latency.json`
+
+## 2026-06-17: Compare Internal USB Diagnostics Before Blaming Route
+
+Decision:
+- Before changing audio format, route, or scheduling again, run the same marker
+  with USB diagnostics enabled and compare internal consumed/packed buffers to
+  external iRig capture.
+- Treat C++ written/consumed/packed byte paths as cleared for the marker
+  failure until new evidence contradicts this run.
+
+Reason:
+- `lead_frames`, `target_latency`, and `startup_silence` are sub-second terms;
+  they cannot explain the residual multi-second delay.
+- If `opena8dj-output-consumed-f32.raw` or `opena8dj-output-packed-usb.raw`
+  already show the marker delayed by seconds, the bug is in our timeline,
+  packing, or queue model.
+- If internal buffers align near the reference while iRig stays delayed, the
+  fault is downstream of the software timeline: USB/device/firmware/DAC,
+  analog route, or capture path.
+- The diagnostic run produced that exact split:
+  written buffer alignment `1.000000`, consumed buffer alignment `1.000000`,
+  packed USB decode alignment `1.000000`, USB check errors `0`, but external
+  iRig marker mean `4.930875s`, std `0.001348s`, physical latency FAIL.
+
+Alternatives discarded:
+- Continue lead sweeps: rejected because lead `0` and lead `8192` both leave a
+  residual delay near four seconds after expected offsets.
+- Declare capture route broken immediately: rejected because the route has
+  strong, stable signal; internal diagnostics can narrow the boundary first.
+
+Evidence:
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/driver-diagnostics-analysis.txt`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/driver-packed-usb-analysis.txt`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/marker-peak-summary.json`
+- `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/physical-latency.json`
+- `local-analysis/runtime-isolation/20260617-after-usbdiag-marker.json`
+
+## 2026-06-17: Reject Valid Capture-Out Layout As A Latency Fix
+
+Decision:
+- Keep `OPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=0` as the default.
+- Treat `HAL_VALID_CAPTURE_OUT_LAYOUT=1` as a rejected diagnostic, not a
+  product optimization.
+
+Reason:
+- The alternate layout preserved the same failure class:
+  external marker mean `4.638750s`, std `0.001297s`, and residual after record
+  pre-roll plus expected internal lead/startup `3.773417s`.
+- Physical latency still failed:
+  `first_energy_seconds=4.85`, `best_correlation=0.565271`,
+  `aligned_snr_db=-2.99`, `linear_fit_snr_db=-3.28`, residual/capture
+  `0.824708`.
+- Physical quality also failed:
+  `quality_alignment_score=0.960473`, SNR floor `-31.75 dB`, mid/high
+  residual `38.609794/40.459687`, and right click outliers `337`.
+- Direct USB transport counters stayed clean, so this flag did not expose a
+  useful scheduling or packet-transmission win.
+
+Alternatives discarded:
+- Promote the alternate layout because it has stable markers: rejected because
+  stable delayed markers remain a blocking latency failure.
+- Continue changing channel layout before isolating the downstream boundary:
+  rejected because USB diagnostic evidence already cleared written, consumed,
+  and packed marker bytes for the default path.
+
+Evidence:
+- `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/summary.txt`
+- `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/metrics.json`
+- `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/physical-latency.json`
+- `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/marker-peak-summary.json`
+
+## 2026-06-17: Playback Profile Is Correct Control-Plane State, Not A Quality Fix
+
+Decision:
+- Make playback profile state consistent across the C++ model and tools:
+  input mode `1`, ground lifts off, software lock off, input decode off,
+  identity input source map.
+- Keep this as a control-plane correctness fix.
+- Do not treat it as an audio-quality or latency fix.
+
+Reason:
+- Before the change, direct USB diagnostics showed playback markers running
+  with device control bytes `00:02:03:01:02:01`; the offline playback profile
+  contract expected disabled decode and CAIAQ input mode `1`.
+- The forced playback-profile run confirmed the new state was applied before
+  streaming: `01:02:03:00:02:00`.
+- The physical marker still failed:
+  `offset_mean_seconds=4.667208`, std `0.001308`, and residual after record
+  pre-roll plus expected internal lead/startup `3.807208s`.
+- Physical latency still failed:
+  `first_energy_seconds=4.9`, `best_correlation=-0.318510`,
+  `aligned_snr_db=-4.36`, `linear_fit_snr_db=-9.47`, residual/capture
+  `0.947840`.
+- Transport stayed clean (`queue_failures=0`), so this is not a queue failure
+  fix either.
+
+Alternatives discarded:
+- Revert the control-plane fix because it did not improve physical sound:
+  rejected because the control contract is still more coherent and better for
+  future DVS/timecode modes.
+- Promote playback-profile direct USB as a candidate: rejected because all
+  physical latency and music-quality gates still fail.
+
+Evidence:
+- `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/play.log`
+- `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/summary.txt`
+- `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+- `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+
+## 2026-06-17: Alt0 Before Alt1 Improves Marker Latency But Does Not Clear Quality
+
+Decision:
+- Keep `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1=0` as default.
+- Treat alt0-before-alt1 as the leading USB state-reset candidate for the next
+  music and A/B tests.
+- Do not claim readiness or promote the candidate yet.
+
+Reason:
+- With `HAL_SELECT_ALT0_BEFORE_ALT1=1` and forced playback profile, diagnostics
+  confirm the candidate was active: `select_alt0_before_alt1=1`.
+- Marker latency improved from the previous `4.6..4.9s` family to
+  `offset_mean_seconds=0.405589`, std `0.001256`, and first energy `0.65s`.
+- Transport counters stayed clean:
+  `queue_failures=0`, `playback_transfers=396`, `frames_written=288000`,
+  `frames_read=304118`.
+- The signal is still not physically valid:
+  `best_correlation=0.414578`, `aligned_snr_db=-3.99`,
+  `linear_fit_snr_db=-6.76`, residual/capture `0.908807`.
+- Soundcheck quality still failed:
+  `quality_alignment_score=0.858726`, SNR floor `-14.49 dB`, mid/high
+  residual `5.086371/4.926583`.
+
+Alternatives discarded:
+- Promote alt0-before-alt1 immediately: rejected because marker latency is only
+  one gate and physical quality remains far below threshold.
+- Ignore alt0 because quality still fails: rejected because it is the first
+  candidate to materially remove the multi-second marker delay and therefore
+  narrows the state-reset boundary.
+
+Evidence:
+- `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/play.log`
+- `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/summary.txt`
+- `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+- `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+
+## 2026-06-17: Reject Alt0 Before Alt1 As A Complete Product Fix
+
+Decision:
+- Do not promote alt0-before-alt1 to default/product yet.
+- Keep it as a partial state-reset improvement for marker latency.
+- Continue quality investigation on real music and same-day A/B evidence.
+
+Reason:
+- The real-music run confirmed the candidate was active:
+  `select_alt0_before_alt1=1` and playback control `01:02:03:00:02:00`.
+- Transport counters stayed clean:
+  `queue_failures=0`, `playback_transfers=771`, `frames_written=576000`,
+  `frames_read=592208`.
+- Real music still failed badly:
+  `quality_alignment_score=0.103674`, SNR floor `-24.25 dB`, mid/high
+  residual `16.213903/15.560684`, no clipping.
+- Failure-mode analysis still points to timebase/alignment instability and
+  rejects simple LR mix/polarity or memoryless nonlinearity as sufficient.
+
+Alternatives discarded:
+- Treat marker latency PASS as product readiness: rejected because music
+  quality is the stronger user-facing gate.
+- Revert all alt0 work: rejected because it remains the first evidence-backed
+  fix for gross marker delay and should inform the eventual state-reset model.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/play.log`
+- `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/summary.txt`
+- `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/metrics.json`
+- `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/failure-modes.json`
+- `local-analysis/runtime-isolation/20260617-after-alt0-music.json`
+
+## 2026-06-17: Fix Continuous Output Timeline Future-Gap Reset
+
+Decision:
+- Change `OutputTimelineWrite` so a continuous write at
+  `ring->maxWrittenFrame + 1` does not trigger the future-gap reset solely
+  because the producer is more than half a ring ahead of the reader.
+- Keep reset behavior for stale writes and discontinuous future writes.
+- Do not promote the candidate yet.
+
+Reason:
+- USB diagnostics on the failing alt0/playback-profile music run showed a real
+  mid-music timeline reset at write frame `162048`.
+- That reset produced startup-silence/underrun gaps beginning around served
+  frame `145600`, explaining why short packet probes passed while 12-second
+  music failed badly.
+- After the fix, written, consumed, and packed USB diagnostics are perfect for
+  the 12-second music run: alignment `1.000000`, lag `0`, SNR `999.00 dB`,
+  USB `check_errors=0`, USB `panic_flags=0`.
+- The physical iRig music gate improved materially but still fails:
+  quality `0.957628`, SNR floor `9.38 dB`, mid/high residual
+  `1.422297/1.413835`.
+
+Alternatives discarded:
+- Increase ring size only: rejected as a blunt mitigation. The reset predicate
+  itself was wrong for continuous writes.
+- Treat internal USB perfection as product readiness: rejected because physical
+  capture, CPU, same-day mainline comparison, and Traktor/timecode gates still
+  fail or remain unproven.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s-usbdiag2/driver-capture-analysis-explicit-usb-12s.txt`
+- `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/driver-capture-analysis-explicit-usb-12s.txt`
+- `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/metrics.json`
+- `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/metrics-timewarp.json`
+- `local-analysis/promotion-readiness/20260617-after-continuous-reset-fix.json`
+
+## 2026-06-17: Accept Direct USB Pair A Routing Evidence, Reject Promotion
+
+Decision:
+- Accept the decorrelated direct USB fixture as evidence that the current
+  direct USB data plane and physical Pair A routing can be clean for one
+  controlled fixture.
+- Do not treat that as product readiness, sound-quality superiority, or branch
+  promotion evidence.
+- Keep C++ off `main` and keep C mainline out of `Legacy` until product HAL
+  quality, CPU, and timecode gates beat mainline under comparable conditions.
+
+Reason:
+- The decorrelated fixture removes the ambiguous alignment problem seen with
+  dense/repetitive music.
+- Internal diagnostics are perfect for the run: written, consumed, and packed
+  USB output all align at `1.000000`, lag `0`, SNR `999.00 dB`, with
+  `check_errors=0` and `panic_flags=0`.
+- The physical Pair A tone matrix passes with
+  `max_wrong_source_leakage_db=-57.447168`, `left_to_right=-61.527228`, and
+  `right_to_left=-55.793274`, proving no basic Pair A deck leakage in this
+  direct USB diagnostic route.
+- The full captured waveform still fails the audiophile gate:
+  `quality_alignment_score=0.721193`, SNR floor `-2.96 dB`, mid/high residual
+  `2.117458/2.018361`, and quiet mid-band noise `-21.77 dBFS`.
+- Promotion readiness remains `FAIL` and `branch_promotion_allowed=false`.
+
+Alternatives discarded:
+- Promote because routing passed: rejected because routing/crosstalk is only one
+  functional gate and waveform quality still fails badly.
+- Blame the C++ packet/data plane for this specific run: rejected because the
+  written, consumed, and packed USB buffers match the reference exactly.
+- Claim this beats mainline: rejected because the measurement is direct USB
+  diagnostic evidence, not a same-day product HAL A/B against mainline with CPU
+  and timecode coverage.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/driver-diagnostics-analysis.txt`
+- `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json`
+- `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/metrics.json`
+- `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/linear-matrix.json`
+- `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-response-compensation.json`
+- `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
+- `local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`

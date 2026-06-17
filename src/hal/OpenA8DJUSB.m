@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -123,6 +124,9 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 
 #ifndef OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING
 #define OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING 0
+#endif
+#ifndef OPENA8DJ_EXPLICIT_SCHED_FALLBACK_ON_QUEUE_FAILURE
+#define OPENA8DJ_EXPLICIT_SCHED_FALLBACK_ON_QUEUE_FAILURE 0
 #endif
 
 #ifndef OPENA8DJ_ENABLE_ELASTIC_OUTPUT
@@ -277,6 +281,7 @@ enum {
     kDiagnosticEventMaxCount = 262144
 };
 static const uint64_t kDiagnosticPackedMaxBytes = (uint64_t)kDiagnosticCaptureMaxFrames * kStreams * kBytesPerSampleUSB;
+static const char *kDefaultDiagnosticDir = "/tmp";
 #endif
 
 enum {
@@ -452,6 +457,14 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackScheduleTooNew;
     uint64_t playbackScheduleOutOfWindow;
     uint64_t playbackScheduleFallbacks;
+    uint64_t playbackQueueFailureLastStatus;
+    uint64_t playbackQueueFailureNoError;
+    uint64_t playbackQueueFailureTooOld;
+    uint64_t playbackQueueFailureTooNew;
+    uint64_t playbackQueueFailureOther;
+    uint64_t playbackQueueFailureExplicit;
+    uint64_t playbackQueueFailureConsumedFrames;
+    uint64_t playbackQueueFailureStartupSilenceFrames;
     uint64_t inputCheckErrors;
     uint64_t outputPanicFlags;
     double outputPeak;
@@ -1370,11 +1383,13 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
     if (!ring->hasWritten) {
         OutputTimelineResetLocked(ring, startFrame, startLatencyFrames);
     } else {
+        int64_t continuousFrame = ring->maxWrittenFrame + 1;
+        bool continuousWrite = startFrame == continuousFrame;
         int64_t lastFrame = startFrame + (int64_t)frameCount - 1;
         int64_t staleGap = ring->readFrame - lastFrame;
         int64_t futureGap = startFrame - ring->readFrame;
         if (staleGap > 0 ||
-            futureGap > (int64_t)ring->capacityFrames / 2) {
+            (!continuousWrite && futureGap > (int64_t)ring->capacityFrames / 2)) {
             uint32_t preroll = restartLatencyFrames > 0 ? restartLatencyFrames : startLatencyFrames;
             OutputTimelineResetLocked(ring, startFrame, preroll);
             resetCount = 1;
@@ -1782,6 +1797,8 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 - (BOOL)queuePlaybackTransfer;
 - (BOOL)queueCapturePacedPlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
 - (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
+- (void)recordPlaybackQueueFailureStatus:(IOReturn)status
+                              outputStats:(const OpenA8DJOutputFillStats *)outputStats;
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
@@ -2248,6 +2265,25 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 }
 
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
+static const char *OpenA8DJDiagnosticDir(void)
+{
+    const char *dir = getenv("OPENA8DJ_DIAGNOSTIC_DIR");
+    if (dir != NULL && dir[0] != '\0') {
+        return dir;
+    }
+    return kDefaultDiagnosticDir;
+}
+
+static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *filename)
+{
+    if (buffer == NULL || bufferSize == 0 || filename == NULL) {
+        return false;
+    }
+    const char *dir = OpenA8DJDiagnosticDir();
+    const int written = snprintf(buffer, bufferSize, "%s/%s", dir, filename);
+    return written > 0 && (size_t)written < bufferSize;
+}
+
 - (void)openDiagnosticCapture
 {
     pthread_mutex_lock(&_diagnosticMutex);
@@ -2271,16 +2307,32 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     _diagnosticPackedOutputBytes = 0;
     _diagnosticPackedOutputDroppedBytes = 0;
     atomic_store(&_diagnosticEventCount, 0);
-    FILE *meta = fopen("/tmp/opena8dj-output-capture.txt", "w");
+    (void)mkdir(OpenA8DJDiagnosticDir(), 0755);
+    char metaPath[1024];
+    char inputLoopbackPath[1024];
+    char inputPackedPath[1024];
+    char outputPackedPath[1024];
+    char eventsPath[1024];
+    const bool pathsReady =
+        OpenA8DJDiagnosticPath(metaPath, sizeof(metaPath), "opena8dj-output-capture.txt") &&
+        OpenA8DJDiagnosticPath(inputLoopbackPath, sizeof(inputLoopbackPath), "opena8dj-input-loopback-f32.raw") &&
+        OpenA8DJDiagnosticPath(inputPackedPath, sizeof(inputPackedPath), "opena8dj-input-packed-usb.raw") &&
+        OpenA8DJDiagnosticPath(outputPackedPath, sizeof(outputPackedPath), "opena8dj-output-packed-usb.raw") &&
+        OpenA8DJDiagnosticPath(eventsPath, sizeof(eventsPath), "opena8dj-output-events.tsv");
+    FILE *meta = pathsReady ? fopen(metaPath, "w") : NULL;
     if (meta != NULL) {
         fprintf(meta,
                 "sample_rate=%.0f\nchannels=%u\nformat=f32le-interleaved\n"
-                "input_loopback_file=/tmp/opena8dj-input-loopback-f32.raw\n"
-                "input_packed_usb_file=/tmp/opena8dj-input-packed-usb.raw\n"
-                "packed_usb_file=/tmp/opena8dj-output-packed-usb.raw\n"
-                "events_file=/tmp/opena8dj-output-events.tsv\n",
+                "input_loopback_file=%s\n"
+                "input_packed_usb_file=%s\n"
+                "packed_usb_file=%s\n"
+                "events_file=%s\n",
                 _sampleRate,
-                (unsigned)kChannels);
+                (unsigned)kChannels,
+                inputLoopbackPath,
+                inputPackedPath,
+                outputPackedPath,
+                eventsPath);
         fclose(meta);
     }
     pthread_mutex_unlock(&_diagnosticMutex);
@@ -2388,7 +2440,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 {
     pthread_mutex_lock(&_diagnosticMutex);
     if (_diagnosticWrittenBuffer != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-output-written-f32.raw", "wb");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-output-written-f32.raw") ? fopen(path, "wb") : NULL;
         if (file != NULL) {
             fwrite(_diagnosticWrittenBuffer,
                    sizeof(float) * kChannels,
@@ -2400,7 +2453,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _diagnosticWrittenBuffer = NULL;
     }
     if (_diagnosticConsumedBuffer != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-output-consumed-f32.raw", "wb");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-output-consumed-f32.raw") ? fopen(path, "wb") : NULL;
         if (file != NULL) {
             fwrite(_diagnosticConsumedBuffer,
                    sizeof(float) * kChannels,
@@ -2412,7 +2466,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _diagnosticConsumedBuffer = NULL;
     }
     if (_diagnosticInputBuffer != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-input-loopback-f32.raw", "wb");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-input-loopback-f32.raw") ? fopen(path, "wb") : NULL;
         if (file != NULL) {
             fwrite(_diagnosticInputBuffer,
                    sizeof(float) * kChannels,
@@ -2424,7 +2479,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _diagnosticInputBuffer = NULL;
     }
     if (_diagnosticPackedInputBuffer != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-input-packed-usb.raw", "wb");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-input-packed-usb.raw") ? fopen(path, "wb") : NULL;
         if (file != NULL) {
             fwrite(_diagnosticPackedInputBuffer,
                    sizeof(uint8_t),
@@ -2436,7 +2492,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _diagnosticPackedInputBuffer = NULL;
     }
     if (_diagnosticPackedOutputBuffer != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-output-packed-usb.raw", "wb");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-output-packed-usb.raw") ? fopen(path, "wb") : NULL;
         if (file != NULL) {
             fwrite(_diagnosticPackedOutputBuffer,
                    sizeof(uint8_t),
@@ -2453,7 +2510,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         eventWriteCount = kDiagnosticEventMaxCount;
     }
     if (_diagnosticEvents != NULL) {
-        FILE *file = fopen("/tmp/opena8dj-output-events.tsv", "w");
+        char path[1024];
+        FILE *file = OpenA8DJDiagnosticPath(path, sizeof(path), "opena8dj-output-events.tsv") ? fopen(path, "w") : NULL;
         if (file != NULL) {
             fprintf(file, "index\ttype\ttimeline\thost_time\tframe_number\tcount\tflags\tvalue\textra\n");
             for (unsigned long long index = 0; index < eventWriteCount; index++) {
@@ -2475,7 +2533,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         free(_diagnosticEvents);
         _diagnosticEvents = NULL;
     }
-    FILE *meta = fopen("/tmp/opena8dj-output-capture.txt", "a");
+    char metaPath[1024];
+    FILE *meta = OpenA8DJDiagnosticPath(metaPath, sizeof(metaPath), "opena8dj-output-capture.txt") ? fopen(metaPath, "a") : NULL;
     if (meta != NULL) {
         fprintf(meta,
                 "written_frames=%llu\nconsumed_frames=%llu\ninput_loopback_frames=%llu\n"
@@ -2796,6 +2855,22 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     (void)[self writeControls];
 }
 
+- (BOOL)applyPlaybackProfileDefaults
+{
+    pthread_mutex_lock(&_ep1Mutex);
+    _controlState[0] = 1;
+    _controlState[3] &= ~(uint8_t)0x07;
+    _controlState[5] &= ~(uint8_t)(1u << 0);
+    pthread_mutex_unlock(&_ep1Mutex);
+    atomic_store(&_inputDecodeEnabled, false);
+    atomic_store(&_inputDecodeActive, false);
+    atomic_store(&_inputSwapMask, 0);
+    atomic_store(&_inputInvertLeftMask, 0);
+    atomic_store(&_inputInvertRightMask, 0);
+    atomic_store(&_inputSourceMap, kInputSourceIdentityMap);
+    return [self writeControls];
+}
+
 - (BOOL)writeControls
 {
     uint8_t state[kA8DJControlStateBytes];
@@ -2850,6 +2925,15 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         USBTrace("open interface failed: %s", NSErrorText(error));
         return NO;
     }
+
+#if OPENA8DJ_SELECT_ALT0_BEFORE_ALT1
+    error = nil;
+    if (![_interface selectAlternateSetting:0 error:&error]) {
+        USBTrace("select alt0 diagnostic failed: %s", NSErrorText(error));
+    } else {
+        USBTrace("select alt0 diagnostic ok");
+    }
+#endif
 
     error = nil;
     if (![_interface selectAlternateSetting:kAlternateSetting error:&error]) {
@@ -2992,6 +3076,31 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     pthread_mutex_lock(&_streamStatsMutex);
     uint64_t *counter = (uint64_t *)((uint8_t *)&_streamStats + offset);
     *counter += value;
+    pthread_mutex_unlock(&_streamStatsMutex);
+}
+
+- (void)recordPlaybackQueueFailureStatus:(IOReturn)status
+                              outputStats:(const OpenA8DJOutputFillStats *)outputStats
+{
+    pthread_mutex_lock(&_streamStatsMutex);
+    _streamStats.playbackQueueFailures++;
+    _streamStats.playbackQueueFailureLastStatus = (uint64_t)(uint32_t)status;
+    if (status == kIOReturnSuccess) {
+        _streamStats.playbackQueueFailureNoError++;
+    } else if (status == kIOReturnIsoTooOld) {
+        _streamStats.playbackQueueFailureTooOld++;
+    } else if (status == kIOReturnIsoTooNew) {
+        _streamStats.playbackQueueFailureTooNew++;
+    } else {
+        _streamStats.playbackQueueFailureOther++;
+    }
+    if (atomic_load(&_playbackUseExplicitScheduling)) {
+        _streamStats.playbackQueueFailureExplicit++;
+    }
+    if (outputStats != NULL) {
+        _streamStats.playbackQueueFailureConsumedFrames += outputStats->framesRead;
+        _streamStats.playbackQueueFailureStartupSilenceFrames += outputStats->startupSilenceFrames;
+    }
     pthread_mutex_unlock(&_streamStatsMutex);
 }
 
@@ -3628,7 +3737,21 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     diagnostics.outputTimelineResets = stats.outputTimelineResets;
     diagnostics.outputLateWriteFrames = stats.outputLateWriteFrames;
     diagnostics.outputLateWriteBatches = stats.outputLateWriteBatches;
+    diagnostics.playbackNextFrameNumber = stats.playbackNextFrameNumber;
+    diagnostics.playbackScheduleResets = stats.playbackScheduleResets;
+    diagnostics.playbackScheduleTooOld = stats.playbackScheduleTooOld;
+    diagnostics.playbackScheduleTooNew = stats.playbackScheduleTooNew;
+    diagnostics.playbackScheduleOutOfWindow = stats.playbackScheduleOutOfWindow;
+    diagnostics.playbackScheduleFallbacks = stats.playbackScheduleFallbacks;
     diagnostics.playbackQueueFailures = stats.playbackQueueFailures;
+    diagnostics.playbackQueueFailureLastStatus = stats.playbackQueueFailureLastStatus;
+    diagnostics.playbackQueueFailureNoError = stats.playbackQueueFailureNoError;
+    diagnostics.playbackQueueFailureTooOld = stats.playbackQueueFailureTooOld;
+    diagnostics.playbackQueueFailureTooNew = stats.playbackQueueFailureTooNew;
+    diagnostics.playbackQueueFailureOther = stats.playbackQueueFailureOther;
+    diagnostics.playbackQueueFailureExplicit = stats.playbackQueueFailureExplicit;
+    diagnostics.playbackQueueFailureConsumedFrames = stats.playbackQueueFailureConsumedFrames;
+    diagnostics.playbackQueueFailureStartupSilenceFrames = stats.playbackQueueFailureStartupSilenceFrames;
     diagnostics.playbackQueueBytesMin = stats.playbackQueueBytesMin;
     diagnostics.playbackQueueBytesMax = stats.playbackQueueBytesMax;
     diagnostics.playbackQueueBytesSum = stats.playbackQueueBytesSum;
@@ -3646,6 +3769,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     diagnostics.playbackCompleteCountSum = stats.playbackCompleteCountSum;
     diagnostics.playbackCompleteCountSamples = stats.playbackCompleteCountSamples;
     diagnostics.cadenceExpectedTransferTicks = stats.cadenceExpectedTransferTicks;
+    diagnostics.selectAlt0BeforeAlt1 = OPENA8DJ_SELECT_ALT0_BEFORE_ALT1 ? 1 : 0;
 
     *outDiagnostics = diagnostics;
     return YES;
@@ -5373,8 +5497,13 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_fetch_add(&_cadenceDiagnostics.playbackQueueAttempts, 1);
 #endif
     if (atomic_load(&_playbackTransfersInFlight) >= kPlaybackQueueMax) {
-        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackQueueFailures)
-                               value:1];
+        [self recordPlaybackQueueFailureStatus:kIOReturnNoResources
+                                   outputStats:NULL];
+#if OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING && OPENA8DJ_EXPLICIT_SCHED_FALLBACK_ON_QUEUE_FAILURE
+        if (atomic_load(&_playbackUseExplicitScheduling)) {
+            [self disableExplicitPlaybackScheduling];
+        }
+#endif
         return NO;
     }
 
@@ -5461,9 +5590,15 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     if (!queued) {
         atomic_fetch_sub(&_playbackTransfersInFlight, 1);
         [self releasePooledTransfer:transfer];
-        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackQueueFailures)
-                               value:1];
-        [self recordPlaybackScheduleStatus:error != nil ? (IOReturn)error.code : kIOReturnError];
+        IOReturn status = error != nil ? (IOReturn)error.code : kIOReturnSuccess;
+        [self recordPlaybackQueueFailureStatus:status
+                                   outputStats:&outputStats];
+        [self recordPlaybackScheduleStatus:status];
+#if OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING && OPENA8DJ_EXPLICIT_SCHED_FALLBACK_ON_QUEUE_FAILURE
+        if (atomic_load(&_playbackUseExplicitScheduling)) {
+            [self disableExplicitPlaybackScheduling];
+        }
+#endif
 #if OPENA8DJ_ENABLE_TRACE
         _debugPlaybackQueueFailures++;
 #endif
@@ -5865,6 +6000,17 @@ void OpenA8DJUSBSetInputDecodeActive(bool active)
     if (engine != nil) {
         [engine setInputDecodeActive:active ? YES : NO];
     }
+}
+
+bool OpenA8DJUSBApplyPlaybackProfile(void)
+{
+    pthread_mutex_lock(&gEngineMutex);
+    OpenA8DJUSBEngine *engine = gEngine;
+    pthread_mutex_unlock(&gEngineMutex);
+    if (engine == nil) {
+        return false;
+    }
+    return [engine applyPlaybackProfileDefaults];
 }
 
 void OpenA8DJUSBStop(void)

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <stdatomic.h>
 #include <unistd.h>
+#include <time.h>
 
 typedef struct RecorderState {
     int fd;
@@ -17,10 +18,19 @@ typedef struct RecorderState {
     UInt32 leftChannel;
     UInt32 rightChannel;
     UInt64 framesWritten;
+    atomic_ullong startNsec;
+    atomic_ullong firstCallbackNsec;
     double squareSum;
     double peak;
     UInt64 clipped;
 } RecorderState;
+
+static uint64_t MonotonicNsec(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000000ull) + (uint64_t)ts.tv_nsec;
+}
 
 static int16_t ClampS16(float sample, UInt64 *clipped)
 {
@@ -301,6 +311,9 @@ static OSStatus IOProc(AudioObjectID inDevice,
     if (state == NULL || state->fd < 0 || inInputData == NULL || !atomic_load(&state->active)) {
         return kAudioHardwareNoError;
     }
+    uint64_t expected = 0;
+    uint64_t now = MonotonicNsec();
+    atomic_compare_exchange_strong(&state->firstCallbackNsec, &expected, now);
 
     UInt32 frameCount = InputFrameCount(inInputData);
     int16_t converted[4096 * 2];
@@ -463,6 +476,8 @@ int main(int argc, char **argv)
     state.leftChannel = leftChannel;
     state.rightChannel = rightChannel;
     atomic_init(&state.active, true);
+    atomic_init(&state.startNsec, 0);
+    atomic_init(&state.firstCallbackNsec, 0);
 
     AudioDeviceIOProcID ioProcID = NULL;
     status = AudioDeviceCreateIOProcID(device, IOProc, &state, &ioProcID);
@@ -473,6 +488,7 @@ int main(int argc, char **argv)
         if (uid != NULL) CFRelease(uid);
         return 10;
     }
+    atomic_store(&state.startNsec, MonotonicNsec());
     status = AudioDeviceStart(device, ioProcID);
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);
@@ -497,7 +513,12 @@ int main(int argc, char **argv)
     if (state.framesWritten > 0) {
         rms = sqrt(state.squareSum / ((double)state.framesWritten * 2.0));
     }
-    printf("recorded path=%s seconds=%d device=\"%s\" uid=\"%s\" rate=%.0f channels=%u,%u frames=%llu rms=%.8f peak=%.8f clipped=%llu\n",
+    uint64_t startNsec = atomic_load(&state.startNsec);
+    uint64_t firstCallbackNsec = atomic_load(&state.firstCallbackNsec);
+    double firstCallbackSeconds = firstCallbackNsec > startNsec ?
+        (double)(firstCallbackNsec - startNsec) / 1000000000.0 :
+        -1.0;
+    printf("recorded path=%s seconds=%d device=\"%s\" uid=\"%s\" rate=%.0f channels=%u,%u frames=%llu rms=%.8f peak=%.8f clipped=%llu first_callback_seconds=%.6f\n",
            argv[2],
            seconds,
            nameBuffer,
@@ -508,7 +529,8 @@ int main(int argc, char **argv)
            state.framesWritten,
            rms,
            state.peak,
-           state.clipped);
+           state.clipped,
+           firstCallbackSeconds);
 
     if (name != NULL) {
         CFRelease(name);

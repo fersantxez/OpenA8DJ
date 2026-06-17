@@ -124,6 +124,14 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackScheduleTooNew;
     uint64_t playbackScheduleOutOfWindow;
     uint64_t playbackScheduleFallbacks;
+    uint64_t playbackQueueFailureLastStatus;
+    uint64_t playbackQueueFailureNoError;
+    uint64_t playbackQueueFailureTooOld;
+    uint64_t playbackQueueFailureTooNew;
+    uint64_t playbackQueueFailureOther;
+    uint64_t playbackQueueFailureExplicit;
+    uint64_t playbackQueueFailureConsumedFrames;
+    uint64_t playbackQueueFailureStartupSilenceFrames;
     uint64_t inputCheckErrors;
     uint64_t outputPanicFlags;
     double outputPeak;
@@ -445,7 +453,13 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         strcmp(name, "output-only") == 0 ||
         strcmp(name, "spotify") == 0 ||
         strcmp(name, "vlc") == 0) {
+        state->inputMode = 1;
+        state->gndLiftTCVinyl = 0;
+        state->gndLiftTCCDLine = 0;
+        state->gndLiftPhono = 0;
+        state->softwareLock = 0;
         state->inputDecodeEnabled = 0;
+        ResetInputTransforms(state);
         return true;
     }
     if (strcmp(name, "timecode-vinyl") == 0 || strcmp(name, "tc-vinyl") == 0) {
@@ -1110,6 +1124,17 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->playbackScheduleTooNew,
            (unsigned long long)stats->playbackScheduleOutOfWindow,
            (unsigned long long)stats->playbackScheduleFallbacks);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, playbackQueueFailureStartupSilenceFrames)) {
+        printf("  scheduling-failures:    last=0x%08llx no-error=%llu too-old=%llu too-new=%llu other=%llu explicit=%llu consumed=%llu startup-silence=%llu\n",
+               (unsigned long long)stats->playbackQueueFailureLastStatus,
+               (unsigned long long)stats->playbackQueueFailureNoError,
+               (unsigned long long)stats->playbackQueueFailureTooOld,
+               (unsigned long long)stats->playbackQueueFailureTooNew,
+               (unsigned long long)stats->playbackQueueFailureOther,
+               (unsigned long long)stats->playbackQueueFailureExplicit,
+               (unsigned long long)stats->playbackQueueFailureConsumedFrames,
+               (unsigned long long)stats->playbackQueueFailureStartupSilenceFrames);
+    }
     double captureDeltaAvg = stats->captureCompletionDeltaSamples > 0 ?
         (double)stats->captureCompletionDeltaSum / (double)stats->captureCompletionDeltaSamples : 0.0;
     double playbackDeltaAvg = stats->playbackCompletionDeltaSamples > 0 ?
@@ -1297,6 +1322,14 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackPayloadGuardMismatches) ?
                                 stats->playbackPayloadGuardMismatches : 0));
     printf("playbackScheduleErrors=%llu\n", (unsigned long long)playbackScheduleErrors);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, playbackQueueFailureStartupSilenceFrames)) {
+        printf("playbackQueueFailureConsumedFrames=%llu\n",
+               (unsigned long long)stats->playbackQueueFailureConsumedFrames);
+        printf("playbackQueueFailureStartupSilenceFrames=%llu\n",
+               (unsigned long long)stats->playbackQueueFailureStartupSilenceFrames);
+        printf("playbackQueueFailureExplicit=%llu\n",
+               (unsigned long long)stats->playbackQueueFailureExplicit);
+    }
     printf("playbackReschedules=%llu\n", (unsigned long long)stats->playbackReschedules);
     printf("outputRingFrames=%u\n", stats->outputRingFrames);
     printf("outputFramesWritten=%llu\n", (unsigned long long)stats->outputFramesWritten);

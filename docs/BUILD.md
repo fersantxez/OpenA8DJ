@@ -445,6 +445,45 @@ the run still failed badly: `quality_alignment_score=0.183990`, SNR floor
 `-21.45 dB`, mid/high residual `17.171794/11.452494`, and coreaudiod p95
 `28.3%`.
 
+Do not use ignored HAL output sample time as a default timing profile:
+
+```sh
+make HAL_IGNORE_OUTPUT_SAMPLE_TIME=1 hal
+```
+
+This variant is buildable and useful only as a diagnostic. It forces HAL output
+cycles to write contiguous timeline frames instead of using CoreAudio
+`mOutputTime.mSampleTime`, matching the direct USB tool's write model more
+closely. The locked physical run still failed quality and CPU:
+`quality_alignment_score=0.963508`, SNR floor `10.20 dB`, mid/high residual
+`1.440572/1.369361`, `32` lag jumps, driver p95 `22.6%`, and coreaudiod p95
+`44.7%`. The default must remain `HAL_IGNORE_OUTPUT_SAMPLE_TIME=0`.
+
+Direct-like queue/prefetch margin can be built for diagnostics:
+
+```sh
+make HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64 \
+  HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256 hal
+```
+
+This variant passed Pair A channel matrix, but failed the locked physical music
+and CPU gates: `quality_alignment_score=0.966043`, SNR floor `10.15 dB`,
+mid/high residual `1.442529/1.373910`, `25` lag jumps, driver p95 `23.7%`,
+and coreaudiod p95 `86.6%`. Do not make q64/prefetch256 the default without
+new evidence that improves both real-music quality and total CPU.
+
+Explicit isochronous scheduling is diagnostic-only:
+
+```sh
+make HAL_EXPLICIT_SCHED=1 build/opena8dj-usb-play
+make HAL_EXPLICIT_SCHED=1 HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1 build/opena8dj-usb-play
+```
+
+The fallback flag is intentionally default-off. In locked physical tests it
+reduced queue-failure storming (`2805` failures down to `135`) but still failed
+physical quality and latency gates. Do not ship or promote explicit scheduling
+without new physical evidence that beats the default path.
+
 HAL bundle packaging must install the plist with explicit readable
 permissions. A stale build artifact with `Contents/Info.plist` mode `0600`
 caused CoreAudio enumeration to miss `org.opena8dj.Audio8DJ` even though USB
@@ -468,6 +507,11 @@ analysis scripts such as:
 .venv/bin/python scripts/analyze-lti-transfer-quality.py --help
 .venv/bin/python scripts/analyze-soundcheck-failure-modes.py --help
 .venv/bin/python scripts/analyze-runtime-discontinuities.py --help
+.venv/bin/python scripts/analyze-physical-latency.py --help
+.venv/bin/python scripts/prepare-latency-marker.py --help
+.venv/bin/python scripts/analyze-latency-marker-peaks.py --help
+.venv/bin/python scripts/analyze-driver-capture.py --help
+.venv/bin/python scripts/analyze-packed-usb-capture.py --help
 ```
 
 Do not install these packages globally as part of the build. They are analysis
@@ -487,6 +531,44 @@ scripts/run-soundcheck --no-monitor-stream-stats --cpu-profile ...
 Use full `--stream-stats-snapshots` runs when validating glitch counters or
 readiness. Monitor-free CPU runs are diagnostic evidence, not sufficient
 product readiness by themselves.
+
+## Direct USB Diagnostic Soundcheck
+
+The direct USB playback path can be tested against the same external iRig
+capture route without installing a HAL driver:
+
+```sh
+make direct-usb-soundcheck SOUNDCHECK_CAPTURE="iRig Stream" SOUNDCHECK_SECONDS=12
+```
+
+This target uses `scripts/run-direct-usb-soundcheck`, acquires the global
+hardware lock, and does not change default devices, install drivers, reset USB,
+or restart CoreAudio. It is diagnostic-only. By default it uses
+`build/opena8dj-usb-play`, the direct USB tool built with the current HAL
+transport flags. A first Pair A control run with the older
+`opena8dj-usb-play-plain-gain05` variant and lead `8192` failed real-music
+quality hard (`quality_alignment_score=0.103211`, worst-channel SNR
+`-24.31 dB`, mid/high residual `17.114359/16.212469`); that run is useful as a
+negative control, not as the final direct-vs-HAL music comparison.
+
+For long-form USB diagnostic evidence, compare the packed USB stream across
+the same duration as the music fixture. The default USB scan is intentionally
+short for layout discovery; use `--usb-compare-seconds` for product evidence:
+
+```sh
+.venv/bin/python scripts/analyze-driver-capture.py reference.wav \
+  --usb-raw opena8dj-output-packed-usb.raw \
+  --pair A --usb-compare-seconds 12
+```
+
+The direct USB tool can force the playback control profile and collect raw USB
+diagnostics without installing a HAL:
+
+```sh
+AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" \
+  scripts/run-direct-usb-soundcheck --capture-device "iRig Stream" \
+  --pair A --playback-profile --collect-usb-diagnostics
+```
 
 ## Migration Order
 

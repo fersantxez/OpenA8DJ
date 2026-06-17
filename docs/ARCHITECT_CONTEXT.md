@@ -1181,3 +1181,158 @@ Next technical target:
     capture ISO completion pacing appears to be part of the practical playback
     timing model in this HAL path. Removing ISO IN is not a valid optimization
     unless a new transport scheduler preserves physical quality and total CPU.
+- `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1` was added and physically rejected as a
+  product behavior.
+  - Rationale:
+    direct USB abs-deadline tests write contiguous output with
+    `sampleTimeValid=false`; this tested whether HAL could gain the same benefit
+    by ignoring CoreAudio `mOutputTime.mSampleTime`.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal`.
+  - Result:
+    HAL safety PASS, physical music FAIL (`quality_alignment_score=0.963508`,
+    SNR floor `10.20 dB`, mid/high residual `1.440572/1.369361`, `32` lag
+    jumps), CPU FAIL (driver p95 `22.6%`, coreaudiod p95 `44.7%`).
+  - Final state:
+    default build restored to `OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME=0`, HAL
+    unloaded, lock absent, runtime isolation PASS.
+  - Interpretation:
+    the simple sample-time-validity difference between direct USB and HAL is
+    not sufficient. The remaining defect is still deeper timebase/transport
+    behavior or physical-route interpretation, not solved by contiguous HAL
+    timeline writes.
+- Carver's direct-like queue/prefetch experiment was tested and physically
+  rejected:
+  - Build:
+    `HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64
+    HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256`.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal`.
+  - Result:
+    Pair A matrix PASS with max wrong-source leakage about `-53.08 dB`, but
+    physical music FAIL (`quality_alignment_score=0.966043`, SNR floor
+    `10.15 dB`, mid/high residual `1.442529/1.373910`, `25` lag jumps), CPU
+    FAIL (driver p95 `23.7%`, coreaudiod p95 `86.6%`).
+  - Final state:
+    default HAL rebuilt, HAL unloaded, lock absent, runtime isolation PASS.
+  - Interpretation:
+    queue/prefetch margin can preserve static routing but does not solve the
+    audiophile gate. The next useful work must isolate the residual/continuity
+    mechanism or reduce USB/CoreAudio overhead without degrading music.
+- Added direct USB music soundcheck tooling and ran the first lock-gated Pair A
+  diagnostic:
+  - Evidence:
+    `local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s`.
+  - Result:
+    direct USB selected Pair A with `plain-gain05` and lead `8192` failed hard
+    on music (`quality_alignment_score=0.103211`, worst-channel SNR
+    `-24.31 dB`, mid/high residual `17.114359/16.212469`, no clipping).
+  - Interpretation:
+    direct USB tone-matrix success does not generalize to real music and cannot
+    be used as readiness evidence. The next product candidate must still beat
+    HAL music/CPU gates directly.
+- Physical latency is now a formal promotion gate:
+  - Current evidence fails. Representative direct USB Pair A has
+    `first_energy_seconds=5.25`, `best_correlation=-0.623648`,
+    `aligned_snr_db=-7.78`, and `linear_fit_snr_db=-1.74`.
+  - Explicit-scheduling fallback still fails: `first_energy_seconds=4.95`,
+    `best_correlation=0.029593`, and `linear_fit_snr_db=-30.81`.
+  - Promotion remains blocked regardless of offline PASS status.
+- Explicit isochronous scheduling is rejected as a product direction:
+  - Without fallback, queue saturation produces `queue_failures=2805` and
+    `qfail_explicit=2805`.
+  - With `HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1`, fallback fires once and reduces
+    queue failures to `135`, but physical quality still fails badly.
+  - Default build restored to explicit scheduling off and fallback off.
+- Direct USB marker probe:
+  - The marker route captures strong signal with stable offset:
+    mean `4.646000s`, std `0.001237s` after split-peak merging.
+  - A lead `0` rerun also captures stable delayed markers:
+    mean `4.900115s`, std `0.001250s`.
+  - After subtracting wrapper record pre-roll and expected internal
+    lead/startup silence, residual delay remains about `3.78s..4.13s`.
+  - This argues against random drift or direct-player lead as the sole
+    explanation.
+  - It does not clear readiness because best-aligned SNR and residual remain
+    poor (`aligned_snr_db=-2.33`, `linear_fit_snr_db=-0.64`,
+    residual/capture `0.732560`).
+  - USB diagnostic marker run:
+    internal written, consumed, and packed USB buffers all align perfectly to
+    reference (`alignment_score=1.000000`, lag `0`, SNR `999.00 dB`,
+    USB check errors `0`), but external iRig marker remains delayed
+    (`offset_mean=4.930875s`) and physical latency FAIL.
+  - Current boundary:
+    C++ sample timeline, consumed-buffer order, and Mode 2 packed bytes are
+    not the observed marker failure. Remaining suspects are downstream:
+    USB/device scheduling/state, Audio 8 DJ firmware/DAC interpretation,
+    analog route, or external capture path.
+  - `HAL_VALID_CAPTURE_OUT_LAYOUT=1` was tested as a direct USB marker
+    diagnostic and rejected:
+    marker mean `4.638750s`, std `0.001297s`, residual after expected offsets
+    `3.773417s`, physical latency FAIL, and physical quality FAIL with SNR
+    floor `-31.75 dB`.
+  - Forced playback-profile control state was tested and rejected as a physical
+    fix:
+    control changed from `00:02:03:01:02:01` to `01:02:03:00:02:00`, but marker
+    mean remained `4.667208s`, residual after expected offsets `3.807208s`,
+    physical latency FAIL, and physical quality FAIL.
+  - `HAL_SELECT_ALT0_BEFORE_ALT1=1` plus playback profile was tested:
+    diagnostics confirmed `select_alt0_before_alt1=1`, marker latency improved
+    to mean `0.405589s` with std `0.001256s`, and first energy was `0.65s`.
+    This is a real state-reset clue, but physical quality/linearity still FAIL:
+    `best_correlation=0.414578`, `aligned_snr_db=-3.99`,
+    `linear_fit_snr_db=-6.76`, quality `0.858726`, SNR floor `-14.49 dB`.
+  - The same alt0/playback-profile candidate was tested with real music and
+    rejected as a complete product fix:
+    quality `0.103674`, SNR floor `-24.25 dB`, mid/high residual
+    `16.213903/15.560684`, clean transport counters, no clipping.
+  - Default has been rebuilt back to `OPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=0`.
+  - Default has also been rebuilt back to
+    `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1=0`.
+  - Playback profile remains a valid control-plane consistency fix, but not a
+    readiness signal.
+- Continuous output timeline reset fix:
+  - The previous alt0/playback-profile music rejection hid a real C++ timeline
+    defect. When direct USB writes were continuous but more than half a ring
+    ahead of the reader, `OutputTimelineWrite` reset the timeline and inserted
+    silence/underrun gaps in the middle of music.
+  - The reset was observed at write frame `162048`, with read anomalies
+    beginning around served frame `145600`.
+  - The reset predicate now excludes continuous writes; discontinuous future
+    writes can still reset.
+  - Post-fix 12-second direct USB diagnostics are internally perfect:
+    written, consumed, and packed USB output all align at `1.000000`, lag `0`,
+    SNR `999.00 dB`, USB check errors `0`, panic flags `0`.
+  - Physical iRig music quality improved to quality `0.957628`, SNR `9.38 dB`,
+    mid/high residual `1.422297/1.413835`, lag jumps `0`, clipping `0`.
+    This is still below audiophile thresholds and does not permit promotion.
+  - Time-warped reanalysis still fails (`quality=0.961334`, SNR `10.41 dB`,
+    mid/high residual `1.404391/1.367270`), so the remaining physical failure
+    is not only the old destructive reset.
+  - Current boundary:
+    C++ write path, consumed path, and Mode 2 packed USB are now proven clean
+    for the fixed direct-USB music run. Remaining blockers are physical
+    output/capture quality, same-day mainline A/B, runtime CPU on a fixed HAL
+    candidate, and Traktor/timecode physical validation.
+- Decorrelated direct USB Pair A fixture status:
+  - Evidence:
+    `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag`.
+  - Internal data plane PASS:
+    written, consumed, and packed USB output all align at `1.000000`, lag `0`,
+    SNR `999.00 dB`, USB `check_errors=0`, USB `panic_flags=0`.
+  - Physical Pair A routing PASS:
+    `max_wrong_source_leakage_db=-57.447168`,
+    `left_to_right_leakage_db=-61.527228`,
+    `right_to_left_leakage_db=-55.793274`, capture clipping `0`.
+  - Physical waveform quality FAIL:
+    `quality_alignment_score=0.721193`, SNR floor `-2.96 dB`, mid/high
+    residual `2.117458/2.018361`, quiet mid-band noise `-21.77 dBFS`.
+  - Readiness implication:
+    the C++ direct USB diagnostic route now has strong evidence for packet
+    correctness and Pair A routing, but it still does not prove audiophile
+    quality, product HAL CPU, or Traktor/timecode behavior.
+  - Current next objective:
+    get same-day mainline-vs-C++ product HAL A/B evidence with the same
+    validated capture route, plus fixed-candidate CPU and timecode evidence.
+    Until that exists, do not move C++ to `main` and do not move C mainline to
+    `Legacy`.

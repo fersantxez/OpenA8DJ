@@ -61,7 +61,21 @@ typedef struct OpenA8DJUSBDiagnostics {
     uint64_t outputTimelineResets;
     uint64_t outputLateWriteFrames;
     uint64_t outputLateWriteBatches;
+    uint64_t playbackNextFrameNumber;
+    uint64_t playbackScheduleResets;
+    uint64_t playbackScheduleTooOld;
+    uint64_t playbackScheduleTooNew;
+    uint64_t playbackScheduleOutOfWindow;
+    uint64_t playbackScheduleFallbacks;
     uint64_t playbackQueueFailures;
+    uint64_t playbackQueueFailureLastStatus;
+    uint64_t playbackQueueFailureNoError;
+    uint64_t playbackQueueFailureTooOld;
+    uint64_t playbackQueueFailureTooNew;
+    uint64_t playbackQueueFailureOther;
+    uint64_t playbackQueueFailureExplicit;
+    uint64_t playbackQueueFailureConsumedFrames;
+    uint64_t playbackQueueFailureStartupSilenceFrames;
     uint64_t playbackQueueBytesMin;
     uint64_t playbackQueueBytesMax;
     uint64_t playbackQueueBytesSum;
@@ -79,6 +93,7 @@ typedef struct OpenA8DJUSBDiagnostics {
     uint64_t playbackCompleteCountSum;
     uint64_t playbackCompleteCountSamples;
     uint64_t cadenceExpectedTransferTicks;
+    uint8_t selectAlt0BeforeAlt1;
 } OpenA8DJUSBDiagnostics;
 
 bool OpenA8DJUSBStart(double sampleRate);
@@ -90,6 +105,7 @@ void OpenA8DJUSBClose(void);
 bool OpenA8DJUSBGetClockAnchor(OpenA8DJUSBClockAnchor *outAnchor);
 bool OpenA8DJUSBGetDiagnostics(OpenA8DJUSBDiagnostics *outDiagnostics);
 void OpenA8DJUSBSetInputDecodeActive(bool active);
+bool OpenA8DJUSBApplyPlaybackProfile(void);
 uint32_t OpenA8DJUSBReadInput(float *outInterleaved, uint32_t frames, uint32_t channels);
 void OpenA8DJUSBWriteOutput(const float *inInterleaved, uint32_t frames, uint32_t channels);
 void OpenA8DJUSBWriteOutputAtSampleTime(const float *inInterleaved,

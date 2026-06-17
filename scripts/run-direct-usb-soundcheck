@@ -1,0 +1,354 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+usage: scripts/run-direct-usb-soundcheck --capture-device NAME [options]
+
+Runs a lock-gated Audio 8 DJ direct USB playback soundcheck with external
+iRig capture. This does not install drivers, change default devices, reset USB,
+or restart CoreAudio. It is diagnostic evidence, not HAL readiness.
+
+Options:
+  --run-dir PATH             Evidence directory
+  --capture-device NAME      External capture device, e.g. "iRig Stream"
+  --capture-channels LIST    Capture channels, default 1,2
+  --music-file PATH          Source music file
+  --reference-wav PATH       Existing stereo PCM16 WAV reference
+  --music-dir PATH           Source music directory, default $HOME/Music
+  --pair A|B|C|D|all         Output pair, default A
+  --rate N                   Fixture sample rate, default 48000
+  --seconds N                Fixture seconds, default 12
+  --postroll-seconds N       Capture tail after playback, default 2
+  --mode MODE                Fixture mode, default dense
+  --target-peak-db DB        Fixture peak, default -16
+  --lead-frames N            Direct USB lead frames, default 8192
+  --player PATH              Direct USB player, default build/opena8dj-usb-play
+  --playback-profile         Force playback-only control bytes before stream
+  --collect-usb-diagnostics  Capture written/consumed/packed USB diagnostics
+  --skip-build               Do not build tools before running
+  -h, --help                 Show this help
+USAGE
+}
+
+repo_root() {
+  cd "$(dirname "$0")/.." && pwd
+}
+
+json_get() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import json
+import sys
+path, key = sys.argv[1], sys.argv[2]
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+print(data[key])
+PY
+}
+
+json_get_first() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import json
+import sys
+path = sys.argv[1]
+keys = sys.argv[2].split(",")
+with open(path, "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+for key in keys:
+    if key in data:
+        print(data[key])
+        break
+else:
+    print("missing")
+PY
+}
+
+json_get_snr_min() {
+  /usr/bin/python3 - "$1" <<'PY'
+import json
+import math
+import sys
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+values = []
+for key in ("snr_db_min", "snr_db", "left_snr_db", "right_snr_db"):
+    value = data.get(key)
+    if isinstance(value, (int, float)) and math.isfinite(value):
+        values.append(float(value))
+print(min(values) if values else "missing")
+PY
+}
+
+looks_virtual_capture() {
+  local lowered
+  lowered="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$lowered" in
+    *blackhole*|*soundflower*|*vb-cable*|*vbcable*|*background\ music*|*loopback\ audio*|*rogue\ amoeba\ loopback*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+root="$(repo_root)"
+python_bin="$root/.venv/bin/python"
+if [ ! -x "$python_bin" ]; then
+  python_bin="/usr/bin/python3"
+fi
+run_dir=""
+capture_device=""
+capture_channels="1,2"
+music_file=""
+reference_wav=""
+music_dir="$HOME/Music"
+pair="A"
+rate="48000"
+seconds="12"
+postroll_seconds="2"
+mode="dense"
+target_peak_db="-16"
+lead_frames="8192"
+player="build/opena8dj-usb-play"
+playback_profile=0
+collect_usb_diagnostics=0
+skip_build=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --capture-device) capture_device="$2"; shift 2 ;;
+    --capture-channels) capture_channels="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --reference-wav) reference_wav="$2"; shift 2 ;;
+    --music-dir) music_dir="$2"; shift 2 ;;
+    --pair) pair="$2"; shift 2 ;;
+    --rate) rate="$2"; shift 2 ;;
+    --seconds) seconds="$2"; shift 2 ;;
+    --postroll-seconds) postroll_seconds="$2"; shift 2 ;;
+    --mode) mode="$2"; shift 2 ;;
+    --target-peak-db) target_peak_db="$2"; shift 2 ;;
+    --lead-frames) lead_frames="$2"; shift 2 ;;
+    --player) player="$2"; shift 2 ;;
+    --playback-profile) playback_profile=1; shift ;;
+    --collect-usb-diagnostics) collect_usb_diagnostics=1; shift ;;
+    --skip-build) skip_build=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$capture_device" ]; then
+  echo "DIRECT_USB_SOUNDCHECK: BLOCKED"
+  echo "--capture-device is required"
+  exit 2
+fi
+
+if looks_virtual_capture "$capture_device"; then
+  echo "DIRECT_USB_SOUNDCHECK: BLOCKED"
+  echo "capture-device appears virtual/pre-device: $capture_device"
+  exit 2
+fi
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/direct-usb-soundcheck/$(date +%Y%m%d-%H%M%S)-pair${pair}"
+fi
+mkdir -p "$run_dir"
+fixture_dir="$run_dir/fixture"
+mkdir -p "$fixture_dir"
+driver_diag_dir="$run_dir/driver-diagnostics"
+
+if [ "$skip_build" != "1" ]; then
+  if [ "$collect_usb_diagnostics" = "1" ]; then
+    make -C "$root" HAL_DIAGNOSTIC=1 build/audio-record build/opena8dj-usb-play >/dev/null
+  else
+    make -C "$root" build/audio-record build/opena8dj-usb-play >/dev/null
+  fi
+fi
+
+if [ -n "$reference_wav" ]; then
+  reference="$reference_wav"
+  case "$reference" in
+    /*) ;;
+    *) reference="$root/$reference" ;;
+  esac
+  if [ ! -f "$reference" ]; then
+    echo "DIRECT_USB_SOUNDCHECK: BLOCKED"
+    echo "reference-wav not found: $reference"
+    exit 2
+  fi
+  fixture_reference="$fixture_dir/reference.wav"
+  if [ "$reference" != "$root/$fixture_reference" ] && [ "$reference" != "$fixture_reference" ]; then
+    cp "$reference" "$fixture_reference"
+    reference="$fixture_reference"
+  fi
+  /usr/bin/python3 - "$reference" "$fixture_dir/source.json" <<'PY'
+import json
+import sys
+reference, out = sys.argv[1], sys.argv[2]
+with open(out, "w", encoding="utf-8") as handle:
+    json.dump({"reference_wav": reference, "source_name": "reference-wav"}, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+PY
+else
+  prepare_cmd=(
+    "$root/scripts/prepare-music-fixture.py"
+    --out-dir "$fixture_dir"
+    --rate "$rate"
+    --seconds "$seconds"
+    --mode "$mode"
+    --target-peak-db "$target_peak_db"
+  )
+  if [ -n "$music_file" ]; then
+    prepare_cmd+=(--music-file "$music_file")
+  else
+    prepare_cmd+=(--music-dir "$music_dir")
+  fi
+  "${prepare_cmd[@]}" > "$run_dir/prepare.log" 2>&1
+  reference="$(json_get "$fixture_dir/source.json" reference_wav)"
+fi
+capture="$run_dir/captured.wav"
+player_path="$player"
+case "$player_path" in
+  /*) ;;
+  *) player_path="$root/$player_path" ;;
+esac
+record_seconds="$(/usr/bin/python3 - "$seconds" "$postroll_seconds" <<'PY'
+import math
+import sys
+print(int(math.ceil(float(sys.argv[1]) + float(sys.argv[2]))))
+PY
+)"
+
+# shellcheck source=scripts/hardware-lock-lib.sh
+. "$root/scripts/hardware-lock-lib.sh"
+opena8dj_acquire_hardware_lock \
+  "$root" \
+  "physical-direct-usb-soundcheck" \
+  "$run_dir" \
+  "Audio 8 DJ direct USB playback, external capture" \
+  "driver-install,HAL-install,default-device-change,USB-reset,CoreAudio-restart,system-reboot"
+trap opena8dj_release_hardware_lock EXIT
+
+"$root/scripts/audio-stack-health" --threshold 80 --total-threshold 180 > "$run_dir/audio-stack-health-before.txt" 2>&1 || {
+  echo "DIRECT_USB_SOUNDCHECK: BLOCKED"
+  echo "audio stack health preflight failed"
+  exit 3
+}
+
+"$root/build/audio-record" "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
+  > "$run_dir/record.log" 2>&1 &
+recorder_pid=$!
+sleep 0.6
+
+if [ "$collect_usb_diagnostics" = "1" ]; then
+  mkdir -p "$driver_diag_dir"
+fi
+
+set +e
+player_args=("$reference" "$pair" "$lead_frames")
+if [ "$playback_profile" = "1" ]; then
+  player_args+=(--playback-profile)
+fi
+if [ "$collect_usb_diagnostics" = "1" ]; then
+  OPENA8DJ_DIAGNOSTIC_DIR="$driver_diag_dir" "$player_path" "${player_args[@]}" > "$run_dir/play.log" 2>&1
+else
+  "$player_path" "${player_args[@]}" > "$run_dir/play.log" 2>&1
+fi
+player_rc=$?
+wait "$recorder_pid"
+recorder_rc=$?
+set -e
+
+if [ "$player_rc" -ne 0 ] || [ "$recorder_rc" -ne 0 ]; then
+  {
+    echo "DIRECT_USB_SOUNDCHECK: FAIL"
+    echo "player_rc=$player_rc"
+    echo "recorder_rc=$recorder_rc"
+    echo "run_dir=$run_dir"
+  } > "$run_dir/summary.txt"
+  exit 4
+fi
+
+analysis_py="$root/scripts/analyze-soundcheck-capture.py"
+"$python_bin" "$analysis_py" "$reference" "$capture" \
+  --max-seconds "$seconds" \
+  --max-lag 4096 \
+  --min-alignment 0.98 \
+  --min-snr-db 35 \
+  --max-clicks 0 \
+  --max-lag-jumps 0 \
+  --max-mid-band-residual-ratio 1.36 \
+  --max-high-band-residual-ratio 1.35 \
+  --max-quiet-mid-band-noise-dbfs -58 \
+  --json-out "$run_dir/metrics.json" \
+  > "$run_dir/analysis.txt" 2> "$run_dir/analysis.err" || analysis_rc=$?
+analysis_rc="${analysis_rc:-0}"
+
+"$python_bin" "$root/scripts/analyze-soundcheck-failure-modes.py" "$run_dir" \
+  --json-out "$run_dir/failure-modes.json" \
+  > "$run_dir/failure-modes.log" 2>&1 || true
+"$python_bin" "$root/scripts/analyze-lti-transfer-quality.py" "$run_dir" \
+  --json-out "$run_dir/lti-transfer-quality.json" \
+  > "$run_dir/lti-transfer-quality.log" 2>&1 || true
+
+if [ "$collect_usb_diagnostics" = "1" ]; then
+  if [ -s "$driver_diag_dir/opena8dj-output-capture.txt" ]; then
+    "$python_bin" "$root/scripts/analyze-driver-capture.py" "$reference" \
+      --written-raw "$driver_diag_dir/opena8dj-output-written-f32.raw" \
+      --consumed-raw "$driver_diag_dir/opena8dj-output-consumed-f32.raw" \
+      --usb-raw "$driver_diag_dir/opena8dj-output-packed-usb.raw" \
+      --events "$driver_diag_dir/opena8dj-output-events.tsv" \
+      --pair "$pair" \
+      --max-seconds "$seconds" \
+      --max-lag 4096 \
+      --usb-check-offset auto \
+      --usb-start-byte auto \
+      --usb-byte-order auto \
+      --usb-compare-seconds "$seconds" \
+      > "$run_dir/driver-diagnostics-analysis.txt" \
+      2> "$run_dir/driver-diagnostics-analysis.err" || true
+  else
+    echo "driver_diagnostics=missing" > "$run_dir/driver-diagnostics-analysis.txt"
+  fi
+  if [ -s "$driver_diag_dir/opena8dj-output-packed-usb.raw" ]; then
+    "$python_bin" "$root/scripts/analyze-driver-capture.py" "$reference" \
+      --usb-raw "$driver_diag_dir/opena8dj-output-packed-usb.raw" \
+      --usb-check-offset 8 \
+      --usb-start-byte 4 \
+      --pair "$pair" \
+      --max-seconds "$seconds" \
+      --usb-compare-seconds "$seconds" \
+      --max-lag 256 \
+      > "$run_dir/driver-packed-usb-analysis.txt" \
+      2> "$run_dir/driver-packed-usb-analysis.err" || true
+  else
+    echo "driver_packed_usb=missing" > "$run_dir/driver-packed-usb-analysis.txt"
+  fi
+fi
+
+quality="$(json_get "$run_dir/metrics.json" quality_alignment_score)"
+snr="$(json_get_snr_min "$run_dir/metrics.json")"
+mid="$(json_get "$run_dir/metrics.json" mid_band_residual_ratio)"
+high="$(json_get "$run_dir/metrics.json" high_band_residual_ratio)"
+lag_jumps="$(json_get "$run_dir/metrics.json" lag_jumps_gt_2_frames)"
+clipped="$(json_get "$run_dir/metrics.json" capture_clipped_frames)"
+
+{
+  echo "DIRECT_USB_SOUNDCHECK: $([ "$analysis_rc" -eq 0 ] && echo PASS || echo FAIL)"
+  echo "reference=$reference"
+  echo "capture=$capture"
+  echo "player=$player"
+  echo "pair=$pair"
+  echo "lead_frames=$lead_frames"
+  echo "playback_profile=$([ "$playback_profile" = "1" ] && echo forced || echo default)"
+  echo "usb_diagnostics=$([ "$collect_usb_diagnostics" = "1" ] && echo "$driver_diag_dir" || echo "disabled")"
+  echo "quality_alignment_score=$quality"
+  echo "snr_db_min=$snr"
+  echo "mid_band_residual_ratio=$mid"
+  echo "high_band_residual_ratio=$high"
+  echo "lag_jumps_gt_2_frames=$lag_jumps"
+  echo "capture_clipped_frames=$clipped"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/summary.txt"
+
+exit "$analysis_rc"

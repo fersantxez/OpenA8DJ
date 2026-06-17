@@ -40,6 +40,10 @@
 #define OPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP 0
 #endif
 
+#ifndef OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME
+#define OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME 0
+#endif
+
 #ifndef OPENA8DJ_BACKGROUND_WARM_OPEN
 #define OPENA8DJ_BACKGROUND_WARM_OPEN 0
 #endif
@@ -1031,6 +1035,11 @@ static UInt64 CycleCounterFromInfo(const AudioServerPlugInIOCycleInfo *cycleInfo
 
 static bool OutputSampleTimeFromInfo(const AudioServerPlugInIOCycleInfo *cycleInfo, Float64 *outSampleTime)
 {
+#if OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME
+    (void)cycleInfo;
+    (void)outSampleTime;
+    return false;
+#else
     if (cycleInfo == NULL || outSampleTime == NULL) {
         return false;
     }
@@ -1039,6 +1048,7 @@ static bool OutputSampleTimeFromInfo(const AudioServerPlugInIOCycleInfo *cycleIn
     }
     *outSampleTime = cycleInfo->mOutputTime.mSampleTime;
     return isfinite(*outSampleTime);
+#endif
 }
 
 static void FlushOutputCycle(void);
@@ -2183,6 +2193,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_DoIOOperation(AudioServerPlugInDriver
         const Float32 *output = (const Float32 *)ioMainBuffer;
         EnsureOutputCycle(inIOBufferFrameSize, inIOCycleInfo);
         CopyClientOutputToOutput(StreamIndex(inStreamObjectID), output);
+        if (OutputCycleHasExpectedStreams()) {
+            FlushOutputCycle();
+        }
         return kAudioHardwareNoError;
     }
     return kAudioHardwareNoError;
@@ -2198,7 +2211,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_EndIOOperation(AudioServerPlugInDrive
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
-    if (inOperationID == kAudioServerPlugInIOOperationWriteMix && OutputCycleHasExpectedStreams()) {
+    if (inOperationID == kAudioServerPlugInIOOperationWriteMix &&
+        (OutputCycleHasExpectedStreams() || gOutputCycleCounter == 0)) {
         FlushOutputCycle();
     }
     return kAudioHardwareNoError;

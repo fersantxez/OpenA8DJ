@@ -502,7 +502,13 @@ def select_usb_decode(data, args, ref, rate, pair_index):
             score = -1.0
             if len(pair) > rate // 2:
                 try:
-                    comparison = compare_pair(ref, pair, rate, min(args.max_seconds, 2.0), args.max_lag)
+                    comparison = compare_pair(
+                        ref,
+                        pair,
+                        rate,
+                        args.usb_compare_seconds,
+                        args.max_lag,
+                    )
                     score = comparison["alignment_score"]
                     decoded["comparison"] = comparison
                 except ValueError:
@@ -524,7 +530,13 @@ def select_usb_decode(data, args, ref, rate, pair_index):
     decoded["pair"] = pair
     if len(pair) > rate // 2:
         try:
-            decoded["comparison"] = compare_pair(ref, pair, rate, min(args.max_seconds, 2.0), args.max_lag)
+            decoded["comparison"] = compare_pair(
+                ref,
+                pair,
+                rate,
+                args.usb_compare_seconds,
+                args.max_lag,
+            )
         except ValueError:
             pass
     return check_offset, start_byte, decoded
@@ -664,6 +676,7 @@ def main():
     parser.add_argument("--usb-start-byte", default="auto", choices=("auto", "0", "1", "2", "3", "4", "5"))
     parser.add_argument("--usb-byte-order", default="big", choices=("auto", "big", "native"))
     parser.add_argument("--usb-auto-scan-bytes", type=int, default=2 * 1024 * 1024)
+    parser.add_argument("--usb-compare-seconds", type=float, default=2.0)
     parser.add_argument("--events", help="optional JSONL or key=value diagnostic event log")
     parser.add_argument("--pair", default="A")
     parser.add_argument("--channels", type=int, default=8)

@@ -1215,3 +1215,236 @@ Latest promotion evaluation:
     residual `17.171794/11.452494`, and `41` lag jumps.
   - Driver p95 `8.0%` does not pass because coreaudiod p95 was `28.3%` and
     the capture was not audiophile-valid.
+
+## 2026-06-17 Ignore HAL Output Sample-Time Candidate Requirements
+
+- Candidate:
+  - `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1`.
+  - Default remains `0`.
+- Purpose:
+  - Test whether the direct USB abs-deadline/contiguous-write matrix success can
+    be approximated in the HAL path by ignoring CoreAudio
+    `mOutputTime.mSampleTime`.
+- Current status:
+  - `FAIL_REJECTED_FOR_PRODUCT`.
+  - HAL candidate safety PASS.
+  - Physical music FAIL:
+    `quality_alignment_score=0.963508`, SNR floor `10.20 dB`, mid/high
+    residual `1.440572/1.369361`, quiet mid `-35.12 dBFS`, `32` lag jumps,
+    clipped frames `0`.
+  - CPU FAIL:
+    driver p95 `22.6%`, coreaudiod p95 `44.7%`.
+  - Stream stats showed no output active underruns, timeline resets, late
+    writes, elastic drops/replays, or pool fallback allocations.
+  - Failure analysis remains `timebase_or_alignment_instability`; simple
+    polarity, matrix, memoryless nonlinear, and LTI transfer corrections are
+    insufficient explanations.
+- Readiness implication:
+  - Clean counters and contiguous HAL writes do not imply sound quality.
+  - Promotion remains blocked by physical music quality, CPU, and missing
+    physical Traktor/timecode validation.
+
+## 2026-06-17 ISO8 Queue64 Prefetch256 Candidate Status
+
+- Candidate:
+  - `HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64
+    HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256`.
+  - Default remains ISO8/q8/prefetch64.
+- Purpose:
+  - Test whether direct-USB-like queue and startup margin improves HAL physical
+    continuity while retaining capture-paced playback.
+- Current status:
+  - `FAIL_REJECTED_FOR_PRODUCT`.
+  - HAL candidate safety PASS.
+  - Pair A channel matrix PASS:
+    max wrong-source leakage `-53.079 dB`, L->R leakage `-58.221 dB`, R->L
+    leakage `-51.442 dB`, no clipping.
+  - Physical music FAIL:
+    `quality_alignment_score=0.966043`, SNR floor `10.15 dB`, mid/high
+    residual `1.442529/1.373910`, quiet mid `-34.87 dBFS`, `25` lag jumps,
+    clipped frames `0`.
+  - CPU FAIL:
+    driver p95 `23.7%`, coreaudiod p95 `86.6%`.
+  - Promotion readiness FAIL:
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, and `traktor_timecode_physical`.
+- Readiness implication:
+  - Static routing/channel matrix quality is no longer the primary blocker for
+    Pair A. The blocker is real-music continuity/residual plus runtime CPU.
+  - Increasing queue/prefetch margin is not a valid path by itself because it
+    did not remove lag jumps and worsened total resource use.
+
+## 2026-06-17 Direct USB Music Diagnostic Status
+
+- Diagnostic:
+  - `scripts/run-direct-usb-soundcheck`
+  - `build/opena8dj-usb-play-plain-gain05`, Pair A, lead `8192`.
+- Current status:
+  - `FAIL_DIAGNOSTIC_ONLY`.
+  - Physical music FAIL:
+    `quality_alignment_score=0.103211`, worst-channel SNR `-24.31 dB`,
+    mid/high residual `17.114359/16.212469`, clipped frames `0`.
+  - Failure-mode analysis:
+    `timebase_or_alignment_instability`,
+    `window_alignment_is_unstable_for_music`, and
+    `residual_tracks_program_level`.
+- Readiness implication:
+  - Direct USB tone matrix evidence cannot be used as an audiophile music
+    oracle.
+  - Any future direct-USB-vs-HAL comparison must use real music and the same
+    objective music metrics, not only static tones.
+
+## 2026-06-17 Physical Latency Promotion Gate
+
+- Gate:
+  - `scripts/analyze-physical-latency.py` must report `result=PASS`.
+  - `first_energy_seconds <= 1.5`.
+  - `abs(best_correlation) >= 0.98`.
+  - `aligned_snr_db >= 35.0`.
+  - `linear_fit_snr_db >= 35.0`.
+  - `linear_residual_over_capture_rms <= 0.10`.
+  - `scripts/analyze-latency-marker-peaks.py` must report `result=PASS`
+    for marker evidence when used:
+    `paired_peaks >= 4`, `offset_std_seconds <= 0.025`, and
+    `abs(offset_mean_seconds) <= 1.5`.
+- Current status:
+  - `FAIL_BLOCKING_PROMOTION`.
+  - Representative direct USB Pair A:
+    `first_energy_seconds=5.25`, `best_correlation=-0.623648`,
+    `aligned_snr_db=-7.78`, `linear_fit_snr_db=-1.74`,
+    `linear_residual_over_capture_rms=0.773905`.
+  - Explicit-scheduling fallback Pair A:
+    `first_energy_seconds=4.95`, `best_correlation=0.029593`,
+    `aligned_snr_db=0.001`, `linear_fit_snr_db=-30.81`.
+  - Marker Pair A with lead `8192`:
+    `offset_mean_seconds=4.646000`, `offset_std_seconds=0.001237`,
+    `readiness_result=FAIL`.
+  - After subtracting the wrapper record pre-roll and expected internal
+    lead/startup silence, unexplained residual offset is still `3.780667s`.
+  - Marker Pair A with lead `0`:
+    `offset_mean_seconds=4.900115`, `offset_std_seconds=0.001250`,
+    unexplained residual offset `4.129448s`.
+  - Marker Pair A with USB diagnostics:
+    external marker mean `4.930875s`, std `0.001348s`, while internal
+    written/consumed/packed USB analyses all show alignment score `1.000000`,
+    lag `0`, and SNR `999.00 dB`.
+  - Marker Pair A with `HAL_VALID_CAPTURE_OUT_LAYOUT=1`:
+    `offset_mean_seconds=4.638750`, `offset_std_seconds=0.001297`,
+    unexplained residual offset `3.773417s`; physical latency still FAILS with
+    `best_correlation=0.565271`, `aligned_snr_db=-2.99`, and
+    `linear_fit_snr_db=-3.28`.
+  - Marker Pair A with forced playback profile control state:
+    control changed to `01:02:03:00:02:00`, but
+    `offset_mean_seconds=4.667208`, `offset_std_seconds=0.001308`,
+    unexplained residual offset `3.807208s`; physical latency still FAILS with
+    `best_correlation=-0.318510`, `aligned_snr_db=-4.36`, and
+    `linear_fit_snr_db=-9.47`.
+  - Marker Pair A with `HAL_SELECT_ALT0_BEFORE_ALT1=1` plus playback profile:
+    `select_alt0_before_alt1=1`,
+    `offset_mean_seconds=0.405589`, `offset_std_seconds=0.001256`,
+    `first_energy_seconds=0.65`; marker/first-energy gates PASS, but physical
+    latency still FAILS with `best_correlation=0.414578`,
+    `aligned_snr_db=-3.99`, `linear_fit_snr_db=-6.76`, and residual/capture
+    `0.908807`.
+- Readiness implication:
+  - No branch promotion, no hardware-readiness claim, and no timecode readiness
+    claim while this gate fails.
+  - A stable marker offset alone is not sufficient. The current marker runs
+    prove a repeatable multi-second delay, not audiophile-valid output.
+  - Changing direct-player lead changes only the small expected margin; it does
+    not explain the base multi-second delay.
+  - Internal buffer PASS is not product PASS. It narrows the failure boundary
+    downstream of C++ timeline/packing, but external physical latency, music
+    quality, CPU, and Traktor/timecode gates still fail.
+  - `HAL_VALID_CAPTURE_OUT_LAYOUT=1` is rejected as a product fix because it
+    preserves the multi-second marker delay and fails the same physical quality
+    gates.
+  - Forced playback profile is now the correct control-plane default for
+    playback, but it is rejected as a product audio-quality fix because the
+    physical marker and latency gates still fail.
+  - Alt0-before-alt1 is a real latency improvement, but not a product fix until
+    full physical music quality, linearity, CPU, and Traktor/timecode gates
+    also pass.
+  - Alt0-before-alt1 with real music is rejected as a product fix:
+    `quality_alignment_score=0.103674`, SNR floor `-24.25 dB`, mid/high
+    residual `16.213903/15.560684`, despite clean transport counters and no
+    clipping.
+
+## 2026-06-17 Explicit Scheduling Status
+
+- Candidate:
+  - `HAL_EXPLICIT_SCHED=1`.
+  - Optional diagnostic fallback:
+    `HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1`.
+- Current status:
+  - `FAIL_REJECTED_FOR_PRODUCT`.
+  - Without fallback:
+    `queue_failures=2805`, `qfail_last=0xe00002be`,
+    `qfail_other=2805`, `qfail_explicit=2805`, `sched_fallbacks=0`,
+    quality `0.041196`.
+  - With queue-full fallback:
+    `sched_fallbacks=1`, queue failures reduced to `135`, but quality still
+    failed at `0.005597` and SNR floor `-52.51 dB`.
+- Readiness implication:
+  - Explicit scheduling is useful only as a transport diagnostic. It is not a
+    performance or audio-quality improvement over the default path.
+
+## 2026-06-17 Continuous Timeline Reset Fix Status
+
+- New objective evidence:
+  - The fixed direct-USB music run passes the internal data-plane integrity
+    oracle for 12 seconds:
+    written, consumed, and packed USB output all have alignment `1.000000`,
+    lag `0`, and SNR `999.00 dB`.
+  - Packed USB has `check_errors=0`, `panic_flags=0`, gain `0.5`, and Mode 2
+    `check_offset=8`, `start_byte=4`, big-endian layout.
+- Product gate status:
+  - Still `FAIL_BLOCKING_PROMOTION`.
+  - Physical iRig music quality remains below thresholds:
+    `quality_alignment_score=0.957628 < 0.98`,
+    SNR `9.38 dB < 35 dB`,
+    mid residual `1.422297 > 1.36`,
+    high residual `1.413835 > 1.35`,
+    quiet mid-band noise `-35.22 dBFS > -58 dBFS`.
+  - Time-warped reanalysis improves the view only slightly and still fails.
+- Readiness implication:
+  - Internal USB integrity is necessary but not sufficient.
+  - The candidate cannot be declared better than mainline until same-day
+    physical A/B, fixed-candidate CPU measurement, physical route/capture
+    isolation, and Traktor/timecode gates pass.
+
+## 2026-06-17 Decorrelated Direct USB Routing And Quality Status
+
+- Evidence:
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag`.
+  - `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`.
+- Gates that now pass for this diagnostic route:
+  - Direct USB internal integrity:
+    written/consumed/packed USB alignment `1.000000`, lag `0`, SNR
+    `999.00 dB`, USB `check_errors=0`, USB `panic_flags=0`.
+  - Physical decorrelated Pair A routing:
+    `max_wrong_source_leakage_db=-57.447168 <= -45.0`,
+    `expected_floor_amplitude=0.147371 >= 0.005`, clipping `0`.
+- Gates that still fail:
+  - Physical waveform/music quality:
+    `quality_alignment_score=0.721193 < 0.98`,
+    SNR `-2.96 dB < 35 dB`,
+    mid residual `2.117458 > 1.36`,
+    high residual `2.018361 > 1.35`,
+    quiet mid-band noise `-21.77 dBFS > -58 dBFS`.
+  - Same-run product music and CPU pairing:
+    latest physical quality evidence is direct USB diagnostic evidence, while
+    latest CPU evidence is from an older HAL soundcheck run.
+  - Runtime CPU:
+    latest selected HAL CPU evidence still fails mainline thresholds.
+  - Physical latency alignment:
+    the best alt0 marker latency run improves first energy and offset but still
+    fails correlation/SNR/residual gates.
+  - Traktor/timecode physical validation:
+    no DVS/timecode vinyl lock evidence exists for the C++ candidate.
+- Readiness implication:
+  - A routing PASS is not a sound-quality PASS.
+  - A direct USB diagnostic PASS is not a product HAL PASS.
+  - Branch promotion remains forbidden until C++ beats or equals mainline in the
+    same physical route for quality, CPU, routing, latency, recovery, and
+    timecode.

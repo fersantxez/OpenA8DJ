@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 typedef struct WavData {
     double sampleRate;
@@ -21,8 +22,18 @@ typedef struct PlayerState {
     int useStreamUsage;
     atomic_uint frameIndex;
     atomic_bool done;
+    atomic_ullong startNsec;
+    atomic_ullong firstCallbackNsec;
+    atomic_ullong doneNsec;
     UInt64 callbacks;
 } PlayerState;
+
+static uint64_t MonotonicNsec(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000000ull) + (uint64_t)ts.tv_nsec;
+}
 
 static uint16_t ReadLE16(const uint8_t *p)
 {
@@ -265,6 +276,9 @@ static OSStatus IOProc(AudioObjectID inDevice,
 
     PlayerState *state = (PlayerState *)inClientData;
     state->callbacks++;
+    uint64_t now = MonotonicNsec();
+    uint64_t expected = 0;
+    atomic_compare_exchange_strong(&state->firstCallbackNsec, &expected, now);
     if (outOutputData == NULL || atomic_load(&state->done)) {
         return kAudioHardwareNoError;
     }
@@ -291,6 +305,8 @@ static OSStatus IOProc(AudioObjectID inDevice,
     for (UInt32 frame = 0; frame < outFrames; frame++) {
         if (frameIndex >= state->wav.frames) {
             atomic_store(&state->done, true);
+            expected = 0;
+            atomic_compare_exchange_strong(&state->doneNsec, &expected, now);
             break;
         }
         float left = state->wav.samples[(size_t)frameIndex * state->wav.channels];
@@ -358,6 +374,9 @@ int main(int argc, char **argv)
     }
     atomic_init(&state.frameIndex, 0);
     atomic_init(&state.done, false);
+    atomic_init(&state.startNsec, 0);
+    atomic_init(&state.firstCallbackNsec, 0);
+    atomic_init(&state.doneNsec, 0);
 
     AudioObjectID device = FindDeviceByUID(CFSTR("org.opena8dj.Audio8DJ"));
     if (device == kAudioObjectUnknown) {
@@ -384,6 +403,7 @@ int main(int argc, char **argv)
         ConfigureInputStreamUsage(device, ioProcID);
         ConfigureOutputStreamUsage(device, ioProcID, state.pairIndex);
     }
+    atomic_store(&state.startNsec, MonotonicNsec());
     status = AudioDeviceStart(device, ioProcID);
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);
@@ -399,12 +419,23 @@ int main(int argc, char **argv)
     AudioDeviceStop(device, ioProcID);
     AudioDeviceDestroyIOProcID(device, ioProcID);
 
-    printf("played path=%s pair=%c frames=%u callbacks=%llu stream_usage=%s\n",
+    uint64_t startNsec = atomic_load(&state.startNsec);
+    uint64_t firstCallbackNsec = atomic_load(&state.firstCallbackNsec);
+    uint64_t doneNsec = atomic_load(&state.doneNsec);
+    double firstCallbackSeconds = firstCallbackNsec > startNsec ?
+        (double)(firstCallbackNsec - startNsec) / 1000000000.0 :
+        -1.0;
+    double doneSeconds = doneNsec > startNsec ?
+        (double)(doneNsec - startNsec) / 1000000000.0 :
+        -1.0;
+    printf("played path=%s pair=%c frames=%u callbacks=%llu stream_usage=%s first_callback_seconds=%.6f done_seconds=%.6f\n",
            argv[1],
            'A' + state.pairIndex,
            atomic_load(&state.frameIndex),
            state.callbacks,
-           state.useStreamUsage ? "on" : "off");
+           state.useStreamUsage ? "on" : "off",
+           firstCallbackSeconds,
+           doneSeconds);
     free(state.wav.samples);
     return state.callbacks > 0 ? 0 : 8;
 }

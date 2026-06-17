@@ -5246,3 +5246,703 @@ Operational note:
   - `local-analysis/cpp-offline/current-offline-gates.json`.
   - `local-analysis/promotion-readiness-after-output-only-no-capture-fillfix-reject.json`.
   - `local-analysis/runtime-isolation/final-after-output-only-no-capture-fillfix-docs.json`.
+
+## 2026-06-17: Ignore HAL Output Sample Time Physical Rejection
+
+- Change:
+  - Added `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1` as an opt-in diagnostic build flag.
+  - The flag makes HAL output cycles pass `sampleTimeValid=false` into the USB
+    timeline, matching the direct USB tool's contiguous write model more closely.
+  - Default was restored after the experiment:
+    `OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME=0`.
+- Preflight:
+  - Hardware lock absent before test.
+  - Audio stack health PASS: total watched CPU `5.5%`, no OpenA8DJ driver pids.
+  - CoreAudio saw `iRig Stream` as `in=2 out=2 rate=48000`.
+  - IORegistry saw both `Audio 8 DJ` and `iRig Stream`.
+- Commands:
+  - `make -B hal build/opena8dj-control HAL_IGNORE_OUTPUT_SAMPLE_TIME=1`
+  - `git diff --check`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-ignore-output-sample-time/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-ignore-output-sample-time-unload`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-ignore-output-sample-time-unload.json`
+  - `build/physical-run-compare local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal > local-analysis/physical-run-compare/20260617-ignore-output-sample-time-reject.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-ignore-output-sample-time.json`
+  - `make -B hal`
+- Results:
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL:
+    `quality_alignment_score=0.963508`, SNR floor `10.20 dB`,
+    mid/high residual `1.440572/1.369361`, quiet mid noise `-35.12 dBFS`,
+    `32` lag jumps, clipped frames `0`.
+  - CPU FAIL versus mainline:
+    driver p95 `22.6%`, coreaudiod p95 `44.7%`.
+  - Stream stats showed no output active underruns, timeline resets, late
+    writes, elastic drops/replays, or pool fallback allocations.
+  - Failure analysis:
+    `timebase_or_alignment_instability`,
+    `static_lr_mix_or_polarity_not_sufficient`,
+    `simple_memoryless_nonlinearity_not_sufficient`.
+  - LTI analysis did not explain the failure:
+    mid coherence about `0.116-0.117`, LTI SNR delta negative.
+  - Promotion readiness FAIL:
+    `branch_promotion_allowed=false`.
+  - Runtime isolation PASS:
+    HAL inactive, lock absent, no OpenA8DJ process.
+- Decision:
+  - Reject `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1` as product behavior.
+  - Keep default `0`.
+  - The direct USB abs-deadline matrix result does not transfer to HAL merely by
+    ignoring CoreAudio sample time.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-ignore-output-sample-time/hal-candidate-safety/`
+  - `local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal/`
+  - `local-analysis/physical-run-compare/20260617-ignore-output-sample-time-reject.json`
+  - `local-analysis/audio-stack-guard/after-ignore-output-sample-time-unload/`
+  - `local-analysis/runtime-isolation/after-ignore-output-sample-time-unload.json`
+  - `local-analysis/promotion-readiness-after-ignore-output-sample-time.json`
+
+## 2026-06-17: ISO8 Queue64 Prefetch256 Physical Rejection
+
+- Purpose:
+  - Test Carver's direct-USB/HAL pacing recommendation while retaining capture
+    ISO and HAL input representation:
+    `HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64
+    HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256
+    HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.
+  - Determine whether direct-like queue and startup margin improves HAL music
+    continuity without losing channel separation.
+- Commands:
+  - `make -B hal build/opena8dj-control HAL_ISO_FRAMES=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_CAPTURE_QUEUE=64 HAL_PLAYBACK_QUEUE=64 HAL_OUTPUT_PREFETCH_FRAMES=256`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-iso8q64-prefetch256/hal-candidate-safety`
+  - `scripts/run-channel-matrix-gate --run-id 20260617-iso8q64-prefetch256-pairA-chmatrix --pair A --capture-device "iRig Stream" --capture-channels 1,2 --run-physical`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-iso8q64-prefetch256-unload`
+  - `build/physical-run-compare local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-ignore-output-sample-time-irig-pairA-12s-cpp-hal > local-analysis/physical-run-compare/20260617-iso8q64-prefetch256-reject.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-iso8q64-prefetch256-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-iso8q64-prefetch256.json`
+  - `make -B hal`
+- Results:
+  - HAL candidate safety PASS.
+  - Pair A physical channel matrix PASS:
+    max wrong-source leakage `-53.079 dB`, left-to-right leakage
+    `-58.221 dB`, right-to-left leakage `-51.442 dB`, no clipping.
+  - Physical music soundcheck FAIL:
+    `quality_alignment_score=0.966043`, SNR floor `10.15 dB`,
+    mid/high residual `1.442529/1.373910`, quiet mid noise `-34.87 dBFS`,
+    `25` lag jumps, clipped frames `0`.
+  - CPU FAIL:
+    driver p95 `23.7%`, coreaudiod p95 `86.6%`.
+  - Capture ISO invariants PASS.
+  - Stream stats showed no output active underruns, timeline resets, late
+    writes, elastic drops/replays, or transfer-pool fallback allocations.
+  - Failure-mode analysis:
+    `timebase_or_alignment_instability`,
+    `static_lr_mix_or_polarity_not_sufficient`,
+    `simple_memoryless_nonlinearity_not_sufficient`.
+  - LTI analysis did not explain the failure; mid coherence improved to about
+    `0.20`, but LTI SNR delta remained negative.
+  - Promotion readiness FAIL:
+    `branch_promotion_allowed=false`; failing gates are
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, and `traktor_timecode_physical`.
+  - Runtime isolation PASS after recovery:
+    HAL inactive, lock absent, no OpenA8DJ process.
+  - Default HAL was rebuilt after the experiment.
+- Decision:
+  - Reject q64/prefetch256 as a product candidate.
+  - Keep ISO8/q8/prefetch64 as the default candidate baseline until a new
+    transport design improves both quality and resource use.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-iso8q64-prefetch256/hal-candidate-safety/`
+  - `local-analysis/channel-matrix/20260617-iso8q64-prefetch256-pairA-chmatrix/`
+  - `local-analysis/soundcheck/20260617-iso8q64-prefetch256-irig-pairA-12s-cpp-hal/`
+  - `local-analysis/physical-run-compare/20260617-iso8q64-prefetch256-reject.json`
+  - `local-analysis/audio-stack-guard/after-iso8q64-prefetch256-unload/`
+  - `local-analysis/runtime-isolation/after-iso8q64-prefetch256-unload.json`
+  - `local-analysis/promotion-readiness-after-iso8q64-prefetch256.json`
+
+## 2026-06-17: Direct USB Music Soundcheck Diagnostic Rejection
+
+- Purpose:
+  - Test whether the direct USB selected-pair/lead path that helped tone-matrix
+    diagnostics can reproduce real music cleanly through the same iRig capture
+    route.
+  - Separate HAL-specific failure from route/reference/direct-USB limitations.
+- Tooling added:
+  - `scripts/run-direct-usb-soundcheck`
+  - `make direct-usb-soundcheck`
+  - `tools/hardware_lock_policy_check.cpp` now audits the new script's lock
+    contract.
+- Commands:
+  - `chmod +x scripts/run-direct-usb-soundcheck`
+  - `scripts/run-direct-usb-soundcheck --help`
+  - `make build/opena8dj-usb-play-plain-gain05 build/audio-record`
+  - `build/audio-list`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/before-direct-usb-soundcheck.json`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --mode dense --target-peak-db -16 --lead-frames 8192`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s --json-out local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s --json-out local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s/lti-transfer-quality.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-direct-usb-soundcheck.json`
+- Results:
+  - `iRig Stream` was visible before the run: `in=2 out=2 rate=48000`.
+  - Lock was absent before the run and absent afterward.
+  - HAL was inactive before and after the run.
+  - Direct USB playback/capture completed without clipping.
+  - Physical music FAIL:
+    `quality_alignment_score=0.103211`, worst-channel SNR `-24.31 dB`,
+    mid/high residual `17.114359/16.212469`, `0` lag jumps in the global
+    analyzer, clipped frames `0`.
+  - Direct diagnostics:
+    after playback, `frames_written=576000`, `frames_read=567535`,
+    `capture_transfers=11825`, `playback_transfers=11824`, no queue failures,
+    no late frames. End-of-run underruns occurred after source exhaustion while
+    the wrapper was still waiting for capture/drain.
+  - Failure-mode analysis:
+    `timebase_or_alignment_instability`,
+    `window_alignment_is_unstable_for_music`,
+    `static_lr_mix_or_polarity_not_sufficient`,
+    `simple_memoryless_nonlinearity_not_sufficient`,
+    `residual_tracks_program_level`.
+  - LTI analysis did not explain the failure:
+    mid coherence about `0.23-0.24`; LTI SNR delta negative.
+- Decision:
+  - Keep direct USB music soundcheck as a diagnostic tool only.
+  - Do not use direct USB tone-matrix success as product readiness evidence.
+- Evidence paths:
+  - `local-analysis/direct-usb-soundcheck/20260617-direct-usb-plain-gain05-lead8192-pairA-12s/`
+  - `local-analysis/runtime-isolation/before-direct-usb-soundcheck.json`
+  - `local-analysis/runtime-isolation/after-direct-usb-soundcheck.json`
+
+## 2026-06-17: Final Verification After Direct USB Diagnostic Tooling
+
+- Commands:
+  - `bash -n scripts/run-direct-usb-soundcheck`
+  - `scripts/run-direct-usb-soundcheck --help`
+  - `git diff --check`
+  - `cmake --build build/cpp-release --target opena8djcpp_hardware_lock_policy_check`
+  - `build/cpp-release/opena8djcpp_hardware_lock_policy_check`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Direct USB diagnostic wrapper syntax/help PASS.
+  - Diff whitespace check PASS.
+  - Hardware lock policy PASS:
+    `audited_scripts=6`, `missing_requirements=0`.
+  - Offline gates PASS:
+    Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS:
+    `required_files=22`, `missing_files=0`.
+  - Release benchmark:
+    `pack_mib_s=1623.62`, `decode_into_mib_s=575.885`,
+    `route_frames_s=8.7796e+08`,
+    `route_advanced_frames_s=4.93564e+08`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/runtime-isolation/after-direct-usb-soundcheck.json`
+
+## 2026-06-17: Physical Latency Gate And Explicit Scheduling Diagnostics
+
+- Purpose:
+  - Convert the observed delayed/weak physical output into a formal PASS/FAIL
+    gate rather than a narrative blocker.
+  - Determine whether explicit isochronous scheduling fails with `too-old` /
+    `too-new` scheduling errors, enqueue rejection, or queue saturation.
+- Tooling changed:
+  - `scripts/analyze-physical-latency.py` now emits `result` and per-metric
+    gates.
+  - `scripts/evaluate-promotion-readiness.py` now consumes a
+    `physical_latency` evidence file and fails promotion when physical output
+    cannot align promptly and cleanly.
+  - `OpenA8DJUSBDiagnostics` and `opena8dj-usb-play` now print scheduling and
+    queue-failure details including `qfail_last`, `qfail_explicit`,
+    `qfail_consumed`, and `qfail_startup_silence`.
+  - `HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1` was added as an opt-in diagnostic
+    fallback, default `0`.
+- Commands:
+  - `.venv/bin/python scripts/analyze-physical-latency.py ... --json-out ...`
+    for all existing physical latency captures.
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness/20260617-after-physical-latency-gate.json`
+  - `make -B HAL_EXPLICIT_SCHED=1 build/opena8dj-usb-play build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-explicit-sched-instrumented-pairA-3s --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 3 --mode dense --target-peak-db -16 --lead-frames 8192 --skip-build`
+  - `make -B HAL_EXPLICIT_SCHED=1 HAL_EXPLICIT_SCHED_FAIL_FALLBACK=1 build/opena8dj-usb-play build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-explicit-sched-fallback2-instrumented-pairA-3s --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 3 --mode dense --target-peak-db -16 --lead-frames 8192 --skip-build`
+  - `make -B build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-explicit-sched-fallback2-instrumented.json`
+- Results:
+  - Existing latency captures are all FAIL under the new gate. Representative
+    direct USB Pair A:
+    `first_energy_seconds=5.25`, `best_correlation=-0.623648`,
+    `aligned_snr_db=-7.78`, `linear_fit_snr_db=-1.74`,
+    `linear_residual_over_capture_rms=0.773905`.
+  - Explicit scheduling without fallback is rejected:
+    quality `0.041196`, SNR floor `-46.88 dB`, `queue_failures=2805`,
+    `qfail_last=0xe00002be`, `qfail_other=2805`,
+    `qfail_explicit=2805`, `sched_fallbacks=0`, capture RMS `0.000380`.
+  - The first fallback attempt did not trigger because the observed failures
+    came from in-flight queue saturation before enqueue, not from the
+    post-fill enqueue failure path.
+  - After enabling fallback on queue-full, the fallback fired once and reduced
+    queue failures from about `2805` to `135`:
+    `sched_fallbacks=1`, `qfail_explicit=1`, `playback_transfers=200`,
+    `frames_read=153671`.
+  - Fallback still fails physical quality:
+    quality `0.005597`, SNR floor `-52.51 dB`, capture RMS `0.001699`,
+    physical latency FAIL with `first_energy_seconds=4.95`,
+    `best_correlation=0.029593`, and `linear_fit_snr_db=-30.81`.
+  - Default direct USB player was rebuilt after experiments with
+    `OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING=0` and
+    `OPENA8DJ_EXPLICIT_SCHED_FALLBACK_ON_QUEUE_FAILURE=0`.
+  - Final runtime isolation PASS:
+    HAL inactive, lock absent, no forbidden OpenA8DJ/mainline processes.
+- Decision:
+  - Keep explicit scheduling disabled by default.
+  - Keep fallback as diagnostic-only; it reduces queue-failure storming but does
+    not recover audiophile-valid output.
+  - Branch promotion remains blocked by physical latency, physical music
+    quality, runtime CPU, and missing physical Traktor/timecode evidence.
+- Evidence paths:
+  - `local-analysis/direct-usb-soundcheck/20260617-explicit-sched-instrumented-pairA-3s/`
+  - `local-analysis/direct-usb-soundcheck/20260617-explicit-sched-fallback2-instrumented-pairA-3s/`
+  - `local-analysis/direct-usb-soundcheck/20260617-explicit-sched-fallback2-instrumented-pairA-3s/physical-latency.json`
+  - `local-analysis/promotion-readiness/20260617-after-physical-latency-gate.json`
+  - `local-analysis/runtime-isolation/20260617-after-explicit-sched-fallback2-instrumented.json`
+
+## 2026-06-17: Direct USB Latency Marker Probe
+
+- Purpose:
+  - Replace dense music with a sparse, deterministic marker signal to separate
+    fixed route/device latency from random drift or analyzer ambiguity.
+- Tooling added:
+  - `scripts/prepare-latency-marker.py`
+  - `scripts/analyze-latency-marker-peaks.py`
+  - `scripts/run-direct-usb-soundcheck --reference-wav`
+  - `scripts/run-direct-usb-soundcheck --postroll-seconds`
+- Commands:
+  - `.venv/bin/python scripts/prepare-latency-marker.py --out-dir local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture --rate 48000 --seconds 6 --peak 0.35`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8 --reference-wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 8192 --skip-build`
+  - `.venv/bin/python scripts/analyze-latency-marker-peaks.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/captured.wav --record-preroll-seconds 0.6 --playback-lead-frames 8192 --startup-silence-frames 4544 --json-out local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0 --reference-wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 0 --skip-build`
+  - `.venv/bin/python scripts/analyze-latency-marker-peaks.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/captured.wav --record-preroll-seconds 0.6 --playback-lead-frames 0 --startup-silence-frames 8192 --json-out local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/marker-peak-summary.json`
+- Results:
+  - Direct USB transport counters were clean in the lead `8192` run:
+    `queue_failures=0`, `playback_transfers=396`,
+    `frames_written=288000`, `frames_read=304217`.
+  - Physical capture had strong signal and no clipping:
+    RMS `0.03722001`, peak `0.64135742`, clipped `0`.
+  - Marker peaks show a stable physical offset after merging split peaks:
+    offsets `4.647771`, `4.646333`, `4.645521`, `4.644375` seconds;
+    mean `4.646000s`, std `0.001237s`.
+  - After subtracting the wrapper record pre-roll (`0.6s`) and expected
+    internal lead/startup silence (`0.265333s`), the unexplained residual
+    offset is still `3.780667s`.
+  - The lead `0` run also fails:
+    marker mean `4.900115s`, std `0.001250s`, and residual after record
+    pre-roll plus expected startup silence is `4.129448s`.
+  - Changing lead frames changes the measured offset by about the expected
+    internal margin; it does not remove the multi-second physical delay.
+  - Generic physical latency gate still fails:
+    `first_energy_seconds=4.9`, `best_correlation=0.645749`,
+    `aligned_snr_db=-2.33`, `linear_fit_snr_db=-0.64`,
+    `linear_residual_over_capture_rms=0.732560`.
+  - Direct USB soundcheck metrics still fail:
+    quality `0.960701`, SNR floor `-14.62 dB`, mid/high residual
+    `5.541492/5.365217`.
+- Decision:
+  - Treat the large delay as a stable route/device latency symptom, not random
+    drift.
+  - Do not treat fixed latency compensation as sufficient: linearity/SNR still
+    fail badly after alignment.
+- Evidence paths:
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/physical-latency.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/marker-peak-summary.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-lead0/physical-latency.json`
+  - `local-analysis/runtime-isolation/20260617-after-default-marker-lead0.json`
+
+## 2026-06-17: Direct USB Marker Internal Buffer Boundary
+
+- Purpose:
+  - Determine whether the multi-second external marker delay is already
+    present inside the C++ timeline/packer or appears after internal buffers
+    are consumed and packed for USB.
+- Commands:
+  - `.venv/bin/python scripts/prepare-latency-marker.py --out-dir local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/fixture --rate 48000 --seconds 6 --peak 0.35`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag --reference-wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 8192 --collect-usb-diagnostics`
+  - `.venv/bin/python scripts/analyze-physical-latency.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/captured.wav --json-out local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/physical-latency.json`
+  - `.venv/bin/python scripts/analyze-latency-marker-peaks.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/captured.wav --record-preroll-seconds 0.6 --playback-lead-frames 8192 --startup-silence-frames 4544 --json-out local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/marker-peak-summary.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-usbdiag-marker.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness/20260617-after-usbdiag-marker.json`
+- Results:
+  - External iRig capture still FAILS:
+    marker mean `4.930875s`, std `0.001348s`,
+    readiness `FAIL`.
+  - Physical latency still FAILS:
+    `first_energy_seconds=5.15`, `best_correlation=-0.424257`,
+    `aligned_snr_db=-7.29`, `linear_fit_snr_db=-6.51`,
+    `linear_residual_over_capture_rms=0.904117`.
+  - Internal written buffer is perfect against reference:
+    `written_alignment_score=1.000000`, `written_alignment_lag=0`,
+    left/right SNR `999.00 dB`, click outliers `0`.
+  - Internal consumed buffer is perfect against reference:
+    `consumed_alignment_score=1.000000`, `consumed_alignment_lag=0`,
+    left/right SNR `999.00 dB`, click outliers `0`.
+  - Packed USB decode is perfect against reference:
+    `usb_check_errors=0`, `usb_panic_flags=0`,
+    `usb_alignment_score=1.000000`, `usb_alignment_lag=0`,
+    left/right SNR `999.00 dB`.
+  - Transport counters stayed clean:
+    `queue_failures=0`, `playback_transfers=396`,
+    `frames_written=288000`, `frames_read=304118`.
+  - Runtime isolation after the run PASS:
+    HAL inactive, lock absent, no forbidden OpenA8DJ/mainline processes.
+  - Promotion readiness FAIL:
+    `branch_promotion_allowed=false`; failing gates include
+    `physical_latency_alignment`, `physical_marker_latency`,
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, and `traktor_timecode_physical`.
+- Interpretation:
+  - This rules out C++ written-buffer corruption, consumed-buffer timing drift,
+    and Mode 2 packed USB byte corruption for this marker run.
+  - The remaining fault boundary is downstream of internal packing: USB/device
+    scheduling/state, Audio 8 DJ firmware/DAC interpretation, analog route, or
+    external capture path.
+  - Do not spend more time mutating packer/channel-map/sample conversion until
+    the downstream boundary is narrowed.
+- Evidence paths:
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/driver-diagnostics-analysis.txt`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/driver-packed-usb-analysis.txt`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/marker-peak-summary.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8-usbdiag/physical-latency.json`
+  - `local-analysis/runtime-isolation/20260617-after-usbdiag-marker.json`
+  - `local-analysis/promotion-readiness/20260617-after-usbdiag-marker.json`
+
+## 2026-06-17: Valid Capture-Out Layout Marker Rejection
+
+- Purpose:
+  - Test whether the alternate capture-out layout flag changes the downstream
+    device behavior that produced stable multi-second external marker delay.
+- Candidate:
+  - Build with `HAL_VALID_CAPTURE_OUT_LAYOUT=1`.
+  - Default restored after the run:
+    `OPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=0`.
+- Commands:
+  - `make -B HAL_VALID_CAPTURE_OUT_LAYOUT=1 build/opena8dj-usb-play build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8 --reference-wav local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 8192 --skip-build`
+  - `make -B build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+- Results:
+  - Direct USB transport stayed clean:
+    `queue_failures=0`, `playback_transfers=395`,
+    `frames_written=288000`, `frames_read=304074`.
+  - External marker still FAILS readiness:
+    `offset_mean_seconds=4.638750`, `offset_std_seconds=0.001297`,
+    residual after record pre-roll plus expected internal lead/startup
+    `3.773417s`.
+  - Physical latency still FAILS:
+    `first_energy_seconds=4.85`, `best_correlation=0.565271`,
+    `aligned_snr_db=-2.99`, `linear_fit_snr_db=-3.28`,
+    `linear_residual_over_capture_rms=0.824708`.
+  - Physical music/marker quality still FAILS:
+    `quality_alignment_score=0.960473`, SNR floor `-31.75 dB`,
+    mid/high residual `38.609794/40.459687`, right click outliers `337`,
+    no clipping.
+- Decision:
+  - Reject `HAL_VALID_CAPTURE_OUT_LAYOUT=1` as a latency or quality fix.
+  - Do not keep this flag enabled for product builds.
+  - The candidate did not move the failure boundary back into C++ timeline or
+    packet packing; it remains downstream or in the physical capture route.
+- Evidence paths:
+  - `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/`
+  - `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/summary.txt`
+  - `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/metrics.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/physical-latency.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-valid-capture-layout-marker-pairA-6s-postroll8/marker-peak-summary.json`
+
+## 2026-06-17: Playback Profile Control-State Marker Rejection
+
+- Purpose:
+  - Test whether the direct USB marker delay is caused by leaving the device in
+    the timecode-vinyl-like control state read from hardware
+    (`00:02:03:01:02:01`) instead of explicit playback defaults.
+- Code/tooling:
+  - `opena8dj-control profile playback` now matches the C++ input-profile
+    contract: input mode `1`, ground lifts off, software lock off, input decode
+    off, identity source map.
+  - `opena8dj-usb-play --playback-profile` applies the same playback defaults
+    after USB open/read-controls and before stream start.
+  - `scripts/run-direct-usb-soundcheck --playback-profile` records this as
+    explicit evidence.
+- Commands:
+  - `make -B build/opena8dj-usb-play build/opena8dj-control build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8 --reference-wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 8192 --playback-profile --skip-build`
+  - `.venv/bin/python scripts/analyze-latency-marker-peaks.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/captured.wav --record-preroll-seconds 0.6 --playback-lead-frames 8192 --startup-silence-frames 4288 --json-out local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `.venv/bin/python scripts/analyze-physical-latency.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/captured.wav --json-out local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+- Results:
+  - Control state changed as intended before streaming:
+    `01:02:03:00:02:00`.
+  - Direct USB transport stayed clean:
+    `queue_failures=0`, `playback_transfers=395`,
+    `frames_written=288000`, `frames_read=304019`.
+  - External marker still FAILS readiness:
+    `offset_mean_seconds=4.667208`, `offset_std_seconds=0.001308`,
+    residual after record pre-roll plus expected internal lead/startup
+    `3.807208s`.
+  - Physical latency still FAILS:
+    `first_energy_seconds=4.9`, `best_correlation=-0.318510`,
+    `aligned_snr_db=-4.36`, `linear_fit_snr_db=-9.47`,
+    `linear_residual_over_capture_rms=0.947840`.
+  - Soundcheck metrics still FAIL:
+    `quality_alignment_score=0.960242`, SNR floor `-17.54 dB`,
+    mid/high residual `7.080066/7.008900`, no clipping.
+- Decision:
+  - Keep the playback-profile control-plane fix for consistency with the C++
+    model.
+  - Reject playback-profile control state as a latency or quality fix.
+  - Remaining suspects stay downstream/stateful: USB alternate-setting reset
+    behavior, device scheduling/state, Audio 8 DJ firmware/DAC interpretation,
+    analog route, or external capture path.
+- Evidence paths:
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/`
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/play.log`
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/summary.txt`
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/metrics.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `local-analysis/runtime-isolation/20260617-after-playback-profile-marker.json`
+
+## 2026-06-17: Alt0 Before Alt1 Marker Latency Improvement, Quality Still Fails
+
+- Purpose:
+  - Test whether the stable multi-second marker delay is caused by stale USB
+    alternate-setting/device stream state.
+- Candidate:
+  - Build with `HAL_SELECT_ALT0_BEFORE_ALT1=1`.
+  - Run with `--playback-profile` so control bytes are
+    `01:02:03:00:02:00`.
+  - Default build restored after the run with
+    `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1=0`.
+- Commands:
+  - `make -B HAL_SELECT_ALT0_BEFORE_ALT1=1 build/opena8dj-usb-play build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8 --reference-wav local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 6 --postroll-seconds 8 --lead-frames 8192 --playback-profile --skip-build`
+  - `.venv/bin/python scripts/analyze-latency-marker-peaks.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/captured.wav --record-preroll-seconds 0.6 --playback-lead-frames 8192 --startup-silence-frames 5568 --json-out local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `.venv/bin/python scripts/analyze-physical-latency.py local-analysis/direct-usb-latency-marker/20260617-default-marker-pairA-6s-postroll8/fixture/reference.wav local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/captured.wav --json-out local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+  - `make -B build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-alt0-diagfield-playback-profile-marker.json`
+- Results:
+  - Diagnostic field confirms the candidate was active:
+    `select_alt0_before_alt1=1`.
+  - Marker latency gate PASS:
+    `offset_mean_seconds=0.405589`, `offset_std_seconds=0.001256`,
+    `paired_peaks=4`.
+  - First physical energy gate PASS:
+    `first_energy_seconds=0.65`.
+  - Overall physical latency still FAILS:
+    `best_correlation=0.414578`, `aligned_snr_db=-3.99`,
+    `linear_fit_snr_db=-6.76`,
+    `linear_residual_over_capture_rms=0.908807`.
+  - Soundcheck quality still FAILS:
+    `quality_alignment_score=0.858726`, SNR floor `-14.49 dB`,
+    mid/high residual `5.086371/4.926583`, no clipping.
+  - Transport stayed clean:
+    `queue_failures=0`, `playback_transfers=396`,
+    `frames_written=288000`, `frames_read=304118`.
+  - Runtime isolation after the run PASS:
+    HAL inactive, lock absent, no forbidden OpenA8DJ/mainline processes.
+- Interpretation:
+  - Alt0-before-alt1 is the first diagnostic that materially improves marker
+    latency.
+  - It does not produce audiophile-valid output. The remaining failure is
+    signal integrity/linearity/routing/capture, not the gross multi-second
+    startup delay.
+- Decision:
+  - Keep `HAL_SELECT_ALT0_BEFORE_ALT1=0` as default until a full music + CPU
+    gate passes.
+  - Promote alt0-before-alt1 to next candidate input for music and same-day
+    A/B testing, not to product readiness.
+- Evidence paths:
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/`
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/play.log`
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/summary.txt`
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/metrics.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/physical-latency.json`
+  - `local-analysis/direct-usb-latency-marker/20260617-alt0-diagfield-playback-profile-marker-pairA-6s-postroll8/marker-peak-summary.json`
+  - `local-analysis/runtime-isolation/20260617-after-alt0-diagfield-playback-profile-marker.json`
+
+## 2026-06-17: Alt0 Playback-Profile Real Music Rejection
+
+- Purpose:
+  - Determine whether the alt0-before-alt1 marker latency improvement also
+    improves real music quality.
+- Candidate:
+  - Build with `HAL_SELECT_ALT0_BEFORE_ALT1=1`.
+  - Run direct USB playback with `--playback-profile`.
+  - Default build restored after the run with
+    `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1=0`.
+- Commands:
+  - `make -B HAL_SELECT_ALT0_BEFORE_ALT1=1 build/opena8dj-usb-play build/audio-record`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --postroll-seconds 2 --lead-frames 8192 --playback-profile --skip-build`
+  - `make -B build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-alt0-music.json`
+- Results:
+  - Diagnostic field confirms the candidate was active:
+    `select_alt0_before_alt1=1`.
+  - Direct USB transport stayed clean:
+    `queue_failures=0`, `playback_transfers=771`,
+    `frames_written=576000`, `frames_read=592208`.
+  - Music quality FAIL:
+    `quality_alignment_score=0.103674`, SNR floor `-24.25 dB`,
+    mid/high residual `16.213903/15.560684`, no clipping.
+  - Failure-mode analysis:
+    `timebase_or_alignment_instability`,
+    `window_alignment_is_unstable_for_music`,
+    `static_lr_mix_or_polarity_not_sufficient`,
+    `simple_memoryless_nonlinearity_not_sufficient`,
+    `residual_tracks_program_level`.
+  - Runtime isolation after the run PASS:
+    HAL inactive, lock absent, no forbidden OpenA8DJ/mainline processes.
+- Decision:
+  - Reject alt0-before-alt1 as a complete product fix.
+  - Keep it as a partial state-reset finding because it improves marker
+    latency, but require another mechanism for real music quality/linearity.
+- Evidence paths:
+  - `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/`
+  - `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/play.log`
+  - `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/summary.txt`
+  - `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/metrics.json`
+  - `local-analysis/direct-usb-soundcheck/20260617-alt0-playback-profile-music-pairA-12s/failure-modes.json`
+  - `local-analysis/runtime-isolation/20260617-after-alt0-music.json`
+
+## 2026-06-17: Continuous Timeline Reset Fix, Direct USB Music
+
+- Purpose:
+  - Explain why the alt0/playback-profile real-music run failed despite clean
+    early packet evidence, then verify the fix with a 12-second USB diagnostic
+    music run.
+- Root cause found:
+  - `OutputTimelineWrite` reset the timeline for continuous writes when the
+    producer was more than half a ring ahead of the reader.
+  - In the failing diagnostic run, the reset happened at write frame `162048`
+    and produced mid-music startup-silence/underrun gaps beginning around
+    served frame `145600`.
+- Fix:
+  - Continuous writes no longer trigger the future-gap reset. Discontinuous
+    future writes can still reset; continuous producer lead is handled by the
+    existing elastic/high-water policy.
+- Commands:
+  - `make -B HAL_SELECT_ALT0_BEFORE_ALT1=1 HAL_DIAGNOSTIC=1 build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --postroll-seconds 2 --lead-frames 8192 --playback-profile --collect-usb-diagnostics --skip-build`
+  - `make -B build/opena8dj-usb-play build/audio-record build/opena8dj-control`
+  - `.venv/bin/python scripts/analyze-driver-capture.py ... --usb-compare-seconds 12`
+  - `.venv/bin/python scripts/analyze-soundcheck-capture.py ... --time-warp --drift-profile`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-continuous-reset-fix.json`
+  - `.venv/bin/python scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness/20260617-after-continuous-reset-fix.json`
+- Internal USB result after fix:
+  - Written vs reference: alignment `1.000000`, lag `0`, SNR `999.00 dB`.
+  - Consumed vs written/reference: alignment `1.000000`, lag `0`, SNR
+    `999.00 dB`, lag windows min/max/first/last all `0`.
+  - Packed USB: Mode 2 `check_offset=8`, `start_byte=4`, big-endian,
+    `check_errors=0`, `panic_flags=0`, alignment `1.000000`, lag `0`,
+    gain `0.5`, SNR `999.00 dB` for `575919` compared frames.
+- Physical iRig result after fix:
+  - Still FAILS product gates:
+    `quality_alignment_score=0.957628`, SNR floor `9.38 dB`,
+    mid/high residual `1.422297/1.413835`, quiet mid-band noise
+    `-35.22 dBFS`, lag jumps `0`, clipping `0`.
+  - Time-warped reanalysis still FAILS:
+    `quality_alignment_score=0.961334`, SNR `10.41 dB`,
+    mid/high residual `1.404391/1.367270`, lag jumps `31`.
+- Promotion readiness:
+  - `local-analysis/promotion-readiness/20260617-after-continuous-reset-fix.json`
+    remains `FAIL` and `branch_promotion_allowed=false`.
+  - Blocking gates include physical music quality, latest music/CPU same-run
+    pairing, runtime CPU, physical latency alignment, physical investigation,
+    and Traktor/timecode physical validation.
+- Runtime isolation:
+  - PASS. HAL inactive, lock absent, forbidden mainline/OpenA8DJ processes
+    absent.
+- Evidence paths:
+  - `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/`
+  - `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/driver-capture-analysis-explicit-usb-12s.txt`
+  - `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/metrics.json`
+  - `local-analysis/direct-usb-soundcheck/20260617-no-continuous-reset-alt0-music-pairA-12s-usbdiag/metrics-timewarp.json`
+  - `local-analysis/runtime-isolation/20260617-after-continuous-reset-fix.json`
+  - `local-analysis/promotion-readiness/20260617-after-continuous-reset-fix.json`
+
+## 2026-06-17: Decorrelated Direct USB Pair A Fixture, Routing Pass, Quality Fail
+
+- Purpose:
+  - Remove ambiguous real-music alignment from the next physical check by using a
+    deterministic decorrelated stereo fixture with sparse transients and
+    separate left/right tone families.
+  - Verify whether the post-reset-fix direct USB path can simultaneously prove
+    internal packet integrity, physical Pair A routing, and audiophile-quality
+    loopback capture.
+- Commands:
+  - `.venv/bin/python scripts/generate-loopback-reference.py local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --rate 48000 --seconds 12 --peak 0.30`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --postroll-seconds 2 --lead-frames 8192 --playback-profile --collect-usb-diagnostics --skip-build`
+  - `.venv/bin/python scripts/analyze-channel-matrix-tones.py local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag --skip-seconds 0.68 --analysis-seconds 11 --json-out local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json`
+  - `.venv/bin/python scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`
+- Internal USB result:
+  - Written, consumed, and packed USB output all align to the fixture at
+    `1.000000`, lag `0`, and SNR `999.00 dB`.
+  - Packed USB decodes as Mode 2 with `start_byte=4`, `check_offset=8`,
+    big-endian samples, gain `0.5`, `check_errors=0`, and `panic_flags=0`
+    over `575907` compared frames.
+- Physical Pair A routing result:
+  - `tone-matrix.json` reports `result=PASS`.
+  - Expected signal floor is strong: `expected_floor_amplitude=0.147371`.
+  - Crosstalk/leakage clears the strict gate:
+    `max_wrong_source_leakage_db=-57.447168`,
+    `left_to_right_leakage_db=-61.527228`,
+    `right_to_left_leakage_db=-55.793274`.
+  - Capture clipping remains `0`.
+- Physical quality result:
+  - Product music/fixture quality still FAILS:
+    `quality_alignment_score=0.721193`, SNR floor `-2.96 dB`,
+    mid/high residual `2.117458/2.018361`, quiet mid-band noise
+    `-21.77 dBFS`, lag jumps `0`, clipping `0`.
+  - Linear-matrix fitting reports a large physical residual
+    (`residual_over_capture=0.748310`), so polarity/gain/matrix correction is
+    not enough.
+  - Tone-response compensation is diagnostic only and worsens the residual; a
+    simple 3-band response model does not explain the failure.
+- Promotion readiness:
+  - `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
+    remains `FAIL` with `branch_promotion_allowed=false`.
+  - New gates pass: `direct_usb_internal_integrity` and
+    `physical_decorrelated_matrix_routing`.
+  - Blocking gates remain: same-run music/CPU pairing, physical latency
+    alignment, physical music quality, runtime CPU, physical investigation, and
+    Traktor/timecode physical validation.
+- Runtime isolation:
+  - PASS. HAL inactive, lock absent, no forbidden OpenA8DJ/mainline processes.
+- Decision:
+  - Treat this as useful isolation evidence, not product readiness.
+  - The current direct USB data plane and Pair A routing are clean for this
+    fixture, but the captured waveform is not audiophile-valid and the product
+    HAL still needs same-day mainline A/B, CPU, and timecode evidence.
+- Evidence paths:
+  - `local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/driver-diagnostics-analysis.txt`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/metrics.json`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/linear-matrix.json`
+  - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-response-compensation.json`
+  - `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
+  - `local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`
