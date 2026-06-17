@@ -1083,3 +1083,22 @@ Next technical target:
     the degraded route-family blocks quality comparisons, but current C++ still
     fails independently. Route validation is now a prerequisite for any
     audiophile claim.
+- Latest inline inactive input decode bypass probe:
+  `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal`.
+  - Built with an earlier inactive-decode bypass in `handleCaptureTransfer`;
+    the source change was removed after measurement.
+  - Offline gates before hardware passed:
+    Debug `17/17`, Release `18/18`.
+  - Quality still FAIL:
+    `quality_alignment_score=0.961965`, SNR floor `10.16 dB`, mid/high
+    residual `1.429792/1.358387`, quiet mid noise `-35.03 dBFS`, `31` lag
+    jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `22.1%`, `coreaudiod` p95 `41.3%`.
+  - Final isolation passed:
+    HAL inactive, hardware lock absent, no OpenA8DJ/mainline QA process
+    detected.
+  - Decision:
+    reject this micro-optimization as a product change. The remaining blocker
+    is still the quality/timebase/route problem, not inactive decode call
+    overhead.

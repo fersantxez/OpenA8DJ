@@ -1057,3 +1057,28 @@ Latest promotion evaluation:
   - Degraded shared-route evidence cannot prove C++ better than mainline.
   - Current C++ evidence still fails product thresholds, so route uncertainty
     does not permit promotion.
+
+## 2026-06-17 Updated Snapshot After Inline Inactive Decode Bypass Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.961965` versus required `>= 0.980000`.
+  - SNR floor `10.16 dB` versus required `>= 35.00 dB`.
+  - mid/high residual ratios `1.429792/1.358387` versus required maxima
+    `1.36/1.35`.
+  - quiet mid noise `-35.03 dBFS` versus required `<= -58.00 dBFS`.
+  - `lag_jumps_gt_2_frames=31` versus required `0`.
+- Runtime CPU beats mainline: FAIL.
+  - Product probe driver p95 `22.1%`.
+  - Product probe `coreaudiod` p95 `41.3%`.
+  - Mainline target remains around driver p95 `<= 6.5%` and `coreaudiod`
+    p95 `<= 1.7%` under comparable conditions.
+- Current threshold interpretation:
+  - The inline inactive decode bypass is rejected as a product change.
+  - This result confirms that inactive input decode call overhead is not the
+    dominant route to audiophile quality or mainline-beating resource use.

@@ -1394,3 +1394,35 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Validate the capture/reference route with a known-good bypass if available.
   - Otherwise, focus on a transport/timebase redesign and require the current
     C++ family to pass strict music quality before timecode/full routing.
+
+### Architect Inline Inactive Decode Bypass Product Probe
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored after removing the attempted source change.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Isolated inline inactive input decode bypass failed quality:
+    quality `0.961965`, SNR floor `10.16 dB`, mid/high residual
+    `1.429792/1.358387`, `31` lag jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `22.1%`, `coreaudiod` p95 `41.3%`.
+  - Capture ISO invariants pass; stream stats show no gross underruns,
+    timeline resets, late writes, or transfer-pool fallback allocations.
+- Risks:
+  - The bottleneck is not inactive decode dispatch overhead. Keeping this
+    change would add hot-path divergence without a measured product benefit.
+- Next recommended action:
+  - Keep the source reverted.
+  - Stop spending hardware windows on isolated micro-optimizations unless a new
+    model predicts a measurable quality or CPU outcome.
+  - Prioritize capture/reference route validation or transport/timebase
+    redesign evidence.

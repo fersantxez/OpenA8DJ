@@ -2846,3 +2846,38 @@ Evidence:
 - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/failure-modes.json`
 - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/lti-transfer-quality.json`
 - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`
+
+## 2026-06-17: Reject Inline Inactive Input Decode Bypass
+
+Decision:
+- Keep the original `handleCaptureTransfer` path that calls
+  `decodeCaptureBytes` for capture transactions.
+- Do not retain the earlier inline bypass for inactive input decode as a
+  product optimization.
+
+Reason:
+- The isolated locked probe still failed physical music quality:
+  quality `0.961965`, SNR floor `10.16 dB`, mid/high residual
+  `1.429792/1.358387`, quiet mid noise `-35.03 dBFS`, and `31` lag jumps.
+- Runtime CPU still failed mainline:
+  driver p95 `22.1%`, `coreaudiod` p95 `41.3%`.
+- Capture ISO invariants and stream stats did not show gross transport faults,
+  which means the attempted bypass is not the dominant quality or CPU fix.
+- The code change was semantically small, but a product default needs measured
+  benefit. This run did not produce one.
+
+Alternatives discarded:
+- Keep the bypass as harmless cleanup: rejected because hot-path changes should
+  not be retained without a measurable win when product quality is failing.
+- Use the driver p95 as partial CPU progress: rejected because `coreaudiod`
+  regressed badly and both CPU metrics remain above the mainline target.
+- Continue one-flag CPU probing immediately: rejected until the capture route
+  and timebase/cadence defect have a better falsifiable model.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
+- `local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`

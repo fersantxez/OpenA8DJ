@@ -4791,3 +4791,58 @@ Operational note:
   - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`
   - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/lti-transfer-quality.json`
   - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/window-trace-1.json`
+
+## 2026-06-17: Inline Inactive Input Decode Bypass Rejection
+
+- Purpose:
+  - Test whether bypassing the Objective-C `decodeCaptureBytes` call earlier
+    when input decode is inactive reduces playback-only CPU without changing
+    packet layout or transport cadence.
+  - Keep the run isolated to the C++ worktree and restore the product HAL after
+    the locked probe.
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-inline-inactive-decode-bypass/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-inline-inactive-decode-bypass-unload`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`
+- Results:
+  - Offline gates before hardware PASS:
+    Debug `17/17`, Release `18/18`.
+  - Physical music quality FAIL:
+    quality `0.961965`, SNR floor `10.16 dB`, mid/high residual
+    `1.429792/1.358387`, quiet mid noise `-35.03 dBFS`, `31` lag jumps,
+    `0` clipped frames, and `0` click outliers.
+  - Runtime CPU still fails mainline:
+    driver p95 `22.1%`, `coreaudiod` p95 `41.3%`.
+  - Capture ISO invariants PASS, stream stats show no pool fallback
+    allocations and no output underruns, timeline resets, or late writes.
+  - Failure mode remains `timebase_or_alignment_instability`; static L/R mix,
+    polarity, simple nonlinearity, and LTI/fixed EQ are still insufficient.
+  - Final isolation PASS:
+    HAL inactive, lock absent, no OpenA8DJ or mainline QA processes detected.
+- Product conclusion:
+  - Reject the inline inactive input decode bypass as a product change.
+  - The attempted source change was removed from `src/hal/OpenA8DJUSB.m` after
+    the probe because it did not provide a defensible CPU win and still failed
+    sound quality.
+  - The evidence is useful only as negative hot-path evidence; it must not be
+    used for readiness or branch-promotion claims.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-inline-inactive-decode-bypass/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
+  - `local-analysis/runtime-isolation/final-after-inline-inactive-decode-bypass-docs.json`
+  - `local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`

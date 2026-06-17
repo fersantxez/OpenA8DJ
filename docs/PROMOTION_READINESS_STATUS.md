@@ -333,3 +333,25 @@ Latest offline route comparison:
 Decision remains unchanged: validate the capture/reference route before any
 audiophile-quality claim, keep C mainline in place, keep C++ off `main`, and do
 not claim readiness.
+
+## 2026-06-17 Inline Inactive Input Decode Bypass Probe Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Product CPU/hot-path probe still fails real-music quality:
+  quality `0.961965`, SNR floor `10.16 dB`, mid/high residual
+  `1.429792/1.358387`, quiet mid noise `-35.03 dBFS`, `31` lag jumps.
+- Runtime CPU still fails mainline:
+  driver p95 `22.1%`, `coreaudiod` p95 `41.3%`.
+- Capture ISO invariants pass, and stream stats show no gross output underruns,
+  timeline resets, late writes, or pool fallback allocations.
+- Final cleanup:
+  `local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
+  PASS, HAL inactive, lock absent, and no OpenA8DJ/mainline QA process detected.
+
+Decision remains unchanged: reject this inline inactive decode bypass as a
+product change, do not move C mainline to Legacy, do not move C++ to `main`,
+and do not claim audiophile readiness.
