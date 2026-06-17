@@ -254,6 +254,9 @@ target_link_libraries(opena8djcpp_channel_leakage_tone_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_audiophile_tone_gate
+  tools/audiophile_tone_gate.cpp)
+
 add_executable(opena8djcpp_physical_run_compare
   tools/physical_run_compare.cpp)
 
@@ -322,6 +325,7 @@ add_test(NAME opena8djcpp_capture_matrix_quality_analysis COMMAND opena8djcpp_ca
 add_test(NAME opena8djcpp_capture_route_health_gate COMMAND opena8djcpp_capture_route_health_gate)
 add_test(NAME opena8djcpp_soundcheck_wav_quality COMMAND opena8djcpp_soundcheck_wav_quality)
 add_test(NAME opena8djcpp_channel_leakage_tone_contract COMMAND opena8djcpp_channel_leakage_tone_contract)
+add_test(NAME opena8djcpp_audiophile_tone_gate COMMAND opena8djcpp_audiophile_tone_gate)
 add_test(NAME opena8djcpp_physical_run_compare COMMAND opena8djcpp_physical_run_compare)
 add_test(NAME opena8djcpp_physical_evidence_frontier COMMAND opena8djcpp_physical_evidence_frontier)
 add_test(NAME opena8djcpp_physical_capture_forensics COMMAND opena8djcpp_physical_capture_forensics)

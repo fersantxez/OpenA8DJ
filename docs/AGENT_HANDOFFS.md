@@ -3253,3 +3253,36 @@ Risk:
   - This is still a HAL experiment, not DriverKit slot ownership. It must pass
     HAL candidate safety and same-session physical A/B before it can influence
     readiness.
+
+## 2026-06-17 Subagent: Bacon Prepared USB Slot Scheduler Review
+
+- Agent:
+  - Bacon (`019ed7a8-db6f-7a83-834c-678a16ef2e36`).
+- Mission:
+  - Read-only review of the next viable low-CPU data-plane direction after
+    independent playback refill/coalescing failed physical sound quality.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - The HAL still performs the expensive work around direct
+    `enqueueIORequestWithData` calls from capture and playback queue paths.
+  - Existing offline prepared transport models already express the safer
+    separation: HAL/CoreAudio reads and writes bounded rings; backend owns
+    prepared slots and requeue.
+  - The next useful implementation should not be another HAL coalescing probe.
+    It should preserve logical ISO8 audio slots while batching real USB submit
+    work below that logical cadence.
+- Integrated action:
+  - The next architecture target is now a real prepared USB slot scheduler with
+    separate counters for logical audio periods, USB submit calls, backend slot
+    completions, slot order errors, timestamp regressions, and HAL steady
+    requeues.
+- Risk:
+  - This superficially resembles ISO64, which failed physically. The quality
+    requirement is that batching must not change logical slot cadence,
+    timestamps, routing, lead, capture/timecode handling, or playback refill
+    timing.

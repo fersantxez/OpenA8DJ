@@ -121,3 +121,40 @@ Local contract:
 This is an architectural scaffold only. It does not remove the need for full
 Xcode/DriverKit SDK, provisioning, signing, user-approved system-extension
 activation, USBDriverKit endpoint implementation, or locked physical evidence.
+
+## Runtime Contract Reinforcement
+
+Added on 2026-06-17 after the capture-paced playback refill rejection:
+
+- `AudioDriverSkeleton` now models the DriverKit runtime obligations that must
+  survive the real dext port:
+  - five IO memory descriptors: one 8-channel input stream plus four
+    2-channel output streams;
+  - 32-bit float stream-memory accounting for the HAL/AudioDriverKit-facing
+    side;
+  - monotonic zero timestamp updates while IO is running;
+  - explicit rejection of sample-rate/buffer configuration changes while IO is
+    running;
+  - counters for memory-layout builds/failures, timestamp updates/regressions,
+    accepted configuration changes, and rejected configuration changes.
+- `opena8djcpp_driverkit_runtime_contract` verifies:
+  - `io_memory_descriptors=5`;
+  - `io_memory_total_bytes=4096` for 64-frame buffers;
+  - valid zero timestamp sequence accepted;
+  - duplicate/regressing zero timestamp sequence rejected in a separate negative
+    test;
+  - running configuration change rejected;
+  - stopped configuration change accepted;
+  - 44.1 kHz and 48 kHz pressure rows still pass without fallback allocations
+    or HAL steady requeues.
+- `opena8djcpp_driverkit_extension_scaffold_contract` now requires the scaffold
+  to name `IOMemoryDescriptor`, `UpdateCurrentZeroTimestamp`,
+  `GetCurrentZeroTimestamp`, `RequestDeviceConfigurationChange`, and
+  `PerformDeviceConfigurationChange`.
+
+Interpretation:
+
+- This is better DriverKit discipline, not product readiness.
+- It prevents a future dext implementation from skipping timing and
+  configuration contracts, but it does not solve the current physical
+  quality/USB enqueue bottleneck by itself.

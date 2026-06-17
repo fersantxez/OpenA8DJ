@@ -58,6 +58,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
+./build/cpp-release/opena8djcpp_audiophile_tone_gate | tee "$EVIDENCE_DIR/audiophile-tone-gate.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -136,6 +137,7 @@ capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
 capture_route_health = load_json("capture-route-health-gate.json")
 soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
+audiophile_tone = load_json("audiophile-tone-gate.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -431,6 +433,23 @@ summary = {
         "max_clean_wrong_source_leakage_db": channel_leakage_tone.get("max_clean_wrong_source_leakage_db"),
         "max_clean_inactive_deck_leakage_db": channel_leakage_tone.get("max_clean_inactive_deck_leakage_db"),
         "evidence": "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
+    },
+    "audiophile_tone_gate": {
+        "status": audiophile_tone.get("result"),
+        "candidate_threshold_pass": audiophile_tone.get("candidate_threshold_pass"),
+        "baseline_threshold_pass": audiophile_tone.get("baseline_threshold_pass"),
+        "candidate_not_worse_than_baseline": audiophile_tone.get(
+            "candidate_not_worse_than_baseline"
+        ),
+        "physical_measurement_valid_for_promotion": audiophile_tone.get(
+            "physical_measurement_valid_for_promotion"
+        ),
+        "candidate_sideband_ratio": audiophile_tone.get("candidate", {}).get("sideband_ratio"),
+        "candidate_thd_ratio": audiophile_tone.get("candidate", {}).get("thd_ratio"),
+        "candidate_clipped_frames": audiophile_tone.get("candidate", {}).get("clipped_frames"),
+        "baseline_sideband_ratio": audiophile_tone.get("baseline", {}).get("sideband_ratio"),
+        "baseline_thd_ratio": audiophile_tone.get("baseline", {}).get("thd_ratio"),
+        "evidence": "local-analysis/cpp-offline/audiophile-tone-gate.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

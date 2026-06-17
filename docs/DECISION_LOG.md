@@ -5950,3 +5950,129 @@ Next implication:
   timing/layout more closely, or move to a lower-overhead prepared
   DriverKit/USBDriverKit transport that reduces enqueue cadence without
   changing the audible timing contract.
+
+## 2026-06-17: Treat DriverKit Timing And Memory Contracts As Offline Gates
+
+Decision:
+- The C++ DriverKit shell must fail offline if it does not model stream memory,
+  zero timestamps, and stopped-only configuration changes.
+
+Reason:
+- Apple AudioDriverKit architecture makes `IOUserAudioDriver`,
+  `IOUserAudioDevice`, `IOUserAudioStream`, mapped memory, start/stop IO, zero
+  timestamps, and configuration-change sequencing part of the actual driver
+  contract, not optional glue.
+- The current CPU blocker is real USB enqueue cadence, so a DriverKit shell that
+  only renames HAL concepts would be misleading.
+- Encoding these requirements in pure C++ gates lets the project advance
+  safely while the local machine lacks a DriverKit SDK and while no system
+  extension installation is authorized.
+
+Evidence:
+- `opena8djcpp_driverkit_runtime_contract` now reports:
+  - `io_memory_descriptors=5`;
+  - `io_memory_total_bytes=4096`;
+  - `zero_timestamp_updates=2`;
+  - `zero_timestamp_regressions=0`;
+  - negative timestamp test: `timestamp_reject_regressions=2`;
+  - `configuration_changes=1`;
+  - `rejected_configuration_changes=1`;
+  - 44.1 kHz and 48 kHz pressure rows PASS.
+- `opena8djcpp_driverkit_extension_scaffold_contract` now requires scaffold
+  references to `IOMemoryDescriptor`, `UpdateCurrentZeroTimestamp`,
+  `GetCurrentZeroTimestamp`, `RequestDeviceConfigurationChange`, and
+  `PerformDeviceConfigurationChange`.
+- Full offline gates after the change:
+  - Debug CTest `43/43` passed.
+  - Release CTest `44/44` passed.
+  - Evidence schema `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+
+Alternatives discarded:
+- Leave DriverKit timing/memory semantics only in documentation: rejected
+  because it would not prevent a future runtime bridge from regressing.
+- Install or activate a dext now: rejected because the local SDK/signing state
+  is incomplete and no physical install window was requested for this change.
+
+Next implication:
+- Future DriverKit work must wire the real dext to these semantics instead of
+  weakening the contract. Product superiority remains blocked by physical
+  quality, CPU, route validation, and timecode evidence.
+
+## 2026-06-17: Add Saved-Tone Audiophile Sideband Gate
+
+Decision:
+- Add `opena8djcpp_audiophile_tone_gate` as an offline evidence artifact and
+  CTest.
+
+Reason:
+- Music soundcheck alignment/SNR is necessary but not sufficient for
+  audiophile-quality claims. A tone-specific gate can catch sideband modulation,
+  harmonic distortion, clipping, and residual energy in saved 1 kHz captures.
+- The gate must remain honest: PASS means the saved candidate tone clears the
+  local threshold and is not worse than the selected historical mainline tone on
+  THD/sidebands. It does not validate the current route or promote the product.
+
+Evidence:
+- `local-analysis/cpp-offline/audiophile-tone-gate.json`.
+- Candidate saved tone:
+  - `candidate_threshold_pass=true`;
+  - sideband ratio `0.010323`;
+  - THD ratio `0.000451`;
+  - clipped frames `0`.
+- Selected baseline saved tone:
+  - `baseline_threshold_pass=false`;
+  - sideband ratio `0.013758`;
+  - THD ratio `0.000874`.
+- Full offline gates after artifact integration:
+  - Debug CTest `44/44` passed.
+  - Release CTest `45/45` passed.
+  - Evidence schema `required_files=45`, `missing_files=0`.
+
+Alternatives discarded:
+- Treat tone PASS as product readiness: rejected; current route and music gates
+  still fail promotion validity.
+- Use a weaker intermediate mainline tone as baseline: rejected after it failed
+  the sideband threshold more clearly than the 0.3.24 final tone.
+
+Next implication:
+- Future physical windows must collect both real-music and tone evidence. Tone
+  sideband wins only matter if the same candidate also beats mainline on route
+  health, music quality, CPU, routing, and Traktor/timecode.
+
+## 2026-06-17: Next Low-CPU Direction Is Logical ISO8 Prepared USB Batching
+
+Decision:
+- The next implementation direction is a real prepared USB slot scheduler:
+  preserve logical ISO8 audio slots while reducing real USB submit/enqueue work
+  below that layer.
+
+Reason:
+- Direct HAL coalescing, independent playback refill, and playback-completion
+  pacing reduced some CPU pressure but broke physical quality.
+- Mainline's low CPU is associated with larger effective USB cadence, but
+  naive ISO64-style behavior is not safe for this hardware route.
+- The safer target is to keep packet/routing/timecode/timestamp semantics at
+  ISO8 while batching prepared USB submits underneath that logical cadence.
+
+Required counters for the next offline/runtime model:
+- `logical_audio_periods`.
+- `usb_submit_calls`.
+- `backend_slot_completions`.
+- `slot_order_errors`.
+- `timestamp_regressions`.
+- `hal_steady_requeues`.
+- fallback allocations and ring overrun/underrun counters.
+
+Rejected paths:
+- Explicit scheduling sweeps.
+- Raw/reuse pool cursor retests.
+- Independent playback coalescing/refill inside the HAL.
+- Decorative prepared-transport bridge that does not reduce real
+  `enqueueIORequestWithData` cadence.
+
+Next implication:
+- The next patch should extend prepared slot scheduler contracts so
+  `logical_audio_gap_ratio` remains safe while `usb_submit_calls` is strictly
+  lower than logical audio periods. Only then should a lock-gated physical
+  candidate be considered.

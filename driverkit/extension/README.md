@@ -22,6 +22,13 @@ Before this scaffold can become a runnable dext:
 - bind `OpenA8DJAudioDriver` to real `IOUserAudioDriver`;
 - bind `OpenA8DJAudioDevice` and `IOUserAudioStream` buffers to the prepared
   transport backend;
+- allocate/map `IOMemoryDescriptor` stream buffers for the 8 input channels and
+  four 2-channel output streams;
+- publish monotonic zero timestamps through `UpdateCurrentZeroTimestamp` and
+  answer HAL reads through `GetCurrentZeroTimestamp`;
+- handle sample-rate and buffer changes through
+  `RequestDeviceConfigurationChange` / `PerformDeviceConfigurationChange` only
+  after IO has stopped;
 - implement USBDriverKit transport for Audio 8 DJ endpoints;
 - run the full offline gate suite;
 - request a locked physical test window before any install or activation.

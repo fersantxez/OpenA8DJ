@@ -2100,3 +2100,14 @@ Prepared transport migration metric:
   least one product-candidate run before any existing physical evidence can be
   used as a promotion argument. Current expected state is diagnostic PASS with
   `product_candidate_runs=0`, which explicitly blocks readiness claims.
+- `local-analysis/cpp-offline/audiophile-tone-gate.json` must be present and
+  PASS before a candidate can be considered for physical promotion. Minimum
+  expectations:
+  - candidate saved-tone threshold pass is true;
+  - candidate is not worse than the selected mainline tone baseline on THD and
+    sideband ratio;
+  - clipped frames are zero;
+  - `physical_measurement_valid_for_promotion` remains false unless the tone
+    came from a current lock-gated route-validation or same-session A/B window.
+  This gate is an additional distortion/sideband detector; it never replaces
+  music soundcheck, route health, CPU, routing, or Traktor/timecode gates.

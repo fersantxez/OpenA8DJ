@@ -45,6 +45,15 @@ bool frames_equal(std::span<const S24Frame> left, std::span<const S24Frame> righ
   return left.size() == right.size() && std::equal(left.begin(), left.end(), right.begin());
 }
 
+std::uint64_t io_memory_total_bytes(
+    const std::array<AudioIOMemoryDescriptorModel, 5>& layout) {
+  std::uint64_t total = 0;
+  for (const auto& descriptor : layout) {
+    total += descriptor.byte_count();
+  }
+  return total;
+}
+
 PressureResult run_pressure(std::uint32_t sample_rate) {
   constexpr std::uint32_t kSeconds = 2;
   constexpr std::uint32_t kIsoFrames = 8;
@@ -127,6 +136,8 @@ int main() {
   std::uint32_t config_failures = 0;
   std::uint32_t frame_mismatches = 0;
   std::uint32_t shutdown_failures = 0;
+  std::uint32_t io_memory_failures = 0;
+  std::uint32_t timestamp_contract_failures = 0;
 
   const AudioStreamConfig valid_config{
       .sample_rate = 48000,
@@ -198,6 +209,35 @@ int main() {
     lifecycle_failures += 1;
   }
 
+  const auto io_layout = driver.io_memory_layout();
+  const std::uint64_t io_layout_total_bytes = io_memory_total_bytes(io_layout);
+  if (io_layout.size() != driver.device_model().streams.size()) {
+    io_memory_failures += 1;
+  }
+  if (io_layout[0].direction != StreamDirection::Input || io_layout[0].channel_count != 8 ||
+      io_layout[0].frames != valid_config.buffer_frames || io_layout[0].byte_count() != 2048U) {
+    io_memory_failures += 1;
+  }
+  for (std::size_t index = 1; index < io_layout.size(); ++index) {
+    const auto expected_starting_channel = static_cast<std::uint32_t>((index - 1U) * 2U);
+    if (io_layout[index].direction != StreamDirection::Output ||
+        io_layout[index].starting_channel != expected_starting_channel ||
+        io_layout[index].channel_count != 2 ||
+        io_layout[index].frames != valid_config.buffer_frames ||
+        io_layout[index].byte_count() != 512U) {
+      io_memory_failures += 1;
+    }
+  }
+  if (io_layout_total_bytes != 4096U) {
+    io_memory_failures += 1;
+  }
+  if (!driver.update_zero_timestamp(0, 1000) || !driver.update_zero_timestamp(8, 2000)) {
+    timestamp_contract_failures += 1;
+  }
+  if (driver.request_configuration_change(valid_config)) {
+    config_failures += 1;
+  }
+
   const auto playback = frames_for(kFrames, 3);
   const auto capture = frames_for(kFrames, 4);
   std::vector<S24Frame> backend_playback(kFrames);
@@ -223,6 +263,39 @@ int main() {
   const auto running_safety = driver.transport_safety();
   if (!running_safety.product_safe) {
     lifecycle_failures += 1;
+  }
+
+  if (!driver.stop_stream()) {
+    shutdown_failures += 1;
+  }
+  const AudioStreamConfig changed_config{
+      .sample_rate = 44100,
+      .buffer_frames = 64,
+      .transport = PreparedTransportConfig{.iso_frames = 8, .capture_slots = 16, .playback_slots = 16},
+  };
+  if (!driver.request_configuration_change(changed_config)) {
+    config_failures += 1;
+  }
+  if (!driver.start_stream()) {
+    lifecycle_failures += 1;
+  }
+  const auto runtime_counters = driver.runtime_counters();
+  const auto final_zero_timestamp = driver.zero_timestamp();
+
+  AudioDriverSkeleton timestamp_reject_driver;
+  if (!timestamp_reject_driver.start_driver() ||
+      !timestamp_reject_driver.configure_stream(valid_config) ||
+      !timestamp_reject_driver.start_stream() ||
+      !timestamp_reject_driver.update_zero_timestamp(10, 2000) ||
+      timestamp_reject_driver.update_zero_timestamp(10, 2100) ||
+      timestamp_reject_driver.update_zero_timestamp(11, 2000) ||
+      !timestamp_reject_driver.stop_driver()) {
+    timestamp_contract_failures += 1;
+  }
+  const auto timestamp_reject_counters = timestamp_reject_driver.runtime_counters();
+  if (timestamp_reject_counters.zero_timestamp_updates != 1 ||
+      timestamp_reject_counters.zero_timestamp_regressions != 2) {
+    timestamp_contract_failures += 1;
   }
 
   if (!driver.stop_driver()) {
@@ -269,7 +342,15 @@ int main() {
 
   const bool pass =
       lifecycle_failures == 0 && config_failures == 0 && frame_mismatches == 0 &&
-      shutdown_failures == 0 && running_counters.backend_prepare_enqueues == 32 &&
+      shutdown_failures == 0 && io_memory_failures == 0 &&
+      timestamp_contract_failures == 0 && runtime_counters.io_memory_layout_builds == 1 &&
+      runtime_counters.io_memory_layout_failures == 0 &&
+      runtime_counters.zero_timestamp_updates == 2 &&
+      runtime_counters.zero_timestamp_regressions == 0 &&
+      runtime_counters.configuration_changes == 1 &&
+      runtime_counters.rejected_configuration_changes == 1 &&
+      final_zero_timestamp.sample_time == 0 && final_zero_timestamp.host_time == 0 &&
+      running_counters.backend_prepare_enqueues == 32 &&
       running_counters.backend_steady_requeues == 2 &&
       running_counters.hal_steady_requeues == 0 &&
       running_counters.fallback_allocations == 0 &&
@@ -298,6 +379,20 @@ int main() {
             << "  \"config_failures\": " << config_failures << ",\n"
             << "  \"frame_mismatches\": " << frame_mismatches << ",\n"
             << "  \"shutdown_failures\": " << shutdown_failures << ",\n"
+            << "  \"io_memory_failures\": " << io_memory_failures << ",\n"
+            << "  \"timestamp_contract_failures\": " << timestamp_contract_failures << ",\n"
+            << "  \"io_memory_descriptors\": " << io_layout.size() << ",\n"
+            << "  \"io_memory_total_bytes\": " << io_layout_total_bytes << ",\n"
+            << "  \"zero_timestamp_updates\": " << runtime_counters.zero_timestamp_updates << ",\n"
+            << "  \"zero_timestamp_regressions\": "
+            << runtime_counters.zero_timestamp_regressions << ",\n"
+            << "  \"configuration_changes\": " << runtime_counters.configuration_changes << ",\n"
+            << "  \"rejected_configuration_changes\": "
+            << runtime_counters.rejected_configuration_changes << ",\n"
+            << "  \"timestamp_reject_updates\": "
+            << timestamp_reject_counters.zero_timestamp_updates << ",\n"
+            << "  \"timestamp_reject_regressions\": "
+            << timestamp_reject_counters.zero_timestamp_regressions << ",\n"
             << "  \"backend_prepare_enqueues\": " << running_counters.backend_prepare_enqueues << ",\n"
             << "  \"backend_steady_requeues\": " << running_counters.backend_steady_requeues << ",\n"
             << "  \"hal_steady_requeues\": " << running_counters.hal_steady_requeues << ",\n"

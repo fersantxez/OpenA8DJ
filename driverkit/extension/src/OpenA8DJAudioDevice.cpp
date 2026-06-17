@@ -2,8 +2,11 @@
 
 // Future binding point for IOUserAudioDevice, IOUserAudioStream objects,
 // IOMemoryDescriptor stream buffers, zero timestamps, and configuration-change
-// sequencing. The default offline build validates these policies with pure C++
-// contracts before this file is compiled with the DriverKit SDK.
+// sequencing. The real dext must publish monotonic zero timestamps with
+// UpdateCurrentZeroTimestamp, answer HAL timing through GetCurrentZeroTimestamp,
+// and accept RequestDeviceConfigurationChange only when IO is stopped. The
+// default offline build validates these policies with pure C++ contracts before
+// this file is compiled with the DriverKit SDK.
 
 bool OpenA8DJAudioDevice::init() {
   return IOUserAudioDevice::init();

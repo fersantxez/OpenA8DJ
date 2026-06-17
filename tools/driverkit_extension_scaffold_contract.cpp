@@ -96,12 +96,21 @@ int main(int argc, char** argv) {
       "IOUserAudioDevice::StartIO",
       "IOUserAudioDevice::StopIO",
       "kIOReturnUnsupported",
+      "IOMemoryDescriptor",
+      "UpdateCurrentZeroTimestamp",
+      "GetCurrentZeroTimestamp",
+      "RequestDeviceConfigurationChange",
   });
   const bool safety_pass = contains_all(readme, {
       "non-installing scaffold",
       "lacks the DriverKit SDK",
       "Do not install",
       "locked physical test window",
+      "IOMemoryDescriptor",
+      "UpdateCurrentZeroTimestamp",
+      "GetCurrentZeroTimestamp",
+      "RequestDeviceConfigurationChange",
+      "PerformDeviceConfigurationChange",
   });
   const bool default_build_excludes_extension =
       read_file(root / "CMakeLists.txt").find("driverkit/extension/src/OpenA8DJAudioDriver.cpp") ==

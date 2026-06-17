@@ -9185,3 +9185,96 @@ Full offline gate rerun:
     comparison is useful until a candidate passes basic physical soundcheck.
 - Evidence:
   - `local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig`
+
+## 2026-06-17 DriverKit Runtime Contract Reinforcement
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+  - Previous commit at test time: `61789c7`
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_runtime_contract opena8djcpp_driverkit_extension_scaffold_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_runtime_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_extension_scaffold_contract`
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline build and filesystem evidence only.
+  - No HAL load, driver install, system-extension activation, audio playback,
+    capture, CoreAudio mutation, USB reset, default-device change, or hardware
+    action.
+- Runtime contract result:
+  - `opena8djcpp_driverkit_runtime_contract`: PASS.
+  - `io_memory_descriptors=5`.
+  - `io_memory_total_bytes=4096`.
+  - `zero_timestamp_updates=2`.
+  - `zero_timestamp_regressions=0`.
+  - Negative timestamp rejection test:
+    `timestamp_reject_updates=1`,
+    `timestamp_reject_regressions=2`.
+  - `configuration_changes=1`.
+  - `rejected_configuration_changes=1`.
+  - 44.1 kHz pressure row: PASS, `frames=88200`,
+    `fallback_allocations=0`.
+  - 48 kHz pressure row: PASS, `frames=96000`,
+    `fallback_allocations=0`.
+- Extension scaffold contract result:
+  - `opena8djcpp_driverkit_extension_scaffold_contract`: PASS.
+  - `system_extension_activated=false`.
+  - `driver_installed_or_activated=false`.
+  - `default_build_excludes_extension=true`.
+- Full offline gate result:
+  - Debug CTest: `43/43` passed.
+  - Release CTest: `44/44` passed.
+  - Evidence schema: `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - DriverKit shell discipline improved: stream memory, zero timestamps, and
+    configuration changes now have executable offline contracts.
+  - This does not supersede the physical rejection of the capture-paced
+    playback refill candidate.
+  - Still no claim of better sound quality, lower CPU than mainline, timecode
+    vinyl readiness, or branch promotion.
+
+## 2026-06-17 Audiophile Tone Gate And Evidence Schema Update
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_audiophile_tone_gate`
+  - `./build/cpp-offline/opena8djcpp_audiophile_tone_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline analysis of saved WAV evidence only.
+  - No HAL load, driver install, system-extension activation, audio playback,
+    capture, CoreAudio mutation, USB reset, default-device change, or hardware
+    action.
+- New gate:
+  - `opena8djcpp_audiophile_tone_gate`.
+  - Evidence file:
+    `local-analysis/cpp-offline/audiophile-tone-gate.json`.
+  - Schema: `opena8djcpp.audiophile-tone-gate.v1`.
+  - Result: PASS.
+  - `candidate_threshold_pass=true`.
+  - `baseline_threshold_pass=false`.
+  - `candidate_not_worse_than_baseline=true`.
+  - `physical_measurement_valid_for_promotion=false`.
+  - Candidate saved tone:
+    - sideband ratio `0.010323`;
+    - THD ratio `0.000451`;
+    - clipped frames `0`;
+    - strongest sideband relative level `-43.492060 dB`.
+  - Baseline saved tone:
+    - sideband ratio `0.013758`;
+    - THD ratio `0.000874`.
+- Full offline gate result after making the tone gate an artifact:
+  - Debug CTest: `44/44` passed.
+  - Release CTest: `45/45` passed.
+  - Evidence schema: `required_files=45`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - This adds a distortion/sideband detector for saved 1 kHz tone captures.
+  - The candidate saved tone is not worse than the selected 0.3.24 mainline
+    tone on this metric family.
+  - This does not override current music/capture-route/CPU failures and does
+    not create a promotion claim.

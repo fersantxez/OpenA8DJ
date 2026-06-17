@@ -2334,6 +2334,28 @@ Current implication:
     collapsed (`quality_alignment_score=0.157019`, SNR `-21.74 dB`,
     `lag_jumps_gt_2_frames=35`). The final guard unloaded the HAL and reported
     audio stack health PASS.
+  - After rejecting that HAL experiment, the DriverKit offline shell was
+    reinforced so it now validates stream memory descriptors, monotonic zero
+    timestamps, and stopped-only configuration changes. The runtime contract
+    reports `io_memory_descriptors=5`, `io_memory_total_bytes=4096`,
+    `zero_timestamp_updates=2`, `zero_timestamp_regressions=0`,
+    `configuration_changes=1`, `rejected_configuration_changes=1`, and both
+    44.1 kHz / 48 kHz pressure rows PASS. Full offline gates still pass
+    (`43/43` Debug, `44/44` Release, evidence schema PASS).
+  - This DriverKit reinforcement improves architectural correctness but does
+    not change product readiness. The next product-critical implementation must
+    reduce real IOUSBHost enqueue cadence without changing the physical timing
+    contract that the hardware/capture route needs for clean audio.
+  - Added an offline saved-tone audiophile gate. It reports the saved C++ tone
+    candidate is not worse than the selected 0.3.24 mainline tone on THD and
+    sideband ratio (`candidate sideband=0.010323`, THD `0.000451`, clipped
+    frames `0`), but `physical_measurement_valid_for_promotion=false`; this is
+    extra distortion evidence only, not a product claim.
+  - Bacon's read-only scheduler review converged with the existing evidence:
+    the next low-CPU design must preserve logical ISO8 audio slots while
+    batching real USB submit/enqueue work under that layer. Do not repeat
+    independent HAL coalescing/refill probes unless new evidence changes the
+    risk calculus.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

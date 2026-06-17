@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/quality-root-cause-analysis.json",
       root / "local-analysis/cpp-offline/soundcheck-wav-quality.json",
       root / "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
+      root / "local-analysis/cpp-offline/audiophile-tone-gate.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
