@@ -934,3 +934,48 @@ Follow-up:
   run.
 - Next one-factor physical hypotheses: reduce queue depth to mainline `8/8`,
   or reduce output prefetch to mainline `64`.
+
+## 2026-06-17: Reject Queue-Depth 8/8 As Standalone Candidate
+
+Decision:
+- Do not change the default queue depths from C++ `64/64` to mainline `8/8`
+  based on the standalone physical run.
+- Keep `queue8` as a diagnostic clue only: it reduced click outliers, but did
+  not beat quality or runtime CPU gates.
+
+Reason:
+- Physical soundcheck with `HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_QUEUE=8` still
+  failed:
+  `quality_alignment_score=0.964133`, `snr_db=10.22`,
+  `lag_jumps_gt_2_frames=39`, `mid_band_residual_ratio=1.422599`,
+  `high_band_residual_ratio=1.365050`, quiet mid-band noise `-36.08 dBFS`.
+- Click outliers improved from `29` to `0`, and coreaudiod p95 improved from
+  `7.0%` to `3.1%` versus the immediately preceding hotstats run.
+- OpenA8DJ driver CPU worsened: avg/p95/max `32.335%/37.2%/37.9%`, still far
+  above the mainline C baseline.
+- Stream stats showed no late writes, no active underruns, no timeline resets,
+  no panic flags, and capture transaction error ratio stayed around `2.273`.
+
+Alternatives discarded:
+- Promote `queue8` because clicks improved: rejected because SNR/residual/lag
+  and driver CPU still fail.
+- Make `queue8` default before testing prefetch/cadence: rejected because the
+  driver CPU regression is material.
+
+Evidence:
+- Build/safety: `local-analysis/physical-queue8/20260616-205510`
+- Soundcheck: `local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal`
+- Stream stats: `local-analysis/stream-stats/queue8-summary.json`
+- Recovery/audit:
+  - `local-analysis/audio-stack-guard/20260616-force-unload-queue8`
+  - `local-analysis/runtime-isolation/post-queue8-failed-unload.json`
+- Default rebuild restored `HAL_CAPTURE_QUEUE_DEPTH=64` and
+  `HAL_PLAYBACK_QUEUE_TARGET=64`:
+  `local-analysis/build-flags/default-restore-after-queue8.log`.
+
+Follow-up:
+- Next standalone physical hypothesis: reduce `HAL_OUTPUT_PREFETCH_FRAMES` from
+  `256` to mainline `64`, with default queue depth restored to `64/64`.
+- If prefetch alone improves quality without driver CPU regression, consider a
+  later controlled combination with `queue8`; do not combine before a positive
+  one-factor result.

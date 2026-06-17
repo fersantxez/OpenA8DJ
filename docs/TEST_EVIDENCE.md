@@ -2103,3 +2103,46 @@ Operational note:
 - Interpretation:
   - The hotstats physical run still has late-write evidence in text snapshots,
     but future runs will have structured TSV/JSON late-write evidence.
+
+## 2026-06-17: Queue-Depth 8/8 Physical Rejection
+
+- Commands:
+  - `make HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_QUEUE=8 usb-play hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-queue8/20260616-205510/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-dir "$HOME/Music" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Forced HAL unload under hardware lock, followed by `audio-stack-guard`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-queue8-failed-unload.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/queue8-summary.json`
+  - `make usb-play hal > local-analysis/build-flags/default-restore-after-queue8.log`
+- Result:
+  - Build PASS with `OPENA8DJ_CAPTURE_QUEUE_DEPTH=8` and
+    `OPENA8DJ_PLAYBACK_QUEUE_TARGET=8`.
+  - HAL candidate safety PASS.
+  - Physical soundcheck FAIL.
+  - Post-failure unload/recovery PASS; final isolation PASS.
+  - Default build restored to queue depth `64/64`.
+- Evidence paths:
+  - `local-analysis/physical-queue8/20260616-205510`
+  - `local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal`
+  - `local-analysis/stream-stats/queue8-summary.json`
+  - `local-analysis/audio-stack-guard/20260616-force-unload-queue8`
+  - `local-analysis/runtime-isolation/post-queue8-failed-unload.json`
+  - `local-analysis/build-flags/default-restore-after-queue8.log`
+- Key metrics:
+  - `quality_alignment_score=0.964133`
+  - `snr_db=10.22`
+  - `click_outliers=0`
+  - `lag_jumps_gt_2_frames=39`
+  - `mid_band_residual_ratio=1.422599`
+  - `high_band_residual_ratio=1.365050`
+  - `quiet_mid_band_noise_dbfs=-36.08`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver avg/p95/max CPU `32.335%/37.2%/37.9%`
+  - coreaudiod avg/p95/max CPU `3.715%/3.1%/47.2%`
+  - Stream stats: `outputLateWriteFrames_delta=0`,
+    `outputLateWriteBatches_delta=0`, no active underruns, no timeline resets,
+    no panic flags, capture transaction errors per capture transfer `2.2727`.
+- Interpretation:
+  - Queue depth is relevant to click behavior and coreaudiod CPU, but as a
+    standalone change it does not solve quality and worsens driver CPU.
+  - Do not make `8/8` default without a later positive combined hypothesis.

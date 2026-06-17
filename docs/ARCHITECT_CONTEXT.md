@@ -361,3 +361,13 @@ Next technical target:
 - Tooling gap fixed after the run: `run-soundcheck` now writes late-write
   counters into `stream-stats-during.tsv`, and `analyze-stream-stats.py` tracks
   them and flags nonzero late writes.
+- Standalone `queue8` physical run (`HAL_CAPTURE_QUEUE=8`,
+  `HAL_PLAYBACK_QUEUE=8`) also failed:
+  `quality_alignment_score=0.964133`, `snr_db=10.22`,
+  `lag_jumps_gt_2_frames=39`, `mid_band_residual_ratio=1.422599`,
+  `high_band_residual_ratio=1.365050`, quiet mid-band noise `-36.08 dBFS`.
+- `queue8` did improve click outliers to `0` and coreaudiod p95 to `3.1%`, but
+  OpenA8DJ driver CPU worsened to p95 `37.2%`. Treat it as a clue, not a
+  default. The local build was restored to default `64/64`.
+- Current next one-factor candidate: `HAL_OUTPUT_PREFETCH_FRAMES=64` with
+  default queues restored.
