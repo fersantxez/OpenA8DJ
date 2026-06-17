@@ -44,6 +44,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
+./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -94,6 +95,7 @@ dvs_packet = load_json("dvs-packet-input-decode.json")
 jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
+loopback_quality = load_json("loopback-quality-analysis.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -258,6 +260,18 @@ summary = {
         "lowest_median_driver_cpu_p95": transport_budget.get("summary", {}).get("lowest_median_driver_cpu_p95"),
         "lowest_estimated_usb_enqueue_calls_per_second": transport_budget.get("summary", {}).get("lowest_estimated_usb_enqueue_calls_per_second"),
         "evidence": "local-analysis/cpp-offline/transport-budget-model.json",
+    },
+    "loopback_quality_analysis": {
+        "status": loopback_quality.get("result"),
+        "mode": loopback_quality.get("mode"),
+        "rows": loopback_quality.get("row_count"),
+        "failures": loopback_quality.get("failures"),
+        "threshold_min_snr_db": loopback_quality.get("threshold_min_snr_db"),
+        "threshold_min_correlation": loopback_quality.get("threshold_min_correlation"),
+        "threshold_max_clicks": loopback_quality.get("threshold_max_clicks"),
+        "clean_min_snr_db": loopback_quality.get("rows", [{}])[0].get("min_snr_db"),
+        "degraded_failures": loopback_quality.get("rows", [{}, {}])[1].get("failures"),
+        "evidence": "local-analysis/cpp-offline/loopback-quality-analysis.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

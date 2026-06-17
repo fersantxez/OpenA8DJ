@@ -635,3 +635,23 @@ The full offline gate runs it automatically. A future real dext target must be
 opt-in, build-dir-only, and unavailable unless the DriverKit SDK and required
 entitlements are present. No install, load, unload, reload, signing, or
 SystemExtensions command may be part of the default build.
+## C++ Loopback Analyzer
+
+The offline build includes `opena8djcpp_loopback_quality_analysis`.
+
+Selftest:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_loopback_quality_analysis
+./build/cpp-offline/opena8djcpp_loopback_quality_analysis
+```
+
+The full offline gate runs the analyzer automatically and writes:
+
+- `local-analysis/cpp-offline/loopback-quality-analysis.json`
+- the `loopback_quality_analysis` summary in
+  `local-analysis/cpp-offline/current-offline-gates.json`
+
+The analyzer is offline and dependency-free. It does not open audio devices,
+touch USB, install drivers, or activate system extensions.

@@ -4519,3 +4519,39 @@ Next implication:
   full Xcode/DriverKit SDK, real AudioDriverKit class compilation,
   USBDriverKit endpoint adapter implementation, signing/entitlements, and
   physical same-session quality/CPU proof against mainline.
+
+## 2026-06-17: Add C++ Loopback Quality Analyzer Gate
+
+Decision:
+- Add `tools/loopback_quality_analysis.cpp` as a dependency-free C++ analyzer
+  for reference/capture loopback quality.
+- Wire it into CMake, CTest, `scripts/run-cpp-offline-gates`, and the evidence
+  schema.
+
+Reason:
+- Audiophile claims need objective signal metrics, not only transport counters
+  or clean compilation.
+- The Python analyzers remain useful for exploratory diagnostics, but a core
+  C++ analyzer gives the candidate a portable, cheap, reproducible gate that can
+  run in the same compiled test surface as packet/routing/timecode contracts.
+- The analyzer currently measures alignment, fitted gain, correlation, SNR,
+  residual RMS/peak, peak level, and robust click outliers. Its selftest proves
+  it accepts a clean delayed loopback and rejects a degraded one.
+
+Alternatives discarded:
+- Install more Python/scientific dependencies now: rejected because this gate
+  does not need them and extra dependencies would reduce reproducibility.
+- Treat previous physical captures as enough: rejected because historical
+  evidence is not a same-session proof that this C++ candidate beats mainline.
+
+Evidence:
+- `local-analysis/cpp-offline/loopback-quality-analysis.json`
+- Required result:
+  clean synthetic loopback passes; degraded synthetic loopback fails for
+  objective reasons such as SNR/correlation/clicks; aggregate result PASS.
+
+Next implication:
+- Future locked physical gates can use the compiled analyzer on real iRig or
+  other external-loopback captures. This still does not prove readiness until
+  the same route shows C++ > mainline on quality, CPU, jitter, routing, and
+  timecode.

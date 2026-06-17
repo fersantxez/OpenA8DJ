@@ -912,3 +912,57 @@ PASS/FAIL semantics:
 - PASS does not mean a signed/runnable dext exists or that the driver can be
   installed or tested physically.
 - FAIL blocks real dext binding work.
+
+## Offline C++ Loopback Quality Analyzer
+
+Purpose:
+
+- provide a compiled, dependency-free signal-quality analyzer that can later be
+  used on locked physical loopback captures.
+- verify offline that the analyzer accepts clean loopback and rejects degraded
+  loopback for measurable reasons.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_loopback_quality_analysis
+./build/cpp-offline/opena8djcpp_loopback_quality_analysis
+```
+
+For real capture analysis after a locked physical window:
+
+```sh
+./build/cpp-offline/opena8djcpp_loopback_quality_analysis \
+  --reference-wav /path/to/reference.wav \
+  --capture-wav /path/to/captured.wav \
+  --min-snr-db 45 \
+  --min-correlation 0.98 \
+  --max-clicks 0
+```
+
+Or for raw f32 interleaved capture:
+
+```sh
+./build/cpp-offline/opena8djcpp_loopback_quality_analysis \
+  --reference-wav /path/to/reference.wav \
+  --captured-f32 /path/to/captured.f32 \
+  --sample-rate 48000 \
+  --channels 8 \
+  --pair 0
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/loopback-quality-analysis.json`;
+- `loopback_quality_analysis` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS in selftest mode means the analyzer can distinguish clean synthetic
+  loopback from degraded synthetic loopback using SNR, correlation, residual,
+  and click metrics.
+- PASS does not mean the hardware candidate is audiophile-ready.
+- FAIL blocks any physical quality claim until the analyzer or candidate is
+  fixed.

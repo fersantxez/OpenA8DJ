@@ -7277,3 +7277,60 @@ Operational note:
   - Readiness remains blocked by actual DriverKit SDK compilation,
     entitlements/signing, USBDriverKit endpoint transport, and physical
     same-session quality/CPU proof against mainline.
+
+## 2026-06-17 C++ Loopback Quality Analyzer Focused Run
+
+- Purpose:
+  - Add and verify a compiled signal-quality analyzer for future external
+    loopback evidence.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_loopback_quality_analysis`
+  - `./build/cpp-offline/opena8djcpp_loopback_quality_analysis`
+- Result:
+  - PASS.
+  - Clean synthetic loopback: PASS, min SNR about `277.806 dB`, min
+    correlation `1.0`, click outliers `0`.
+  - Degraded synthetic loopback: correctly rejected, min SNR about `17.1579
+    dB`, min correlation about `0.990517`, click outliers `1`.
+- Evidence:
+  - `local-analysis/cpp-offline/loopback-quality-analysis.json`
+- Safety:
+  - Offline synthetic analysis only.
+  - No hardware, USB, CoreAudio, default device, service restart, driver
+    install, or system-extension activation.
+- Interpretation:
+  - The analyzer is now a measurable prerequisite for physical quality gates.
+  - It is not physical evidence and does not prove better-than-mainline audio
+    quality.
+
+## 2026-06-17 Offline Gates After C++ Loopback Analyzer
+
+- Purpose:
+  - Verify the complete offline gate surface after adding the compiled loopback
+    quality analyzer.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `25/25` passed.
+  - Release CTest: `26/26` passed.
+  - Loopback quality analyzer: PASS.
+  - Clean synthetic loopback min SNR: `277.806 dB`.
+  - Degraded synthetic loopback rejected for `snr_db`, `correlation`, and
+    `clicks`.
+  - Evidence schema: PASS, `required_files=25`, missing `0`.
+  - Static policy: PASS, `audited_files=19`, forbidden hits `0`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/loopback-quality-analysis.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Not-ready blockers still present:
+  - mainline runtime byte parity requires physical capture/export evidence;
+  - full Traktor DVS signal quality matrix;
+  - physical audio and Traktor validation;
+  - runtime CPU/resource comparison against mainline.

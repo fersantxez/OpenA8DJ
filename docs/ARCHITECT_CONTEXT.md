@@ -1594,3 +1594,14 @@ Next technical target:
     `0x17cc:0x1978`, entitlements, runtime binding intent, and default-build
     exclusion.
   - This is not a signed, installed, activated, or runnable dext.
+- C++ loopback quality analyzer:
+  - Added compiled gate `opena8djcpp_loopback_quality_analysis`.
+  - It reads WAV pair references and either WAV pair captures or raw f32
+    interleaved captures for a selected stereo pair.
+  - Metrics: alignment, gain, correlation, SNR, residual RMS/peak, peak level,
+    and robust click outliers.
+  - The offline selftest passes a clean delayed/gain-shifted loopback and
+    intentionally rejects a degraded loopback with residual distortion,
+    cross-feed, and a click.
+  - This is an analyzer/readiness prerequisite, not product proof. The actual
+    claim still requires locked physical same-session captures versus mainline.

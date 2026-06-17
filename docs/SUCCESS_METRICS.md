@@ -1854,3 +1854,36 @@ Required before real dext binding:
 Current status:
 - PASS in the focused build run.
 - This is not a runnable/signed dext and not physical readiness.
+
+## 2026-06-17 C++ Loopback Quality Analyzer Gate
+
+Required for objective audio-quality analysis:
+- `opena8djcpp_loopback_quality_analysis` must PASS in selftest mode.
+- Clean synthetic loopback must pass:
+  - minimum SNR `>= 70 dB` in selftest;
+  - minimum correlation `>= 0.995`;
+  - click outliers `0`.
+- Degraded synthetic loopback must fail for objective signal reasons.
+- Real physical captures must use stricter per-run thresholds documented in the
+  evidence file and must include:
+  - reference path;
+  - capture path;
+  - sample rate;
+  - compared frames/seconds;
+  - alignment score;
+  - per-channel fitted gain;
+  - per-channel correlation;
+  - per-channel SNR;
+  - residual RMS/peak;
+  - click outliers.
+
+Current status:
+- PASS offline in selftest mode.
+- This gate proves the analyzer can distinguish clean from degraded synthetic
+  loopback. It does not prove physical sound quality.
+
+Readiness rule:
+- A future C++ candidate may only claim better sound than mainline if locked
+  same-session external-loopback captures show C++ meeting or exceeding
+  mainline on SNR, residuals, click count, channel leakage, and subjective
+  listening, while also beating or matching CPU/jitter/resource thresholds.

@@ -202,6 +202,9 @@ add_executable(opena8djcpp_transfer_pool_model
 add_executable(opena8djcpp_transport_budget_model
   tools/transport_budget_model.cpp)
 
+add_executable(opena8djcpp_loopback_quality_analysis
+  tools/loopback_quality_analysis.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -237,6 +240,7 @@ add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_transfer_pool_model COMMAND opena8djcpp_transfer_pool_model)
 add_test(NAME opena8djcpp_transport_budget_model COMMAND opena8djcpp_transport_budget_model)
+add_test(NAME opena8djcpp_loopback_quality_analysis COMMAND opena8djcpp_loopback_quality_analysis)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 
