@@ -11,6 +11,9 @@ must preserve:
 - `opena8djcpp_driverkit_shell_contract`
 - `opena8djcpp_driverkit_runtime_contract`
 - `opena8djcpp_driverkit_prepared_transport_contract`
+- `opena8djcpp_driverkit_usb_submit_binding_contract`
+- `opena8djcpp_driverkit_usb_request_lifecycle_contract`
+- `opena8djcpp_driverkit_usb_request_shutdown_contract`
 - `opena8djcpp_prepared_transport_packet_contract`
 - `opena8djcpp_prepared_transport_routing_timecode_contract`
 - `opena8djcpp_prepared_transport_recovery_contract`
@@ -30,6 +33,10 @@ Before this scaffold can become a runnable dext:
   `RequestDeviceConfigurationChange` / `PerformDeviceConfigurationChange` only
   after IO has stopped;
 - implement USBDriverKit transport for Audio 8 DJ endpoints;
+- map USBDriverKit async requests to the preallocated request pool without
+  fallback allocation;
+- preserve explicit stop cancellation accounting and reject late completions
+  after cancel;
 - run the full offline gate suite;
 - request a locked physical test window before any install or activation.
 

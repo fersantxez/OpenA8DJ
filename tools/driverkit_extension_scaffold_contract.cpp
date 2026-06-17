@@ -106,11 +106,17 @@ int main(int argc, char** argv) {
       "lacks the DriverKit SDK",
       "Do not install",
       "locked physical test window",
+      "opena8djcpp_driverkit_usb_submit_binding_contract",
+      "opena8djcpp_driverkit_usb_request_lifecycle_contract",
+      "opena8djcpp_driverkit_usb_request_shutdown_contract",
       "IOMemoryDescriptor",
       "UpdateCurrentZeroTimestamp",
       "GetCurrentZeroTimestamp",
       "RequestDeviceConfigurationChange",
       "PerformDeviceConfigurationChange",
+      "preallocated request pool",
+      "stop cancellation accounting",
+      "late completions",
   });
   const bool default_build_excludes_extension =
       read_file(root / "CMakeLists.txt").find("driverkit/extension/src/OpenA8DJAudioDriver.cpp") ==
