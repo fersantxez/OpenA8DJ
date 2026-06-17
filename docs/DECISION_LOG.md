@@ -4730,3 +4730,33 @@ Next implication:
 - Future physical windows must produce same-run product evidence that turns
   this comparator to `PASS`, and promotion still requires the separate
   promotion evaluator to return `branch_promotion_allowed=true`.
+
+## 2026-06-17: Add Native Soundcheck WAV Quality Reanalysis
+
+Decision:
+- Add `tools/soundcheck_wav_quality.cpp` as the first compiled C++ analyzer for
+  stored soundcheck WAV pairs.
+- Wire it into CMake, CTest, `scripts/run-cpp-offline-gates`, and the evidence
+  schema.
+
+Reason:
+- The promotion path needs independent C++ evidence over actual WAV captures,
+  not only Python-generated `metrics.json`.
+- The latest selected run already has `fixture/reference.wav` and
+  `captured.wav`, so there is no reason to defer native reanalysis.
+- This first slice proves alignment and broad metric parity before deeper
+  algorithm unification.
+
+Alternatives discarded:
+- Jump directly to full Python replacement: rejected because the existing
+  analyzer includes time-warp, CPU coupling, quiet-window, and failure-mode
+  logic; porting that safely should be incremental.
+- Use the native comparator alone: rejected because it reads already-computed
+  metrics and cannot catch analyzer drift or bad alignment by itself.
+
+Evidence:
+- `local-analysis/cpp-offline/soundcheck-wav-quality.json`
+
+Next implication:
+- Tighten the parity tolerances and port remaining Python logic: time-warp,
+  CPU coupling, exact quiet/noise windows, and click-count semantics.

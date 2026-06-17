@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
       root / "tools/prepared_transport_recovery_contract.cpp",
       root / "tools/prepared_slot_scheduler_contract.cpp",
       root / "tools/physical_run_compare.cpp",
+      root / "tools/soundcheck_wav_quality.cpp",
       root / "tools/driverkit_surface_model.cpp",
       root / "tools/evidence_schema_check.cpp",
       root / "tools/static_policy_check.cpp",

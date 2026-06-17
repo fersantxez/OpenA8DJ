@@ -1644,5 +1644,19 @@ Next technical target:
 - The selected run has `fixture/reference.wav` and `captured.wav`; the
   comparator marks native WAV reanalysis as `AVAILABLE_NOT_YET_USED`, so the
   next implementation target is a native C++ reanalysis of those WAVs.
+
+### 2026-06-17 Native Soundcheck WAV Quality
+
+- Added `opena8djcpp_soundcheck_wav_quality`.
+- It reopens stored soundcheck WAVs and computes native C++ alignment,
+  left/right SNR, mid/high residual ratios, quiet mid noise, lag jumps, clicks,
+  and clipping.
+- Latest analyzed run:
+  `20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+- Native alignment is now consistent with Python:
+  `reference_start=81`, `capture_start=6228`, `alignment_lag=6147`.
+- Parity against recorded metrics is `PASS` for the first six broad
+  comparisons, but this remains analyzer progress only. Product quality and CPU
+  still fail.
 - Offline gates pass, but this does not improve physical sound; it improves the
   integrity of the readiness claim.

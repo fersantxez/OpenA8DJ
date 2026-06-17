@@ -2624,3 +2624,26 @@ Risk:
 - Next action:
   - Implement or reinforce native real-music/WAV metric parity for alignment,
     SNR, residual bands, quiet noise, click outliers, clipping, and lag jumps.
+
+## 2026-06-17 Native WAV Reanalysis Integration
+
+- Agent: Architect.
+- Files affected:
+  - `tools/soundcheck_wav_quality.cpp`
+  - `CMakeLists.txt`
+  - `scripts/run-cpp-offline-gates`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+  - docs listed in this handoff.
+- Result:
+  - Added a first-slice native C++ analyzer over stored soundcheck WAV pairs.
+  - Fixed the alignment search to use Python-style coarse/fine lag search after
+    an initial false periodic maximum.
+  - Current analyzer parity is broad but passing for core alignment/SNR/residual
+    metrics.
+- Risk:
+  - It is not a full replacement for Python yet. Time-warp, CPU coupling,
+    exact quiet-window behavior, and stricter click parity remain.
+- Next action:
+  - Tighten parity and port remaining `analyze-soundcheck-capture.py` logic
+    into a reusable C++ audio-quality module.

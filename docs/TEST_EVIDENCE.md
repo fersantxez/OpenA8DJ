@@ -7619,3 +7619,47 @@ Operational note:
     improvement.
   - The C++ line still cannot claim better sound quality, lower CPU, Traktor
     timecode readiness, branch promotion readiness, or hardware readiness.
+
+## 2026-06-17 Native Soundcheck WAV Quality Reanalysis
+
+- Purpose:
+  - Start replacing Python-only soundcheck quality evidence with a compiled C++
+    analyzer over stored `fixture/reference.wav` and `captured.wav`.
+  - Keep the analyzer offline-only and explicitly separate it from product
+    readiness.
+- Changes:
+  - Added `tools/soundcheck_wav_quality.cpp`.
+  - Added `opena8djcpp_soundcheck_wav_quality` to CMake/CTest.
+  - Added `local-analysis/cpp-offline/soundcheck-wav-quality.json` to the
+    offline evidence bundle and schema.
+- Native analyzer scope:
+  - WAV parsing for PCM/float pairs.
+  - Python-style coarse/fine lag search.
+  - Alignment score, quality alignment score, left/right SNR, mid/high residual
+    ratios, quiet mid-band noise, lag windows/jumps, click outliers, and
+    clipping.
+  - Parity comparison against existing `metrics.json` with broad first-slice
+    tolerances.
+- Focused command:
+  - `cmake --build build/cpp-offline --target opena8djcpp_soundcheck_wav_quality`
+  - `./build/cpp-offline/opena8djcpp_soundcheck_wav_quality | tee local-analysis/cpp-offline/soundcheck-wav-quality.json`
+- Focused result:
+  - Analyzer result: `PASS`.
+  - Run:
+    `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+  - Native alignment matches the Python evidence shape:
+    `reference_start=81`, `capture_start=6228`, `alignment_lag=6147`,
+    `alignment_score=0.953641`.
+  - Native quality metrics:
+    quality `0.953641`, left/right SNR `8.797298/8.815170 dB`,
+    mid/high residual ratio `1.685303/1.580494`, quiet mid
+    `-34.694516 dBFS`, lag jumps `32`, click outliers `0`, clipping `0`.
+  - Parity result: `PASS`, `6/6` comparisons within current tolerance.
+- Interpretation:
+  - This is the first native WAV reanalysis slice. It is good enough to catch
+    gross alignment/quality contradictions in stored evidence.
+  - It is not yet a full replacement for `scripts/analyze-soundcheck-capture.py`
+    because time-warp, CPU coupling, exact quiet-window policy, and stricter
+    click parity still need to be unified.
+  - The analyzed run still fails product quality and CPU gates; this does not
+    change readiness.

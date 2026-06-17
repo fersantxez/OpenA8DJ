@@ -450,3 +450,16 @@ Decision remains unchanged: do not move C mainline to Legacy, do not move C++
 to `main`, do not claim audiophile readiness, and do not request physical
 readiness until same-session product evidence beats mainline quality and CPU
 and timecode physical validation exists.
+
+## 2026-06-17 Native WAV Reanalysis Status
+
+Latest native WAV reanalysis evidence:
+`local-analysis/cpp-offline/soundcheck-wav-quality.json`.
+
+- Analyzer result: `PASS`.
+- Parity result: `PASS` for the first broad comparison set.
+- Native metrics for the latest selected product run still show a bad
+  candidate: quality `0.953641`, SNR around `8.8 dB`, mid/high residual
+  `1.685303/1.580494`, lag jumps `32`, and clipping `0`.
+- This strengthens the evidence chain but does not change promotion status:
+  C++ remains not ready to replace mainline.

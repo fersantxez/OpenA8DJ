@@ -47,6 +47,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
+./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
@@ -111,6 +112,7 @@ transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
 capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
+soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 realtime = load_json("realtime-audit.json")
@@ -302,6 +304,21 @@ summary = {
         "clean_max_wrong_source_leakage_db": capture_matrix_quality.get("runs", [{}])[0].get("metrics", {}).get("max_wrong_source_leakage_db"),
         "degraded_failures": capture_matrix_quality.get("runs", [{}, {}])[1].get("failures"),
         "evidence": "local-analysis/cpp-offline/capture-matrix-quality-analysis.json",
+    },
+    "soundcheck_wav_quality": {
+        "status": soundcheck_wav_quality.get("result"),
+        "run_dir": soundcheck_wav_quality.get("run_dir"),
+        "quality_alignment_score": soundcheck_wav_quality.get("quality_alignment_score"),
+        "left_snr_db": soundcheck_wav_quality.get("left_snr_db"),
+        "right_snr_db": soundcheck_wav_quality.get("right_snr_db"),
+        "mid_band_residual_ratio": soundcheck_wav_quality.get("mid_band_residual_ratio"),
+        "high_band_residual_ratio": soundcheck_wav_quality.get("high_band_residual_ratio"),
+        "lag_jumps_gt_2_frames": soundcheck_wav_quality.get("lag_jumps_gt_2_frames"),
+        "click_outliers": soundcheck_wav_quality.get("click_outliers"),
+        "capture_clipped_frames": soundcheck_wav_quality.get("capture_clipped_frames"),
+        "parity_result": soundcheck_wav_quality.get("parity", {}).get("result"),
+        "parity_failures": soundcheck_wav_quality.get("parity", {}).get("failures"),
+        "evidence": "local-analysis/cpp-offline/soundcheck-wav-quality.json",
     },
     "channel_leakage_tone_contract": {
         "status": channel_leakage_tone.get("result"),
