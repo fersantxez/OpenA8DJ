@@ -1,5 +1,62 @@
 # Test Evidence
 
+## 2026-06-17: C++ Physical Capture Forensics Over Archived iRig WAVs
+
+- Change:
+  - Added `opena8djcpp_physical_capture_forensics`, a dependency-free C++
+    analyzer for archived reference/captured WAV pairs.
+  - The analyzer reports fixed-lag correlation, per-window lag spread/jumps,
+    static 2x2 stereo matrix explainability, residual level, high-change
+    residual ratio, and diagnostic classification.
+  - Integrated the analyzer into CMake, `scripts/run-cpp-offline-gates`, and
+    evidence schema requirements.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_capture_forensics`
+  - `./build/cpp-offline/opena8djcpp_physical_capture_forensics | tee local-analysis/cpp-offline/physical-capture-forensics.json`
+- Result:
+  - Analyzer PASS, hardware untouched.
+  - WAV-backed candidate runs: `61`.
+  - Deep analyzed runs: `12`.
+  - Strict quality candidates: `0`.
+  - Best analyzed run:
+    `local-analysis/soundcheck/20260616-capture-detail-irig-pairA-8s-cpp-hal`.
+  - Best run quality `0.978050`, SNR floor `9.845114 dB`, matrix explain
+    `4.643718 dB`, lag stddev `10.974947` frames, residual diff ratio
+    `0.637056`.
+  - Best run classification:
+    `variable_timebase_or_route_capture_instability`.
+- Interpretation:
+  - The current physical frontier still does not prove audiophile superiority.
+  - The failure is not explained by a simple static stereo gain/crossfeed
+    matrix. Further physical work must isolate route/capture/timebase behavior
+    under lock before promotion.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-capture-forensics.json`.
+
+## 2026-06-17: Full Offline Gates With Physical Capture Forensics
+
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Overall status: `PASS`.
+  - Debug CTest: `39/39` passed.
+  - Release CTest: `40/40` passed.
+  - Evidence schema: `40` required files, `0` missing.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - USB touched: `false`.
+  - Physical evidence frontier: `61` runs, `12` families, `0` quality-passing
+    runs, `0` CPU-passing runs, `0` product candidates.
+  - Physical capture forensics: `61` WAV-backed candidates, `12` analyzed
+    runs, `0` strict quality candidates.
+  - Product comparison remains blocked:
+    `branch_promotion_supported=false`,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/cpp-offline/physical-capture-forensics.json`.
+
 ## 2026-06-17: Direct USB Timeline Instrumentation And Reset No-Wait Rejection
 
 - Change:

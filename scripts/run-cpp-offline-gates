@@ -57,6 +57,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
+./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -128,6 +129,7 @@ soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
+physical_capture_forensics = load_json("physical-capture-forensics.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -430,6 +432,24 @@ summary = {
         "best_quality_run": physical_evidence_frontier.get("best_quality_run"),
         "readiness_claim": physical_evidence_frontier.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/physical-evidence-frontier.json",
+    },
+    "physical_capture_forensics": {
+        "status": physical_capture_forensics.get("result"),
+        "candidate_runs_with_wav": physical_capture_forensics.get("candidate_runs_with_wav"),
+        "analyzed_runs": physical_capture_forensics.get("analyzed_runs"),
+        "strict_quality_candidates": physical_capture_forensics.get("strict_quality_candidates"),
+        "best_analyzed_run": physical_capture_forensics.get("best_analyzed_run"),
+        "variable_timebase_or_route_capture_instability_runs": physical_capture_forensics.get(
+            "variable_timebase_or_route_capture_instability_runs"
+        ),
+        "static_stereo_route_or_gain_dominant_runs": physical_capture_forensics.get(
+            "static_stereo_route_or_gain_dominant_runs"
+        ),
+        "high_frequency_or_nonlinear_residual_dominant_runs": physical_capture_forensics.get(
+            "high_frequency_or_nonlinear_residual_dominant_runs"
+        ),
+        "readiness_claim": physical_capture_forensics.get("readiness_claim"),
+        "evidence": "local-analysis/cpp-offline/physical-capture-forensics.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

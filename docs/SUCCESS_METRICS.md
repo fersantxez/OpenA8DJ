@@ -29,6 +29,17 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 
 ## Baseline References
 
+## Promotion-Blocking Physical Metrics
+
+- Physical capture forensics must find at least one same-session candidate with
+  strict quality and no dominant route/timebase instability before any
+  audiophile-quality claim. Current archived evidence fails this: the C++
+  forensic gate reports `0` strict quality candidates; best analyzed run
+  quality `0.978050`, SNR floor `9.845114 dB`, lag stddev `10.974947`
+  frames, classification `variable_timebase_or_route_capture_instability`.
+- This metric is intentionally stricter than "the analyzer ran." Analyzer
+  `PASS` only means the forensic pass is healthy.
+
 ### Mainline C Reference
 
 Current mainline C/OpenA8DJ internal reference: `0.3.135`.

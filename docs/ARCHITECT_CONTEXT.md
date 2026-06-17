@@ -16,6 +16,15 @@ Branch: `driverkit/cpp-redesign`
   collapse physical quality. The raw/reused completion-handler probe reduced
   driver CPU only slightly while still failing physical quality, so it remains
   rejected as a default. Runtime isolation after cleanup is clean.
+- The archived iRig WAV frontier now has a C++ forensic gate. It found `61`
+  physical runs with WAV evidence, deeply analyzed `12`, and found `0` strict
+  audiophile/product candidates. The best analyzed run is
+  `20260616-capture-detail-irig-pairA-8s-cpp-hal`: quality `0.978050`, SNR
+  floor `9.845114 dB`, matrix explain `4.643718 dB`, lag stddev
+  `10.974947` frames, and classification
+  `variable_timebase_or_route_capture_instability`. This means the current
+  physical frontier is not a simple static gain/crossfeed correction and does
+  not prove better sound than mainline.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
   `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the

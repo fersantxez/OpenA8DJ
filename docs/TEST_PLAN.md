@@ -1155,6 +1155,19 @@ Physical evidence frontier:
 - It reports whether any stored physical run is already a product candidate
   under the strict quality and CPU gates.
 
+Physical capture forensics:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It scans existing iRig WAV evidence only and recompares reference/capture
+  audio in C++.
+- It reports fixed-lag score, per-window lag spread/jumps, static stereo matrix
+  explainability, residual level, high-change residual ratio, and a diagnostic
+  classification for the best archived runs.
+- PASS means analyzer health. Promotion still requires
+  `strict_quality_candidates > 0` plus same-session C/mainline comparison.
+- Current result: `61` WAV-backed runs, `12` deep analyses, `0` strict
+  candidates; best run classified as
+  `variable_timebase_or_route_capture_instability`.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.

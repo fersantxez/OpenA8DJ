@@ -1,5 +1,43 @@
 # Decision Log
 
+## 2026-06-17: Add C++ Physical Capture Forensics Before Further Hardware Claims
+
+Decision:
+- Add `opena8djcpp_physical_capture_forensics`, a compiled C++ analyzer over
+  archived iRig WAV captures.
+- Wire it into CMake, the offline gate runner, the evidence schema, and the
+  global gate summary.
+- Treat the analyzer PASS as diagnostic health only; it cannot promote the
+  C++ driver or claim audiophile quality.
+
+Reason:
+- Aggregated `metrics.json` files are not enough to decide whether the current
+  physical failure is fixable by gain/routing correction, fixed latency, or a
+  real variable route/timebase problem.
+- The C++ forensic pass recomputes fixed-lag correlation, per-window lag
+  stability, 2x2 stereo matrix explanation, residual energy, high-change
+  residual ratio, and classification directly from archived reference/capture
+  WAVs.
+- Current evidence shows `61` physical WAV candidates, `12` deep analyses,
+  and `0` strict quality candidates. The best analyzed capture has quality
+  `0.978050` and SNR floor `9.845114 dB`, but it is still classified as
+  `variable_timebase_or_route_capture_instability`.
+
+Alternatives discarded:
+- Install more tools before analyzing existing WAVs: rejected for now because
+  a dependency-free C++ analyzer can extract the next useful signal without
+  touching hardware, CoreAudio, USB, or system state.
+- Promote based on the best `0.978050` quality score: rejected because SNR,
+  lag stability, and matrix residual evidence still fail.
+
+Evidence:
+- `local-analysis/cpp-offline/physical-capture-forensics.json`.
+
+Next implication:
+- Any further physical test must be same-route, lock-gated, and designed to
+  distinguish capture-route/timebase instability from true driver output
+  quality. Branch promotion remains blocked.
+
 ## 2026-06-17: Instrument Direct USB Timeline, Keep Reset Reply Wait Default
 
 Decision:
