@@ -3820,3 +3820,38 @@ Operational note:
   - `local-analysis/soundcheck/20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s`
   - `local-analysis/promotion-readiness-after-inputdecode-off-ch12.json`
   - `local-analysis/runtime-isolation/after-inputdecode-off-dense-ch12-unload.json`
+
+## 2026-06-17: Reject HAL_INPUT_IO=0 Diagnostic Variant
+
+- Commit under test: `ea46f01` plus Makefile diagnostic flag exposure.
+- Commands:
+  - Build diagnostic variant:
+    `make -B hal build/audio-wav-play build/opena8dj-control HAL_INPUT_IO=0`
+  - Safety:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 45 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-inputio-off/20260617-inputio-off/hal-candidate-safety`
+  - Explicit cleanup after safety failure:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --enumeration-timeout 8 --run-dir local-analysis/audio-stack-guard/after-inputio-off-safety-fail-unload`
+    and
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-inputio-off-safety-fail-unload.json`
+  - Rebuild default product HAL:
+    `make -B hal build/audio-wav-play build/opena8dj-control`
+- Results:
+  - Diagnostic variant was rejected before soundcheck:
+    `cycle=1 result=FAIL reason=required_device_missing`.
+  - The OpenA8DJ HAL process was present during the guard, but CoreAudio
+    enumeration did not show UID `org.opena8dj.Audio8DJ`; only iRig, MacBook
+    microphone, and MacBook speakers were visible.
+  - The safety script moved the rejected bundle to:
+    `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.rejected-missing-device-cycle-1-20260617-022416`.
+  - Recovery completed with HAL inactive, lock absent, and audio stack health
+    PASS. Recovery did restart audio-related services as part of the authorized
+    safety failure path.
+  - Default product HAL was rebuilt afterward with `HAL_INPUT_IO=1`.
+- Decision:
+  - Do not use `HAL_INPUT_IO=0` as a product or benchmark variant. Disabling
+    HAL input I/O at compile time breaks device enumeration, so it cannot answer
+    the coreaudiod CPU question safely.
+- Evidence paths:
+  - `local-analysis/physical-inputio-off/20260617-inputio-off/hal-candidate-safety`
+  - `local-analysis/audio-stack-guard/after-inputio-off-safety-fail-unload`
+  - `local-analysis/runtime-isolation/after-inputio-off-safety-fail-unload.json`

@@ -2282,3 +2282,34 @@ Evidence:
   FAIL quality but driver p95 `6.3%`.
 - Promotion readiness:
   `local-analysis/promotion-readiness-after-inputdecode-off-ch12.json`, FAIL.
+
+## 2026-06-17: Expose But Reject HAL_INPUT_IO=0 Physical Diagnostic
+
+Decision:
+- Expose the existing `OPENA8DJ_ENABLE_INPUT_IO` HAL macro as
+  `HAL_INPUT_IO`, default `1`, so future builds are explicit about whether HAL
+  input callbacks are compiled.
+- Reject `HAL_INPUT_IO=0` as a valid physical diagnostic/product variant for
+  the current HAL: it fails device enumeration safety.
+
+Reason:
+- Performance analysis suggested `coreaudiod` p95 may include input/full-duplex
+  graph work even when USB input decode is disabled. A compile-time no-input
+  HAL variant was the smallest way to test that hypothesis.
+- The variant compiled, but `test-hal-candidate-safety` failed before
+  soundcheck with `required_device_missing`. The driver process existed, but
+  CoreAudio enumeration did not expose UID `org.opena8dj.Audio8DJ`.
+- Because the device surface disappears, the variant cannot produce meaningful
+  product CPU, quality, or timecode evidence.
+
+Alternatives discarded:
+- Run soundcheck anyway through a missing/unlisted device: rejected by safety.
+- Make no-input HAL a product optimization: rejected because Audio 8 DJ must
+  expose and support 8 inputs and timecode vinyl.
+
+Evidence:
+- Safety failure:
+  `local-analysis/physical-inputio-off/20260617-inputio-off/hal-candidate-safety/summary.txt`.
+- Cleanup:
+  `local-analysis/runtime-isolation/after-inputio-off-safety-fail-unload.json`,
+  PASS with HAL inactive and lock absent.

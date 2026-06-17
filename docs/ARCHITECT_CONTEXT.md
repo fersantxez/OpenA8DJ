@@ -803,3 +803,18 @@ Next technical target:
   physical music quality PASS, coreaudiod CPU below mainline/threshold,
   physical Traktor/timecode vinyl validation, physical A/B/C/D matrix, and a
   resolved explanation for the degraded iRig route.
+
+## 2026-06-17 HAL Input I/O Diagnostic
+
+- `HAL_INPUT_IO` is now an explicit Makefile knob for the existing HAL macro
+  `OPENA8DJ_ENABLE_INPUT_IO`; default remains `1`.
+- The `HAL_INPUT_IO=0` diagnostic build is rejected for physical testing:
+  `test-hal-candidate-safety` failed with `required_device_missing`.
+- Evidence showed the OpenA8DJ HAL process existed, but CoreAudio did not
+  enumerate UID `org.opena8dj.Audio8DJ`. That means the no-input HAL variant
+  cannot be used to measure product CPU or quality.
+- Recovery after the failed safety run completed successfully: HAL inactive,
+  lock absent, audio stack PASS.
+- The next CPU investigation should not remove HAL input I/O wholesale. It
+  needs a runtime/control-plane approach that preserves device enumeration,
+  8-input surface, and DVS/timecode readiness.
