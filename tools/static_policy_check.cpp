@@ -1,7 +1,9 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -28,6 +30,55 @@ bool contains_forbidden(const std::filesystem::path& path,
     }
   }
   return failed;
+}
+
+std::string trim(std::string_view value) {
+  const auto begin = value.find_first_not_of(" \t\r\n");
+  if (begin == std::string_view::npos) {
+    return "";
+  }
+  const auto end = value.find_last_not_of(" \t\r\n");
+  return std::string(value.substr(begin, end - begin + 1));
+}
+
+std::map<std::string, std::string> parse_make_defaults(const std::filesystem::path& path,
+                                                       std::vector<std::string>& failures) {
+  std::ifstream input(path);
+  std::map<std::string, std::string> defaults;
+  if (!input) {
+    failures.push_back(path.string() + ":unreadable");
+    return defaults;
+  }
+
+  std::string line;
+  std::uint32_t line_number = 0;
+  while (std::getline(input, line)) {
+    line_number += 1;
+    const auto assign = line.find("?=");
+    if (assign == std::string::npos) {
+      continue;
+    }
+    auto name = trim(std::string_view(line).substr(0, assign));
+    auto value = trim(std::string_view(line).substr(assign + 2));
+    if (name.empty()) {
+      failures.push_back(path.string() + ":" + std::to_string(line_number) + ":empty-default-name");
+      continue;
+    }
+    defaults[name] = value;
+  }
+  return defaults;
+}
+
+std::string json_escape(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (const char ch : value) {
+    if (ch == '"' || ch == '\\') {
+      escaped.push_back('\\');
+    }
+    escaped.push_back(ch);
+  }
+  return escaped;
 }
 
 }  // namespace
@@ -77,17 +128,61 @@ int main(int argc, char** argv) {
     (void)contains_forbidden(path, forbidden, hits);
   }
 
+  std::vector<std::string> default_failures;
+  const auto defaults = parse_make_defaults(root / "Makefile", default_failures);
+  const std::map<std::string, std::string> expected_defaults = {
+      {"HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC", "0"},
+      {"HAL_ISO_FRAMES", "8"},
+      {"HAL_PLAYBACK_ISO_FRAMES", "$(HAL_ISO_FRAMES)"},
+      {"HAL_PLAYBACK_COALESCE_TRANSFERS", "1"},
+      {"HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE", "0"},
+      {"HAL_EXPLICIT_SCHED", "0"},
+      {"HAL_OUTPUT_NATIVE", "0"},
+      {"HAL_FAST_OUTPUT_PREFETCH_CLEAR", "0"},
+      {"HAL_UNROLLED_OUTPUT_PACK", "0"},
+      {"HAL_TRANSFER_POOL_CURSOR", "0"},
+      {"HAL_REUSE_ISOC_COMPLETIONS", "0"},
+      {"HAL_FAST_ISO_TRANSFER_CONFIG", "0"},
+      {"HAL_PLAYBACK_PAYLOAD_GUARD", "0"},
+      {"HAL_OUTPUT_SAMPLE_TIME_FOLLOWER", "0"},
+      {"HAL_IGNORE_OUTPUT_SAMPLE_TIME", "0"},
+      {"HAL_HOT_PATH_TIMING", "0"},
+      {"HAL_STREAM_STATS_ATOMIC_ACCUMULATORS", "0"},
+      {"HAL_OUTPUT_START_BYTE", "4"},
+      {"HAL_OUTPUT_CHECK_OFFSET", "8"},
+      {"HAL_VALID_CAPTURE_OUT_LAYOUT", "0"},
+      {"HAL_SELECT_ALT0_BEFORE_ALT1", "0"},
+  };
+  for (const auto& [name, expected] : expected_defaults) {
+    const auto found = defaults.find(name);
+    if (found == defaults.end()) {
+      default_failures.push_back(name + ":missing");
+      continue;
+    }
+    if (found->second != expected) {
+      default_failures.push_back(name + ":expected=" + expected + ":actual=" + found->second);
+    }
+  }
+
   const bool path_policy = root == std::filesystem::path("/Users/fer/dev/audio8djcpp");
-  const bool pass = hits.empty() && path_policy;
+  const bool pass = hits.empty() && path_policy && default_failures.empty();
 
   std::cout << "{\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
             << "  \"audited_files\": " << audited_files.size() << ",\n"
             << "  \"forbidden_hits\": " << hits.size() << ",\n"
             << "  \"path_policy\": " << (path_policy ? "true" : "false") << ",\n"
+            << "  \"rejected_default_checks\": " << expected_defaults.size() << ",\n"
+            << "  \"default_policy_failures\": " << default_failures.size() << ",\n"
             << "  \"hits\": [";
   for (std::size_t index = 0; index < hits.size(); ++index) {
-    std::cout << (index == 0 ? "" : ", ") << "\"" << hits[index] << "\"";
+    std::cout << (index == 0 ? "" : ", ") << "\"" << json_escape(hits[index]) << "\"";
+  }
+  std::cout << "],\n"
+            << "  \"default_failures\": [";
+  for (std::size_t index = 0; index < default_failures.size(); ++index) {
+    std::cout << (index == 0 ? "" : ", ") << "\""
+              << json_escape(default_failures[index]) << "\"";
   }
   std::cout << "]\n}\n";
 

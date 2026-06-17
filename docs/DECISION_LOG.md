@@ -3873,3 +3873,38 @@ Next implication:
 - The next optimization should either preserve the measured output consumption
   near 48 kHz while reducing callback cost, or introduce a new transport model
   that passes this offline gate before any hardware run.
+
+## 2026-06-17: Enforce Rejected HAL Defaults In Static Policy
+
+Decision:
+- Extend `opena8djcpp_static_policy_check` so offline gates fail if known
+  rejected or diagnostic-only HAL flags become Makefile defaults.
+- Surface the rejected-default check count and failure count in
+  `current-offline-gates.json`.
+
+Reason:
+- The project has accumulated many physical rejections. Repeating one by
+  accidentally changing a Makefile default would waste hardware time and could
+  produce misleading "new" evidence.
+- The protected defaults include CPU-attractive but quality-rejected paths:
+  ISO64-like default promotion, playback coalescing, fixed/output-only pacing,
+  unrolled output pack, fast prefetch clear, atomic stream stats, reused ISO
+  completions, fast ISO config, explicit scheduling, native output format,
+  valid-capture OUT layout, and sample-time follower/ignore variants.
+- This is a cheap offline guardrail that does not touch hardware, CoreAudio, USB,
+  mainline, or Rust.
+
+Alternatives discarded:
+- Keep the rejections only in prose: rejected because prose does not fail a
+  build before a risky hardware run.
+- Forbid the flags entirely: rejected because several remain useful as opt-in
+  diagnostics when a locked, documented experiment needs them.
+
+Evidence:
+- `local-analysis/cpp-offline/static-policy.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- Any future candidate that wants to promote a rejected knob must change both
+  the evidence and this policy deliberately, with a new reason and fresh
+  physical proof.

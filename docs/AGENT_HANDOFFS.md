@@ -2319,3 +2319,40 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Do not repeat plain ISO64/q8. Investigate pacing/rate-preserving transport
     smoothing only if it can be modelled offline first and then measured
     under lock against physical quality and CPU.
+
+## Socrates: HAL Hot-Path CPU Scout - 2026-06-17
+
+- Mission:
+  - Read-only audit of the C++ HAL hot path for CPU candidates that preserve
+    the already modelled rate shape and avoid rejected transport knobs.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+- Findings:
+  - Highest-priority candidate:
+    reuse ISO transfer layout/request geometry when sample rate, request list,
+    and transaction count are unchanged. This should not change payload bytes,
+    ISO8/q8/default pacing, coalescing, lead, or rate shape.
+  - Second candidate:
+    reuse completion handlers in pooled transfers, but only with strict lifetime
+    handling. This reduces block creation risk but has concurrency/lifetime
+    hazards.
+  - Third candidate:
+    build a new byte-parity-proven specialized HAL packer rather than enabling
+    the physically rejected existing `HAL_UNROLLED_OUTPUT_PACK` path.
+  - Do not candidate ISO64/q8, coalescing, output-only, full-8 ISO8 layout,
+    fixed OUT pacing, `VALID_CAPTURE_OUT_LAYOUT`, or loss of observability as
+    primary fixes.
+- Architect integration:
+  - Added a static rejected-default policy gate before attempting another CPU
+    optimization, so accidental promotion of previously rejected defaults fails
+    offline.
+- Next recommended action:
+  - Implement the ISO layout reuse path behind offline/contract evidence first,
+    then require locked physical evidence for hot-path timing, quality, CPU,
+    stream stats, and rate shape before any readiness claim.

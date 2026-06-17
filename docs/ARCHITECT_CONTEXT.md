@@ -1430,3 +1430,14 @@ Next technical target:
   - A mainline-like ISO64/q8 rate shape is mathematically rate-safe but remains
     blocked as a C++ product default because the exact candidate was already
     physically rejected. Rate correctness alone is not a readiness claim.
+- Rejected-default static policy:
+  - `tools/static_policy_check.cpp` now audits Makefile HAL defaults for known
+    rejected or diagnostic-only knobs, in addition to unsafe mutation strings.
+  - The gate currently checks `21` defaults, including ISO64 promotion, playback
+    coalescing, output-only mode, explicit scheduling, native/little-endian
+    output, unrolled pack, fast prefetch clear, atomic stream stats, reused ISO
+    completions, fast ISO config, output sample-time follower, ignore sample
+    time, valid-capture OUT layout, hot-path timing, and alt0-before-alt1.
+  - Purpose:
+    prevent accidental reintroduction of physically rejected paths before they
+    burn another hardware window. Passing this gate is not readiness.

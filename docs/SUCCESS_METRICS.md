@@ -1497,3 +1497,21 @@ Latest promotion evaluation:
     about `88000` frames/s, `833333 ppm` too high.
   - Mainline-like ISO64/q8 is rate-safe but blocked by prior physical
     rejection, so it is not a product-readiness path by itself.
+
+## 2026-06-17 Rejected-Default Static Policy Status
+
+- Evidence:
+  - `local-analysis/cpp-offline/static-policy.json`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+- Gate result:
+  - `PASS`.
+  - `21` rejected-default checks.
+  - `0` default-policy failures.
+- Required semantics:
+  - `PASS` means known rejected or diagnostic-only HAL knobs remain opt-in and
+    are not the Makefile product defaults.
+  - `FAIL` blocks hardware testing until either the default is restored or the
+    rejection is deliberately overturned with new written evidence.
+- Readiness implication:
+  - This protects evidence quality and hardware windows. It does not prove
+    audiophile sound quality, timecode readiness, or CPU superiority.

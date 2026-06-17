@@ -259,6 +259,8 @@ summary = {
         "audited_files": static.get("audited_files"),
         "forbidden_hits": static.get("forbidden_hits"),
         "path_policy": static.get("path_policy"),
+        "rejected_default_checks": static.get("rejected_default_checks"),
+        "default_policy_failures": static.get("default_policy_failures"),
         "evidence": "local-analysis/cpp-offline/static-policy.json",
     },
     "hardware_lock_policy": {

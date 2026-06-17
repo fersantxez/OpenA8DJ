@@ -6308,3 +6308,30 @@ Operational note:
 - Evidence paths:
   - `local-analysis/cpp-offline/jitter-model.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Rejected-Default Static Policy Gate
+
+- Purpose:
+  - Make offline gates fail if a physically rejected or diagnostic-only HAL knob
+    is accidentally promoted to the default Makefile build.
+  - Preserve opt-in diagnostic flags without letting them silently become the
+    product candidate.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `scripts/run-cpp-offline-gates`
+- Direct checker result:
+  - PASS.
+  - `audited_files=10`.
+  - `forbidden_hits=0`.
+  - `path_policy=true`.
+  - `rejected_default_checks=21`.
+  - `default_policy_failures=0`.
+- Protected default classes:
+  - transfer-rate and pacing defaults rejected by model or physical evidence;
+  - output format/packer defaults rejected by physical evidence;
+  - diagnostic instrumentation defaults that must remain opt-in;
+  - sample-time and explicit-scheduling defaults that failed product gates.
+- Evidence paths:
+  - `local-analysis/cpp-offline/static-policy.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
