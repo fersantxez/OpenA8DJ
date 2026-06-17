@@ -123,6 +123,13 @@ Branch: `driverkit/cpp-redesign`
 - C++ now exposes `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM`, default `1`, matching
   current behavior while allowing a future locked one-factor test with the
   reset skipped. This is testability infrastructure only, not a quality fix.
+- Added offline stream-stats summarization for existing soundcheck snapshots.
+  Current latest calibrated run summary:
+  `local-analysis/stream-stats/default-minus16-summary.json`, result
+  `DIAGNOSTIC_FLAGS`, with `stream_stats_timeouts`,
+  `output_write_stats_unobservable`, output read rate about `48009.4` fps, and
+  no active-underrun/timeline/panic flag. Across prior runs, ISO64 is a clear
+  outlier for capture transaction error ratio, matching its physical rejection.
 
 ## Known Baseline Inputs
 

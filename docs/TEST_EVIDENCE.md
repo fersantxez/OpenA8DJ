@@ -1935,3 +1935,31 @@ Operational note:
   - The promotion command now defaults to the latest paired physical quality
     and CPU evidence instead of a fixed older run. This improves readiness
     rigor only; it does not improve the candidate.
+
+## 2026-06-17: Offline Stream-Stats Summary Analyzer
+
+- Commands:
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/default-minus16-summary.json`
+  - `scripts/analyze-stream-stats.py $(find local-analysis/soundcheck -maxdepth 2 -name stream-stats-during.tsv | sort) --json-out local-analysis/stream-stats/all-soundchecks-summary.json`
+- Result:
+  - Analyzer executed offline only; no hardware, CoreAudio, USB, HAL install,
+    or system service was touched.
+  - Latest calibrated run summary result: `DIAGNOSTIC_FLAGS`.
+- Key metrics for `20260616-default-minus16-irig-pairA-16s-cpp-hal`:
+  - `ok_sample_count=45`
+  - `error_sample_count=2`
+  - `output_read_frames_per_second=48009.4`
+  - `capture_transaction_errors_per_capture_transfer=2.273`
+  - `output_write_stats_observable=false`
+  - Flags: `stream_stats_timeouts`, `output_write_stats_unobservable`.
+- Cross-run finding:
+  - ISO64 remains an outlier with
+    `capture_transaction_errors_per_capture_transfer=29.092`, consistent with
+    its physical rejection and not worth retesting without a new hypothesis.
+- Interpretation:
+  - The latest calibrated run did not show active underruns, timeline resets,
+    or panic flags in the stream snapshots. The failure is still in physical
+    audio quality/CPU, not a simple output starvation counter.
+  - Because `HAL_OUTPUT_WRITE_STATS=0`, future diagnostic physical runs need an
+    explicit plan for whether write stats are worth enabling despite their
+    previous physical regression.
