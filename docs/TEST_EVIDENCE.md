@@ -8447,3 +8447,51 @@ Full offline gate rerun:
   - A promotion-quality mainline/C++ A/B remains blocked until a real
     non-Audio8 source is physically routed into the same mixer/REC OUT -> iRig
     capture path and passes the known-good route gate.
+
+## 2026-06-17 Diagnostic Mainline A/B Attempt With Known-Good Route Skipped
+
+- Scope:
+  - Lock-gated diagnostic physical window.
+  - Explicitly used `--skip-known-good`, so this run cannot support readiness
+    or branch promotion.
+  - Installed/reloaded the read-only mainline HAL candidate and ran one
+    Audio 8 DJ Pair A soundcheck against the iRig capture path.
+  - The run stopped before loading the C++ candidate because the mainline
+    soundcheck failed.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --skip-known-good --run-dir local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good --capture-device "iRig Stream" --capture-channels 1,2 --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --music-file local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 12 --rate 48000 --buffer 512 --pair A --skip-build`
+- Result:
+  - Physical preflight PASS.
+  - Known-good route explicitly skipped and recorded as
+    `BLOCKED_KNOWN_GOOD_ROUTE_SKIPPED`.
+  - Mainline HAL candidate safety PASS and left mainline loaded for the
+    soundcheck.
+  - Mainline soundcheck FAIL:
+    - `quality_alignment_score=0.125194`;
+    - `alignment_score=0.087119`;
+    - `analog_snr_db=-12.77`;
+    - `lag_jumps_gt_2_frames=40`;
+    - `mid_band_cpu_corr=0.969575 source=opena8dj_driver`;
+    - `capture_clipped_frames=0`.
+  - Because mainline failed, no C++ HAL soundcheck or same-session comparator
+    was run in this window.
+  - The runner's normal final guard did not unload because audio stack health
+    was PASS while the HAL remained loaded.
+  - A separate lock-gated force-unload moved the active HAL to
+    `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.guard-unloaded-20260617-154618`
+    and killed the stale `OpenA8DJ.driver` process.
+- Evidence paths:
+  - `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/physical-window-preflight.json`
+  - `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/known-good-route-skipped.json`
+  - `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/mainline-hal-candidate-safety/summary.txt`
+  - `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/mainline-soundcheck/metrics.json`
+  - `local-analysis/physical-superiority-window/20260617T194618Z-force-unload-after-diagnostic-ab/guard/force-unload.log`
+  - `local-analysis/physical-superiority-window/20260617T194618Z-force-unload-after-diagnostic-ab/guard/summary.txt`
+- Interpretation:
+  - This is a useful diagnostic against the current mainline candidate under
+    the current capture setup, not a C++ superiority result.
+  - The strong CPU-correlation metric points at driver-timed interference in
+    the failed mainline capture, but the skipped known-good route still blocks
+    product claims.
+  - The physical runner cleanup was fixed to force-unload when
+    `--leave-loaded` is absent, even if the health guard itself passes.

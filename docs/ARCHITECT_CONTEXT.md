@@ -2031,3 +2031,29 @@ Current implication:
   iRig path and the known-good route gate passes.
 - This is a route/cabling/source blocker, not evidence that C++ quality is
   worse or better than mainline.
+
+### 2026-06-17 Diagnostic Mainline Physical Attempt
+
+- Ran a lock-gated diagnostic physical window with `--skip-known-good`.
+- Mainline HAL candidate safety passed, then mainline Pair A soundcheck failed
+  before any C++ candidate was loaded:
+  - `quality_alignment_score=0.125194`;
+  - `analog_snr_db=-12.77`;
+  - `lag_jumps_gt_2_frames=40`;
+  - `mid_band_cpu_corr=0.969575 source=opena8dj_driver`;
+  - `capture_clipped_frames=0`.
+- Because known-good route validation was skipped and mainline failed, no
+  same-session C++ comparison exists from this window.
+- The runner's normal final cleanup left mainline HAL loaded because
+  `audio-stack-guard --recover --unload-opena8dj` only unloads during recovery
+  and the stack health check passed. A lock-gated force-unload then moved the
+  active HAL out of `/Library/Audio/Plug-Ins/HAL` and killed the
+  `OpenA8DJ.driver` process.
+
+Current implication:
+- Current hardware evidence still blocks C++ promotion, but it also shows the
+  mainline candidate is not currently passing the physical quality gate.
+- Fixed `scripts/run-physical-superiority-window` cleanup to force-unload the
+  active HAL when `--leave-loaded` is absent.
+- Do not continue to C++ superiority claims until the known-good route is
+  valid and the runner completes same-session mainline/C++ evidence.

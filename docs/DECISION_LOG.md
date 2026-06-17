@@ -5401,3 +5401,44 @@ Next implication:
   then rerun the known-good route gate.
 - Driver install/reload and mainline/C++ A/B should remain blocked for
   product claims until that route gate passes.
+
+## 2026-06-17: Treat Skipped-Route Mainline Failure As Diagnostic Only
+
+Decision:
+- Keep the `--skip-known-good` mainline physical result as diagnostic evidence,
+  not promotion evidence.
+- Stop the same-session window after mainline fails instead of loading C++ into
+  an already-invalid comparison.
+- Require a runner cleanup fix: when `--leave-loaded` is absent, the final
+  unload path must force-unload the active HAL even if stack health is PASS.
+
+Reason:
+- The window explicitly skipped the known-good route, so it cannot prove the
+  capture route is valid.
+- Mainline failed the physical quality gate with strong driver CPU correlation;
+  loading C++ afterward would not create a valid superiority comparison.
+- The final guard used `--recover --unload-opena8dj`, but recovery did not run
+  because the stack health check passed, leaving mainline HAL loaded until a
+  separate force-unload.
+
+Evidence:
+- Diagnostic window:
+  `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good`.
+- Mainline metrics:
+  - `quality_alignment_score=0.125194`;
+  - `analog_snr_db=-12.77`;
+  - `lag_jumps_gt_2_frames=40`;
+  - `mid_band_cpu_corr=0.969575 source=opena8dj_driver`;
+  - `capture_clipped_frames=0`.
+- Force-unload window:
+  `local-analysis/physical-superiority-window/20260617T194618Z-force-unload-after-diagnostic-ab`.
+- Force-unload moved the active HAL to
+  `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.guard-unloaded-20260617-154618`
+  and ended with `opena8dj_state=unloaded`,
+  `opena8dj_driver_pids=none`, `audio_stack_guard=PASS`.
+
+Next implication:
+- Cleanup now uses `--force-unload-opena8dj` when the active HAL should not be
+  left loaded.
+- This diagnostic strengthens the need for same-session, route-validated
+  physical evidence. It does not make C++ better than mainline by itself.

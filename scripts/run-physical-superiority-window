@@ -258,8 +258,7 @@ trap opena8dj_release_hardware_lock EXIT
 cleanup_candidate() {
   if [ "$leave_loaded" -eq 0 ] && [ "$route_only" -ne 1 ] && [ -n "$candidate" ]; then
     "$root/scripts/audio-stack-guard" \
-      --recover \
-      --unload-opena8dj \
+      --force-unload-opena8dj \
       --wait 3 \
       --enumeration-timeout 8 \
       --min-idle-pct 20 \
@@ -271,8 +270,7 @@ trap 'cleanup_candidate; opena8dj_release_hardware_lock' EXIT
 
 unload_active_hal() {
   "$root/scripts/audio-stack-guard" \
-    --recover \
-    --unload-opena8dj \
+    --force-unload-opena8dj \
     --wait 3 \
     --enumeration-timeout 8 \
     --min-idle-pct 20 \
