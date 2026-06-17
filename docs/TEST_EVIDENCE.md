@@ -2209,3 +2209,29 @@ Operational note:
     decomposition before it can drive another transport change. Future physical
     runs will identify whether errors are status failures, zero-complete,
     short/other-size filtered transactions, or a mixture.
+
+## 2026-06-17: Holder Cleanup And Capture ISO Invariant Analyzer
+
+- Commands:
+  - `scripts/audio-stack-guard --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/20260616-kill-open-holders`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current-after-kill-request-live.json`
+  - `python3 -m py_compile scripts/analyze-capture-iso-invariants.py`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260616-capture-detail-irig-pairA-8s-cpp-hal --json-out local-analysis/stream-stats/capture-iso-invariants-recent-v3.json`
+  - `scripts/analyze-capture-iso-invariants.py $(find local-analysis/soundcheck -maxdepth 1 -type d -name '*irig*' | sort) --json-out local-analysis/stream-stats/capture-iso-invariants-all-irig-v3.json`
+- Result:
+  - Runtime cleanup PASS: HAL inactive, lock absent, no OpenA8DJ driver
+    process, forbidden mainline LaunchAgents disabled.
+  - Recent detailed capture ISO invariants PASS on 4 runs.
+  - Historical iRig sweep result FAIL only because
+    `20260616-lifecycle-preopen-irig-pairA-16s-cpp-hal` has a real classified
+    ISO-slot mismatch. Older runs without detail are UNKNOWN, not FAIL.
+- Evidence paths:
+  - `local-analysis/audio-stack-guard/20260616-kill-open-holders`
+  - `local-analysis/runtime-isolation/current-after-kill-request-live.json`
+  - `local-analysis/stream-stats/capture-iso-invariants-recent-v3.json`
+  - `local-analysis/stream-stats/capture-iso-invariants-all-irig-v3.json`
+- Interpretation:
+  - Recent aggregate `captureTransactionErrors` are zero-complete ISO slots, not
+    status failures.
+  - This removes one false lead but does not improve product readiness:
+    physical music quality and driver CPU still fail.

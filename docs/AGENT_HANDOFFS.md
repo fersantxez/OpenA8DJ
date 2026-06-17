@@ -378,3 +378,33 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - These changes improve observability and remove one hot-path mutex, but do
     not prove physical quality. Next locked tests must verify CPU, late-write
     counters, and iRig quality before promotion.
+
+### Harvey
+
+- Mission: compare mainline and C++ capture transaction counters read-only and
+  explain whether the stable aggregate capture error ratio is a real transport
+  failure.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Mainline and C++ classify capture transactions the same way:
+    non-success status is a status failure, `completeCount == 0` is a
+    zero-complete transaction, and only expected-size transactions are useful.
+  - Recent C++ evidence shows status failures `0`, short/other-size transfers
+    `0`, and the aggregate error count equals zero-complete transactions.
+  - With ISO5, expected plus zero-complete transactions exactly match
+    `5 * captureTransfers` in recent detailed runs.
+- Integrated action:
+  - Added `scripts/analyze-capture-iso-invariants.py`.
+  - Recorded recent PASS and historical UNKNOWN/FAIL split in docs.
+- Evidence:
+  - `local-analysis/stream-stats/capture-iso-invariants-recent-v3.json`
+  - `local-analysis/stream-stats/capture-iso-invariants-all-irig-v3.json`
+- Risk:
+  - This is not a quality fix. The remaining blocker is analog residual/lag and
+    high driver CPU versus mainline.

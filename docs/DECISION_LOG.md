@@ -1019,3 +1019,43 @@ Follow-up:
   persistent analog residual/lag and high driver CPU. Next work should inspect
   capture transaction error semantics and USB transaction request sizes/status
   rather than more parity knobs.
+
+## 2026-06-17: Treat Zero-Complete Capture ISO Slots As Packetization, Not Transport Failure
+
+Decision:
+- Do not use aggregate `captureTransactionErrors/transfer ~= 2.273` as a
+  physical-readiness blocker by itself.
+- Keep blocking on status failures, short/other-size capture transactions,
+  classified ISO-slot mismatches, residual/lag, and CPU.
+
+Reason:
+- New capture-detail counters decompose the aggregate "error" bucket. Recent
+  detailed runs show:
+  - `captureStatusFailures=0`
+  - `captureOtherByteCountTransactions=0`
+  - `captureShortTransfers=0`
+  - `captureTransactionFailures == captureZeroCompleteTransactions`
+  - `captureExpectedTransactions + captureZeroCompleteTransactions == 5 *
+    captureTransfers`
+  - useful capture transactions are exactly `352` bytes.
+- This means the stable ratio is mostly empty ISO microframes in a 5-frame
+  transfer, not failed USB status.
+- The physical product blocker remains real: analog residual/lag and driver
+  CPU still fail badly versus mainline.
+
+Alternatives discarded:
+- Continue chasing the aggregate counter as a USB transport failure: rejected
+  because the decomposed counters show no status, short, or other-size failures
+  in recent default/variant runs.
+- Ignore capture details entirely: rejected because `lifecycle-preopen` has a
+  real measurable mismatch (`classified_transactions != total_iso_slots`) and
+  must stay rejected.
+
+Evidence:
+- Recent invariant pass:
+  `local-analysis/stream-stats/capture-iso-invariants-recent-v3.json`
+- Historical iRig sweep:
+  `local-analysis/stream-stats/capture-iso-invariants-all-irig-v3.json`
+  (`lifecycle-preopen` remains FAIL; older runs without detail are UNKNOWN).
+- Tool:
+  `scripts/analyze-capture-iso-invariants.py`

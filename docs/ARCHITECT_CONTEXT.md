@@ -381,3 +381,20 @@ Next technical target:
   persistent capture transaction errors around `2.273` per capture transfer,
   high driver CPU, and bad analog residual/lag. Next work should inspect USB
   transaction request/complete semantics and capture error classification.
+- User-requested stale-holder cleanup was rerun live under lock. Evidence:
+  `local-analysis/audio-stack-guard/20260616-kill-open-holders` and
+  `local-analysis/runtime-isolation/current-after-kill-request-live.json`.
+  Final state: lock absent, HAL inactive, no OpenA8DJ/mainline/soundcheck
+  holder processes, forbidden mainline LaunchAgents disabled. The guard did not
+  need to kill a real OpenA8DJ holder.
+- Capture detail counters changed the interpretation of the stable aggregate
+  capture error ratio. Recent detailed iRig runs pass ISO-slot invariants:
+  status failures `0`, short transfers `0`, other-size transfers `0`, useful
+  transactions `352` bytes each, and
+  `expected + zero_complete == 5 * captureTransfers`. The aggregate ratio is
+  empty ISO slots, not proof of USB status failure.
+- One rejected variant remains diagnostically useful: `lifecycle-preopen`
+  violates `classified_transactions == total_iso_slots`, so preopen lifecycle
+  behavior stays rejected.
+- Current blocker after this correction: physical analog residual/lag and
+  driver CPU, not the decomposed zero-complete ISO slots.
