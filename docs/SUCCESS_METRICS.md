@@ -2066,6 +2066,10 @@ Prepared transport migration metric:
   product readiness and branch promotion as false until same-session physical
   A/B evidence beats mainline on quality, functionality, timecode, CPU, and
   recovery.
+- It must report
+  `prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio >= 8.0` and
+  `prepared_slot_scheduler_max_safe_logical_audio_gap_ratio <= 1.0`; otherwise
+  the prepared transport path is not allowed to proceed toward hardware.
 - `local-analysis/cpp-offline/prepared-transport-pressure-gate.json` must PASS
   with 44.1/48 kHz, decks A/B/C/D, zero HAL steady requeues, zero fallback
   allocations, zero ring faults, and zero packet/check mismatches before the

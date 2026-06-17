@@ -63,6 +63,7 @@ struct PreparedSlotSchedulerConfig {
   std::uint32_t playback_target_slots = 8;
   std::uint32_t capture_pool_slots = kPreparedTransportMaxSlots;
   std::uint32_t playback_pool_slots = kPreparedTransportMaxSlots;
+  std::uint32_t usb_slots_per_submit = 1;
   std::uint32_t unavailable_capture_slots = 0;
   std::uint32_t unavailable_playback_slots = 0;
   std::uint32_t playback_completion_gap_periods = 1;
@@ -73,19 +74,26 @@ struct PreparedSlotSchedulerStepOptions {
   bool hal_direct_requeue_attempt = false;
   bool fallback_allocation_attempt = false;
   bool suppress_backend_requeue = false;
+  bool force_slot_order_error = false;
 };
 
 struct PreparedSlotSchedulerCounters {
   std::uint64_t periods = 0;
+  std::uint64_t logical_audio_periods = 0;
   std::uint64_t backend_prepare_enqueues = 0;
   std::uint64_t backend_steady_requeues = 0;
+  std::uint64_t usb_submit_calls = 0;
+  std::uint64_t backend_slot_completions = 0;
   std::uint64_t hal_steady_requeues = 0;
   std::uint64_t fallback_allocations = 0;
   std::uint64_t capture_starved_periods = 0;
   std::uint64_t playback_starved_periods = 0;
   std::uint64_t backend_requeue_budget_violations = 0;
   std::uint64_t completion_gap_violations = 0;
+  std::uint64_t logical_audio_gap_violations = 0;
+  std::uint64_t slot_order_errors = 0;
   double max_completion_gap_ratio = 0.0;
+  double max_logical_audio_gap_ratio = 0.0;
   std::uint32_t capture_in_flight = 0;
   std::uint32_t playback_in_flight = 0;
   std::uint32_t min_capture_in_flight = 0;
@@ -125,6 +133,7 @@ class PreparedSlotScheduler {
   [[nodiscard]] PreparedSlotSchedulerSafety safety() const;
 
  private:
+  void account_usb_slot_submit();
   void queue_capture_slot(bool prepare);
   void queue_playback_slot(bool prepare);
   void refill_to_targets();
@@ -132,6 +141,7 @@ class PreparedSlotScheduler {
 
   PreparedSlotSchedulerConfig config_{};
   PreparedSlotSchedulerCounters counters_{};
+  std::uint32_t pending_usb_submit_slots_ = 0;
   bool started_ = false;
 };
 

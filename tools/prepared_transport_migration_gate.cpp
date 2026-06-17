@@ -251,6 +251,10 @@ int main(int argc, char** argv) {
   const auto promotion = read_file(base / "promotion-readiness-offline-check.json");
 
   const double scheduler_gap = number_or_nan(json_number(scheduler, "max_completion_gap_ratio"));
+  const double scheduler_logical_gap =
+      number_or_nan(json_number(scheduler, "max_safe_logical_audio_gap_ratio"));
+  const double scheduler_usb_submit_reduction =
+      number_or_nan(json_number(scheduler, "max_safe_usb_submit_reduction_ratio"));
   const double transport_gap =
       number_or_nan(json_number(driverkit_prepared, "max_completion_gap_ratio"));
   const double fixed_to_fill =
@@ -295,7 +299,13 @@ int main(int argc, char** argv) {
       number_is_zero(recovery, "timestamp_regressions") &&
       number_at_most(driverkit_prepared, "max_completion_gap_ratio", 1.25) &&
       finite(scheduler_gap) && scheduler_gap <= 1.25 &&
+      finite(scheduler_logical_gap) && scheduler_logical_gap <= 1.0 &&
+      number_is_zero(scheduler, "safe_logical_audio_gap_violations") &&
+      number_is_zero(scheduler, "safe_slot_order_errors") &&
       number_is_zero(pressure, "failures");
+  const bool usb_submit_batching_supported =
+      result_pass(scheduler) && finite(scheduler_usb_submit_reduction) &&
+      scheduler_usb_submit_reduction >= 8.0;
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -346,6 +356,7 @@ int main(int argc, char** argv) {
       {"zero_hal_requeue_in_safe_contracts", zero_hal_requeue_in_safe_contracts},
       {"no_fallback_or_ring_faults", no_fallback_or_ring_faults},
       {"timestamp_and_cadence_safe", timestamp_and_cadence_safe},
+      {"logical_iso8_usb_submit_batching_supported", usb_submit_batching_supported},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -369,6 +380,10 @@ int main(int argc, char** argv) {
   print_bool("physical_ab_required_before_claim", true);
   print_number("driverkit_prepared_max_completion_gap_ratio", transport_gap);
   print_number("prepared_slot_scheduler_max_completion_gap_ratio", scheduler_gap);
+  print_number("prepared_slot_scheduler_max_safe_logical_audio_gap_ratio",
+               scheduler_logical_gap);
+  print_number("prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio",
+               scheduler_usb_submit_reduction);
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

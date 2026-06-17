@@ -9278,3 +9278,53 @@ Full offline gate rerun:
     tone on this metric family.
   - This does not override current music/capture-route/CPU failures and does
     not create a promotion claim.
+
+## 2026-06-17 Logical ISO8 USB Submit Batching Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_prepared_slot_scheduler_contract opena8djcpp_prepared_transport_migration_gate`
+  - `./build/cpp-offline/opena8djcpp_prepared_slot_scheduler_contract`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline C++ model and saved evidence only.
+  - No HAL load, driver install, system-extension activation, audio playback,
+    capture, CoreAudio mutation, USB reset, default-device change, or hardware
+    action.
+- Prepared slot scheduler result:
+  - `opena8djcpp_prepared_slot_scheduler_contract`: PASS.
+  - Row count `10`.
+  - Safe scenarios `3`.
+  - `minimum_hal_steady_requeues_for_safe=0`.
+  - `max_safe_logical_audio_gap_ratio=1`.
+  - `safe_logical_audio_gap_violations=0`.
+  - `safe_slot_order_errors=0`.
+  - `max_safe_usb_submit_reduction_ratio=8`.
+  - Scenario `prepared_iso8_usb_batch8_stable`:
+    - `logical_audio_periods=256`;
+    - `backend_slot_completions=512`;
+    - `usb_submit_calls=66`;
+    - `usb_submit_reduction_ratio=8`;
+    - zero fallback allocations, HAL requeues, logical gap violations, and
+      slot order errors.
+- Migration gate result:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `logical_iso8_usb_submit_batching_supported=PASS`.
+  - `prepared_slot_scheduler_max_safe_logical_audio_gap_ratio=1.000000`.
+  - `prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio=8.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Full offline gate result:
+  - Debug CTest: `44/44` passed.
+  - Release CTest: `45/45` passed.
+  - Evidence schema: `required_files=45`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The next low-CPU path now has an executable offline contract: preserve
+    logical ISO8 audio cadence while reducing modeled USB submit calls by 8x.
+  - This is still not a runtime HAL/DriverKit implementation and does not
+    justify hardware or promotion claims by itself.

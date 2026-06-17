@@ -19,6 +19,7 @@ struct Scenario {
 struct ScenarioResult {
   PreparedSlotSchedulerCounters counters{};
   PreparedSlotSchedulerSafety safety{};
+  double usb_submit_reduction_ratio = 0.0;
 };
 
 ScenarioResult run(const Scenario& scenario) {
@@ -27,7 +28,13 @@ ScenarioResult run(const Scenario& scenario) {
   for (std::uint32_t period = 0; period < scenario.periods; ++period) {
     (void)scheduler.complete_period(scenario.options);
   }
-  return ScenarioResult{scheduler.counters(), scheduler.safety()};
+  auto counters = scheduler.counters();
+  const auto logical_enqueues = counters.backend_prepare_enqueues + counters.backend_steady_requeues;
+  const double reduction =
+      counters.usb_submit_calls == 0
+          ? 0.0
+          : static_cast<double>(logical_enqueues) / static_cast<double>(counters.usb_submit_calls);
+  return ScenarioResult{counters, scheduler.safety(), reduction};
 }
 
 bool passes(const Scenario& scenario, const ScenarioResult& result) {
@@ -47,6 +54,7 @@ void print_row(const Scenario& scenario,
             << ", \"playback_target_slots\": " << config.playback_target_slots
             << ", \"capture_pool_slots\": " << config.capture_pool_slots
             << ", \"playback_pool_slots\": " << config.playback_pool_slots
+            << ", \"usb_slots_per_submit\": " << config.usb_slots_per_submit
             << ", \"unavailable_capture_slots\": " << config.unavailable_capture_slots
             << ", \"unavailable_playback_slots\": " << config.unavailable_playback_slots
             << ", \"playback_completion_gap_periods\": "
@@ -55,6 +63,10 @@ void print_row(const Scenario& scenario,
             << config.max_backend_requeues_per_period
             << ", \"backend_prepare_enqueues\": " << counters.backend_prepare_enqueues
             << ", \"backend_steady_requeues\": " << counters.backend_steady_requeues
+            << ", \"logical_audio_periods\": " << counters.logical_audio_periods
+            << ", \"usb_submit_calls\": " << counters.usb_submit_calls
+            << ", \"usb_submit_reduction_ratio\": " << result.usb_submit_reduction_ratio
+            << ", \"backend_slot_completions\": " << counters.backend_slot_completions
             << ", \"hal_steady_requeues\": " << counters.hal_steady_requeues
             << ", \"fallback_allocations\": " << counters.fallback_allocations
             << ", \"capture_starved_periods\": " << counters.capture_starved_periods
@@ -62,7 +74,11 @@ void print_row(const Scenario& scenario,
             << ", \"backend_requeue_budget_violations\": "
             << counters.backend_requeue_budget_violations
             << ", \"completion_gap_violations\": " << counters.completion_gap_violations
+            << ", \"logical_audio_gap_violations\": "
+            << counters.logical_audio_gap_violations
+            << ", \"slot_order_errors\": " << counters.slot_order_errors
             << ", \"max_completion_gap_ratio\": " << counters.max_completion_gap_ratio
+            << ", \"max_logical_audio_gap_ratio\": " << counters.max_logical_audio_gap_ratio
             << ", \"min_capture_in_flight\": " << counters.min_capture_in_flight
             << ", \"min_playback_in_flight\": " << counters.min_playback_in_flight
             << ", \"max_capture_in_flight\": " << counters.max_capture_in_flight
@@ -107,6 +123,17 @@ int main() {
               },
       },
       {
+          .name = "prepared_iso8_usb_batch8_stable",
+          .config =
+              PreparedSlotSchedulerConfig{
+                  .capture_target_slots = 8,
+                  .playback_target_slots = 8,
+                  .capture_pool_slots = 16,
+                  .playback_pool_slots = 16,
+                  .usb_slots_per_submit = 8,
+              },
+      },
+      {
           .name = "hal_requeue_rejected",
           .options =
               PreparedSlotSchedulerStepOptions{
@@ -143,6 +170,18 @@ int main() {
           .expect_safe = false,
       },
       {
+          .name = "slot_order_error_rejected",
+          .config =
+              PreparedSlotSchedulerConfig{
+                  .usb_slots_per_submit = 8,
+              },
+          .options =
+              PreparedSlotSchedulerStepOptions{
+                  .force_slot_order_error = true,
+              },
+          .expect_safe = false,
+      },
+      {
           .name = "backend_budget_violation_rejected",
           .config =
               PreparedSlotSchedulerConfig{
@@ -168,6 +207,10 @@ int main() {
   std::uint32_t failures = 0;
   std::uint32_t safe_scenarios = 0;
   std::uint64_t min_hal_requeues_for_safe = 0;
+  std::uint64_t safe_logical_audio_gap_violations = 0;
+  std::uint64_t safe_slot_order_errors = 0;
+  double max_safe_logical_audio_gap_ratio = 0.0;
+  double max_safe_usb_submit_reduction_ratio = 0.0;
   bool saw_safe = false;
 
   std::cout << "{\n"
@@ -184,6 +227,12 @@ int main() {
     }
     if (result.safety.product_safe) {
       safe_scenarios += 1;
+      safe_logical_audio_gap_violations += result.counters.logical_audio_gap_violations;
+      safe_slot_order_errors += result.counters.slot_order_errors;
+      max_safe_logical_audio_gap_ratio =
+          std::max(max_safe_logical_audio_gap_ratio, result.counters.max_logical_audio_gap_ratio);
+      max_safe_usb_submit_reduction_ratio =
+          std::max(max_safe_usb_submit_reduction_ratio, result.usb_submit_reduction_ratio);
       if (!saw_safe || result.counters.hal_steady_requeues < min_hal_requeues_for_safe) {
         min_hal_requeues_for_safe = result.counters.hal_steady_requeues;
         saw_safe = true;
@@ -191,12 +240,22 @@ int main() {
     }
     print_row(scenarios[index], result, ok, index + 1U < scenarios.size());
   }
-  const bool pass = failures == 0 && safe_scenarios >= 2 && min_hal_requeues_for_safe == 0;
+  const bool pass = failures == 0 && safe_scenarios >= 3 && min_hal_requeues_for_safe == 0 &&
+                    safe_logical_audio_gap_violations == 0 && safe_slot_order_errors == 0 &&
+                    max_safe_logical_audio_gap_ratio <= 1.0 &&
+                    max_safe_usb_submit_reduction_ratio >= 8.0;
   std::cout << "  ],\n"
             << "  \"row_count\": " << scenarios.size() << ",\n"
             << "  \"safe_scenarios\": " << safe_scenarios << ",\n"
             << "  \"minimum_hal_steady_requeues_for_safe\": " << min_hal_requeues_for_safe
             << ",\n"
+            << "  \"safe_logical_audio_gap_violations\": "
+            << safe_logical_audio_gap_violations << ",\n"
+            << "  \"safe_slot_order_errors\": " << safe_slot_order_errors << ",\n"
+            << "  \"max_safe_logical_audio_gap_ratio\": "
+            << max_safe_logical_audio_gap_ratio << ",\n"
+            << "  \"max_safe_usb_submit_reduction_ratio\": "
+            << max_safe_usb_submit_reduction_ratio << ",\n"
             << "  \"failures\": " << failures << ",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\"\n"
             << "}\n";

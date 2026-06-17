@@ -2356,6 +2356,12 @@ Current implication:
     batching real USB submit/enqueue work under that layer. Do not repeat
     independent HAL coalescing/refill probes unless new evidence changes the
     risk calculus.
+  - The prepared slot scheduler contract now models that requirement directly.
+    The safe batch row keeps `logical_audio_periods=256` and
+    `backend_slot_completions=512` while reducing modeled USB submits to `66`
+    (`usb_submit_reduction_ratio=8`) with zero HAL requeues, fallback
+    allocations, logical gap violations, or slot order errors. Migration PASS
+    now includes `logical_iso8_usb_submit_batching_supported=PASS`.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

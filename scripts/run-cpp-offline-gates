@@ -778,6 +778,12 @@ summary = {
         "driverkit_runtime_pressure_total_frames": prepared_transport_migration.get(
             "driverkit_runtime_pressure_total_frames"
         ),
+        "prepared_slot_scheduler_max_safe_logical_audio_gap_ratio": prepared_transport_migration.get(
+            "prepared_slot_scheduler_max_safe_logical_audio_gap_ratio"
+        ),
+        "prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio": prepared_transport_migration.get(
+            "prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio"
+        ),
         "failing_gates": [
             gate.get("name")
             for gate in prepared_transport_migration.get("gates", [])

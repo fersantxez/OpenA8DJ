@@ -11,6 +11,8 @@ bool PreparedSlotScheduler::start(const PreparedSlotSchedulerConfig& config) {
       config.playback_pool_slots > kPreparedTransportMaxSlots ||
       config.capture_target_slots > kPreparedTransportMaxSlots ||
       config.playback_target_slots > kPreparedTransportMaxSlots ||
+      config.usb_slots_per_submit == 0 ||
+      config.usb_slots_per_submit > kPreparedTransportMaxSlots ||
       config.playback_completion_gap_periods == 0 ||
       config.max_backend_requeues_per_period == 0 ||
       config.unavailable_capture_slots > config.capture_pool_slots ||
@@ -20,6 +22,7 @@ bool PreparedSlotScheduler::start(const PreparedSlotSchedulerConfig& config) {
 
   config_ = config;
   counters_ = {};
+  pending_usb_submit_slots_ = 0;
   started_ = true;
   for (std::uint32_t index = 0; index < config_.capture_target_slots; ++index) {
     queue_capture_slot(true);
@@ -45,24 +48,34 @@ bool PreparedSlotScheduler::complete_period(const PreparedSlotSchedulerStepOptio
   }
 
   counters_.periods += 1;
+  counters_.logical_audio_periods += 1;
   if (options.hal_direct_requeue_attempt) {
     counters_.hal_steady_requeues += 2;
   }
   if (options.fallback_allocation_attempt) {
     counters_.fallback_allocations += 2;
   }
+  if (options.force_slot_order_error) {
+    counters_.slot_order_errors += 1;
+  }
   const double completion_gap_ratio =
       static_cast<double>(config_.playback_completion_gap_periods);
   counters_.max_completion_gap_ratio =
       std::max(counters_.max_completion_gap_ratio, completion_gap_ratio);
+  counters_.max_logical_audio_gap_ratio =
+      std::max(counters_.max_logical_audio_gap_ratio, completion_gap_ratio);
   if (completion_gap_ratio > kPreparedTransportMaxCompletionGapRatio) {
     counters_.completion_gap_violations += 1;
+  }
+  if (completion_gap_ratio > 1.0) {
+    counters_.logical_audio_gap_violations += 1;
   }
 
   if (counters_.capture_in_flight == 0) {
     counters_.capture_starved_periods += 1;
   } else {
     counters_.capture_in_flight -= 1;
+    counters_.backend_slot_completions += 1;
   }
 
   if ((counters_.periods % config_.playback_completion_gap_periods) == 0) {
@@ -70,6 +83,7 @@ bool PreparedSlotScheduler::complete_period(const PreparedSlotSchedulerStepOptio
       counters_.playback_starved_periods += 1;
     } else {
       counters_.playback_in_flight -= 1;
+      counters_.backend_slot_completions += 1;
     }
   }
 
@@ -96,12 +110,22 @@ PreparedSlotSchedulerSafety PreparedSlotScheduler::safety() const {
                   counters_.playback_starved_periods == 0 &&
                   counters_.min_capture_in_flight >= config_.capture_target_slots &&
                   counters_.min_playback_in_flight >= config_.playback_target_slots;
-  out.cadence_safe = counters_.completion_gap_violations == 0;
+  out.cadence_safe = counters_.completion_gap_violations == 0 &&
+                     counters_.logical_audio_gap_violations == 0 &&
+                     counters_.slot_order_errors == 0;
   out.hal_hot_path_safe = counters_.hal_steady_requeues == 0;
   out.backend_budget_safe = counters_.backend_requeue_budget_violations == 0;
   out.product_safe = out.prepared_slots_only && out.lead_safe && out.cadence_safe &&
                      out.hal_hot_path_safe && out.backend_budget_safe;
   return out;
+}
+
+void PreparedSlotScheduler::account_usb_slot_submit() {
+  pending_usb_submit_slots_ += 1;
+  if (pending_usb_submit_slots_ >= config_.usb_slots_per_submit) {
+    counters_.usb_submit_calls += 1;
+    pending_usb_submit_slots_ = 0;
+  }
 }
 
 void PreparedSlotScheduler::queue_capture_slot(bool prepare) {
@@ -110,6 +134,7 @@ void PreparedSlotScheduler::queue_capture_slot(bool prepare) {
     counters_.fallback_allocations += 1;
   }
   counters_.capture_in_flight += 1;
+  account_usb_slot_submit();
   if (prepare) {
     counters_.backend_prepare_enqueues += 1;
   } else {
@@ -123,6 +148,7 @@ void PreparedSlotScheduler::queue_playback_slot(bool prepare) {
     counters_.fallback_allocations += 1;
   }
   counters_.playback_in_flight += 1;
+  account_usb_slot_submit();
   if (prepare) {
     counters_.backend_prepare_enqueues += 1;
   } else {

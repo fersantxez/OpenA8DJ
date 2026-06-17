@@ -6076,3 +6076,49 @@ Next implication:
   `logical_audio_gap_ratio` remains safe while `usb_submit_calls` is strictly
   lower than logical audio periods. Only then should a lock-gated physical
   candidate be considered.
+
+## 2026-06-17: Gate Low-CPU Path On Logical ISO8 USB Submit Reduction
+
+Decision:
+- Extend `PreparedSlotScheduler` with explicit logical-slot and USB-submit
+  accounting.
+- Require the migration gate to prove a safe scenario with `8x` modeled USB
+  submit reduction while keeping logical audio gap ratio at `1.0`.
+
+Reason:
+- The previous failed probes reduced queue pressure by changing audible timing.
+  The next viable design must reduce submit/enqueue pressure below the logical
+  audio layer, while preserving logical ISO8 cadence, ordering, routing,
+  timestamps, and timecode.
+- This prevents a future runtime bridge from claiming progress if it merely
+  moves accounting around while still submitting one USB request per logical
+  slot.
+
+Evidence:
+- `opena8djcpp_prepared_slot_scheduler_contract`: PASS.
+- Safe batching row:
+  - scenario `prepared_iso8_usb_batch8_stable`;
+  - `logical_audio_periods=256`;
+  - `backend_slot_completions=512`;
+  - `usb_submit_calls=66`;
+  - `usb_submit_reduction_ratio=8`;
+  - zero HAL steady requeues, fallback allocations, logical gap violations, and
+    slot order errors.
+- `opena8djcpp_prepared_transport_migration_gate`: PASS, including
+  `logical_iso8_usb_submit_batching_supported=PASS`.
+- Full offline gates:
+  - Debug CTest `44/44` passed.
+  - Release CTest `45/45` passed.
+  - Evidence schema `required_files=45`, `missing_files=0`.
+
+Alternatives discarded:
+- Treat old prepared-slot PASS as enough: rejected because it did not prove
+  reduced real USB submit cadence.
+- Re-open independent HAL playback coalescing: rejected because the physical
+  soundcheck failure is already decisive.
+
+Next implication:
+- The next implementation may target a runtime adapter only if it can expose
+  the same counters: logical periods, USB submit calls, backend slot
+  completions, order errors, timestamp regressions, HAL requeues, and fallback
+  allocations.
