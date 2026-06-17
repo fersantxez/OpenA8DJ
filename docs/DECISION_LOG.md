@@ -2161,3 +2161,74 @@ Next decision pressure:
   scanning, or a DriverKit/USBDriverKit transport that can keep cadence fine
   while reducing enqueue overhead. Any candidate must prove unchanged or better
   physical music quality before using a CPU win.
+
+## 2026-06-17: Adopt Mainline ISO64/q8 Geometry And StopIO Stream Shutdown
+
+Decision:
+- Set the C++ HAL defaults to the mainline-proven transport geometry:
+  `HAL_ISO_FRAMES=64`, `HAL_CAPTURE_QUEUE=8`, `HAL_PLAYBACK_QUEUE=8`, and
+  `HAL_OUTPUT_PREFETCH_FRAMES=64`.
+- Set `HAL_STOP_ISOC_ON_STOP=1` so StopIO closes the isochronous stream and
+  avoids post-playback active underrun accumulation.
+- Keep the newly ported completion-handler reuse, strict pool, legacy output
+  slot, fast ISO config, and USB queue QoS knobs compiled behind flags but
+  disabled by default. The combined variant did not improve CPU and produced
+  post-run underrun evidence, so it is not a product default.
+- Do not promote. The new default is a measured improvement over the prior
+  C++ runtime, but it still does not objectively beat mainline performance and
+  it does not pass physical music quality.
+
+Reason:
+- Baseline mainline `0.3.135` from the read-only mainline build artifact
+  passed safety after a 45 s stabilization wait. Its physical soundcheck failed
+  quality in the current iRig route, but it established the current CPU target:
+  `opena8dj_driver_p95=6.0%`, `coreaudiod_p95=8.0%`.
+- C++ ISO5/queue64 stream-usage candidate measured
+  `opena8dj_driver_p95=37.2%`. Matching mainline ISO64/q8 geometry reduced
+  C++ driver p95 to `10.6%`, and adding StopIO shutdown reduced it to `9.8%`.
+- StopIO shutdown fixed a concrete runtime bug: the ISO64/q8 candidate without
+  StopIO shutdown left `streaming=yes` and accumulated about `86k` active
+  underrun frames after playback stopped; the updated candidate ends with
+  `streaming=no`, `outputUnderruns=0`, and `outputActiveUnderruns=0`.
+- The current physical iRig route is not quality-valid for promotion: both
+  mainline and C++ ISO64/q8 fail with `quality_alignment_score` around
+  `0.68`, SNR around `-0.85 dB`, and many lag jumps. This blocks sound-quality
+  claims and raises priority for capture-route/reference validation.
+
+Alternatives discarded:
+- Make completion-handler reuse/strict-pool/legacy-slot/QoS/fast-ISO default:
+  rejected because the combined run did not reduce driver CPU and left
+  post-run active-underrun evidence.
+- Claim C++ is better because its quality score was similar to mainline in the
+  degraded route: rejected. A degraded shared capture route can only block
+  claims; it cannot prove audiophile quality.
+- Promote the CPU win over previous C++ default: rejected because the product
+  criterion is beating mainline, not merely improving over an earlier C++
+  candidate.
+
+Evidence:
+- Mainline baseline safety:
+  `local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45/hal-candidate-safety`.
+- Mainline baseline soundcheck:
+  `local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45/soundcheck-irig-pairA-12s`,
+  `opena8dj_driver_p95=6.0%`, `quality_alignment_score=0.680798`,
+  `analog_snr_db=-0.83`.
+- C++ ISO64/q8 pre-StopIO soundcheck:
+  `local-analysis/soundcheck/20260617-cpp-iso64q8-streamusage-irig-pairA-12s`,
+  `opena8dj_driver_p95=10.6%`, final `streaming=yes` with active underruns.
+- C++ ISO64/q8 StopIO soundcheck:
+  `local-analysis/soundcheck/20260617-cpp-iso64q8-stopisoc-irig-pairA-12s`,
+  `opena8dj_driver_p95=9.8%`, final `streaming=no`,
+  `outputActiveUnderruns=0`, `quality_alignment_score=0.686712`,
+  `analog_snr_db=-0.84`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`,
+  result `FAIL`.
+
+Next decision pressure:
+- Close the remaining performance gap to mainline without changing USB/audio
+  semantics. The current delta is likely residual C++/Obj-C diagnostic and
+  stream-stat overhead or HAL-side work not present in mainline.
+- Independently validate the physical capture/reference route before making
+  any sound-quality claim; the current shared route made mainline and C++
+  fail similarly.

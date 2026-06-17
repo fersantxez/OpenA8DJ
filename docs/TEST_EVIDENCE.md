@@ -3699,3 +3699,62 @@ Operational note:
   - `FAIL_NOT_READY`. The candidate still does not beat mainline in music
     quality or CPU, and Traktor/timecode vinyl physical validation remains
     absent. Do not move C to Legacy or C++ to main.
+
+## 2026-06-17: Mainline Baseline And C++ ISO64/q8 StopIO Candidate
+
+- Commands:
+  - C++ experimental transport build:
+    `make -B hal build/audio-wav-play build/opena8dj-control HAL_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_QUEUE=8 HAL_OUTPUT_PREFETCH_FRAMES=64`
+  - Default C++ build after adopting ISO64/q8/StopIO:
+    `make -B hal build/audio-wav-play build/opena8dj-control`
+  - Offline verification:
+    `cmake --build build/cpp-release --target opena8djcpp_core_tests opena8djcpp_static_policy_check opena8djcpp_realtime_audit`
+    and `ctest --test-dir build/cpp-release --output-on-failure`
+  - Mainline baseline safety:
+    `scripts/test-hal-candidate-safety --candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 45 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45/hal-candidate-safety`
+  - Mainline baseline soundcheck:
+    `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45/soundcheck-irig-pairA-12s --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - C++ ISO64/q8 soundcheck:
+    `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-cpp-iso64q8-streamusage-irig-pairA-12s --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - C++ ISO64/q8 StopIO soundcheck:
+    `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-cpp-iso64q8-stopisoc-irig-pairA-12s --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Promotion evaluation:
+    `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`
+  - Final unload/isolation:
+    `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --enumeration-timeout 8 --run-dir local-analysis/audio-stack-guard/cpp-iso64q8-stopisoc-force-unload`
+    and `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-cpp-iso64q8-stopisoc-force-unload.json`
+- Results:
+  - Mainline artifact used read-only:
+    `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`, version `0.3.135`,
+    SHA256 `569c7303a1a9672d40c56eeee914eadccdbcd541562e1d2d674d1a3ffb9b90dc`.
+  - First mainline safety attempt with short wait failed due transient
+    CoreAudio/mediaremoted CPU; the 45 s stabilization attempt passed.
+  - Mainline baseline soundcheck FAIL for quality in the current physical
+    route: `quality_alignment_score=0.680798`, `analog_snr_db=-0.83`,
+    `lag_jumps_gt_2_frames=39`. CPU: `opena8dj_driver_p95=6.0%`,
+    `coreaudiod_p95=8.0%`.
+  - C++ ISO64/q8 before StopIO shutdown FAIL for quality:
+    `quality_alignment_score=0.674248`, `analog_snr_db=-0.87`,
+    `lag_jumps_gt_2_frames=42`. CPU improved from the previous C++ default:
+    `opena8dj_driver_p95=10.6%`, `coreaudiod_p95=12.4%`.
+  - C++ ISO64/q8 before StopIO shutdown left `streaming=yes` after playback
+    and accumulated about `86k` final active-underrun frames.
+  - C++ ISO64/q8 with `HAL_STOP_ISOC_ON_STOP=1` FAIL for quality:
+    `quality_alignment_score=0.686712`, `analog_snr_db=-0.84`,
+    `lag_jumps_gt_2_frames=35`. CPU: `opena8dj_driver_p95=9.8%`,
+    `coreaudiod_p95=11.5%`.
+  - StopIO shutdown fixed final state:
+    `streaming=no`, `outputUnderruns=0`, `outputActiveUnderruns=0`.
+  - Offline CTest remained PASS, 18/18.
+  - Promotion readiness remains FAIL:
+    physical music quality FAIL, runtime CPU still above mainline threshold,
+    and Traktor/timecode physical validation remains absent.
+  - Final runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ
+    CoreAudio driver process.
+- Evidence paths:
+  - `local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45`
+  - `local-analysis/soundcheck/20260617-cpp-iso64q8-streamusage-irig-pairA-12s`
+  - `local-analysis/soundcheck/20260617-cpp-iso64q8-stopisoc-irig-pairA-12s`
+  - `local-analysis/stream-stats/cpp-iso64q8-stopisoc-soundcheck-summary.json`
+  - `local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`
+  - `local-analysis/runtime-isolation/after-cpp-iso64q8-stopisoc-force-unload.json`

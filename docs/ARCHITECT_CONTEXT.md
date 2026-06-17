@@ -735,7 +735,39 @@ Next technical target:
   conversion, transfer ledger, or generic DSP.
 - Already rejected knobs remain rejected: playback coalesce2 lowers CPU but
   damages physical quality; input-decode active gating regressed badly; pool
-  cursor failed HAL safety; ISO64/q8 was physically catastrophic.
+  cursor failed HAL safety. The earlier ISO64/q8 rejection has been superseded
+  by the 2026-06-17 retest with stream usage and StopIO shutdown.
 - Current decision pressure is a transport/hot-path redesign that preserves
   fine playback cadence while reducing IOUSBHost/Objective-C enqueue cost.
   CPU-only wins are not acceptable without physical music quality proof.
+
+## 2026-06-17 ISO64/q8 And Physical Baseline Update
+
+- Mainline `0.3.135` was measured from the read-only artifact
+  `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver` without writing to the
+  mainline worktree. A short-wait safety attempt failed due transient
+  CoreAudio/mediaremoted CPU; a 45 s stabilization attempt passed.
+- Current physical iRig route is not quality-valid for promotion. Mainline and
+  C++ ISO64/q8 both failed the same Pair A music gate with very low alignment
+  and SNR:
+  - mainline: `quality_alignment_score=0.680798`, SNR `-0.83 dB`,
+    `39` lag jumps;
+  - C++ ISO64/q8 StopIO: `quality_alignment_score=0.686712`,
+    SNR `-0.84 dB`, `35` lag jumps.
+- CPU comparison is still valid enough to guide performance work:
+  - prior C++ ISO5/queue64 stream-usage run: driver p95 `37.2%`;
+  - C++ ISO64/q8 StopIO: driver p95 `9.8%`;
+  - mainline `0.3.135`: driver p95 `6.0%`.
+- C++ default now adopts mainline geometry:
+  `HAL_ISO_FRAMES=64`, `HAL_CAPTURE_QUEUE=8`, `HAL_PLAYBACK_QUEUE=8`,
+  `HAL_OUTPUT_PREFETCH_FRAMES=64`.
+- C++ default now sets `HAL_STOP_ISOC_ON_STOP=1`; this fixed the final
+  post-playback state from `streaming=yes` with active underruns to
+  `streaming=no`, `outputUnderruns=0`, and `outputActiveUnderruns=0`.
+- The ported completion-reuse/strict-pool/legacy-slot/QoS/fast-ISO switches
+  remain disabled by default because the combined physical run did not improve
+  CPU and left post-run active-underrun evidence.
+- Promotion remains forbidden. Current blockers:
+  physical music quality route fails for both mainline and C++, C++ CPU still
+  does not beat mainline, physical Traktor/timecode vinyl validation is absent,
+  and the A/B/C/D physical matrix is absent.

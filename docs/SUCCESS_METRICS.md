@@ -748,3 +748,31 @@ CPU-root-cause evidence:
 `local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only/opena8dj-driver.sample.txt`
 shows the active CPU hotspot is IOUSBHost async enqueue cadence in the USB
 completion path, not transfer-ledger diagnostics or pure sample conversion.
+
+## 2026-06-17 Updated Gate Snapshot After ISO64/q8 StopIO
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`.
+
+- Offline gates: PASS.
+- Simulated output matrix: PASS.
+- C++ default transport changed to `ISO64/q8/prefetch64` with
+  `HAL_STOP_ISOC_ON_STOP=1`.
+- StopIO final-state gate: PASS for latest physical run. Evidence:
+  `local-analysis/soundcheck/20260617-cpp-iso64q8-stopisoc-irig-pairA-12s/stream-stats-after.txt`
+  reports `streaming=0`, `outputUnderruns=0`,
+  `outputActiveUnderruns=0`.
+- Runtime CPU beats prior C++ default: PASS as an internal improvement.
+  Driver p95 improved from `37.2%` to `9.8%`.
+- Runtime CPU beats mainline: FAIL. Same-window mainline `0.3.135` baseline
+  reports driver p95 `6.0%`; latest C++ reports `9.8%`.
+- Physical music quality: FAIL. Latest C++ run reports
+  `quality_alignment_score=0.686712`, SNR `-0.84 dB`, `35` lag jumps, mid/high
+  residual ratios `2.525233/1.788470`, quiet mid noise `-35.97 dBFS`.
+- Physical route sanity: FAIL/BLOCKED. Same-window mainline also failed the
+  same route (`quality_alignment_score=0.680798`, SNR `-0.83 dB`), so this
+  capture path cannot support audiophile quality claims until independently
+  validated.
+- Traktor/timecode physical validation: FAIL/BLOCKED, no physical DVS evidence.
+- Branch promotion: forbidden. Do not move C mainline to Legacy and do not move
+  C++ to main.
