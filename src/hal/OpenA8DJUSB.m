@@ -4927,6 +4927,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         };
     }
     NSError *error = nil;
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
     [self recordTransferLedgerEvent:kTransferLedgerCaptureQueue
                             transfer:transfer
                     firstFrameNumber:0
@@ -4937,6 +4938,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   failedTransactions:0
                    shortTransactions:0
                           outputStats:NULL];
+#endif
     BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
                                          transactionList:transactions
                                     transactionListCount:transfer.transactionCount
@@ -5099,6 +5101,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         USBTrace("isoc IN complete status=0x%08x", status);
     }
 
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
     [self recordTransferLedgerEvent:kTransferLedgerCaptureComplete
                             transfer:transfer
                     firstFrameNumber:0
@@ -5109,6 +5112,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   failedTransactions:failedTransactions
                    shortTransactions:shortTransfers
                           outputStats:NULL];
+#endif
 
 #if OPENA8DJ_ENABLE_TRACE
     _debugCaptureTransfers++;
@@ -5570,6 +5574,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #else
     (void)inFlightAfterQueue;
 #endif
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
     [self recordTransferLedgerEvent:kTransferLedgerPlaybackQueue
                             transfer:transfer
                     firstFrameNumber:firstFrameNumber
@@ -5580,6 +5585,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   failedTransactions:0
                    shortTransactions:0
                           outputStats:&outputStats];
+#endif
     BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
                                           transactionList:transactions
                                      transactionListCount:transfer.transactionCount
@@ -5639,7 +5645,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     }
     _lastPlaybackCompletionHostTime = playbackCompletionTime;
 
+#if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC || OPENA8DJ_ENABLE_TRANSFER_LEDGER
     uint32_t inFlightAtCompletion = atomic_load(&_playbackTransfersInFlight);
+#endif
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     CadenceRecordRange(&_cadenceDiagnostics.playbackInFlightAtCompletion, inFlightAtCompletion);
 #endif
@@ -5687,6 +5695,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     } else if (status != kIOReturnAborted) {
         failedTransactions++;
     }
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
     [self recordTransferLedgerEvent:kTransferLedgerPlaybackComplete
                             transfer:transfer
                     firstFrameNumber:transfer.ledgerFirstFrameNumber
@@ -5697,6 +5706,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   failedTransactions:failedTransactions
                    shortTransactions:shortTransfers
                           outputStats:NULL];
+#endif
     if (status == kIOReturnSuccess && failedTransactions == 0 && shortTransfers == 0) {
         atomic_store(&_playbackScheduleFailureStreak, 0);
     }

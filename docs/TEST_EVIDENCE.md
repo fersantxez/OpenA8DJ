@@ -1,5 +1,69 @@
 # Test Evidence
 
+## 2026-06-17: Transfer Ledger No-Op Call-Site Prune And Transfer-Rate Rejections
+
+- Change:
+  - Wrapped disabled transfer-ledger call sites in
+    `OPENA8DJ_ENABLE_TRANSFER_LEDGER`, so the Objective-C no-op messages are
+    not sent from callback-adjacent transfer paths when the ledger is off.
+  - Tested transfer-rate variants proposed by the CPU audit:
+    ISO64+unrolled output packing, coalesce2+unrolled output packing, and the
+    default ISO8/generic packer after the ledger call-site prune.
+  - Reverted Makefile defaults after the experiments. Only the ledger
+    call-site prune remains as code hygiene.
+- Commands:
+  - `make -B hal usb-play HAL_FAST_OUTPUT_PREFETCH_CLEAR=1 HAL_UNROLLED_OUTPUT_PACK=1`
+  - `make -B hal usb-play HAL_ISO_FRAMES=64 HAL_PLAYBACK_ISO_FRAMES=64 HAL_FAST_OUTPUT_PREFETCH_CLEAR=1 HAL_UNROLLED_OUTPUT_PACK=1`
+  - `make -B hal usb-play HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_FAST_OUTPUT_PREFETCH_CLEAR=1 HAL_UNROLLED_OUTPUT_PACK=1`
+  - `make -B hal usb-play`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Offline gates PASS after restoring defaults and applying the ledger
+    call-site prune.
+  - Debug CTest: `100% tests passed, 0 tests failed out of 17`.
+  - Release CTest: `100% tests passed, 0 tests failed out of 18`.
+  - Evidence schema: PASS, `22` required files, `0` missing.
+  - Hardware touched: yes, under hardware lock for the locked HAL safety and
+    iRig soundcheck runs listed below.
+  - Driver install/load touched: yes, under hardware lock only.
+  - CoreAudio touched: yes, under hardware lock only for HAL candidate loading,
+    soundcheck, cleanup, and runtime isolation.
+- Physical evidence:
+  - `local-analysis/physical-unrolled-pack/20260617T131114Z-640dee9`:
+    soundcheck FAIL, `quality_alignment_score=0.962106`, SNR about `9.24 dB`,
+    `lag_jumps_gt_2_frames=44`, clicks `113`, OpenA8DJ driver CPU p95 `22.0%`.
+  - `local-analysis/physical-iso64-unrolled/20260617T131356Z-640dee9`:
+    soundcheck FAIL, `quality_alignment_score=0.186393`, SNR `-20.96 dB`,
+    `lag_jumps_gt_2_frames=60`, OpenA8DJ driver CPU p95 `5.5%`.
+  - `local-analysis/physical-coalesce2-unrolled/20260617T131709Z-640dee9`:
+    soundcheck FAIL, `quality_alignment_score=0.258519`, SNR `-18.71 dB`,
+    `lag_jumps_gt_2_frames=57`, OpenA8DJ driver CPU p95 `16.5%`.
+  - `local-analysis/physical-ledger-callsite-prune/20260617T131921Z-640dee9`:
+    soundcheck FAIL, `quality_alignment_score=0.234322`, SNR `-17.53 dB`,
+    `lag_jumps_gt_2_frames=61`, OpenA8DJ driver CPU p95 `23.4%`.
+- Recovery:
+  - Each physical run ended with a runtime isolation audit PASS and no active
+    HAL left loaded.
+  - Latest cleanup evidence:
+    `local-analysis/physical-ledger-callsite-prune/20260617T131921Z-640dee9/runtime-isolation-after-force-unload.json`.
+- Release benchmark after restoring defaults and applying the ledger prune:
+  - `pack_mib_s=1656.8`
+  - `decode_into_mib_s=578.522`
+  - `route_frames_s=1.1163e+09`
+  - `route_advanced_frames_s=5.09512e+08`
+- Interpretation:
+  - ISO64 proves the CPU target is reachable, but it destroys physical audio
+    quality in the current C++ HAL and must stay rejected.
+  - Playback coalescing lowers CPU less than ISO64 and also destroys physical
+    audio quality, so it must stay rejected.
+  - The unrolled packer is not accepted as a default; it still failed physical
+    quality and introduced click evidence.
+  - The ledger call-site prune is acceptable callback hygiene only. It is not
+    a performance or sound-quality claim.
+  - `playbackTransfersSubmitted` is not trustworthy for readiness until its
+    counter contract is fixed; recent physical runs report about `16134`
+    submitted versus about `1008` completed.
+
 ## 2026-06-17: HAL Hot-Path Lock Reduction
 
 - Change:

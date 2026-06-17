@@ -25,6 +25,7 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Pasteur | Read-only byte-format and diagnostic-capture analysis. | findings integrated in this document |
 | Euler | Read-only physical evidence triage after diagnostic capture. | findings integrated in this document |
 | Carver | Read-only steady CPU/sample audit after v5 profiling. | recommended output-only no-capture ISO experiment; integrated as opt-in only |
+| Einstein | Read-only C++ versus mainline HAL CPU divergence audit. | findings integrated in this document |
 
 ## Findings Integrated
 
@@ -2231,3 +2232,45 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Next recommended action:
   - Focus on product HAL CPU and physical alignment/quality. Direct USB packet
     correctness is no longer the dominant blocker for branch promotion.
+
+## Einstein: C++ Versus Mainline HAL CPU Divergence Audit - 2026-06-17
+
+- Mission:
+  - Inspect C++ and mainline HAL behavior read-only and explain why C++ physical
+    runs consume much more OpenA8DJ driver CPU than the same-day mainline A/B.
+  - No edits, no hardware, no CoreAudio, no USB, no installs.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Findings:
+  - Primary CPU suspect: C++ default transfer shape was ISO8/current-cadence,
+    while mainline evidence used ISO64-like lower completion pressure. C++
+    driver p95 stayed around `23%`; mainline was around `5.6%`.
+  - C++ had disabled fast unrolled output packing and prefetch clearing by
+    default while mainline uses the faster output path.
+  - Disabled transfer-ledger Objective-C messages still existed at call sites
+    before the prune and were unnecessary callback-adjacent work.
+  - Capture-paced playback magnifies per-transfer cost.
+  - Input decode is not the primary CPU suspect for the playback-heavy
+    evidence.
+- Integrated actions:
+  - Tested ISO64+unrolled and coalesce2+unrolled under lock.
+  - Rejected both as defaults because they reduce CPU while collapsing physical
+    quality.
+  - Pruned disabled transfer-ledger call sites as callback hygiene only.
+- Files affected:
+  - None by the subagent directly.
+  - Architect integration touched `src/hal/OpenA8DJUSB.m` and documentation in
+    this worktree only.
+- Risks:
+  - The CPU gap is real, but a CPU-only fix can be actively harmful if it
+    changes USB/audio cadence.
+  - `playbackTransfersSubmitted` is not trustworthy as readiness evidence until
+    its counter contract is fixed.
+- Next recommended action:
+  - Fix stream-stats/control-tool observability first, then continue
+    cadence-preserving CPU reductions. Do not retry ISO64/coalescing as product
+    candidates without a new physical-quality hypothesis.

@@ -1,5 +1,57 @@
 # Decision Log
 
+## 2026-06-17: Reject ISO64 And Playback Coalescing As C++ Defaults
+
+Decision:
+- Keep C++ transfer-rate changes rejected unless a later design proves equal
+  or better physical quality.
+- Do not adopt ISO64 as the C++ HAL default even though it reduces OpenA8DJ
+  driver CPU p95 to mainline-like levels.
+- Do not adopt playback coalescing as a CPU optimization.
+- Do not promote the unrolled output packer to default yet.
+- Keep the transfer-ledger call-site prune as callback hygiene only, not as a
+  product performance or audio-quality claim.
+
+Reason:
+- The current C++ HAL can trade quality for CPU, but that is not a product
+  improvement. Audiophile readiness requires lower resource use with equal or
+  better physical sound quality.
+- ISO64+unrolled measured OpenA8DJ driver CPU p95 `5.5%`, but physical quality
+  collapsed: alignment `0.186393`, SNR `-20.96 dB`, and `60` lag jumps.
+- Coalesce2+unrolled lowered CPU p95 to `16.5%`, but physical quality also
+  collapsed: alignment `0.258519`, SNR `-18.71 dB`, and `57` lag jumps.
+- Unrolled output packing with ISO8 had better alignment than the rejected
+  transfer-rate variants but still failed physical quality and produced click
+  evidence.
+- The default ledger-pruned build also failed the subsequent physical run, so
+  clean internal counters and offline byte gates remain insufficient.
+
+Alternatives discarded:
+- Accept ISO64 because CPU matches mainline: rejected because physical music
+  capture is far below product thresholds.
+- Accept coalesce2 as a compromise: rejected because it still fails quality and
+  does not meet the CPU target.
+- Accept unrolled packing as default after one better alignment run: rejected
+  until click behavior and repeatability are understood.
+- Use `playbackTransfersSubmitted` as readiness evidence: rejected because the
+  counter currently reports about `16x` the completion count in physical runs
+  and needs a contract fix.
+
+Evidence:
+- `local-analysis/physical-unrolled-pack/20260617T131114Z-640dee9`: FAIL,
+  alignment `0.962106`, SNR about `9.24 dB`, `44` lag jumps, clicks `113`,
+  driver CPU p95 `22.0%`.
+- `local-analysis/physical-iso64-unrolled/20260617T131356Z-640dee9`: FAIL,
+  alignment `0.186393`, SNR `-20.96 dB`, `60` lag jumps, driver CPU p95
+  `5.5%`.
+- `local-analysis/physical-coalesce2-unrolled/20260617T131709Z-640dee9`:
+  FAIL, alignment `0.258519`, SNR `-18.71 dB`, `57` lag jumps, driver CPU p95
+  `16.5%`.
+- `local-analysis/physical-ledger-callsite-prune/20260617T131921Z-640dee9`:
+  FAIL, alignment `0.234322`, SNR `-17.53 dB`, `61` lag jumps, driver CPU p95
+  `23.4%`.
+- Runtime isolation after cleanup: PASS, HAL inactive, lock absent.
+
 ## 2026-06-17: Reduce HAL Hot-Path Locks Without Changing Cadence
 
 Decision:

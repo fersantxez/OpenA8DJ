@@ -9,6 +9,14 @@ Branch: `driverkit/cpp-redesign`
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.
 - `/Users/fer/dev/opena8dj` is the C/Objective-C mainline and is read-only for this effort.
 - `/Users/fer/dev/audio8djrust` is the Rust experiment and is read-only for this effort.
+- 2026-06-17 status: C++ is not ready for branch promotion or physical
+  readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
+  improvement over mainline. ISO8/current-cadence builds remain high CPU and
+  still fail strict music quality; ISO64 and playback coalescing reduce CPU but
+  collapse physical quality. Runtime isolation after cleanup is clean.
+- Reboot/autologin recovery is an unresolved operational gap. After the prior
+  reboot, the session did not recover without user intervention as intended;
+  this must be fixed before planned unattended test windows.
 - The first implementation target is an offline C++20 core with no macOS, CoreAudio, USB, HAL, kext, dext, or hardware side effects.
 - The initial core models the Audio 8 DJ surface as 8 inputs and 8 outputs arranged as stereo pairs A/B/C/D.
 - The core now has executable Mode 2 packet gates: S24 big-endian conversion, all-start-byte round trip, no deck leakage for pair-A-only data, and Release throughput gates.
