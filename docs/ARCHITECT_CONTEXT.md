@@ -418,3 +418,9 @@ Next technical target:
   `local-analysis/promotion-readiness-after-unrolled-rejection.json`.
   The latest selected physical music and CPU evidence are both failing, so
   branch promotion and hardware readiness claims remain blocked.
+- Default-restored control run with the same music file confirms the severe
+  regression was specific to the opt-in unrolled candidate. The default still
+  fails product gates: `quality_alignment_score=0.964049`, SNR `10.44 dB`,
+  `lag_jumps_gt_2_frames=40`, driver p95 `38.5%`.
+  Evidence:
+  `local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal`.

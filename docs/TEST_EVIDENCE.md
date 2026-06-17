@@ -2328,3 +2328,34 @@ Operational note:
     evidence.
 - Evidence path:
   - `local-analysis/promotion-readiness-after-unrolled-rejection.json`
+
+## 2026-06-17: Default Control After Unrolled-Pack Rejection
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-default-after-unrolled/20260616-212139/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Explicit HAL unload under lock.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-default-after-unrolled-failed-unload.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/default-after-unrolled-summary.json`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/default-after-unrolled-capture-iso-invariants.json`
+- Result:
+  - Safety PASS.
+  - Soundcheck FAIL, but returned to the known default failure profile rather
+    than the severe unrolled-pack regression.
+  - Post-failure unload/recovery PASS; final isolation PASS.
+- Key metrics:
+  - `quality_alignment_score=0.964049`
+  - `snr_db=10.44`
+  - `lag_jumps_gt_2_frames=40`
+  - `mid_band_residual_ratio=1.436380`
+  - `high_band_residual_ratio=1.372535`
+  - `quiet_mid_band_noise_dbfs=-35.80`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver avg/p95/max CPU `33.942%/38.500%/38.700%`
+  - Stream stats: no active underruns, no late writes, no timeline resets, no
+    panic flags.
+  - Capture ISO invariants PASS.
+- Interpretation:
+  - Default is restored but still not ready.
+  - The next useful investigation should target the physical residual/lag path
+    and runtime CPU above the Mode 2 byte-pack layer.
