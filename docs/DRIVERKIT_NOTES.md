@@ -64,3 +64,27 @@ Required before real dext build:
 - Appropriate DriverKit and AudioDriverKit entitlements.
 - Xcode or CMake/Xcode generator configuration for the dext bundle.
 - Explicit user-approved window before any activation, installation, reload, or system-extension command.
+
+## Prepared Transport Contract
+
+The current CPU evidence points at USB transfer enqueue/requeue work as the
+hotspot. Until the real DriverKit SDK is available, the project models the
+required backend contract offline in
+`tools/driverkit_prepared_transport_contract.cpp`.
+
+Required architecture:
+
+- HAL/CoreAudio-facing code reads and writes bounded audio rings only.
+- A prepared transport backend owns USB-facing slots and steady-state requeue.
+- HAL steady-state direct USB requeue count must be `0`.
+- The backend may enqueue prepared slots during start/prepare, outside the
+  audio hot path.
+- No fallback allocations are allowed after streaming starts.
+- Completion cadence must remain `1x`; gaps above `1.25x` are rejected.
+- Capture/playback timestamps must stay monotonic.
+- 8 inputs, 8 outputs, A/B/C/D stereo routing, and timecode profile semantics
+  must remain represented.
+
+This gate does not compile a real dext and does not activate a system
+extension. It exists to prevent the future DriverKit implementation from
+smuggling the current HAL enqueue bottleneck back into the hot path.

@@ -35,6 +35,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
@@ -91,6 +92,7 @@ transport_budget = load_json("transport-budget-model.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
+driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
@@ -271,6 +273,16 @@ summary = {
         "system_extension_activated": driverkit_shell.get("system_extension_activated"),
         "device_model_valid": driverkit_shell.get("device_model_valid"),
         "evidence": "local-analysis/cpp-offline/driverkit-shell-contract.json",
+    },
+    "driverkit_prepared_transport_contract": {
+        "status": driverkit_prepared_transport.get("result"),
+        "safe_scenarios": driverkit_prepared_transport.get("safe_scenarios"),
+        "minimum_hal_steady_requeues_for_safe": driverkit_prepared_transport.get(
+            "minimum_hal_steady_requeues_for_safe"
+        ),
+        "rows": driverkit_prepared_transport.get("row_count"),
+        "failures": driverkit_prepared_transport.get("failures"),
+        "evidence": "local-analysis/cpp-offline/driverkit-prepared-transport-contract.json",
     },
     "static_policy": {
         "status": static.get("result"),

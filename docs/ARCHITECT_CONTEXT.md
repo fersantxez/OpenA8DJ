@@ -1521,3 +1521,13 @@ Next technical target:
     more hardware should not be spent on simple cadence ladder variants unless
     the implementation changes the quality/CPU frontier, not just its position
     along the old tradeoff curve.
+- Prepared DriverKit transport contract:
+  - Added compiled model `tools/driverkit_prepared_transport_contract.cpp`.
+  - The contract encodes the next CPU architecture direction: HAL steady-state
+    must perform `0` direct USB requeues while the backend owns prepared slot
+    requeue, cadence remains `1x`, timestamps stay ordered, and A/B/C/D plus
+    timecode semantics remain represented.
+  - Negative scenarios reject HAL direct requeue, steady-state fallback
+    allocations, coalesced completion gaps, and timestamp reorder.
+  - This is offline architecture evidence only. It is not a real DriverKit dext,
+    not a hardware pass, and not better-than-mainline proof.

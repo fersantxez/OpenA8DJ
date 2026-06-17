@@ -699,3 +699,39 @@ Next implementation gate:
   steady-state path performs no direct `IOUSBHostPipe` enqueue/requeue work;
 - preserve frame order, timestamps, 8 input channels, 8 output channels,
   A/B/C/D routing, and timecode profile semantics.
+
+## Offline Prepared DriverKit Transport Contract
+
+Purpose:
+
+- turn the next CPU architecture hypothesis into a compiled test;
+- require `0` HAL steady-state direct USB requeue work in safe scenarios;
+- reject designs that hide CPU reduction behind allocations, completion gaps,
+  timestamp reorder, routing breakage, or timecode/input loss.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_driverkit_prepared_transport_contract
+./build/cpp-offline/opena8djcpp_driverkit_prepared_transport_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/driverkit-prepared-transport-contract.json`;
+- `driverkit_prepared_transport_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the offline transport model enforces the intended architecture and
+  catches known unsafe variants.
+- PASS does not mean a dext exists, installs, runs, or beats mainline.
+- FAIL blocks any physical prepared-transport candidate.

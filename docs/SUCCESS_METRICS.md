@@ -1736,3 +1736,21 @@ Next required evidence:
 - offline gates PASS before any new physical window;
 - same-session physical proof that the new backend beats mainline in quality,
   driver CPU, coreaudiod CPU, routing, and timecode behavior.
+
+## 2026-06-17 Prepared Transport Contract Gate
+
+Required for the next CPU candidate:
+- `opena8djcpp_driverkit_prepared_transport_contract` must PASS.
+- Safe scenarios must report `minimum_hal_steady_requeues_for_safe=0`.
+- Safe scenarios must reject steady-state fallback allocations.
+- Completion gap ratio must be `<=1.25`.
+- Timestamp regressions must be `0`.
+- Channel identity failures must be `0`.
+- Timecode profile failures must be `0`.
+
+Current meaning:
+- PASS is only an offline architecture gate.
+- It does not prove real DriverKit behavior, physical sound quality, or
+  better-than-mainline performance.
+- It is required before implementing or physically testing a prepared transport
+  candidate because the current HAL enqueue path is CPU-blocked.

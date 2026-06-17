@@ -414,3 +414,30 @@ pass:
 Any future implementation that needs to violate this contract must document the
 specific callback operation, its upper bound, why it cannot move to a
 non-realtime thread, and the measurement proving it does not regress audio.
+
+## Prepared Transport Backend Contract
+
+The next transport architecture must split CoreAudio/HAL-facing callbacks from
+USB-facing prepared slot ownership:
+
+- HAL steady-state callback work:
+  - copy/route frames to or from fixed rings;
+  - update bounded counters and timestamps;
+  - never issue direct USB transfer enqueue/requeue;
+  - never allocate fallback transfer state.
+- Transport backend work:
+  - prepare capture and playback slots before streaming;
+  - own steady-state completion/requeue outside the HAL callback;
+  - preserve one-completion-period cadence unless a future physical candidate
+    proves a different cadence beats quality and CPU gates;
+  - publish ordered timestamps and channel-stable frame batches to the rings.
+
+Offline gate:
+
+- `opena8djcpp_driverkit_prepared_transport_contract`.
+- Required safe scenarios have `hal_steady_requeues=0`, no fallback
+  allocations, no timestamp regressions, no routing failures, no timecode
+  profile failures, and completion gap ratio `<=1.25`.
+
+This is still weaker than physical readiness. It is the contract a real
+DriverKit/USB backend must satisfy before another hardware window is justified.

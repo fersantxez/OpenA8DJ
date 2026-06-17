@@ -6798,3 +6798,66 @@ Operational note:
   - This is still not a product readiness pass. Physical quality, same-session
     mainline comparison, runtime CPU, routing, recovery, and physical
     Traktor/timecode evidence still block readiness and branch promotion.
+
+## 2026-06-17 Prepared DriverKit Transport Contract
+
+- Purpose:
+  - Add an offline architecture gate for the next CPU candidate: a prepared
+    DriverKit/transport backend where HAL steady-state performs zero direct USB
+    requeue work.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_prepared_transport_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_prepared_transport_contract`
+- Result:
+  - PASS.
+  - Rows: `6`.
+  - Safe scenarios: `2`.
+  - Failures: `0`.
+  - Minimum HAL steady-state requeues among safe scenarios: `0`.
+  - Negative scenarios reject HAL direct requeue, steady fallback allocation,
+    coalesced completion gap, and timestamp reorder.
+- Safety:
+  - Offline model only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-prepared-transport-contract.json`
+- Interpretation:
+  - This makes the next transport direction testable before hardware: prepared
+    backend owns steady requeue; HAL owns only ring-facing audio work.
+  - This is not a real DriverKit dext and does not prove physical quality or
+    better-than-mainline performance.
+
+## 2026-06-17 Offline Gates After Prepared Transport Contract
+
+- Purpose:
+  - Verify that the prepared transport contract is compiled, run by CTest,
+    captured in offline gate evidence, and covered by static policy.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `19/19` passed.
+  - Release CTest: `20/20` passed.
+  - Prepared transport contract: PASS, `safe_scenarios=2`,
+    `minimum_hal_steady_requeues_for_safe=0`, `failures=0`.
+  - Static policy: PASS, `audited_files=12`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-driverkit-prepared-transport`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/driverkit-prepared-transport-contract.json`
+  - `local-analysis/audio-stack-guard/final-after-driverkit-prepared-transport`
+- Interpretation:
+  - Offline architecture and regression gates remain green.
+  - Readiness remains blocked by the absence of a real prepared transport
+    implementation and by missing physical proof against mainline for quality,
+    CPU, routing, recovery, and Traktor/timecode.

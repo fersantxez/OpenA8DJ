@@ -4255,3 +4255,44 @@ Next implication:
   mechanism, or it should be rejected offline before lock/hardware use. The
   current observed family set still does not prove better-than-mainline
   quality or performance.
+
+## 2026-06-17: Add Prepared DriverKit Transport Contract
+
+Decision:
+- Add `tools/driverkit_prepared_transport_contract.cpp` and wire it into CTest
+  plus `scripts/run-cpp-offline-gates`.
+- Treat the next CPU candidate as a prepared transport/backend problem, not as
+  another HAL cadence knob.
+
+Reason:
+- Profiling already identified transfer enqueue/requeue work as the measured
+  driver CPU hotspot, while the transport budget gate shows simple cadence
+  changes trade CPU against physical quality instead of satisfying both.
+- A DriverKit/USB transport direction is only credible if the HAL steady-state
+  hot path stops issuing direct USB requeue work, while packet cadence, order,
+  timestamps, routing, and timecode input semantics remain intact.
+- The contract provides a compiled offline gate before any DriverKit SDK,
+  system extension, USB, CoreAudio, or hardware action.
+
+Contract:
+- Safe scenarios must have `hal_steady_requeues=0`.
+- All steady-state slots must be prepared; fallback allocations are rejected.
+- Completion gaps greater than `1.25x`, timestamp reorder/regression, routing
+  identity failure, or timecode profile failure reject the model.
+- The model covers both deeper prepared queues and mainline-like queue depth.
+
+Alternatives discarded:
+- Keep optimizing the existing HAL enqueue path: rejected as the primary route
+  because previous knobs, reuse, raw completions, and cadence variants did not
+  satisfy quality plus CPU.
+- Build or install a real dext immediately: rejected because the local toolchain
+  lacks DriverKit SDK support and hardware/system-extension work requires a
+  locked, explicit window.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-prepared-transport-contract.json`
+
+Next implication:
+- The next implementation target is an actual C++ transport abstraction that
+  can satisfy this contract with the real packet/ring types, then a locked
+  physical A/B only after the offline suite remains green.
