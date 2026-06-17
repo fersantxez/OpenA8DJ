@@ -2688,3 +2688,31 @@ Risk:
 - Next action:
   - Reduce sustained driver CPU and obtain decorrelated physical evidence before
     any further readiness or branch-promotion claim.
+
+## 2026-06-17 Subagent Integration: Sustained CPU Root-Cause Scout
+
+- Agent: Ptolemy (`019ed69c-cd01-7e30-bd77-a29a950dd7fe`).
+- Mandatory warning included:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar
+    hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.
+- Findings:
+  - ISO12/q8 sustains about `666.8` capture and playback transfers per second.
+  - OpenA8DJ driver CPU remains around `16.6%` after startup, while
+    `coreaudiod` stabilizes much lower.
+  - Existing ISO12/q8 evidence lacks hot-path timing samples, so the CPU
+    failure is process-level, not callback-attributed.
+  - Most likely suspects are fixed per-transfer queue/requeue/enqueue costs,
+    not audio math.
+  - Previously tried reuse/fast-transfer flags should not be promoted blindly;
+    they need locked revalidation with quality gates.
+- Integrated action:
+  - `tools/physical_run_compare.cpp` now emits capture/playback transfer rates
+    and callback attribution status.
+  - `scripts/run-cpp-offline-gates` includes those fields in the summary.
+- Next action:
+  - Create a locked hot-path-timing physical window only after deciding the
+    exact diagnostic build. Until then, no CPU root-cause claim beyond
+    process-level evidence.

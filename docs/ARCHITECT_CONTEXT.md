@@ -1684,10 +1684,16 @@ Next technical target:
 - CPU split:
   driver p95 total and after 5s are both `16.6%`.
   `coreaudiod` p95 total is `35.4%`, but after 5s is `2.1%`.
+- Transport/callback context:
+  capture and playback rates are both about `666.809545` transfers/s.
+  Callback attribution status is
+  `external_process_cpu_only_hot_path_timing_absent`.
 
 Current technical truth:
 - The line is stronger as an evidence system, but not as a product candidate.
 - The sustained driver CPU issue is real.
+- The current evidence does not yet tell which internal callback segment owns
+  that sustained CPU.
 - The stored WAV failure is not explained by simple timing correction or a
   simple L/R matrix.
 - Branch promotion, hardware readiness, and Traktor/timecode readiness remain

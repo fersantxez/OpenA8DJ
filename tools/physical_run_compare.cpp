@@ -57,6 +57,10 @@ struct RunStats {
   bool hot_path_timing_present = false;
   bool reference_wav_present = false;
   bool captured_wav_present = false;
+  double capture_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
+  double playback_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
+  double playback_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
   double quality = std::numeric_limits<double>::quiet_NaN();
   double snr = std::numeric_limits<double>::quiet_NaN();
   double mid = std::numeric_limits<double>::quiet_NaN();
@@ -387,6 +391,14 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
   run.cpu_present = std::filesystem::is_regular_file(cpu_path);
   run.stream_summary_present = !stream_summary.empty();
   run.hot_path_timing_present = stream_summary_has_hot_path_timing(stream_summary);
+  run.capture_transfers_per_second =
+      number_or_nan(json_number(stream_summary, "capture_transfers_per_second"));
+  run.playback_transfers_per_second =
+      number_or_nan(json_number(stream_summary, "playback_transfers_completed_per_second"));
+  run.capture_transfers_sampled_per_second =
+      number_or_nan(json_number(stream_summary, "capture_transfers_sampled_per_second"));
+  run.playback_transfers_sampled_per_second =
+      number_or_nan(json_number(stream_summary, "playback_transfers_sampled_per_second"));
   run.reference_wav_present = std::filesystem::is_regular_file(path / "fixture/reference.wav");
   run.captured_wav_present = std::filesystem::is_regular_file(path / "captured.wav");
   run.quality = number_or_nan(json_number(metrics, "quality_alignment_score"));
@@ -613,6 +625,18 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"callback_attribution_status\": ";
   print_json_string(run.hot_path_timing_present ? "hot_path_timing_present"
                                                 : "external_process_cpu_only_hot_path_timing_absent");
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_transfers_per_second\": ";
+  print_json_number(run.capture_transfers_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_transfers_per_second\": ";
+  print_json_number(run.playback_transfers_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_transfers_sampled_per_second\": ";
+  print_json_number(run.capture_transfers_sampled_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_transfers_sampled_per_second\": ";
+  print_json_number(run.playback_transfers_sampled_per_second);
   std::cout << ",\n";
   std::cout << indent << "  \"practical_pass\": " << (practical_pass(run) ? "true" : "false")
             << ",\n";

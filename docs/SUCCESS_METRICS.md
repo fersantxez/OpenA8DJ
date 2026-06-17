@@ -1969,3 +1969,22 @@ Readiness rule:
   either remove the residual/capture-path failure or provide stronger
   decorrelated physical evidence showing that the failure was not produced by
   the C++ driver path.
+
+## 2026-06-17 CPU Attribution Gate
+
+Required for any low-resource superiority claim:
+- Product evidence must include process-level CPU and callback/hot-path
+  attribution, or explicitly report that callback attribution is absent.
+- If callback attribution is absent, CPU may still fail gates, but root-cause
+  claims must stay limited to process-level evidence.
+- Candidate evidence must include capture and playback transfer rates.
+- A CPU improvement is not promotable unless quality gates remain passing in
+  the same locked physical family.
+
+Current status:
+- Latest selected product run reports about `666.809545` capture transfers/s
+  and `666.809545` playback transfers/s.
+- Callback attribution status:
+  `external_process_cpu_only_hot_path_timing_absent`.
+- Driver CPU remains `16.6%` after 5s, so the sustained CPU blocker is real,
+  but the current run does not prove which internal callback segment owns it.

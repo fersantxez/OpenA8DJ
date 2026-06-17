@@ -347,6 +347,8 @@ summary = {
         "candidate_coreaudiod_cpu_p95": physical_run_product_superiority.get("candidate", {}).get("coreaudiod_cpu_p95"),
         "candidate_coreaudiod_cpu_p95_after_5s": physical_run_product_superiority.get("candidate", {}).get("coreaudiod_cpu_p95_after_5s"),
         "callback_attribution_status": physical_run_product_superiority.get("candidate", {}).get("callback_attribution_status"),
+        "candidate_capture_transfers_per_second": physical_run_product_superiority.get("candidate", {}).get("capture_transfers_per_second"),
+        "candidate_playback_transfers_per_second": physical_run_product_superiority.get("candidate", {}).get("playback_transfers_per_second"),
         "residual_classification": physical_run_product_superiority.get("candidate", {}).get("residual_classification"),
         "analysis_source": physical_run_product_superiority.get("analysis_source"),
         "native_wav_reanalysis_required_before_promotion": physical_run_product_superiority.get("native_wav_reanalysis_required_before_promotion"),
