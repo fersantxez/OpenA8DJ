@@ -417,6 +417,10 @@ still failed quality and measured driver p95 at `36.8%`, worse than the
 interval-16 default. It is only useful as a diagnostic A/B if a future question
 specifically needs telemetry removed.
 
+Do not reintroduce sparse output-cycle clear as a CPU profile. That experiment
+passed HAL safety but failed physical music quality and worsened driver CPU p95
+to `38.3%`. It was removed instead of being kept as a disabled build flag.
+
 ## Analysis Environment
 
 Precise offline audio analysis can use the local Python environment under the

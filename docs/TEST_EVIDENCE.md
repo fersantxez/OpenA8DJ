@@ -2763,3 +2763,45 @@ Operational note:
   - Stats-off is rejected as a default. It removes observability, does not
     improve quality, and does not improve CPU relative to the current
     interval-16 default.
+
+## 2026-06-17: Sparse Output-Cycle Clear Physical Rejection
+
+- Candidate:
+  - `HAL_OUTPUT_SPARSE_CYCLE_CLEAR=1`
+- Commands:
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-next-hardware-check.json`
+  - `make -B hal HAL_OUTPUT_SPARSE_CYCLE_CLEAR=1`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-sparse-cycle-clear/20260617-a1c8b50/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-sparse-cycle-clear-a1c8b50-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal HAL unload under global lock, then
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`
+  - `make -B hal`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-sparse-cycle-clear.json`
+- Result:
+  - Initial runtime isolation PASS: HAL inactive and lock absent.
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL.
+  - Final isolation PASS: HAL inactive, lock absent, no OpenA8DJ/mainline
+    holder processes.
+  - Promotion readiness FAIL.
+- Key quality metrics:
+  - `quality_alignment_score=0.9636469258932283`
+  - `analog_snr_db=10.48`
+  - `lag_jumps_gt_2_frames=33`
+  - `click_outliers=0`
+  - `mid_band_residual_ratio=1.4081802020521872`
+  - `high_band_residual_ratio=1.3645974703502124`
+  - `quiet_mid_band_noise_dbfs=-36.222340546910175`
+  - `capture_clipped_frames=0`
+- CPU metrics:
+  - OpenA8DJ driver median/p95/max `37.15%/38.3%/38.5%`
+  - coreaudiod median/p95/max `2.7%/14.2%/58.7%`
+  - total watched audio/UI median/p95/max `54.85%/56.9%/125.4%`
+- Evidence paths:
+  - `local-analysis/physical-sparse-cycle-clear/20260617-a1c8b50/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-sparse-cycle-clear-a1c8b50-irig-pairA-16s-cpp-hal`
+  - `local-analysis/promotion-readiness-after-sparse-cycle-clear.json`
+  - `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`
+- Interpretation:
+  - Sparse cycle clear is rejected. It did not improve quality, worsened CPU,
+    and should not remain as a latent hot-path option.

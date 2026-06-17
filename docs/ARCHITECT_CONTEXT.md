@@ -510,3 +510,17 @@ Next technical target:
 - Final post-run isolation after stats-off PASS:
   `local-analysis/runtime-isolation/final-after-stats-off.json`. HAL inactive,
   lock absent, and no OpenA8DJ/mainline holder processes were detected.
+- Physical sparse output-cycle clear candidate was tested and rejected:
+  `HAL_OUTPUT_SPARSE_CYCLE_CLEAR=1`. Evidence:
+  `local-analysis/physical-sparse-cycle-clear/20260617-a1c8b50/hal-candidate-safety`
+  and
+  `local-analysis/soundcheck/20260617-sparse-cycle-clear-a1c8b50-irig-pairA-16s-cpp-hal`.
+  It passed install safety, but physical music still failed
+  (`quality_alignment_score=0.963647`, SNR `10.48 dB`,
+  `lag_jumps_gt_2_frames=33`, mid/high residual `1.408180/1.364597`) and
+  driver CPU p95 worsened to `38.3%`. The code experiment was removed rather
+  than kept as a disabled flag.
+- Final post-run isolation after sparse clear PASS:
+  `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`. HAL
+  inactive, lock absent, and no OpenA8DJ/mainline holder processes were
+  detected.

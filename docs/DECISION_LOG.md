@@ -1466,3 +1466,38 @@ Evidence:
   `local-analysis/promotion-readiness-after-stats-off.json`.
 - Final isolation:
   `local-analysis/runtime-isolation/final-after-stats-off.json`.
+
+## 2026-06-17: Reject Sparse Output-Cycle Clear
+
+Decision:
+- Do not keep or promote the experimental sparse output-cycle clear path.
+- Leave the current default output-cycle reset behavior unchanged.
+
+Reason:
+- The sparse-clear candidate passed HAL install safety but failed physical
+  music quality with the same broad signature as earlier rejected candidates:
+  quality alignment `0.963647`, SNR `10.48 dB`, lag jumps `33`, and mid/high
+  residual ratios `1.408180/1.364597`.
+- Runtime CPU got worse rather than better: OpenA8DJ driver median/p95/max
+  `37.15%/38.3%/38.5%`, compared with `34.5%/35.7%/36.3%` for the current
+  interval-16 default run. coreaudiod p95 also rose to `14.2%`.
+- The experiment adds hot-path branching/complexity without an objective win.
+
+Alternatives discarded:
+- Keep the flag disabled for future use: rejected because the first physical
+  A/B showed worse CPU and no quality improvement, so carrying dead hot-path
+  complexity is not justified.
+- Promote as an optimization because it reduces a `memset`: rejected by
+  measured end-to-end CPU.
+
+Evidence:
+- Build under test:
+  `make -B hal HAL_OUTPUT_SPARSE_CYCLE_CLEAR=1`.
+- Safety:
+  `local-analysis/physical-sparse-cycle-clear/20260617-a1c8b50/hal-candidate-safety`.
+- Soundcheck:
+  `local-analysis/soundcheck/20260617-sparse-cycle-clear-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Promotion readiness after run:
+  `local-analysis/promotion-readiness-after-sparse-cycle-clear.json`.
+- Final isolation:
+  `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`.
