@@ -4846,3 +4846,57 @@ Operational note:
   - `local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
   - `local-analysis/runtime-isolation/final-after-inline-inactive-decode-bypass-docs.json`
   - `local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`
+
+## 2026-06-17: Output Sample Time Follower Rejection
+
+- Purpose:
+  - Test the least-invasive remaining timebase knob:
+    `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`.
+  - This preserves payload bytes, queue geometry, capture-paced playback,
+    playback coalescing `1`, and implicit 1:1 transfer cadence.
+- Commands:
+  - `make -B hal build/opena8dj-control HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-output-sample-time-follower/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-output-sample-time-follower-unload`
+  - `make -B hal`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-output-sample-time-follower.json`
+- Results:
+  - HAL candidate safety PASS.
+  - Physical music quality FAIL:
+    quality `0.962572`, SNR floor `9.94 dB`, mid/high residual
+    `1.458736/1.377276`, quiet mid noise `-34.98 dBFS`, `28` lag jumps,
+    `0` clipped frames.
+  - Runtime CPU still fails mainline and regressed versus the prior probe:
+    driver p95 `24.7%`, `coreaudiod` p95 `53.0%`.
+  - Capture ISO invariants PASS; no capture short transfers, status failures,
+    or other-size transactions.
+  - Stream stats show no output active underruns, timeline resets, late writes,
+    or transfer-pool fallback allocations.
+  - Failure mode remains `timebase_or_alignment_instability`; LTI/fixed EQ,
+    static L/R mix, polarity, and simple nonlinearity remain insufficient.
+  - Final isolation PASS:
+    HAL inactive, lock absent, no OpenA8DJ or mainline QA process detected.
+- Product conclusion:
+  - Reject `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` as a product default.
+  - Small `sampleTime` continuity following does not solve the physical music
+    defect and worsens CPU in this run.
+  - The next useful work must either validate the physical route independently
+    or change the deeper USB/device transport state model while preserving
+    byte payload and 1:1 cadence.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-output-sample-time-follower/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
+  - `local-analysis/promotion-readiness-after-output-sample-time-follower.json`

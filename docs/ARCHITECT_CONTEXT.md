@@ -1102,3 +1102,22 @@ Next technical target:
     reject this micro-optimization as a product change. The remaining blocker
     is still the quality/timebase/route problem, not inactive decode call
     overhead.
+- Latest output sample time follower probe:
+  `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal`.
+  - Built with `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`, preserving payload,
+    queue geometry, capture-paced playback, coalesce `1`, and 1:1 cadence.
+  - Quality still FAIL:
+    `quality_alignment_score=0.962572`, SNR floor `9.94 dB`, mid/high
+    residual `1.458736/1.377276`, quiet mid noise `-34.98 dBFS`, `28` lag
+    jumps.
+  - Runtime CPU still fails mainline and regressed:
+    driver p95 `24.7%`, `coreaudiod` p95 `53.0%`.
+  - Capture ISO invariants PASS and stream stats show no gross underruns,
+    timeline resets, late writes, or pool fallback allocations.
+  - Final isolation passed:
+    HAL inactive, hardware lock absent, no OpenA8DJ/mainline QA process
+    detected.
+  - Decision:
+    reject `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` as a product default. The
+    remaining useful path is independent route validation or a deeper
+    USB/device transport state model.

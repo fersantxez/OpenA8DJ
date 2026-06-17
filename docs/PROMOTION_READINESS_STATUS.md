@@ -355,3 +355,25 @@ Latest promotion evaluation:
 Decision remains unchanged: reject this inline inactive decode bypass as a
 product change, do not move C mainline to Legacy, do not move C++ to `main`,
 and do not claim audiophile readiness.
+
+## 2026-06-17 Output Sample Time Follower Probe Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-output-sample-time-follower.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Product timebase probe still fails real-music quality:
+  quality `0.962572`, SNR floor `9.94 dB`, mid/high residual
+  `1.458736/1.377276`, quiet mid noise `-34.98 dBFS`, `28` lag jumps.
+- Runtime CPU still fails mainline:
+  driver p95 `24.7%`, `coreaudiod` p95 `53.0%`.
+- Capture ISO invariants pass, and stream stats show no gross output underruns,
+  timeline resets, late writes, or pool fallback allocations.
+- Final cleanup:
+  `local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
+  PASS, HAL inactive, lock absent, and no OpenA8DJ/mainline QA process detected.
+
+Decision remains unchanged: keep `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=0`, do not
+move C mainline to Legacy, do not move C++ to `main`, and do not claim
+audiophile readiness.

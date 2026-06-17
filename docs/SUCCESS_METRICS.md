@@ -1082,3 +1082,29 @@ Latest promotion evaluation:
   - The inline inactive decode bypass is rejected as a product change.
   - This result confirms that inactive input decode call overhead is not the
     dominant route to audiophile quality or mainline-beating resource use.
+
+## 2026-06-17 Updated Snapshot After Output Sample Time Follower Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-output-sample-time-follower.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.962572` versus required `>= 0.980000`.
+  - SNR floor `9.94 dB` versus required `>= 35.00 dB`.
+  - mid/high residual ratios `1.458736/1.377276` versus required maxima
+    `1.36/1.35`.
+  - quiet mid noise `-34.98 dBFS` versus required `<= -58.00 dBFS`.
+  - `lag_jumps_gt_2_frames=28` versus required `0`.
+- Runtime CPU beats mainline: FAIL.
+  - Product probe driver p95 `24.7%`.
+  - Product probe `coreaudiod` p95 `53.0%`.
+  - Mainline target remains around driver p95 `<= 6.5%` and `coreaudiod`
+    p95 `<= 1.7%` under comparable conditions.
+- Current threshold interpretation:
+  - `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` is rejected as a product default.
+  - Passing transport counters with failing music again means build cleanliness,
+    ISO invariants, and local timeline counters are necessary but not sufficient
+    for audiophile readiness.

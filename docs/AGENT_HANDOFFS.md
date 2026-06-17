@@ -1426,3 +1426,58 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     model predicts a measurable quality or CPU outcome.
   - Prioritize capture/reference route validation or transport/timebase
     redesign evidence.
+
+### Carver Follow-Up Failure-Family Analysis
+
+- Status:
+  - Completed read-only.
+  - No file edits, no hardware, no CoreAudio/USB mutation.
+- Mission:
+  - Re-rank the current physical quality failure after the inline inactive
+    decode bypass run.
+- Findings:
+  - The current C++ failure family remains quality around `0.96`, SNR around
+    `10 dB`, residual around `1.4/1.36`, and persistent lag jumps.
+  - Byte packing/routing is a low-priority explanation for this family because
+    previous packed-output and payload-guard evidence ruled out simple payload
+    corruption.
+  - Timebase/cadence or USB/device state after byte preparation remains the
+    highest-priority implementation hypothesis.
+  - Route/capture-chain validity is still a claim blocker because older
+    mainline/C++ captures share a separate degraded family around
+    `0.68/-0.83 dB`.
+- Integration result:
+  - The next accepted physical probe must either validate the route with a
+    known-good bypass or change a deeper transport/timebase mechanism while
+    preserving payload and 1:1 cadence.
+
+### Architect Output Sample Time Follower Product Probe
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored with `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=0`.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Isolated `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` failed quality:
+    quality `0.962572`, SNR floor `9.94 dB`, mid/high residual
+    `1.458736/1.377276`, `28` lag jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `24.7%`, `coreaudiod` p95 `53.0%`.
+  - Capture ISO invariants pass; stream stats show no gross underruns,
+    timeline resets, late writes, or transfer-pool fallback allocations.
+- Risks:
+  - Small timeline following is not sufficient; further shallow timebase knobs
+    can add CPU without product quality benefit.
+- Next recommended action:
+  - Keep `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=0`.
+  - Either validate the physical capture/reference route independently or
+    redesign the USB/device transport state model with new observability before
+    another hardware window.

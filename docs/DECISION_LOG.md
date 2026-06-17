@@ -2881,3 +2881,37 @@ Evidence:
 - `local-analysis/soundcheck/20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal/failure-modes.json`
 - `local-analysis/runtime-isolation/after-inline-inactive-decode-bypass-unload.json`
 - `local-analysis/promotion-readiness-after-inline-inactive-decode-bypass.json`
+
+## 2026-06-17: Reject Output Sample Time Follower
+
+Decision:
+- Keep `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=0` as the product default.
+- Do not treat small CoreAudio `sampleTime` continuity following as a fix for
+  the current physical music failure.
+
+Reason:
+- The isolated locked probe with `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` preserved
+  payload and transport cadence but still failed physical music quality:
+  quality `0.962572`, SNR floor `9.94 dB`, mid/high residual
+  `1.458736/1.377276`, quiet mid noise `-34.98 dBFS`, and `28` lag jumps.
+- Runtime CPU still failed mainline and regressed versus the prior probe:
+  driver p95 `24.7%`, `coreaudiod` p95 `53.0%`.
+- Capture ISO invariants passed and stream stats showed no gross underruns,
+  timeline resets, late writes, or pool fallback allocations. The defect is not
+  explained by the follower's local sample-time continuity correction.
+
+Alternatives discarded:
+- Enable follower because failure-mode drift ppm improved: rejected because
+  product metrics did not improve and lag span/residual/SNR still fail.
+- Keep follower as a harmless timebase guard: rejected because CPU worsened and
+  no quality gate improved enough to justify the runtime change.
+- Resume explicit scheduling or fixed OUT pacing: already physically rejected
+  by much worse quality and transport behavior.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
+- `local-analysis/promotion-readiness-after-output-sample-time-follower.json`
