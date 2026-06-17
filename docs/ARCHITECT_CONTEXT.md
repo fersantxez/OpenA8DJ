@@ -130,6 +130,13 @@ Branch: `driverkit/cpp-redesign`
   `output_write_stats_unobservable`, output read rate about `48009.4` fps, and
   no active-underrun/timeline/panic flag. Across prior runs, ISO64 is a clear
   outlier for capture transaction error ratio, matching its physical rejection.
+- Reset-off (`HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0`) was rejected at the HAL
+  candidate safety gate before any audio playback/capture: CoreAudio
+  enumeration passed, but `coreaudiod=115.1%` and watched audio CPU `130.0%`.
+  Recovery unloaded the HAL and post-audit passed with lock absent.
+- Build flag hygiene is now stricter: `hal` and `usb-play` depend on a HAL
+  flags stamp so changing `HAL_*` build variables cannot silently reuse stale
+  binaries for physical evidence.
 
 ## Known Baseline Inputs
 

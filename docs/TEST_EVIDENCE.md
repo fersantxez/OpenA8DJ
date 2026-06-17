@@ -1963,3 +1963,50 @@ Operational note:
   - Because `HAL_OUTPUT_WRITE_STATS=0`, future diagnostic physical runs need an
     explicit plan for whether write stats are worth enabling despite their
     previous physical regression.
+
+## 2026-06-17: Reset-Off HAL Safety Rejection
+
+- Commands:
+  - `make -B HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0 usb-play hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-reset-audio-params-off/20260616-203712/hal-candidate-safety`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-reset-audio-params-off-safety-fail.json`
+- Result:
+  - Safety FAIL before soundcheck.
+  - No music playback or iRig capture was run for this variant.
+  - Recovery PASS; final state HAL inactive, lock absent, no OpenA8DJ process.
+- Evidence paths:
+  - `local-analysis/physical-reset-audio-params-off/20260616-203712/build.log`
+  - `local-analysis/physical-reset-audio-params-off/20260616-203712/candidate-hal.sha256`
+  - `local-analysis/physical-reset-audio-params-off/20260616-203712/hal-candidate-safety/summary.txt`
+  - `local-analysis/runtime-isolation/post-reset-audio-params-off-safety-fail.json`
+- Key metrics:
+  - Build log contains `-DOPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM=0`.
+  - `core_audio_enumeration=PASS`.
+  - `audio_stack_health=FAIL`.
+  - `coreaudiod=115.1%`.
+  - `opena8dj_driver=0.1%`.
+  - `total_watched_cpu_pct=130.0`.
+- Interpretation:
+  - Skipping the reset is not a viable improvement candidate under current
+    evidence. It regresses load/enumeration CPU before audio quality can even
+    be measured.
+
+## 2026-06-17: HAL Flag Rebuild Guard
+
+- Commands:
+  - `make usb-play hal > local-analysis/build-flags/default-rebuild-v2.log`
+  - `make HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0 usb-play hal > local-analysis/build-flags/reset0-rebuild-v2.log`
+  - `make HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0 usb-play hal > local-analysis/build-flags/reset0-repeat-v2.log`
+  - `make usb-play hal > local-analysis/build-flags/default-restore-v2.log`
+- Result:
+  - PASS.
+  - Changing HAL flags now forces rebuild of affected generated binaries.
+  - Repeating identical HAL flags does not rebuild.
+  - Final local build restored default `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=1`.
+- Key observations:
+  - `reset0-rebuild-v2_compiles=2`.
+  - `reset0-repeat-v2_compiles=0`.
+  - `default-restore-v2_compiles=2`.
+- Interpretation:
+  - Physical variant evidence is safer because `HAL_*` changes can no longer
+    silently reuse stale `hal` or `usb-play` binaries.

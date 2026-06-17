@@ -1,5 +1,65 @@
 # Decision Log
 
+## 2026-06-17: Reject Reset-Off Variant Before Soundcheck
+
+Decision:
+- Keep `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=1` as the default.
+- Do not run music soundcheck with `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0`
+  unless a new hypothesis explains its load-time CoreAudio CPU spike.
+
+Reason:
+- The reset-off variant failed the HAL candidate safety gate before playback or
+  capture. CoreAudio enumeration passed, but `coreaudiod` reached `115.1%` and
+  total watched CPU reached `130.0%`, exceeding the safety threshold.
+- The OpenA8DJ driver process itself was nearly idle (`0.1%`), so this looks
+  like a CoreAudio load/enumeration interaction, not a playback-quality result.
+
+Alternatives discarded:
+- Proceed to soundcheck despite safety failure: rejected because the candidate
+  already violated the low-resource/safe-load gate.
+- Treat reset-off as neutral because no audio was played: rejected because
+  high `coreaudiod` CPU during load is itself a product blocker.
+
+Evidence:
+- Build evidence:
+  `local-analysis/physical-reset-audio-params-off/20260616-203712/build.log`
+  contains `-DOPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM=0`.
+- Safety evidence:
+  `local-analysis/physical-reset-audio-params-off/20260616-203712/hal-candidate-safety/summary.txt`.
+- Recovery evidence:
+  `local-analysis/runtime-isolation/post-reset-audio-params-off-safety-fail.json`
+  returns `PASS`, with HAL inactive and lock absent.
+
+## 2026-06-17: HAL Flag Changes Must Force Rebuild
+
+Decision:
+- Add `build/.hal-cflags.stamp` and make `hal` plus `usb-play` rebuild when
+  `HAL_CFLAGS` changes.
+- When the stamp detects a flag change, remove only the generated HAL and
+  `usb-play` binaries inside the C++ worktree so the next target cannot reuse a
+  stale binary.
+
+Reason:
+- During reset-off preparation, `make HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0
+  usb-play hal` initially reported parts as already up to date. That could have
+  led to a physical test using a previous binary.
+- Build flags are part of the candidate identity. Physical evidence is invalid
+  if the binary was not rebuilt with the intended flags.
+
+Alternatives discarded:
+- Rely on manual `rm` before every variant: rejected because it is easy to miss
+  under time pressure.
+- Use `make -B` for every physical variant: rejected as a workaround rather
+  than a reproducible build contract.
+
+Evidence:
+- `local-analysis/build-flags/reset0-rebuild-v2.log`: changing default to
+  `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0` rebuilds both affected targets.
+- `local-analysis/build-flags/reset0-repeat-v2.log`: repeating the same flags
+  does not rebuild.
+- `local-analysis/build-flags/default-restore-v2.log`: restoring default
+  `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=1` rebuilds both affected targets.
+
 ## 2026-06-17: Promotion Evaluator Must Use Latest Paired Soundcheck Evidence
 
 Decision:

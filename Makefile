@@ -4,6 +4,7 @@ TOOL := build/opena8dj-probe
 SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
+HAL_FLAGS_STAMP := build/.hal-cflags.stamp
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
@@ -125,7 +126,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list package dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -135,7 +136,17 @@ $(TOOL): $(SRC)
 
 hal: $(HAL_BIN)
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_PLIST)
+$(HAL_FLAGS_STAMP): FORCE
+	@mkdir -p build
+	@tmp="$@.tmp"; printf '%s\n' '$(HAL_CFLAGS)' > "$$tmp"; \
+	if ! cmp -s "$$tmp" "$@"; then \
+		mv "$$tmp" "$@"; \
+		rm -f $(HAL_BIN) $(USB_PLAY); \
+	else \
+		rm "$$tmp"; \
+	fi
+
+$(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_FLAGS_STAMP)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	xcrun clang $(HAL_CFLAGS) -bundle $(HAL_FRAMEWORKS) -o $@ $(HAL_SRC)
@@ -269,7 +280,7 @@ simulated-output-soundcheck:
 		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
 		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)"
 
-$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
+$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h $(HAL_FLAGS_STAMP)
 	@mkdir -p build
 	$(CC) $(HAL_CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m
 
