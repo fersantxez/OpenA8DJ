@@ -1059,3 +1059,30 @@ Evidence:
   (`lifecycle-preopen` remains FAIL; older runs without detail are UNKNOWN).
 - Tool:
   `scripts/analyze-capture-iso-invariants.py`
+
+## 2026-06-17: Port Mainline-Style Unrolled HAL Output Packing As CPU Candidate
+
+Decision:
+- Replace the C++ HAL's default per-byte/modulo `fillPlaybackBytes` loop with a
+  mainline-style unrolled 16-byte fast path when `OPENA8DJ_OUTPUT_CHECK_OFFSET`
+  is the default `8`.
+- Keep the previous generic path for non-default diagnostic check offsets.
+
+Reason:
+- Mainline already uses an unrolled group writer for Mode 2 output packing.
+- C++ still paid modulo and branch work per byte on every playback transfer.
+- The change preserves byte layout for the default check offset and should
+  reduce CPU/jitter in the playback hot path. It does not alter USB request
+  counts, queue depth, sample time policy, gain, or control-plane state.
+
+Alternatives discarded:
+- More queue/prefetch/ISO parity knobs: rejected for now because recent locked
+  one-factor runs already failed quality/CPU gates.
+- Claim product improvement from offline build/gates: rejected; the candidate
+  must still pass locked iRig quality and CPU comparison.
+
+Evidence:
+- `make usb-play hal` PASS.
+- `make HAL_OUTPUT_CHECK_OFFSET=4 hal` PASS for the generic fallback.
+- `make hal` rebuilt the default artifact after fallback verification.
+- `scripts/run-cpp-offline-gates` PASS: Debug `16/16`, Release `17/17`.

@@ -3650,6 +3650,73 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     OpenA8DJOutputFillStats stats = {0};
     NSUInteger i = 0;
+#if OPENA8DJ_OUTPUT_CHECK_OFFSET == 8
+    NSUInteger group = 0;
+#define OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED() \
+    do { \
+        if (!_outputFrameLoaded || _outputByteInFrame == 0) { \
+            [self loadNextOutputFrameWithStats:&stats]; \
+        } \
+    } while (0)
+    while (i + (kStreams * kBytesPerSampleUSB) <= length) {
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 0] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 1] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 2] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 3] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 4] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 5] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 6] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 7] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        uint8_t checkLowBit = (uint8_t)((~group) & 1);
+        bytes[i + 8] = checkLowBit;
+        bytes[i + 9] = (uint8_t)(2u | checkLowBit);
+        bytes[i + 10] = (uint8_t)(4u | checkLowBit);
+        bytes[i + 11] = (uint8_t)(6u | checkLowBit);
+
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 12] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 13] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 14] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 15] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        i += kStreams * kBytesPerSampleUSB;
+        group++;
+    }
+    while (i < length) {
+        if ((i % (kStreams * kBytesPerSampleUSB)) == OPENA8DJ_OUTPUT_CHECK_OFFSET) {
+            for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
+                bytes[i] = Mode2CheckByte(stream, i);
+            }
+            continue;
+        }
+
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
+            bytes[i] = _outputFrameBytes[stream][_outputByteInFrame];
+        }
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+    }
+#undef OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED
+#else
     while (i < length) {
         if ((i % (kStreams * kBytesPerSampleUSB)) == OPENA8DJ_OUTPUT_CHECK_OFFSET) {
             for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
@@ -3667,6 +3734,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             _outputByteInFrame = 0;
         }
     }
+#endif
     [self accumulateOutputFillStats:&stats force:NO];
 }
 

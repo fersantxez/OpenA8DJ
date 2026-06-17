@@ -2257,3 +2257,20 @@ Operational note:
     evidence has been recorded.
 - Evidence path:
   - `local-analysis/promotion-readiness-after-capture-invariants.json`
+
+## 2026-06-17: HAL Output Pack Fast Path Offline Verification
+
+- Commands:
+  - `make usb-play hal`
+  - `make HAL_OUTPUT_CHECK_OFFSET=4 hal`
+  - `make hal`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Default HAL and `usb-play` build PASS with the unrolled default
+    `OPENA8DJ_OUTPUT_CHECK_OFFSET=8` fast path.
+  - Generic fallback build PASS with `HAL_OUTPUT_CHECK_OFFSET=4`.
+  - Default HAL rebuilt after fallback verification.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+- Interpretation:
+  - This is a CPU/jitter candidate only. It preserves offline layout contracts,
+    but it has not proved better physical music quality or lower runtime CPU.

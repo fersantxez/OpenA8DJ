@@ -402,3 +402,8 @@ Next technical target:
   `local-analysis/promotion-readiness-after-capture-invariants.json`.
   Blocking gates are `physical_music_quality`, `runtime_cpu_beats_mainline`,
   `latest_physical_investigation`, and `traktor_timecode_physical`.
+- Integrated a low-risk HAL output packing CPU candidate: C++ now uses a
+  mainline-style unrolled 16-byte Mode 2 `fillPlaybackBytes` fast path when
+  `OPENA8DJ_OUTPUT_CHECK_OFFSET=8`, with the old generic path retained for
+  diagnostic offsets. Offline gates remain PASS, but this is not a readiness
+  claim until locked iRig quality and CPU improve.
