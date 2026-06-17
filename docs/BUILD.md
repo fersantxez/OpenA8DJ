@@ -771,6 +771,10 @@ physical Traktor/timecode-vinyl validation is still blocked. It does not open
 audio devices, touch USB, launch Traktor, install drivers, or activate system
 extensions.
 
+The JSON includes explicit `offline_coverage` and
+`physical_requirements_remaining` fields so a passing offline DVS gate cannot
+be mistaken for physical Traktor/timecode readiness.
+
 ## Known-Good Route Soundcheck Harness
 
 The physical route isolation wrapper is:

@@ -8609,3 +8609,32 @@ Full offline gate rerun:
   - The expanded C++ analyzer confirms that archived direct USB and physical
     windows still do not contain a strict-quality external capture candidate.
   - Product readiness and branch promotion remain blocked.
+
+## 2026-06-17 Timecode Readiness Coverage Tightening
+
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_timecode_matrix opena8djcpp_timecode_readiness_gate`
+  - `./build/cpp-offline/opena8djcpp_timecode_matrix | tee local-analysis/cpp-offline/timecode-matrix.json`
+  - `./build/cpp-offline/opena8djcpp_timecode_readiness_gate | tee local-analysis/cpp-offline/timecode-readiness-gate.json`
+- Safety:
+  - Offline-only C++ tests.
+  - No audio device open, USB action, CoreAudio mutation, Traktor launch,
+    driver install/load, default-device change, or hardware action.
+- Result:
+  - `timecode-matrix`: `PASS`, schema
+    `opena8djcpp.timecode-matrix.v1`, `row_count=8`, `failures=0`.
+  - `timecode-readiness-gate`: `PASS` as an aggregate evidence gate,
+    `offline_timecode_pass=true`, `product_timecode_ready=false`,
+    `physical_traktor_timecode_blocked=true`.
+  - Offline coverage: profiles `timecode-vinyl`, `timecode-cd-line`, `phono`,
+    `disabled`; decks `A/B/C/D`; sample rates `44100/48000`; Mode-2 packet
+    decode; prepared transport path.
+  - Remaining physical requirements:
+    `real_traktor_scope_lock`, `physical_timecode_vinyl_decks`,
+    `same_session_mainline_cpp_dvs_comparison`, `validated_capture_route`.
+- Evidence:
+  - `local-analysis/cpp-offline/timecode-matrix.json`.
+  - `local-analysis/cpp-offline/timecode-readiness-gate.json`.
+- Interpretation:
+  - This improves machine-checkable DVS/timecode functionality evidence.
+  - It does not authorize a Traktor/timecode-vinyl readiness claim.

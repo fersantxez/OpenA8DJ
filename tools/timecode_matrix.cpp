@@ -77,9 +77,14 @@ int main() {
                                       TimecodeProfile::Phono, TimecodeProfile::Disabled};
   const StereoPair decks[] = {StereoPair::A, StereoPair::B, StereoPair::C, StereoPair::D};
 
+  constexpr std::uint32_t profile_count = 4;
+  constexpr std::uint32_t deck_count = 4;
+  constexpr std::uint32_t row_count = profile_count + deck_count;
   std::uint32_t failures = 0;
-  std::cout << "{\n  \"profiles\": [\n";
-  for (std::uint32_t index = 0; index < 4; ++index) {
+  std::cout << "{\n"
+            << "  \"schema\": \"opena8djcpp.timecode-matrix.v1\",\n"
+            << "  \"profiles\": [\n";
+  for (std::uint32_t index = 0; index < profile_count; ++index) {
     const auto spec = timecode_profile_spec(profiles[index]);
     const auto input = profile_for_matrix(profiles[index]);
     const bool ok = validate_profile(profiles[index]) && validate_input_profile(profiles[index]);
@@ -93,21 +98,23 @@ int main() {
               << ", \"source_map_identity\": "
               << (input.source_map_is_identity() ? "true" : "false")
               << ", \"result\": \"" << (ok ? "PASS" : "FAIL") << "\"}"
-              << (index == 3 ? "\n" : ",\n");
+              << (index + 1U == profile_count ? "\n" : ",\n");
   }
 
   std::cout << "  ],\n  \"deck_assignments\": [\n";
-  for (std::uint32_t index = 0; index < 4; ++index) {
+  for (std::uint32_t index = 0; index < deck_count; ++index) {
     const auto assignment = deck_timecode_assignment(decks[index]);
     const bool ok = validate_deck(decks[index]);
     failures += ok ? 0U : 1U;
     std::cout << "    {\"deck\": \"" << pair_name(decks[index]) << "\", \"left\": "
               << assignment.left_input_channel << ", \"right\": "
               << assignment.right_input_channel << ", \"result\": \""
-              << (ok ? "PASS" : "FAIL") << "\"}" << (index == 3 ? "\n" : ",\n");
+              << (ok ? "PASS" : "FAIL") << "\"}"
+              << (index + 1U == deck_count ? "\n" : ",\n");
   }
 
-  std::cout << "  ],\n  \"failures\": " << failures << ",\n  \"result\": \""
+  std::cout << "  ],\n  \"row_count\": " << row_count << ",\n  \"failures\": " << failures
+            << ",\n  \"result\": \""
             << (failures == 0 ? "PASS" : "FAIL") << "\"\n}\n";
   return failures == 0 ? 0 : 1;
 }

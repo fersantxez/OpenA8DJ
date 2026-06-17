@@ -2116,3 +2116,27 @@ Current implication:
   result.
 - Promotion remains blocked because no run proves audiophile-quality external
   capture or same-session mainline/C++ superiority.
+
+## 2026-06-17 Timecode Readiness Evidence Tightening
+
+- `opena8djcpp_timecode_matrix` now emits schema
+  `opena8djcpp.timecode-matrix.v1` and `row_count=8`.
+- `opena8djcpp_timecode_readiness_gate` now exposes:
+  - offline profiles: `timecode-vinyl`, `timecode-cd-line`, `phono`,
+    `disabled`;
+  - decks: `A/B/C/D`;
+  - sample rates covered by the offline DVS path: `44100` and `48000`;
+  - `mode2_packet_decode=true`;
+  - `prepared_transport_path=true`.
+- The same gate still reports `product_timecode_ready=false` and
+  `physical_traktor_timecode_blocked=true`.
+- Remaining physical requirements are now machine-readable:
+  - `real_traktor_scope_lock`;
+  - `physical_timecode_vinyl_decks`;
+  - `same_session_mainline_cpp_dvs_comparison`;
+  - `validated_capture_route`.
+
+Current implication:
+- The C++ core has stronger offline DVS/timecode evidence, but no Traktor or
+  vinyl readiness claim is allowed until the physical route is valid and real
+  Traktor/timecode scope evidence exists.

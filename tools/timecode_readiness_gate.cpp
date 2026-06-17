@@ -4,6 +4,7 @@
 #include <iostream>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -62,6 +63,14 @@ void print_bool(const char* name, bool value) {
   std::cout << "  \"" << name << "\": " << (value ? "true" : "false") << ",\n";
 }
 
+void print_string_array(const char* name, const std::vector<const char*>& values) {
+  std::cout << "  \"" << name << "\": [";
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    std::cout << (index == 0 ? "" : ", ") << "\"" << values[index] << "\"";
+  }
+  std::cout << "],\n";
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -86,9 +95,17 @@ int main(int argc, char** argv) {
   const bool product_timecode_ready = offline_pass && !physical_blocked;
 
   const auto matrix_failures = json_u64(matrix, "failures").value_or(9999);
+  const auto matrix_rows = json_u64(matrix, "row_count").value_or(0);
   const auto signal_rows = json_u64(signal, "row_count").value_or(0);
   const auto dvs_rows = json_u64(dvs_packet, "row_count").value_or(0);
   const auto prepared_rows = json_u64(prepared, "row_count").value_or(0);
+  std::vector<const char*> physical_requirements_remaining;
+  if (physical_blocked) {
+    physical_requirements_remaining.push_back("real_traktor_scope_lock");
+    physical_requirements_remaining.push_back("physical_timecode_vinyl_decks");
+    physical_requirements_remaining.push_back("same_session_mainline_cpp_dvs_comparison");
+    physical_requirements_remaining.push_back("validated_capture_route");
+  }
 
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.timecode-readiness-gate.v1\",\n"
@@ -101,7 +118,15 @@ int main(int argc, char** argv) {
   print_bool("prepared_transport_timecode_pass", prepared_pass);
   print_bool("physical_traktor_timecode_blocked", physical_blocked);
   print_bool("product_timecode_ready", product_timecode_ready);
-  std::cout << "  \"metrics\": {\"timecode_matrix_failures\": " << matrix_failures
+  std::cout << "  \"offline_coverage\": {\"profiles\": [\"timecode-vinyl\", "
+               "\"timecode-cd-line\", \"phono\", \"disabled\"], "
+               "\"decks\": [\"A\", \"B\", \"C\", \"D\"], "
+               "\"sample_rates\": [44100, 48000], "
+               "\"mode2_packet_decode\": true, "
+               "\"prepared_transport_path\": true},\n";
+  print_string_array("physical_requirements_remaining", physical_requirements_remaining);
+  std::cout << "  \"metrics\": {\"timecode_matrix_rows\": " << matrix_rows
+            << ", \"timecode_matrix_failures\": " << matrix_failures
             << ", \"timecode_signal_rows\": " << signal_rows
             << ", \"dvs_packet_rows\": " << dvs_rows
             << ", \"prepared_transport_profile_deck_rows\": " << prepared_rows << "},\n"

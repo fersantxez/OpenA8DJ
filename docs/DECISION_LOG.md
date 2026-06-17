@@ -5541,3 +5541,36 @@ Next implication:
 - The next physical step must be lock-gated known-good non-Audio8 route
   validation into the same iRig chain, then same-session mainline/C++
   comparison.
+
+## 2026-06-17: Make Timecode Readiness Coverage Machine-Readable
+
+Decision:
+- Add schema and row count to `opena8djcpp_timecode_matrix`.
+- Extend `opena8djcpp_timecode_readiness_gate` with explicit offline coverage
+  and machine-readable physical requirements still blocking product timecode
+  readiness.
+- Surface those fields in `scripts/run-cpp-offline-gates`.
+
+Reason:
+- The project can currently prove synthetic DVS/timecode behavior offline, but
+  it must not blur that with real Traktor/timecode-vinyl readiness.
+- Promotion requires functionality evidence as well as quality and CPU
+  evidence. Timecode readiness should therefore report both what is already
+  covered and what remains absent.
+
+Evidence:
+- Focused run:
+  - `opena8djcpp_timecode_matrix`: `row_count=8`, `failures=0`, `PASS`.
+  - `opena8djcpp_timecode_readiness_gate`: `offline_timecode_pass=true`,
+    `product_timecode_ready=false`, `physical_traktor_timecode_blocked=true`.
+- Offline coverage includes profiles `timecode-vinyl`, `timecode-cd-line`,
+  `phono`, `disabled`, decks `A/B/C/D`, sample rates `44100/48000`, Mode-2
+  packet decode, and prepared transport path.
+- Remaining physical requirements are `real_traktor_scope_lock`,
+  `physical_timecode_vinyl_decks`, `same_session_mainline_cpp_dvs_comparison`,
+  and `validated_capture_route`.
+
+Next implication:
+- Timecode functionality is better specified offline, but still cannot be
+  claimed complete until a lock-gated physical Traktor/timecode run exists on
+  a validated capture route.

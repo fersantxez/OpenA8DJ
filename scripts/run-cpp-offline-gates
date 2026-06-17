@@ -222,6 +222,7 @@ summary = {
     },
     "timecode_matrix": {
         "status": timecode.get("result"),
+        "rows": timecode.get("row_count"),
         "profiles": len(timecode.get("profiles", [])),
         "deck_assignments": len(timecode.get("deck_assignments", [])),
         "failures": timecode.get("failures"),
@@ -238,6 +239,10 @@ summary = {
         "offline_timecode_pass": timecode_readiness.get("offline_timecode_pass"),
         "physical_status": timecode_readiness.get("physical_status"),
         "product_timecode_ready": timecode_readiness.get("product_timecode_ready"),
+        "offline_coverage": timecode_readiness.get("offline_coverage"),
+        "physical_requirements_remaining": timecode_readiness.get(
+            "physical_requirements_remaining"
+        ),
         "readiness_claim": timecode_readiness.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/timecode-readiness-gate.json",
     },
