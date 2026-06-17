@@ -930,3 +930,37 @@ Latest promotion evaluation:
   completion jitter and capture-paced queue timing, because payload format,
   fixed EQ, simple nonlinearity, and gross underrun counters are not sufficient
   explanations.
+
+## 2026-06-17 Updated Snapshot After Playback-Before-Capture-Requeue Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.961360` versus required `>= 0.980000`.
+  - SNR floor `10.25 dB` versus required `>= 35.00 dB`.
+  - mid/high residual ratios `1.425897/1.365001` versus required maxima
+    `1.36/1.35` in the current promotion evaluator.
+  - quiet mid noise `-35.03 dBFS` versus required `<= -58.00 dBFS`.
+  - `lag_jumps_gt_2_frames=28` versus required `0`.
+  - no clipping and click outliers `0`, but those passes are not sufficient.
+- Runtime CPU beats mainline: FAIL.
+  - Product probe driver p95 `21.8%`.
+  - Product probe `coreaudiod` p95 `12.2%`.
+  - Mainline target remains around driver p95 `<= 6.5%` and `coreaudiod`
+    p95 `<= 1.7%` under comparable conditions.
+- Transport/counter interpretation:
+  - Capture ISO invariants PASS with stop-window warning.
+  - Lightweight stream stats did not report output active underruns, timeline
+    resets, late writes, or completion delta outliers.
+  - Actual audio still shows `28` lag jumps, so completion counters alone are
+    not an adequate success metric.
+- Current threshold interpretation:
+  - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` is rejected as a product
+    default.
+  - A future candidate must beat this run and mainline on the full gate set:
+    real-music quality, CPU, lag stability, full A/B/C/D routing, and
+    Traktor/timecode evidence.

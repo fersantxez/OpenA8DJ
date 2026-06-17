@@ -1185,3 +1185,39 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     than one, and explicit scheduling with strict fallback.
   - Any physical run must preserve the Pair A matrix and show better real-music
     residual and CPU together before expanding to A/B/C/D or Traktor/timecode.
+
+### Architect Playback-Before-Capture-Requeue Product Probe
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Product timing probe with
+    `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` failed quality:
+    quality `0.961360`, SNR floor `10.25 dB`, mid/high residual
+    `1.425897/1.365001`, `28` lag jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `21.8%`, `coreaudiod` p95 `12.2%`.
+  - Capture ISO invariants pass with stop-window warning.
+  - Lightweight stream stats show no output active underruns, timeline resets,
+    late writes, or completion delta outliers, but real audio lag jumps remain.
+  - Failure-mode analysis remains `timebase_or_alignment_instability`.
+- Risks:
+  - The lack of completion delta outliers in lightweight stats can be a false
+    comfort metric; the quality gate is the source of truth.
+  - Further timing probes must avoid increasing CPU while chasing lag jumps.
+- Next recommended action:
+  - Do not enable playback-before-capture-requeue by default.
+  - Test a bounded capture-paced lead or explicit scheduling only after an
+    offline model predicts fewer lag jumps without higher CPU.
+  - Do not expand to full A/B/C/D or Traktor/timecode until Pair A real-music
+    quality materially improves.

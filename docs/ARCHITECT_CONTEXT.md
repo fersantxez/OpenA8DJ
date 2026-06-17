@@ -1005,5 +1005,22 @@ Next technical target:
     hypothesis to test, not a proven root cause.
   - Product HAL build was restored and final isolation passed:
     `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`.
+- Latest locked product timing probe:
+  `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal`.
+  - Built with `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1`.
+  - Quality still FAIL:
+    `quality_alignment_score=0.961360`, SNR floor `10.25 dB`, mid/high
+    residual `1.425897/1.365001`, quiet mid noise `-35.03 dBFS`, `28` lag
+    jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `21.8%`, `coreaudiod` p95 `12.2%`.
+  - Capture ISO invariants PASS with stop-window warning.
+  - Stream stats show no output active underruns, timeline resets, late writes,
+    or lightweight completion delta outliers, but real audio lag jumps remain.
+  - Failure analysis remains `timebase_or_alignment_instability`; fixed LTI/EQ
+    correction worsens SNR.
+  - Decision: reject this timing order as product default.
+  - Product HAL build was restored and final isolation passed:
+    `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`.
 - Current safety state after cleanup:
   HAL inactive, hardware lock absent, no C mainline or Rust mutation expected.

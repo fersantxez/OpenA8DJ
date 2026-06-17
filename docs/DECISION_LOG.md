@@ -2668,3 +2668,44 @@ Evidence:
 - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
 - `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`
 - `local-analysis/promotion-readiness-after-cadence-diagnostic.json`
+
+## 2026-06-17: Reject Playback-Before-Capture-Requeue As Product Improvement
+
+Decision:
+- Do not enable `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` as the product
+  default.
+- Keep branch promotion forbidden.
+- Continue treating completion/cadence timing as a hypothesis, but require the
+  next timing probe to improve real-music quality, lag jumps, and CPU together.
+
+Reason:
+- The locked product probe failed physical music quality:
+  quality `0.961360`, SNR floor `10.25 dB`, mid/high residual
+  `1.425897/1.365001`, quiet mid noise `-35.03 dBFS`, and `28` lag jumps.
+- CPU remains above mainline:
+  driver p95 `21.8%`, `coreaudiod` p95 `12.2%`.
+- Stream stats showed no gross output underruns, timeline resets, or late
+  writes, so the audible defect remains below those coarse counters.
+- Failure analyzers still classify the run as timebase/alignment instability.
+- Fixed LTI/EQ correction worsened SNR, and static L/R/polarity or simple
+  memoryless nonlinearity remain insufficient explanations.
+
+Alternatives discarded:
+- Promote because CPU improved versus some failed diagnostic/product probes:
+  rejected because it still misses mainline CPU by a wide margin and music
+  quality still fails hard.
+- Treat the absence of lightweight completion outliers as proof of timing fix:
+  rejected because actual audio lag jumps remained at `28`.
+- Move on to Traktor/timecode physical gates immediately: rejected because the
+  Pair A real-music gate still fails and would waste hardware time without a
+  credible quality candidate.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+- `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+- `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
+- `local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`

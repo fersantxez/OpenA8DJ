@@ -244,3 +244,28 @@ Latest promotion evaluation:
 
 Decision remains unchanged: do not move C mainline to Legacy, do not move C++
 to `main`, and do not claim audiophile readiness.
+
+## 2026-06-17 Playback-Before-Capture-Requeue Probe Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Product timing probe still fails real-music quality:
+  quality `0.961360`, SNR floor `10.25 dB`, mid/high residual
+  `1.425897/1.365001`, quiet mid noise `-35.03 dBFS`, `28` lag jumps.
+- Runtime CPU still fails mainline:
+  driver p95 `21.8%`, `coreaudiod` p95 `12.2%`.
+- This probe is cleaner than the diagnostic profile from an overhead
+  standpoint, but it still does not provide a quality or resource superiority
+  claim.
+- Transport counters do not show gross output underruns, timeline resets, late
+  writes, or lightweight completion delta outliers. The remaining failure is
+  still audible/metric timebase instability in the capture comparison.
+- Final cleanup:
+  `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
+  PASS, HAL inactive, lock absent.
+
+Decision remains unchanged: do not move C mainline to Legacy, do not move C++
+to `main`, and do not claim audiophile readiness.

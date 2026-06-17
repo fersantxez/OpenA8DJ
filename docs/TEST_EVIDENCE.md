@@ -4469,3 +4469,81 @@ Operational note:
   - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
   - `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`
   - `local-analysis/promotion-readiness-after-cadence-diagnostic.json`
+
+## 2026-06-17: Playback-Before-Capture-Requeue Product Probe
+
+- Purpose:
+  - Test whether queueing playback before capture requeue reduces completion
+    jitter and improves real-music quality without the heavy cadence diagnostic
+    profile.
+  - Keep the run as a product-timing probe only; do not use it for readiness
+    unless music quality and CPU both beat the gates.
+- Build/run flags:
+  - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1`.
+  - Cadence/ledger/payload-guard diagnostic flags were not enabled for this
+    product probe.
+- Commands:
+  - `make -B hal build/audio-wav-play build/audio-record build/audio-config build/opena8dj-control HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-playback-before-capture-requeue/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-playback-before-capture-requeue-unload`
+  - `make -B hal`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`
+- Safety and cleanup:
+  - HAL candidate safety PASS.
+  - Final `audio-stack-guard` PASS.
+  - Final runtime isolation PASS: HAL inactive, hardware lock absent, no
+    OpenA8DJ process detected.
+  - Post-documentation runtime isolation PASS: HAL inactive, hardware lock
+    absent, no OpenA8DJ process detected.
+  - Product HAL build restored after the timing probe.
+- Physical soundcheck result:
+  - Result: FAIL.
+  - `quality_alignment_score=0.961360`.
+  - SNR right channel floor `10.25 dB`; stereo mean about `10.35 dB`.
+  - mid/high residual ratios `1.425897/1.365001`.
+  - quiet mid noise `-35.03 dBFS`.
+  - `lag_jumps_gt_2_frames=28`.
+  - no clipping; click outliers `0`.
+- Runtime result:
+  - Promotion evaluator still FAIL.
+  - driver p95 `21.8%`, `coreaudiod` p95 `12.2%`.
+  - This is lower than some recent failed probes, but still far above the
+    mainline CPU budget and not paired with acceptable sound quality.
+- Transport/runtime result:
+  - Capture ISO invariants PASS with warning
+    `classified_transactions_missing_in_stop_transfer_gap`.
+  - Stream stats show no output active underruns, no timeline resets, no late
+    writes, no completion delta outliers in the lightweight sampled stats.
+  - Capture zero-complete packetization remains present at about `3.63`
+    zero-complete slots per capture transfer.
+- Failure-mode interpretation:
+  - Failure classifier still reports `timebase_or_alignment_instability`.
+  - Static L/R mix or polarity is not sufficient.
+  - Simple memoryless nonlinearity is not sufficient.
+  - Fixed LTI/EQ correction worsens SNR.
+  - Runtime discontinuity analysis found no strong correlation; lag jumps
+    remain present.
+- Product conclusion:
+  - Reject as a product improvement.
+  - Do not promote.
+  - Do not claim readiness.
+  - The reduced lightweight completion outliers are not enough; the next probe
+    must improve actual lag jumps, residuals, SNR, and CPU together.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-playback-before-capture-requeue/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
+  - `local-analysis/runtime-isolation/final-after-playback-before-capture-requeue-docs.json`
+  - `local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`
