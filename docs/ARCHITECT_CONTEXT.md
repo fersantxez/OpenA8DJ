@@ -424,3 +424,11 @@ Next technical target:
   `lag_jumps_gt_2_frames=40`, driver p95 `38.5%`.
   Evidence:
   `local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal`.
+- Window-trace analysis now makes the physical blocker narrower:
+  `local-analysis/soundcheck-window-trace/default-after-unrolled-v2.json`,
+  `hotstats-write-late-v2.json`, and `queue8-v2.json` show local lag correction
+  improves median mid-band residual by only `0.6%` to `4.0%`. Median corrected
+  correlation is around `0.969-0.971`, but corrected mid-band residual remains
+  about `1.43x`. The main blocker is therefore not a simple alignment/drift
+  issue; it is persistent coloration/distortion/mixed signal plus high driver
+  CPU.

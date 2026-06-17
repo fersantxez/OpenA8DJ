@@ -1124,3 +1124,34 @@ Evidence:
   `local-analysis/audio-stack-guard/20260616-force-unload-unrolled-pack-explicit`
   and
   `local-analysis/runtime-isolation/post-unrolled-pack-failed-unload.json`.
+
+## 2026-06-17: Treat Lag Correction As Insufficient Explanation For Default Residual
+
+Decision:
+- Stop treating the default music failure as a simple lag/drift problem.
+- Keep lag-jump metrics as blockers, but prioritize signal coloration,
+  distortion, wrong mixed signal, and runtime CPU as the next investigation
+  targets.
+
+Reason:
+- Offline window traces over existing iRig captures show that local lag
+  correction barely changes residual for default-like runs:
+  - default-after-unrolled: median mid residual `1.448463 -> 1.430920`
+    (`1.2%` improvement);
+  - hotstats-write-late: `1.452215 -> 1.443643` (`0.6%` improvement);
+  - queue8: `1.491993 -> 1.431929` (`4.0%` improvement).
+- Corrected median correlation is consistently about `0.969-0.971`, but the
+  residual remains far above the product gate.
+- Stream stats still show no active underruns, no late writes, no timeline
+  resets, and capture ISO invariants pass for the detailed runs.
+
+Alternatives discarded:
+- Chase only `lag_jumps_gt_2_frames`: rejected because even after per-window
+  lag correction the spectral residual remains too high.
+- Treat clean stream counters as product quality: rejected because the analog
+  evidence is still failing.
+
+Evidence:
+- `local-analysis/soundcheck-window-trace/default-after-unrolled-v2.json`
+- `local-analysis/soundcheck-window-trace/hotstats-write-late-v2.json`
+- `local-analysis/soundcheck-window-trace/queue8-v2.json`

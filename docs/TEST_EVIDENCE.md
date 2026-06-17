@@ -2359,3 +2359,35 @@ Operational note:
   - Default is restored but still not ready.
   - The next useful investigation should target the physical residual/lag path
     and runtime CPU above the Mode 2 byte-pack layer.
+
+## 2026-06-17: Window Trace Residual/Lag Classification
+
+- Commands:
+  - `python3 -m py_compile scripts/analyze-soundcheck-window-trace.py`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal --json-out local-analysis/soundcheck-window-trace/default-after-unrolled-v2.json`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal --json-out local-analysis/soundcheck-window-trace/hotstats-write-late-v2.json`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/soundcheck/20260616-queue8-irig-pairA-16s-cpp-hal --json-out local-analysis/soundcheck-window-trace/queue8-v2.json`
+- Tooling change:
+  - `scripts/analyze-soundcheck-window-trace.py` now creates the output
+    directory and records aggregate lag/correlation/driver-CPU fields.
+- Result:
+  - default-after-unrolled:
+    - local lag min/max `-26/16`, jumps `40`;
+    - median mid residual `1.448463 -> 1.430920` after local lag correction;
+    - median correlation `0.960389 -> 0.970858`;
+    - driver CPU median/p95/max `37.4%/38.5%/38.7%`.
+  - hotstats-write-late:
+    - local lag min/max `-28/8`, jumps `45`;
+    - median mid residual `1.452215 -> 1.443643`;
+    - median correlation `0.955921 -> 0.969117`;
+    - driver CPU median/p95/max `34.9%/36.1%/36.4%`.
+  - queue8:
+    - local lag min/max `-5/63`, jumps `39`;
+    - median mid residual `1.491993 -> 1.431929`;
+    - median correlation `0.856756 -> 0.970177`;
+    - driver CPU median/p95/max `35.8%/37.4%/37.9%`.
+- Interpretation:
+  - Local lag correction does not materially solve the residual. The dominant
+    remaining blocker is not simple alignment; it is persistent coloration,
+    distortion, wrong mixed signal, or another below-HAL analog/transport issue
+    plus high CPU.

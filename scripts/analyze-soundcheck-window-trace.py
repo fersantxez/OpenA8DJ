@@ -8,6 +8,7 @@ devices, touch CoreAudio, query USB, install drivers, or mutate system state.
 import argparse
 import importlib.util
 import json
+import statistics
 from pathlib import Path
 
 
@@ -73,6 +74,18 @@ def avg_cpu(analyzer, rows, columns, start_seconds, end_seconds):
         for key in ("coreaudiod", "opena8dj_driver", "audio_tools", "windowserver", "total_audio_ui")
         if key in averaged
     }
+
+
+def median(values):
+    return statistics.median(values) if values else 0.0
+
+
+def percentile(values, pct):
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = int((len(ordered) - 1) * pct)
+    return ordered[index]
 
 
 def main():
@@ -154,6 +167,14 @@ def main():
             lag_jumps += 1
     raw_mid = [row["raw_mid_band_residual_ratio"] for row in rows]
     corrected_mid = [row["lag_corrected_mid_band_residual_ratio"] for row in rows]
+    raw_correlation = [row["raw_correlation"] for row in rows]
+    corrected_correlation = [row["lag_corrected_correlation"] for row in rows]
+    abs_lag = [abs(row["local_lag_frames"]) for row in rows]
+    driver_cpu = [
+        row.get("cpu", {}).get("opena8dj_driver")
+        for row in rows
+        if row.get("cpu", {}).get("opena8dj_driver") is not None
+    ]
     improvement = 0.0
     if raw_mid and analyzer.median(raw_mid) > 1e-9:
         improvement = 1.0 - (analyzer.median(corrected_mid) / analyzer.median(raw_mid))
@@ -167,16 +188,24 @@ def main():
         "windows": len(rows),
         "local_lag_min": min((row["local_lag_frames"] for row in rows), default=0),
         "local_lag_max": max((row["local_lag_frames"] for row in rows), default=0),
+        "local_abs_lag_median": median(abs_lag),
+        "local_abs_lag_p95": percentile(abs_lag, 0.95),
         "lag_jumps_gt_2_frames": lag_jumps,
         "raw_mid_band_residual_ratio_median": analyzer.median(raw_mid),
         "lag_corrected_mid_band_residual_ratio_median": analyzer.median(corrected_mid),
         "lag_correction_mid_ratio_improvement": improvement,
+        "raw_correlation_median": median(raw_correlation),
+        "lag_corrected_correlation_median": median(corrected_correlation),
+        "opena8dj_driver_cpu_median": median(driver_cpu),
+        "opena8dj_driver_cpu_p95": percentile(driver_cpu, 0.95),
+        "opena8dj_driver_cpu_max": max(driver_cpu, default=0.0),
         "rows": rows,
     }
 
     text = json.dumps(summary, indent=2, sort_keys=True)
     print(text)
     if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(text + "\n", encoding="utf-8")
     return 0 if rows else 1
 
