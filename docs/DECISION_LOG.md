@@ -4217,3 +4217,41 @@ Next implication:
   behavior directly, or establish a healthier same-session physical reference.
   Do not spend more hardware windows on alignment-only fixes unless new
   evidence changes this classification.
+
+## 2026-06-17: Add Transport Budget Gate
+
+Decision:
+- Add `tools/transport_budget_model.cpp` and include it in CTest and
+  `scripts/run-cpp-offline-gates`.
+- Treat the gate as a negative frontier diagnostic: PASS means the known
+  observed families are classified correctly and no observed family is a
+  product candidate.
+
+Reason:
+- Existing physical evidence shows a hard tradeoff:
+  - lower ISO cadence can approach the quality threshold but burns driver CPU;
+  - high ISO cadence approaches mainline CPU but destroys physical quality.
+- The project needs a compiled gate that prevents CPU-only or quality-only
+  families from being mistaken for readiness.
+- The model uses the current objective thresholds: quality alignment `>=0.98`,
+  driver CPU p95 `<=6.5%`, and `0` lag jumps.
+
+Alternatives discarded:
+- Keep this as prose in docs only: rejected because future candidates need a
+  repeatable CTest artifact.
+- Use transport cadence alone as a candidate selector: rejected because cadence
+  predicts enqueue pressure but not quality; the gate must include physical
+  quality and lag evidence.
+
+Evidence:
+- `local-analysis/cpp-offline/transport-budget-model.json`
+- Current output:
+  `product_candidate_exists=false`, `quality_passing_families=0`,
+  `driver_cpu_passing_families=1`, best quality `0.978050`, lowest median
+  driver CPU p95 `6.3%`, and lowest estimated enqueue calls/s `31.25`.
+
+Next implication:
+- A future physical candidate must either move the frontier with a new
+  mechanism, or it should be rejected offline before lock/hardware use. The
+  current observed family set still does not prove better-than-mainline
+  quality or performance.

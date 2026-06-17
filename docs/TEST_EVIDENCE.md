@@ -6727,3 +6727,74 @@ Operational note:
   - This does not change product readiness: physical quality, CPU, same-session
     mainline comparison, full routing, and physical timecode gates still block
     readiness and branch promotion.
+
+## 2026-06-17 Transport Budget Frontier Model
+
+- Purpose:
+  - Encode the observed C++ physical transport frontier so future candidates
+    must beat it rather than slide between bad quality and bad CPU.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_transport_budget_model`
+  - `./build/cpp-offline/opena8djcpp_transport_budget_model`
+- Result:
+  - PASS as a negative offline model.
+  - Observed families: `5`.
+  - Product candidates among observed families: `0`.
+  - Quality-passing families: `0`.
+  - Driver-CPU-passing families: `1`.
+  - Best quality alignment score: `0.97805`.
+  - Lowest median driver CPU p95: `6.3%`.
+  - Lowest estimated USB enqueue calls per second: `31.25`.
+- Safety:
+  - Offline model only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+  - Pre-check audio stack guard reported HAL unloaded, no OpenA8DJ driver pids,
+    and `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/transport-budget-model.json`
+  - `local-analysis/audio-stack-guard/post-compaction-transport-budget`
+- Interpretation:
+  - The simple ISO/cadence frontier is exhausted: low ISO keeps quality closer
+    but burns CPU and jitters; high ISO lowers enqueue rate but destroys
+    quality.
+  - The next candidate must reduce HAL/USB enqueue overhead without changing
+    cadence, bytes, routing, or timecode behavior.
+
+## 2026-06-17 Offline Gates After Transport Budget Frontier
+
+- Purpose:
+  - Verify that the transport budget model is compiled, run by CTest, captured
+    in offline gate evidence, and covered by static policy.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `18/18` passed.
+  - Release CTest: `19/19` passed.
+  - Transport budget model: PASS, `observed_families=5`,
+    `product_candidate_exists=false`, `quality_passing_families=0`,
+    `driver_cpu_passing_families=1`.
+  - Static policy: PASS, `audited_files=11`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - Stream-stats contract: PASS, HAL/control field count `196`,
+    mismatches `0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-transport-budget`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/transport-budget-model.json`
+  - `local-analysis/audio-stack-guard/final-after-transport-budget`
+- Interpretation:
+  - The C++ offline surface remains reproducible after adding the frontier
+    model.
+  - This is still not a product readiness pass. Physical quality, same-session
+    mainline comparison, runtime CPU, routing, recovery, and physical
+    Traktor/timecode evidence still block readiness and branch promotion.

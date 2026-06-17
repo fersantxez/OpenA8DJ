@@ -654,3 +654,48 @@ Current status:
   rejects fractional time-warp for the current best C++ captures.
 - Next physical work should focus on HAL CPU/transport behavior or a healthier
   same-session fixture reference, not another alignment-only probe.
+
+## Offline Transport Budget Frontier
+
+Purpose:
+
+- make the current quality/CPU/cadence tradeoff explicit and testable;
+- reject candidate families that only reduce CPU by increasing USB period and
+  audibly damaging quality;
+- provide the offline contract for the next DriverKit transport backend before
+  any hardware run.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_transport_budget_model
+./build/cpp-offline/opena8djcpp_transport_budget_model
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/transport-budget-model.json`;
+- `transport_budget_model` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the model classifies all observed physical transport families and
+  confirms that no observed family is a product candidate.
+- PASS does not mean audio readiness.
+- FAIL means the model no longer matches the documented physical frontier and
+  the metrics/thresholds must be reconciled before more physical testing.
+
+Next implementation gate:
+
+- add a DriverKit/prepared-transport contract proving the simulated HAL
+  steady-state path performs no direct `IOUSBHostPipe` enqueue/requeue work;
+- preserve frame order, timestamps, 8 input channels, 8 output channels,
+  A/B/C/D routing, and timecode profile semantics.

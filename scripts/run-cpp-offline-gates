@@ -37,6 +37,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
+./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -86,6 +87,7 @@ dvs = load_json("dvs-signal-smoke.json")
 dvs_packet = load_json("dvs-packet-input-decode.json")
 jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
+transport_budget = load_json("transport-budget-model.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -233,6 +235,17 @@ summary = {
             if row.get("expect_no_fallback") is False and row.get("result") == "PASS"
         ],
         "evidence": "local-analysis/cpp-offline/transfer-pool-model.json",
+    },
+    "transport_budget_model": {
+        "status": transport_budget.get("result"),
+        "observed_families": transport_budget.get("summary", {}).get("observed_families"),
+        "product_candidate_exists": transport_budget.get("summary", {}).get("product_candidate_exists"),
+        "quality_passing_families": transport_budget.get("summary", {}).get("quality_passing_families"),
+        "driver_cpu_passing_families": transport_budget.get("summary", {}).get("driver_cpu_passing_families"),
+        "best_quality_alignment_score": transport_budget.get("summary", {}).get("best_quality_alignment_score"),
+        "lowest_median_driver_cpu_p95": transport_budget.get("summary", {}).get("lowest_median_driver_cpu_p95"),
+        "lowest_estimated_usb_enqueue_calls_per_second": transport_budget.get("summary", {}).get("lowest_estimated_usb_enqueue_calls_per_second"),
+        "evidence": "local-analysis/cpp-offline/transport-budget-model.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

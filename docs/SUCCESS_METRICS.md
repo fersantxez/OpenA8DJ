@@ -1694,3 +1694,45 @@ Product meaning:
 - A future candidate still needs absolute physical quality PASS, same-session
   mainline-relative PASS, CPU PASS, routing PASS, recovery PASS, and physical
   Traktor/timecode evidence before readiness or branch promotion.
+
+## 2026-06-17 Transport Budget Frontier Gate
+
+Latest offline evidence:
+`local-analysis/cpp-offline/transport-budget-model.json`.
+
+Purpose:
+- encode the observed physical transport families as a regression frontier;
+- prevent promotion of a candidate that merely moves along the same bad
+  quality/CPU tradeoff curve;
+- force the next implementation to reduce HAL/USB enqueue cost while preserving
+  the best known low-ISO quality behavior.
+
+Observed frontier:
+
+| family | quality alignment | median driver CPU p95 | lag jumps > 2 frames | verdict |
+| --- | ---: | ---: | ---: | --- |
+| ISO5/q64 | `0.978050` | `36.9%` | `22` | quality close, CPU/jitter fail |
+| ISO8/q8 | `0.964724` | `22.4%` | `23` | quality/CPU/jitter fail |
+| ISO10/q8 | `0.969379` | `19.6%` | `35` | quality/CPU/jitter fail |
+| ISO12/q8 | `0.963395` | `16.6%` | `32` | quality/CPU/jitter fail |
+| ISO64/q8 | `0.686712` | `6.3%` | `35` | CPU pass, quality/jitter fail |
+
+Required product thresholds:
+- quality alignment score `>= 0.980000`;
+- driver CPU p95 `<= 6.5%` under comparable conditions;
+- lag jumps greater than two frames: `0`;
+- no branch promotion unless all physical product gates also pass.
+
+Current result:
+- `PASS` only as a negative offline model: no observed family is a product
+  candidate.
+- `FAIL` for product readiness: none of the observed families simultaneously
+  satisfies quality, CPU, and jitter.
+
+Next required evidence:
+- a prepared DriverKit/transport backend model where steady-state HAL callback
+  work has `0` direct `IOUSBHostPipe` enqueue/requeue calls;
+- unchanged USB cadence/bytes/routing/timecode semantics;
+- offline gates PASS before any new physical window;
+- same-session physical proof that the new backend beats mainline in quality,
+  driver CPU, coreaudiod CPU, routing, and timecode behavior.

@@ -1505,3 +1505,19 @@ Next technical target:
     alignment/capture post-correction is not the product path. The blocking
     work remains HAL USB enqueue CPU, physical route validation, and a same-
     session reference that is healthy enough to support audiophile claims.
+- Transport budget gate:
+  - Added compiled model `tools/transport_budget_model.cpp`, now wired into
+    CTest and `scripts/run-cpp-offline-gates`.
+  - Current frontier:
+    - best quality family `iso5_q64`: quality `0.978050`, estimated USB enqueue
+      calls/s `400`, median driver CPU p95 `36.9%`.
+    - current middle families `iso8_q8`, `iso10_q8`, `iso12_q8`: quality below
+      `0.98` and driver CPU p95 `16.6-22.4%`.
+    - CPU-near family `iso64_q8`: estimated enqueue calls/s `31.25`, median
+      driver CPU p95 `6.3%`, but quality only `0.686712`.
+  - The gate reports `product_candidate_exists=false`: no observed family
+    simultaneously satisfies quality, driver CPU, and zero-lag-jump gates.
+  - Meaning:
+    more hardware should not be spent on simple cadence ladder variants unless
+    the implementation changes the quality/CPU frontier, not just its position
+    along the old tradeoff curve.

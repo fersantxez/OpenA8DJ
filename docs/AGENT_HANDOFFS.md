@@ -2469,3 +2469,36 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Focus on reducing HAL USB enqueue CPU while preserving the best current
     quality family, or run a locked same-session fixture reference when a new
     physical window is justified.
+
+## Noether: Transport CPU Frontier Scout - 2026-06-17
+
+- Mission:
+  - Read-only audit for the next CPU/transport implementation hypothesis that
+    reduces HAL/USB enqueue CPU without repeating rejected knobs or breaking
+    quality.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+  - Architect integrated the recommendation into the transport budget frontier
+    model and DriverKit transport direction.
+- Findings:
+  - The only credible next candidate is a prepared DriverKit/transport backend:
+    keep cadence, bytes, routing, DVS, input decode, and USB packet semantics
+    fixed while moving steady-state isochronous requeue work out of the HAL
+    callback path.
+  - Do not repeat rejected knobs: coalescing, ISO64/q8, pool cursor, input
+    decode gating, stats-off, atomic stats, fast ISO config, or raw/reused
+    completion handlers.
+  - Offline proof should precede hardware: simulated DriverKit transport must
+    show zero direct HAL steady-state `IOUSBHostPipe` enqueue/requeue work, no
+    fallback allocations, stable cadence, and preserved DVS/timecode gates.
+  - Risk remains high for timecode/input if a ring loses order, timestamps, or
+    A/B/C/D channel identity.
+- Next recommended action:
+  - Implement an offline DriverKit transport contract/model first, then only
+    request a locked physical window if all offline gates pass.
