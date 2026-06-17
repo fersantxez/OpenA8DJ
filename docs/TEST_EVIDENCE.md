@@ -6522,3 +6522,52 @@ Operational note:
 - Interpretation:
   - ISO12/q8 is rejected. It improves CPU directionally but worsens physical
     residual/quality, so cadence alone is not a solution.
+
+## 2026-06-17 Offline Analog Residual And Product Evidence Summary
+
+- Purpose:
+  - Integrate Russell's read-only residual analysis into a reproducible
+    architect-side product gate.
+  - Avoid false promotion claims from comparing best-global C++ runs against a
+    mainline run from a different physical session.
+- Safety:
+  - Offline-only analysis of existing artifacts.
+  - No hardware, CoreAudio, USB, HAL install, default-device changes, service
+    restarts, or physical capture performed.
+  - NumPy/SciPy were installed only into ignored local `.venv/` inside
+    `/Users/fer/dev/audio8djcpp`.
+  - An initial patch was accidentally applied relative to `/Users/fer/dev/opena8dj`;
+    the untracked file was removed and recreated in the C++ worktree. A direct
+    `git status --short -- scripts/summarize-physical-product-evidence.py` in
+    `/Users/fer/dev/opena8dj` returned clean afterward.
+- Commands:
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py <six existing runs> --json-out local-analysis/analog-residual/20260617-key-runs-failure-modes.json`
+  - `python3 -m py_compile scripts/summarize-physical-product-evidence.py`
+  - `scripts/summarize-physical-product-evidence.py --cpp-run local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s --cpp-run local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s --cpp-run local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal --cpp-run local-analysis/soundcheck/20260617-output-flush-mainline-irig-pairA-12s-cpp-hal --cpp-run local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck --mainline-run local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck --failure-modes-json local-analysis/analog-residual/20260617-key-runs-failure-modes.json --json-out local-analysis/physical-product/20260617-product-evidence-summary.json`
+- Failure-mode result:
+  - PASS diagnostic.
+  - Key ISO8/ISO10/ISO12/output-flush captures classify as:
+    `timebase_or_alignment_instability`,
+    `static_lr_mix_or_polarity_not_sufficient`, and
+    `simple_memoryless_nonlinearity_not_sufficient`.
+  - Static matrix fit improves SNR by less than about `0.25 dB` in the key
+    relatively-good C++ runs, so simple L/R mix/polarity is not a sufficient
+    explanation.
+- Product evidence summary:
+  - `result=FAIL`, `branch_promotion_allowed=false`.
+  - Best global C++ run in the summary remains ISO10/q8:
+    quality `0.969379`, SNR floor `10.18 dB`, mid/high residual
+    `1.514509/1.396638`, `35` lag jumps, driver CPU p95 `19.6%`.
+  - Same-session C++ vs mainline run is marked fixture-degraded for both
+    candidates.
+  - Same-session blockers:
+    C++ quality does not beat mainline, C++ driver CPU does not beat mainline,
+    C++ coreaudiod CPU does not beat mainline, and both candidates fail
+    absolute physical quality gates.
+- Evidence:
+  - `local-analysis/analog-residual/20260617-key-runs-failure-modes.json`
+  - `local-analysis/physical-product/20260617-product-evidence-summary.json`
+- Interpretation:
+  - Current C++ still does not objectively beat mainline.
+  - Route/fixture health must be validated for audiophile claims, and CPU must
+    be reduced without falling back to physically rejected cadence families.

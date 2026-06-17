@@ -4105,3 +4105,42 @@ Next implication:
 - The blocker is not solved by transport cadence alone. The next useful work
   should explain the persistent analog residual/lag mechanism, or split the
   route/capture baseline from driver behavior before more physical probes.
+
+## 2026-06-17: Add Physical Product Evidence Summary Gate
+
+Decision:
+- Add `scripts/summarize-physical-product-evidence.py` as an offline product
+  evidence summary tool.
+- Keep same-session C++ vs mainline comparisons separate from best-global C++
+  physical runs.
+- Treat fixture degradation as a blocker for audiophile claims even when one
+  candidate partially beats another on residual or lag.
+
+Reason:
+- Existing evidence contains two different questions:
+  - best C++ global physical behavior so far, currently ISO10/q8 with quality
+    `0.969379` and driver CPU p95 `19.6%`;
+  - same-session C++ vs mainline comparison, where both candidates were in a
+    degraded fixture and C++ still failed quality and CPU versus mainline.
+- Mixing those questions can produce false claims. A global C++ run must not
+  be compared as if it were the same physical session as a mainline run.
+- Russell's residual analysis and the offline failure-mode run showed that
+  static L/R matrix or simple nonlinear gain corrections do not explain the
+  residual; the decision logic needs to preserve route/cadence/timebase
+  context.
+
+Alternatives discarded:
+- Compare latest C++ against latest mainline regardless of session: rejected
+  because fixture state can dominate physical metrics.
+- Use quality alone: rejected because the best quality family still fails CPU.
+- Use CPU alone: rejected because CPU-near families have been physically
+  rejected for music quality.
+
+Evidence:
+- `local-analysis/analog-residual/20260617-key-runs-failure-modes.json`
+- `local-analysis/physical-product/20260617-product-evidence-summary.json`
+
+Next implication:
+- Promotion remains forbidden. The next useful candidate must either validate
+  the fixture with a healthy same-session reference or reduce HAL CPU while
+  preserving the best current physical quality family.

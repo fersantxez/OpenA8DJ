@@ -1608,3 +1608,35 @@ Meaning:
   worse. It is not a valid product path.
 - Transport cadence remains a necessary variable to record, but it is not
   sufficient to solve the audiophile quality gate.
+
+## 2026-06-17 Physical Product Evidence Summary Gate
+
+Latest evidence:
+`local-analysis/physical-product/20260617-product-evidence-summary.json`.
+
+Required semantics:
+- `branch_promotion_allowed=true` is required before any C++ to `main` or C to
+  `Legacy` action.
+- Same-session C++ vs mainline comparisons must use runs from the same physical
+  session directory.
+- Best-global C++ runs may establish the current C++ ceiling, but they cannot
+  be used as same-session mainline comparisons.
+- If both C++ and mainline are marked `fixture_degraded_candidate`, the run can
+  diagnose relative behavior but cannot prove audiophile quality.
+
+Current result: `FAIL`.
+
+Current blockers:
+- `cpp_physical_quality_gate_failed`.
+- `cpp_runtime_cpu_gate_failed`.
+- `cpp_quality_does_not_beat_mainline_same_session`.
+- `cpp_driver_cpu_does_not_beat_mainline_same_session`.
+- `cpp_coreaudiod_cpu_does_not_beat_mainline_same_session`.
+- `same_session_fixture_degraded_for_both_candidates`.
+
+Meaning:
+- Current C++ has not beaten mainline in sound quality, resource use, or
+  full-product readiness.
+- The next promotable candidate needs simultaneous absolute quality PASS,
+  same-session mainline comparison PASS, CPU PASS, routing PASS, recovery PASS,
+  and physical Traktor/timecode evidence.

@@ -2391,3 +2391,42 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Test the new output-flush timing under the hardware lock with same-route
     real-music quality, window-trace timebase classification, CPU profile, and
     promotion-readiness evidence. Do not claim improvement from compilation.
+
+## Russell: Analog Residual Scout - 2026-06-17
+
+- Mission:
+  - Read-only analysis of existing physical artifacts to rank whether the
+    persistent residual is route/capture/iRig/mixer, variable latency, fixed
+    spectral/gain distortion, or USB/HAL cadence.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+  - Architect integrated the findings into
+    `scripts/summarize-physical-product-evidence.py` and
+    `local-analysis/physical-product/20260617-product-evidence-summary.json`.
+- Findings:
+  - Mainline and C++ ISO64/q8 can fail similarly on the shared iRig route,
+    which means that route cannot be treated as an audiophile reference unless
+    same-session fixture health is proven.
+  - Current C++ runs show real lag jumps, but local lag correction alone does
+    not remove the residual.
+  - USB packed payload evidence is clean, so the strongest next hypotheses are
+    physical route/fixture state, time-varying latency, and HAL/USB cadence
+    behavior rather than simple byte-packing corruption.
+  - Static L/R matrix and simple nonlinear gain models are weak explanations
+    for the key captures.
+- Architect integration:
+  - Installed NumPy/SciPy into the ignored local `.venv/` for offline analysis.
+  - Ran `analyze-soundcheck-failure-modes.py` on key existing captures and
+    confirmed static matrix/nonlinearity improvements are below `0.25 dB`.
+  - Added a physical-product summary gate that keeps same-session C++ vs
+    mainline comparisons separate from best-global C++ runs.
+- Next recommended action:
+  - Do not spend more hardware windows on blind cadence sweeps. Either validate
+    the physical fixture in a same-session reference test or reduce product HAL
+    CPU without changing the currently best quality family.

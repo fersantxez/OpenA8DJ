@@ -43,7 +43,8 @@ python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats
 python3 -m py_compile \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
-  scripts/summarize-transport-cadence.py
+  scripts/summarize-transport-cadence.py \
+  scripts/summarize-physical-product-evidence.py
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
