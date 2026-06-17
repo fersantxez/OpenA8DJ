@@ -179,6 +179,17 @@ summary = {
         "measurement_valid_for_promotion"
     ),
     "physical_measurement_blockers": capture_route_health.get("promotion_blockers", []),
+    "promotion_hard_blockers": [
+        "same_session_mainline_cpp_physical_ab_missing",
+        "valid_irig_loopback_route_not_currently_proven_for_promotion",
+        "traktor_timecode_vinyl_physical_gate_missing",
+        "runtime_cpu_superiority_over_mainline_missing",
+        "post_reboot_autologin_codex_resume_unfixed",
+    ],
+    "promotion_claim_policy": (
+        "offline PASS is diagnostic only; branch promotion requires same-session physical "
+        "quality, routing, timecode, CPU, recovery, and rollback evidence against mainline"
+    ),
     "scope": "offline_only",
     "hardware_touched": False,
     "coreaudio_touched": False,

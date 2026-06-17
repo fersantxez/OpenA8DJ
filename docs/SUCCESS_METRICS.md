@@ -2070,6 +2070,10 @@ Prepared transport migration metric:
   `prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio >= 8.0` and
   `prepared_slot_scheduler_max_safe_logical_audio_gap_ratio <= 1.0`; otherwise
   the prepared transport path is not allowed to proceed toward hardware.
+- The offline summary must keep `promotion_hard_blockers` visible while
+  same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
+  Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume
+  evidence are missing.
 - `local-analysis/cpp-offline/prepared-transport-pressure-gate.json` must PASS
   with 44.1/48 kHz, decks A/B/C/D, zero HAL steady requeues, zero fallback
   allocations, zero ring faults, and zero packet/check mismatches before the
