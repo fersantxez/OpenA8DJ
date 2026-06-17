@@ -740,3 +740,18 @@ cmake --build build/cpp-offline --target opena8djcpp_hot_path_timing_analysis
 The tool reads stored `stream-stats-summary.json` files under
 `local-analysis/hot-path-timing/`. It does not open audio devices, touch USB,
 install drivers, or activate system extensions.
+
+## C++ Quality Root-Cause Analyzer
+
+The offline build includes `opena8djcpp_quality_root_cause_analysis`.
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_quality_root_cause_analysis
+./build/cpp-offline/opena8djcpp_quality_root_cause_analysis
+```
+
+The tool reads existing evidence only and reports whether promotion is blocked
+by route health, analog quality, lag/timebase, or fixed transport CPU evidence.
+It does not open audio devices, touch USB, install drivers, or activate system
+extensions.

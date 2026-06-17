@@ -1108,3 +1108,30 @@ PASS/FAIL semantics:
 - PASS is diagnostic only. It cannot prove product CPU superiority.
 - Future CPU improvements must still pass same-session product quality and CPU
   gates.
+
+## Offline Quality Root-Cause Analysis
+
+Purpose:
+
+- combine existing stored evidence into one root-cause classification;
+- distinguish clean packed USB payload from failed analog quality;
+- block promotion when route health, timebase, physical quality, or CPU remain
+  unresolved.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_quality_root_cause_analysis
+./build/cpp-offline/opena8djcpp_quality_root_cause_analysis
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/quality-root-cause-analysis.json`.
+
+PASS/FAIL semantics:
+
+- Tool `result=PASS` means the diagnostic ran.
+- `product_readiness_allowed=false` blocks readiness and branch promotion.
+- This gate does not replace physical same-session mainline/C++ evidence.

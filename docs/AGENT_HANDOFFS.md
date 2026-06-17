@@ -2716,3 +2716,33 @@ Risk:
   - Create a locked hot-path-timing physical window only after deciding the
     exact diagnostic build. Until then, no CPU root-cause claim beyond
     process-level evidence.
+## 2026-06-17 Reused Subagent: Russell Analog Residual Scout
+
+- Agent:
+  - Russell (`019ed60d-b361-7853-a909-cd131a750d0a`).
+- Mission:
+  - Read stored C++ evidence and rank analog residual/root-cause hypotheses.
+  - No edits, no hardware, no CoreAudio/USB/system changes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.`
+- Findings integrated:
+  - Packed USB payload can be clean while analog capture quality fails.
+  - Shared route/capture evidence is degraded for both mainline and C++ in one
+    stored comparison.
+  - Lag exists but does not explain enough residual by itself.
+  - Cadence/control remains plausible while simple L/R matrix, polarity, gain,
+    or fixed EQ are weak explanations.
+- Files affected by integration:
+  - `tools/quality_root_cause_analysis.cpp`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/SUCCESS_METRICS.md`.
+  - `docs/TEST_PLAN.md`.
+  - `docs/TEST_EVIDENCE.md`.
+- Next action:
+  - Keep promotion blocked until route health and same-session mainline/C++
+    physical comparison pass under lock.

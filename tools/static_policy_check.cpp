@@ -104,6 +104,7 @@ int main(int argc, char** argv) {
       root / "tools/realtime_audit.cpp",
       root / "tools/transport_budget_model.cpp",
       root / "tools/hot_path_timing_analysis.cpp",
+      root / "tools/quality_root_cause_analysis.cpp",
       root / "tools/driverkit_runtime_contract.cpp",
       root / "tools/driverkit_extension_scaffold_contract.cpp",
       root / "tools/driverkit_prepared_transport_contract.cpp",

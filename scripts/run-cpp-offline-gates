@@ -46,6 +46,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
 ./build/cpp-release/opena8djcpp_hot_path_timing_analysis | tee "$EVIDENCE_DIR/hot-path-timing-analysis.json"
+./build/cpp-release/opena8djcpp_quality_root_cause_analysis | tee "$EVIDENCE_DIR/quality-root-cause-analysis.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
@@ -112,6 +113,7 @@ jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
 hot_path_timing = load_json("hot-path-timing-analysis.json")
+quality_root_cause = load_json("quality-root-cause-analysis.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
 capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
 soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
@@ -296,6 +298,17 @@ summary = {
         "nested_sum_to_capture_handler_ratio": hot_path_timing.get("nested_sum_to_capture_handler_ratio"),
         "nested_timing_policy": hot_path_timing.get("nested_timing_policy"),
         "evidence": "local-analysis/cpp-offline/hot-path-timing-analysis.json",
+    },
+    "quality_root_cause_analysis": {
+        "status": quality_root_cause.get("result"),
+        "product_readiness_allowed": quality_root_cause.get("product_readiness_allowed"),
+        "classification": quality_root_cause.get("classification"),
+        "digital_payload_clean": quality_root_cause.get("digital_payload_clean"),
+        "shared_fixture_or_capture_path_unhealthy": quality_root_cause.get("shared_fixture_or_capture_path_unhealthy"),
+        "candidate_physical_quality_fails": quality_root_cause.get("candidate_physical_quality_fails"),
+        "timebase_lag_not_sufficient_explanation": quality_root_cause.get("timebase_lag_not_sufficient_explanation"),
+        "fixed_transport_cpu_suspect": quality_root_cause.get("fixed_transport_cpu_suspect"),
+        "evidence": "local-analysis/cpp-offline/quality-root-cause-analysis.json",
     },
     "loopback_quality_analysis": {
         "status": loopback_quality.get("result"),

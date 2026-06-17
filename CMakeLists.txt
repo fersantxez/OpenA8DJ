@@ -212,6 +212,9 @@ add_executable(opena8djcpp_transport_budget_model
 add_executable(opena8djcpp_hot_path_timing_analysis
   tools/hot_path_timing_analysis.cpp)
 
+add_executable(opena8djcpp_quality_root_cause_analysis
+  tools/quality_root_cause_analysis.cpp)
+
 add_executable(opena8djcpp_loopback_quality_analysis
   tools/loopback_quality_analysis.cpp)
 
@@ -268,6 +271,7 @@ add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_transfer_pool_model COMMAND opena8djcpp_transfer_pool_model)
 add_test(NAME opena8djcpp_transport_budget_model COMMAND opena8djcpp_transport_budget_model)
 add_test(NAME opena8djcpp_hot_path_timing_analysis COMMAND opena8djcpp_hot_path_timing_analysis)
+add_test(NAME opena8djcpp_quality_root_cause_analysis COMMAND opena8djcpp_quality_root_cause_analysis)
 add_test(NAME opena8djcpp_loopback_quality_analysis COMMAND opena8djcpp_loopback_quality_analysis)
 add_test(NAME opena8djcpp_capture_matrix_quality_analysis COMMAND opena8djcpp_capture_matrix_quality_analysis)
 add_test(NAME opena8djcpp_soundcheck_wav_quality COMMAND opena8djcpp_soundcheck_wav_quality)

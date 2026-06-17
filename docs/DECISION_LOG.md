@@ -4860,3 +4860,31 @@ Evidence:
 Next implication:
 - The next optimization should target fixed transport queue/requeue/enqueue
   overhead or callback cadence, then prove same-session quality did not regress.
+
+## 2026-06-17: Add Native Quality Root-Cause Analysis Gate
+
+Decision:
+- Add `tools/quality_root_cause_analysis.cpp`.
+- Wire it into CMake/CTest and the offline evidence bundle.
+
+Reason:
+- Current physical failures cannot be explained by a single metric.
+- Existing evidence says the packed USB payload can be bit-clean while analog
+  capture quality still fails hard.
+- Mainline and C++ both show a degraded route signature in one stored
+  same-fixture comparison, so promotion must be blocked until the physical
+  route is validated in-session.
+
+Alternatives discarded:
+- Optimize HAL micro-flags again: rejected because reused completions, raw
+  completions, fast ISO config, coalescing, and lead changes already have
+  negative physical or cadence evidence.
+- Treat payload cleanliness as readiness: rejected because analog SNR,
+  residual, lag, and CPU gates still fail.
+
+Evidence:
+- `local-analysis/cpp-offline/quality-root-cause-analysis.json`
+
+Next implication:
+- The next hardware window must first prove route health, then compare C++
+  against mainline in the same session before any branch-promotion claim.

@@ -2000,3 +2000,16 @@ Readiness rule:
   - hot-path attribution consistent with the intended fix.
 - A hot-path attribution improvement alone is not sufficient if physical sound
   quality, residual, lag, or timecode gates regress.
+
+Native root-cause gate:
+- `opena8djcpp_quality_root_cause_analysis` must be present in offline
+  evidence before promotion.
+- Current result is diagnostic PASS but product readiness blocked:
+  - digital payload is clean;
+  - shared route/capture path is unhealthy in stored evidence;
+  - selected candidate physical quality fails;
+  - lag exists but does not explain enough residual;
+  - fixed queue/requeue/enqueue CPU remains suspect.
+- Promotion requires this gate to report `product_readiness_allowed=true` only
+  after same-session physical evidence clears route health, quality, CPU,
+  routing, and timecode criteria.

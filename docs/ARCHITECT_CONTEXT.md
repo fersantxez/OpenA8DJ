@@ -1725,3 +1725,34 @@ Current implication:
   overhead or callback cadence before touching audio packing/math.
 - The selected hot-path evidence is diagnostic and does not prove the current
   product candidate is ready or better than mainline.
+
+### 2026-06-17 Native Quality Root-Cause Gate
+
+- Added `opena8djcpp_quality_root_cause_analysis`.
+- It reads stored evidence only:
+  - route-signature summary;
+  - timebase-family summary;
+  - packed USB diagnostic output;
+  - selected current candidate metrics;
+  - hot-path timing analysis.
+- Current classification:
+  - `digital_payload_clean`;
+  - `shared_fixture_or_capture_path_unhealthy`;
+  - `candidate_physical_quality_fails`;
+  - `lag_present_but_not_sufficient_explanation`;
+  - `fixed_transport_queue_requeue_enqueue_cpu_suspect`.
+- Key metrics:
+  - USB packed output alignment `1.000000`, check errors `0`, panic flags `0`.
+  - Mainline route quality/SNR in degraded shared route:
+    `0.680798` / `-0.828880 dB`.
+  - C++ ISO64 route quality/SNR in same degraded signature:
+    `0.686712` / `-0.841473 dB`.
+  - Selected C++ candidate quality/SNR:
+    `0.963395` / `9.675760 dB`.
+  - Timebase max lag jumps `35`; lag correction median mid-ratio improvement
+    only `0.011021`.
+
+Current implication:
+- The next physical work must validate the analog route/capture path and run a
+  same-session mainline/C++ comparison before any audiophile-quality claim.
+- Internal packet cleanliness does not prove analog sound quality.

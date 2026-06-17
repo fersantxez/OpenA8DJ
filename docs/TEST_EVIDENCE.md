@@ -7770,3 +7770,37 @@ Operational note:
     CPU.
   - This supports the next CPU investigation direction but does not make the
     current C++ candidate better than mainline.
+
+## 2026-06-17 Native Quality Root-Cause Analysis Gate
+
+- Scope:
+  - Offline-only analysis over stored evidence.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Changes:
+  - Added `opena8djcpp_quality_root_cause_analysis`.
+  - Wired it into CMake/CTest and `scripts/run-cpp-offline-gates`.
+  - Added `local-analysis/cpp-offline/quality-root-cause-analysis.json` to the
+    evidence schema.
+- Focused command:
+  - `./build/cpp-release/opena8djcpp_quality_root_cause_analysis`
+- Focused result:
+  - Diagnostic result: PASS.
+  - Product readiness allowed: `false`.
+  - Classification:
+    `digital_payload_clean`,
+    `shared_fixture_or_capture_path_unhealthy`,
+    `candidate_physical_quality_fails`,
+    `lag_present_but_not_sufficient_explanation`,
+    `fixed_transport_queue_requeue_enqueue_cpu_suspect`.
+  - USB packed output: alignment `1.000000`, check errors `0`, panic flags `0`.
+  - Stored degraded shared-route signature:
+    mainline `0.680798` quality / `-0.828880 dB` SNR;
+    C++ ISO64 `0.686712` quality / `-0.841473 dB` SNR.
+  - Selected C++ candidate:
+    quality `0.963395`, SNR floor `9.675760 dB`,
+    mid/high residual `1.653871/1.494546`, lag jumps `32`.
+- Interpretation:
+  - Internal USB payload cleanliness is not sufficient for audiophile quality.
+  - The next physical window must validate the capture route and compare
+    mainline/C++ in the same session.
