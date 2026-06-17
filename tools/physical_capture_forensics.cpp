@@ -28,6 +28,7 @@ struct StereoBuffer {
 
 struct RunMeta {
   std::filesystem::path dir;
+  std::string source;
   double quality = std::numeric_limits<double>::quiet_NaN();
   double left_snr = std::numeric_limits<double>::quiet_NaN();
   double right_snr = std::numeric_limits<double>::quiet_NaN();
@@ -295,9 +296,10 @@ void print_number(double value) {
   }
 }
 
-RunMeta read_meta(const std::filesystem::path& metrics_path) {
+RunMeta read_meta(const std::filesystem::path& metrics_path, std::string source) {
   RunMeta meta{};
   meta.dir = metrics_path.parent_path();
+  meta.source = std::move(source);
   const auto json = read_file(metrics_path);
   meta.quality = json_number(json, "quality_alignment_score").value_or(meta.quality);
   meta.left_snr = json_number(json, "left_snr_db").value_or(meta.left_snr);
@@ -507,14 +509,25 @@ RunForensics analyze_run(const RunMeta& meta) {
 int main(int argc, char** argv) {
   try {
     const auto root = repo_root(argv);
-    const auto soundcheck_root = root / "local-analysis/soundcheck";
+    struct ScanRoot {
+      std::filesystem::path path;
+      std::string source;
+    };
+    const std::vector<ScanRoot> scan_roots = {
+        {root / "local-analysis/soundcheck", "hal_soundcheck"},
+        {root / "local-analysis/direct-usb-soundcheck", "direct_usb_soundcheck"},
+        {root / "local-analysis/physical-superiority-window", "physical_superiority_window"},
+    };
     std::vector<RunMeta> candidates;
-    if (std::filesystem::is_directory(soundcheck_root)) {
-      for (const auto& entry : std::filesystem::recursive_directory_iterator(soundcheck_root)) {
+    for (const auto& scan : scan_roots) {
+      if (!std::filesystem::is_directory(scan.path)) {
+        continue;
+      }
+      for (const auto& entry : std::filesystem::recursive_directory_iterator(scan.path)) {
         if (!entry.is_regular_file() || entry.path().filename() != "metrics.json") {
           continue;
         }
-        const auto meta = read_meta(entry.path());
+        const auto meta = read_meta(entry.path(), scan.source);
         if (!reference_path_for(meta.dir).empty() && !capture_path_for(meta.dir).empty() &&
             std::isfinite(meta.quality)) {
           candidates.push_back(meta);
@@ -540,6 +553,16 @@ int main(int argc, char** argv) {
         selected.push_back(*it);
       }
     }
+    for (auto it = candidates.begin(); it != candidates.end() && selected.size() < 18U; ++it) {
+      if (it->source == "direct_usb_soundcheck" && seen.insert(it->dir.string()).second) {
+        selected.push_back(*it);
+      }
+    }
+    for (auto it = candidates.begin(); it != candidates.end() && selected.size() < 22U; ++it) {
+      if (it->source == "physical_superiority_window" && seen.insert(it->dir.string()).second) {
+        selected.push_back(*it);
+      }
+    }
 
     std::vector<RunForensics> analyses;
     for (const auto& meta : selected) {
@@ -550,7 +573,17 @@ int main(int argc, char** argv) {
     std::uint32_t variable_timebase = 0;
     std::uint32_t static_matrix_dominant = 0;
     std::uint32_t high_frequency_dominant = 0;
+    std::uint32_t direct_usb_candidates = 0;
+    std::uint32_t direct_usb_analyzed = 0;
+    std::uint32_t physical_window_candidates = 0;
+    std::uint32_t physical_window_analyzed = 0;
     const RunForensics* best = nullptr;
+    const RunForensics* best_direct_usb = nullptr;
+    const RunForensics* best_physical_window = nullptr;
+    for (const auto& meta : candidates) {
+      direct_usb_candidates += meta.source == "direct_usb_soundcheck" ? 1U : 0U;
+      physical_window_candidates += meta.source == "physical_superiority_window" ? 1U : 0U;
+    }
     for (const auto& run : analyses) {
       const double snr_floor = std::min(run.meta.left_snr, run.meta.right_snr);
       strict_candidates +=
@@ -561,8 +594,19 @@ int main(int argc, char** argv) {
           run.classification == "static_stereo_route_or_gain_dominant" ? 1U : 0U;
       high_frequency_dominant +=
           run.classification == "high_frequency_or_nonlinear_residual_dominant" ? 1U : 0U;
+      direct_usb_analyzed += run.meta.source == "direct_usb_soundcheck" ? 1U : 0U;
+      physical_window_analyzed += run.meta.source == "physical_superiority_window" ? 1U : 0U;
       if (best == nullptr || run.meta.quality > best->meta.quality) {
         best = &run;
+      }
+      if (run.meta.source == "direct_usb_soundcheck" &&
+          (best_direct_usb == nullptr || run.meta.quality > best_direct_usb->meta.quality)) {
+        best_direct_usb = &run;
+      }
+      if (run.meta.source == "physical_superiority_window" &&
+          (best_physical_window == nullptr ||
+           run.meta.quality > best_physical_window->meta.quality)) {
+        best_physical_window = &run;
       }
     }
 
@@ -574,7 +618,11 @@ int main(int argc, char** argv) {
               << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
               << "  \"meaning\": \"diagnostic classifier over archived iRig WAV captures; PASS is analyzer health, not product readiness\",\n"
               << "  \"candidate_runs_with_wav\": " << candidates.size() << ",\n"
+              << "  \"direct_usb_runs_with_wav\": " << direct_usb_candidates << ",\n"
+              << "  \"physical_window_runs_with_wav\": " << physical_window_candidates << ",\n"
               << "  \"analyzed_runs\": " << analyses.size() << ",\n"
+              << "  \"direct_usb_analyzed_runs\": " << direct_usb_analyzed << ",\n"
+              << "  \"physical_window_analyzed_runs\": " << physical_window_analyzed << ",\n"
               << "  \"strict_quality_candidates\": " << strict_candidates << ",\n"
               << "  \"variable_timebase_or_route_capture_instability_runs\": " << variable_timebase
               << ",\n"
@@ -600,10 +648,48 @@ int main(int argc, char** argv) {
     } else {
       std::cout << "null,\n";
     }
+    std::cout << "  \"best_direct_usb_run\": ";
+    if (best_direct_usb != nullptr) {
+      std::cout << "{\"path\": \"" << json_escape(best_direct_usb->meta.dir.string())
+                << "\", \"quality_alignment_score\": ";
+      print_number(best_direct_usb->meta.quality);
+      std::cout << ", \"snr_floor_db\": ";
+      print_number(std::min(best_direct_usb->meta.left_snr, best_direct_usb->meta.right_snr));
+      std::cout << ", \"classification\": \"" << best_direct_usb->classification
+                << "\", \"fixed_lag_score\": ";
+      print_number(best_direct_usb->fixed_lag_score);
+      std::cout << ", \"matrix_explain_db\": ";
+      print_number(best_direct_usb->matrix_explain_db);
+      std::cout << ", \"lag_stddev_frames\": ";
+      print_number(best_direct_usb->lag_stddev);
+      std::cout << "},\n";
+    } else {
+      std::cout << "null,\n";
+    }
+    std::cout << "  \"best_physical_window_run\": ";
+    if (best_physical_window != nullptr) {
+      std::cout << "{\"path\": \"" << json_escape(best_physical_window->meta.dir.string())
+                << "\", \"quality_alignment_score\": ";
+      print_number(best_physical_window->meta.quality);
+      std::cout << ", \"snr_floor_db\": ";
+      print_number(
+          std::min(best_physical_window->meta.left_snr, best_physical_window->meta.right_snr));
+      std::cout << ", \"classification\": \"" << best_physical_window->classification
+                << "\", \"fixed_lag_score\": ";
+      print_number(best_physical_window->fixed_lag_score);
+      std::cout << ", \"matrix_explain_db\": ";
+      print_number(best_physical_window->matrix_explain_db);
+      std::cout << ", \"lag_stddev_frames\": ";
+      print_number(best_physical_window->lag_stddev);
+      std::cout << "},\n";
+    } else {
+      std::cout << "null,\n";
+    }
     std::cout << "  \"runs\": [\n";
     for (std::size_t i = 0; i < analyses.size(); ++i) {
       const auto& run = analyses[i];
       std::cout << "    {\"path\": \"" << json_escape(run.meta.dir.string()) << "\""
+                << ", \"source\": \"" << json_escape(run.meta.source) << "\""
                 << ", \"quality_alignment_score\": ";
       print_number(run.meta.quality);
       std::cout << ", \"snr_floor_db\": ";

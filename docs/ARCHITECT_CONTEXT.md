@@ -2085,3 +2085,34 @@ Current implication:
 - The next meaningful work is to separate physical route/analog capture
   failure from HAL runtime scheduling, then improve the C++ HAL only against
   a validated capture path.
+
+## 2026-06-17 Expanded C++ Capture Forensics
+
+- Integrated Lorentz's read-only signal-forensics conclusion into the offline
+  gate surface.
+- `opena8djcpp_physical_capture_forensics` now scans:
+  - `local-analysis/soundcheck`;
+  - `local-analysis/direct-usb-soundcheck`;
+  - `local-analysis/physical-superiority-window`.
+- The analyzer remains offline-only and touches no audio devices, USB,
+  CoreAudio, HAL installation, or hardware.
+- Current expanded result:
+  - archived WAV candidates: `81`;
+  - direct USB WAV candidates: `16`;
+  - physical-window WAV candidates: `3`;
+  - analyzed runs: `21`;
+  - strict quality candidates: `0`;
+  - best direct USB run:
+    `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`;
+  - best direct USB quality/SNR: `0.959037` / `9.697139 dB`;
+  - best physical-window quality/SNR: `0.125194` / `-12.774687 dB`.
+
+Current implication:
+- No installed package or additional analysis dependency is justified yet:
+  the next decisive evidence is a valid physical route capture, not a new
+  parser or DSP library.
+- Packet packing is low-priority until direct USB internal payload evidence
+  contradicts the current `alignment=1.0`, `check_errors=0`, `panic_flags=0`
+  result.
+- Promotion remains blocked because no run proves audiophile-quality external
+  capture or same-session mainline/C++ superiority.

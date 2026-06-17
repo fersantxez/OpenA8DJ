@@ -2938,3 +2938,49 @@ Risk:
 - Next action:
   - Re-run offline gates and keep promotion blocked until real physical
     same-session evidence exists.
+
+## 2026-06-17 Subagent: Lorentz Signal Forensics
+
+- Agent:
+  - Lorentz (`019ed730-9337-7c02-a98b-fc1cd9e3fbe0`).
+- Mission:
+  - Read-only forensics over existing physical/direct-USB evidence.
+  - Determine whether the current audiophile-quality blocker is packet
+    packing, direct USB payload, HAL timing, CPU, or external route/capture.
+  - No hardware, audio, USB, CoreAudio, driver install, service change, or
+    system mutation.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.`
+- Findings:
+  - The current dominant blocker is the external physical route/capture, not
+    Mode-2 packet packing.
+  - Direct USB internal artifacts are clean in the latest diagnostic run:
+    written, consumed, and packed USB alignment `1.000000`, USB check errors
+    `0`, USB panic flags `0`, and USB SNR floor `999 dB`.
+  - The same direct USB run still fails external iRig capture with
+    `quality_alignment_score=0.738457`, `snr_db_min=-0.637949`, and
+    mid/high residual ratios `1.681576/1.664308`.
+  - HAL C++ remains secondary until route validation is clean; current HAL
+    physical evidence shows low SNR, lag jumps, and high CPU.
+- Integrated action:
+  - Expanded `opena8djcpp_physical_capture_forensics` to include archived
+    direct USB and physical-superiority-window captures, not only HAL
+    soundcheck captures.
+  - Added direct USB and physical-window forensic summaries to
+    `scripts/run-cpp-offline-gates`.
+- Files affected:
+  - `tools/physical_capture_forensics.cpp`.
+  - `scripts/run-cpp-offline-gates`.
+  - `docs/AGENT_HANDOFFS.md`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/TEST_EVIDENCE.md`.
+- Next action:
+  - Re-run offline gates, then use a lock-gated physical route revalidation
+    only when a real non-Audio8 output is physically routed into the same
+    mixer/REC OUT -> iRig chain. Do not claim C++ superiority before that
+    route gate passes.

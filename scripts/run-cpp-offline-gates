@@ -446,9 +446,15 @@ summary = {
     "physical_capture_forensics": {
         "status": physical_capture_forensics.get("result"),
         "candidate_runs_with_wav": physical_capture_forensics.get("candidate_runs_with_wav"),
+        "direct_usb_runs_with_wav": physical_capture_forensics.get("direct_usb_runs_with_wav"),
+        "physical_window_runs_with_wav": physical_capture_forensics.get("physical_window_runs_with_wav"),
         "analyzed_runs": physical_capture_forensics.get("analyzed_runs"),
+        "direct_usb_analyzed_runs": physical_capture_forensics.get("direct_usb_analyzed_runs"),
+        "physical_window_analyzed_runs": physical_capture_forensics.get("physical_window_analyzed_runs"),
         "strict_quality_candidates": physical_capture_forensics.get("strict_quality_candidates"),
         "best_analyzed_run": physical_capture_forensics.get("best_analyzed_run"),
+        "best_direct_usb_run": physical_capture_forensics.get("best_direct_usb_run"),
+        "best_physical_window_run": physical_capture_forensics.get("best_physical_window_run"),
         "variable_timebase_or_route_capture_instability_runs": physical_capture_forensics.get(
             "variable_timebase_or_route_capture_instability_runs"
         ),

@@ -5505,3 +5505,39 @@ Next implication:
   output, mixer/REC OUT, iRig capture, or timing attribution.
 - C++ HAL optimization must not claim superiority until this route is
   controlled and a same-session mainline/C++ comparison passes.
+
+## 2026-06-17: Expand C++ Physical Capture Forensics To Direct USB And Physical Windows
+
+Decision:
+- Extend `opena8djcpp_physical_capture_forensics` beyond HAL soundcheck runs so
+  it also classifies archived direct USB soundchecks and physical-superiority
+  window captures.
+- Surface the best direct USB and best physical-window forensic rows in
+  `scripts/run-cpp-offline-gates`.
+
+Reason:
+- The current quality debate depends on whether the external iRig capture path
+  is valid enough to judge the C++ HAL.
+- Direct USB runs bypass HAL and prove the generated USB payload can be clean
+  internally, but the captured analog path still fails.
+- This needs to be visible in the reproducible offline gate summary rather than
+  remaining a manual interpretation of scattered evidence files.
+
+Evidence:
+- Expanded C++ forensics over archived WAVs currently sees `81` candidate runs,
+  including `16` direct USB runs and `3` physical-window runs.
+- It analyzes `21` representative runs and finds `0` strict quality candidates.
+- Best direct USB archived run is
+  `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`
+  with `quality_alignment_score=0.959037`, `snr_floor_db=9.697139`, and
+  classification `variable_timebase_or_route_capture_instability`.
+- Best physical-window run is the mainline diagnostic
+  `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/mainline-soundcheck`
+  with `quality_alignment_score=0.125194` and `snr_floor_db=-12.774687`.
+
+Next implication:
+- Do not install analysis tooling by default. The active blocker is not
+  analysis precision but physical route validity.
+- The next physical step must be lock-gated known-good non-Audio8 route
+  validation into the same iRig chain, then same-session mainline/C++
+  comparison.

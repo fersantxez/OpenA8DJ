@@ -8574,3 +8574,38 @@ Full offline gate rerun:
   - This still does not validate C++ HAL audio quality, but it narrows the
     next work away from packet packing and toward physical route/analog timing
     plus HAL runtime scheduling.
+
+## 2026-06-17 Expanded Physical Capture Forensics
+
+- Command:
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_capture_forensics`
+  - `./build/cpp-offline/opena8djcpp_physical_capture_forensics | tee local-analysis/cpp-offline/physical-capture-forensics.json`
+- Safety:
+  - Offline-only analysis of existing WAV/evidence files.
+  - No audio device open, USB action, CoreAudio mutation, driver install/load,
+    default-device change, or hardware action.
+- Result:
+  - `PASS` for analyzer health only.
+  - `candidate_runs_with_wav=81`.
+  - `direct_usb_runs_with_wav=16`.
+  - `physical_window_runs_with_wav=3`.
+  - `analyzed_runs=21`.
+  - `strict_quality_candidates=0`.
+  - `variable_timebase_or_route_capture_instability_runs=20`.
+- Best direct USB analyzed run:
+  - Path:
+    `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`.
+  - `quality_alignment_score=0.959037`.
+  - `snr_floor_db=9.697139`.
+  - `classification=variable_timebase_or_route_capture_instability`.
+- Best physical-window analyzed run:
+  - Path:
+    `local-analysis/physical-superiority-window/20260617T194403Z-diagnostic-ab-skip-known-good/mainline-soundcheck`.
+  - `quality_alignment_score=0.125194`.
+  - `snr_floor_db=-12.774687`.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-capture-forensics.json`.
+- Interpretation:
+  - The expanded C++ analyzer confirms that archived direct USB and physical
+    windows still do not contain a strict-quality external capture candidate.
+  - Product readiness and branch promotion remain blocked.
