@@ -7458,3 +7458,51 @@ Operational note:
   - full Traktor DVS signal quality matrix;
   - physical audio and Traktor validation;
   - runtime CPU/resource comparison against mainline.
+
+## 2026-06-17 Promotion Evaluator Paired Product Evidence
+
+- Purpose:
+  - Prevent the promotion evaluator from mixing a physical music capture from
+    one run with a CPU profile from another run when default evidence paths are
+    used.
+  - Preserve direct-USB captures as diagnostics, not as the default physical
+    product music gate when no same-run CPU profile exists.
+- Change:
+  - `scripts/evaluate-promotion-readiness.py` now selects the latest
+    `local-analysis/soundcheck/*` run that contains both `metrics.json` and
+    `cpu-profile.tsv`.
+  - `scripts/run-cpp-offline-gates` now compiles and runs the promotion
+    evaluator, writes
+    `local-analysis/cpp-offline/promotion-readiness-offline-check.json`, and
+    records the result in `current-offline-gates.json`.
+  - `tools/evidence_schema_check.cpp` now requires the promotion-evaluator
+    evidence file.
+- Commands:
+  - `python3 -m py_compile scripts/evaluate-promotion-readiness.py`
+  - `python3 scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Promotion evaluator: `FAIL`, `branch_promotion_allowed=false`.
+  - Default selected product run:
+    `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+  - Failing promotion gates:
+    `physical_latency_alignment`, `physical_music_quality`,
+    `runtime_cpu_beats_mainline`, `latest_physical_investigation`, and
+    `traktor_timecode_physical`.
+  - Offline gates: PASS.
+  - Debug CTest: `27/27` passed.
+  - Release CTest: `28/28` passed.
+  - Evidence schema: PASS, `required_files=28`, missing `0`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/promotion-readiness-offline-check.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Interpretation:
+  - This is a metrics-integrity improvement only. It does not improve physical
+    audio quality or CPU.
+  - C++ remains not ready for hardware-readiness claims, branch promotion, or
+    replacement of the C mainline.

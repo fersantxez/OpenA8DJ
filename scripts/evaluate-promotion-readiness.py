@@ -32,21 +32,32 @@ def latest_file_any(patterns, fallback):
     return max(matches, key=lambda path: (path.stat().st_mtime, str(path)))
 
 
+def latest_complete_soundcheck_run(fallback):
+    """Return the latest product run with music and CPU from one run directory."""
+    matches = []
+    for metrics_path in ROOT.glob("local-analysis/soundcheck/*/metrics.json"):
+        run_dir = metrics_path.parent
+        cpu_path = run_dir / "cpu-profile.tsv"
+        if not cpu_path.is_file():
+            continue
+        newest_ns = max(metrics_path.stat().st_mtime_ns,
+                        cpu_path.stat().st_mtime_ns)
+        matches.append((newest_ns, str(run_dir), run_dir))
+    if not matches:
+        return fallback
+    return max(matches)[2]
+
+
+DEFAULT_PRODUCT_RUN = latest_complete_soundcheck_run(
+    ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal")
+
+
 DEFAULTS = {
     "offline": ROOT / "local-analysis/cpp-offline/current-offline-gates.json",
     "simulated": ROOT / "local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json",
     "tone": ROOT / "local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-4/tone-analysis.txt",
-    "music": latest_file_any(
-        [
-            "local-analysis/soundcheck/*/metrics.json",
-            "local-analysis/direct-usb-soundcheck/*/metrics.json",
-        ],
-        ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/metrics.json",
-    ),
-    "cpu": latest_file(
-        "local-analysis/soundcheck/*/cpu-profile.tsv",
-        ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/cpu-profile.tsv",
-    ),
+    "music": DEFAULT_PRODUCT_RUN / "metrics.json",
+    "cpu": DEFAULT_PRODUCT_RUN / "cpu-profile.tsv",
     "physical_investigation": ROOT / "local-analysis/usb-physical-investigation-summary.json",
     "physical_latency": latest_file(
         "local-analysis/**/physical-latency.json",
@@ -206,6 +217,8 @@ def evaluate(args):
             "branch_promotion_allowed": False,
             "baseline": BASELINE,
             "evidence_selection": {
+                "product_run": str(paths["music"].parent)
+                if paths["music"].parent == paths["cpu"].parent else None,
                 "music": evidence_metadata(paths["music"]),
                 "cpu": evidence_metadata(paths["cpu"]),
             },
@@ -499,6 +512,8 @@ def evaluate(args):
         "baseline": BASELINE,
         "evidence": {key: str(path) for key, path in paths.items()},
         "evidence_selection": {
+            "product_run": str(paths["music"].parent)
+            if paths["music"].parent == paths["cpu"].parent else None,
             "music": evidence_metadata(paths["music"]),
             "cpu": evidence_metadata(paths["cpu"]),
         },

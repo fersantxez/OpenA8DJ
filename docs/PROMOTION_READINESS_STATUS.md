@@ -217,6 +217,31 @@ Latest promotion evaluation:
 Decision: do not move C mainline to Legacy, do not move C++ to `main`, and do
 not claim better sound quality, functionality, or performance than mainline.
 
+## 2026-06-17 Promotion Evaluator Paired-Evidence Status
+
+Latest offline evidence:
+`local-analysis/cpp-offline/promotion-readiness-offline-check.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- The promotion evaluator now defaults to a complete product run only:
+  `metrics.json` and `cpu-profile.tsv` must come from the same
+  `local-analysis/soundcheck/*` directory unless paths are explicitly
+  overridden.
+- Direct-USB captures remain diagnostic evidence, but are no longer selected
+  as the default product music gate when they do not have same-run CPU data.
+- The current default product run is
+  `local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+- Current failing gates are:
+  `physical_latency_alignment`, `physical_music_quality`,
+  `runtime_cpu_beats_mainline`, `latest_physical_investigation`, and
+  `traktor_timecode_physical`.
+- Offline gates remain PASS, and the evidence schema now requires the
+  promotion-evaluator evidence file.
+
+Decision: this is metrics-integrity hardening only. It does not improve sound
+quality, CPU, routing, or timecode behavior, and it does not permit promotion.
+
 ## 2026-06-17 Cadence Diagnostic Status
 
 Latest promotion evaluation:

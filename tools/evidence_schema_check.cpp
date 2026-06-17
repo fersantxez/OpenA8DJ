@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
+      root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",

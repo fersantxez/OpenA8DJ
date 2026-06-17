@@ -4624,3 +4624,37 @@ Next implication:
 - The next physical window should use this analyzer on same-session C++ and
   mainline captures, but readiness still requires the full quality/CPU/jitter
   comparison, not just leakage PASS.
+
+## 2026-06-17: Require Paired Product Evidence In Promotion Evaluator
+
+Decision:
+- Change the default promotion evaluator selection so physical music metrics
+  and CPU/resource metrics come from the same `local-analysis/soundcheck/*`
+  run directory.
+- Add the evaluator result to the offline evidence bundle without treating
+  `NOT_READY` as an offline build failure.
+
+Reason:
+- Branch promotion is a joint product claim. A direct-USB capture can be useful
+  for diagnostics, routing, or USB integrity, but it is not a complete product
+  run if there is no same-run CPU profile.
+- Mixing the newest music file with the newest CPU file can create false
+  conclusions. The correct default is an internally paired physical product
+  run, with explicit CLI overrides still available for controlled comparisons.
+
+Alternatives discarded:
+- Keep selecting newest music and newest CPU independently: rejected because it
+  can mix transport families or test modes.
+- Fail the offline gate because the promotion evaluator returns `FAIL`:
+  rejected because `FAIL` is currently the correct product verdict. The offline
+  gate should prove the evaluator ran and blocked promotion, not pretend the
+  candidate is ready.
+
+Evidence:
+- `local-analysis/cpp-offline/promotion-readiness-offline-check.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- Future physical windows must produce same-run `metrics.json` and
+  `cpu-profile.tsv` evidence. Promotion remains forbidden until this evaluator
+  returns `PASS` and `branch_promotion_allowed=true`.

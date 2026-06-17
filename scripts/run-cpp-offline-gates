@@ -53,8 +53,18 @@ python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats
 python3 -m py_compile \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
+  scripts/evaluate-promotion-readiness.py \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py
+set +e
+python3 scripts/evaluate-promotion-readiness.py \
+  --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
+  > "$EVIDENCE_DIR/promotion-readiness-offline-check.stdout"
+PROMOTION_EVALUATOR_RC=$?
+set -e
+if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; then
+  exit "$PROMOTION_EVALUATOR_RC"
+fi
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -113,6 +123,7 @@ static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
 bench = load_json("offline-bench-release.json")
+promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 
 summary = {
     "date": subprocess.check_output(["date", "+%F"], text=True).strip(),
@@ -477,6 +488,18 @@ summary = {
         "panic_flags": bench.get("panic_flags"),
         "decode_into_check_errors": bench.get("decode_into_check_errors"),
         "decode_into_panic_flags": bench.get("decode_into_panic_flags"),
+    },
+    "promotion_readiness_evaluator": {
+        "status": "PASS" if promotion_evaluator.get("result") in ("PASS", "FAIL") else "FAIL",
+        "promotion_result": promotion_evaluator.get("result"),
+        "branch_promotion_allowed": promotion_evaluator.get("branch_promotion_allowed"),
+        "product_run": promotion_evaluator.get("evidence_selection", {}).get("product_run"),
+        "failing_gates": [
+            gate.get("name")
+            for gate in promotion_evaluator.get("gates", [])
+            if gate.get("result") != "PASS"
+        ],
+        "evidence": "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
     },
     "not_ready": [
         "mainline_runtime_byte_parity_requires physical capture/export evidence",
