@@ -2431,6 +2431,12 @@ Current implication:
     offline evidence after this hardening: Debug CTest `52/52`, Release CTest
     `53/53`, evidence schema `required_files=52`, `missing_files=0`. Promotion
     remains blocked.
+  - The offline evidence schema check now also uses structured reads for the
+    summary and manifest fields that control no-touch safety, promotion
+    blockers, prepared transport counters, DriverKit USB request counters, and
+    physical-window readiness. Current full offline evidence remains Debug
+    CTest `52/52`, Release CTest `53/53`, evidence schema `required_files=52`,
+    `missing_files=0`.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

@@ -2160,6 +2160,12 @@ Prepared transport migration metric:
   `latest_run.capture_failed`, historical-route freshness blockers, HAL
   `driver_installed_or_activated_now`, migration `product_ready` /
   `branch_promotion_supported`, and hardware-lock `sensitive_paths`.
+- The offline evidence schema check must structurally validate summary and
+  manifest safety fields before PASS: `status=PASS`,
+  `diagnostic_status=PASS`, no-touch hardware/CoreAudio/USB flags false,
+  promotion hard blockers present, prepared transport and DriverKit USB request
+  counters present, physical-window readiness still limited to route
+  revalidation, and manifest `scope=offline_only`.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.

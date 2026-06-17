@@ -9884,3 +9884,41 @@ Full offline gate rerun:
   - `ready_for_route_revalidation_window=true` remains diagnostic only.
   - `ready_for_product_physical_ab=false` and
     `ready_for_branch_promotion=false` remain hard blocked.
+
+## 2026-06-17 Structured Offline Summary Schema Check
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Refactored `opena8djcpp_evidence_schema_check` to validate the critical
+    `current-offline-gates.json` and `CANDIDATE_MANIFEST.json` fields through
+    structured JSON reads instead of broad text matches.
+  - Protected fields now include offline status, diagnostic status, promotion
+    blockers, branch-promotion false, hardware/CoreAudio/USB untouched flags,
+    prepared transport counters, DriverKit USB request counters, physical
+    window readiness booleans, allowed window types, and manifest scope.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_evidence_schema_check`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused schema check: PASS.
+  - Debug CTest: `52/52` passed.
+  - Release CTest: `53/53` passed.
+  - Evidence schema: `required_files=52`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+- Interpretation:
+  - Offline summary PASS is now less vulnerable to stale or misleading text in
+    nested JSON.
+  - This is still diagnostic evidence only. Product A/B, branch promotion,
+    audiophile quality superiority, runtime CPU superiority, and physical
+    Traktor/timecode vinyl remain blocked.

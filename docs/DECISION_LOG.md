@@ -6491,3 +6491,32 @@ Next implication:
 - Future readiness gates should prefer structured reads for critical fields.
   Text matching is acceptable only for narrow diagnostics that cannot authorize
   hardware windows, product readiness, or branch promotion.
+
+## 2026-06-17: Structured Reads for Offline Summary Schema
+
+Decision:
+- Refactored `opena8djcpp_evidence_schema_check` to use the shared evidence
+  JSON reader for critical fields in `current-offline-gates.json` and
+  `docs/CANDIDATE_MANIFEST.json`.
+
+Reason:
+- The summary schema check is the final offline evidence integrity gate. It
+  should prove the actual fields that matter for safety and readiness, not just
+  that matching text exists somewhere in the file.
+
+Evidence:
+- Focused `opena8djcpp_evidence_schema_check`: PASS.
+- Full offline gates after the change: Debug CTest `52/52`, Release CTest
+  `53/53`, evidence schema `required_files=52`, `missing_files=0`,
+  `summary_pass=true`, `manifest_pass=true`.
+
+Alternatives discarded:
+- Leave summary validation as broad string search: rejected because the summary
+  carries hard blockers and no-touch safety flags.
+- Make schema validation exhaustive: deferred because the targeted critical
+  fields cover the readiness risk without turning this small C++ tool into a
+  full schema engine.
+
+Next implication:
+- Any future field that gates hardware windows, product readiness, branch
+  promotion, or no-touch safety should be added to structured schema checks.

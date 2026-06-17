@@ -1,19 +1,41 @@
+#include "evidence_json.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
 
-bool file_contains(const std::filesystem::path& path, const std::string& needle) {
+std::string read_file(const std::filesystem::path& path) {
   std::ifstream input(path);
   if (!input) {
-    return false;
+    return {};
   }
-  const std::string data((std::istreambuf_iterator<char>(input)),
-                         std::istreambuf_iterator<char>());
-  return data.find(needle) != std::string::npos;
+  return std::string((std::istreambuf_iterator<char>(input)),
+                     std::istreambuf_iterator<char>());
+}
+
+bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
+}
+
+bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
+  return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
+}
+
+bool number_field_is(std::string_view json, std::string_view key, double expected) {
+  return opena8djcpp::evidence_json::json_number(json, key).value_or(expected + 1.0) == expected;
+}
+
+bool object_present(std::string_view json, std::string_view key) {
+  return opena8djcpp::evidence_json::json_object(json, key).has_value();
+}
+
+bool string_array_has(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
 }
 
 }  // namespace
@@ -91,84 +113,55 @@ int main(int argc, char** argv) {
     }
   }
 
-  const bool summary_pass = file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"status\": \"PASS\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"diagnostic_status\": \"PASS\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"branch_promotion_allowed\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"physical_measurement_valid_for_promotion\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"promotion_hard_blockers\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "same_session_mainline_cpp_physical_ab_missing") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "traktor_timecode_vinyl_physical_gate_missing") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "runtime_cpu_superiority_over_mainline_missing") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "post_reboot_autologin_codex_resume_unfixed") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"runtime_adapter_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"stable_usb_submit_reduction_ratio\": 8") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_submit_plan_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"stable_logical_slots\": 528") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"stable_total_frames\": 5808") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_submit_plan_stable_usb_submit_calls\": 66") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_submit_payload_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_submit_payload_descriptors\": 66") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_submit_payload_total_frames\": 5808") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_submit_binding_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_submit_binding_usb_submit_calls\": 66") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_submit_binding_total_frames\": 5808") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_lifecycle_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_lifecycle_submit_calls\": 66") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_lifecycle_completed_frames\": 5808") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_shutdown_contract\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_shutdown_cancelled_requests\": 3") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"driverkit_usb_request_shutdown_live_requests_after_stop\": 0") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"physical_window_readiness_gate\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"ready_for_route_revalidation_window\": true") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"ready_for_product_physical_ab\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"ready_for_branch_promotion\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"ROUTE_REVALIDATION_ONLY\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"NO_PROMOTION_AB_UNTIL_ROUTE_PASS\"") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"hardware_touched\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"coreaudio_touched\": false") &&
-                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
-                                          "\"usb_touched\": false");
+  const auto summary = read_file(root / "local-analysis/cpp-offline/current-offline-gates.json");
+  const bool summary_pass =
+      string_field_is(summary, "status", "PASS") &&
+      string_field_is(summary, "diagnostic_status", "PASS") &&
+      bool_field_is(summary, "branch_promotion_allowed", false) &&
+      bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "same_session_mainline_cpp_physical_ab_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "traktor_timecode_vinyl_physical_gate_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "runtime_cpu_superiority_over_mainline_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "post_reboot_autologin_codex_resume_unfixed") &&
+      object_present(summary, "runtime_adapter_contract") &&
+      number_field_is(summary, "stable_usb_submit_reduction_ratio", 8.0) &&
+      object_present(summary, "usb_submit_plan_contract") &&
+      number_field_is(summary, "stable_logical_slots", 528.0) &&
+      number_field_is(summary, "stable_total_frames", 5808.0) &&
+      number_field_is(summary, "usb_submit_plan_stable_usb_submit_calls", 66.0) &&
+      object_present(summary, "usb_submit_payload_contract") &&
+      number_field_is(summary, "usb_submit_payload_descriptors", 66.0) &&
+      number_field_is(summary, "usb_submit_payload_total_frames", 5808.0) &&
+      object_present(summary, "driverkit_usb_submit_binding_contract") &&
+      number_field_is(summary, "driverkit_usb_submit_binding_usb_submit_calls", 66.0) &&
+      number_field_is(summary, "driverkit_usb_submit_binding_total_frames", 5808.0) &&
+      object_present(summary, "driverkit_usb_request_lifecycle_contract") &&
+      number_field_is(summary, "driverkit_usb_request_lifecycle_submit_calls", 66.0) &&
+      number_field_is(summary, "driverkit_usb_request_lifecycle_completed_frames", 5808.0) &&
+      object_present(summary, "driverkit_usb_request_shutdown_contract") &&
+      number_field_is(summary, "driverkit_usb_request_shutdown_cancelled_requests", 3.0) &&
+      number_field_is(summary, "driverkit_usb_request_shutdown_live_requests_after_stop", 0.0) &&
+      object_present(summary, "physical_window_readiness_gate") &&
+      bool_field_is(summary, "ready_for_route_revalidation_window", true) &&
+      bool_field_is(summary, "ready_for_product_physical_ab", false) &&
+      bool_field_is(summary, "ready_for_branch_promotion", false) &&
+      string_array_has(summary, "allowed_window_types", "ROUTE_REVALIDATION_ONLY") &&
+      string_array_has(summary, "allowed_window_types", "NO_PROMOTION_AB_UNTIL_ROUTE_PASS") &&
+      string_field_is(
+          summary, "blocked_claim",
+          "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
+      bool_field_is(summary, "hardware_touched", false) &&
+      bool_field_is(summary, "coreaudio_touched", false) &&
+      bool_field_is(summary, "usb_touched", false);
 
+  const auto manifest = read_file(root / "docs/CANDIDATE_MANIFEST.json");
   const bool manifest_pass =
-      file_contains(root / "docs/CANDIDATE_MANIFEST.json", "\"worktree\": \"/Users/fer/dev/audio8djcpp\"") &&
-      file_contains(root / "docs/CANDIDATE_MANIFEST.json", "\"scope\": \"offline_only\"");
+      string_field_is(manifest, "worktree", "/Users/fer/dev/audio8djcpp") &&
+      string_field_is(manifest, "scope", "offline_only");
 
   const bool pass = missing == 0 && summary_pass && manifest_pass;
   std::cout << "{\n"
