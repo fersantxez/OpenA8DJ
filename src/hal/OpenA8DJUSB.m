@@ -565,11 +565,21 @@ static double MachTicksPerSecond(void)
     return 1000000000.0 * (double)timebase.denom / (double)timebase.numer;
 }
 
-static uint64_t ExpectedIsoTransferTicks(void)
+static uint64_t ExpectedIsoTransferTicksForFrames(uint32_t isoFrames)
 {
     double ticksPerSecond = MachTicksPerSecond();
-    double ticks = (ticksPerSecond * (double)kIsoFramesPerTransfer) / 8000.0;
+    double ticks = (ticksPerSecond * (double)isoFrames) / 8000.0;
     return ticks > 0.0 ? (uint64_t)llround(ticks) : 0;
+}
+
+static uint64_t ExpectedCaptureIsoTransferTicks(void)
+{
+    return ExpectedIsoTransferTicksForFrames(kIsoFramesPerTransfer);
+}
+
+static uint64_t __attribute__((unused)) ExpectedPlaybackIsoTransferTicks(void)
+{
+    return ExpectedIsoTransferTicksForFrames(kPlaybackIsoFramesPerTransfer);
 }
 
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
@@ -727,9 +737,8 @@ static void AtomicStreamStatsApplySnapshot(OpenA8DJStreamStatsPayload *payload,
 #endif
 
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
-static uint64_t CadenceOutlierThresholdTicks(void)
+static uint64_t CadenceOutlierThresholdTicks(uint64_t expected)
 {
-    uint64_t expected = ExpectedIsoTransferTicks();
     return expected > 0 ? expected * 2 : 0;
 }
 
@@ -845,9 +854,10 @@ static OpenA8DJCadenceRangeSnapshot CadenceSnapshotRange(OpenA8DJCadenceRange *r
 static void CadenceRecordOutlier(atomic_uint_fast64_t *count,
                                  atomic_uint_fast64_t *maxValue,
                                  atomic_uint_fast64_t *sumValue,
-                                 uint64_t delta)
+                                 uint64_t delta,
+                                 uint64_t expected)
 {
-    uint64_t threshold = CadenceOutlierThresholdTicks();
+    uint64_t threshold = CadenceOutlierThresholdTicks(expected);
     if (threshold == 0 || delta <= threshold) {
         return;
     }
@@ -2765,7 +2775,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats.playbackTransfersInFlight = atomic_load(&_playbackTransfersInFlight);
     stats.sampleRate = _sampleRate;
     stats.playbackExplicitScheduling = atomic_load(&_playbackUseExplicitScheduling) ? 1 : 0;
-    stats.cadenceExpectedTransferTicks = ExpectedIsoTransferTicks();
+    stats.cadenceExpectedTransferTicks = ExpectedCaptureIsoTransferTicks();
 
     pthread_mutex_lock(&_clockAnchorMutex);
     stats.clockAnchorValid = _clockAnchor.valid ? 1 : 0;
@@ -3993,7 +4003,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         CadenceRecordOutlier(&_cadenceDiagnostics.captureCompletionDeltaOutliers,
                              &_cadenceDiagnostics.captureCompletionDeltaOutlierMax,
                              &_cadenceDiagnostics.captureCompletionDeltaOutlierSum,
-                             captureCompletionDelta);
+                             captureCompletionDelta,
+                             ExpectedCaptureIsoTransferTicks());
 #endif
     }
     _lastCaptureCompletionHostTime = captureCompletionTime;
@@ -4162,7 +4173,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             CadenceRecordOutlier(&_cadenceDiagnostics.captureToPlaybackQueueDeltaOutliers,
                                  &_cadenceDiagnostics.captureToPlaybackQueueDeltaOutlierMax,
                                  &_cadenceDiagnostics.captureToPlaybackQueueDeltaOutlierSum,
-                                 captureToPlaybackQueueDelta);
+                                 captureToPlaybackQueueDelta,
+                                 ExpectedCaptureIsoTransferTicks());
 #endif
         }
     }
@@ -4585,7 +4597,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         CadenceRecordOutlier(&_cadenceDiagnostics.playbackCompletionDeltaOutliers,
                              &_cadenceDiagnostics.playbackCompletionDeltaOutlierMax,
                              &_cadenceDiagnostics.playbackCompletionDeltaOutlierSum,
-                             playbackCompletionDelta);
+                             playbackCompletionDelta,
+                             ExpectedPlaybackIsoTransferTicks());
 #endif
     }
     _lastPlaybackCompletionHostTime = playbackCompletionTime;

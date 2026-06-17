@@ -555,3 +555,7 @@ Next technical target:
   `quality_alignment_score=0.898854`, SNR `5.85 dB`, mid/high residual
   `2.563432/1.666568`, and lag jumps `45`. Coalescing is therefore not a
   direct path to readiness without a deeper cadence/timeline redesign.
+- Cadence diagnostics had a threshold bug for coalesced playback: the expected
+  transfer ticks were based on capture/default transfer size even when playback
+  coalesced multiple transfers. This is now fixed internally for outlier
+  accounting. It is observability only and does not change audio behavior.

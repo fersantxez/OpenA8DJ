@@ -1643,3 +1643,29 @@ Evidence:
   `local-analysis/runtime-isolation/final-after-coalesce2-only.json`.
 - Promotion readiness:
   `local-analysis/promotion-readiness-after-coalesce2-only.json`.
+
+## 2026-06-17: Fix Cadence Outlier Threshold For Coalesced Playback
+
+Decision:
+- Split cadence outlier expectations between capture and playback transfer
+  durations.
+- Keep the public `cadenceExpectedTransferTicks` field as the base capture
+  transfer period for compatibility.
+
+Reason:
+- `ExpectedIsoTransferTicks()` used `kIsoFramesPerTransfer` for every cadence
+  outlier. That is correct for capture and default playback, but wrong when
+  `HAL_PLAYBACK_COALESCE_TRANSFERS > 1` because playback transfers then span
+  more USB microframes.
+- The coalesce2-only run showed playback completions at about `580` transfers
+  versus default `1825`, with average playback delta around `47060` ticks
+  instead of the default `15083` ticks. The old diagnostic threshold did not
+  represent playback transfer duration correctly for that experiment.
+- This is observability only. It does not change audio bytes, routing, USB
+  request counts, transfer scheduling, or HAL behavior.
+
+Evidence:
+- Default build:
+  `make -B hal`.
+- Diagnostic coalesce build:
+  `make -B hal HAL_CADENCE_DIAGNOSTIC=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2`.

@@ -2958,3 +2958,20 @@ Operational note:
   - Coalesce2 confirms transaction frequency contributes to CPU, but the
     quality regression is severe and CPU still misses mainline by a wide
     margin. It is rejected as a candidate/default.
+
+## 2026-06-17: Cadence Outlier Threshold Fix
+
+- Change:
+  - Split internal cadence outlier threshold calculation into capture and
+    playback expected transfer durations.
+  - `cadenceExpectedTransferTicks` remains the base capture transfer period in
+    the stream-stats payload.
+- Commands:
+  - `make -B hal`
+  - `make -B hal HAL_CADENCE_DIAGNOSTIC=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2`
+  - `make -B hal`
+- Result:
+  - PASS. Default and diagnostic builds compile cleanly.
+- Interpretation:
+  - This is an observability fix only. It makes future coalescing diagnostics
+    less misleading; it is not a quality or CPU improvement claim.
