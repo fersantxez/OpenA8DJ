@@ -1756,3 +1756,21 @@ Current implication:
 - The next physical work must validate the analog route/capture path and run a
   same-session mainline/C++ comparison before any audiophile-quality claim.
 - Internal packet cleanliness does not prove analog sound quality.
+
+### 2026-06-17 Native Timecode Readiness Gate
+
+- Added `opena8djcpp_timecode_readiness_gate`.
+- It aggregates existing offline timecode/DVS evidence and the promotion
+  evaluator's physical Traktor status.
+- Current result:
+  - offline timecode pass: `true`;
+  - matrix failures: `0`;
+  - timecode signal rows: `8`;
+  - DVS packet rows: `24`;
+  - prepared transport profile/deck rows: `12`;
+  - physical status: `BLOCKED_UNVALIDATED_DVS`;
+  - product timecode ready: `false`.
+
+Current implication:
+- C++ has useful synthetic DVS/timecode coverage, but it still has no physical
+  Traktor/timecode-vinyl lock evidence. Timecode readiness remains blocked.

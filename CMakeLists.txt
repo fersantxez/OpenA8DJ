@@ -120,6 +120,9 @@ target_link_libraries(opena8djcpp_timecode_signal_analysis
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_timecode_readiness_gate
+  tools/timecode_readiness_gate.cpp)
+
 add_executable(opena8djcpp_realtime_audit
   tools/realtime_audit.cpp)
 
@@ -255,6 +258,7 @@ add_test(NAME opena8djcpp_protocol_contract COMMAND opena8djcpp_protocol_contrac
 add_test(NAME opena8djcpp_simulated_output_matrix COMMAND opena8djcpp_simulated_output_matrix)
 add_test(NAME opena8djcpp_timecode_matrix COMMAND opena8djcpp_timecode_matrix)
 add_test(NAME opena8djcpp_timecode_signal_analysis COMMAND opena8djcpp_timecode_signal_analysis)
+add_test(NAME opena8djcpp_timecode_readiness_gate COMMAND opena8djcpp_timecode_readiness_gate)
 add_test(NAME opena8djcpp_realtime_audit COMMAND opena8djcpp_realtime_audit)
 add_test(NAME opena8djcpp_driverkit_surface_model COMMAND opena8djcpp_driverkit_surface_model)
 add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit_shell_contract)

@@ -2746,3 +2746,37 @@ Risk:
 - Next action:
   - Keep promotion blocked until route health and same-session mainline/C++
     physical comparison pass under lock.
+
+## 2026-06-17 Subagent: Euclid Performance Direction Scout
+
+- Agent:
+  - Euclid (`019ed6b0-47d3-7050-a22d-b80939959203`).
+- Mission:
+  - Read stored evidence and identify the safest next performance direction
+    that does not repeat physically rejected HAL flags.
+  - No edits, no hardware, no CoreAudio/USB/system changes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.`
+- Findings:
+  - Do not repeat isolated HAL flag experiments as product candidates:
+    ISO64/coalesce, native output format, no audio-param reset, sample-time
+    follower, ignore sample time, fast ISO config, reused/raw completions,
+    stats-off, and input-decode bypass all have negative physical or CPU
+    evidence.
+  - Packed USB payload cleanliness is not the current product blocker.
+  - Best next performance direction is prepared transport/backend-owned
+    requeue: reduce steady-state IOUSBHost/Objective-C queue/requeue/enqueue
+    cost while preserving bytes, cadence, routing, sample rate, and timecode.
+  - Required offline gates before hardware:
+    prepared transport PASS, static policy PASS, no rejected defaults,
+    `hal_steady_requeues=0`, fallback allocations `0`, completion gap within
+    bounded threshold, timestamp regressions `0`, routing/timecode safe.
+- Files affected by integration:
+  - `docs/AGENT_HANDOFFS.md`.
+- Next action:
+  - Move toward prepared transport implementation evidence, not more HAL
+    micro-flag probes.

@@ -32,6 +32,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_timecode_signal_analysis | tee "$EVIDENCE_DIR/timecode-signal-analysis.json"
 ./build/cpp-release/opena8djcpp_dvs_signal_smoke | tee "$EVIDENCE_DIR/dvs-signal-smoke.json"
 ./build/cpp-release/opena8djcpp_dvs_packet_input_decode | tee "$EVIDENCE_DIR/dvs-packet-input-decode.json"
+./build/cpp-release/opena8djcpp_timecode_readiness_gate | tee "$EVIDENCE_DIR/timecode-readiness-gate.json"
 ./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
@@ -109,6 +110,7 @@ timecode = load_json("timecode-matrix.json")
 timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
 dvs_packet = load_json("dvs-packet-input-decode.json")
+timecode_readiness = load_json("timecode-readiness-gate.json")
 jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
@@ -208,6 +210,14 @@ summary = {
         "rows": timecode_signal.get("row_count"),
         "failures": timecode_signal.get("failures"),
         "evidence": "local-analysis/cpp-offline/timecode-signal-analysis.json",
+    },
+    "timecode_readiness_gate": {
+        "status": timecode_readiness.get("result"),
+        "offline_timecode_pass": timecode_readiness.get("offline_timecode_pass"),
+        "physical_status": timecode_readiness.get("physical_status"),
+        "product_timecode_ready": timecode_readiness.get("product_timecode_ready"),
+        "readiness_claim": timecode_readiness.get("readiness_claim"),
+        "evidence": "local-analysis/cpp-offline/timecode-readiness-gate.json",
     },
     "dvs_signal_smoke": {
         "status": dvs.get("result"),

@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
       root / "tools/offline_bench.cpp",
       root / "tools/packet_matrix.cpp",
       root / "tools/timecode_matrix.cpp",
+      root / "tools/timecode_readiness_gate.cpp",
       root / "tools/dvs_signal_smoke.cpp",
       root / "tools/realtime_audit.cpp",
       root / "tools/transport_budget_model.cpp",

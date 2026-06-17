@@ -7804,3 +7804,29 @@ Operational note:
   - Internal USB payload cleanliness is not sufficient for audiophile quality.
   - The next physical window must validate the capture route and compare
     mainline/C++ in the same session.
+
+## 2026-06-17 Native Timecode Readiness Gate
+
+- Scope:
+  - Offline-only aggregation over stored timecode/DVS evidence.
+  - No hardware, CoreAudio, USB, Traktor, driver install, defaults, service
+    restart, or physical audio touched.
+- Changes:
+  - Added `opena8djcpp_timecode_readiness_gate`.
+  - Wired it into CMake/CTest and `scripts/run-cpp-offline-gates`.
+  - Added `local-analysis/cpp-offline/timecode-readiness-gate.json` to the
+    evidence schema.
+- Focused command:
+  - `./build/cpp-release/opena8djcpp_timecode_readiness_gate`
+- Focused result:
+  - Diagnostic result: PASS.
+  - Offline timecode pass: `true`.
+  - Matrix failures: `0`.
+  - Timecode signal rows: `8`.
+  - DVS packet rows: `24`.
+  - Prepared transport profile/deck rows: `12`.
+  - Physical status: `BLOCKED_UNVALIDATED_DVS`.
+  - Product timecode ready: `false`.
+- Interpretation:
+  - Offline DVS/timecode coverage is useful and green.
+  - It is not physical Traktor/timecode-vinyl readiness.

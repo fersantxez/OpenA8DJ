@@ -1135,3 +1135,31 @@ PASS/FAIL semantics:
 - Tool `result=PASS` means the diagnostic ran.
 - `product_readiness_allowed=false` blocks readiness and branch promotion.
 - This gate does not replace physical same-session mainline/C++ evidence.
+
+## Offline Timecode Readiness Gate
+
+Purpose:
+
+- aggregate timecode matrix, synthetic signal, DVS packet decode, and prepared
+  transport profile/deck evidence;
+- preserve an explicit distinction between offline PASS and physical Traktor
+  vinyl readiness.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_timecode_readiness_gate
+./build/cpp-offline/opena8djcpp_timecode_readiness_gate
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/timecode-readiness-gate.json`.
+
+PASS/FAIL semantics:
+
+- Tool `result=PASS` means the aggregate diagnostic ran.
+- `offline_timecode_pass=true` means synthetic/offline DVS contracts pass.
+- `product_timecode_ready=false` blocks any Traktor/timecode-vinyl readiness
+  claim until physical lock evidence exists.

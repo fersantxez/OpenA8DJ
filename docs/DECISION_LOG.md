@@ -4888,3 +4888,26 @@ Evidence:
 Next implication:
 - The next hardware window must first prove route health, then compare C++
   against mainline in the same session before any branch-promotion claim.
+
+## 2026-06-17: Add Native Timecode Readiness Gate
+
+Decision:
+- Add `tools/timecode_readiness_gate.cpp`.
+- Wire it into CMake/CTest and offline evidence.
+
+Reason:
+- The project has multiple offline timecode/DVS tests, but physical Traktor
+  lock evidence is still absent.
+- A single aggregate gate makes it harder to overclaim “timecode vinyl ready”
+  from synthetic PASS results.
+
+Alternatives discarded:
+- Treat offline DVS PASS as physical readiness: rejected because Traktor scope
+  and lock behavior must be validated under hardware lock.
+
+Evidence:
+- `local-analysis/cpp-offline/timecode-readiness-gate.json`
+
+Next implication:
+- Physical Traktor/timecode validation remains a required later hardware-window
+  gate after music quality, CPU, route health, and safety preflight are sane.

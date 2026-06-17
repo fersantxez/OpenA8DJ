@@ -755,3 +755,18 @@ The tool reads existing evidence only and reports whether promotion is blocked
 by route health, analog quality, lag/timebase, or fixed transport CPU evidence.
 It does not open audio devices, touch USB, install drivers, or activate system
 extensions.
+
+## C++ Timecode Readiness Gate
+
+The offline build includes `opena8djcpp_timecode_readiness_gate`.
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_timecode_readiness_gate
+./build/cpp-offline/opena8djcpp_timecode_readiness_gate
+```
+
+The tool aggregates stored offline timecode/DVS evidence and reports whether
+physical Traktor/timecode-vinyl validation is still blocked. It does not open
+audio devices, touch USB, launch Traktor, install drivers, or activate system
+extensions.

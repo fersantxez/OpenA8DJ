@@ -2013,3 +2013,12 @@ Native root-cause gate:
 - Promotion requires this gate to report `product_readiness_allowed=true` only
   after same-session physical evidence clears route health, quality, CPU,
   routing, and timecode criteria.
+
+Timecode readiness aggregation:
+- `opena8djcpp_timecode_readiness_gate` must run in offline gates.
+- Current state:
+  - offline timecode pass: `true`;
+  - physical Traktor/timecode-vinyl status: `BLOCKED_UNVALIDATED_DVS`;
+  - product timecode ready: `false`.
+- Product readiness requires physical Traktor scope/lock evidence for the
+  relevant decks and profiles, not just synthetic timecode signal PASS.

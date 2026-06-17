@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/mode2-cross-oracle-parity.json",
       root / "local-analysis/cpp-offline/timecode-matrix.json",
       root / "local-analysis/cpp-offline/timecode-signal-analysis.json",
+      root / "local-analysis/cpp-offline/timecode-readiness-gate.json",
       root / "local-analysis/cpp-offline/dvs-signal-smoke.json",
       root / "local-analysis/cpp-offline/dvs-packet-input-decode.json",
       root / "local-analysis/cpp-offline/realtime-audit.json",
