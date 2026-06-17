@@ -1609,3 +1609,37 @@ Evidence:
   `local-analysis/runtime-isolation/final-after-default-normal-confirm.json`.
 - Promotion readiness:
   `local-analysis/promotion-readiness-after-default-normal-confirm.json`.
+
+## 2026-06-17: Reject Coalesce2-Only Candidate
+
+Decision:
+- Do not promote `HAL_PLAYBACK_COALESCE_TRANSFERS=2` as a default.
+- Keep `HAL_PLAYBACK_COALESCE_TRANSFERS=1`.
+
+Reason:
+- The isolated coalesce2 candidate passed HAL safety and did reduce driver CPU
+  p95 from the normal default confirmation (`36.9%`) to `28.5%`, which supports
+  the hypothesis that transaction frequency is a real CPU cost.
+- The quality regression is unacceptable: quality alignment fell to
+  `0.898854`, SNR to `5.85 dB`, lag jumps remained `45`, and mid/high residual
+  rose to `2.563432/1.666568`.
+- The CPU is still far above mainline (`28.5%` vs `6.5%`) even after the
+  quality regression, so this is not a useful tradeoff.
+
+Alternatives discarded:
+- Keep coalesce2 as a CPU profile: rejected because it damages physical music
+  quality and still misses the CPU gate.
+- Try coalesce4 immediately: rejected. Coalesce2 already shows the direction
+  worsens quality/cadence before reaching target CPU.
+
+Evidence:
+- Build:
+  `make -B hal HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=0`.
+- Safety:
+  `local-analysis/physical-coalesce2-only/20260617-43773be/hal-candidate-safety`.
+- Soundcheck:
+  `local-analysis/soundcheck/20260617-coalesce2-only-43773be-irig-pairA-16s-cpp-hal`.
+- Final isolation:
+  `local-analysis/runtime-isolation/final-after-coalesce2-only.json`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-coalesce2-only.json`.

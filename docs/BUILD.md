@@ -421,6 +421,16 @@ Do not reintroduce sparse output-cycle clear as a CPU profile. That experiment
 passed HAL safety but failed physical music quality and worsened driver CPU p95
 to `38.3%`. It was removed instead of being kept as a disabled build flag.
 
+Do not use playback coalescing as a default CPU profile:
+
+```sh
+make HAL_PLAYBACK_COALESCE_TRANSFERS=2 hal
+```
+
+The isolated coalesce2 run passed HAL safety and reduced driver CPU p95 to
+`28.5%`, but it damaged physical music quality (`quality_alignment_score`
+`0.898854`, SNR `5.85 dB`). It remains an explicit experiment only.
+
 ## Analysis Environment
 
 Precise offline audio analysis can use the local Python environment under the

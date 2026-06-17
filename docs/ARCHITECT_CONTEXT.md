@@ -549,3 +549,9 @@ Next technical target:
   to the known failing aligned signature (`quality_alignment_score=0.963713`,
   SNR `10.57 dB`, lag jumps `46`, driver p95 `36.9%`). Monitor-free evidence
   is not product evidence yet.
+- `HAL_PLAYBACK_COALESCE_TRANSFERS=2` without pool cursor passed HAL safety and
+  reduced driver CPU p95 to `28.5%`, confirming transaction frequency matters.
+  It is still rejected because physical music quality regressed sharply:
+  `quality_alignment_score=0.898854`, SNR `5.85 dB`, mid/high residual
+  `2.563432/1.666568`, and lag jumps `45`. Coalescing is therefore not a
+  direct path to readiness without a deeper cadence/timeline redesign.

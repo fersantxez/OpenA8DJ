@@ -2916,3 +2916,45 @@ Operational note:
     invalid/decorrelated capture. Normal stream-stat soundcheck remains the
     readiness evidence path until the harness has a better low-perturbation
     monitor design.
+
+## 2026-06-17: Coalesce2-Only Physical Rejection
+
+- Candidate:
+  - `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=0`
+- Commands:
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-coalesce2-only.json`
+  - `make -B hal HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=0`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-coalesce2-only/20260617-43773be/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-coalesce2-only-43773be-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal HAL unload under global lock, then
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-coalesce2-only.json`
+  - `make -B hal`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-coalesce2-only.json`
+- Result:
+  - Initial runtime isolation PASS.
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL.
+  - Final isolation PASS.
+  - Promotion readiness FAIL.
+- Quality metrics:
+  - `quality_alignment_score=0.8988544786595754`
+  - `analog_snr_db=5.85`
+  - `lag_jumps_gt_2_frames=45`
+  - `click_outliers=0`
+  - `mid_band_residual_ratio=2.5634316824600596`
+  - `high_band_residual_ratio=1.6665681529777348`
+  - `quiet_mid_band_noise_dbfs=-33.677652564671256`
+  - `capture_clipped_frames=0`
+- CPU metrics:
+  - OpenA8DJ driver median/p95/max `28.0%/28.5%/28.7%`
+  - coreaudiod median/p95/max `2.7%/8.3%/60.4%`
+  - total watched audio/UI median/p95/max `45.05%/47.2%/125.6%`
+- Evidence paths:
+  - `local-analysis/physical-coalesce2-only/20260617-43773be/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-coalesce2-only-43773be-irig-pairA-16s-cpp-hal`
+  - `local-analysis/runtime-isolation/final-after-coalesce2-only.json`
+  - `local-analysis/promotion-readiness-after-coalesce2-only.json`
+- Interpretation:
+  - Coalesce2 confirms transaction frequency contributes to CPU, but the
+    quality regression is severe and CPU still misses mainline by a wide
+    margin. It is rejected as a candidate/default.
