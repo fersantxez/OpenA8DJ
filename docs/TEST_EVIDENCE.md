@@ -2308,3 +2308,23 @@ Operational note:
   - Offline layout parity did not translate to physical improvement.
   - The root blocker remains analog residual/lag and high driver CPU; this
     candidate must not be promoted or left as default.
+
+## 2026-06-17: Promotion Readiness After Unrolled-Pack Rejection
+
+- Command:
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-unrolled-rejection.json`
+- Commit under test: `0144ffc`
+- Result: FAIL; branch promotion is not allowed.
+- Blocking gates:
+  - `physical_music_quality`: latest selected run is
+    `20260616-unrolled-pack-irig-pairA-16s-cpp-hal`, with
+    `quality_alignment_score=0.13104262411477222`, SNR `-18.433998179397555`,
+    `lag_jumps_gt_2_frames=47`, mid residual `8.393129418488618`, high residual
+    `7.405798355303025`.
+  - `runtime_cpu_beats_mainline`: driver p95 `35.6%`, coreaudiod p95 `3.3%`,
+    versus mainline limits `6.5%` and `1.7%`.
+  - `latest_physical_investigation`: `FAIL_NOT_READY`.
+  - `traktor_timecode_physical`: no physical Traktor/timecode-vinyl lock
+    evidence.
+- Evidence path:
+  - `local-analysis/promotion-readiness-after-unrolled-rejection.json`

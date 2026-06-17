@@ -414,3 +414,7 @@ Next technical target:
   failed with `quality_alignment_score=0.131043`, SNR `-18.43 dB`, and
   `lag_jumps_gt_2_frames=47`; driver CPU p95 stayed around `35.6%`.
   Post-failure unload and isolation passed.
+- Promotion evaluator after unrolled-pack rejection remains FAIL:
+  `local-analysis/promotion-readiness-after-unrolled-rejection.json`.
+  The latest selected physical music and CPU evidence are both failing, so
+  branch promotion and hardware readiness claims remain blocked.
