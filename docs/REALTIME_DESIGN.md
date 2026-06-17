@@ -564,3 +564,27 @@ Offline gate:
 This still does not submit real USB requests. It proves the runtime shell must
 preserve the low-CPU submit plan before a DriverKit/USBDriverKit adapter is
 allowed to become a hardware candidate.
+
+## DriverKit USB Request Lifecycle Boundary
+
+The USB request lifecycle model is stricter than the descriptor model:
+
+- request slots are preallocated before stream flow;
+- submit returns a generation-checked handle;
+- completion must match a live handle;
+- completion recycles the slot and advances its generation;
+- stale handles, invalid handles, pool pressure, and fallback allocation are
+  product failures.
+
+Offline gate:
+
+- `opena8djcpp_driverkit_usb_request_lifecycle_contract`.
+- Required stable result has `66` submit calls, `66` completion calls, `66`
+  recycle calls, max `4` live requests, `185856` completed bytes, `5808`
+  completed frames, zero fallback allocations, zero invalid completions, zero
+  stale completions, and zero live requests after drain.
+- Negative rows must reject pool pressure and stale completion handles.
+
+The future real USB adapter must preserve this lifecycle with real DriverKit or
+USBDriverKit async request objects. The audio path must not allocate replacement
+requests or repair lifecycle errors while audio is flowing.

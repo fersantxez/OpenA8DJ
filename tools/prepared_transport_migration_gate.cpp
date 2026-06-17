@@ -239,6 +239,8 @@ int main(int argc, char** argv) {
   const auto driverkit_hotpath = read_file(base / "driverkit-prepared-hotpath-contract.json");
   const auto driverkit_usb_submit_binding =
       read_file(base / "driverkit-usb-submit-binding-contract.json");
+  const auto driverkit_usb_request_lifecycle =
+      read_file(base / "driverkit-usb-request-lifecycle-contract.json");
   const auto packet = read_file(base / "prepared-transport-packet-contract.json");
   const auto routing_timecode =
       read_file(base / "prepared-transport-routing-timecode-contract.json");
@@ -301,6 +303,18 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(driverkit_usb_submit_binding, "total_bytes"));
   const double driverkit_usb_binding_total_frames =
       number_or_nan(json_number(driverkit_usb_submit_binding, "total_frames"));
+  const double driverkit_usb_request_submit_calls =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_submit_calls"));
+  const double driverkit_usb_request_completion_calls =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_completion_calls"));
+  const double driverkit_usb_request_recycle_calls =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_recycle_calls"));
+  const double driverkit_usb_request_max_live =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_max_live_requests"));
+  const double driverkit_usb_request_completed_bytes =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_completed_bytes"));
+  const double driverkit_usb_request_completed_frames =
+      number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_completed_frames"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(driverkit_hotpath) && result_pass(packet) &&
@@ -415,6 +429,20 @@ int main(int argc, char** argv) {
       number_is_zero(driverkit_usb_submit_binding, "descriptor_frame_mismatches") &&
       number_is_zero(driverkit_usb_submit_binding, "direction_order_errors") &&
       number_is_zero(driverkit_usb_submit_binding, "timestamp_mismatches");
+  const bool driverkit_usb_request_lifecycle_safe =
+      result_pass(driverkit_usb_request_lifecycle) &&
+      finite(driverkit_usb_request_submit_calls) &&
+      driverkit_usb_request_submit_calls == 66.0 &&
+      finite(driverkit_usb_request_completion_calls) &&
+      driverkit_usb_request_completion_calls == 66.0 &&
+      finite(driverkit_usb_request_recycle_calls) &&
+      driverkit_usb_request_recycle_calls == 66.0 &&
+      finite(driverkit_usb_request_max_live) && driverkit_usb_request_max_live <= 4.0 &&
+      finite(driverkit_usb_request_completed_bytes) &&
+      driverkit_usb_request_completed_bytes == 185856.0 &&
+      finite(driverkit_usb_request_completed_frames) &&
+      driverkit_usb_request_completed_frames == 5808.0 &&
+      number_is_zero(driverkit_usb_request_lifecycle, "failures");
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -444,6 +472,7 @@ int main(int argc, char** argv) {
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
       {"driverkit_usb_submit_binding_safe", driverkit_usb_submit_binding_safe},
+      {"driverkit_usb_request_lifecycle_safe", driverkit_usb_request_lifecycle_safe},
       {"performance_hypothesis_supported_by_hot_path_timing", performance_hypothesis_supported},
       {"product_promotion_still_blocked", product_promotion_blocked},
       {"quality_claim_still_blocked", quality_claim_blocked},
@@ -494,6 +523,18 @@ int main(int argc, char** argv) {
                driverkit_usb_binding_total_bytes);
   print_number("driverkit_usb_submit_binding_total_frames",
                driverkit_usb_binding_total_frames);
+  print_number("driverkit_usb_request_lifecycle_submit_calls",
+               driverkit_usb_request_submit_calls);
+  print_number("driverkit_usb_request_lifecycle_completion_calls",
+               driverkit_usb_request_completion_calls);
+  print_number("driverkit_usb_request_lifecycle_recycle_calls",
+               driverkit_usb_request_recycle_calls);
+  print_number("driverkit_usb_request_lifecycle_max_live_requests",
+               driverkit_usb_request_max_live);
+  print_number("driverkit_usb_request_lifecycle_completed_bytes",
+               driverkit_usb_request_completed_bytes);
+  print_number("driverkit_usb_request_lifecycle_completed_frames",
+               driverkit_usb_request_completed_frames);
   print_number("driverkit_prepared_hotpath_max_ring_publications_per_period",
                hotpath_max_publications);
   print_number("driverkit_prepared_hotpath_min_publication_reduction_ratio",

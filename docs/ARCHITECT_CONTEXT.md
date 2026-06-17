@@ -2390,8 +2390,16 @@ Current implication:
     logical slots, `66` submit calls/descriptors, `185856` bytes, `5808` Mode2
     payload frames, and zero Mode2/payload/timestamp/direction errors. The
     migration gate now requires `driverkit_usb_submit_binding_safe=PASS`.
-  - Current full offline evidence after this integration: Debug CTest `48/48`,
-    Release CTest `49/49`, evidence schema `required_files=49`,
+  - The DriverKit USB boundary now has a request lifecycle contract.
+    `opena8djcpp_driverkit_usb_request_lifecycle_contract` feeds the
+    DriverKit-generated descriptors into a preallocated request pool and
+    requires `66` submit calls, `66` completions, `66` recycles, max `4` live
+    requests, `185856` completed bytes, `5808` completed frames, zero fallback
+    allocations, zero invalid completions, zero stale completions, and explicit
+    rejection of pool-pressure/stale-handle scenarios. The migration gate now
+    requires `driverkit_usb_request_lifecycle_safe=PASS`.
+  - Current full offline evidence after this integration: Debug CTest `49/49`,
+    Release CTest `50/50`, evidence schema `required_files=50`,
     `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the

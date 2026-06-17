@@ -9620,3 +9620,81 @@ Full offline gate rerun:
   - This is not a real DriverKit/USBDriverKit submit implementation, not a
     physical sound-quality result, not Traktor/timecode-vinyl readiness, and
     not CPU superiority over mainline.
+
+## 2026-06-17 Offline DriverKit USB Request Lifecycle Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `PreparedUsbRequestPool`, a preallocated request lifecycle model with
+    generation-checked handles.
+  - Added a DriverKit-facing contract that feeds the DriverKit-generated USB
+    submit descriptors into the request pool and validates submit, completion,
+    recycle, request pressure, and stale-handle behavior.
+  - No HAL install, dext install, CoreAudio, USB, hardware, reset, service
+    restart, or default-device action was performed.
+- Files:
+  - `core/include/opena8djcpp/usb_request_pool.hpp`
+  - `core/src/usb_request_pool.cpp`
+  - `tools/driverkit_usb_request_lifecycle_contract.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+  - `scripts/run-cpp-offline-gates`
+  - `CMakeLists.txt`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/REALTIME_DESIGN.md`
+  - `docs/TEST_EVIDENCE.md`
+- Gate:
+  - `opena8djcpp_driverkit_usb_request_lifecycle_contract`.
+  - Result: PASS.
+  - `source_descriptors=66`.
+  - Stable row:
+    - `submit_calls=66`;
+    - `capture_submit_calls=33`;
+    - `playback_submit_calls=33`;
+    - `completion_calls=66`;
+    - `recycle_calls=66`;
+    - `fallback_allocations=0`;
+    - `invalid_completions=0`;
+    - `stale_completions=0`;
+    - `live_requests=0`;
+    - `max_live_requests=4`;
+    - `submitted_bytes=185856`;
+    - `completed_bytes=185856`;
+    - `submitted_frames=5808`;
+    - `completed_frames=5808`.
+  - Negative rows reject request-pool pressure and stale completion handles.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `driverkit_usb_request_lifecycle_safe=PASS`.
+  - `driverkit_usb_request_lifecycle_submit_calls=66.000000`.
+  - `driverkit_usb_request_lifecycle_completion_calls=66.000000`.
+  - `driverkit_usb_request_lifecycle_recycle_calls=66.000000`.
+  - `driverkit_usb_request_lifecycle_max_live_requests=4.000000`.
+  - `driverkit_usb_request_lifecycle_completed_bytes=185856.000000`.
+  - `driverkit_usb_request_lifecycle_completed_frames=5808.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_usb_request_lifecycle_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_usb_request_lifecycle_contract`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_usb_request_lifecycle_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `49/49` passed.
+  - Release CTest: `50/50` passed.
+  - Evidence schema: `required_files=50`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The DriverKit/USB path now has an offline request lifecycle contract, not
+    only descriptor and payload contracts.
+  - This is not a real DriverKit/USBDriverKit submit implementation, not a
+    physical sound-quality result, not Traktor/timecode-vinyl readiness, and
+    not CPU superiority over mainline.

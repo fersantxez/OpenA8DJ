@@ -6288,3 +6288,51 @@ Next implication:
   toward a real DriverKit/USBDriverKit submit adapter. Product superiority and
   branch promotion remain blocked until lock-gated same-session physical A/B
   proves quality, routing, timecode vinyl, CPU, and recovery against mainline.
+
+## 2026-06-17: Require DriverKit USB Request Lifecycle Pool
+
+Decision:
+- Add `PreparedUsbRequestPool` as a pure C++ model of preallocated USB request
+  submit, completion, recycle, and stale-handle rejection.
+- Add `opena8djcpp_driverkit_usb_request_lifecycle_contract`.
+- Require `prepared-transport-migration-gate` to pass
+  `driverkit_usb_request_lifecycle_safe`.
+
+Reason:
+- Submit descriptor correctness is not enough for physical-readiness planning.
+  A real DriverKit/USBDriverKit path can still glitch if requests are allocated
+  dynamically, leaked, completed out of lifecycle, or recycled unsafely.
+- The future hardware candidate needs bounded request pressure before any
+  locked physical window is worth the risk.
+
+Evidence:
+- `opena8djcpp_driverkit_usb_request_lifecycle_contract`: PASS.
+- Stable lifecycle row:
+  - `source_descriptors=66`;
+  - `stable_submit_calls=66`;
+  - `stable_completion_calls=66`;
+  - `stable_recycle_calls=66`;
+  - `stable_max_live_requests=4`;
+  - `stable_submitted_bytes=185856`;
+  - `stable_completed_bytes=185856`;
+  - `stable_submitted_frames=5808`;
+  - `stable_completed_frames=5808`;
+  - fallback allocations, invalid completions, stale completions, and live
+    requests all `0`.
+- Negative rows reject request-pool pressure and stale completions.
+- Full offline gates:
+  - Debug CTest `49/49` passed.
+  - Release CTest `50/50` passed.
+  - Evidence schema `required_files=50`, `missing_files=0`.
+
+Alternatives discarded:
+- Rely on descriptor counts only: rejected because descriptors do not prove
+  request object lifetime, recycling, or bounded in-flight pressure.
+- Allow fallback allocation on pressure: rejected because the real-time path
+  must not allocate or repair missing request objects during audio flow.
+
+Next implication:
+- A real DriverKit/USBDriverKit submit adapter must map these modeled request
+  slots to real async USB request objects and preserve the same counters.
+  Product superiority still requires lock-gated physical same-session quality,
+  routing, timecode vinyl, CPU, and recovery evidence against mainline.

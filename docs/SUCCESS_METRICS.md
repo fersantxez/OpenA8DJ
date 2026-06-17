@@ -2094,6 +2094,14 @@ Prepared transport migration metric:
   `driverkit_usb_submit_binding_total_frames=5808`, with zero transport frame
   mismatches and zero payload/timestamp/direction failures. Otherwise the
   DriverKit runtime shell is not bound to the low-CPU submit plan.
+- It must also report `driverkit_usb_request_lifecycle_safe=PASS`,
+  `driverkit_usb_request_lifecycle_submit_calls=66`,
+  `driverkit_usb_request_lifecycle_completion_calls=66`,
+  `driverkit_usb_request_lifecycle_recycle_calls=66`,
+  `driverkit_usb_request_lifecycle_max_live_requests<=4`,
+  `driverkit_usb_request_lifecycle_completed_bytes=185856`, and
+  `driverkit_usb_request_lifecycle_completed_frames=5808`. Otherwise the
+  future USB path has not proven bounded preallocated request lifecycle.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

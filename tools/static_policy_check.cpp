@@ -110,6 +110,7 @@ int main(int argc, char** argv) {
       root / "tools/driverkit_extension_scaffold_contract.cpp",
       root / "tools/driverkit_prepared_transport_contract.cpp",
       root / "tools/driverkit_usb_submit_binding_contract.cpp",
+      root / "tools/driverkit_usb_request_lifecycle_contract.cpp",
       root / "tools/prepared_transport_packet_contract.cpp",
       root / "tools/prepared_transport_routing_timecode_contract.cpp",
       root / "tools/prepared_transport_recovery_contract.cpp",
@@ -132,6 +133,8 @@ int main(int argc, char** argv) {
       root / "core/src/runtime_adapter.cpp",
       root / "core/include/opena8djcpp/usb_submit_plan.hpp",
       root / "core/src/usb_submit_plan.cpp",
+      root / "core/include/opena8djcpp/usb_request_pool.hpp",
+      root / "core/src/usb_request_pool.cpp",
   };
   const auto join = [](const char* left, const char* right) {
     return std::string(left) + std::string(right);
