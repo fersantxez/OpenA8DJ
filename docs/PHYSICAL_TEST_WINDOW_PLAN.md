@@ -113,6 +113,9 @@ scripts/analyze-soundcheck-window-trace.py \
 
 Decision criteria:
 
+- `physical-window-preflight.json` must pass before the lock is acquired.
+  This proves only that devices/files are currently visible and the lock is
+  free; it does not prove the route.
 - The run is blocked unless the same window captures both the read-only
   mainline HAL candidate and the C++ HAL candidate through the same iRig route.
 - C++ must pass `same-session-physical-compare.json` against mainline before

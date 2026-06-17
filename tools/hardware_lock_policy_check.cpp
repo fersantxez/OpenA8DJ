@@ -142,6 +142,8 @@ int main(int argc, char** argv) {
                                                       "hardware-lock-lib.sh",
                                                       "opena8dj_acquire_hardware_lock",
                                                       "physical-superiority-window",
+                                                      "physical-window-preflight",
+                                                      "PREFLIGHT_FAIL",
                                                       "known-good route playback/capture, mainline HAL install/reload, C++ HAL install/reload, Audio 8 DJ playback/capture, CoreAudio enumeration",
                                                       "trap 'cleanup_candidate; opena8dj_release_hardware_lock' EXIT",
                                                       "No hardware/audio action was run. Add --execute for a locked physical window.",

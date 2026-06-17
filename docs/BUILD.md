@@ -840,8 +840,12 @@ scripts/run-physical-superiority-window \
 ```
 
 This is HAL-candidate physical validation only. It is not DriverKit/dext
-activation. The runner acquires the global hardware lock, runs the known-good
-route check first, then installs/reloads the explicit mainline HAL candidate,
+activation. Before acquiring the hardware lock, the runner executes
+`scripts/physical-window-preflight`, a read-only check for iRig/CoreAudio
+capture visibility, Audio 8 DJ USB visibility, candidate bundles, fixture
+files, explicit non-Audio8 output visibility, and lock availability. The
+runner then acquires the global hardware lock, runs the known-good route check
+first, then installs/reloads the explicit mainline HAL candidate,
 runs a mainline Audio 8 soundcheck, unloads it, installs/reloads the explicit
 C++ HAL candidate, runs the C++ Audio 8 soundcheck, analyzes both WAV captures
 with the native C++ analyzer, compares same-session mainline vs C++ physical
@@ -857,3 +861,6 @@ revalidation, writes `known_good_rc=1`, and prevents a successful runner exit.
 The promotion evaluator must be called with the same window's
 `same-session-physical-compare.json`; evidence from separate windows is
 rejected for branch promotion.
+
+Preflight PASS means the requested devices and files are visible. It does not
+prove the physical route; the known-good route capture must still pass.

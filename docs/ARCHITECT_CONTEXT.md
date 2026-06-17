@@ -1986,3 +1986,27 @@ Current implication:
   run by adding the runner.
 - Product readiness remains blocked until the runner produces passing
   same-session evidence and the result beats mainline thresholds.
+
+### 2026-06-17 Physical Window Preflight
+
+- Added `scripts/physical-window-preflight`.
+- The physical superiority runner now calls this read-only preflight before
+  acquiring the hardware lock or installing/reloading HAL candidates.
+- It checks:
+  - `iRig Stream` visible in CoreAudio with capture channels;
+  - `Audio 8 DJ` visible on USB as Native Instruments VID/PID;
+  - mainline and C++ HAL bundle paths exist;
+  - reference/music fixtures exist;
+  - known-good output is explicit, visible, and not Audio 8;
+  - hardware lock is free.
+- Current observed state:
+  - `iRig Stream` visible in CoreAudio and USB;
+  - `Audio 8 DJ` visible on USB;
+  - `Open Audio 8 DJ` absent from CoreAudio until a HAL candidate is loaded;
+  - C++ and mainline HAL bundles are present.
+
+Current implication:
+- The next hardware window can fail fast before lock if the capture route,
+  USB device, bundles, fixture files, or known-good output are missing.
+- Preflight PASS is not evidence of route health. The locked known-good route
+  capture remains mandatory before judging mainline or C++ audio quality.

@@ -203,6 +203,48 @@ if [ "$execute" -ne 1 ]; then
   exit 0
 fi
 
+if [ "$skip_build" -ne 1 ]; then
+  make -C "$root" build/audio-list >/dev/null
+fi
+
+preflight_args=(
+  "$root/scripts/physical-window-preflight"
+  --run-dir "$run_dir"
+  --capture-device "$capture_device"
+  --capture-channels "$capture_channels"
+  --reference-wav "$reference_wav"
+  --mainline-candidate "$mainline_candidate"
+  --candidate "$candidate"
+  --json-out "$run_dir/physical-window-preflight.json"
+)
+if [ "$route_only" -eq 1 ]; then
+  preflight_args+=(--route-only)
+fi
+if [ "$candidate_only" -eq 1 ]; then
+  preflight_args+=(--candidate-only)
+fi
+if [ "$skip_known_good" -eq 1 ]; then
+  preflight_args+=(--skip-known-good)
+fi
+if [ -n "$known_good_output_device_uid" ]; then
+  preflight_args+=(--known-good-output-device-uid "$known_good_output_device_uid")
+else
+  preflight_args+=(--known-good-output-device "$known_good_output_device")
+fi
+if [ -n "$music_file" ]; then
+  preflight_args+=(--music-file "$music_file")
+fi
+if ! "${preflight_args[@]}" > "$run_dir/physical-window-preflight.stdout" 2> "$run_dir/physical-window-preflight.stderr"; then
+  {
+    echo "PHYSICAL_SUPERIORITY_WINDOW: PREFLIGHT_FAIL"
+    echo "preflight=$run_dir/physical-window-preflight.json"
+    echo "preflight_stdout=$run_dir/physical-window-preflight.stdout"
+    echo "preflight_stderr=$run_dir/physical-window-preflight.stderr"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/summary.txt"
+  exit 2
+fi
+
 # shellcheck source=scripts/hardware-lock-lib.sh
 source "$root/scripts/hardware-lock-lib.sh"
 opena8dj_acquire_hardware_lock \

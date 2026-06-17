@@ -8375,3 +8375,40 @@ Full offline gate rerun:
   - The next admissible quality/performance claim requires a locked physical
     window with known-good route PASS, same-session mainline/C++ compare PASS,
     promotion evaluator PASS, and physical timecode validation.
+
+## 2026-06-17 Physical Window Read-Only Preflight
+
+- Scope:
+  - Read-only physical-window preflight and runner integration.
+  - No playback, capture, HAL install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or service mutation performed.
+- Changes:
+  - Added `scripts/physical-window-preflight`.
+  - Integrated it into `scripts/run-physical-superiority-window --execute`
+    before hardware-lock acquisition.
+  - Extended the hardware-lock policy audit so the runner must keep the
+    preflight and `PREFLIGHT_FAIL` path.
+- Focused commands:
+  - `scripts/physical-window-preflight --capture-device "iRig Stream" --known-good-output-device "MacBook Air Speakers" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --music-file local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --json-out local-analysis/physical-superiority-window/preflight-current-system-rerun.json`
+  - `scripts/run-physical-superiority-window --execute --route-only --run-dir local-analysis/physical-superiority-window/preflight-runner-missing-output-check --capture-device "iRig Stream" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --known-good-output-device "Definitely Missing Output"`
+  - `python3 -m py_compile scripts/physical-window-preflight`
+  - `bash -n scripts/run-physical-superiority-window`
+- Focused result:
+  - Current-system preflight returned `PASS` with `iRig Stream`, `Audio 8 DJ`
+    visible on USB, C++ and mainline HAL bundles present, lock absent, and
+    `MacBook Air Speakers` visible as a non-Audio8 output.
+  - `Open Audio 8 DJ` was absent from CoreAudio, which is acceptable before
+    HAL loading.
+  - Runner with a missing known-good output exited `2` before lock acquisition
+    and wrote `PHYSICAL_SUPERIORITY_WINDOW: PREFLIGHT_FAIL`.
+  - The first preflight attempt exposed a parser bug for UIDs containing
+    spaces; parser was fixed to handle `AppleUSBAudioEngine:...:iRig Stream`.
+- Evidence paths:
+  - `local-analysis/physical-superiority-window/preflight-current-system-rerun.json`
+  - `local-analysis/physical-superiority-window/preflight-runner-missing-output-check/physical-window-preflight.json`
+  - `local-analysis/physical-superiority-window/preflight-runner-missing-output-check/summary.txt`
+- Interpretation:
+  - The system currently has the USB/CoreAudio ingredients for a future
+    physical window, but the actual known-good physical route must still be
+    proven by capture under lock.
+  - No superiority/readiness claim changes.

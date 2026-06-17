@@ -5336,3 +5336,36 @@ Evidence:
 Next implication:
 - No script-level path can support branch promotion without a same-window
   mainline/C++ physical compare and a successful known-good route check.
+
+## 2026-06-17: Add Read-Only Physical Window Preflight
+
+Decision:
+- Add `scripts/physical-window-preflight`.
+- Run that preflight from `scripts/run-physical-superiority-window --execute`
+  before acquiring the hardware lock or installing/reloading any HAL candidate.
+- Check candidates, iRig/CoreAudio capture visibility, Audio 8 DJ USB
+  visibility, reference/music files, explicit non-Audio8 known-good output,
+  and hardware-lock availability.
+- Keep `Open Audio 8 DJ` CoreAudio presence optional before candidate loading,
+  but require it to be `8 in / 8 out` if it is already loaded.
+
+Reason:
+- A physical superiority window should not begin if the capture route, USB
+  device, HAL bundles, or explicit known-good output are missing.
+- Failing before the lock avoids partial driver install/reload attempts when
+  the evidence window is invalid.
+- Audio 8 can be visible on USB while absent from CoreAudio before HAL loading;
+  that state is acceptable for the preflight.
+
+Evidence:
+- `scripts/physical-window-preflight` on the current system with iRig, Audio 8
+  USB, C++ candidate, mainline candidate, and `MacBook Air Speakers` as a
+  visible non-Audio8 output returns `PASS`.
+- A runner route-only execution with a missing known-good output exits `2`
+  before lock acquisition and writes `PHYSICAL_SUPERIORITY_WINDOW:
+  PREFLIGHT_FAIL`.
+
+Next implication:
+- The next physical A/B command must first pass this read-only preflight, then
+  prove the known-good route by capture. A visible output device alone is not a
+  claim that the physical cabling is correct.

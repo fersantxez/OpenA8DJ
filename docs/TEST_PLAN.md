@@ -1230,7 +1230,19 @@ Physical superiority window runner:
 - Script:
   `scripts/run-physical-superiority-window`.
 - Default mode is dry-run plan only. Physical work requires `--execute`.
+- Full execution starts with a read-only preflight:
+  `scripts/physical-window-preflight`.
+- The preflight must PASS before the hardware lock is acquired. It checks:
+  - iRig capture visibility in CoreAudio;
+  - Audio 8 DJ visibility on USB;
+  - explicit mainline and C++ HAL bundle paths for full A/B execution;
+  - reference/music files;
+  - explicit non-Audio8 known-good output visibility;
+  - hardware lock availability.
+- `Open Audio 8 DJ` may be absent from CoreAudio before HAL loading, but if
+  present it must expose `8 in / 8 out`.
 - Full execution order:
+  - run read-only physical-window preflight;
   - acquire the global hardware lock;
   - run known-good non-Audio8 route soundcheck into iRig;
   - install/reload the explicit read-only mainline HAL candidate through
@@ -1280,6 +1292,8 @@ PASS/FAIL semantics:
   compare JSON from the same physical window as the C++ soundcheck.
 - The runner exits success only when known-good route validation, same-session
   comparison, and promotion evaluation all pass.
+- Preflight PASS is not route proof. The known-good route capture must still
+  pass after lock acquisition.
 
 ## Offline Timecode Readiness Gate
 
