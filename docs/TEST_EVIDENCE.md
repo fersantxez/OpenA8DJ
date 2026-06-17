@@ -2048,3 +2048,58 @@ Operational note:
     observability, but it does not prove physical quality or CPU superiority.
   - The next hardware run must check the new counters and compare CPU/quality
     against mainline before any readiness claim.
+
+## 2026-06-17: Physical Hot-Stats/Atomic-Write Candidate Rejection
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-hotstats-write-late/20260616-205111/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-dir "$HOME/Music" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Forced HAL unload under hardware lock, followed by `audio-stack-guard`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-hotstats-write-late-failed-unload.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/hotstats-write-late-summary-v2.json`
+- Result:
+  - HAL candidate safety PASS.
+  - Physical soundcheck FAIL.
+  - Post-failure unload/recovery PASS; final isolation PASS.
+- Evidence paths:
+  - `local-analysis/physical-hotstats-write-late/20260616-205111/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal`
+  - `local-analysis/stream-stats/hotstats-write-late-summary-v2.json`
+  - `local-analysis/audio-stack-guard/20260616-force-unload-hotstats-write-late`
+  - `local-analysis/runtime-isolation/post-hotstats-write-late-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=0.962133`
+  - `snr_db=10.24`
+  - `click_outliers=29`
+  - `lag_jumps_gt_2_frames=45`
+  - `mid_band_residual_ratio=1.443461`
+  - `high_band_residual_ratio=1.362932`
+  - `quiet_mid_band_noise_dbfs=-35.91`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver avg/p95/max CPU `31.58%/36.00%/36.40%`
+  - coreaudiod avg/p95/max CPU `4.70%/7.00%/60.40%`
+  - Stream stats: `output_write_stats_observable=true`,
+    `outputFramesWritten_per_second=48000.35`,
+    `outputFramesRead_per_second=48006.75`, no active underruns, no timeline
+    resets, no panic flags.
+  - Text stream snapshots showed `outputLateWriteFrames=0` and
+    `outputLateWriteBatches=0` throughout the run.
+- Interpretation:
+  - Atomic write stats and hot stats gates are useful, but not sufficient.
+  - Late writes do not explain the current analog quality failure.
+  - Continue with queue-depth/prefetch/cadence hypotheses; do not promote.
+
+## 2026-06-17: Late-Write TSV Tooling Fix
+
+- Commands:
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/hotstats-write-late-summary-v2.json`
+- Result:
+  - PASS.
+  - `run-soundcheck` now includes `outputLateWriteFrames` and
+    `outputLateWriteBatches` in `stream-stats-during.tsv`.
+  - `analyze-stream-stats.py` summarizes those counters and flags
+    `late_writes` if they increase.
+- Interpretation:
+  - The hotstats physical run still has late-write evidence in text snapshots,
+    but future runs will have structured TSV/JSON late-write evidence.

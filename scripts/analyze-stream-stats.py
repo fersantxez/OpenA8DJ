@@ -28,6 +28,8 @@ COUNTERS = [
     "outputElasticDrops",
     "outputElasticReplays",
     "outputTimelineResets",
+    "outputLateWriteFrames",
+    "outputLateWriteBatches",
     "outputPanicFlags",
     "clockAcceptedAnchors",
     "clockRejectedAnchors",
@@ -157,6 +159,8 @@ def analyze(path):
         flags.append("active_underruns")
     if counters["outputTimelineResets"]["delta"] > 0:
         flags.append("timeline_resets")
+    if counters["outputLateWriteFrames"]["delta"] > 0:
+        flags.append("late_writes")
     if counters["outputPanicFlags"]["delta"] > 0:
         flags.append("panic_flags")
     if counters["playbackTransferErrors"]["delta"] > 0:

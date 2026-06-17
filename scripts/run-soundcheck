@@ -214,6 +214,8 @@ STREAM_STATS_TSV_COLUMNS = [
     "outputElasticDrops",
     "outputElasticReplays",
     "outputTimelineResets",
+    "outputLateWriteFrames",
+    "outputLateWriteBatches",
     "outputPanicFlags",
     "clockAnchorValid",
     "clockAcceptedAnchors",

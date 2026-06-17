@@ -894,3 +894,43 @@ Follow-up:
 - If quality still fails, prioritize the other read-only findings: queue depth
   `64/64` versus mainline `8/8`, output prefetch `256` versus mainline `64`,
   and input/control-plane parity.
+
+## 2026-06-17: Reject Hot-Stats/Atomic-Write Candidate As Not Ready
+
+Decision:
+- Do not promote commit `5e6fab7` and do not claim physical readiness after the
+  locked iRig music run.
+- Keep the code/tooling improvements, but continue optimization because the
+  candidate still fails music quality and CPU gates.
+
+Reason:
+- Safety install passed, but physical soundcheck failed:
+  `quality_alignment_score=0.962133`, `snr_db=10.24`,
+  `click_outliers=29`, `lag_jumps_gt_2_frames=45`,
+  `mid_band_residual_ratio=1.443461`,
+  `high_band_residual_ratio=1.362932`, quiet mid-band noise `-35.91 dBFS`.
+- CPU remains above mainline: OpenA8DJ driver avg/p95 `31.58%/36.00%`,
+  coreaudiod avg/p95 `4.70%/7.00%`.
+- Stream stats showed output write accounting is now observable and no active
+  underruns/timeline resets/panic flags, but late-write text snapshots were
+  all zero. Late writes do not explain this failure.
+
+Alternatives discarded:
+- Promote based on slight SNR/CoreAudio CPU improvement over the previous
+  calibrated run: rejected because all product gates still fail and driver CPU
+  is far above the C baseline.
+- Retest the same candidate immediately: rejected until a new variable changes.
+
+Evidence:
+- Safety: `local-analysis/physical-hotstats-write-late/20260616-205111/hal-candidate-safety`
+- Soundcheck: `local-analysis/soundcheck/20260616-hotstats-write-late-irig-pairA-16s-cpp-hal`
+- Stream stats summary: `local-analysis/stream-stats/hotstats-write-late-summary-v2.json`
+- Recovery/audit:
+  - `local-analysis/audio-stack-guard/20260616-force-unload-hotstats-write-late`
+  - `local-analysis/runtime-isolation/post-hotstats-write-late-failed-unload.json`
+
+Follow-up:
+- Fix structured TSV capture for late-write counters before the next physical
+  run.
+- Next one-factor physical hypotheses: reduce queue depth to mainline `8/8`,
+  or reduce output prefetch to mainline `64`.

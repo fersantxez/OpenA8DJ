@@ -344,3 +344,20 @@ Next technical target:
 - Next physical candidate remains not ready to promote. It needs a locked
   safety/music run and must beat mainline CPU and physical quality before any
   branch promotion is considered.
+- Locked physical test of commit `5e6fab7` passed HAL safety but failed music
+  quality:
+  `quality_alignment_score=0.962133`, `snr_db=10.24`,
+  `click_outliers=29`, `lag_jumps_gt_2_frames=45`,
+  `mid_band_residual_ratio=1.443461`,
+  `high_band_residual_ratio=1.362932`, quiet mid-band noise `-35.91 dBFS`.
+- CPU remains too high: OpenA8DJ driver avg/p95 `31.58%/36.00%`, coreaudiod
+  avg/p95 `4.70%/7.00%`.
+- The new write-stats path is observable and text stream snapshots showed
+  `outputLateWriteFrames=0` / `outputLateWriteBatches=0`, so late writes do not
+  explain this failure.
+- Post-failure cleanup moved the active HAL to `HAL.disabled`, restarted
+  CoreAudio, and runtime isolation passed with HAL inactive, lock absent, and no
+  OpenA8DJ driver process.
+- Tooling gap fixed after the run: `run-soundcheck` now writes late-write
+  counters into `stream-stats-during.tsv`, and `analyze-stream-stats.py` tracks
+  them and flags nonzero late writes.
