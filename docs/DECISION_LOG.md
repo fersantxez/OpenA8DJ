@@ -700,3 +700,33 @@ Follow-up:
 - Prioritize below-HAL USB transport/cadence and device-state differences.
 - Add byte-for-byte packer dumps and/or device-observed transfer diagnostics
   before more physical sweeps.
+
+## 2026-06-16: Treat Mode 2 Packer Layout As Offline-Parity Verified
+
+Decision:
+- Do not spend the next physical window on more start-byte/check-offset layout
+  sweeps unless new device-observed evidence contradicts the offline parity
+  model.
+
+Reason:
+- Added an independent `opena8djcpp_mode2_mainline_layout_parity` gate that
+  implements the mainline unrolled Mode 2 fill structure separately from the
+  C++ `Mode2OutputPacker`.
+- The gate passed `132` rows across start bytes `0..5`, short partial transfer
+  sizes, and normal transfer sizes including `352`.
+- This removes one important false-positive risk in the old offline oracle:
+  packer/decode self-consistency is no longer the only byte-layout evidence.
+
+Alternatives discarded:
+- Continue byte-offset physical sweeps now: rejected because direct physical
+  sweeps already failed and the independent byte layout gate now passes.
+- Declare physical readiness from layout parity: rejected because physical iRig
+  quality and CPU still fail badly.
+
+Evidence:
+- `local-analysis/cpp-offline/mode2-mainline-layout-parity.json`
+- `scripts/run-cpp-offline-gates` with Debug `16/16`, Release `17/17`.
+
+Follow-up:
+- Focus on transfer cadence, USB transaction state, `AUDIO_PARAMS` reset
+  behavior, and device-observed control/stream state.

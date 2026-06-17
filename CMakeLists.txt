@@ -77,6 +77,13 @@ target_link_libraries(opena8djcpp_packet_matrix
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_mode2_mainline_layout_parity
+  tools/mode2_mainline_layout_parity.cpp)
+
+target_link_libraries(opena8djcpp_mode2_mainline_layout_parity
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_mode2_cpp_oracle_dump
   tools/mode2_cpp_oracle_dump.cpp)
 
@@ -162,6 +169,7 @@ add_executable(opena8djcpp_evidence_schema_check
 enable_testing()
 add_test(NAME opena8djcpp_core_contract COMMAND opena8djcpp_core_tests)
 add_test(NAME opena8djcpp_packet_matrix COMMAND opena8djcpp_packet_matrix)
+add_test(NAME opena8djcpp_mode2_mainline_layout_parity COMMAND opena8djcpp_mode2_mainline_layout_parity)
 add_test(NAME opena8djcpp_mode2_cpp_oracle_dump COMMAND opena8djcpp_mode2_cpp_oracle_dump)
 add_test(NAME opena8djcpp_protocol_contract COMMAND opena8djcpp_protocol_contract)
 add_test(NAME opena8djcpp_simulated_output_matrix COMMAND opena8djcpp_simulated_output_matrix)

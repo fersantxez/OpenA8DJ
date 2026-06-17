@@ -281,7 +281,11 @@ Next technical target:
   plain CFLAGS clipped badly and scored `quality_alignment_score=0.186400`;
   plain CFLAGS with only `OPENA8DJ_OUTPUT_GAIN=0.50f` still scored
   `quality_alignment_score=0.023502`.
+- Added `opena8djcpp_mode2_mainline_layout_parity`, an independent unrolled
+  mainline-style byte-layout gate. It passed `132` rows and is now part of the
+  offline gates; Debug is `16/16` and Release is `17/17`.
 - Current interpretation: the blocker is not only a HAL callback problem, not
   only `HAL_CFLAGS` contamination of direct USB tools, and not only output
-  gain. Continue below-HAL transport/cadence/device-state investigation before
-  more physical sweeps.
+  gain. A simple Mode 2 byte-layout mismatch is also less likely after the new
+  parity gate. Continue below-HAL transport/cadence/device-state investigation
+  before more physical sweeps.

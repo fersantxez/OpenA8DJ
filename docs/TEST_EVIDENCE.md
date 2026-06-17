@@ -1847,3 +1847,27 @@ Operational note:
     direct USB failures are caused only by `HAL_CFLAGS` contamination.
   - HAL default remains less bad than direct USB, but still fails physical
     quality and CPU gates.
+
+## 2026-06-16: Mode 2 Mainline Layout Parity Offline Gate
+
+- Commands:
+  - Added `opena8djcpp_mode2_mainline_layout_parity`.
+  - `scripts/run-cpp-offline-gates`
+  - `build/cpp-release/opena8djcpp_mode2_mainline_layout_parity > local-analysis/cpp-offline/mode2-mainline-layout-parity.json`
+- Result:
+  - Debug offline gates: PASS, 16/16.
+  - Release offline gates: PASS, 17/17.
+  - New mainline-layout parity gate: PASS.
+- Evidence paths:
+  - `local-analysis/cpp-offline/mode2-mainline-layout-parity.json`
+- Key metrics:
+  - `schema=opena8djcpp.mode2-mainline-layout-parity.v1`
+  - `row_count=132`
+  - `failures=0`
+- Interpretation:
+  - The C++ `Mode2OutputPacker` matches an independently implemented unrolled
+    mainline-style layout across start bytes `0..5`, short partial transfer
+    lengths, and normal transfer lengths including `352`.
+  - This makes a simple byte-layout mismatch less likely as the physical
+    blocker. Continue investigating transfer cadence, device state, and
+    hardware-observed USB behavior.
