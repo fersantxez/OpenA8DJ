@@ -205,6 +205,13 @@ add_executable(opena8djcpp_transport_budget_model
 add_executable(opena8djcpp_loopback_quality_analysis
   tools/loopback_quality_analysis.cpp)
 
+add_executable(opena8djcpp_channel_leakage_tone_contract
+  tools/channel_leakage_tone_contract.cpp)
+
+target_link_libraries(opena8djcpp_channel_leakage_tone_contract
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -241,6 +248,7 @@ add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_transfer_pool_model COMMAND opena8djcpp_transfer_pool_model)
 add_test(NAME opena8djcpp_transport_budget_model COMMAND opena8djcpp_transport_budget_model)
 add_test(NAME opena8djcpp_loopback_quality_analysis COMMAND opena8djcpp_loopback_quality_analysis)
+add_test(NAME opena8djcpp_channel_leakage_tone_contract COMMAND opena8djcpp_channel_leakage_tone_contract)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

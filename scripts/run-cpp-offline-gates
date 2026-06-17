@@ -45,6 +45,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
+./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -96,6 +97,7 @@ jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
+channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -272,6 +274,14 @@ summary = {
         "clean_min_snr_db": loopback_quality.get("rows", [{}])[0].get("min_snr_db"),
         "degraded_failures": loopback_quality.get("rows", [{}, {}])[1].get("failures"),
         "evidence": "local-analysis/cpp-offline/loopback-quality-analysis.json",
+    },
+    "channel_leakage_tone_contract": {
+        "status": channel_leakage_tone.get("result"),
+        "rows": channel_leakage_tone.get("row_count"),
+        "failures": channel_leakage_tone.get("failures"),
+        "max_clean_wrong_source_leakage_db": channel_leakage_tone.get("max_clean_wrong_source_leakage_db"),
+        "max_clean_inactive_deck_leakage_db": channel_leakage_tone.get("max_clean_inactive_deck_leakage_db"),
+        "evidence": "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

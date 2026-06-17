@@ -2531,3 +2531,33 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Keep recovery as an offline gate and require the future real DriverKit/USB
     adapter to satisfy the same contract before any locked hardware recovery
     window.
+## 2026-06-17: Zeno - Metrics Explorer
+
+Prompt summary:
+- Read-only inspection of `/Users/fer/dev/audio8djcpp` scripts/docs around
+  channel matrix, leakage, loopback quality, and physical quality gates.
+- Same mandatory safety warning: no mutation in `/Users/fer/dev/opena8dj` or
+  `/Users/fer/dev/audio8djrust`; no hardware/audio/CoreAudio/USB.
+
+Findings:
+- Existing C++ already covers digital routing/leakage in
+  `tools/simulated_output_matrix.cpp`, basic loopback analysis in
+  `tools/loopback_quality_analysis.cpp`, and synthetic routing/timecode leakage
+  in `tools/prepared_transport_routing_timecode_contract.cpp`.
+- The highest-value next metric is a C++ analyzer over stored physical capture
+  directories, not another hardware run.
+- Fields to port from Python:
+  `left_to_right_leakage_db`, `right_to_left_leakage_db`,
+  `max_wrong_source_leakage_db <= -45.0`, `expected_floor_amplitude >= 0.005`,
+  `capture_clipped_frames == 0`, plus quality alignment, SNR, click outliers,
+  lag jumps, band residuals, quiet-band noise, and optional CPU coupling.
+
+Files affected by subagent:
+- None. Read-only only.
+
+Integration:
+- Added a narrower C++ digital tone-leakage contract in this pass.
+- Next recommended implementation remains:
+  `opena8djcpp_capture_matrix_quality_analysis`, reading existing
+  `fixture/reference.wav`, `captured.wav`, `metrics.json`, and optional CPU
+  profile files without touching hardware.

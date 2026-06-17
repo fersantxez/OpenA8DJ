@@ -1605,3 +1605,14 @@ Next technical target:
     cross-feed, and a click.
   - This is an analyzer/readiness prerequisite, not product proof. The actual
     claim still requires locked physical same-session captures versus mainline.
+- C++ channel leakage tone contract:
+  - Added compiled gate `opena8djcpp_channel_leakage_tone_contract`.
+  - It exercises A/B/C/D at 44.1 kHz and 48 kHz through real Mode 2 pack/decode
+    and measures tone leakage into wrong source/inactive decks.
+  - Clean digital rows PASS; injected inactive-deck leakage is rejected.
+  - This strengthens offline no-leakage coverage but does not replace physical
+    matrix capture with the actual Audio 8 DJ analog path.
+- Subagent Zeno recommendation:
+  - Highest-value next metric is a C++ analyzer over stored physical capture
+    directories, porting the Python tone-matrix/quality fields into a compiled
+    offline tool without opening audio devices.

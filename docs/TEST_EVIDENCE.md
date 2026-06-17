@@ -7334,3 +7334,56 @@ Operational note:
   - full Traktor DVS signal quality matrix;
   - physical audio and Traktor validation;
   - runtime CPU/resource comparison against mainline.
+
+## 2026-06-17 C++ Channel Leakage Tone Contract Focused Run
+
+- Purpose:
+  - Add and verify a compiled no-leakage tone detector over the Mode 2
+    pack/decode path.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_channel_leakage_tone_contract`
+  - `./build/cpp-offline/opena8djcpp_channel_leakage_tone_contract`
+- Result:
+  - PASS.
+  - Rows: `16`.
+  - Clean rows cover A/B/C/D at `44100` and `48000`.
+  - Injected inactive-deck leakage rows are rejected.
+  - Max clean wrong-source leakage: about `-167.97 dB`.
+  - Max clean inactive-deck leakage: `-240 dB`.
+- Evidence:
+  - `local-analysis/cpp-offline/channel-leakage-tone-contract.json`
+- Safety:
+  - Offline synthetic/Mode 2 analysis only.
+  - No hardware, USB, CoreAudio, default device, service restart, driver
+    install, or system-extension activation.
+- Interpretation:
+  - This proves the C++ offline data path and detector can enforce digital
+    no-leakage. It is not physical A/B/C/D matrix evidence.
+
+## 2026-06-17 Offline Gates After Channel Leakage Tone Contract
+
+- Purpose:
+  - Verify the complete offline gate surface after adding the compiled
+    A/B/C/D leakage contract.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `26/26` passed.
+  - Release CTest: `27/27` passed.
+  - Channel leakage tone contract: PASS, `16` rows, failures `0`.
+  - Evidence schema: PASS, `required_files=26`, missing `0`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/channel-leakage-tone-contract.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Not-ready blockers still present:
+  - mainline runtime byte parity requires physical capture/export evidence;
+  - full Traktor DVS signal quality matrix;
+  - physical audio and Traktor validation;
+  - runtime CPU/resource comparison against mainline.

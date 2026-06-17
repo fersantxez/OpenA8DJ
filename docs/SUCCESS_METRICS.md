@@ -1887,3 +1887,28 @@ Readiness rule:
   same-session external-loopback captures show C++ meeting or exceeding
   mainline on SNR, residuals, click count, channel leakage, and subjective
   listening, while also beating or matching CPU/jitter/resource thresholds.
+
+## 2026-06-17 C++ Channel Leakage Tone Contract
+
+Required for digital no-leakage coverage:
+- `opena8djcpp_channel_leakage_tone_contract` must PASS.
+- Sample rates: `44100` and `48000`.
+- Active output pairs: A/B/C/D.
+- Clean rows must report:
+  - check errors `0`;
+  - panic flags `0`;
+  - expected tone floor `>= 0.10`;
+  - wrong-source leakage `<= -90 dB`;
+  - inactive-deck leakage `<= -90 dB`.
+- Injected-leak rows must be rejected.
+
+Current status:
+- PASS offline with `16` rows.
+- Max clean wrong-source leakage: about `-167.97 dB`.
+- Max clean inactive-deck leakage: `-240 dB`.
+- Injected inactive-deck leakage around `-37.26 dB` is rejected.
+
+Readiness rule:
+- This proves the digital Mode 2 pack/decode path and tone-domain detector can
+  enforce no-leakage offline. Physical A/B/C/D routing still requires locked
+  same-session capture evidence and comparison against mainline.

@@ -966,3 +966,35 @@ PASS/FAIL semantics:
 - PASS does not mean the hardware candidate is audiophile-ready.
 - FAIL blocks any physical quality claim until the analyzer or candidate is
   fixed.
+
+## Offline C++ Channel Leakage Tone Contract
+
+Purpose:
+
+- verify a compiled tone-domain no-leakage detector over the real Mode 2
+  pack/decode path.
+- exercise all A/B/C/D output pairs at 44.1 kHz and 48 kHz without touching
+  hardware.
+- reject an injected inactive-deck leak so the test proves detection power, not
+  only a clean happy path.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_channel_leakage_tone_contract
+./build/cpp-offline/opena8djcpp_channel_leakage_tone_contract
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/channel-leakage-tone-contract.json`;
+- `channel_leakage_tone_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means clean digital A/B/C/D rows pass and injected-leak rows fail at
+  both validated sample rates.
+- PASS does not mean physical deck isolation is proven.
+- FAIL blocks physical routing/no-leakage claims until fixed.

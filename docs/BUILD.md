@@ -655,3 +655,22 @@ The full offline gate runs the analyzer automatically and writes:
 
 The analyzer is offline and dependency-free. It does not open audio devices,
 touch USB, install drivers, or activate system extensions.
+
+## C++ Channel Leakage Contract
+
+The offline build includes `opena8djcpp_channel_leakage_tone_contract`.
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_channel_leakage_tone_contract
+./build/cpp-offline/opena8djcpp_channel_leakage_tone_contract
+```
+
+The full offline gate runs it automatically and writes:
+
+- `local-analysis/cpp-offline/channel-leakage-tone-contract.json`
+- the `channel_leakage_tone_contract` summary in
+  `local-analysis/cpp-offline/current-offline-gates.json`
+
+This is a digital Mode 2 pack/decode and tone-analysis contract. It does not
+replace physical A/B/C/D external-loopback evidence.

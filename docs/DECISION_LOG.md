@@ -4555,3 +4555,39 @@ Next implication:
   other external-loopback captures. This still does not prove readiness until
   the same route shows C++ > mainline on quality, CPU, jitter, routing, and
   timecode.
+
+## 2026-06-17: Add C++ Channel Leakage Tone Contract
+
+Decision:
+- Add `tools/channel_leakage_tone_contract.cpp` and wire it into CMake, CTest,
+  `scripts/run-cpp-offline-gates`, and evidence schema.
+
+Reason:
+- The product gate requires no leakage between decks A/B/C/D. Existing physical
+  tone-matrix analysis is useful, but the C++ line also needs a compiled
+  offline contract proving the analyzer and Mode 2 pack/decode path can detect
+  deck leakage.
+- The contract generates per-channel integer-cycle tones for 44.1 kHz and
+  48 kHz, exercises each active pair A/B/C/D through real Mode 2 pack/decode,
+  measures wrong-source and inactive-deck tone energy, and confirms an injected
+  inactive-deck leak is rejected.
+
+Alternatives discarded:
+- Reuse only `simulated_output_matrix`: rejected because that gate measures
+  broad synthetic audio quality but does not explicitly prove a tone-domain
+  leakage detector with negative injected-leak cases.
+- Port the full physical capture analyzer in the same patch: deferred because
+  that is larger and should read existing capture directories without touching
+  hardware.
+
+Evidence:
+- `local-analysis/cpp-offline/channel-leakage-tone-contract.json`
+- Required result:
+  all clean A/B/C/D rows pass at 44.1 kHz and 48 kHz; all injected-leak rows
+  are rejected; aggregate result PASS.
+
+Next implication:
+- The C++ offline suite now has a stricter digital no-leakage contract. It is
+  still not physical routing proof; the next analyzer should consume stored
+  `fixture/reference.wav` and `captured.wav` runs and report the physical
+  leakage fields used by the current Python tone-matrix gate.
