@@ -1,0 +1,227 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+usage: scripts/run-known-good-route-soundcheck --output-device NAME --capture-device NAME --reference-wav PATH [options]
+
+Runs a lock-gated non-Audio8 known-good source route check:
+explicit CoreAudio output device -> physical route -> iRig capture.
+
+This script rejects OpenA8DJ/Audio 8 as the output source. It does not install
+drivers, load HAL, change default devices, restart CoreAudio, or reset USB.
+
+Options:
+  --run-dir PATH             Evidence directory
+  --output-device NAME       Explicit non-Audio8 output device name/substring
+  --output-device-uid UID    Explicit non-Audio8 output device UID
+  --capture-device NAME      External capture device, e.g. "iRig Stream"
+  --capture-channels LIST    Capture channels, default 1,2
+  --reference-wav PATH       Existing stereo PCM16 WAV reference
+  --seconds N                Capture/reference seconds, default from WAV
+  --postroll-seconds N       Capture tail after playback, default 2
+  --max-lag N                Analyzer max lag frames, default 360000
+  --skip-build               Do not build tools before running
+  -h, --help                 Show this help
+USAGE
+}
+
+repo_root() {
+  cd "$(dirname "$0")/.." && pwd
+}
+
+reject_audio8_source() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    *opena8dj*|*open\ audio\ 8*|*audio\ 8\ dj*|*org.opena8dj.audio8dj*)
+      echo "known-good output source must not be OpenA8DJ/Audio 8: $1" >&2
+      return 1
+      ;;
+  esac
+}
+
+looks_virtual_capture() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    *blackhole*|*soundflower*|*vb-cable*|*vbcable*|*background\ music*|*loopback\ audio*|*rogue\ amoeba\ loopback*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+json_wav_duration() {
+  /usr/bin/python3 - "$1" <<'PY'
+import sys, wave
+with wave.open(sys.argv[1], "rb") as wav:
+    frames = wav.getnframes()
+    rate = wav.getframerate()
+print(f"{frames / rate:.6f}")
+PY
+}
+
+root="$(repo_root)"
+run_dir=""
+output_device=""
+output_device_uid=""
+capture_device=""
+capture_channels="1,2"
+reference_wav=""
+seconds=""
+postroll_seconds="2"
+max_lag="360000"
+skip_build=0
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --output-device|--output-device-name) output_device="$2"; shift 2 ;;
+    --output-device-uid) output_device_uid="$2"; shift 2 ;;
+    --capture-device) capture_device="$2"; shift 2 ;;
+    --capture-channels) capture_channels="$2"; shift 2 ;;
+    --reference-wav) reference_wav="$2"; shift 2 ;;
+    --seconds) seconds="$2"; shift 2 ;;
+    --postroll-seconds) postroll_seconds="$2"; shift 2 ;;
+    --max-lag) max_lag="$2"; shift 2 ;;
+    --skip-build) skip_build=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$output_device" ] && [ -z "$output_device_uid" ]; then
+  echo "--output-device or --output-device-uid is required" >&2
+  exit 2
+fi
+if [ -n "$output_device" ]; then
+  reject_audio8_source "$output_device"
+fi
+if [ -n "$output_device_uid" ]; then
+  reject_audio8_source "$output_device_uid"
+fi
+if [ -z "$capture_device" ]; then
+  echo "--capture-device is required" >&2
+  exit 2
+fi
+if looks_virtual_capture "$capture_device"; then
+  echo "capture-device appears virtual/pre-device: $capture_device" >&2
+  exit 2
+fi
+if [ -z "$reference_wav" ]; then
+  echo "--reference-wav is required" >&2
+  exit 2
+fi
+case "$reference_wav" in
+  /*) ;;
+  *) reference_wav="$root/$reference_wav" ;;
+esac
+if [ ! -f "$reference_wav" ]; then
+  echo "reference-wav not found: $reference_wav" >&2
+  exit 2
+fi
+
+if [ -z "$seconds" ]; then
+  seconds="$(json_wav_duration "$reference_wav")"
+fi
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/known-good-route/$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+case "$run_dir" in
+  /*) ;;
+  *) run_dir="$root/$run_dir" ;;
+esac
+mkdir -p "$run_dir/fixture"
+
+if [ "$skip_build" -ne 1 ]; then
+  make -C "$root" build/audio-wav-play build/audio-record >/dev/null
+fi
+
+cp "$reference_wav" "$run_dir/fixture/reference.wav"
+reference="$run_dir/fixture/reference.wav"
+capture="$run_dir/captured.wav"
+record_log="$run_dir/record.log"
+play_log="$run_dir/play.log"
+metrics="$run_dir/metrics.json"
+
+record_seconds="$(/usr/bin/python3 - "$seconds" "$postroll_seconds" <<'PY'
+import sys
+print(f"{float(sys.argv[1]) + float(sys.argv[2]):.6f}")
+PY
+)"
+
+# shellcheck source=scripts/hardware-lock-lib.sh
+source "$root/scripts/hardware-lock-lib.sh"
+opena8dj_acquire_hardware_lock \
+  "$root" \
+  "known-good-route-soundcheck" \
+  "$run_dir" \
+  "explicit non-Audio8 CoreAudio output playback, iRig Stream capture, no defaults change" \
+  "driver-install,HAL-load,default-device-change,CoreAudio-restart,USB-reset"
+trap opena8dj_release_hardware_lock EXIT
+cp "$(opena8dj_lock_root)/owner" "$run_dir/lock-owner.txt" 2>/dev/null || true
+
+"$root/build/audio-record" "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
+  > "$record_log" 2>&1 &
+recorder_pid=$!
+
+sleep 0.6
+player_args=("$reference" A "--no-stream-usage" "--no-set-rate" "--require-rate-match")
+if [ -n "$output_device_uid" ]; then
+  player_args+=("--device-uid" "$output_device_uid")
+else
+  player_args+=("--device" "$output_device")
+fi
+set +e
+"$root/build/audio-wav-play" "${player_args[@]}" > "$play_log" 2>&1
+player_rc=$?
+wait "$recorder_pid"
+recorder_rc=$?
+set -e
+
+if [ "$player_rc" -ne 0 ] || [ "$recorder_rc" -ne 0 ]; then
+  {
+    echo "KNOWN_GOOD_ROUTE: FAIL"
+    echo "player_rc=$player_rc"
+    echo "recorder_rc=$recorder_rc"
+    echo "run_dir=$run_dir"
+    echo "play_log=$play_log"
+    echo "record_log=$record_log"
+  } > "$run_dir/summary.txt"
+  exit 1
+fi
+
+/usr/bin/python3 "$root/scripts/analyze-soundcheck-capture.py" "$reference" "$capture" \
+  --max-seconds "$seconds" \
+  --max-lag "$max_lag" \
+  --min-alignment 0.98 \
+  --min-snr-db 35 \
+  --max-clicks 0 \
+  --max-lag-jumps 0 \
+  --max-mid-band-residual-ratio 1.36 \
+  --max-high-band-residual-ratio 1.35 \
+  --max-quiet-mid-band-noise-dbfs -58 \
+  --json-out "$metrics"
+
+result="$(/usr/bin/python3 - "$metrics" <<'PY'
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    data = json.load(handle)
+print(data.get("result", "missing"))
+PY
+)"
+
+{
+  echo "KNOWN_GOOD_ROUTE: $result"
+  echo "output_device=${output_device:-}"
+  echo "output_device_uid=${output_device_uid:-}"
+  echo "capture_device=$capture_device"
+  echo "capture_channels=$capture_channels"
+  echo "reference=$reference"
+  echo "capture=$capture"
+  echo "metrics=$metrics"
+  echo "run_dir=$run_dir"
+} > "$run_dir/summary.txt"
+
+[ "$result" = "PASS" ]

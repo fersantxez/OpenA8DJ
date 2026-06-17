@@ -2,6 +2,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include <math.h>
 #include <stdatomic.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,14 @@ typedef struct PlayerState {
     atomic_ullong doneNsec;
     UInt64 callbacks;
 } PlayerState;
+
+typedef struct PlayerOptions {
+    const char *deviceName;
+    const char *deviceUID;
+    int explicitDevice;
+    int setRate;
+    int requireRateMatch;
+} PlayerOptions;
 
 static uint64_t MonotonicNsec(void)
 {
@@ -260,6 +269,149 @@ static AudioObjectID FindDeviceByUID(CFStringRef targetUID)
     return found;
 }
 
+static UInt32 CountOutputChannels(AudioObjectID deviceID)
+{
+    AudioObjectPropertyAddress address = {
+        kAudioDevicePropertyStreamConfiguration,
+        kAudioObjectPropertyScopeOutput,
+        kAudioObjectPropertyElementMain
+    };
+    UInt32 dataSize = 0;
+    if (AudioObjectGetPropertyDataSize(deviceID, &address, 0, NULL, &dataSize) != kAudioHardwareNoError ||
+        dataSize == 0) {
+        return 0;
+    }
+    AudioBufferList *buffers = (AudioBufferList *)calloc(1, dataSize);
+    if (buffers == NULL) {
+        return 0;
+    }
+    OSStatus status = AudioObjectGetPropertyData(deviceID, &address, 0, NULL, &dataSize, buffers);
+    UInt32 channels = 0;
+    if (status == kAudioHardwareNoError) {
+        for (UInt32 i = 0; i < buffers->mNumberBuffers; i++) {
+            channels += buffers->mBuffers[i].mNumberChannels;
+        }
+    }
+    free(buffers);
+    return channels;
+}
+
+static AudioObjectID FindOutputDevice(const char *requestedName,
+                                      const char *requestedUID,
+                                      CFStringRef fallbackUID)
+{
+    if (requestedUID == NULL && requestedName == NULL) {
+        return FindDeviceByUID(fallbackUID);
+    }
+
+    CFStringRef targetUID = NULL;
+    CFStringRef targetName = NULL;
+    if (requestedUID != NULL) {
+        targetUID = CFStringCreateWithCString(kCFAllocatorDefault,
+                                              requestedUID,
+                                              kCFStringEncodingUTF8);
+    }
+    if (requestedName != NULL) {
+        targetName = CFStringCreateWithCString(kCFAllocatorDefault,
+                                               requestedName,
+                                               kCFStringEncodingUTF8);
+    }
+
+    AudioObjectPropertyAddress address = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+    UInt32 dataSize = 0;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &address, 0, NULL, &dataSize) != kAudioHardwareNoError) {
+        if (targetUID != NULL) {
+            CFRelease(targetUID);
+        }
+        if (targetName != NULL) {
+            CFRelease(targetName);
+        }
+        return kAudioObjectUnknown;
+    }
+    UInt32 count = dataSize / (UInt32)sizeof(AudioObjectID);
+    AudioObjectID *devices = calloc(count, sizeof(AudioObjectID));
+    if (devices == NULL) {
+        if (targetUID != NULL) {
+            CFRelease(targetUID);
+        }
+        if (targetName != NULL) {
+            CFRelease(targetName);
+        }
+        return kAudioObjectUnknown;
+    }
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &address, 0, NULL, &dataSize, devices) != kAudioHardwareNoError) {
+        free(devices);
+        if (targetUID != NULL) {
+            CFRelease(targetUID);
+        }
+        if (targetName != NULL) {
+            CFRelease(targetName);
+        }
+        return kAudioObjectUnknown;
+    }
+
+    AudioObjectID found = kAudioObjectUnknown;
+    for (UInt32 i = 0; i < count; i++) {
+        if (CountOutputChannels(devices[i]) == 0) {
+            continue;
+        }
+        CFStringRef uid = NULL;
+        UInt32 uidSize = sizeof(uid);
+        CFStringRef name = NULL;
+        UInt32 nameSize = sizeof(name);
+        (void)GetProperty(devices[i],
+                          kAudioDevicePropertyDeviceUID,
+                          kAudioObjectPropertyScopeGlobal,
+                          &uidSize,
+                          &uid);
+        (void)GetProperty(devices[i],
+                          kAudioObjectPropertyName,
+                          kAudioObjectPropertyScopeGlobal,
+                          &nameSize,
+                          &name);
+        bool uidMatches = targetUID != NULL && uid != NULL && CFEqual(uid, targetUID);
+        bool nameMatches = targetName != NULL && name != NULL && CFStringFind(name, targetName, kCFCompareCaseInsensitive).location != kCFNotFound;
+        if (uidMatches || nameMatches) {
+            found = devices[i];
+        }
+        if (uid != NULL) {
+            CFRelease(uid);
+        }
+        if (name != NULL) {
+            CFRelease(name);
+        }
+        if (found != kAudioObjectUnknown) {
+            break;
+        }
+    }
+    free(devices);
+    if (targetUID != NULL) {
+        CFRelease(targetUID);
+    }
+    if (targetName != NULL) {
+        CFRelease(targetName);
+    }
+    return found;
+}
+
+static double CurrentSampleRate(AudioObjectID device)
+{
+    double rate = 0.0;
+    UInt32 size = sizeof(rate);
+    if (GetProperty(device,
+                    kAudioDevicePropertyNominalSampleRate,
+                    kAudioObjectPropertyScopeGlobal,
+                    &size,
+                    &rate) != kAudioHardwareNoError) {
+        return 0.0;
+    }
+    return rate;
+}
+
 static OSStatus IOProc(AudioObjectID inDevice,
                        const AudioTimeStamp *inNow,
                        const AudioBufferList *inInputData,
@@ -334,7 +486,10 @@ static OSStatus IOProc(AudioObjectID inDevice,
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "usage: audio-wav-play <file.wav> [A|B|C|D|0-3] [--stream-usage|--no-stream-usage]\n");
+        fprintf(stderr,
+                "usage: audio-wav-play <file.wav> [A|B|C|D|0-3] [--stream-usage|--no-stream-usage]\n"
+                "                      [--device NAME|--device-uid UID] [--set-rate|--no-set-rate]\n"
+                "                      [--require-rate-match|--allow-rate-mismatch]\n");
         return 2;
     }
 
@@ -346,12 +501,46 @@ int main(int argc, char **argv)
 
     state.pairIndex = 0;
     state.useStreamUsage = 1;
+    PlayerOptions options;
+    memset(&options, 0, sizeof(options));
+    options.setRate = 1;
+    options.requireRateMatch = 0;
     for (int arg = 2; arg < argc; arg++) {
         const char *value = argv[arg];
         if (strcmp(value, "--stream-usage") == 0) {
             state.useStreamUsage = 1;
         } else if (strcmp(value, "--no-stream-usage") == 0) {
             state.useStreamUsage = 0;
+        } else if (strcmp(value, "--device") == 0 || strcmp(value, "--device-name") == 0) {
+            if (arg + 1 >= argc) {
+                fprintf(stderr, "%s requires a value\n", value);
+                free(state.wav.samples);
+                return 2;
+            }
+            options.deviceName = argv[++arg];
+            options.explicitDevice = 1;
+            options.setRate = 0;
+            options.requireRateMatch = 1;
+            state.useStreamUsage = 0;
+        } else if (strcmp(value, "--device-uid") == 0) {
+            if (arg + 1 >= argc) {
+                fprintf(stderr, "%s requires a value\n", value);
+                free(state.wav.samples);
+                return 2;
+            }
+            options.deviceUID = argv[++arg];
+            options.explicitDevice = 1;
+            options.setRate = 0;
+            options.requireRateMatch = 1;
+            state.useStreamUsage = 0;
+        } else if (strcmp(value, "--set-rate") == 0) {
+            options.setRate = 1;
+        } else if (strcmp(value, "--no-set-rate") == 0) {
+            options.setRate = 0;
+        } else if (strcmp(value, "--require-rate-match") == 0) {
+            options.requireRateMatch = 1;
+        } else if (strcmp(value, "--allow-rate-mismatch") == 0) {
+            options.requireRateMatch = 0;
         } else if (value[0] >= 'A' && value[0] <= 'D') {
             state.pairIndex = (UInt32)(value[0] - 'A');
         } else if (value[0] >= 'a' && value[0] <= 'd') {
@@ -378,19 +567,36 @@ int main(int argc, char **argv)
     atomic_init(&state.firstCallbackNsec, 0);
     atomic_init(&state.doneNsec, 0);
 
-    AudioObjectID device = FindDeviceByUID(CFSTR("org.opena8dj.Audio8DJ"));
+    AudioObjectID device = FindOutputDevice(options.deviceName,
+                                            options.deviceUID,
+                                            CFSTR("org.opena8dj.Audio8DJ"));
     if (device == kAudioObjectUnknown) {
-        fprintf(stderr, "Open Audio 8 DJ not found\n");
+        fprintf(stderr,
+                "output device not found%s%s%s\n",
+                options.deviceName != NULL ? " name=" : "",
+                options.deviceName != NULL ? options.deviceName : "",
+                options.deviceUID != NULL ? " uid requested" : "");
         free(state.wav.samples);
         return 5;
     }
 
-    double rate = state.wav.sampleRate;
-    (void)SetProperty(device,
-                      kAudioDevicePropertyNominalSampleRate,
-                      kAudioObjectPropertyScopeGlobal,
-                      sizeof(rate),
-                      &rate);
+    const double currentRate = CurrentSampleRate(device);
+    if (options.requireRateMatch && currentRate > 0.0 && fabs(currentRate - state.wav.sampleRate) > 0.5) {
+        fprintf(stderr,
+                "sample-rate mismatch: device=%.0f wav=%.0f; refusing to resample or change device rate\n",
+                currentRate,
+                state.wav.sampleRate);
+        free(state.wav.samples);
+        return 9;
+    }
+    if (options.setRate) {
+        double rate = state.wav.sampleRate;
+        (void)SetProperty(device,
+                          kAudioDevicePropertyNominalSampleRate,
+                          kAudioObjectPropertyScopeGlobal,
+                          sizeof(rate),
+                          &rate);
+    }
 
     AudioDeviceIOProcID ioProcID = NULL;
     OSStatus status = AudioDeviceCreateIOProcID(device, IOProc, &state, &ioProcID);
@@ -428,12 +634,17 @@ int main(int argc, char **argv)
     double doneSeconds = doneNsec > startNsec ?
         (double)(doneNsec - startNsec) / 1000000000.0 :
         -1.0;
-    printf("played path=%s pair=%c frames=%u callbacks=%llu stream_usage=%s first_callback_seconds=%.6f done_seconds=%.6f\n",
+    printf("played path=%s pair=%c frames=%u callbacks=%llu stream_usage=%s explicit_device=%s set_rate=%s require_rate_match=%s device_rate=%.0f wav_rate=%.0f first_callback_seconds=%.6f done_seconds=%.6f\n",
            argv[1],
            'A' + state.pairIndex,
            atomic_load(&state.frameIndex),
            state.callbacks,
            state.useStreamUsage ? "on" : "off",
+           options.explicitDevice ? "true" : "false",
+           options.setRate ? "true" : "false",
+           options.requireRateMatch ? "true" : "false",
+           currentRate,
+           state.wav.sampleRate,
            firstCallbackSeconds,
            doneSeconds);
     free(state.wav.samples);

@@ -770,3 +770,36 @@ The tool aggregates stored offline timecode/DVS evidence and reports whether
 physical Traktor/timecode-vinyl validation is still blocked. It does not open
 audio devices, touch USB, launch Traktor, install drivers, or activate system
 extensions.
+
+## Known-Good Route Soundcheck Harness
+
+The physical route isolation wrapper is:
+
+```sh
+scripts/run-known-good-route-soundcheck --help
+```
+
+It is intentionally hardware-lock gated and requires an explicit non-Audio8
+output device plus an explicit capture device:
+
+```sh
+scripts/run-known-good-route-soundcheck \
+  --output-device "<known-good output device name>" \
+  --capture-device "iRig Stream" \
+  --capture-channels 1,2 \
+  --reference-wav /absolute/path/to/reference.wav \
+  --seconds 12 \
+  --run-dir local-analysis/known-good-route/<timestamp>-known-good-irig
+```
+
+The wrapper builds `build/audio-wav-play` and `build/audio-record`, starts the
+capture, plays the reference WAV through the selected output, and then runs
+`scripts/analyze-soundcheck-capture.py`.
+
+`audio-wav-play` now supports `--device` and `--device-uid` for diagnostics.
+When one of those options is used, it does not set device sample rate by
+default and it requires the WAV sample rate to match the selected device. This
+prevents a route check from silently changing system audio state.
+
+Do not use this wrapper as a product claim. It is a route-health prerequisite
+for later Audio 8 DJ and mainline/C++ same-session comparisons.

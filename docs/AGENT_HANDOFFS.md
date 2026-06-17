@@ -2851,3 +2851,43 @@ Risk:
 - Next action:
   - Bind prepared transport into the runtime candidate path, then run a
     lock-gated same-session A/B hardware window only after offline gates pass.
+
+## 2026-06-17 Reused Subagent: Ramanujan Route Harness Scout
+
+- Agent:
+  - Ramanujan (`019ed6f3-1e16-7343-a88f-b7c993f26ae3`).
+- Mission:
+  - Inspect existing local soundcheck tooling read-only and identify the
+    smallest safe change to test a known-good non-Audio8 source through the
+    iRig capture route.
+  - No hardware, no CoreAudio/USB reset, no driver install/load, no default
+    device changes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.`
+- Findings:
+  - Existing `scripts/run-soundcheck` is lock gated, but playback was fixed to
+    the OpenA8DJ/CoreAudio Audio 8 output path.
+  - `src/tools/audio-wav-play.c` needed explicit device name/UID selection to
+    drive a controlled non-Audio8 route test.
+  - Explicit-device playback should refuse hidden default-device changes and
+    sample-rate changes.
+- Integrated action:
+  - Added explicit `--device` / `--device-uid` playback support.
+  - Added `scripts/run-known-good-route-soundcheck`.
+  - Added hardware-lock policy coverage for the wrapper.
+- Files affected:
+  - `src/tools/audio-wav-play.c`.
+  - `scripts/run-known-good-route-soundcheck`.
+  - `tools/hardware_lock_policy_check.cpp`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/TEST_PLAN.md`.
+  - `docs/TEST_EVIDENCE.md`.
+  - `docs/BUILD.md`.
+- Next action:
+  - Use the wrapper only in an authorized physical window with a real
+    non-Audio8 output routed into the same iRig capture chain.

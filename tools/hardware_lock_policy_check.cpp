@@ -49,6 +49,7 @@ int main(int argc, char** argv) {
   const auto direct_soundcheck = read_file(root / "scripts/run-direct-usb-soundcheck");
   const auto soundcheck = read_file(root / "scripts/run-soundcheck");
   const auto matrix = read_file(root / "scripts/run-channel-matrix-gate");
+  const auto known_good = read_file(root / "scripts/run-known-good-route-soundcheck");
 
   const bool lib_ok = contains_all(lib,
                                    {
@@ -122,19 +123,33 @@ int main(int argc, char** argv) {
                                       missing,
                                       "scripts/run-channel-matrix-gate");
 
+  const bool known_good_ok = contains_all(known_good,
+                                          {
+                                              "hardware-lock-lib.sh",
+                                              "opena8dj_acquire_hardware_lock",
+                                              "known-good-route-soundcheck",
+                                              "explicit non-Audio8 CoreAudio output playback, iRig Stream capture",
+                                              "trap opena8dj_release_hardware_lock EXIT",
+                                              "--output-device or --output-device-uid is required",
+                                              "driver-install,HAL-load,default-device-change,CoreAudio-restart,USB-reset",
+                                          },
+                                          missing,
+                                          "scripts/run-known-good-route-soundcheck");
+
   const bool pass = lib_ok && safety_ok && direct_ok && direct_soundcheck_ok &&
-                    soundcheck_ok && matrix_ok;
+                    soundcheck_ok && matrix_ok && known_good_ok;
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.hardware-lock-policy.v1\",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-            << "  \"audited_scripts\": 6,\n"
+            << "  \"audited_scripts\": 7,\n"
             << "  \"missing_requirements\": " << missing.size() << ",\n"
             << "  \"sensitive_paths\": [\n"
             << "    \"scripts/test-hal-candidate-safety\",\n"
             << "    \"scripts/run-audio8dj-direct-gate\",\n"
             << "    \"scripts/run-direct-usb-soundcheck\",\n"
             << "    \"scripts/run-soundcheck\",\n"
-            << "    \"scripts/run-channel-matrix-gate\"\n"
+            << "    \"scripts/run-channel-matrix-gate\",\n"
+            << "    \"scripts/run-known-good-route-soundcheck\"\n"
             << "  ],\n"
             << "  \"missing\": [";
   for (std::size_t index = 0; index < missing.size(); ++index) {

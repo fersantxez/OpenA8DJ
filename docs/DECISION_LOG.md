@@ -5198,3 +5198,28 @@ Evidence:
 Next implication:
 - No existing physical run supports promotion. The next physical window must
   first prove capture-route health, then run same-session mainline/C++ A/B.
+
+## 2026-06-17: Add Known-Good Non-Audio8 Route Soundcheck Harness
+
+Decision:
+- Add a lock-gated physical harness for a known-good non-Audio8 playback
+  source through the existing capture route.
+- Extend `audio-wav-play` with explicit device name/UID selection so the
+  harness can target a chosen output device without changing default devices.
+- Refuse Audio 8 DJ/OpenA8DJ as the known-good source.
+
+Reason:
+- Existing evidence separates clean internal/USB payload from failed iRig
+  physical capture, but it cannot yet prove whether the shared mixer/REC OUT
+  -> iRig route is healthy enough for a fair driver comparison.
+- The next measurement should validate the route before another Audio 8 driver
+  candidate is judged.
+
+Evidence:
+- Focused build/usage/policy checks only so far; no physical route capture yet.
+
+Next implication:
+- Run this only inside an authorized hardware window, with the lock held, using
+  a real non-Audio8 output routed into the same capture path. Product readiness
+  and branch promotion remain blocked until the route test and same-session
+  mainline/C++ A/B pass.

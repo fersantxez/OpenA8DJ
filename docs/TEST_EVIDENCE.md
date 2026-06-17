@@ -8171,3 +8171,35 @@ Full offline gate rerun:
   - Existing physical evidence does not contain a promotion candidate.
   - The next useful physical evidence must be a lock-gated capture-route
     revalidation and same-session A/B against mainline.
+
+## 2026-06-17 Known-Good Route Soundcheck Harness
+
+- Scope:
+  - Tooling and policy validation for a future physical route-isolation run.
+  - No physical playback, capture, CoreAudio default changes, USB reset,
+    service restart, HAL install/load, or DriverKit activation performed.
+- Changes:
+  - Extended `src/tools/audio-wav-play.c` with explicit output device name/UID
+    selection for diagnostics.
+  - Added `scripts/run-known-good-route-soundcheck`.
+  - Extended `tools/hardware_lock_policy_check.cpp` to audit the new wrapper.
+- Focused commands:
+  - `make build/audio-wav-play`
+  - `./build/audio-wav-play`
+  - `scripts/run-known-good-route-soundcheck --help`
+  - `scripts/run-known-good-route-soundcheck --capture-device "iRig Stream" --reference-wav /tmp/nope.wav`
+  - `scripts/run-known-good-route-soundcheck --output-device "Open Audio 8 DJ" --capture-device "iRig Stream" --reference-wav /tmp/nope.wav`
+  - `cmake --build build/cpp-offline --target opena8djcpp_hardware_lock_policy_check`
+  - `./build/cpp-offline/opena8djcpp_hardware_lock_policy_check`
+- Focused result:
+  - `audio-wav-play` builds and prints the new usage including `--device`,
+    `--device-uid`, `--no-set-rate`, and `--require-rate-match`.
+  - The wrapper help prints successfully.
+  - The wrapper rejects missing explicit output device with exit code `2`.
+  - The wrapper rejects Open Audio 8 DJ as a known-good source with exit code
+    `1`.
+  - Hardware lock policy PASS with `7` audited scripts and `0` missing
+    requirements.
+- Interpretation:
+  - The next route isolation step is now scripted and auditable.
+  - This is not physical quality evidence and does not change readiness.

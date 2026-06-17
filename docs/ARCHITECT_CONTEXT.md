@@ -1926,3 +1926,23 @@ Current implication:
 - Existing physical evidence contains no run that can prove C++ superiority.
 - The next useful physical step remains capture-route revalidation plus a
   same-session A/B, not branch promotion.
+
+### 2026-06-17 Known-Good Route Soundcheck Harness
+
+- Added `scripts/run-known-good-route-soundcheck`.
+- Extended `src/tools/audio-wav-play.c` so locked diagnostics can play a WAV
+  through an explicitly selected non-Audio8 CoreAudio output device without
+  changing defaults and without changing that device's sample rate.
+- The harness records the physical route through the selected capture device,
+  normally `iRig Stream`, then runs the existing soundcheck analyzer.
+- Safety rules encoded in the wrapper:
+  - it refuses OpenA8DJ / Open Audio 8 DJ as the known-good output source;
+  - it requires explicit output device or UID and explicit capture device;
+  - it uses the global hardware lock;
+  - it does not install, load, unload, restart, reset USB, or change defaults.
+
+Current implication:
+- The next physical quality step can now isolate the shared mixer/REC OUT ->
+  iRig route from the Audio 8 DJ output path.
+- This harness has not been physically executed yet. It adds measurement
+  control, not product readiness.

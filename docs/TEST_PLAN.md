@@ -1193,6 +1193,34 @@ iRig idle capture gate:
   the same mixer/REC OUT -> iRig route. If that passes, test Audio 8 Pair A
   directly into iRig to isolate the DAC/analog output from the mixer route.
 
+Known-good route soundcheck:
+- Physical-only, lock-gated harness:
+  `scripts/run-known-good-route-soundcheck`.
+- Purpose:
+  - validate the shared analog route before evaluating the Audio 8 DJ driver;
+  - use a known-good non-Audio8 CoreAudio output as the playback source;
+  - capture through the explicit iRig route and analyze the result with the
+    same soundcheck quality thresholds.
+- Required command shape, inside an authorized hardware window only:
+
+```sh
+scripts/run-known-good-route-soundcheck \
+  --output-device "<known-good output device name>" \
+  --capture-device "iRig Stream" \
+  --capture-channels 1,2 \
+  --reference-wav /absolute/path/to/reference.wav \
+  --seconds 12 \
+  --run-dir local-analysis/known-good-route/<timestamp>-known-good-irig
+```
+
+- The output source must not be OpenA8DJ, Open Audio 8 DJ, or Audio 8 DJ.
+- The wrapper must not change default devices, sample rate, CoreAudio services,
+  USB state, HAL install/load state, or DriverKit state.
+- PASS means the selected known-good source plus shared capture route met the
+  soundcheck thresholds for that run.
+- FAIL blocks driver quality comparison until the physical route is fixed or a
+  cleaner route is selected.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.
