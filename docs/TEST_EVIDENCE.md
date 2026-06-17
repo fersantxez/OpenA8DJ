@@ -7711,3 +7711,24 @@ Operational note:
     the stored WAV failure.
   - C++ remains not ready for branch promotion, Traktor/timecode readiness
     claims, or hardware-readiness claims.
+
+## 2026-06-17 HAL Hot-Path Diagnostic Build Target
+
+- Scope:
+  - Local build only.
+  - No install, load, unload, activation, hardware, CoreAudio, USB, default
+    device, service restart, or physical audio.
+- Commands:
+  - `make hal-hotpath-diagnostic`
+  - `make -B hal`
+- Result:
+  - Diagnostic HAL build PASS.
+  - Default HAL rebuild PASS after diagnostic build, so
+    `build/OpenA8DJ.driver` was restored to default flags.
+- Purpose:
+  - Prepare a future locked CPU-attribution window with
+    `HAL_HOT_PATH_TIMING=1`, per-transfer stats interval `1`, and atomic stream
+    accumulators.
+- Readiness:
+  - This is build evidence only. It does not prove CPU, quality, hardware
+    readiness, or branch promotion.

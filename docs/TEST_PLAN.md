@@ -1042,3 +1042,40 @@ PASS/FAIL semantics:
 - PASS on a stored physical run means that run met the supplied thresholds. It
   does not by itself prove the candidate beats mainline.
 - FAIL blocks any claim tied to the failed threshold dimension.
+
+## Locked Hot-Path CPU Attribution Window
+
+Purpose:
+
+- capture callback/hot-path timing for the sustained driver CPU blocker.
+- separate process CPU from capture handler, capture requeue, playback queue,
+  playback fill, playback enqueue, and playback completion costs.
+- avoid changing audio math while gathering attribution.
+
+Pre-window build:
+
+```sh
+make hal-hotpath-diagnostic
+```
+
+Safety requirements:
+
+- acquire `$HOME/.opena8dj/hardware-gate.lock`;
+- explicit user-approved physical window;
+- no default-device changes unless separately approved;
+- no CoreAudio/USB service restart unless separately approved;
+- evidence directory named before starting.
+
+After the diagnostic window:
+
+```sh
+make -B hal
+```
+
+PASS/FAIL semantics:
+
+- PASS for the diagnostic means evidence contains nonzero hot-path timing
+  samples and no cleanup failure.
+- It is not a product PASS.
+- Product CPU improvement still requires a separate same-session quality and
+  CPU run against mainline thresholds.

@@ -700,3 +700,29 @@ Capture mode reads stored run directories only:
 It expects `fixture/reference.wav` and `captured.wav` in each run directory.
 It does not open audio devices, touch USB, install drivers, or activate system
 extensions.
+
+## HAL Hot-Path Timing Diagnostic Build
+
+Use only to prepare a locked physical CPU-attribution window:
+
+```sh
+make hal-hotpath-diagnostic
+```
+
+This builds `build/OpenA8DJ.driver` with:
+
+- `HAL_HOT_PATH_TIMING=1`
+- `HAL_HOT_STREAM_STATS_INTERVAL=1`
+- `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1`
+- `HAL_TRANSFER_LEDGER=0`
+- `HAL_PLAYBACK_PAYLOAD_GUARD=0`
+- `HAL_CADENCE_DIAGNOSTIC=0`
+
+It does not install, load, unload, activate, or touch hardware by itself.
+
+After building a diagnostic HAL, restore the default local bundle before any
+non-diagnostic packaging or install step:
+
+```sh
+make -B hal
+```
