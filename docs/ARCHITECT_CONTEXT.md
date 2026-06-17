@@ -1049,3 +1049,23 @@ Next technical target:
   - No gross output underruns, timeline resets, late writes, or transfer-pool
     fallback allocations.
   - Decision: reject reused ISO completion handlers as product default.
+- Latest locked descriptor-layout probe:
+  `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal`.
+  - Built with `HAL_FAST_ISO_TRANSFER_CONFIG=1` only.
+  - Quality still FAIL:
+    `quality_alignment_score=0.959397`, SNR floor `10.19 dB`, mid/high
+    residual `1.450623/1.368530`, quiet mid noise `-35.05 dBFS`, `35` lag
+    jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `23.1%`, `coreaudiod` p95 `25.9%`.
+  - Capture ISO invariants PASS with no warnings, but product quality and CPU
+    still fail.
+  - Decision: reject fast ISO transfer config as product default.
+- Subagent synthesis:
+  - Hume identified low-risk CPU flags to isolate; reused completion handlers
+    and fast ISO transfer config have now both been physically rejected as
+    defaults.
+  - Carver ranked capture/reference route validation as the next lowest-risk
+    high-value physical step because multiple current runs share a failing
+    route signature. Do not claim audiophile quality until the capture route is
+    independently validated.

@@ -1287,3 +1287,79 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Keep `HAL_REUSE_ISOC_COMPLETIONS=0`.
   - Focus on a transport redesign or a stronger scheduler model that preserves
     1:1 cadence and can be proven offline before another physical run.
+
+### Hume CPU/Hot-Path Explorer
+
+- Status:
+  - Completed read-only analysis.
+  - No file edits, no hardware, no CoreAudio/USB mutation.
+- Mission:
+  - Identify CPU/hot-path changes that preserve 1:1 capture-paced cadence and
+    can be tested offline before hardware.
+- Findings:
+  - Recommended isolating `HAL_FAST_ISO_TRANSFER_CONFIG=1` because it reuses
+    stable ISO transaction layout without changing request counts or cadence.
+  - Recommended isolating `HAL_REUSE_ISOC_COMPLETIONS=1` because it avoids
+    per-transfer completion block creation without changing payload or cadence.
+  - Suggested input-decode inactive bypass and a future serial/free-list pool
+    redesign as deeper candidates.
+- Integration result:
+  - Reused ISO completion handlers were physically tested and rejected as a
+    product default.
+  - Fast ISO transfer config was physically tested and rejected as a product
+    default.
+  - Remaining Hume suggestions require code/model work before more hardware.
+
+### Carver Evidence/Priority Explorer
+
+- Status:
+  - Completed read-only analysis.
+  - No file edits, no hardware, no CoreAudio/USB mutation.
+- Mission:
+  - Rank the next physical test by evidence, risk, and required offline
+    preconditions.
+- Findings:
+  - Ranked capture/reference route validation as the lowest-risk high-value
+    next physical step because mainline and C++ share failing route signatures
+    in several current iRig runs.
+  - Ranked timebase/cadence after payload correctness as the next Audio 8 DJ
+    target; ledger and payload evidence already reject byte corruption and
+    gross underruns.
+  - Ranked CPU/transport enqueue work as real but secondary until the route and
+    quality gate are trustworthy.
+- Integration result:
+  - Do not claim audiophile superiority from the current iRig route.
+  - Further CPU probes must be justified by a model or isolated implementation
+    change; route validation is now the preferred next hardware window if a
+    physically valid bypass path exists.
+
+### Architect Fast ISO Transfer Config Product Probe
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Isolated `HAL_FAST_ISO_TRANSFER_CONFIG=1` failed quality:
+    quality `0.959397`, SNR floor `10.19 dB`, mid/high residual
+    `1.450623/1.368530`, `35` lag jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `23.1%`, `coreaudiod` p95 `25.9%`.
+  - Capture ISO invariants pass with no warnings.
+  - Stream stats show no output active underruns, timeline resets, late writes,
+    or transfer-pool fallback allocations.
+- Risks:
+  - Descriptor-layout reuse is not the bottleneck; further small hot-path flags
+    risk wasting physical windows.
+- Next recommended action:
+  - Keep `HAL_FAST_ISO_TRANSFER_CONFIG=0`.
+  - Prefer capture-route validation or a deeper transport redesign model over
+    more one-flag HAL hot-path probes.

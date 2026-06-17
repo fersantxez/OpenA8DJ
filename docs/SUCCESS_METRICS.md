@@ -1011,3 +1011,28 @@ Latest promotion evaluation:
   - This result confirms that removing per-transfer block setup alone is not
     enough; the remaining CPU problem is deeper in IOUSBHost enqueue/completion
     behavior or transport architecture.
+
+## 2026-06-17 Updated Snapshot After Fast ISO Transfer Config Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-fast-iso-transfer-config.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.959397` versus required `>= 0.980000`.
+  - SNR floor `10.19 dB` versus required `>= 35.00 dB`.
+  - mid/high residual ratios `1.450623/1.368530` versus required maxima
+    `1.36/1.35`.
+  - quiet mid noise `-35.05 dBFS` versus required `<= -58.00 dBFS`.
+  - `lag_jumps_gt_2_frames=35` versus required `0`.
+- Runtime CPU beats mainline: FAIL.
+  - Product probe driver p95 `23.1%`.
+  - Product probe `coreaudiod` p95 `25.9%`.
+  - Mainline target remains around driver p95 `<= 6.5%` and `coreaudiod`
+    p95 `<= 1.7%` under comparable conditions.
+- Current threshold interpretation:
+  - `HAL_FAST_ISO_TRANSFER_CONFIG=1` is rejected as a product default.
+  - Passing ISO invariants and preserving descriptor layout do not establish
+    sound quality, timecode readiness, or low resource use.

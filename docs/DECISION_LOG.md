@@ -2774,3 +2774,37 @@ Evidence:
 - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/failure-modes.json`
 - `local-analysis/runtime-isolation/after-reuse-isoc-completions-unload.json`
 - `local-analysis/promotion-readiness-after-reuse-isoc-completions.json`
+
+## 2026-06-17: Reject Fast ISO Transfer Config As Default
+
+Decision:
+- Keep `HAL_FAST_ISO_TRANSFER_CONFIG=0` as the product default.
+- Do not use descriptor-layout reuse as a CPU or readiness claim.
+
+Reason:
+- The isolated locked probe with `HAL_FAST_ISO_TRANSFER_CONFIG=1` still failed
+  physical music quality:
+  quality `0.959397`, SNR floor `10.19 dB`, mid/high residual
+  `1.450623/1.368530`, quiet mid noise `-35.05 dBFS`, and `35` lag jumps.
+- Runtime CPU still failed mainline and did not improve versus recent probes:
+  driver p95 `23.1%`, `coreaudiod` p95 `25.9%`.
+- Capture ISO invariants passed with no warnings, and stream stats showed no
+  gross underruns or pool fallback allocations. That is useful negative
+  evidence: repeated descriptor configuration is not the primary quality or
+  CPU blocker.
+
+Alternatives discarded:
+- Promote fast ISO transfer config because it preserves packet layout:
+  rejected because preserving layout is necessary but not sufficient.
+- Combine it with reused completion handlers immediately: rejected because
+  both isolated factors failed to produce a product win.
+- Treat no ISO invariant warnings as quality evidence: rejected because music
+  quality and CPU gates are the product truth.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/runtime-isolation/after-fast-iso-transfer-config-unload.json`
+- `local-analysis/promotion-readiness-after-fast-iso-transfer-config.json`

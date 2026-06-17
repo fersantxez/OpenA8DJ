@@ -292,3 +292,25 @@ Latest promotion evaluation:
 Decision remains unchanged: keep `HAL_REUSE_ISOC_COMPLETIONS=0`, do not move C
 mainline to Legacy, do not move C++ to `main`, and do not claim audiophile
 readiness.
+
+## 2026-06-17 Fast ISO Transfer Config Probe Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-fast-iso-transfer-config.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Product CPU/hot-path probe still fails real-music quality:
+  quality `0.959397`, SNR floor `10.19 dB`, mid/high residual
+  `1.450623/1.368530`, quiet mid noise `-35.05 dBFS`, `35` lag jumps.
+- Runtime CPU still fails mainline:
+  driver p95 `23.1%`, `coreaudiod` p95 `25.9%`.
+- Capture ISO invariants pass with no warnings, and stream stats show no gross
+  underruns, timeline resets, late writes, or pool fallback allocations.
+- Final cleanup:
+  `local-analysis/runtime-isolation/after-fast-iso-transfer-config-unload.json`
+  PASS, HAL inactive, lock absent.
+
+Decision remains unchanged: keep `HAL_FAST_ISO_TRANSFER_CONFIG=0`, do not move
+C mainline to Legacy, do not move C++ to `main`, and do not claim audiophile
+readiness.
