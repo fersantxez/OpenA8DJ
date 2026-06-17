@@ -843,3 +843,54 @@ Evidence:
 Follow-up:
 - Focus on transfer cadence, USB transaction state, `AUDIO_PARAMS` reset
   behavior, and device-observed control/stream state.
+
+## 2026-06-17: Add Hot Stream Stats Gate And Restore Atomic Output Write Stats
+
+Decision:
+- Port mainline-style `OPENA8DJ_ENABLE_HOT_STREAM_STATS` and
+  `OPENA8DJ_HOT_STREAM_STATS_INTERVAL` gates to the C++ HAL, with default
+  behavior still equivalent to the current per-completion stats path
+  (`enabled=1`, `interval=1`).
+- Change C++ `HAL_OUTPUT_WRITE_STATS` default from `0` to `1`, matching
+  mainline atomic-only accounting and removing a useless mutex path where
+  `addStreamStatAtOffset(outputFramesWritten)` was later overwritten by the
+  atomic snapshot value.
+- Add `outputLateWriteFrames` and `outputLateWriteBatches` observability to
+  the C++ stream stats payload and control tool, matching mainline semantics.
+
+Reason:
+- Read-only comparison found C++ was paying a stream-stats mutex on every
+  output write when `HAL_OUTPUT_WRITE_STATS=0`, but `streamStatsSnapshot`
+  always overwrote `outputFramesWritten` from `_outputFramesWrittenAtomic`.
+  That made the fallback both hot-path cost and unobservable.
+- Mainline already uses atomic output write stats by default and reports late
+  writes. C++ was missing late-write counters, leaving a plausible path where
+  physical quality could be bad while output counters looked clean.
+- The hot stream-stats gate gives controlled CPU/observability experiments
+  without changing the default physical candidate behavior.
+
+Alternatives discarded:
+- Disable hot stream stats by default now: rejected until a locked physical run
+  proves lower CPU without hiding required failure evidence.
+- Treat the old fast-clear/write-stats physical rejection as proof against
+  atomic write stats alone: rejected because that run changed two variables.
+  `HAL_FAST_OUTPUT_PREFETCH_CLEAR=0` remains the default.
+
+Evidence:
+- `make usb-play hal`
+- `make HAL_HOT_STREAM_STATS=0 usb-play hal`
+- `make HAL_OUTPUT_WRITE_STATS=0 usb-play hal`
+- `scripts/run-cpp-offline-gates` with Debug `16/16`, Release `17/17`.
+- Logs:
+  - `local-analysis/build-flags/hot-stats-off-build.log`
+  - `local-analysis/build-flags/output-write-stats-off-build.log`
+  - `local-analysis/build-flags/default-after-hot-stats-output-write-build.log`
+  - `local-analysis/offline-gates-after-hot-stats-output-write.log`
+
+Follow-up:
+- Next locked physical candidate should verify whether atomic write stats plus
+  late-write observability improves CPU diagnostics and whether any late writes
+  correlate with iRig quality failure.
+- If quality still fails, prioritize the other read-only findings: queue depth
+  `64/64` versus mainline `8/8`, output prefetch `256` versus mainline `64`,
+  and input/control-plane parity.

@@ -2010,3 +2010,41 @@ Operational note:
 - Interpretation:
   - Physical variant evidence is safer because `HAL_*` changes can no longer
     silently reuse stale `hal` or `usb-play` binaries.
+
+## 2026-06-17: Hot Stats Gate, Atomic Output Write Stats, Late-Write Counters
+
+- Commands:
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/current-after-kill-request.json`
+  - `make usb-play hal`
+  - `make build/opena8dj-control`
+  - `make HAL_HOT_STREAM_STATS=0 usb-play hal`
+  - `make HAL_OUTPUT_WRITE_STATS=0 usb-play hal`
+  - `make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Runtime isolation PASS before edits/tests; no hardware holder was alive and
+    no process needed killing.
+  - Default HAL/tools build PASS.
+  - `HAL_HOT_STREAM_STATS=0` variant build PASS, no warnings after marking the
+    timing helper as possibly unused in diagnostic builds.
+  - `HAL_OUTPUT_WRITE_STATS=0` variant build PASS.
+  - Final default rebuild PASS with `HAL_OUTPUT_WRITE_STATS=1`,
+    `HAL_HOT_STREAM_STATS=1`, `HAL_HOT_STREAM_STATS_INTERVAL=1`.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+- Evidence paths:
+  - `local-analysis/runtime-isolation/current-after-kill-request.json`
+  - `local-analysis/build-flags/hot-stats-off-build.log`
+  - `local-analysis/build-flags/output-write-stats-off-build.log`
+  - `local-analysis/build-flags/default-after-hot-stats-output-write-build.log`
+  - `local-analysis/offline-gates-after-hot-stats-output-write.log`
+- Key metrics from release bench:
+  - `pack_mib_s=1640.8`
+  - `decode_mib_s=589.055`
+  - `route_frames_s=9.14455e+08`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Interpretation:
+  - This removes an unobservable hot-path mutex and adds late-write
+    observability, but it does not prove physical quality or CPU superiority.
+  - The next hardware run must check the new counters and compare CPU/quality
+    against mainline before any readiness claim.

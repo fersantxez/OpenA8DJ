@@ -204,6 +204,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackRequestCountSamples;
     uint64_t playbackZeroCompleteTransactions;
     uint64_t playbackLayoutSignatureSum;
+    uint64_t outputLateWriteFrames;
+    uint64_t outputLateWriteBatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -827,7 +829,7 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->playbackTransactionFailures,
            (unsigned long long)stats->playbackShortTransfers,
            (unsigned long long)stats->playbackQueueFailures);
-    printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu\n",
+    printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu late-write-frames=%llu late-write-batches=%llu\n",
            (unsigned long long)stats->outputFramesWritten,
            (unsigned long long)stats->outputFramesRead,
            (unsigned long long)stats->outputUnderruns,
@@ -836,7 +838,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->outputRingOverruns,
            (unsigned long long)stats->outputElasticDrops,
            (unsigned long long)stats->outputElasticReplays,
-           (unsigned long long)stats->outputTimelineResets);
+           (unsigned long long)stats->outputTimelineResets,
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteFrames : 0),
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteBatches : 0));
     printf("  output-level:           peak=%.6f near-clip=%llu clipped=%llu\n",
            stats->outputPeak,
            (unsigned long long)stats->outputNearClipSamples,
@@ -980,6 +984,10 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("outputElasticDrops=%llu\n", (unsigned long long)stats->outputElasticDrops);
     printf("outputElasticReplays=%llu\n", (unsigned long long)stats->outputElasticReplays);
     printf("outputTimelineResets=%llu\n", (unsigned long long)stats->outputTimelineResets);
+    printf("outputLateWriteFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteFrames : 0));
+    printf("outputLateWriteBatches=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteBatches : 0));
     printf("outputPanicFlags=%llu\n", (unsigned long long)stats->outputPanicFlags);
     printf("clockAnchorValid=%u\n", stats->clockAnchorValid);
     printf("clockAcceptedAnchors=%llu\n", (unsigned long long)stats->clockAcceptedAnchors);

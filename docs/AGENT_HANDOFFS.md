@@ -341,3 +341,40 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - No subagent may declare readiness independently.
 - Architect owns final prioritization, integration, and go/no-go claims.
 - Disjoint write ownership was assigned to prevent document conflicts.
+
+### Halley
+
+- Mission: read-only comparison of mainline `/Users/fer/dev/opena8dj` and C++
+  `/Users/fer/dev/audio8djcpp` USB/HAL transport, scheduling, counters, and
+  build defaults to explain C++ physical quality/CPU failures.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp si necesitas dejar una nota, pero
+  preferimos respuesta final sin editar. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Found C++ `HAL_OUTPUT_WRITE_STATS=0` caused an unobservable mutex update:
+    `writeOutput` updated `outputFramesWritten` through stream-stats mutex, but
+    snapshots overwrote the field from `_outputFramesWrittenAtomic`.
+  - Found mainline exposes `outputLateWriteFrames` and
+    `outputLateWriteBatches`, while C++ dropped late writes silently.
+  - Found C++ still uses queue depth `64/64` versus mainline `8/8`.
+  - Found C++ output prefetch is `256` versus mainline `64`.
+  - Confirmed mainline has hot stream-stats gates/intervals while C++ did not.
+  - Flagged input/control-plane decode divergences for later timecode/control
+    validation.
+- Integrated action:
+  - Added C++ hot stream-stats gate/interval.
+  - Restored atomic output-write stats default to `1`.
+  - Added late-write counters to HAL and `opena8dj-control`.
+- Evidence:
+  - `local-analysis/build-flags/hot-stats-off-build.log`
+  - `local-analysis/build-flags/output-write-stats-off-build.log`
+  - `local-analysis/offline-gates-after-hot-stats-output-write.log`
+- Risk:
+  - These changes improve observability and remove one hot-path mutex, but do
+    not prove physical quality. Next locked tests must verify CPU, late-write
+    counters, and iRig quality before promotion.

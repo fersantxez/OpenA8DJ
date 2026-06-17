@@ -275,11 +275,17 @@ Next technical target:
   `quality_alignment_score=0.159859`, `analog_snr_db=-16.87`,
   `lag_jumps_gt_2_frames=59`. Defaults are back to
   `HAL_BACKGROUND_PREOPEN_ON_INIT=0` and `HAL_STOP_ISOC_ON_STOP=0`.
-- Fast prefetch clear and atomic output-write stats are also ported but rejected
-  as defaults after an isolated physical run regressed to
-  `quality_alignment_score=-0.048481`, `analog_snr_db=-32.06`,
-  `lag_jumps_gt_2_frames=46`. Defaults are back to
-  `HAL_FAST_OUTPUT_PREFETCH_CLEAR=0` and `HAL_OUTPUT_WRITE_STATS=0`.
+- Fast prefetch clear remains rejected after an isolated physical run regressed
+  to `quality_alignment_score=-0.048481`, `analog_snr_db=-32.06`,
+  `lag_jumps_gt_2_frames=46`.
+- `HAL_OUTPUT_WRITE_STATS` is now restored to `1` by default as a separate
+  atomic-only/mainline-parity cleanup. The prior physical rejection changed it
+  together with fast prefetch clear, while the new read-only analysis showed
+  `HAL_OUTPUT_WRITE_STATS=0` paid a mutex per output write and then lost the
+  value when `streamStatsSnapshot` overwrote it from the atomic counter.
+- C++ now also exposes mainline-style `outputLateWriteFrames` and
+  `outputLateWriteBatches` counters. This is observability for the next locked
+  physical run, not a readiness claim.
 
 ## 2026-06-16 Current Iteration: Calibrated HAL And Direct USB Diagnostics
 
@@ -310,3 +316,31 @@ Next technical target:
   gain. A simple Mode 2 byte-layout mismatch is also less likely after the new
   parity gate. Continue below-HAL transport/cadence/device-state investigation
   before more physical sweeps.
+
+## 2026-06-17 Current Iteration: Hot Stats And Late-Write Observability
+
+- Current lock/process audit after the kill request passed:
+  `local-analysis/runtime-isolation/current-after-kill-request.json` shows lock
+  absent, HAL inactive, no OpenA8DJ process, and disabled mainline launch
+  agents. No process was killed because no real OpenA8DJ/soundcheck/test-hal
+  holder was alive; `coreaudiod` and `usbaudiod` were left alone.
+- Halley completed a read-only mainline/C++ comparison. Highest-priority
+  findings:
+  - C++ output write stats default was paying an unobservable mutex path.
+  - C++ lacked late-write counters present in mainline.
+  - C++ queue depth is still `64/64` while mainline defaults to `8/8`.
+  - C++ output prefetch is still `256` while mainline defaults to `64`.
+  - C++ hot completion stats had no gate/interval even though mainline does.
+- Integrated changes:
+  - Added `HAL_HOT_STREAM_STATS` and `HAL_HOT_STREAM_STATS_INTERVAL`.
+  - Set `HAL_OUTPUT_WRITE_STATS=1` by default.
+  - Added `outputLateWriteFrames` and `outputLateWriteBatches` to HAL/control
+    stats.
+- Verification:
+  - `make usb-play hal` passed.
+  - `make HAL_HOT_STREAM_STATS=0 usb-play hal` passed.
+  - `make HAL_OUTPUT_WRITE_STATS=0 usb-play hal` passed.
+  - `scripts/run-cpp-offline-gates` passed Debug `16/16`, Release `17/17`.
+- Next physical candidate remains not ready to promote. It needs a locked
+  safety/music run and must beat mainline CPU and physical quality before any
+  branch promotion is considered.
