@@ -114,3 +114,28 @@ Interpretation:
 - Runtime isolation audit PASS before any physical window:
   `scripts/runtime-isolation-audit --expect-hal active`.
 - User authorization for the final branch move after evidence is archived.
+
+## 2026-06-17 Current Blocking Update
+
+Current commit: `13ac259`.
+
+- Offline gates remain PASS, but product promotion remains forbidden.
+- Input decode is now control-plane gated and off by default for playback. This
+  improved C++ driver p95 to `6.3%`, close to but still above same-window
+  mainline `6.0%`.
+- The latest comparable Pair A/iRig music capture still fails quality:
+  C++ `quality_alignment_score=0.680121`, SNR `-0.83 dB`, `42` lag jumps;
+  mainline `quality_alignment_score=0.680798`, SNR `-0.83 dB`, `39` lag jumps.
+- `coreaudiod` p95 remains a blocker in the current gate:
+  C++ `43.2%` versus same-window mainline `8.0%`, dominated by startup spikes
+  but still counted as resource evidence.
+- The latest Pair A channel matrix rejects the current C++ HAL as worse than
+  mainline in the same route:
+  C++ max wrong-source leakage `-35.36 dB`; mainline `-42.58 dB`; threshold
+  `-45 dB`.
+- Physical Traktor/timecode vinyl remains unvalidated.
+
+Conclusion: C++ is not ready for hardware-readiness claims, branch promotion,
+or replacement of C mainline. The next acceptable work must produce evidence
+that improves physical leakage/quality and preserves or improves CPU versus
+mainline.

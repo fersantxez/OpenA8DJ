@@ -776,3 +776,29 @@ Latest promotion evaluation:
 - Traktor/timecode physical validation: FAIL/BLOCKED, no physical DVS evidence.
 - Branch promotion: forbidden. Do not move C mainline to Legacy and do not move
   C++ to main.
+
+## 2026-06-17 Updated Snapshot After Input Decode And Channel Matrix
+
+- Offline gates: PASS at commit `13ac259`.
+- Playback input decode policy: PASS structurally. Input decode is off by
+  default for playback/output-only use and enabled by timecode vinyl, CD-line,
+  and phono profiles.
+- Driver CPU: improved but not accepted as better than mainline.
+  - mainline `0.3.135`: driver p95 `6.0%`.
+  - C++ ISO64/q8 StopIO before input-decode control: driver p95 `9.8%`.
+  - C++ input-decode-off: driver p95 `6.3%`.
+- CoreAudio CPU: FAIL. C++ input-decode-off reports `coreaudiod_p95=43.2%`
+  versus same-window mainline `8.0%`. The spike appears startup-heavy, but the
+  current resource gate counts it.
+- Physical music quality: FAIL for both drivers in the current iRig route.
+  - mainline: `quality_alignment_score=0.680798`, SNR `-0.83 dB`,
+    `39` lag jumps.
+  - C++ input-decode-off: `quality_alignment_score=0.680121`,
+    SNR `-0.83 dB`, `42` lag jumps.
+- Physical Pair A channel matrix: FAIL and worse than mainline.
+  - mainline max wrong-source leakage `-42.58 dB`.
+  - C++ max wrong-source leakage `-35.36 dB`.
+  - threshold `-45 dB`.
+- Traktor/timecode vinyl physical validation: FAIL/BLOCKED.
+- Branch promotion: forbidden. C++ has not objectively beaten mainline on
+  quality, functionality/routing, or resource consumption.

@@ -2313,3 +2313,43 @@ Evidence:
 - Cleanup:
   `local-analysis/runtime-isolation/after-inputio-off-safety-fail-unload.json`,
   PASS with HAL inactive and lock absent.
+
+## 2026-06-17: Reject Current Physical Pair A Matrix As Promotion Evidence
+
+Decision:
+- Treat the current physical Pair A/iRig channel-matrix evidence as a blocker,
+  not as a routing/functionality proof.
+- Do not claim C++ has better routing or sound quality than mainline until a
+  comparable physical matrix passes and C++ beats or equals mainline leakage
+  with a validated capture route.
+
+Reason:
+- The same decorrelated Pair A matrix was run against the current C++ product
+  HAL and the read-only mainline `0.3.135` artifact.
+- Both fail the strict `-45 dB` wrong-source leakage threshold, which means the
+  current physical route is not clean enough for promotion.
+- C++ is worse than mainline in the same route: max wrong-source leakage is
+  `-35.36 dB` for C++ versus `-42.58 dB` for mainline. That delta is not
+  explainable as a C++ improvement and cannot be hand-waved as a shared route
+  problem.
+
+Alternatives discarded:
+- Promote because both drivers fail similarly: rejected because C++ must beat
+  mainline, not merely share a degraded measurement class.
+- Ignore the matrix because real-music evidence is already failing: rejected
+  because routing/channel leakage is a separate functional requirement for
+  A/B/C/D decks and Traktor/timecode use.
+- Treat linear-matrix diagnostics as a pass: rejected because they only
+  classify the residual shape and explicitly report large unexplained physical
+  residual.
+
+Evidence:
+- C++:
+  `local-analysis/channel-matrix/20260617-inputdecode-default-pairA-chmatrix/tone-matrix.json`,
+  `result=FAIL`, `max_wrong_source_leakage_db=-35.36`.
+- Mainline:
+  `local-analysis/channel-matrix/20260617-mainline-pairA-chmatrix/tone-matrix.json`,
+  `result=FAIL`, `max_wrong_source_leakage_db=-42.58`.
+- Final isolation:
+  `local-analysis/runtime-isolation/after-mainline-chmatrix-unload.json`,
+  PASS with HAL inactive and lock absent.

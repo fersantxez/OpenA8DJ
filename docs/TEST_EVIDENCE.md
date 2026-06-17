@@ -3855,3 +3855,101 @@ Operational note:
   - `local-analysis/physical-inputio-off/20260617-inputio-off/hal-candidate-safety`
   - `local-analysis/audio-stack-guard/after-inputio-off-safety-fail-unload`
   - `local-analysis/runtime-isolation/after-inputio-off-safety-fail-unload.json`
+
+## 2026-06-17: Current C++ vs Mainline Pair A Channel Matrix Rejection
+
+- Purpose:
+  - Compare the current C++ product HAL after input-decode gating against the
+    current mainline `0.3.135` artifact on the same physical Pair A route:
+    Audio 8 DJ output -> external mixer REC OUT -> iRig Stream capture.
+  - Validate routing/leakage with decorrelated tones before making any
+    A/B/C/D or audiophile-quality claim.
+- C++ current product HAL evidence:
+  - HAL candidate safety:
+    `local-analysis/physical-channel-matrix/20260617-inputdecode-default-chmatrix-safety`,
+    PASS.
+  - Matrix run:
+    `local-analysis/channel-matrix/20260617-inputdecode-default-pairA-chmatrix`.
+  - Tone matrix result: `FAIL`.
+  - `max_wrong_source_leakage_db=-35.36` against threshold `-45.0`.
+  - `left_to_right_leakage_db=-41.79`.
+  - `right_to_left_leakage_db=-30.09`.
+  - `expected_floor_amplitude=0.019538`.
+  - `capture_clipped_frames=0`.
+  - Linear matrix diagnostic result: `PASS_DIAGNOSTIC`, but classified
+    `linear_matrix_rejected_large_physical_residual` with
+    `global_mono_correlation=0.043` and
+    `residual_over_capture_rms=0.992`.
+- Mainline `0.3.135` read-only artifact evidence:
+  - HAL candidate safety:
+    `local-analysis/mainline-baseline/20260617-mainline-chmatrix/hal-candidate-safety`,
+    PASS.
+  - Matrix run:
+    `local-analysis/channel-matrix/20260617-mainline-pairA-chmatrix`.
+  - Tone matrix result: `FAIL`.
+  - `max_wrong_source_leakage_db=-42.58` against threshold `-45.0`.
+  - `left_to_right_leakage_db=-46.09`.
+  - `right_to_left_leakage_db=-37.28`.
+  - `expected_floor_amplitude=0.046111`.
+  - `capture_clipped_frames=0`.
+  - Linear matrix diagnostic result: `PASS_DIAGNOSTIC`, but classified
+    `linear_matrix_rejected_large_physical_residual` with
+    `global_mono_correlation=0.343` and
+    `residual_over_capture_rms=0.946`.
+- Cleanup:
+  - `local-analysis/runtime-isolation/after-inputdecode-default-chmatrix-unload.json`,
+    PASS.
+  - `local-analysis/runtime-isolation/after-mainline-chmatrix-unload.json`,
+    PASS.
+- Result:
+  - Both C++ and mainline fail the current physical Pair A channel-matrix
+    threshold in this iRig/mixer route.
+  - C++ is objectively worse than mainline on this test:
+    `-35.36 dB` max wrong-source leakage versus mainline `-42.58 dB`.
+  - This blocks any claim that C++ routing/functionality is better than
+    mainline and blocks branch promotion.
+- Readiness interpretation:
+  - The current physical route cannot support an audiophile-quality PASS claim.
+  - The C++ driver must either fix its additional leakage versus mainline or
+    prove with an independently validated capture path that the measurement
+    route is the limiting factor.
+
+## 2026-06-17: Channel Matrix Documentation And Offline Verification
+
+- Change:
+  - Documented the current C++ vs mainline Pair A channel-matrix rejection in
+    `ARCHITECT_CONTEXT.md`, `DECISION_LOG.md`,
+    `PROMOTION_READINESS_STATUS.md`, `SUCCESS_METRICS.md`, and this evidence
+    file.
+  - Re-ran offline gates and promotion evaluation after the documentation
+    update.
+- Commands:
+  - `git diff --check`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-channel-matrix-doc-update.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Results:
+  - Diff whitespace check PASS.
+  - Runtime isolation PASS: HAL inactive, hardware lock absent, no OpenA8DJ
+    process, no hardware/CoreAudio/USB mutation.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS: `22` required files, `0` missing.
+  - Release benchmark:
+    `pack_mib_s=1652.58`, `decode_into_mib_s=587.724`,
+    `route_frames_s=1.01639e+09`,
+    `route_advanced_frames_s=5.05785e+08`.
+  - Promotion readiness remains `FAIL` with
+    `branch_promotion_allowed=false`.
+- Current promotion blockers:
+  - `physical_music_quality`: C++ Pair A/iRig music capture still fails with
+    `quality_alignment_score=0.680121`, SNR `-0.83 dB`, and `42` lag jumps.
+  - `runtime_cpu_beats_mainline`: C++ driver p95 `6.3%` is near but above
+    mainline `6.0%`; `coreaudiod_p95=43.2%` is worse than mainline `8.0%`.
+  - `latest_physical_investigation`: still `FAIL_NOT_READY`.
+  - `traktor_timecode_physical`: still `BLOCKED_UNVALIDATED_DVS`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/offline-bench-release.json`
+  - `local-analysis/promotion-readiness-current.json`
+  - `local-analysis/runtime-isolation/post-channel-matrix-doc-update.json`

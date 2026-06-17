@@ -818,3 +818,12 @@ Next technical target:
 - The next CPU investigation should not remove HAL input I/O wholesale. It
   needs a runtime/control-plane approach that preserves device enumeration,
   8-input surface, and DVS/timecode readiness.
+- Latest same-route Pair A channel-matrix evidence rejects both the current
+  C++ HAL and the read-only mainline `0.3.135` artifact for physical routing
+  proof. C++ is worse than mainline on max wrong-source leakage:
+  `-35.36 dB` versus mainline `-42.58 dB` against the `-45 dB` threshold.
+  Evidence:
+  `local-analysis/channel-matrix/20260617-inputdecode-default-pairA-chmatrix`
+  and `local-analysis/channel-matrix/20260617-mainline-pairA-chmatrix`.
+  This blocks any claim that C++ routing, physical functionality, or sound
+  quality is better than mainline.
