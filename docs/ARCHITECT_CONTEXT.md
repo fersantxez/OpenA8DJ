@@ -603,3 +603,13 @@ Next technical target:
   the single timeline write lock, and input stats are aggregated locally per
   capture transfer before one locked merge. Offline gates pass, but this is not
   a physical performance/readiness claim until locked A/B evidence exists.
+- Carver's read-only audit converged on the same next step: do not spend
+  another physical window on a standalone micro-optimization. Add transport
+  observability first, especially around OUT transfer queue/completion cadence,
+  implicit scheduling, in-flight state, and whether the transfer pool ever
+  falls back to allocating a new transfer while streaming.
+- C++ now records `captureTransferPoolFallbackAllocations` and
+  `playbackTransferPoolFallbackAllocations` in stream stats. These counters
+  are expected to stay at `0` in any candidate run. A nonzero value means the
+  preallocated pool was exhausted and the HAL allocated transfer objects in the
+  streaming path, which is a CPU/latency blocker before any quality claim.

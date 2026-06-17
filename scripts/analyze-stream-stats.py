@@ -25,6 +25,8 @@ COUNTERS = [
     "playbackTransfersSubmitted",
     "playbackTransfersCompleted",
     "playbackTransferErrors",
+    "captureTransferPoolFallbackAllocations",
+    "playbackTransferPoolFallbackAllocations",
     "playbackScheduleErrors",
     "playbackReschedules",
     "outputFramesWritten",
@@ -171,6 +173,10 @@ def analyze(path):
         flags.append("panic_flags")
     if counters["playbackTransferErrors"]["delta"] > 0:
         flags.append("playback_transfer_errors")
+    if counters["captureTransferPoolFallbackAllocations"]["delta"] > 0:
+        flags.append("capture_transfer_pool_fallback_allocations")
+    if counters["playbackTransferPoolFallbackAllocations"]["delta"] > 0:
+        flags.append("playback_transfer_pool_fallback_allocations")
     if counters["playbackScheduleErrors"]["delta"] > 0:
         flags.append("playback_schedule_errors")
 
@@ -190,6 +196,10 @@ def analyze(path):
         "capture_transfers_per_second": counters["captureTransfersCompleted"]["per_second"],
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,
+        "capture_transfer_pool_fallback_allocations_per_second":
+            counters["captureTransferPoolFallbackAllocations"]["per_second"],
+        "playback_transfer_pool_fallback_allocations_per_second":
+            counters["playbackTransferPoolFallbackAllocations"]["per_second"],
         "capture_transaction_errors_per_capture_transfer": capture_error_per_transfer,
         "capture_status_failures_per_capture_transfer": (
             counters["captureStatusFailures"]["delta"] / capture_tx_delta

@@ -1747,3 +1747,42 @@ Evidence:
   `make -B hal`.
 - Diagnostic coalesce build:
   `make -B hal HAL_CADENCE_DIAGNOSTIC=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2`.
+
+## 2026-06-17: Instrument Transfer-Pool Fallback Allocations Before More Physical Runs
+
+Decision:
+- Add stream-stats counters for capture and playback transfer-pool fallback
+  allocations.
+- Surface those counters through `opena8dj-control stream-stats`,
+  `scripts/run-soundcheck` TSV output, and `scripts/analyze-stream-stats.py`.
+- Treat nonzero fallback allocations during streaming as a diagnostic failure
+  and CPU/latency blocker.
+
+Reason:
+- The HAL default build uses the transfer pool, but the checkout path still
+  falls back to `CreateIsoTransfer(...)` if every pool slot is in use.
+- Existing physical runs show high driver CPU and bad music quality without
+  active underruns, late writes, or timeline resets. If fallback allocations
+  are happening under sustained streaming, that is a concrete real-time path
+  violation that current evidence could not see.
+- This is a low-risk observability change: it does not change USB request
+  layout, payload bytes, queue depth, pool selection order, scheduling, sample
+  rate, routing, or CoreAudio defaults.
+
+Alternatives discarded:
+- Retest the same `056d29b` candidate: rejected because it already failed
+  physical quality and CPU gates.
+- Re-enable pool cursor or coalescing immediately: rejected because prior
+  physical/safety evidence rejected those variants.
+- Guess whether pool fallback happens from CPU alone: rejected because the
+  stream-stats payload can report it directly.
+
+Evidence:
+- `make -B hal build/opena8dj-control`: PASS.
+- `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`:
+  PASS.
+- Existing-run compatibility check:
+  `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/hotpath-lock-056d29b-summary-with-pool-fields.json`.
+- Runtime isolation after the build:
+  `local-analysis/runtime-isolation/post-transfer-pool-instrumentation-build.json`,
+  PASS, HAL inactive, lock absent.

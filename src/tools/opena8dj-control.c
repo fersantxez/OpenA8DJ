@@ -206,6 +206,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackLayoutSignatureSum;
     uint64_t outputLateWriteFrames;
     uint64_t outputLateWriteBatches;
+    uint64_t captureTransferPoolFallbackAllocations;
+    uint64_t playbackTransferPoolFallbackAllocations;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -829,6 +831,11 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->playbackTransactionFailures,
            (unsigned long long)stats->playbackShortTransfers,
            (unsigned long long)stats->playbackQueueFailures);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations)) {
+        printf("  transfer-pool:          capture-fallback-alloc=%llu playback-fallback-alloc=%llu\n",
+               (unsigned long long)stats->captureTransferPoolFallbackAllocations,
+               (unsigned long long)stats->playbackTransferPoolFallbackAllocations);
+    }
     printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu late-write-frames=%llu late-write-batches=%llu\n",
            (unsigned long long)stats->outputFramesWritten,
            (unsigned long long)stats->outputFramesRead,
@@ -980,6 +987,12 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                                 stats->playbackQueueAttempts : stats->playbackTransfers));
     printf("playbackTransfersCompleted=%llu\n", (unsigned long long)stats->playbackTransfers);
     printf("playbackTransferErrors=%llu\n", (unsigned long long)stats->playbackTransactionFailures);
+    printf("captureTransferPoolFallbackAllocations=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?
+                                stats->captureTransferPoolFallbackAllocations : 0));
+    printf("playbackTransferPoolFallbackAllocations=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?
+                                stats->playbackTransferPoolFallbackAllocations : 0));
     printf("playbackScheduleErrors=%llu\n", (unsigned long long)playbackScheduleErrors);
     printf("playbackReschedules=%llu\n", (unsigned long long)stats->playbackReschedules);
     printf("outputRingFrames=%u\n", stats->outputRingFrames);

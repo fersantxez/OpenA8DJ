@@ -474,6 +474,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackLayoutSignatureSum;
     uint64_t outputLateWriteFrames;
     uint64_t outputLateWriteBatches;
+    uint64_t captureTransferPoolFallbackAllocations;
+    uint64_t playbackTransferPoolFallbackAllocations;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1593,7 +1595,8 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
-                                        nextIndex:(NSUInteger *)nextIndex;
+                                        nextIndex:(NSUInteger *)nextIndex
+                                   fallbackOffset:(size_t)fallbackOffset;
 - (void)releasePooledTransfer:(OpenA8DJIsoTransfer *)transfer;
 - (void)resyncPlaybackSchedule;
 - (void)handlePlaybackTransfer:(OpenA8DJIsoTransfer *)transfer
@@ -2769,10 +2772,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
                                         nextIndex:(NSUInteger *)nextIndex
+                                   fallbackOffset:(size_t)fallbackOffset
 {
 #if !OPENA8DJ_ENABLE_TRANSFER_POOL
     (void)pool;
     (void)nextIndex;
+    [self addStreamStatAtOffset:fallbackOffset value:1];
     return CreateIsoTransfer(requests, count);
 #else
     OpenA8DJIsoTransfer *selected = nil;
@@ -2808,6 +2813,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (selected != nil) {
         return selected;
     }
+    [self addStreamStatAtOffset:fallbackOffset value:1];
     return CreateIsoTransfer(requests, count);
 #endif
 }
@@ -4027,7 +4033,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJIsoTransfer *transfer = [self checkoutTransferFromPool:_captureTransferPool
                                                           requests:requests
                                                              count:kIsoFramesPerTransfer
-                                                         nextIndex:&_captureTransferPoolCursor];
+                                                         nextIndex:&_captureTransferPoolCursor
+                                                    fallbackOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                                                            captureTransferPoolFallbackAllocations)];
     if (transfer == nil) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)
                                value:1];
@@ -4586,7 +4594,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJIsoTransfer *transfer = [self checkoutTransferFromPool:_playbackTransferPool
                                                           requests:requests
                                                              count:count
-                                                         nextIndex:&_playbackTransferPoolCursor];
+                                                         nextIndex:&_playbackTransferPoolCursor
+                                                    fallbackOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                                                            playbackTransferPoolFallbackAllocations)];
     if (transfer == nil) {
         return NO;
     }

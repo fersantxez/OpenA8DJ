@@ -632,3 +632,35 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Risk:
   - These are callback-overhead changes only; they do not prove better audio
     or lower physical runtime CPU until a locked hardware A/B run passes.
+
+### Carver
+
+- Mission: read-only inspection of existing physical evidence and HAL/USB
+  transport code after commit `056d29b` failed physically.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Confirmed the next high-value hypothesis is structural transport/pacing
+    observability, not another isolated stats/lock tweak.
+  - Highlighted that `056d29b` failed with SNR about `10.41 dB`, `43` lag
+    jumps, residual mid/high about `1.43/1.36`, and driver CPU p95 about
+    `37.5%`.
+  - Confirmed existing evidence weakens byte order, crosstalk, late writes,
+    clipping, and simple matrix explanations.
+  - Recommended a preallocated transport ledger for OUT transfers and an
+    offline replay using the real HAL transfer layout before another physical
+    run.
+- Integrated action:
+  - Added transfer-pool fallback allocation counters to the HAL stream-stats
+    payload, `opena8dj-control`, `run-soundcheck` TSV capture, and
+    `analyze-stream-stats.py`.
+- Risk:
+  - This is observability, not a sound-quality fix. The next physical run must
+    still be blocked until there is a new transport/cadence/device-state
+    hypothesis, and any fallback allocations found during streaming must be
+    treated as a CPU/latency defect.

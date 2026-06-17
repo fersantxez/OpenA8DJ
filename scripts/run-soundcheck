@@ -210,6 +210,8 @@ STREAM_STATS_TSV_COLUMNS = [
     "playbackTransfersSubmitted",
     "playbackTransfersCompleted",
     "playbackTransferErrors",
+    "captureTransferPoolFallbackAllocations",
+    "playbackTransferPoolFallbackAllocations",
     "playbackScheduleErrors",
     "playbackReschedules",
     "outputRingFrames",

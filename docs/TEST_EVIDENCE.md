@@ -136,6 +136,54 @@
   - `local-analysis/runtime-isolation/post-hotpath-doc-update.json`.
   - `local-analysis/promotion-readiness-current.json`.
 
+## 2026-06-17: Transfer-Pool Fallback Allocation Instrumentation
+
+- Change:
+  - Added `captureTransferPoolFallbackAllocations` and
+    `playbackTransferPoolFallbackAllocations` to the HAL stream-stats payload.
+  - `opena8dj-control stream-stats` now prints both counters as `key=value`
+    fields while remaining compatible with older payloads.
+  - `scripts/run-soundcheck` now records both fields in
+    `stream-stats-during.tsv`.
+  - `scripts/analyze-stream-stats.py` now summarizes both counters and raises
+    diagnostic flags if either increases during a run.
+- Reason:
+  - The default HAL uses transfer pools, but checkout still falls back to
+    creating a transfer if every pool slot is in use.
+  - Fallback allocation in sustained streaming would violate the no-allocation
+    real-time policy and could explain CPU/latency that current underrun and
+    late-write counters miss.
+- Commands:
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`
+  - `make -B hal build/opena8dj-control`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/hotpath-lock-056d29b-summary-with-pool-fields.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-transfer-pool-instrumentation-build.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-transfer-pool-instrumentation.json`
+- Result:
+  - Python syntax PASS.
+  - HAL/control build PASS.
+  - Existing stream-stats evidence remains readable; old runs report these new
+    fields as unavailable/null, not as failures.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`, evidence schema
+    PASS with `22` required files and `0` missing.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Latest Release benchmark:
+  - `pack_mib_s=1653.52`.
+  - `decode_into_mib_s=551.331`.
+  - `route_frames_s=9.34836e+08`.
+  - `route_advanced_frames_s=4.85227e+08`.
+- Readiness note:
+  - This is observability only, not an audio-quality fix.
+  - Any future physical candidate must show both fallback allocation counters
+    stay at `0` before it can make a low-CPU or real-time-path claim.
+
 ## 2026-06-17: Playback Burst Cadence Model Gate
 
 - Change:
