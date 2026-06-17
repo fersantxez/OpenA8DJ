@@ -524,6 +524,40 @@ Next technical target:
   `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`. HAL
   inactive, lock absent, and no OpenA8DJ/mainline holder processes were
   detected.
+
+## 2026-06-17 Current Iteration: HAL Hot-Path Lock Reduction Rejected Physically
+
+- Commit `056d29b` reduces mutex pressure without changing USB cadence or
+  payload bytes: output timeline start-frame resolution now happens under the
+  existing write lock, and input stats merge once per capture transfer instead
+  of locking for every stream sample.
+- Build and offline gates passed after the change:
+  `make -B hal usb-play`, `make -B hal HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`, and
+  `scripts/run-cpp-offline-gates`.
+- Locked HAL candidate safety passed and left the HAL loaded for one controlled
+  Pair A/iRig music soundcheck.
+- The physical soundcheck still failed:
+  `quality_alignment_score=0.964558`, `analog_snr_db=10.41`,
+  `lag_jumps_gt_2_frames=43`, mid/high residual ratios
+  `1.430949/1.358723`, quiet mid-band noise `-35.90 dBFS`, no clipping, and
+  no channel click outliers.
+- CPU did not improve enough to matter: OpenA8DJ driver p95 was `37.5%`,
+  while the mainline C reference is about `6.5%`. `coreaudiod` p95 reached
+  `60.3%` and total watched audio/UI p95 reached `121.1%`.
+- Recovery required a manual HAL park because `audio-stack-guard --recover
+  --unload-opena8dj` did not fully unload the active candidate. The HAL was
+  moved to
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260617T031430Z`,
+  `coreaudiod` was restarted, and final isolation passed at
+  `local-analysis/runtime-isolation/after-hotpath-manual-unload.json`.
+- Current promotion status remains `FAIL` with
+  `branch_promotion_allowed=false`. C++ must not be promoted to `main`, C must
+  not be moved to `Legacy`, and this candidate must not be described as better
+  than mainline.
+- Next work should stop spending physical windows on superficial stats/lock
+  cleanup as standalone candidates. The live blocker is still below-HAL
+  transport/cadence/device-state behavior or a reference-route/format mismatch
+  that the current offline byte-layout gates do not expose.
 - Added `scripts/analyze-runtime-discontinuities.py` to correlate existing
   soundcheck WAV windows against CPU and stream-stats telemetry without
   touching hardware. Evidence:

@@ -45,6 +45,97 @@
     counted as better-than-mainline evidence until a locked physical
     A/B soundcheck shows equal or better quality and lower runtime CPU.
 
+## 2026-06-17: Hot-Path Lock Reduction Physical Rejection
+
+- Candidate: commit `056d29b` (`Reduce HAL hot-path locks`).
+- Preflight:
+  - Runtime isolation before physical run:
+    `local-analysis/runtime-isolation/pre-hotpath-lock-physical.json`,
+    `PASS`.
+  - iRig Stream and Audio 8 DJ were both visible before installing the HAL.
+  - `scripts/audio-stack-health`: `PASS`.
+- HAL candidate safety command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-hotpath-lock-reduction/20260617-056d29b/hal-candidate-safety`
+- HAL candidate safety result:
+  - `PASS`.
+  - Evidence:
+    `local-analysis/physical-hotpath-lock-reduction/20260617-056d29b/hal-candidate-safety/summary.txt`.
+- Physical soundcheck command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+- Physical soundcheck result:
+  - `FAIL`.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal/`.
+  - `quality_alignment_score=0.964558`.
+  - `analog_snr_db=10.41`.
+  - `left_snr_db=10.49`, `right_snr_db=10.41`.
+  - `lag_jumps_gt_2_frames=43`.
+  - `mid_band_residual_ratio=1.430949`.
+  - `high_band_residual_ratio=1.358723`.
+  - `quiet_mid_band_noise_dbfs=-35.90`.
+  - `capture_clipped_frames=0`.
+  - `left_click_outliers=0`, `right_click_outliers=0`,
+    `window_click_outliers_max=1`.
+  - `mid_band_cpu_corr_max=0.154560`, source `controlcenter`.
+- CPU evidence from the same soundcheck:
+  - `opena8dj_driver`: median `36.45%`, p95 `37.5%`, max `37.6%`.
+  - `coreaudiod`: median `2.65%`, p95 `60.3%`, max `85.8%`.
+  - `total_audio_ui`: median `54.2%`, p95 `121.1%`, max `167.5%`.
+  - `top_audio_ui`: median `36.65%`, p95 `60.3%`, max `85.8%`.
+- Recovery:
+  - `scripts/audio-stack-guard --recover --unload-opena8dj` did not fully
+    unload the HAL.
+  - The active HAL was manually parked under the hardware lock at
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260617T031430Z`,
+    then `coreaudiod` was restarted.
+  - After a short post-restart wait, `scripts/audio-stack-health` returned
+    `PASS`.
+  - Final runtime isolation:
+    `local-analysis/runtime-isolation/after-hotpath-manual-unload.json`,
+    `PASS`, HAL inactive, lock absent.
+- Promotion result after the run:
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+    returned `FAIL`, `branch_promotion_allowed=false`.
+- Interpretation:
+  - The lock reduction remains acceptable code hygiene, but it is physically
+    rejected as a readiness/performance candidate.
+  - Runtime CPU remains far above the mainline reference, and physical music
+    quality still fails the product thresholds.
+  - Do not rerun this candidate as a standalone physical test. The next
+    physical run needs a new transport/cadence/device-state hypothesis.
+
+## 2026-06-17: Documentation Update Offline Verification
+
+- Change:
+  - Documented the locked physical rejection of commit `056d29b` in
+    `ARCHITECT_CONTEXT.md`, `DECISION_LOG.md`, `SUCCESS_METRICS.md`, and this
+    evidence file.
+  - Updated current success metrics to use the latest offline benchmark
+    artifact generated after the documentation update.
+- Commands:
+  - `git diff --check`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-hotpath-doc-update.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Diff whitespace check PASS.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`, evidence schema
+    PASS with `22` required files and `0` missing.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+  - Hardware touched by this verification: no.
+  - CoreAudio/USB touched by this verification: no.
+- Latest Release benchmark:
+  - `pack_mib_s=1650.82`.
+  - `decode_into_mib_s=530.75`.
+  - `route_frames_s=9.11539e+08`.
+  - `route_advanced_frames_s=4.79861e+08`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/runtime-isolation/post-hotpath-doc-update.json`.
+  - `local-analysis/promotion-readiness-current.json`.
+
 ## 2026-06-17: Playback Burst Cadence Model Gate
 
 - Change:

@@ -184,13 +184,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1628.80 MiB/s` over `5` repeats, min `1622.91`, max `1658.37` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `586.682 MiB/s` over `5` repeats, min `572.898`, max `590.301` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `577.864 MiB/s` over `5` repeats, min `535.466`, max `583.069` | informational |
-| Float32 to S24 conversion throughput | median `86,294,300 frames/s` over `5` repeats, min `84,961,100`, max `86,860,200` | `1,000,000 frames/s` |
-| identity routing throughput | median `964,800,000 frames/s` over `5` repeats, min `909,039,000`, max `975,725,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `510,174,000 frames/s` over `5` repeats, min `505,501,000`, max `527,497,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `499,203,000 frames/s` over `5` repeats, min `497,467,000`, max `500,833,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1650.82 MiB/s` over `5` repeats, min `1631.46`, max `1659.52` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `530.75 MiB/s` over `5` repeats, min `486.069`, max `569.317` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `536.298 MiB/s` over `5` repeats, min `450.692`, max `554.004` | informational |
+| Float32 to S24 conversion throughput | median `83,121,400 frames/s` over `5` repeats, min `80,484,300`, max `87,028,400` | `1,000,000 frames/s` |
+| identity routing throughput | median `911,539,000 frames/s` over `5` repeats, min `855,517,000`, max `941,133,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `472,438,000 frames/s` over `5` repeats, min `385,387,000`, max `524,988,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `479,861,000 frames/s` over `5` repeats, min `475,653,000`, max `490,218,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -276,7 +276,7 @@ scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-read
 Promotion to `main` is forbidden unless this script returns `PASS` and
 `branch_promotion_allowed=true`.
 
-Current status as of 2026-06-16:
+Current status as of 2026-06-17:
 
 | Gate | Current result | Reason |
 |---|---|---|
@@ -288,12 +288,21 @@ Current status as of 2026-06-16:
 | offline throughput | `PASS` | pack/decode/routing exceed offline floors |
 | simulated output oracle | `PASS` | alignment/SNR/residual match oracle expectations |
 | physical tone beats mainline best | `PASS` | `sideband_ratio=0.000657`, clicks `0` |
-| physical music quality | `FAIL` | `quality_alignment_score=0.938154`, `snr_db_min=8.93`, quiet mid noise `-31.17 dBFS`, lag jumps `24` |
-| runtime CPU beats mainline | `FAIL` | observed `opena8dj_driver_p95=11.5`, `coreaudiod_p95=95.8` |
+| physical music quality | `FAIL` | latest locked Pair A/iRig run at commit `056d29b`: `quality_alignment_score=0.964558`, `snr_db_min=10.41`, quiet mid noise `-35.90 dBFS`, lag jumps `43`, mid/high residual `1.430949/1.358723` |
+| runtime CPU beats mainline | `FAIL` | latest locked Pair A/iRig run at commit `056d29b`: `opena8dj_driver_p95=37.5%`, `coreaudiod_p95=60.3%`, versus mainline driver p95 about `6.5%` |
 | physical Traktor/timecode vinyl | `FAIL` | no real Traktor/timecode lock evidence |
 
 The current candidate is therefore not ready for branch promotion, regardless
 of offline PASS status or tone performance.
+
+The latest physical rejection evidence is:
+
+- HAL safety:
+  `local-analysis/physical-hotpath-lock-reduction/20260617-056d29b/hal-candidate-safety/summary.txt`.
+- Soundcheck:
+  `local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal/`.
+- Final isolation:
+  `local-analysis/runtime-isolation/after-hotpath-manual-unload.json`.
 
 ## Offline Thresholds
 

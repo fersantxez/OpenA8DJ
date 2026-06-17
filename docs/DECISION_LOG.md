@@ -33,6 +33,17 @@ Evidence:
 - `local-analysis/promotion-readiness-current.json`: FAIL,
   `branch_promotion_allowed=false`.
 
+Physical outcome:
+- Locked HAL safety for commit `056d29b`: PASS.
+- Locked Pair A/iRig music soundcheck:
+  `local-analysis/soundcheck/20260617-hotpath-lock-056d29b-irig-pairA-16s-cpp-hal`,
+  FAIL.
+- Key failures: SNR `10.41 dB`, `43` lag jumps, mid/high residual
+  `1.430949/1.358723`, driver CPU p95 `37.5%`.
+- Decision update: keep the code hygiene change, but reject it as a physical
+  readiness/performance candidate. Do not run another standalone physical
+  test of this candidate without a new transport/cadence/device-state change.
+
 ## 2026-06-17: Reject CPU Wins That Violate Playback Cadence
 
 Decision:
