@@ -34,6 +34,7 @@ DETAIL_RE = re.compile(
 
 FIELDS = [
     "captureTransfers",
+    "playbackTransfers",
     "captureTransactions",
     "captureBytes",
     "captureTransactionFailures",
@@ -90,6 +91,7 @@ def normalize_values(raw):
     values = {}
     aliases = {
         "captureTransfersCompleted": "captureTransfers",
+        "playbackTransfersCompleted": "playbackTransfers",
         "captureTransactionErrors": "captureTransactionFailures",
     }
     for key, value in raw.items():
@@ -116,6 +118,7 @@ def analyze_run(run_dir, iso_frames):
     source = "stream-stats-after.txt" if after_values else "stream-stats-during.tsv"
 
     transfers = values.get("captureTransfers", math.nan)
+    playback_transfers = values.get("playbackTransfers", math.nan)
     expected = values.get("captureExpectedTransactions", math.nan)
     zero = values.get("captureZeroCompleteTransactions", math.nan)
     status = values.get("captureStatusFailures", math.nan)
@@ -154,8 +157,11 @@ def analyze_run(run_dir, iso_frames):
     if finite(total_expected) and finite(classified):
         classified_delta = total_expected - classified
         if classified_delta != 0:
-            if 0 < classified_delta <= iso_frames:
-                warnings.append("classified_transactions_missing_at_most_one_stop_transfer")
+            stop_transfer_gap = 1
+            if finite(playback_transfers) and finite(transfers):
+                stop_transfer_gap = max(1, int(abs(transfers - playback_transfers)))
+            if 0 < classified_delta <= iso_frames * stop_transfer_gap:
+                warnings.append("classified_transactions_missing_in_stop_transfer_gap")
             else:
                 failures.append("classified_transactions_do_not_match_iso_frames")
     if finite(failed) and finite(zero) and finite(status) and failed != zero + status:
@@ -183,6 +189,7 @@ def analyze_run(run_dir, iso_frames):
         "warnings": warnings,
         "unknowns": unknowns,
         "capture_transfers": transfers,
+        "playback_transfers": playback_transfers,
         "capture_expected_transactions": expected,
         "capture_zero_complete_transactions": zero,
         "capture_status_failures": status,

@@ -989,5 +989,21 @@ Next technical target:
   `make hal-cadence-diagnostic`. It is for the next locked cadence/ledger
   evidence run only; restore product flags with `make -B hal` before any CPU
   or product-quality claim.
+- Latest locked cadence diagnostic run:
+  `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal`.
+  - Quality still FAIL:
+    `quality_alignment_score=0.958757`, SNR `10.09 dB`, mid/high residual
+    `1.447622/1.366173`, quiet mid noise `-35.03 dBFS`, `27` lag jumps.
+  - Promotion readiness still FAIL:
+    `local-analysis/promotion-readiness-after-cadence-diagnostic.json`.
+  - Ledger and payload evidence reject gross transport corruption:
+    continuous ledger, no payload mismatches, no playback errors, no output
+    underruns, no timeline resets, no late writes.
+  - Cadence outliers are now visible:
+    capture completion outliers `7`, playback completion outliers `8`.
+  - Runtime correlation is weak, so completion jitter remains the next
+    hypothesis to test, not a proven root cause.
+  - Product HAL build was restored and final isolation passed:
+    `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`.
 - Current safety state after cleanup:
   HAL inactive, hardware lock absent, no C mainline or Rust mutation expected.

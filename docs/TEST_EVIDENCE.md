@@ -4390,3 +4390,82 @@ Operational note:
   - `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
   - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
   - `local-analysis/runtime-isolation/after-iso-invariant-tooling.json`
+
+## 2026-06-17: Locked Cadence Diagnostic Physical Capture
+
+- Purpose:
+  - Capture high-resolution cadence/ledger evidence under hardware lock without
+    using the diagnostic build as product-performance evidence.
+  - Verify whether the latest failure is accompanied by payload corruption,
+    transport status errors, ledger discontinuity, underruns, or cadence
+    outliers.
+- Commands:
+  - `make -B hal-cadence-diagnostic build/audio-wav-play build/audio-record build/audio-config build/opena8dj-control`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-cadence-diagnostic/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `scripts/analyze-transfer-ledger.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/transfer-ledger-after.tsv --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/transfer-ledger-analysis.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-cadence-diagnostic-unload`
+  - `make -B hal`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-cadence-diagnostic.json`
+- Safety and cleanup:
+  - HAL candidate safety PASS.
+  - Final `audio-stack-guard` PASS.
+  - Final runtime isolation PASS: HAL inactive, hardware lock absent, no
+    OpenA8DJ processes detected.
+  - Product HAL build restored after the diagnostic run.
+- Physical soundcheck result:
+  - Result: FAIL.
+  - `quality_alignment_score=0.958757`.
+  - analog SNR `10.09 dB`.
+  - mid/high residual ratios `1.447622/1.366173`.
+  - quiet mid noise `-35.03 dBFS`.
+  - `lag_jumps_gt_2_frames=27`.
+  - no clipping; click outliers `0` in the soundcheck summary.
+- Runtime result:
+  - Promotion evaluator still FAIL.
+  - driver p95 `24.1%`, `coreaudiod` p95 `12.3%`.
+  - Diagnostic flags add overhead, so these numbers are not product CPU
+    evidence except to reject promotion.
+- Transport/ledger result:
+  - Capture ISO invariants PASS with warning
+    `classified_transactions_missing_in_stop_transfer_gap`.
+  - Transfer ledger PASS after classifying final `0xe00002eb` stop aborts as a
+    stop-window warning.
+  - Ledger coverage continuous: `48528` rows, no sequence gaps, no overwritten
+    entries.
+  - Playback queue/complete delta `0`, max in-flight `8`.
+  - Payload guard checks about `1000/s`; mismatches `0`.
+  - No output active underruns, elastic drops, elastic replays, timeline
+    resets, late writes, short playback transfers, or playback transfer errors.
+  - Cadence outliers were observed: capture completion `7`, playback
+    completion `8` during the run.
+- Failure-mode interpretation:
+  - Failure classifier still reports `timebase_or_alignment_instability`.
+  - Static L/R mix or polarity is not sufficient.
+  - Simple memoryless nonlinearity is not sufficient.
+  - LTI/fixed EQ correction worsens SNR, so this is not a fixed linear
+    transfer problem.
+  - Runtime discontinuity analysis found no strong correlation, but the top
+    weak correlations include completion outlier deltas against lag jumps.
+- Product conclusion:
+  - Do not promote.
+  - Do not claim readiness.
+  - Next product work should target USB completion jitter, queue timing, and
+    capture-paced scheduling policy while preserving payload correctness.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-cadence-diagnostic/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/transfer-ledger-analysis.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`
+  - `local-analysis/promotion-readiness-after-cadence-diagnostic.json`

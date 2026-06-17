@@ -1145,3 +1145,43 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Use the ledger/cadence evidence to decide whether the next product change
     should target queue ordering, transfer lead/depth, explicit scheduling, or
     timeline write/read policy.
+
+### Architect Cadence Diagnostic Physical Capture
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored with diagnostics off.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `scripts/analyze-capture-iso-invariants.py`
+  - `scripts/analyze-transfer-ledger.py`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Diagnostic soundcheck failed quality: quality `0.958757`, SNR `10.09 dB`,
+    mid/high residual `1.447622/1.366173`, `27` lag jumps.
+  - Transfer ledger is continuous with `48528` rows, no gaps, no overwritten
+    entries, playback queue/complete delta `0`, max in-flight `8`.
+  - Final capture `0xe00002eb` rows are stop-window aborts and are now
+    classified as warning, not transport failure.
+  - Payload guard checks had `0` mismatches.
+  - Capture ISO invariants pass when stop-transfer gap is accounted for.
+  - Completion outliers are now visible: capture `7`, playback `8`.
+  - Runtime discontinuity analysis found no strong correlation; completion
+    outlier deltas are weakly correlated with lag jumps.
+- Risks:
+  - Diagnostic run overhead invalidates product CPU comparisons except as a
+    rejection signal.
+  - Completion jitter is still a hypothesis, not a proven root cause.
+- Next recommended action:
+  - Implement a product-side timing experiment that reduces completion jitter
+    without diagnostic overhead. Candidates to test offline first:
+    queue playback before capture requeue, bounded capture-paced lead greater
+    than one, and explicit scheduling with strict fallback.
+  - Any physical run must preserve the Pair A matrix and show better real-music
+    residual and CPU together before expanding to A/B/C/D or Traktor/timecode.

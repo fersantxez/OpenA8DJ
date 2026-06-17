@@ -2623,3 +2623,48 @@ Evidence:
 - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
 - `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
 - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+
+## 2026-06-17: Cadence Diagnostic Rejects Payload Corruption, Keeps Timebase As Target
+
+Decision:
+- Do not pursue byte-format, payload-corruption, or gross underrun fixes as the
+  next primary line.
+- Keep the next product work focused on USB completion jitter, queue timing,
+  and capture-paced scheduling.
+- Keep branch promotion forbidden.
+
+Reason:
+- Locked diagnostic HAL run failed physical music quality:
+  quality `0.958757`, SNR `10.09 dB`, mid/high residual
+  `1.447622/1.366173`, quiet mid noise `-35.03 dBFS`, and `27` lag jumps.
+- Transfer ledger is continuous with no sequence gaps, no overwrites, playback
+  queue/complete delta `0`, max in-flight `8`, and no playback short/error
+  rows.
+- Payload guard found `0` mismatches across the run.
+- Output counters show no active underruns, timeline resets, late writes,
+  elastic drops, or elastic replays.
+- Capture ISO invariants pass once stop-transfer gap is accounted for.
+- Failure analyzers still classify the run as timebase/alignment instability;
+  fixed LTI/EQ correction worsens SNR.
+- Runtime discontinuity analysis finds no strong correlation, but completion
+  outlier deltas have weak correlation with lag jumps. This makes completion
+  jitter a testable hypothesis, not proof.
+
+Alternatives discarded:
+- Continue trying byte-order/output-packer changes: rejected because payload
+  guard and previous offline pack/oracle gates are clean.
+- Treat the diagnostic run as a product performance candidate: rejected because
+  cadence/ledger/payload-guard flags add overhead and are for measurement only.
+- Promote based on fewer lag jumps than the previous run: rejected because
+  quality and CPU still fail hard against thresholds and mainline.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/transfer-ledger-analysis.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+- `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+- `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json`
+- `local-analysis/promotion-readiness-after-cadence-diagnostic.json`

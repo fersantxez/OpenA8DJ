@@ -216,3 +216,31 @@ Latest promotion evaluation:
 
 Decision: do not move C mainline to Legacy, do not move C++ to `main`, and do
 not claim better sound quality, functionality, or performance than mainline.
+
+## 2026-06-17 Cadence Diagnostic Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-cadence-diagnostic.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Diagnostic physical capture still fails real-music quality:
+  quality `0.958757`, SNR `10.09 dB`, mid/high residual
+  `1.447622/1.366173`, quiet mid noise `-35.03 dBFS`, `27` lag jumps.
+- Runtime CPU still fails mainline:
+  driver p95 `24.1%`, `coreaudiod` p95 `12.3%`.
+- Diagnostic evidence rejects several candidate root causes:
+  - payload corruption: payload guard mismatches `0`;
+  - gross queue discontinuity: ledger continuous, no sequence gaps;
+  - playback transfer errors: none;
+  - output underruns/timeline resets/late writes: none;
+  - fixed LTI/EQ correction: worsens SNR.
+- Diagnostic evidence keeps cadence/timebase as the active target:
+  capture completion outliers `7`, playback completion outliers `8`, with weak
+  but nonzero lag-jump correlation.
+- Final cleanup:
+  `local-analysis/runtime-isolation/after-cadence-diagnostic-unload.json` PASS,
+  HAL inactive, lock absent.
+
+Decision remains unchanged: do not move C mainline to Legacy, do not move C++
+to `main`, and do not claim audiophile readiness.

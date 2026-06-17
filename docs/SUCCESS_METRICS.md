@@ -900,3 +900,33 @@ Latest promotion evaluation:
   - It is not a product improvement and cannot support readiness.
   - Next PASS evidence must improve real-music residual, lag stability, and
     runtime CPU against mainline at the same time.
+
+## 2026-06-17 Updated Snapshot After Cadence Diagnostic Capture
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-cadence-diagnostic.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.958757`.
+  - SNR `10.09 dB`.
+  - mid/high residual ratios `1.447622/1.366173`.
+  - quiet mid noise `-35.03 dBFS`.
+  - `lag_jumps_gt_2_frames=27`.
+- Runtime CPU beats mainline: FAIL.
+  - Diagnostic run driver p95 `24.1%`.
+  - Diagnostic run `coreaudiod` p95 `12.3%`.
+  - Diagnostic flags add overhead, but the run still cannot support any
+    resource-superiority claim.
+- Transport integrity diagnostics: PASS with warnings.
+  - Transfer ledger continuous, no sequence gaps, no overwrites.
+  - Playback queue/complete delta `0`, max in-flight `8`.
+  - Payload guard mismatches `0`.
+  - Capture ISO invariants PASS after accounting for stop-transfer gap.
+  - Final stop abort status is a warning, not a product transport failure.
+- Remaining target:
+  completion jitter and capture-paced queue timing, because payload format,
+  fixed EQ, simple nonlinearity, and gross underrun counters are not sufficient
+  explanations.

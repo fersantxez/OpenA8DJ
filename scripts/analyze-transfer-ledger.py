@@ -21,6 +21,9 @@ EVENTS = {
     "playback_complete",
 }
 
+STOP_ABORT_STATUS = "0xe00002eb"
+STOP_ABORT_SEQUENCE_WINDOW = 32
+
 
 def to_int(value: str, default: int = 0) -> int:
     text = value.strip()
@@ -111,6 +114,25 @@ def first_frame_regressions(rows: list[dict[str, str]]) -> int:
     return regressions
 
 
+def split_stop_abort_status_rows(
+    rows: list[dict[str, str]],
+    non_success_status_rows: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    max_sequence = max((to_int(row.get("sequence", "0")) for row in rows), default=0)
+    stop_abort_rows = []
+    real_status_rows = []
+    for row in non_success_status_rows:
+        sequence = to_int(str(row.get("sequence", "0")))
+        status = str(row.get("status", "")).lower()
+        event = str(row.get("event", ""))
+        final_window = max_sequence > 0 and sequence >= max_sequence - STOP_ABORT_SEQUENCE_WINDOW
+        if status == STOP_ABORT_STATUS and event.endswith("_complete") and final_window:
+            stop_abort_rows.append(row)
+        else:
+            real_status_rows.append(row)
+    return real_status_rows, stop_abort_rows
+
+
 def summarize(path: Path) -> dict:
     metadata, rows = read_ledger(path)
     counts = event_counts(rows)
@@ -133,6 +155,10 @@ def summarize(path: Path) -> dict:
         if row.get("event", "").endswith("_complete") and
         row.get("status", "0x00000000") not in ("0x00000000", "0", "")
     ]
+    real_non_success_status_rows, stop_abort_status_rows = split_stop_abort_status_rows(
+        rows,
+        non_success_status_rows,
+    )
     playback_failed_transaction_rows = [
         {
             "sequence": to_int(row.get("sequence", "0")),
@@ -194,7 +220,7 @@ def summarize(path: Path) -> dict:
         failures.append("declared_count_mismatch")
     if expected_count and expected_count != len(rows):
         failures.append("coverage_count_mismatch")
-    if non_success_status_rows:
+    if real_non_success_status_rows:
         failures.append("non_success_status")
     if playback_failed_transaction_rows:
         failures.append("playback_failed_or_short_transactions")
@@ -207,6 +233,8 @@ def summarize(path: Path) -> dict:
     ):
         failures.append("playback_queue_complete_imbalance")
     warnings = []
+    if stop_abort_status_rows:
+        warnings.append("final_stop_abort_status_observed")
     if output_active_underrun_frames > 0:
         warnings.append("output_active_underrun_frames_observed")
     if capture_failed_transaction_rows:
@@ -229,8 +257,10 @@ def summarize(path: Path) -> dict:
         "event_counts": counts,
         "sequence_gaps": gaps[:16],
         "sequence_gap_count": len(gaps),
-        "non_success_status_count": len(non_success_status_rows),
-        "non_success_status_rows": non_success_status_rows[:16],
+        "non_success_status_count": len(real_non_success_status_rows),
+        "non_success_status_rows": real_non_success_status_rows[:16],
+        "final_stop_abort_status_count": len(stop_abort_status_rows),
+        "final_stop_abort_status_rows": stop_abort_status_rows[:16],
         "playback_failed_transaction_row_count": len(playback_failed_transaction_rows),
         "playback_failed_transaction_rows": playback_failed_transaction_rows[:16],
         "capture_failed_transaction_row_count": len(capture_failed_transaction_rows),
