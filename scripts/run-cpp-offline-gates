@@ -175,7 +175,14 @@ summary = {
     "jitter_model": {
         "status": jitter.get("result"),
         "rows": len(jitter.get("rows", [])),
+        "burst_rows": len(jitter.get("burst_rows", [])),
         "failures": jitter.get("failures"),
+        "burst_failures": jitter.get("burst_failures"),
+        "unsafe_burst_scenarios": [
+            row.get("scenario")
+            for row in jitter.get("burst_rows", [])
+            if row.get("model_safe") is False and row.get("result") == "PASS"
+        ],
         "max_abs_error_frames": max(
             row.get("max_abs_error_frames", 0) for row in jitter.get("rows", [])
         ),

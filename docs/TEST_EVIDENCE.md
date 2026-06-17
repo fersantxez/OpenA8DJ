@@ -1,5 +1,56 @@
 # Test Evidence
 
+## 2026-06-17: Playback Burst Cadence Model Gate
+
+- Change:
+  - Extended `opena8djcpp_jitter_model` with an offline burst cadence model.
+  - The gate now records normal timeline/jitter rows and `burst_rows` for
+    playback completion spacing relative to the capture period.
+  - `scripts/run-cpp-offline-gates` now exposes `burst_rows`,
+    `burst_failures`, and unsafe burst scenarios in
+    `current-offline-gates.json`.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_jitter_model`
+  - `./build/cpp-release/opena8djcpp_jitter_model | tee local-analysis/cpp-offline/jitter-model.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-burst-cadence-model.json`
+- Result:
+  - Offline gates PASS.
+  - Default CTest: `100% tests passed, 0 tests failed out of 16`.
+  - Release CTest: `100% tests passed, 0 tests failed out of 17`.
+  - Evidence schema: PASS, `22` required files, `0` missing.
+  - Runtime isolation after the gate: PASS, HAL inactive, lock absent.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Jitter model evidence:
+  - Normal rows: `8`, failures `0`.
+  - Burst rows: `3`, burst failures `0`.
+  - Unsafe-by-design burst scenarios:
+    `capture_paced_coalesce2_rejected_by_physical_gate`,
+    `capture_paced_coalesce4_rejected_by_model`.
+  - `coalesce=2` models a playback completion interval of `128` frames
+    against a `64` frame capture period, with completion gap ratio `2.0` and
+    completion-count CPU ratio `0.5`.
+- Release benchmark from the same gate:
+  - `pack_mib_s=1654.72`
+  - `decode_into_mib_s=587.81`
+  - `route_frames_s=8.23705e+08`
+  - `route_advanced_frames_s=5.00832e+08`
+- Promotion readiness:
+  - FAIL, `branch_promotion_allowed=false`.
+  - Current blockers remain physical real-music quality, runtime CPU versus
+    mainline, latest physical investigation readiness, and unvalidated physical
+    Traktor/timecode vinyl.
+- Interpretation:
+  - The previous coalesce2 physical run proved that reducing completion count
+    can lower driver CPU while making quality worse. This offline model
+    captures that tradeoff explicitly, so future CPU changes must preserve
+    playback cadence instead of winning by batching completions into unsafe
+    gaps.
+
 ## 2026-06-16: Mandatory Hardware Lock Policy For Physical Scripts
 
 - Command: `scripts/run-cpp-offline-gates`

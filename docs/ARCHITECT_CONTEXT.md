@@ -559,3 +559,8 @@ Next technical target:
   transfer ticks were based on capture/default transfer size even when playback
   coalesced multiple transfers. This is now fixed internally for outlier
   accounting. It is observability only and does not change audio behavior.
+- Offline jitter modeling now also includes playback burst cadence rows. The
+  gate records coalesce2 as an expected unsafe burst profile: completion count
+  drops to `0.5x`, but playback completion spacing doubles from `64` to `128`
+  frames (`completion_gap_ratio=2.0`). That matches the physical coalesce2
+  rejection and prevents CPU-only wins from bypassing cadence/quality gates.

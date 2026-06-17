@@ -96,7 +96,8 @@ Current PASS coverage:
 - DVS packet input decode across vinyl/CD-line/phono, 44.1/48 kHz, decks A/B/C/D, including playback decode-off behavior;
 - realtime hot-path allocation audit;
 - DriverKit/CoreAudio surface model;
-- jitter/timestamp model;
+- jitter/timestamp model plus playback burst cadence rejection for unsafe
+  coalesced completion gaps;
 - static policy check;
 - hardware lock policy check for HAL candidate safety, direct hardware gates,
   and physical soundcheck;

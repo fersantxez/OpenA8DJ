@@ -45,6 +45,22 @@ struct JitterResult {
   std::uint64_t regressions = 0;
 };
 
+struct BurstScenario {
+  const char* name = "";
+  std::uint32_t capture_period_frames = 64;
+  std::uint32_t playback_coalesce = 1;
+  double max_safe_gap_ratio = 1.25;
+  bool expected_safe = true;
+};
+
+struct BurstResult {
+  std::uint32_t playback_completion_interval_frames = 0;
+  std::uint32_t frames_per_playback_completion = 0;
+  double completion_gap_ratio = 0.0;
+  double cpu_completion_reduction_ratio = 1.0;
+  bool model_safe = true;
+};
+
 bool has_gap(const GapEvent& gap, std::uint32_t period) {
   return gap.frame_delta != 0.0 && gap.period == period;
 }
@@ -165,6 +181,23 @@ bool passes(const Scenario& scenario, const JitterResult& result) {
          result.max_lag_error_frames <= kLatencyMarginFrames;
 }
 
+BurstResult burst_model(const BurstScenario& scenario) {
+  BurstResult result{};
+  const std::uint32_t coalesce = std::max(1U, scenario.playback_coalesce);
+  result.playback_completion_interval_frames = scenario.capture_period_frames * coalesce;
+  result.frames_per_playback_completion = scenario.capture_period_frames * coalesce;
+  result.completion_gap_ratio =
+      static_cast<double>(result.playback_completion_interval_frames) /
+      static_cast<double>(scenario.capture_period_frames);
+  result.cpu_completion_reduction_ratio = 1.0 / static_cast<double>(coalesce);
+  result.model_safe = result.completion_gap_ratio <= scenario.max_safe_gap_ratio;
+  return result;
+}
+
+bool burst_passes(const BurstScenario& scenario, const BurstResult& result) {
+  return result.model_safe == scenario.expected_safe;
+}
+
 void print_row(const Scenario& scenario,
                std::uint32_t sample_rate,
                std::uint32_t frames_per_period,
@@ -188,6 +221,27 @@ void print_row(const Scenario& scenario,
             << ", \"max_phase_step_error_frames\": " << result.max_phase_step_error_frames
             << ", \"regressions\": " << result.regressions << ", \"result\": \""
             << (ok ? "PASS" : "FAIL") << "\"}" << (trailing_comma ? ",\n" : "\n");
+}
+
+void print_burst_row(const BurstScenario& scenario,
+                     const BurstResult& result,
+                     bool ok,
+                     bool trailing_comma) {
+  std::cout << "    {\"scenario\": \"" << scenario.name << "\""
+            << ", \"capture_period_frames\": " << scenario.capture_period_frames
+            << ", \"playback_coalesce\": " << scenario.playback_coalesce
+            << ", \"playback_completion_interval_frames\": "
+            << result.playback_completion_interval_frames
+            << ", \"frames_per_playback_completion\": "
+            << result.frames_per_playback_completion
+            << ", \"completion_gap_ratio\": " << result.completion_gap_ratio
+            << ", \"cpu_completion_reduction_ratio\": "
+            << result.cpu_completion_reduction_ratio
+            << ", \"max_safe_gap_ratio\": " << scenario.max_safe_gap_ratio
+            << ", \"model_safe\": " << (result.model_safe ? "true" : "false")
+            << ", \"expected_safe\": " << (scenario.expected_safe ? "true" : "false")
+            << ", \"result\": \"" << (ok ? "PASS" : "FAIL") << "\"}"
+            << (trailing_comma ? ",\n" : "\n");
 }
 
 }  // namespace
@@ -240,10 +294,17 @@ int main() {
        2,
        48.0},
   };
+  const BurstScenario burst_scenarios[] = {
+      {"capture_paced_periodic_playback", 64, 1, 1.25, true},
+      {"capture_paced_coalesce2_rejected_by_physical_gate", 64, 2, 1.25, false},
+      {"capture_paced_coalesce4_rejected_by_model", 64, 4, 1.25, false},
+  };
   const std::uint32_t periods = 20000;
   const std::uint32_t frames_per_period = 64;
   std::uint32_t failures = 0;
+  std::uint32_t burst_failures = 0;
   std::uint32_t rows = 0;
+  std::uint32_t burst_rows = 0;
 
   std::cout << "{\n  \"rows\": [\n";
   for (std::uint32_t sample_index = 0; sample_index < 2; ++sample_index) {
@@ -262,7 +323,20 @@ int main() {
                 trailing_comma);
     }
   }
-  std::cout << "  ],\n  \"row_count\": " << rows << ",\n  \"failures\": " << failures
+  std::cout << "  ],\n  \"burst_rows\": [\n";
+  for (std::uint32_t scenario_index = 0; scenario_index < 3; ++scenario_index) {
+    const auto result = burst_model(burst_scenarios[scenario_index]);
+    const bool ok = burst_passes(burst_scenarios[scenario_index], result);
+    burst_failures += ok ? 0U : 1U;
+    burst_rows += 1;
+    const bool trailing_comma = scenario_index != 2;
+    print_burst_row(burst_scenarios[scenario_index], result, ok, trailing_comma);
+  }
+  failures += burst_failures;
+  std::cout << "  ],\n  \"row_count\": " << rows
+            << ",\n  \"burst_row_count\": " << burst_rows
+            << ",\n  \"burst_failures\": " << burst_failures
+            << ",\n  \"failures\": " << failures
             << ",\n  \"result\": \""
             << (failures == 0 ? "PASS" : "FAIL") << "\"\n}\n";
 

@@ -1,5 +1,39 @@
 # Decision Log
 
+## 2026-06-17: Reject CPU Wins That Violate Playback Cadence
+
+Decision:
+- Add an offline playback burst cadence model to `opena8djcpp_jitter_model`.
+- Treat playback coalescing that increases completion spacing beyond `1.25x`
+  the capture period as unsafe unless a later physical design proves otherwise.
+- Keep `HAL_PLAYBACK_COALESCE_TRANSFERS=2` rejected as a quality candidate,
+  despite its lower driver CPU.
+
+Reason:
+- The coalesce2 physical soundcheck reduced OpenA8DJ driver p95 CPU to
+  `28.5%`, but quality failed badly: alignment `0.898854`, SNR `5.85 dB`,
+  `45` lag jumps, mid residual `2.5634`, high residual `1.6666`.
+- The modeled cadence shows the mechanism plainly: coalesce2 halves the
+  completion count, but doubles playback completion spacing from `64` to `128`
+  frames. That is not an audiophile-safe optimization.
+
+Alternatives discarded:
+- Accept coalesce2 as a performance improvement: rejected because product
+  quality and cadence are worse.
+- Keep the insight only in prose: rejected because readiness gates must block
+  misleading CPU-only wins automatically.
+- Reject all future transaction-count work: rejected because CPU still matters,
+  but future work must preserve cadence or prove a safer pacing model.
+
+Evidence:
+- `local-analysis/cpp-offline/jitter-model.json`: `burst_rows=3`,
+  `burst_failures=0`, coalesce2 and coalesce4 marked unsafe by model and
+  expected rejection.
+- `local-analysis/cpp-offline/current-offline-gates.json`: offline gates PASS
+  and `unsafe_burst_scenarios` records the rejected burst profiles.
+- `local-analysis/soundcheck/20260617-coalesce2-only-43773be-irig-pairA-16s-cpp-hal/metrics.json`:
+  physical coalesce2 quality failure.
+
 ## 2026-06-17: Reject Reset-Off Variant Before Soundcheck
 
 Decision:

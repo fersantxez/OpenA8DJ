@@ -595,7 +595,11 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Added `--no-monitor-stream-stats` diagnostic mode.
   - Tested `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`;
     it failed HAL safety and was rejected before soundcheck.
+  - Added playback burst cadence rows to `opena8djcpp_jitter_model` so the
+    coalesce2 CPU win is blocked offline when it doubles playback completion
+    spacing relative to capture cadence.
 - Risk:
   - Transaction-count reduction is still likely important for CPU, but the
-    first coalescing variant destabilized CoreAudio on load. Future variants
-    need smaller, separately isolated changes and safety gates.
+    first coalescing variants either destabilized CoreAudio on load or failed
+    physical music quality. Future variants need smaller, separately isolated
+    changes that preserve playback cadence and pass safety gates.

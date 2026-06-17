@@ -184,13 +184,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1546.09 MiB/s` over `5` repeats, min `1541.60`, max `1603.37` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `565.894 MiB/s` over `5` repeats, min `561.880`, max `570.159` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `560.702 MiB/s` over `5` repeats, min `502.531`, max `564.367` | informational |
-| Float32 to S24 conversion throughput | median `85,450,400 frames/s` over `5` repeats, min `84,446,800`, max `85,565,500` | `1,000,000 frames/s` |
-| identity routing throughput | median `999,440,000 frames/s` over `5` repeats, min `766,037,000`, max `1,010,510,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `481,809,000 frames/s` over `5` repeats, min `481,219,000`, max `492,135,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `472,260,000 frames/s` over `5` repeats, min `470,987,000`, max `475,401,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1654.72 MiB/s` over `5` repeats, min `1631.29`, max `1658.32` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `587.810 MiB/s` over `5` repeats, min `582.355`, max `590.359` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `577.083 MiB/s` over `5` repeats, min `539.559`, max `580.745` | informational |
+| Float32 to S24 conversion throughput | median `88,319,700 frames/s` over `5` repeats, min `87,562,500`, max `88,402,900` | `1,000,000 frames/s` |
+| identity routing throughput | median `823,705,000 frames/s` over `5` repeats, min `766,783,000`, max `837,855,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `511,002,000 frames/s` over `5` repeats, min `509,471,000`, max `518,754,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `500,832,000 frames/s` over `5` repeats, min `489,798,000`, max `506,355,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -202,6 +202,8 @@ Current Release benchmark values:
 | jitter model elastic drops/replays | `172/82 frames` | scenario-bounded |
 | jitter max error | `46.639 frames` in gap recovery scenario | scenario-bounded |
 | jitter regressions | `0` | `0` |
+| burst cadence rows | `3`, failures `0` | `>= 3`, failures `0` |
+| unsafe burst scenarios | `coalesce2`, `coalesce4` rejected by model | unsafe CPU-only burst wins rejected |
 
 Functional coverage in the current C++ test binary:
 
