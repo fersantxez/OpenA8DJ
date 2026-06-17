@@ -1,5 +1,49 @@
 # Decision Log
 
+## 2026-06-17: Separate Raw Playback Completions From Sampled Stream Stats
+
+Decision:
+- Add a raw playback completion counter and make `opena8dj-control` report it
+  as `playbackTransfersCompleted` when present.
+- Keep the older sampled stream-stats counters for low-overhead diagnostics,
+  but do not compare sampled completions against raw submitted counts.
+
+Reason:
+- With `OPENA8DJ_HOT_STREAM_STATS_INTERVAL=16`, the existing
+  `_streamStats.playbackTransfers` counter was sampled once per 16 playback
+  completions. `playbackTransfersSubmitted` was raw.
+- That produced misleading physical evidence such as
+  `playbackTransfersSubmitted=8131` versus `playbackTransfersCompleted=508`.
+- After adding `playbackTransfersCompletedRaw`, the same style of locked
+  soundcheck reports `playbackTransfersSubmitted=8123` and
+  `playbackTransfersCompleted=8123`.
+
+Alternatives discarded:
+- Disable hot-stream-stats sampling: rejected because it would add mutex work
+  back into the completion path for every transfer.
+- Divide submitted by the sampling interval: rejected because it hides the real
+  raw transfer rate and is wrong when sampling policy changes.
+- Rename existing public keys immediately: rejected because scripts already
+  consume `playbackTransfersCompleted`; the control tool can preserve the key
+  while using the raw field when available.
+
+Evidence:
+- `local-analysis/physical-stream-stats-contract/20260617T132743Z-288f65a`:
+  before fix, `8131` submitted versus `508` reported completed.
+- `local-analysis/physical-stream-stats-raw-completions/20260617T133008Z-288f65a`:
+  after fix, `8123` submitted and `8123` completed.
+- The fixed run still failed quality:
+  alignment `0.977635`, SNR `11.00 dB`, `21` lag jumps.
+- Runtime isolation after cleanup:
+  `local-analysis/runtime-isolation/post-stream-stats-raw-completions-physical.json`,
+  PASS, HAL inactive, lock absent.
+
+Next implication:
+- C++ default playback currently completes about `16x` more often than capture
+  transfers (`8123` playback completions versus `508` capture completions in
+  the short run). This explains CPU pressure, but prior ISO64/coalesce tests
+  prove that reducing completion rate naively is not audiophile safe.
+
 ## 2026-06-17: Make Stream-Stats Payload Drift A Gate Failure
 
 Decision:

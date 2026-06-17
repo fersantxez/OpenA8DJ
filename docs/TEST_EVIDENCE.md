@@ -1,5 +1,53 @@
 # Test Evidence
 
+## 2026-06-17: Raw Playback Completion Counter Fix
+
+- Change:
+  - Added `playbackTransfersCompletedRaw` to `OpenA8DJStreamStatsPayload`.
+  - Added `_playbackTransfersCompletedAtomic` and increment it once per
+    playback completion, outside the hot-stream-stats sampling interval.
+  - `opena8dj-control stream-stats` now prints raw playback completions when
+    the field is present, falling back to the legacy sampled counter for older
+    HAL payloads.
+- Commands:
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `make -B hal`
+  - `scripts/run-cpp-offline-gates`
+  - Locked HAL safety and short iRig soundcheck before the fix:
+    `local-analysis/physical-stream-stats-contract/20260617T132743Z-288f65a`.
+  - Locked HAL safety and short iRig soundcheck after the fix:
+    `local-analysis/physical-stream-stats-raw-completions/20260617T133008Z-288f65a`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-stream-stats-raw-completions-physical.json`
+- Result:
+  - Stream-stats contract PASS: `167` HAL fields, `167` control-tool fields,
+    `0` mismatches, last field `playbackTransfersCompletedRaw`.
+  - Offline gates PASS.
+  - Debug CTest: `100% tests passed, 0 tests failed out of 17`.
+  - Release CTest: `100% tests passed, 0 tests failed out of 18`.
+  - Evidence schema: PASS, `22` required files, `0` missing.
+  - Post-run runtime isolation PASS, HAL inactive, lock absent.
+- Physical counter evidence:
+  - Before the fix, the same build-hardening line still reported
+    `playbackTransfersSubmitted=8131` and `playbackTransfersCompleted=508`,
+    proving the stale-tool/drift fix was not enough.
+  - After the raw completion fix, the short locked run reported
+    `playbackTransfersSubmitted=8123` and `playbackTransfersCompleted=8123`.
+  - The same run reported `captureTransfersCompleted=508`, so C++ playback is
+    currently doing about `16x` more playback completions than capture
+    completions in this default physical path.
+- Physical quality result after the fix:
+  - Soundcheck remains FAIL:
+    `quality_alignment_score=0.977635`, SNR `11.00 dB`,
+    `lag_jumps_gt_2_frames=21`,
+    mid/high residual `1.365994/1.351958`.
+- Interpretation:
+  - The misleading `submitted/completed` mismatch is fixed.
+  - The new raw counters expose a real performance issue: C++ default playback
+    completion rate is high, and previous ISO64/coalesce experiments show that
+    naively reducing that rate breaks physical quality.
+  - This is observability progress only. It is not a readiness or quality
+    improvement claim.
+
 ## 2026-06-17: Stream-Stats Contract And Control Tool Build Hardening
 
 - Change:

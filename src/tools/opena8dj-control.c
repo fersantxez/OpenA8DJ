@@ -237,6 +237,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackPayloadGuardChecks;
     uint64_t playbackPayloadGuardMismatches;
     uint64_t playbackTransfersSubmitted;
+    uint64_t playbackTransfersCompletedRaw;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1262,7 +1263,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                                 stats->playbackTransfersSubmitted :
                                 (STREAM_STATS_HAS_FIELD(payloadLength, playbackQueueAttempts) ?
                                  stats->playbackQueueAttempts : stats->playbackTransfers)));
-    printf("playbackTransfersCompleted=%llu\n", (unsigned long long)stats->playbackTransfers);
+    printf("playbackTransfersCompleted=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransfersCompletedRaw) ?
+                                stats->playbackTransfersCompletedRaw : stats->playbackTransfers));
     printf("playbackTransferErrors=%llu\n", (unsigned long long)stats->playbackTransactionFailures);
     printf("captureTransferPoolFallbackAllocations=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?

@@ -16,10 +16,14 @@ Branch: `driverkit/cpp-redesign`
   collapse physical quality. Runtime isolation after cleanup is clean.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
-  `OpenA8DJStreamStatsPayload` field list (`166` fields, `0` mismatches in the
-  latest run). This does not yet prove the `playbackTransfersSubmitted`
-  runtime counter semantics; it only removes stale-tool/payload-drift as an
-  avoidable explanation before the next hardware run.
+  `OpenA8DJStreamStatsPayload` field list (`167` fields, `0` mismatches in the
+  latest run). This removes stale-tool/payload-drift as an avoidable
+  explanation before hardware runs.
+- Raw playback completion telemetry is now fixed. A locked before/after short
+  iRig run changed reported playback submitted/completed from `8131/508` to
+  `8123/8123`. The same fixed run still failed strict quality, and it exposed
+  the real CPU pressure source: default C++ playback completions are about
+  `16x` capture completions in the current physical path.
 - Reboot/autologin recovery is an unresolved operational gap. After the prior
   reboot, the session did not recover without user intervention as intended;
   this must be fixed before planned unattended test windows.
