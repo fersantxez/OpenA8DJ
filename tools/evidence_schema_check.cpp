@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
+      root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
       root / "local-analysis/cpp-offline/prepared-transport-pressure-gate.json",
       root / "local-analysis/cpp-offline/prepared-transport-migration-gate.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
@@ -113,7 +114,15 @@ int main(int argc, char** argv) {
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"stable_logical_slots\": 528") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"stable_total_frames\": 5808") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"usb_submit_plan_stable_usb_submit_calls\": 66") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"usb_submit_payload_contract\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"usb_submit_payload_descriptors\": 66") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"usb_submit_payload_total_frames\": 5808") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",

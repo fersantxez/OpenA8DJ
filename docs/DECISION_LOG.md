@@ -6191,3 +6191,49 @@ Next implication:
 - The real runtime adapter must allocate and recycle actual DriverKit/USB
   descriptors according to this plan; until then, CPU superiority remains an
   offline hypothesis, not a product claim.
+
+## 2026-06-17: Require USB Submit Payload Contract
+
+Decision:
+- Add `opena8djcpp_usb_submit_payload_contract`.
+- Require `prepared-transport-migration-gate` to pass
+  `usb_submit_payload_plan_safe` before the prepared transport path can be
+  treated as a hardware-candidate direction.
+
+Reason:
+- Descriptor counts alone were not enough. The previous model could count
+  logical ISO8 slots correctly while under-describing the Mode2 payload frame
+  capacity required by a 352-byte transfer.
+- The contract now keeps two facts separate:
+  - logical timestamps advance by ISO8 slots;
+  - USB payload descriptors carry Mode2 payload frames derived from bytes.
+
+Evidence:
+- `opena8djcpp_usb_submit_payload_contract`: PASS.
+- Stable payload contract:
+  - `descriptors=66`;
+  - `capture_descriptors=33`;
+  - `playback_descriptors=33`;
+  - `total_bytes=185856`;
+  - `total_frames=5808`;
+  - `check_errors=0`;
+  - `panic_flags=0`;
+  - `output_overflows=0`;
+  - `prefix_mismatches=0`;
+  - descriptor, direction, and timestamp mismatches all `0`.
+- Full offline gates:
+  - Debug CTest `47/47` passed.
+  - Release CTest `48/48` passed.
+  - Evidence schema `required_files=48`, `missing_files=0`.
+
+Alternatives discarded:
+- Keep `frame_count` as logical `slot_count * frames_per_slot`: rejected
+  because it caused payload decode overflow in the descriptor payload gate.
+- Treat the payload contract as optional: rejected because CPU reduction is
+  only meaningful if batched descriptors still carry the full Mode2 payload.
+
+Next implication:
+- A real DriverKit/USB backend must submit payloads that satisfy both the
+  logical ISO8 cadence contract and the Mode2 payload contract. Product
+  superiority still requires lock-gated physical same-session A/B evidence
+  against mainline.

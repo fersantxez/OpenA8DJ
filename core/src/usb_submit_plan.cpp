@@ -103,6 +103,10 @@ PreparedUsbSubmitPlannerSafety PreparedUsbSubmitPlanner::safety() const {
   return out;
 }
 
+std::span<const UsbSubmitDescriptor> PreparedUsbSubmitPlanner::descriptors() const {
+  return std::span<const UsbSubmitDescriptor>(descriptors_.data(), descriptor_count_);
+}
+
 PreparedUsbSubmitPlanner::DirectionState& PreparedUsbSubmitPlanner::state_for(
     UsbSlotDirection direction) {
   return direction == UsbSlotDirection::Capture ? capture_ : playback_;
@@ -126,12 +130,14 @@ void PreparedUsbSubmitPlanner::flush_direction(UsbSlotDirection direction, bool 
   }
 
   const auto slots = static_cast<std::uint64_t>(state.pending_slots);
+  const auto payload_frames =
+      (slots * static_cast<std::uint64_t>(config_.bytes_per_slot)) / kMode2FullFrameBytes;
   descriptors_[static_cast<std::size_t>(descriptor_count_)] =
       UsbSubmitDescriptor{.direction = direction,
                           .first_sequence = state.pending_first_sequence,
                           .slot_count = slots,
                           .first_sample_timestamp = state.pending_first_timestamp,
-                          .frame_count = slots * config_.frames_per_slot,
+                          .frame_count = payload_frames,
                           .byte_count = slots * config_.bytes_per_slot};
   descriptor_count_ += 1;
 
@@ -144,7 +150,7 @@ void PreparedUsbSubmitPlanner::flush_direction(UsbSlotDirection direction, bool 
   if (partial) {
     counters_.partial_submit_calls += 1;
   }
-  counters_.total_frames += slots * config_.frames_per_slot;
+  counters_.total_frames += payload_frames;
   counters_.total_bytes += slots * config_.bytes_per_slot;
   state.pending_slots = 0;
 }

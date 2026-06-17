@@ -2081,6 +2081,12 @@ Prepared transport migration metric:
   `usb_submit_plan_stable_usb_submit_reduction_ratio >= 8.0`; otherwise the
   runtime bridge lacks an ordered descriptor plan and cannot proceed toward
   hardware.
+- It must also report `usb_submit_payload_plan_safe=PASS`,
+  `usb_submit_payload_descriptors=66`, `usb_submit_payload_total_bytes=185856`,
+  and `usb_submit_payload_total_frames=5808`, with zero Mode2 check errors,
+  panic flags, output overflows, prefix mismatches, descriptor mismatches,
+  direction-order errors, and timestamp mismatches. Otherwise the batching
+  model is counting submits without proving complete payload integrity.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

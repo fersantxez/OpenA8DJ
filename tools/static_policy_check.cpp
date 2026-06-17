@@ -115,6 +115,7 @@ int main(int argc, char** argv) {
       root / "tools/prepared_slot_scheduler_contract.cpp",
       root / "tools/runtime_adapter_contract.cpp",
       root / "tools/usb_submit_plan_contract.cpp",
+      root / "tools/usb_submit_payload_contract.cpp",
       root / "tools/prepared_transport_pressure_gate.cpp",
       root / "tools/prepared_transport_migration_gate.cpp",
       root / "tools/physical_run_compare.cpp",

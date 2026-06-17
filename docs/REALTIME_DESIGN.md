@@ -526,8 +526,11 @@ timestamps, capture, playback, or timecode.
 Offline gate:
 
 - `opena8djcpp_usb_submit_plan_contract`.
+- `opena8djcpp_usb_submit_payload_contract`.
 - The stable row maps `528` logical capture/playback slots into `66` prepared
   submit descriptors, split `33/33` between capture and playback.
+- The payload gate proves those descriptors carry `185856` bytes and `5808`
+  Mode2 payload frames with zero decode/check/panic/overflow/prefix failures.
 - Required result has zero partial submits, descriptor overflows, slot-order
   errors, and timestamp regressions.
 - Negative rows reject unbatched submits, order errors, timestamp regressions,
@@ -535,4 +538,5 @@ Offline gate:
 
 A real DriverKit/USB backend must preallocate and recycle descriptors according
 to this plan. The audio callback must not allocate descriptors, repair order,
-flush partial batches, or perform direct submit work per logical slot.
+flush partial batches, perform direct submit work per logical slot, or recompute
+payload layout dynamically.

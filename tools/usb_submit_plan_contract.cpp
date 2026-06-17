@@ -205,6 +205,7 @@ int main() {
   std::uint32_t safe_rows = 0;
   std::uint64_t stable_logical_slots = 0;
   std::uint64_t stable_submit_calls = 0;
+  std::uint64_t stable_total_frames = 0;
   std::uint64_t stable_total_bytes = 0;
   double stable_reduction = 0.0;
 
@@ -224,6 +225,7 @@ int main() {
     if (std::string(scenarios[index].name) == "usb_submit_batch8_stable") {
       stable_logical_slots = result.planner_counters.logical_slots;
       stable_submit_calls = result.planner_counters.usb_submit_calls;
+      stable_total_frames = result.planner_counters.total_frames;
       stable_total_bytes = result.planner_counters.total_bytes;
       stable_reduction = result.planner_counters.usb_submit_reduction_ratio;
     }
@@ -231,13 +233,14 @@ int main() {
   }
 
   const bool pass = failures == 0 && safe_rows == 1 && stable_logical_slots == 528 &&
-                    stable_submit_calls == 66 && stable_total_bytes == 185856 &&
-                    stable_reduction >= 8.0;
+                    stable_submit_calls == 66 && stable_total_frames == 5808 &&
+                    stable_total_bytes == 185856 && stable_reduction >= 8.0;
   std::cout << "  ],\n"
             << "  \"row_count\": " << scenarios.size() << ",\n"
             << "  \"safe_rows\": " << safe_rows << ",\n"
             << "  \"stable_logical_slots\": " << stable_logical_slots << ",\n"
             << "  \"stable_usb_submit_calls\": " << stable_submit_calls << ",\n"
+            << "  \"stable_total_frames\": " << stable_total_frames << ",\n"
             << "  \"stable_total_bytes\": " << stable_total_bytes << ",\n"
             << "  \"stable_usb_submit_reduction_ratio\": " << stable_reduction << ",\n"
             << "  \"failures\": " << failures << ",\n"

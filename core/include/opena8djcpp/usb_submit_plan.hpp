@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
 
 namespace opena8djcpp {
 
@@ -77,6 +78,8 @@ class PreparedUsbSubmitPlanner {
   [[nodiscard]] const PreparedUsbSubmitPlannerCounters& counters() const {
     return counters_;
   }
+
+  [[nodiscard]] std::span<const UsbSubmitDescriptor> descriptors() const;
 
   [[nodiscard]] PreparedUsbSubmitPlannerSafety safety() const;
 

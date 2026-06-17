@@ -2375,8 +2375,16 @@ Current implication:
     `stable_total_bytes=185856`, zero partial submits, zero descriptor
     overflows, zero ordering errors, and zero timestamp regressions. The
     migration gate now requires `usb_submit_descriptor_plan_safe=PASS`.
-  - Current full offline evidence after this integration: Debug CTest `46/46`,
-    Release CTest `47/47`, evidence schema `required_files=47`,
+  - The descriptor plan is now tied to actual Mode2 payload validation.
+    `opena8djcpp_usb_submit_payload_contract` packs and decodes every prepared
+    descriptor offline and requires `66` descriptors, `185856` bytes, `5808`
+    Mode2 payload frames, zero check errors, zero panic flags, zero output
+    overflows, zero prefix mismatches, zero descriptor mismatches, zero
+    direction-order errors, and zero timestamp mismatches. This corrected the
+    earlier ambiguity between `528` logical ISO8 slots and `5808` Mode2 payload
+    frames.
+  - Current full offline evidence after this integration: Debug CTest `47/47`,
+    Release CTest `48/48`, evidence schema `required_files=48`,
     `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the

@@ -244,6 +244,7 @@ int main(int argc, char** argv) {
   const auto scheduler = read_file(base / "prepared-slot-scheduler-contract.json");
   const auto runtime_adapter = read_file(base / "runtime-adapter-contract.json");
   const auto usb_submit_plan = read_file(base / "usb-submit-plan-contract.json");
+  const auto usb_submit_payload = read_file(base / "usb-submit-payload-contract.json");
   const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
@@ -267,8 +268,16 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(usb_submit_plan, "stable_logical_slots"));
   const double usb_plan_submit_calls =
       number_or_nan(json_number(usb_submit_plan, "stable_usb_submit_calls"));
+  const double usb_plan_total_frames =
+      number_or_nan(json_number(usb_submit_plan, "stable_total_frames"));
   const double usb_plan_reduction =
       number_or_nan(json_number(usb_submit_plan, "stable_usb_submit_reduction_ratio"));
+  const double usb_payload_descriptors =
+      number_or_nan(json_number(usb_submit_payload, "descriptors"));
+  const double usb_payload_total_bytes =
+      number_or_nan(json_number(usb_submit_payload, "total_bytes"));
+  const double usb_payload_total_frames =
+      number_or_nan(json_number(usb_submit_payload, "total_frames"));
   const double transport_gap =
       number_or_nan(json_number(driverkit_prepared, "max_completion_gap_ratio"));
   const double fixed_to_fill =
@@ -329,8 +338,22 @@ int main(int argc, char** argv) {
   const bool usb_submit_plan_safe =
       result_pass(usb_submit_plan) && finite(usb_plan_logical_slots) &&
       usb_plan_logical_slots >= 528.0 && finite(usb_plan_submit_calls) &&
-      usb_plan_submit_calls <= 66.0 && finite(usb_plan_reduction) &&
+      usb_plan_submit_calls <= 66.0 && finite(usb_plan_total_frames) &&
+      usb_plan_total_frames == 5808.0 && finite(usb_plan_reduction) &&
       usb_plan_reduction >= 8.0 && number_is_zero(usb_submit_plan, "failures");
+  const bool usb_submit_payload_safe =
+      result_pass(usb_submit_payload) && finite(usb_payload_descriptors) &&
+      usb_payload_descriptors == 66.0 && finite(usb_payload_total_bytes) &&
+      usb_payload_total_bytes == 185856.0 && finite(usb_payload_total_frames) &&
+      usb_payload_total_frames == 5808.0 &&
+      number_is_zero(usb_submit_payload, "check_errors") &&
+      number_is_zero(usb_submit_payload, "panic_flags") &&
+      number_is_zero(usb_submit_payload, "output_overflows") &&
+      number_is_zero(usb_submit_payload, "prefix_mismatches") &&
+      number_is_zero(usb_submit_payload, "descriptor_byte_mismatches") &&
+      number_is_zero(usb_submit_payload, "descriptor_frame_mismatches") &&
+      number_is_zero(usb_submit_payload, "direction_order_errors") &&
+      number_is_zero(usb_submit_payload, "timestamp_mismatches");
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -384,6 +407,7 @@ int main(int argc, char** argv) {
       {"logical_iso8_usb_submit_batching_supported", usb_submit_batching_supported},
       {"runtime_adapter_batched_submit_counters_exposed", runtime_adapter_batching_exposed},
       {"usb_submit_descriptor_plan_safe", usb_submit_plan_safe},
+      {"usb_submit_payload_plan_safe", usb_submit_payload_safe},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -419,7 +443,11 @@ int main(int argc, char** argv) {
                runtime_adapter_logical_periods);
   print_number("usb_submit_plan_stable_logical_slots", usb_plan_logical_slots);
   print_number("usb_submit_plan_stable_usb_submit_calls", usb_plan_submit_calls);
+  print_number("usb_submit_plan_stable_total_frames", usb_plan_total_frames);
   print_number("usb_submit_plan_stable_usb_submit_reduction_ratio", usb_plan_reduction);
+  print_number("usb_submit_payload_descriptors", usb_payload_descriptors);
+  print_number("usb_submit_payload_total_bytes", usb_payload_total_bytes);
+  print_number("usb_submit_payload_total_frames", usb_payload_total_frames);
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

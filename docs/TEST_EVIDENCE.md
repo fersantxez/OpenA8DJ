@@ -9474,3 +9474,70 @@ Full offline gate rerun:
     submit calls without changing logical ISO8 cadence.
   - This still is not a real DriverKit/USB binding and does not prove hardware
     quality, Traktor/timecode-vinyl readiness, or CPU superiority over mainline.
+
+## 2026-06-17 Offline USB Submit Payload Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added an offline payload contract for prepared USB submit descriptors.
+  - The contract packs and decodes Mode2 payloads for every prepared descriptor
+    without touching HAL, DriverKit runtime, CoreAudio, USB, hardware, installs,
+    resets, or default devices.
+- Files:
+  - `core/include/opena8djcpp/usb_submit_plan.hpp`
+  - `core/src/usb_submit_plan.cpp`
+  - `tools/usb_submit_payload_contract.cpp`
+  - `tools/usb_submit_plan_contract.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `scripts/run-cpp-offline-gates`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/REALTIME_DESIGN.md`
+  - `docs/TEST_EVIDENCE.md`
+- Gate:
+  - `opena8djcpp_usb_submit_payload_contract`.
+  - Result: PASS.
+  - `descriptors=66`.
+  - `capture_descriptors=33`.
+  - `playback_descriptors=33`.
+  - `total_bytes=185856`.
+  - `total_frames=5808`.
+  - `decoded_frames=5742`.
+  - `check_errors=0`.
+  - `panic_flags=0`.
+  - `output_overflows=0`.
+  - `prefix_mismatches=0`.
+  - Descriptor byte/frame mismatches, direction-order errors, and timestamp
+    mismatches are all `0`.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `usb_submit_payload_plan_safe=PASS`.
+  - `usb_submit_payload_descriptors=66.000000`.
+  - `usb_submit_payload_total_bytes=185856.000000`.
+  - `usb_submit_payload_total_frames=5808.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_usb_submit_payload_contract opena8djcpp_usb_submit_plan_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_usb_submit_payload_contract`
+  - `./build/cpp-offline/opena8djcpp_usb_submit_plan_contract`
+  - `./build/cpp-offline/opena8djcpp_static_policy_check`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `47/47` passed.
+  - Release CTest: `48/48` passed.
+  - Evidence schema: `required_files=48`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The C++ line now distinguishes logical ISO8 slots from Mode2 payload
+    frames. The stable plan remains `528` logical slots and `66` submit
+    descriptors, while payload capacity is `5808` Mode2 frames for `185856`
+    bytes.
+  - This is stronger offline evidence for a future low-CPU USB path, but it is
+    not physical sound-quality evidence, not Traktor/timecode-vinyl readiness,
+    and not CPU superiority over mainline.
