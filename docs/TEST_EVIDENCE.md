@@ -2833,3 +2833,86 @@ Operational note:
     residual. The next decisive work should isolate reference-route mismatch,
     physical path behavior, output format/phase semantics, or runtime
     discontinuities that are not currently counted.
+
+## 2026-06-17: Monitor-Free Soundcheck CPU Mode
+
+- Change:
+  - Added `--no-monitor-stream-stats` to `scripts/run-soundcheck`.
+- Commands:
+  - `python3 -m py_compile scripts/run-soundcheck`
+  - `git diff --check`
+- Result:
+  - PASS. The mode is available for lower-perturbation CPU diagnostics.
+- Interpretation:
+  - Use this mode for CPU A/B only. Readiness and glitch claims still require
+    stream-stat evidence from normal locked runs.
+
+## 2026-06-17: Coalesce2 + Pool Cursor Safety Rejection
+
+- Candidate:
+  - `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`
+- Commands:
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-coalesce2-poolcursor.json`
+  - `make -B hal HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`
+  - `scripts/run-cpp-offline-gates`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-coalesce2-poolcursor/20260617-190a7ed/hal-candidate-safety`
+- Result:
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+  - HAL candidate safety FAIL.
+  - The gate unloaded the rejected HAL and recovery PASS.
+- Safety failure metrics:
+  - `audio_stack_health=FAIL`
+  - `coreaudiod=86.8%`
+  - `mediaremoted=57.5%`
+  - `total_watched_cpu_pct=145.3`
+  - `opena8dj_driver=0.7%`
+- Evidence paths:
+  - `local-analysis/physical-coalesce2-poolcursor/20260617-190a7ed/hal-candidate-safety`
+  - `local-analysis/runtime-isolation/after-coalesce2-safety-fail-before-unload.json`
+- Interpretation:
+  - Coalescing playback transfers by 2 plus pool cursor is rejected before
+    soundcheck. It does not satisfy the safety gate.
+
+## 2026-06-17: Default Monitor-Free And Normal Confirmation Runs
+
+- Commands:
+  - `make -B hal`
+  - Default safety:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-default-monitorfree/20260617-190a7ed/hal-candidate-safety`
+  - Monitor-free soundcheck:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-default-monitorfree-a1c8b50-irig-pairA-16s-cpp-hal --no-monitor-stream-stats --cpu-profile-interval 0.25 --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Default normal confirmation safety and soundcheck:
+    `local-analysis/physical-default-normal-confirm/20260617-190a7ed/hal-candidate-safety`
+    and
+    `local-analysis/soundcheck/20260617-default-normal-confirm-a1c8b50-irig-pairA-16s-cpp-hal`
+  - Final unload/isolation:
+    `local-analysis/runtime-isolation/final-after-default-normal-confirm.json`
+  - Promotion readiness:
+    `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-default-normal-confirm.json`
+- Result:
+  - Default safety PASS before monitor-free.
+  - Monitor-free soundcheck FAIL and is not comparable product evidence.
+  - Default normal confirmation soundcheck FAIL with the known aligned failure
+    signature.
+  - Final isolation PASS: HAL inactive and lock absent.
+  - Promotion readiness FAIL.
+- Monitor-free metrics:
+  - `quality_alignment_score=0.097964`
+  - `snr_db=-29.18`
+  - `lag_jumps_gt_2_frames=47`
+  - OpenA8DJ driver median/p95/max `36.2%/39.0%/39.6%`
+  - No stream-stat files by design.
+- Normal confirmation metrics:
+  - `quality_alignment_score=0.963713`
+  - `analog_snr_db=10.57`
+  - `lag_jumps_gt_2_frames=46`
+  - `mid_band_residual_ratio=1.417748`
+  - `high_band_residual_ratio=1.364806`
+  - `quiet_mid_band_noise_dbfs=-35.79`
+  - OpenA8DJ driver median/p95/max `35.8%/36.9%/37.7%`
+  - coreaudiod median/p95/max `2.6%/4.6%/42.5%`
+- Interpretation:
+  - Removing stream-stat polling did not lower driver CPU and produced an
+    invalid/decorrelated capture. Normal stream-stat soundcheck remains the
+    readiness evidence path until the harness has a better low-perturbation
+    monitor design.

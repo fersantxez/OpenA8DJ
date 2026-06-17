@@ -533,3 +533,19 @@ Next technical target:
   jumps and ~10 dB scalar SNR persist. This weakens blind CPU-tuning as the
   next quality path and raises priority for controlled reference-route,
   physical path, output format/phase, or uncounted runtime-discontinuity tests.
+- Added `--no-monitor-stream-stats` to `scripts/run-soundcheck` for
+  lower-perturbation CPU A/B runs. This is diagnostic-only; readiness still
+  requires stream-stat evidence.
+- `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1` was tested
+  after Hume's read-only audit suggested transaction count as the likely CPU
+  driver. It passed offline gates but failed HAL safety on load with
+  `coreaudiod=86.8%`, `mediaremoted=57.5%`, and total watched CPU `145.3%`.
+  The default build passed safety immediately afterward, so this candidate is
+  rejected before soundcheck.
+- Default monitor-free soundcheck was attempted to separate CPU from
+  observability overhead, but the capture was decorrelated
+  (`quality_alignment_score=0.097964`, SNR `-29.18 dB`) and driver CPU p95
+  was worse (`39.0%`). A normal default confirmation run immediately returned
+  to the known failing aligned signature (`quality_alignment_score=0.963713`,
+  SNR `10.57 dB`, lag jumps `46`, driver p95 `36.9%`). Monitor-free evidence
+  is not product evidence yet.

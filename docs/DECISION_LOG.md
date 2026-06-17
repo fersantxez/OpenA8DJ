@@ -1534,3 +1534,78 @@ Evidence:
 - Script: `scripts/analyze-runtime-discontinuities.py`.
 - Result JSON:
   `local-analysis/runtime-discontinuities/recent-music-runs.json`.
+
+## 2026-06-17: Add Monitor-Free Soundcheck CPU Mode
+
+Decision:
+- Add `--no-monitor-stream-stats` to `scripts/run-soundcheck` so CPU A/B runs
+  can avoid polling `opena8dj-control stream-stats` during playback.
+
+Reason:
+- The normal soundcheck monitor samples stream stats every CPU interval. That
+  is valuable for observability, but it can perturb the exact CPU metric being
+  measured.
+- Readiness runs still need stream evidence. The new mode is diagnostic-only:
+  it helps separate driver CPU from monitoring overhead, but cannot prove
+  glitch freedom on its own.
+
+Evidence:
+- Syntax check:
+  `python3 -m py_compile scripts/run-soundcheck`.
+
+## 2026-06-17: Reject Coalesce2 + Pool Cursor Candidate
+
+Decision:
+- Do not run physical soundcheck for
+  `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`.
+- Keep default `HAL_PLAYBACK_COALESCE_TRANSFERS=1` and
+  `HAL_TRANSFER_POOL_CURSOR=0`.
+
+Reason:
+- The candidate compiled and offline gates passed, but the HAL safety gate
+  failed immediately after load. Audio stack health reported coreaudiod
+  `86.8%`, mediaremoted `57.5%`, and total watched CPU `145.3%`.
+- The same default build passed the same safety gate immediately afterward, so
+  the failure is candidate-specific enough to block further physical testing.
+- A candidate that cannot pass HAL safety is not a valid path to audiophile
+  quality or low CPU, regardless of the expected transaction reduction.
+
+Evidence:
+- Candidate build:
+  `make -B hal HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`.
+- Offline gates: Debug `16/16`, Release `17/17`.
+- Safety failure:
+  `local-analysis/physical-coalesce2-poolcursor/20260617-190a7ed/hal-candidate-safety`.
+- Post-failure isolation:
+  `local-analysis/runtime-isolation/after-coalesce2-safety-fail-before-unload.json`.
+- Default safety confirmation:
+  `local-analysis/physical-default-normal-confirm/20260617-190a7ed/hal-candidate-safety`.
+
+## 2026-06-17: Monitor-Free Soundcheck Is Diagnostic But Not Reliable Evidence
+
+Decision:
+- Keep `--no-monitor-stream-stats` available as a diagnostic mode, but do not
+  use the first monitor-free run as product-quality or CPU-improvement evidence.
+- Continue using normal soundcheck with stream-stat evidence for readiness
+  decisions.
+
+Reason:
+- Default monitor-free soundcheck produced a badly decorrelated capture:
+  quality alignment `0.097964`, SNR `-29.18 dB`, estimated channel gains about
+  `0.06`, and no stream-stat evidence. That is not comparable to normal
+  soundchecks.
+- It did not reduce driver CPU: OpenA8DJ driver p95 was `39.0%`, worse than
+  the normal-confirm run p95 `36.9%`.
+- A normal default soundcheck immediately afterward returned to the known
+  failing-but-aligned signature: quality alignment `0.963713`, SNR `10.57 dB`,
+  lag jumps `46`, mid/high residual `1.417748/1.364806`.
+
+Evidence:
+- Monitor-free run:
+  `local-analysis/soundcheck/20260617-default-monitorfree-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Normal confirmation:
+  `local-analysis/soundcheck/20260617-default-normal-confirm-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Final isolation:
+  `local-analysis/runtime-isolation/final-after-default-normal-confirm.json`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-default-normal-confirm.json`.

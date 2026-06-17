@@ -443,6 +443,21 @@ analysis scripts such as:
 Do not install these packages globally as part of the build. They are analysis
 dependencies, not runtime driver dependencies.
 
+## Physical CPU Measurement Notes
+
+`scripts/run-soundcheck` normally polls `opena8dj-control stream-stats` during
+playback. That is useful for glitch forensics, but it adds observability load
+to CPU profiles. For a lower-perturbation CPU A/B, keep the physical lock and
+capture path but disable monitor polling:
+
+```sh
+scripts/run-soundcheck --no-monitor-stream-stats --cpu-profile ...
+```
+
+Use full `--stream-stats-snapshots` runs when validating glitch counters or
+readiness. Monitor-free CPU runs are diagnostic evidence, not sufficient
+product readiness by themselves.
+
 ## Migration Order
 
 1. Add CMake core/test skeleton.

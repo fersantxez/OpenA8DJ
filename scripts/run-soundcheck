@@ -507,31 +507,34 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
     stress_finished = False
     sample_index = 0
     interval = max(0.05, args.cpu_profile_interval)
-    stream_stats_txt = base_dir / ("stream-stats-during.txt" if args.stream_stats_snapshots else "stream-stats.txt")
-    stream_stats_legacy_txt = base_dir / "stream-stats.txt"
-    with open(stream_stats_txt, "w", encoding="utf-8") as stream_file:
-        legacy_stream_file = None
-        if args.stream_stats_snapshots:
-            legacy_stream_file = open(stream_stats_legacy_txt, "w", encoding="utf-8")
-        stream_tsv_file = None
-        if args.stream_stats_snapshots:
-            stream_tsv_file = open(base_dir / "stream-stats-during.tsv", "w", encoding="utf-8")
-            write_stream_stats_tsv_header(stream_tsv_file)
-        cpu_file = None
+    stream_file = None
+    legacy_stream_file = None
+    stream_tsv_file = None
+    cpu_file = None
+    try:
+        if args.monitor_stream_stats:
+            stream_stats_txt = base_dir / ("stream-stats-during.txt" if args.stream_stats_snapshots else "stream-stats.txt")
+            stream_file = open(stream_stats_txt, "w", encoding="utf-8")
+            if args.stream_stats_snapshots:
+                legacy_stream_file = open(base_dir / "stream-stats.txt", "w", encoding="utf-8")
+                stream_tsv_file = open(base_dir / "stream-stats-during.tsv", "w", encoding="utf-8")
+                write_stream_stats_tsv_header(stream_tsv_file)
         if args.cpu_profile:
             cpu_file = open(base_dir / "cpu-profile.tsv", "w", encoding="utf-8")
             cpu_file.write("\t".join(CPU_PROFILE_COLUMNS) + "\n")
-        try:
-            while playback_process.poll() is None:
-                elapsed = time.monotonic() - playback_start_monotonic
-                if args.cpu_stress and not stress_started and elapsed >= args.cpu_stress_after:
-                    stress_workers = start_cpu_stress(worker_count, args.cpu_stress_seconds)
-                    stress_started = True
-                if (stress_started
-                        and not stress_finished
-                        and elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
-                    stop_cpu_stress(stress_workers)
-                    stress_finished = True
+        while playback_process.poll() is None:
+            elapsed = time.monotonic() - playback_start_monotonic
+            if args.cpu_stress and not stress_started and elapsed >= args.cpu_stress_after:
+                stress_workers = start_cpu_stress(worker_count, args.cpu_stress_seconds)
+                stress_started = True
+            if (stress_started
+                    and not stress_finished
+                    and elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
+                stop_cpu_stress(stress_workers)
+                stress_finished = True
+            stats_text = ""
+            stats_error = ""
+            if args.monitor_stream_stats:
                 stats_text, stats_error = capture_stream_stats(root, control, args.monitor_command_timeout)
                 sample_time = time.time()
                 for file in (stream_file, legacy_stream_file):
@@ -552,22 +555,24 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
                                                   worker_count,
                                                   stats_text,
                                                   stats_error)
-                if cpu_file:
-                    write_cpu_sample(cpu_file,
-                                     sample_index,
-                                     playback_start_monotonic,
-                                     stress_started and not stress_finished,
-                                     worker_count)
-                sample_index += 1
-                time.sleep(interval)
-        finally:
-            stop_cpu_stress(stress_workers)
-            if stream_tsv_file:
-                stream_tsv_file.close()
-            if legacy_stream_file:
-                legacy_stream_file.close()
             if cpu_file:
-                cpu_file.close()
+                write_cpu_sample(cpu_file,
+                                 sample_index,
+                                 playback_start_monotonic,
+                                 stress_started and not stress_finished,
+                                 worker_count)
+            sample_index += 1
+            time.sleep(interval)
+    finally:
+        stop_cpu_stress(stress_workers)
+        if stream_tsv_file:
+            stream_tsv_file.close()
+        if legacy_stream_file:
+            legacy_stream_file.close()
+        if stream_file:
+            stream_file.close()
+        if cpu_file:
+            cpu_file.close()
 
 
 def build_prepare_command(root, args, fixture_dir):
@@ -665,6 +670,9 @@ def main():
     parser.add_argument("--cpu-stress-seconds", type=float, default=8.0)
     parser.add_argument("--cpu-stress-workers", default="auto")
     parser.add_argument("--monitor-command-timeout", type=float, default=1.0)
+    parser.add_argument("--monitor-stream-stats", action="store_true", default=True)
+    parser.add_argument("--no-monitor-stream-stats", action="store_false", dest="monitor_stream_stats",
+                        help="skip stream-stats polling during playback; CPU profile can still run")
     parser.add_argument("--stream-stats-snapshots", action="store_true",
                         help="write stream-stats-before.txt, stream-stats-during.txt/.tsv, and stream-stats-after.txt")
     parser.add_argument("--skip-audio-stack-health", action="store_true")

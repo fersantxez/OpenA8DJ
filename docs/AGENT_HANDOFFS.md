@@ -568,3 +568,34 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Risk:
   - Remaining CPU work must target actual transfer/timeline/packing cost, not
     superficial telemetry removal.
+
+### Hume
+
+- Mission: read-only HAL/USB audit after repeated quality and CPU failures,
+  focused on runtime discontinuities, transaction cadence, and soundcheck
+  measurement perturbation.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Identified capture-paced playback with many small isochronous transactions
+    as a more plausible CPU source than HAL cycle-buffer clear.
+  - Highlighted locks/copies in USB timeline, transfer-pool checkout, and
+    sampled stream stats.
+  - Noted that `run-soundcheck` stream-stat polling can perturb CPU profiles
+    and that `stream-stats-after` underruns are post-playback/drain evidence,
+    not active music-glitch proof.
+  - Kept sample-time/reference mismatch as a live hypothesis, but not due to
+    iRig sample-rate mismatch in recent 48 kHz runs.
+- Integrated action:
+  - Added `--no-monitor-stream-stats` diagnostic mode.
+  - Tested `HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_TRANSFER_POOL_CURSOR=1`;
+    it failed HAL safety and was rejected before soundcheck.
+- Risk:
+  - Transaction-count reduction is still likely important for CPU, but the
+    first coalescing variant destabilized CoreAudio on load. Future variants
+    need smaller, separately isolated changes and safety gates.
