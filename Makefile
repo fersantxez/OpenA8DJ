@@ -161,7 +161,7 @@ $(TOOL): $(SRC)
 	@mkdir -p build
 	$(CC) $(CFLAGS) $(FRAMEWORKS) -o $@ $<
 
-hal: $(HAL_BIN)
+hal: $(HAL_BIN) $(CONTROL_TOOL)
 
 hal-cadence-diagnostic:
 	$(MAKE) -B hal \
@@ -360,7 +360,7 @@ $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build
 	xcrun clang $(CFLAGS) $(MIDI_FRAMEWORKS) -o $@ $<
 
-$(CONTROL_TOOL): $(CONTROL_TOOL_SRC)
+$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) src/hal/OpenA8DJUSB.m
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 

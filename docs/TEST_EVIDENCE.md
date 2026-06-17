@@ -1,5 +1,41 @@
 # Test Evidence
 
+## 2026-06-17: Stream-Stats Contract And Control Tool Build Hardening
+
+- Change:
+  - `make hal` now also builds `build/opena8dj-control`.
+  - `build/opena8dj-control` now depends on `src/hal/OpenA8DJUSB.m`, so a HAL
+    stream-stats payload edit forces a matching control-tool rebuild.
+  - Added `scripts/check-stream-stats-contract.py`, an offline gate that
+    compares the `OpenA8DJStreamStatsPayload` field sequence in the HAL and
+    control tool.
+  - Integrated the stream-stats contract check into
+    `scripts/run-cpp-offline-gates`.
+- Commands:
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `make -B hal`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Stream-stats contract PASS: `166` HAL fields, `166` control-tool fields,
+    `0` mismatches, last field `playbackTransfersSubmitted`.
+  - `make -B hal` rebuilt both `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+    and `build/opena8dj-control`.
+  - Offline gates PASS.
+  - Debug CTest: `100% tests passed, 0 tests failed out of 17`.
+  - Release CTest: `100% tests passed, 0 tests failed out of 18`.
+  - Evidence schema: PASS, `22` required files, `0` missing.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Evidence:
+  - `local-analysis/cpp-offline/stream-stats-contract.json`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+- Interpretation:
+  - This does not prove `playbackTransfersSubmitted` is physically correct.
+    It closes one concrete observability risk: future HAL/control payload drift
+    or stale control-tool binaries should be caught before locked hardware
+    tests.
+
 ## 2026-06-17: Transfer Ledger No-Op Call-Site Prune And Transfer-Rate Rejections
 
 - Change:

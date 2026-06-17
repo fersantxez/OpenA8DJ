@@ -39,6 +39,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
+python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -85,6 +86,7 @@ surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
 static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
+stream_stats_contract = load_json("stream-stats-contract.json")
 bench = load_json("offline-bench-release.json")
 
 summary = {
@@ -253,6 +255,15 @@ summary = {
         "missing_requirements": hardware_lock_policy.get("missing_requirements"),
         "sensitive_paths": hardware_lock_policy.get("sensitive_paths"),
         "evidence": "local-analysis/cpp-offline/hardware-lock-policy.json",
+    },
+    "stream_stats_contract": {
+        "status": stream_stats_contract.get("result"),
+        "struct": stream_stats_contract.get("struct"),
+        "field_count": stream_stats_contract.get("field_count"),
+        "control_field_count": stream_stats_contract.get("control_field_count"),
+        "mismatch_count": stream_stats_contract.get("mismatch_count"),
+        "last_field": stream_stats_contract.get("last_field"),
+        "evidence": "local-analysis/cpp-offline/stream-stats-contract.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

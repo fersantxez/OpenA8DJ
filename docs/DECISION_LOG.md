@@ -1,5 +1,41 @@
 # Decision Log
 
+## 2026-06-17: Make Stream-Stats Payload Drift A Gate Failure
+
+Decision:
+- Make `hal` build `build/opena8dj-control` as part of the same local build
+  used before physical HAL tests.
+- Make the control tool rebuild when `src/hal/OpenA8DJUSB.m` changes.
+- Add an offline stream-stats contract gate that compares the duplicated
+  `OpenA8DJStreamStatsPayload` layout between HAL and control source files.
+
+Reason:
+- Recent physical evidence showed `playbackTransfersSubmitted` around `16x`
+  higher than playback completions. That value cannot be used for readiness
+  until the observability contract is trustworthy.
+- The HAL and `opena8dj-control` duplicate the stream-stats struct by hand.
+  Without a gate, a payload edit in one file can silently produce misleading
+  physical-test metrics.
+- `run-soundcheck` reads `build/opena8dj-control`; forcing it to rebuild with
+  the HAL reduces the chance of stale local tooling during a locked run.
+
+Alternatives discarded:
+- Trust the existing binary manually: rejected because physical-test evidence
+  must be reproducible and tool-version safe.
+- Delay until a full shared-header refactor: rejected because the cheap gate
+  blocks drift now without a risky HAL refactor.
+- Treat `playbackTransfersSubmitted` as fixed: rejected. The gate proves field
+  parity and build freshness only; the next physical run must still verify the
+  counter's runtime meaning.
+
+Evidence:
+- `python3 scripts/check-stream-stats-contract.py`: PASS, `166` fields in both
+  sources, `0` mismatches.
+- `make -B hal`: PASS and rebuilt both HAL and `build/opena8dj-control`.
+- `scripts/run-cpp-offline-gates`: PASS, with
+  `local-analysis/cpp-offline/stream-stats-contract.json` included in
+  `current-offline-gates.json`.
+
 ## 2026-06-17: Reject ISO64 And Playback Coalescing As C++ Defaults
 
 Decision:

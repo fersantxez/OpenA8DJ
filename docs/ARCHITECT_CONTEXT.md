@@ -14,6 +14,12 @@ Branch: `driverkit/cpp-redesign`
   improvement over mainline. ISO8/current-cadence builds remain high CPU and
   still fail strict music quality; ISO64 and playback coalescing reduce CPU but
   collapse physical quality. Runtime isolation after cleanup is clean.
+- Stream-stats observability is now harder to drift: `make hal` rebuilds
+  `build/opena8dj-control`, and the offline gate compares the HAL/control
+  `OpenA8DJStreamStatsPayload` field list (`166` fields, `0` mismatches in the
+  latest run). This does not yet prove the `playbackTransfersSubmitted`
+  runtime counter semantics; it only removes stale-tool/payload-drift as an
+  avoidable explanation before the next hardware run.
 - Reboot/autologin recovery is an unresolved operational gap. After the prior
   reboot, the session did not recover without user intervention as intended;
   this must be fixed before planned unattended test windows.

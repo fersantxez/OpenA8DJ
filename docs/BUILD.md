@@ -88,6 +88,21 @@ ctest --test-dir build/cmake/debug --output-on-failure
 
 These commands are the target behavior for the future CMake implementation.
 
+## HAL/Control Tool Coupling
+
+The local HAL Makefile path is used for locked physical HAL tests. `make hal`
+must build both:
+
+- `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+- `build/opena8dj-control`
+
+The control tool reads the HAL stream-stats IPC payload during soundchecks, so
+stale control binaries can corrupt the evidence even when the driver itself is
+fresh. `build/opena8dj-control` therefore depends on `src/hal/OpenA8DJUSB.m`,
+and `scripts/run-cpp-offline-gates` runs
+`scripts/check-stream-stats-contract.py` to compare the duplicated
+`OpenA8DJStreamStatsPayload` field sequence in HAL and control source.
+
 ## Build Options
 
 The CMake options should make the safe path explicit:
