@@ -34,10 +34,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - Physical capture forensics must find at least one same-session candidate with
   strict quality and no dominant route/timebase instability before any
   audiophile-quality claim. Current archived evidence fails this: the C++
-  forensic gate reports `0` strict quality candidates across `62` WAV-backed
-  runs; best analyzed run
-  quality `0.978050`, SNR floor `9.845114 dB`, lag stddev `10.974947`
-  frames, classification `variable_timebase_or_route_capture_instability`.
+  forensic gate reports `0` strict quality candidates across `82` candidate
+  WAV-backed runs plus `17` direct USB WAV-backed runs. `21` representative
+  runs were deeply analyzed and the best analyzed run remains classified as
+  `variable_timebase_or_route_capture_instability`.
 - This metric is intentionally stricter than "the analyzer ran." Analyzer
   `PASS` only means the forensic pass is healthy.
 - The latest lock-gated HAL and direct USB runs both fail this metric:
@@ -47,6 +47,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   clean packed USB payload or a clearly identified non-product route fault. The
   current result is diagnostic-only: packed USB is clean, but physical capture
   still fails after the device/analog/capture boundary.
+- `capture_route_health_gate` must include
+  `direct_usb_capture_failed_after_clean_payload=false` before physical quality
+  evidence can support promotion. The current value is `true`, with latest
+  attribution `post_usb_device_analog_or_capture_route_dominant`.
 - iRig idle capture must remain below idle-noise guardrails before it can be
   used as a trustworthy external capture device. Current idle evidence passes
   diagnostic guardrails: max RMS `-66.94 dBFS`, max peak `-41.65 dBFS`, max

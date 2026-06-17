@@ -5615,3 +5615,31 @@ Next implication:
   produce a same-session physical comparison on a known-valid route.
 - No claim of better sound quality, full functionality, timecode vinyl
   readiness, CPU superiority, or branch promotion is allowed from this result.
+
+## 2026-06-17: Promote Direct USB Attribution Into Capture Route Health
+
+Decision:
+- Make `opena8djcpp_capture_route_health_gate` consume
+  `direct-usb-path-attribution.json`.
+- Add `direct_usb_capture_failed_after_clean_payload` as a promotion blocker.
+- Emit the required physical experiments from the gate itself.
+
+Reason:
+- Direct USB internal cleanliness is strong evidence, but it was previously
+  easy to miss unless the operator read a separate attribution JSON.
+- Promotion should be blocked by a single route-health surface when a physical
+  capture fails after the written/consumed/packed USB payload has already been
+  proven clean.
+
+Evidence:
+- Focused gate run:
+  - `direct_usb_internal_clean=true`;
+  - `direct_usb_capture_failed=true`;
+  - `direct_usb_capture_failed_after_clean_payload=true`;
+  - `direct_usb_attribution=post_usb_device_analog_or_capture_route_dominant`;
+  - `measurement_valid_for_promotion=false`.
+
+Next implication:
+- Branch promotion cannot proceed until the capture route health gate no longer
+  reports `direct_usb_capture_failed_after_clean_payload` and a same-session
+  mainline/C++ physical comparison passes on a validated route.

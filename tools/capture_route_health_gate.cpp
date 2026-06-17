@@ -109,6 +109,42 @@ std::optional<bool> json_bool(const std::string& json, const std::string& key) {
   return std::nullopt;
 }
 
+std::optional<std::string> json_string(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return std::nullopt;
+  }
+  const std::size_t colon = json.find(':', key_pos + needle.size());
+  if (colon == std::string::npos) {
+    return std::nullopt;
+  }
+  std::size_t start = colon + 1U;
+  while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+    ++start;
+  }
+  if (start >= json.size() || json[start] != '"') {
+    return std::nullopt;
+  }
+  ++start;
+  std::string out;
+  bool escaped = false;
+  for (std::size_t index = start; index < json.size(); ++index) {
+    const char c = json[index];
+    if (escaped) {
+      out.push_back(c);
+      escaped = false;
+    } else if (c == '\\') {
+      escaped = true;
+    } else if (c == '"') {
+      return out;
+    } else {
+      out.push_back(c);
+    }
+  }
+  return std::nullopt;
+}
+
 double number_or_nan(std::optional<double> value) {
   return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
@@ -135,6 +171,10 @@ void print_string_array(const char* name, const std::vector<std::string>& values
   std::cout << "],\n";
 }
 
+void print_string_value(const char* name, const std::string& value) {
+  std::cout << "  \"" << name << "\": \"" << value << "\",\n";
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -145,6 +185,8 @@ int main(int argc, char** argv) {
   const auto quality_root = read_file(root / "local-analysis/cpp-offline/quality-root-cause-analysis.json");
   const auto soundcheck = read_file(root / "local-analysis/cpp-offline/soundcheck-wav-quality.json");
   const auto physical = read_file(root / "local-analysis/cpp-offline/physical-run-product-superiority.json");
+  const auto direct_usb =
+      read_file(root / "local-analysis/cpp-offline/direct-usb-path-attribution.json");
 
   const double mainline_quality =
       number_or_nan(json_number_after_anchor(route_summary, "mainline-0.3.135",
@@ -164,9 +206,35 @@ int main(int argc, char** argv) {
   const double soundcheck_lag_jumps = number_or_nan(json_number(soundcheck, "lag_jumps_gt_2_frames"));
   const double physical_snr = number_or_nan(json_number(physical, "snr_floor_db"));
   const double physical_quality = number_or_nan(json_number(physical, "quality_alignment_score"));
+  const double direct_usb_capture_quality =
+      number_or_nan(json_number(direct_usb, "capture_quality_alignment_score"));
+  const double direct_usb_capture_snr =
+      number_or_nan(json_number(direct_usb, "capture_snr_floor_db"));
+  const double direct_usb_mid_ratio =
+      number_or_nan(json_number(direct_usb, "capture_mid_band_residual_ratio"));
+  const double direct_usb_high_ratio =
+      number_or_nan(json_number(direct_usb, "capture_high_band_residual_ratio"));
+  const double direct_usb_drift_ppm =
+      number_or_nan(json_number(direct_usb, "failure_drift_ppm"));
+  const double direct_usb_mid_coherence =
+      number_or_nan(json_number(direct_usb, "lti_mid_coherence"));
+  const double direct_usb_usb_alignment =
+      number_or_nan(json_number(direct_usb, "usb_alignment_score"));
+  const double direct_usb_usb_snr =
+      number_or_nan(json_number(direct_usb, "usb_snr_floor_db"));
+  const double direct_usb_usb_check_errors =
+      number_or_nan(json_number(direct_usb, "usb_check_errors"));
+  const double direct_usb_usb_panic_flags =
+      number_or_nan(json_number(direct_usb, "usb_panic_flags"));
+  const auto direct_usb_attribution =
+      json_string(direct_usb, "attribution").value_or("missing");
   const bool shared_route_unhealthy =
       json_bool(quality_root, "shared_fixture_or_capture_path_unhealthy").value_or(false);
   const bool digital_payload_clean = json_bool(quality_root, "digital_payload_clean").value_or(false);
+  const bool direct_usb_internal_clean =
+      json_bool(direct_usb, "internal_clean").value_or(false);
+  const bool direct_usb_capture_failed =
+      json_bool(direct_usb, "capture_failed").value_or(false);
 
   const bool common_route_low =
       finite(mainline_quality) && finite(cpp_route_quality) && finite(mainline_snr) &&
@@ -180,6 +248,10 @@ int main(int argc, char** argv) {
   const bool product_compare_fails =
       finite(physical_quality) && finite(physical_snr) &&
       (physical_quality < 0.98 || physical_snr < 35.0);
+  const bool direct_usb_capture_failed_after_clean_payload =
+      direct_usb_internal_clean && direct_usb_capture_failed &&
+      finite(direct_usb_usb_alignment) && direct_usb_usb_alignment >= 0.999999 &&
+      direct_usb_usb_check_errors == 0.0 && direct_usb_usb_panic_flags == 0.0;
 
   std::vector<std::string> blockers;
   if (shared_route_unhealthy || common_route_low) {
@@ -197,6 +269,15 @@ int main(int argc, char** argv) {
   if (!digital_payload_clean) {
     blockers.push_back("digital_payload_not_proven_clean");
   }
+  if (direct_usb_capture_failed_after_clean_payload) {
+    blockers.push_back("direct_usb_capture_failed_after_clean_payload");
+  }
+
+  std::vector<std::string> required_experiments;
+  required_experiments.push_back("known_good_non_audio8_source_into_same_irig_capture_route");
+  required_experiments.push_back("audio8_direct_to_irig_without_mixer_or_eq_if_physically_possible");
+  required_experiments.push_back("same_session_mainline_cpp_physical_ab_on_validated_route");
+  required_experiments.push_back("traktor_timecode_vinyl_scope_on_validated_route");
 
   const bool measurement_valid_for_promotion = blockers.empty();
   const bool pass = true;
@@ -215,7 +296,15 @@ int main(int argc, char** argv) {
             << "  \"timing_unstable\": " << (timing_unstable ? "true" : "false") << ",\n"
             << "  \"product_compare_fails\": " << (product_compare_fails ? "true" : "false")
             << ",\n";
+  std::cout << "  \"direct_usb_internal_clean\": "
+            << (direct_usb_internal_clean ? "true" : "false") << ",\n"
+            << "  \"direct_usb_capture_failed\": "
+            << (direct_usb_capture_failed ? "true" : "false") << ",\n"
+            << "  \"direct_usb_capture_failed_after_clean_payload\": "
+            << (direct_usb_capture_failed_after_clean_payload ? "true" : "false") << ",\n";
+  print_string_value("direct_usb_attribution", direct_usb_attribution);
   print_string_array("promotion_blockers", blockers);
+  print_string_array("required_physical_experiments", required_experiments);
   print_number("mainline_route_quality", mainline_quality);
   print_number("mainline_route_snr_db", mainline_snr);
   print_number("cpp_route_quality", cpp_route_quality);
@@ -224,6 +313,16 @@ int main(int argc, char** argv) {
   print_number("soundcheck_snr_floor_db", soundcheck_snr);
   print_number("soundcheck_quiet_mid_band_noise_dbfs", soundcheck_quiet);
   print_number("soundcheck_lag_jumps_gt_2_frames", soundcheck_lag_jumps);
+  print_number("direct_usb_capture_quality_alignment_score", direct_usb_capture_quality);
+  print_number("direct_usb_capture_snr_floor_db", direct_usb_capture_snr);
+  print_number("direct_usb_capture_mid_band_residual_ratio", direct_usb_mid_ratio);
+  print_number("direct_usb_capture_high_band_residual_ratio", direct_usb_high_ratio);
+  print_number("direct_usb_failure_drift_ppm", direct_usb_drift_ppm);
+  print_number("direct_usb_lti_mid_coherence", direct_usb_mid_coherence);
+  print_number("direct_usb_usb_alignment_score", direct_usb_usb_alignment);
+  print_number("direct_usb_usb_snr_floor_db", direct_usb_usb_snr);
+  print_number("direct_usb_usb_check_errors", direct_usb_usb_check_errors);
+  print_number("direct_usb_usb_panic_flags", direct_usb_usb_panic_flags);
   std::cout << "  \"next_required_action\": \"LOCK_GATED_CAPTURE_ROUTE_REVALIDATION_BEFORE_QUALITY_PROMOTION\",\n"
             << "  \"readiness_claim\": \"DIAGNOSTIC_ONLY_CAPTURE_ROUTE_NOT_VALID_FOR_PROMOTION\"\n"
             << "}\n";

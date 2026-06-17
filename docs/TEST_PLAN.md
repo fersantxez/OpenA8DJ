@@ -1135,6 +1135,11 @@ Capture route health gate:
 - Run as part of `scripts/run-cpp-offline-gates`.
 - It consumes existing physical evidence only.
 - It must not touch hardware, CoreAudio, USB, drivers, defaults, or services.
+- It consumes `direct-usb-path-attribution.json` and exposes
+  `direct_usb_capture_failed_after_clean_payload`. This must be `false` before
+  any same-route physical result can support promotion.
+- It also emits `required_physical_experiments` so the next hardware window is
+  explicit and machine-readable.
 - Product promotion requires `measurement_valid_for_promotion=true`; otherwise
   the next step is a lock-gated capture route revalidation rather than driver
   promotion.

@@ -8689,3 +8689,37 @@ Full offline gate rerun:
     physical timebase behavior, not C++ packet packing.
   - This evidence does not support audiophile readiness, Traktor readiness, or
     branch promotion.
+
+## 2026-06-17 Capture Route Health Gate Direct USB Integration
+
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_direct_usb_path_attribution opena8djcpp_capture_route_health_gate`
+  - `./build/cpp-offline/opena8djcpp_direct_usb_path_attribution | tee local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `./build/cpp-offline/opena8djcpp_capture_route_health_gate | tee local-analysis/cpp-offline/capture-route-health-gate.json`
+- Safety:
+  - Offline-only analysis of existing evidence files.
+  - No audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action.
+- Result:
+  - `capture-route-health-gate`: `PASS` as diagnostic analyzer health.
+  - `measurement_valid_for_promotion=false`.
+  - `direct_usb_internal_clean=true`.
+  - `direct_usb_capture_failed=true`.
+  - `direct_usb_capture_failed_after_clean_payload=true`.
+  - `direct_usb_attribution=post_usb_device_analog_or_capture_route_dominant`.
+  - Promotion blockers now include
+    `direct_usb_capture_failed_after_clean_payload`.
+  - Required physical experiments are machine-readable:
+    `known_good_non_audio8_source_into_same_irig_capture_route`,
+    `audio8_direct_to_irig_without_mixer_or_eq_if_physically_possible`,
+    `same_session_mainline_cpp_physical_ab_on_validated_route`,
+    `traktor_timecode_vinyl_scope_on_validated_route`.
+- Evidence:
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`.
+- Interpretation:
+  - Promotion is blocked not merely because capture quality is low, but because
+    the latest Direct USB run proves the physical capture can fail after a
+    clean internal payload.
+  - The next product-relevant physical work is route validation, not packer
+    churn or branch promotion.

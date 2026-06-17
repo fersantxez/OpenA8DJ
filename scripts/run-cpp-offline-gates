@@ -378,7 +378,16 @@ summary = {
         "candidate_capture_low": capture_route_health.get("candidate_capture_low"),
         "timing_unstable": capture_route_health.get("timing_unstable"),
         "product_compare_fails": capture_route_health.get("product_compare_fails"),
+        "direct_usb_internal_clean": capture_route_health.get("direct_usb_internal_clean"),
+        "direct_usb_capture_failed": capture_route_health.get("direct_usb_capture_failed"),
+        "direct_usb_capture_failed_after_clean_payload": capture_route_health.get(
+            "direct_usb_capture_failed_after_clean_payload"
+        ),
+        "direct_usb_attribution": capture_route_health.get("direct_usb_attribution"),
         "promotion_blockers": capture_route_health.get("promotion_blockers"),
+        "required_physical_experiments": capture_route_health.get(
+            "required_physical_experiments"
+        ),
         "next_required_action": capture_route_health.get("next_required_action"),
         "evidence": "local-analysis/cpp-offline/capture-route-health-gate.json",
     },

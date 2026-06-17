@@ -2180,3 +2180,27 @@ Current implication:
   the current internal USB cleanliness result.
 - The decisive next physical requirement remains a validated route/capture
   path followed by same-session mainline/C++ comparison.
+
+## 2026-06-17 Capture Route Gate Tightening
+
+- `opena8djcpp_capture_route_health_gate` now consumes
+  `direct-usb-path-attribution.json`.
+- It emits:
+  - `direct_usb_internal_clean=true`;
+  - `direct_usb_capture_failed=true`;
+  - `direct_usb_capture_failed_after_clean_payload=true`;
+  - `direct_usb_attribution=post_usb_device_analog_or_capture_route_dominant`.
+- The gate now adds `direct_usb_capture_failed_after_clean_payload` to
+  `promotion_blockers`.
+- It also emits required physical experiments:
+  - known-good non-Audio8 source into the same iRig capture route;
+  - Audio 8 DJ direct-to-iRig without mixer/EQ if physically possible;
+  - same-session mainline/C++ physical A/B on the validated route;
+  - Traktor timecode vinyl scope on the validated route.
+
+Current implication:
+- A clean Direct USB payload is now integrated into the blocker model instead
+  of sitting as separate context.
+- The current route cannot support audiophile, timecode, CPU, or branch
+  promotion claims until `direct_usb_capture_failed_after_clean_payload=false`
+  and `measurement_valid_for_promotion=true`.
