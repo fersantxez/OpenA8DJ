@@ -398,3 +398,7 @@ Next technical target:
   behavior stays rejected.
 - Current blocker after this correction: physical analog residual/lag and
   driver CPU, not the decomposed zero-complete ISO slots.
+- Promotion evaluator after commit `1c574cc` remains FAIL:
+  `local-analysis/promotion-readiness-after-capture-invariants.json`.
+  Blocking gates are `physical_music_quality`, `runtime_cpu_beats_mainline`,
+  `latest_physical_investigation`, and `traktor_timecode_physical`.

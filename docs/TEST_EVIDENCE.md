@@ -2235,3 +2235,25 @@ Operational note:
     status failures.
   - This removes one false lead but does not improve product readiness:
     physical music quality and driver CPU still fail.
+
+## 2026-06-17: Promotion Readiness After Capture ISO Classification
+
+- Command:
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-capture-invariants.json`
+- Commit under test: `1c574cc`
+- Result: FAIL; branch promotion is not allowed.
+- PASS gates include offline, simulated output oracle, physical tone, evidence
+  presence, hardware-lock policy, and offline throughput floors.
+- Blocking gates:
+  - `physical_music_quality`: latest selected music metrics still have
+    `quality_alignment_score=0.978049577556115`,
+    `snr_db=9.845114058005024`, `lag_jumps_gt_2_frames=24`,
+    `mid_band_residual_ratio=1.3932011051574409`, and quiet mid-band noise
+    `-35.22881003368516 dBFS`.
+  - `runtime_cpu_beats_mainline`: OpenA8DJ driver p95 `35.5%` and coreaudiod
+    p95 `37.2%`, versus mainline limits `6.5%` and `1.7%`.
+  - `latest_physical_investigation`: decision remains `FAIL_NOT_READY`.
+  - `traktor_timecode_physical`: no physical Traktor/timecode-vinyl lock
+    evidence has been recorded.
+- Evidence path:
+  - `local-analysis/promotion-readiness-after-capture-invariants.json`
