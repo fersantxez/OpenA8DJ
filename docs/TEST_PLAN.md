@@ -1129,6 +1129,24 @@ cmake --build build/cpp-offline --target opena8djcpp_quality_root_cause_analysis
 Expected artifact:
 
 - `local-analysis/cpp-offline/quality-root-cause-analysis.json`.
+- `local-analysis/cpp-offline/capture-route-health-gate.json`.
+
+Capture route health gate:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It consumes existing physical evidence only.
+- It must not touch hardware, CoreAudio, USB, drivers, defaults, or services.
+- Product promotion requires `measurement_valid_for_promotion=true`; otherwise
+  the next step is a lock-gated capture route revalidation rather than driver
+  promotion.
+
+Prepared DriverKit hot path gate:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It exercises the offline DriverKit shell with prepared iso8 batches at
+  44.1/48 kHz.
+- PASS requires zero HAL requeues/fallback allocations/ring faults and batch
+  ring publication budget of max four publications per period.
+- This gate supports a migration candidate only; physical CPU superiority still
+  requires lock-gated A/B evidence.
 
 PASS/FAIL semantics:
 

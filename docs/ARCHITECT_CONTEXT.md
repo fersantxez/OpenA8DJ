@@ -1831,3 +1831,44 @@ Current implication:
 Current implication:
 - The offline DriverKit shell is closer to a real lifecycle boundary.
 - It still is not a built/installed dext and cannot prove hardware behavior.
+
+### 2026-06-17 Capture Route Health Gate
+
+- Added `opena8djcpp_capture_route_health_gate`.
+- This is an offline diagnostic over existing evidence only; it touches no
+  hardware, CoreAudio, USB, driver install, defaults, or services.
+- It formalizes a key distinction:
+  - diagnostic gate execution can PASS;
+  - measurement validity for promotion can still be false.
+- Current evidence reports:
+  - digital payload clean;
+  - shared capture route unhealthy;
+  - candidate capture below reference threshold;
+  - capture lag unstable;
+  - candidate not better than mainline reference.
+
+Current implication:
+- The next physical run must first revalidate the capture route under lock.
+- Existing physical quality evidence cannot support branch promotion or claims
+  of better sound quality, timecode readiness, or lower CPU.
+
+### 2026-06-17 Prepared Hot Path Batch Publication
+
+- Optimized `SpscFrameRing::push_many` and `pop_many` to publish indices once
+  per batch instead of once per frame.
+- Added offline publication counters to the prepared transport model.
+- Added `opena8djcpp_driverkit_prepared_hotpath_contract`.
+- The new contract runs 10 seconds at 44.1 kHz and 48 kHz through the
+  DriverKit shell with iso8 batches:
+  - `921,000` total frames;
+  - zero HAL steady requeues;
+  - zero fallback allocations;
+  - zero ring faults;
+  - four ring publications per period;
+  - 8x fewer index publications than scalar per-frame publication.
+
+Current implication:
+- This directly targets the fixed requeue/enqueue CPU suspect in offline
+  architecture.
+- It is still not a physical CPU win until the runtime candidate is tested
+  under lock against mainline.

@@ -236,6 +236,7 @@ int main(int argc, char** argv) {
   const auto root = repo_root(argv);
   const auto base = root / "local-analysis/cpp-offline";
   const auto driverkit_prepared = read_file(base / "driverkit-prepared-transport-contract.json");
+  const auto driverkit_hotpath = read_file(base / "driverkit-prepared-hotpath-contract.json");
   const auto packet = read_file(base / "prepared-transport-packet-contract.json");
   const auto routing_timecode =
       read_file(base / "prepared-transport-routing-timecode-contract.json");
@@ -258,10 +259,16 @@ int main(int argc, char** argv) {
   const double pressure_rows = number_or_nan(json_number(pressure, "row_count"));
   const double runtime_pressure_total_frames =
       number_or_nan(json_number(runtime, "pressure_total_frames"));
+  const double hotpath_total_frames = number_or_nan(json_number(driverkit_hotpath, "total_frames"));
+  const double hotpath_max_publications =
+      number_or_nan(json_number(driverkit_hotpath, "max_ring_publications_per_period"));
+  const double hotpath_min_reduction =
+      number_or_nan(json_number(driverkit_hotpath, "min_publication_reduction_ratio"));
 
   const bool prepared_contracts_pass =
-      result_pass(driverkit_prepared) && result_pass(packet) && result_pass(routing_timecode) &&
-      result_pass(recovery) && result_pass(scheduler) && result_pass(pressure) &&
+      result_pass(driverkit_prepared) && result_pass(driverkit_hotpath) && result_pass(packet) &&
+      result_pass(routing_timecode) && result_pass(recovery) && result_pass(scheduler) &&
+      result_pass(pressure) &&
       finite(pressure_rows) && pressure_rows >= 8.0 && finite(pressure_total_frames) &&
       pressure_total_frames >= 3684000.0;
   const bool zero_hal_requeue_in_safe_contracts =
@@ -270,12 +277,15 @@ int main(int argc, char** argv) {
       number_is_zero(packet, "hal_steady_requeues") &&
       number_is_zero(routing_timecode, "hal_steady_requeues") &&
       number_is_zero(recovery, "hal_steady_requeues") &&
-      number_is_zero(pressure, "total_hal_steady_requeues");
+      number_is_zero(pressure, "total_hal_steady_requeues") &&
+      number_is_zero(driverkit_hotpath, "hal_steady_requeues");
   const bool no_fallback_or_ring_faults =
       number_is_zero(packet, "fallback_allocations") &&
       number_is_zero(routing_timecode, "fallback_allocations") &&
       number_is_zero(recovery, "fallback_allocations") &&
       number_is_zero(pressure, "total_fallback_allocations") &&
+      number_is_zero(driverkit_hotpath, "fallback_allocations") &&
+      number_is_zero(driverkit_hotpath, "hal_hot_path_allocations") &&
       number_is_zero(recovery, "capture_ring_overruns") &&
       number_is_zero(recovery, "capture_ring_underruns") &&
       number_is_zero(recovery, "playback_ring_overruns") &&
@@ -308,6 +318,13 @@ int main(int argc, char** argv) {
       number_is_zero(runtime, "pressure_total_hal_steady_requeues") &&
       number_is_zero(runtime, "pressure_total_fallback_allocations") &&
       finite(runtime_pressure_total_frames) && runtime_pressure_total_frames >= 184200.0;
+  const bool driverkit_prepared_hotpath_safe =
+      result_pass(driverkit_hotpath) && finite(hotpath_total_frames) &&
+      hotpath_total_frames >= 921000.0 && finite(hotpath_max_publications) &&
+      hotpath_max_publications <= 4.0 && finite(hotpath_min_reduction) &&
+      hotpath_min_reduction >= 8.0 && number_is_zero(driverkit_hotpath, "failures") &&
+      number_is_zero(driverkit_hotpath, "hal_steady_requeues") &&
+      number_is_zero(driverkit_hotpath, "fallback_allocations");
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -331,6 +348,7 @@ int main(int argc, char** argv) {
       {"timestamp_and_cadence_safe", timestamp_and_cadence_safe},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
+      {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
       {"performance_hypothesis_supported_by_hot_path_timing", performance_hypothesis_supported},
       {"product_promotion_still_blocked", product_promotion_blocked},
       {"quality_claim_still_blocked", quality_claim_blocked},
@@ -355,6 +373,11 @@ int main(int argc, char** argv) {
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);
   print_number("driverkit_runtime_pressure_total_frames", runtime_pressure_total_frames);
+  print_number("driverkit_prepared_hotpath_total_frames", hotpath_total_frames);
+  print_number("driverkit_prepared_hotpath_max_ring_publications_per_period",
+               hotpath_max_publications);
+  print_number("driverkit_prepared_hotpath_min_publication_reduction_ratio",
+               hotpath_min_reduction);
   print_gate_rows(gates);
   std::cout << "  \"mode\": \"offline_migration_only\",\n"
             << "  \"next_allowed_action\": \"LOCK_GATED_PREPARED_TRANSPORT_A_B_HARDWARE_WINDOW_ONLY_AFTER_RUNTIME_BINDING\",\n"

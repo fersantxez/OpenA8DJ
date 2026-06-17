@@ -42,6 +42,10 @@ struct PreparedTransportCounters {
   std::uint64_t backend_playback_frames = 0;
   std::uint64_t hal_capture_reads = 0;
   std::uint64_t hal_playback_writes = 0;
+  std::uint64_t capture_ring_write_publications = 0;
+  std::uint64_t capture_ring_read_publications = 0;
+  std::uint64_t playback_ring_write_publications = 0;
+  std::uint64_t playback_ring_read_publications = 0;
   double max_completion_gap_ratio = 0.0;
 };
 
@@ -165,6 +169,7 @@ class PreparedTransportBackend {
  private:
   void validate_channel_identity();
   void record_timestamp(std::uint64_t sample_timestamp);
+  void snapshot_ring_publications();
 
   PreparedTransportConfig config_{};
   PreparedTransportCounters counters_{};

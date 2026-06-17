@@ -161,6 +161,8 @@ bool PreparedTransportBackend::start(const PreparedTransportConfig& config) {
   counters_ = {};
   capture_ring_.clear();
   playback_ring_.clear();
+  capture_ring_.reset_publication_counters();
+  playback_ring_.reset_publication_counters();
   last_timestamp_ = 0;
   have_timestamp_ = false;
   started_ = true;
@@ -224,6 +226,7 @@ bool PreparedTransportBackend::backend_complete_period(
       playback_frames[index] = {};
     }
   }
+  snapshot_ring_publications();
 
   return true;
 }
@@ -234,9 +237,11 @@ bool PreparedTransportBackend::hal_write_playback(const S24Frame& frame) {
   }
   if (!playback_ring_.push(frame)) {
     counters_.playback_ring_overruns += 1;
+    snapshot_ring_publications();
     return false;
   }
   counters_.hal_playback_writes += 1;
+  snapshot_ring_publications();
   return true;
 }
 
@@ -249,6 +254,7 @@ std::uint32_t PreparedTransportBackend::hal_write_playback(std::span<const S24Fr
   if (pushed != frames.size()) {
     counters_.playback_ring_overruns += frames.size() - pushed;
   }
+  snapshot_ring_publications();
   return static_cast<std::uint32_t>(pushed);
 }
 
@@ -258,9 +264,11 @@ bool PreparedTransportBackend::hal_read_capture(S24Frame& frame) {
   }
   if (!capture_ring_.pop(frame)) {
     counters_.capture_ring_underruns += 1;
+    snapshot_ring_publications();
     return false;
   }
   counters_.hal_capture_reads += 1;
+  snapshot_ring_publications();
   return true;
 }
 
@@ -273,6 +281,7 @@ std::uint32_t PreparedTransportBackend::hal_read_capture(std::span<S24Frame> fra
   if (popped != frames.size()) {
     counters_.capture_ring_underruns += frames.size() - popped;
   }
+  snapshot_ring_publications();
   return static_cast<std::uint32_t>(popped);
 }
 
@@ -318,6 +327,13 @@ void PreparedTransportBackend::record_timestamp(std::uint64_t sample_timestamp) 
   }
   last_timestamp_ = sample_timestamp;
   have_timestamp_ = true;
+}
+
+void PreparedTransportBackend::snapshot_ring_publications() {
+  counters_.capture_ring_write_publications = capture_ring_.write_publications();
+  counters_.capture_ring_read_publications = capture_ring_.read_publications();
+  counters_.playback_ring_write_publications = playback_ring_.write_publications();
+  counters_.playback_ring_read_publications = playback_ring_.read_publications();
 }
 
 }  // namespace opena8djcpp

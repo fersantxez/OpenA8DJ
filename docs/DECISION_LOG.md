@@ -4985,3 +4985,48 @@ Next implication:
 - The next implementation step can focus on dext/USB binding design or a
   lock-gated physical window only after deciding the exact runtime candidate.
   No hardware readiness claim is added by this contract.
+
+## 2026-06-17: Add Capture Route Health Gate
+
+Decision:
+- Add `tools/capture_route_health_gate.cpp` and wire it into CMake, CTest,
+  offline gates, and evidence schema.
+- Treat unhealthy shared capture route evidence as a blocker for product
+  promotion even when the diagnostic itself executes successfully.
+
+Reason:
+- Current physical evidence mixes candidate failure with signs that the shared
+  capture route is not healthy enough for a trustworthy A/B claim.
+- The project needs an explicit gate that says whether a measurement can be
+  used for promotion, not only whether a candidate beats thresholds.
+
+Evidence:
+- `local-analysis/cpp-offline/capture-route-health-gate.json`
+
+Next implication:
+- Before another quality-superiority claim, run a lock-gated capture route
+  revalidation with the Audio 8 DJ -> capture chain and store the evidence.
+  If route health still fails, do not compare driver candidates from that run.
+
+## 2026-06-17: Batch SPSC Publication for Prepared Hot Path
+
+Decision:
+- Change `SpscFrameRing::push_many` and `pop_many` to publish read/write
+  indices once per batch.
+- Add `opena8djcpp_driverkit_prepared_hotpath_contract`.
+- Require that contract from `prepared_transport_migration_gate`.
+
+Reason:
+- Existing timing evidence points at fixed queue/requeue/enqueue work as the
+  CPU suspect, not sample packing/decoding.
+- Per-frame index publication is unnecessary for iso-period batches and
+  inflates callback-side work in the model.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json`
+- `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+
+Next implication:
+- Offline evidence now supports the prepared hot-path implementation direction.
+  It does not prove lower physical CPU until a lock-gated A/B run compares the
+  runtime candidate against mainline on the same route.

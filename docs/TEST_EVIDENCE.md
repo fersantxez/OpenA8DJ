@@ -7936,3 +7936,51 @@ Full offline gate rerun:
   - The shell lifecycle model is stricter and better aligned with a future
     dext binding.
   - It remains offline-only and does not install or activate DriverKit.
+
+## 2026-06-17 Capture Route Health Gate
+
+- Scope:
+  - Offline-only diagnostic over existing quality evidence.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Focused command:
+  - `./build/cpp-release/opena8djcpp_capture_route_health_gate`
+- Focused result:
+  - Result: PASS.
+  - `measurement_valid_for_promotion`: `false`.
+  - `digital_payload_clean`: `true`.
+  - `shared_route_unhealthy`: `true`.
+  - `candidate_capture_low`: `true`.
+  - `timing_unstable`: `true`.
+  - `product_compare_fails`: `true`.
+  - Next required action:
+    `LOCK_GATED_CAPTURE_ROUTE_REVALIDATION_BEFORE_QUALITY_PROMOTION`.
+- Interpretation:
+  - This does not exonerate the candidate.
+  - It blocks use of the current physical evidence for quality or branch
+    promotion claims until the capture route itself is revalidated under lock.
+
+## 2026-06-17 Prepared Hot Path Batch Publication
+
+- Scope:
+  - Offline-only DriverKit shell/prepared transport hot-path contract.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Focused commands:
+  - `./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_migration_gate`
+- Focused result:
+  - Hot path contract: PASS.
+  - Total frames: `921,000`.
+  - Sample rates: `44.1 kHz`, `48 kHz`.
+  - Ring publications per iso8 period: `4`.
+  - Scalar equivalent publications per iso8 period: `32`.
+  - Publication reduction ratio: `8x`.
+  - HAL steady requeues: `0`.
+  - Fallback allocations: `0`.
+  - Migration gate: PASS with
+    `driverkit_prepared_hotpath_batch_publication_safe`.
+- Interpretation:
+  - This is an objective offline improvement in the prepared hot-path model.
+  - It does not prove physical CPU, jitter, timecode, or sound-quality
+    superiority against mainline.

@@ -2038,3 +2038,14 @@ Prepared transport migration metric:
   schema v2 runtime-shell pressure at 44.1/48 kHz, zero HAL steady requeues,
   zero fallback allocations, and clean stop/restart/reconfigure lifecycle
   before the migration gate can PASS.
+- `local-analysis/cpp-offline/capture-route-health-gate.json` must report
+  `measurement_valid_for_promotion=true` before any physical A/B run can be
+  used to claim better sound quality, timecode-vinyl readiness, or branch
+  promotion. A PASS result alone is diagnostic execution, not promotion
+  validity.
+- `local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json` must
+  PASS before prepared-transport migration can be considered supported. Minimum
+  expectations: 44.1/48 kHz, at least `921,000` total frames, zero HAL steady
+  requeues, zero fallback allocations, zero ring/timestamp/channel faults,
+  max `4` ring index publications per iso8 period, and at least `8x` reduction
+  versus scalar per-frame publication.
