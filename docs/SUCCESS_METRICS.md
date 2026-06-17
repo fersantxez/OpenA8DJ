@@ -2147,6 +2147,12 @@ Prepared transport migration metric:
   least one product-candidate run before any existing physical evidence can be
   used as a promotion argument. Current expected state is diagnostic PASS with
   `product_candidate_runs=0`, which explicitly blocks readiness claims.
+- `local-analysis/cpp-offline/physical-window-readiness-gate.json` must PASS
+  before requesting any next physical window. A PASS here only means the
+  blockers are explicit and a lock-gated known-good non-Audio8 route
+  revalidation can be planned. It must keep
+  `ready_for_product_physical_ab=false` and `ready_for_branch_promotion=false`
+  until route revalidation and same-session mainline-vs-C++ physical A/B pass.
 - `local-analysis/cpp-offline/audiophile-tone-gate.json` must be present and
   PASS before a candidate can be considered for physical promotion. Minimum
   expectations:

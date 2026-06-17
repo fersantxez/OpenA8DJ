@@ -6379,3 +6379,44 @@ Next implication:
 - The next USB/DriverKit adapter must map cancellation and late completion
   behavior to real async request objects. This does not prove physical audio
   quality, CPU superiority, or timecode readiness.
+
+## 2026-06-17: Separate Route-Revalidation Readiness From Product Readiness
+
+Decision:
+- Added `opena8djcpp_physical_window_readiness_gate`.
+- A PASS allows only planning a lock-gated known-good non-Audio8 route
+  revalidation window.
+- Product physical A/B and branch promotion remain forced false until the route
+  is current-valid and same-session mainline-vs-C++ physical comparison passes.
+
+Reason:
+- Existing evidence proves the digital/internal path can be clean while the
+  physical capture route remains invalid for promotion.
+- Without a current valid route, any sound-quality or CPU-superiority claim can
+  be contaminated by iRig/capture-route instability.
+
+Evidence:
+- `opena8djcpp_physical_window_readiness_gate`: PASS.
+- The gate now consumes source artifacts directly for product-blocked,
+  route-invalid, direct-USB-blocking, historical-route-stale, HAL-safety,
+  migration, and lock-policy decisions. It does not use
+  `current-offline-gates.json` as a decision source.
+- `ready_for_route_revalidation_window=true`.
+- `ready_for_product_physical_ab=false`.
+- `ready_for_branch_promotion=false`.
+- Full offline gates: Debug CTest `51/51`, Release CTest `52/52`, evidence
+  schema `required_files=52`, `missing_files=0`.
+
+Alternatives discarded:
+- Let HAL safety PASS authorize a product A/B window: rejected because HAL
+  enumeration safety is not sound-quality evidence.
+- Reuse historical iRig route evidence for promotion: rejected because it is
+  not current same-session evidence after the later route failures.
+- Treat direct USB internal-clean evidence as product readiness: rejected
+  because the same direct USB run still showed failed physical capture.
+
+Next implication:
+- The next physical action, if authorized, must be route revalidation only:
+  known-good non-Audio8 source into the same iRig capture route under the
+  hardware lock. Mainline-vs-C++ A/B, timecode vinyl, and branch promotion
+  remain blocked until that route passes.

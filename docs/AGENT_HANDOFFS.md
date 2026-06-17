@@ -3351,3 +3351,37 @@ Risk:
   - This remains offline DriverKit-shell modeling. It does not prove real
     USBDriverKit submits, dext installation, physical audio quality, CPU
     superiority, or Traktor/timecode vinyl readiness.
+
+## 2026-06-17 Subagent: Galileo Physical Window Gate Auditor
+
+- Agent:
+  - Galileo (`019ed7ee-c72d-7ac1-b39a-f48d7c8a4d2c`).
+- Mission:
+  - Read-only audit of the new physical-window readiness gate and integration.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - No direct authorization path was found for product physical A/B or branch
+    promotion.
+  - High-risk integration issue: the first version could execute before
+    regenerating some source evidence, allowing a stale standalone PASS.
+  - Additional risk: schema did not explicitly require branch-promotion false,
+    restrictive window types, and the blocked-claim string.
+- Integrated action:
+  - `opena8djcpp_physical_window_readiness_gate` now reads source evidence
+    directly instead of relying on `current-offline-gates.json` for critical
+    decisions.
+  - `scripts/run-cpp-offline-gates` now regenerates promotion, migration, and
+    hardware-lock evidence before emitting
+    `physical-window-readiness-gate.json`.
+  - `opena8djcpp_evidence_schema_check` now requires
+    `ready_for_branch_promotion=false`, `ROUTE_REVALIDATION_ONLY`,
+    `NO_PROMOTION_AB_UNTIL_ROUTE_PASS`, and the explicit blocked claim.
+- Risk:
+  - The gate still uses text checks over JSON artifacts. That is acceptable as
+    a narrow offline guard for this slice, but a future hardening pass should
+    move critical evidence gates to a small structured JSON reader.

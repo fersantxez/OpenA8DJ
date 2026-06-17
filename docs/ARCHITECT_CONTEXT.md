@@ -2410,6 +2410,17 @@ Current implication:
   - Current full offline evidence after this shutdown integration: Debug CTest
     `50/50`, Release CTest `51/51`, evidence schema `required_files=51`,
     `missing_files=0`. Promotion remains blocked.
+  - Added an offline physical-window readiness gate. It consumes only existing
+    evidence and reports:
+    `ready_for_route_revalidation_window=true`,
+    `ready_for_product_physical_ab=false`, and
+    `ready_for_branch_promotion=false`.
+    The only allowed next window type is route revalidation, not product A/B.
+  - Current full offline evidence after this gate: Debug CTest `51/51`,
+    Release CTest `52/52`, evidence schema `required_files=52`,
+    `missing_files=0`. The run touched no hardware, USB, CoreAudio, driver
+    install/activation, service restart, default device, sample-rate, or buffer
+    setting.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

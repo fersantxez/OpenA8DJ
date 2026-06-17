@@ -75,6 +75,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/irig-idle-capture-gate.json",
       root / "local-analysis/cpp-offline/historical-route-reference-gate.json",
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
+      root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
@@ -144,6 +145,20 @@ int main(int argc, char** argv) {
                                           "\"driverkit_usb_request_shutdown_cancelled_requests\": 3") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"driverkit_usb_request_shutdown_live_requests_after_stop\": 0") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"physical_window_readiness_gate\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"ready_for_route_revalidation_window\": true") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"ready_for_product_physical_ab\": false") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"ready_for_branch_promotion\": false") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"ROUTE_REVALIDATION_ONLY\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"NO_PROMOTION_AB_UNTIL_ROUTE_PASS\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",

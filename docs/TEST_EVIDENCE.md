@@ -9754,3 +9754,50 @@ Full offline gate rerun:
   - This is not a real DriverKit/USBDriverKit submit implementation, not a
     physical sound-quality result, not Traktor/timecode-vinyl readiness, and
     not CPU superiority over mainline.
+
+## 2026-06-17 Offline Physical Window Readiness Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added an offline evidence-only gate for physical-window planning.
+  - The gate reads existing route, direct USB, historical route, HAL safety,
+    migration, hardware-lock, physical frontier, and promotion evidence.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Gate:
+  - `opena8djcpp_physical_window_readiness_gate`.
+  - Result: PASS.
+  - The gate reads source evidence directly instead of using
+    `current-offline-gates.json` as a decision input, avoiding stale-summary
+    false positives.
+  - `ready_for_route_revalidation_window=true`.
+  - `ready_for_product_physical_ab=false`.
+  - `ready_for_branch_promotion=false`.
+  - Allowed window types:
+    `ROUTE_REVALIDATION_ONLY`,
+    `NO_PROMOTION_AB_UNTIL_ROUTE_PASS`.
+  - Next required action:
+    `LOCK_GATED_KNOWN_GOOD_NON_AUDIO8_ROUTE_REVALIDATION`.
+  - Blocked claim:
+    `NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_window_readiness_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_physical_window_readiness_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `51/51` passed.
+  - Release CTest: `52/52` passed.
+  - Evidence schema: `required_files=52`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The project is ready to request only a lock-gated route revalidation
+    window.
+  - It is still not ready to claim audiophile quality, product physical A/B,
+    Traktor/timecode-vinyl readiness, CPU superiority, or branch promotion.

@@ -1295,6 +1295,10 @@ scripts/run-known-good-route-soundcheck \
 Physical superiority window runner:
 - Script:
   `scripts/run-physical-superiority-window`.
+- Before using this runner for product A/B, the offline physical-window gate
+  must PASS and still report `ready_for_product_physical_ab=false` until the
+  known-good non-Audio8 route revalidation passes in the same lock-gated
+  window. Current allowed window type is route revalidation only.
 - Default mode is dry-run plan only. Physical work requires `--execute`.
 - Full execution starts with a read-only preflight:
   `scripts/physical-window-preflight`.

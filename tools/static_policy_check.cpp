@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
       root / "tools/physical_run_compare.cpp",
       root / "tools/direct_usb_path_attribution.cpp",
       root / "tools/irig_idle_capture_gate.cpp",
+      root / "tools/physical_window_readiness_gate.cpp",
       root / "tools/soundcheck_wav_quality.cpp",
       root / "tools/driverkit_surface_model.cpp",
       root / "tools/evidence_schema_check.cpp",
