@@ -61,6 +61,24 @@ struct BurstResult {
   bool model_safe = true;
 };
 
+struct RateShapeScenario {
+  const char* name = "";
+  std::uint32_t sample_rate = 48000;
+  double playback_transactions_per_ms = 0.0;
+  std::uint32_t request_bytes = 352;
+  std::uint32_t output_usb_bytes_per_frame = 32;
+  double max_rate_error_ppm = 1000.0;
+  bool expected_rate_safe = true;
+  bool physically_rejected = false;
+};
+
+struct RateShapeResult {
+  double frames_per_transaction = 0.0;
+  double output_frames_per_second = 0.0;
+  double rate_error_ppm = 0.0;
+  bool rate_safe = false;
+};
+
 bool has_gap(const GapEvent& gap, std::uint32_t period) {
   return gap.frame_delta != 0.0 && gap.period == period;
 }
@@ -198,6 +216,25 @@ bool burst_passes(const BurstScenario& scenario, const BurstResult& result) {
   return result.model_safe == scenario.expected_safe;
 }
 
+RateShapeResult rate_shape_model(const RateShapeScenario& scenario) {
+  RateShapeResult result{};
+  result.frames_per_transaction =
+      static_cast<double>(scenario.request_bytes) /
+      static_cast<double>(scenario.output_usb_bytes_per_frame);
+  result.output_frames_per_second =
+      scenario.playback_transactions_per_ms * result.frames_per_transaction * 1000.0;
+  result.rate_error_ppm =
+      ((result.output_frames_per_second - static_cast<double>(scenario.sample_rate)) /
+       static_cast<double>(scenario.sample_rate)) *
+      1'000'000.0;
+  result.rate_safe = std::fabs(result.rate_error_ppm) <= scenario.max_rate_error_ppm;
+  return result;
+}
+
+bool rate_shape_passes(const RateShapeScenario& scenario, const RateShapeResult& result) {
+  return result.rate_safe == scenario.expected_rate_safe;
+}
+
 void print_row(const Scenario& scenario,
                std::uint32_t sample_rate,
                std::uint32_t frames_per_period,
@@ -240,6 +277,31 @@ void print_burst_row(const BurstScenario& scenario,
             << ", \"max_safe_gap_ratio\": " << scenario.max_safe_gap_ratio
             << ", \"model_safe\": " << (result.model_safe ? "true" : "false")
             << ", \"expected_safe\": " << (scenario.expected_safe ? "true" : "false")
+            << ", \"result\": \"" << (ok ? "PASS" : "FAIL") << "\"}"
+            << (trailing_comma ? ",\n" : "\n");
+}
+
+void print_rate_shape_row(const RateShapeScenario& scenario,
+                          const RateShapeResult& result,
+                          bool ok,
+                          bool trailing_comma) {
+  std::cout << "    {\"scenario\": \"" << scenario.name << "\""
+            << ", \"sample_rate\": " << scenario.sample_rate
+            << ", \"playback_transactions_per_ms\": "
+            << scenario.playback_transactions_per_ms
+            << ", \"request_bytes\": " << scenario.request_bytes
+            << ", \"output_usb_bytes_per_frame\": "
+            << scenario.output_usb_bytes_per_frame
+            << ", \"frames_per_transaction\": " << result.frames_per_transaction
+            << ", \"output_frames_per_second\": "
+            << result.output_frames_per_second
+            << ", \"rate_error_ppm\": " << result.rate_error_ppm
+            << ", \"max_rate_error_ppm\": " << scenario.max_rate_error_ppm
+            << ", \"rate_safe\": " << (result.rate_safe ? "true" : "false")
+            << ", \"expected_rate_safe\": "
+            << (scenario.expected_rate_safe ? "true" : "false")
+            << ", \"physically_rejected\": "
+            << (scenario.physically_rejected ? "true" : "false")
             << ", \"result\": \"" << (ok ? "PASS" : "FAIL") << "\"}"
             << (trailing_comma ? ",\n" : "\n");
 }
@@ -299,12 +361,46 @@ int main() {
       {"capture_paced_coalesce2_rejected_by_physical_gate", 64, 2, 1.25, false},
       {"capture_paced_coalesce4_rejected_by_model", 64, 4, 1.25, false},
   };
+  const RateShapeScenario rate_shape_scenarios[] = {
+      {
+          "iso8_observed_partial_layout_rate_safe",
+          48000,
+          4.3607214428857715,
+          352,
+          32,
+          1000.0,
+          true,
+          false,
+      },
+      {
+          "iso8_forced_full8_layout_overreads",
+          48000,
+          8.0,
+          352,
+          32,
+          1000.0,
+          false,
+          false,
+      },
+      {
+          "mainline_like_iso64_q8_rate_shape_not_sufficient",
+          48000,
+          48000.0 / (352.0 / 32.0) / 1000.0,
+          352,
+          32,
+          1000.0,
+          true,
+          true,
+      },
+  };
   const std::uint32_t periods = 20000;
   const std::uint32_t frames_per_period = 64;
   std::uint32_t failures = 0;
   std::uint32_t burst_failures = 0;
+  std::uint32_t rate_shape_failures = 0;
   std::uint32_t rows = 0;
   std::uint32_t burst_rows = 0;
+  std::uint32_t rate_shape_rows = 0;
 
   std::cout << "{\n  \"rows\": [\n";
   for (std::uint32_t sample_index = 0; sample_index < 2; ++sample_index) {
@@ -333,9 +429,21 @@ int main() {
     print_burst_row(burst_scenarios[scenario_index], result, ok, trailing_comma);
   }
   failures += burst_failures;
+  std::cout << "  ],\n  \"rate_shape_rows\": [\n";
+  for (std::uint32_t scenario_index = 0; scenario_index < 3; ++scenario_index) {
+    const auto result = rate_shape_model(rate_shape_scenarios[scenario_index]);
+    const bool ok = rate_shape_passes(rate_shape_scenarios[scenario_index], result);
+    rate_shape_failures += ok ? 0U : 1U;
+    rate_shape_rows += 1;
+    const bool trailing_comma = scenario_index != 2;
+    print_rate_shape_row(rate_shape_scenarios[scenario_index], result, ok, trailing_comma);
+  }
+  failures += rate_shape_failures;
   std::cout << "  ],\n  \"row_count\": " << rows
             << ",\n  \"burst_row_count\": " << burst_rows
+            << ",\n  \"rate_shape_row_count\": " << rate_shape_rows
             << ",\n  \"burst_failures\": " << burst_failures
+            << ",\n  \"rate_shape_failures\": " << rate_shape_failures
             << ",\n  \"failures\": " << failures
             << ",\n  \"result\": \""
             << (failures == 0 ? "PASS" : "FAIL") << "\"\n}\n";

@@ -1475,3 +1475,25 @@ Latest promotion evaluation:
   - `PASS` requires C++ to clear absolute quality thresholds and be no worse
     than mainline on same-day quality and CPU.
   - Current status forbids moving C++ to `main` or C mainline to `Legacy`.
+
+## 2026-06-17 Offline Rate-Shape Gate Status
+
+- Evidence:
+  - `local-analysis/cpp-offline/jitter-model.json`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+- Gate result:
+  - `PASS` as an offline rejection/guardrail gate.
+  - `3` rate-shape rows, `0` rate-shape failures.
+- Required semantics:
+  - A transport candidate fails before hardware if average output consumption
+    deviates from the requested sample rate by more than the modeled tolerance.
+  - A transport candidate does not become ready merely because the rate-shape
+    row passes; it still needs physical music quality, CPU, routing, recovery,
+    and Traktor/timecode evidence.
+- Current decisions from the gate:
+  - Observed ISO8 partial layout is rate-safe enough to keep investigating:
+    about `47967.9` frames/s at 48 kHz, `-668 ppm`.
+  - Forced full-8 ISO8 layout is rejected:
+    about `88000` frames/s, `833333 ppm` too high.
+  - Mainline-like ISO64/q8 is rate-safe but blocked by prior physical
+    rejection, so it is not a product-readiness path by itself.

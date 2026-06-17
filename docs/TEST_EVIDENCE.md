@@ -6273,3 +6273,38 @@ Operational note:
   - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/soundcheck/metrics.json`
   - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/stream-stats-summary.json`
   - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/runtime-isolation-final.json`
+
+## 2026-06-17: Offline Capture-Paced Rate-Shape Gate
+
+- Purpose:
+  - Prevent mathematically unsafe playback-pacing ideas from reaching hardware.
+  - Separate rate correctness from product readiness.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_jitter_model`
+  - `./build/cpp-release/opena8djcpp_jitter_model`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `17/17`.
+  - Release CTest: `18/18`.
+  - Jitter model now reports `3` rate-shape rows and `0` rate-shape failures.
+- Rate-shape findings:
+  - `iso8_observed_partial_layout_rate_safe`:
+    about `4.360721` playback transactions/ms, `352` bytes/request,
+    `32` USB bytes/frame, output about `47967.9` frames/s, rate error
+    `-668 ppm`, model PASS.
+  - `iso8_forced_full8_layout_overreads`:
+    `8.0` playback transactions/ms, output about `88000` frames/s, rate
+    error `833333 ppm`, model PASS as an expected unsafe rejection.
+  - `mainline_like_iso64_q8_rate_shape_not_sufficient`:
+    rate-safe in the model but marked physically rejected because the exact
+    C++ ISO64/q8 candidate already failed locked music quality.
+- Decision:
+  - Do not spend a hardware window on forced full-8 ISO8 OUT layouts.
+  - Do not retry plain ISO64/q8 as a product candidate without a new physical
+    quality hypothesis.
+  - C++ remains not ready for hardware-readiness claims, Traktor/timecode
+    claims, or branch promotion.
+- Evidence paths:
+  - `local-analysis/cpp-offline/jitter-model.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`

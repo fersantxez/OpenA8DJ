@@ -3832,3 +3832,44 @@ Next implication:
   violating the measured output read rate. Already-rejected paths remain
   blocked: output-only, fixed OUT pacing, coalesced playback, ISO64/q8, and
   `VALID_CAPTURE_OUT_LAYOUT=1`.
+
+## 2026-06-17: Gate Capture-Paced Rate Shape Offline Before More Hardware
+
+Decision:
+- Extend the offline jitter model with rate-shape rows for capture-paced
+  playback candidates.
+- Reject any candidate whose average output frame consumption cannot stay close
+  to the requested sample rate before it reaches hardware.
+- Treat rate-safe transport shape as necessary but not sufficient for product
+  readiness.
+
+Reason:
+- Corrected hot-path evidence showed sampled capture transfers carry about
+  `4.36` valid transactions and `3.64` zero-complete transactions per sampled
+  ISO8 transfer.
+- That partial layout is compatible with 48 kHz output consumption:
+  about `47967.9` frames/s, `-668 ppm`.
+- Forcing a full 8 playback slots per millisecond with the same `352` byte
+  requests and `32` USB bytes/frame would consume about `88000` frames/s,
+  `833333 ppm` too high. That is unsafe before considering noise, CPU, or
+  routing.
+- A mainline-shaped ISO64/q8 rate shape can be rate-safe, but the exact C++
+  ISO64/q8 candidate was already physically rejected, so rate math cannot
+  overrule physical quality evidence.
+
+Alternatives discarded:
+- Force full ISO8 OUT layouts to avoid partial slots: rejected because the
+  offline model proves it over-reads output audio.
+- Retry plain ISO64/q8 because it looks rate-safe: rejected because same-day
+  C++ physical evidence already showed unacceptable quality.
+- Use compile success or rate safety as readiness: rejected because product
+  gates require physical quality, CPU, routing, recovery, and timecode evidence.
+
+Evidence:
+- `local-analysis/cpp-offline/jitter-model.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- The next optimization should either preserve the measured output consumption
+  near 48 kHz while reducing callback cost, or introduce a new transport model
+  that passes this offline gate before any hardware run.

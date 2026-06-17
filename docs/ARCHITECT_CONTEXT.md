@@ -1415,3 +1415,18 @@ Next technical target:
     layouts from ISO8 capture-paced completions would over-read output audio;
     any smoothing/coalescing idea must prove average output frames/s,
     physical quality, and CPU against mainline.
+- Offline rate-shape gate:
+  - `tools/jitter_model.cpp` now includes `rate_shape_rows` so transport
+    candidates can be rejected before hardware if their average output
+    consumption cannot stay near the selected sample rate.
+  - Current evidence:
+    `local-analysis/cpp-offline/jitter-model.json` and
+    `local-analysis/cpp-offline/current-offline-gates.json`.
+  - The observed ISO8 partial capture-paced layout is rate-safe within the
+    model: about `4.360721` playback transactions/ms at `352` bytes/request
+    and `32` USB bytes/frame yields about `47967.9` frames/s, `-668 ppm`.
+  - A forced full-8 ISO8 layout is rejected offline: it would consume about
+    `88000` frames/s, `833333 ppm` high, before any sound-quality question.
+  - A mainline-like ISO64/q8 rate shape is mathematically rate-safe but remains
+    blocked as a C++ product default because the exact candidate was already
+    physically rejected. Rate correctness alone is not a readiness claim.
