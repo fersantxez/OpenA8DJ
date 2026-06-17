@@ -1221,3 +1221,37 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     offline model predicts fewer lag jumps without higher CPU.
   - Do not expand to full A/B/C/D or Traktor/timecode until Pair A real-music
     quality materially improves.
+
+### Architect Transfer-Rate-Safe Lead Model
+
+- Status:
+  - Completed offline only.
+  - No HAL install, no hardware, no CoreAudio mutation.
+  - Offline gates PASS after the model change.
+- Files affected:
+  - `tools/transfer_pool_model.cpp`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - The previous transfer model accepted `lead64` because it only checked pool
+    fallback allocations.
+  - The updated model records `playback_queue_ratio` and
+    `transport_rate_safe`.
+  - Default lead1 and mainline-like queue8 stay safe with playback queue ratio
+    `1`.
+  - Coalesce2 is unsafe with playback queue ratio `0.5`.
+  - Implicit lead2, lead4, and lead64 are unsafe with ratios `2`, `4`, and
+    `64`.
+  - `scripts/run-cpp-offline-gates` passed: Debug `17/17`, Release `18/18`.
+- Risks:
+  - This is a model-level rejection, not a physical quality improvement.
+  - Explicit scheduling may still be viable, but only with a stronger offline
+    model and strict fallback because prior explicit-scheduling evidence was
+    rejected.
+- Next recommended action:
+  - Do not physically test implicit `HAL_CAPTURE_PACED_OUT_LEAD>1`.
+  - If pursuing scheduling, implement a cadence-preserving explicit scheduler
+    model first, then require offline PASS before lock/hardware.

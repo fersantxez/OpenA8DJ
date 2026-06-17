@@ -1024,3 +1024,15 @@ Next technical target:
     `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`.
 - Current safety state after cleanup:
   HAL inactive, hardware lock absent, no C mainline or Rust mutation expected.
+- Offline transfer model update after the timing probe:
+  - `tools/transfer_pool_model.cpp` now gates transport-rate safety, not only
+    transfer-pool fallback allocations.
+  - `HAL_CAPTURE_PACED_OUT_LEAD>1` on the current implicit scheduling path is
+    blocked from physical testing:
+    lead2 ratio `2`, lead4 ratio `4`, lead64 ratio `64`.
+  - Safe model rows keep playback queue ratio near `1`:
+    default lead1 and mainline-like queue8.
+  - Offline gates pass after the model change:
+    Debug `17/17`, Release `18/18`.
+  - Next viable timing work must preserve 1:1 capture/playback cadence before
+    asking for hardware time.

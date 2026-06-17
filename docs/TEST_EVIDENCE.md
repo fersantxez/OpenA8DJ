@@ -4547,3 +4547,46 @@ Operational note:
   - `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
   - `local-analysis/runtime-isolation/final-after-playback-before-capture-requeue-docs.json`
   - `local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`
+
+## 2026-06-17: Transfer-Rate-Safe Lead Model
+
+- Purpose:
+  - Prevent another physical probe from treating `CAPTURE_PACED_OUT_LEAD>1` as
+    a harmless latency lead when the current implicit scheduling path actually
+    changes the capture-to-playback transfer cadence.
+  - Make the offline transfer model reject transport-rate-unsafe candidates
+    even when transfer pools have enough slots and no fallback allocations.
+- Code change:
+  - `tools/transfer_pool_model.cpp` now computes
+    `playback_queue_ratio = playback_queue_attempts / periods`.
+  - The model requires playback queue ratio in `[0.95, 1.05]` for transport
+    rate safety unless a scenario explicitly expects rejection.
+  - Added rejection scenarios for:
+    `lead2_implicit_bursts_rejected`, `lead4_implicit_bursts_rejected`, and
+    `lead64_pool_margin`.
+  - Existing coalesce2 remains rejected for cadence/rate safety even though it
+    has no pool pressure.
+- Commands:
+  - `scripts/run-cpp-offline-gates`
+- Results:
+  - Offline gates PASS:
+    Debug `17/17`, Release `18/18`.
+  - Transfer-pool model PASS with `8` rows.
+  - Safe rows:
+    - default lead1: playback queue ratio `1`, transport-rate-safe `true`;
+    - mainline-like queue8: playback queue ratio `1`, transport-rate-safe
+      `true`.
+  - Rejected rows:
+    - coalesce2: playback queue ratio `0.5`, transport-rate-safe `false`;
+    - lead2: playback queue ratio `2`, transport-rate-safe `false`;
+    - lead4: playback queue ratio `4`, transport-rate-safe `false`;
+    - lead64: playback queue ratio `64`, transport-rate-safe `false`.
+- Interpretation:
+  - Do not run `HAL_CAPTURE_PACED_OUT_LEAD>1` physically on the current
+    implicit scheduling path as a quality optimization.
+  - A future lead experiment must first implement explicit, frame-numbered
+    scheduling or another model that preserves a 1:1 capture/playback cadence,
+    then pass offline gates before hardware.
+- Evidence paths:
+  - `local-analysis/cpp-offline/transfer-pool-model.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`

@@ -2709,3 +2709,34 @@ Evidence:
 - `local-analysis/soundcheck/20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
 - `local-analysis/runtime-isolation/after-playback-before-capture-requeue-unload.json`
 - `local-analysis/promotion-readiness-after-playback-before-capture-requeue.json`
+
+## 2026-06-17: Block Implicit Capture-Paced Lead Greater Than One
+
+Decision:
+- Do not run `HAL_CAPTURE_PACED_OUT_LEAD>1` physically on the current implicit
+  scheduling path.
+- Extend the offline transfer-pool model so it gates both pool fallback safety
+  and capture-to-playback transfer-rate safety.
+
+Reason:
+- The existing model only checked pool pressure. That allowed `lead64` to pass
+  because the pool had enough slots, even though it queued `64x` as many
+  playback transfers as capture periods in the implicit model.
+- `lead2` and `lead4` show the same defect at smaller scale: playback queue
+  ratios `2` and `4`, not the required approximately `1`.
+- Changing the effective OUT transfer cadence is not a safe audiophile-quality
+  optimization. It can increase CPU and alter output timing before any physical
+  quality benefit is plausible.
+
+Alternatives discarded:
+- Physically test `HAL_CAPTURE_PACED_OUT_LEAD=2` immediately: rejected because
+  the offline model now shows a transport-rate-safety failure.
+- Treat no pool fallback as sufficient: rejected because pool health and audio
+  cadence are separate safety dimensions.
+- Use `lead>1` without explicit frame scheduling: rejected for now because the
+  current implicit IOUSBHost path cannot prove a stable 1:1 capture/playback
+  cadence.
+
+Evidence:
+- `local-analysis/cpp-offline/transfer-pool-model.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`

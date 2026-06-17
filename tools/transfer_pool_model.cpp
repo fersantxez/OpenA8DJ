@@ -18,7 +18,10 @@ struct Scenario {
   std::uint32_t playback_completion_periods = 1;
   std::uint32_t leaked_capture_slots = 0;
   std::uint32_t leaked_playback_slots = 0;
+  double min_playback_queue_ratio = 0.95;
+  double max_playback_queue_ratio = 1.05;
   bool expect_no_fallback = true;
+  bool expect_transport_rate_safe = true;
 };
 
 struct Result {
@@ -28,6 +31,8 @@ struct Result {
   std::uint64_t playback_fallback_allocations = 0;
   std::uint32_t capture_in_flight_max = 0;
   std::uint32_t playback_in_flight_max = 0;
+  double playback_queue_ratio = 0.0;
+  bool transport_rate_safe = false;
 };
 
 struct PlaybackTransfer {
@@ -119,13 +124,21 @@ Result run(const Scenario& scenario) {
     }
   }
 
+  result.playback_queue_ratio = scenario.periods == 0
+                                    ? 0.0
+                                    : static_cast<double>(result.playback_queue_attempts) /
+                                          static_cast<double>(scenario.periods);
+  result.transport_rate_safe =
+      result.playback_queue_ratio >= scenario.min_playback_queue_ratio &&
+      result.playback_queue_ratio <= scenario.max_playback_queue_ratio;
   return result;
 }
 
 bool passes(const Scenario& scenario, const Result& result) {
   const bool no_fallback =
       result.capture_fallback_allocations == 0 && result.playback_fallback_allocations == 0;
-  return no_fallback == scenario.expect_no_fallback;
+  return no_fallback == scenario.expect_no_fallback &&
+         result.transport_rate_safe == scenario.expect_transport_rate_safe;
 }
 
 void print_row(const Scenario& scenario, const Result& result, bool ok, bool trailing_comma) {
@@ -140,13 +153,19 @@ void print_row(const Scenario& scenario, const Result& result, bool ok, bool tra
             << ", \"playback_completion_periods\": " << scenario.playback_completion_periods
             << ", \"leaked_capture_slots\": " << scenario.leaked_capture_slots
             << ", \"leaked_playback_slots\": " << scenario.leaked_playback_slots
+            << ", \"min_playback_queue_ratio\": " << scenario.min_playback_queue_ratio
+            << ", \"max_playback_queue_ratio\": " << scenario.max_playback_queue_ratio
             << ", \"capture_queue_attempts\": " << result.capture_queue_attempts
             << ", \"playback_queue_attempts\": " << result.playback_queue_attempts
+            << ", \"playback_queue_ratio\": " << result.playback_queue_ratio
+            << ", \"transport_rate_safe\": " << (result.transport_rate_safe ? "true" : "false")
             << ", \"capture_fallback_allocations\": " << result.capture_fallback_allocations
             << ", \"playback_fallback_allocations\": " << result.playback_fallback_allocations
             << ", \"capture_in_flight_max\": " << result.capture_in_flight_max
             << ", \"playback_in_flight_max\": " << result.playback_in_flight_max
             << ", \"expect_no_fallback\": " << (scenario.expect_no_fallback ? "true" : "false")
+            << ", \"expect_transport_rate_safe\": "
+            << (scenario.expect_transport_rate_safe ? "true" : "false")
             << ", \"result\": \"" << (ok ? "PASS" : "FAIL") << "\"}";
   if (trailing_comma) {
     std::cout << ",";
@@ -172,10 +191,22 @@ int main() {
           .name = "coalesce2_no_pool_pressure_but_cadence_rejected_elsewhere",
           .playback_coalesce = 2,
           .playback_completion_periods = 2,
+          .expect_transport_rate_safe = false,
+      },
+      {
+          .name = "lead2_implicit_bursts_rejected",
+          .capture_paced_output_lead = 2,
+          .expect_transport_rate_safe = false,
+      },
+      {
+          .name = "lead4_implicit_bursts_rejected",
+          .capture_paced_output_lead = 4,
+          .expect_transport_rate_safe = false,
       },
       {
           .name = "lead64_pool_margin",
           .capture_paced_output_lead = 64,
+          .expect_transport_rate_safe = false,
       },
       {
           .name = "capture_pool_leak_rejected",

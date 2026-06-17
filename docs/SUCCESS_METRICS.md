@@ -964,3 +964,24 @@ Latest promotion evaluation:
   - A future candidate must beat this run and mainline on the full gate set:
     real-music quality, CPU, lag stability, full A/B/C/D routing, and
     Traktor/timecode evidence.
+
+## 2026-06-17 Offline Cadence-Safety Gate Addition
+
+- Offline transfer-rate safety: PASS.
+  - Evidence: `local-analysis/cpp-offline/transfer-pool-model.json`.
+  - Debug offline gates: `17/17` PASS.
+  - Release offline gates: `18/18` PASS.
+- Required semantics:
+  - Capture-paced playback must keep playback queue ratio near `1.0` unless an
+    explicitly modeled and physically validated scheduling mode proves
+    otherwise.
+  - Pool fallback safety alone is not sufficient for timing readiness.
+- Current unsafe variants blocked before hardware:
+  - coalesce2: playback queue ratio `0.5`;
+  - implicit lead2: playback queue ratio `2`;
+  - implicit lead4: playback queue ratio `4`;
+  - implicit lead64: playback queue ratio `64`.
+- Readiness implication:
+  - Do not count `HAL_CAPTURE_PACED_OUT_LEAD>1` as a candidate optimization
+    until it preserves 1:1 transfer cadence and then passes physical music and
+    CPU gates.
