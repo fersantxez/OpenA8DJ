@@ -984,3 +984,39 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Isolate the remaining residual path below current counters: USB/device
     scheduling, hidden packet/cadence interpretation, analog/capture topology,
     or a missing physical control-state difference.
+
+### Architect Direct USB Follow-Up
+
+- Status:
+  - Completed locally under lock after the stream-usage probes.
+- Findings:
+  - Direct USB `opena8dj-usb-play-plain-gain05` still failed Pair A matrix:
+    max wrong-source leakage `-44.78 dB`; R->L leakage `-29.97 dB`; no
+    clipping.
+  - The same run had strong L/R level asymmetry, with right expected max only
+    `0.01005`.
+  - Direct USB `opena8dj-usb-play` built with current HAL flags was worse:
+    max wrong-source leakage `-13.19 dB`.
+  - Final isolation after both runs was PASS: HAL inactive, lock absent.
+- Risk:
+  - Direct USB tools are not clean bypass oracles yet because they write the
+    stereo WAV to all output pairs and do not prove selected-pair routing.
+- Next recommended action:
+  - Build or adapt a selected-pair direct USB diagnostic with explicit audio
+    params/control-state logging before using direct USB results to separate
+    HAL/CoreAudio from USB/device behavior.
+
+### Architect Selected-Pair Direct USB Follow-Up
+
+- Status:
+  - Implemented selected-pair support in `src/tools/opena8dj-usb-play.m`.
+  - Default remains `all`; new usage is `[wav] [A|B|C|D|all] [lead_frames]`.
+- Findings:
+  - Selected Pair A without lead failed:
+    max wrong-source leakage `-35.28 dB`, R->L `-18.05 dB`.
+  - Selected Pair A with `8192` lead frames improved L->R to `-46.82 dB`, but
+    the right expected level fell below threshold and R->L stayed poor at
+    `-16.05 dB`.
+- Next recommended action:
+  - Stop using the direct USB tool as a quality oracle until it logs and
+    validates audio params, control state, and selected-pair packet cadence.

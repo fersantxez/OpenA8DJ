@@ -868,3 +868,37 @@ Next technical target:
   work must isolate the residual path below current counters: USB/device
   scheduling, hidden packet/cadence interpretation, analog/capture topology, or
   a missing physical control/state difference.
+
+## 2026-06-17 Direct USB Isolation Update
+
+- Direct USB playback with `opena8dj-usb-play-plain-gain05` bypassed HAL
+  publication and still failed the Pair A matrix:
+  max wrong-source leakage `-44.78 dB`, R->L `-29.97 dB`, no clipping.
+- That run was not level-balanced: left expected max `0.09584`, right expected
+  max `0.01005`. It is not proof of routing quality even though L->R was near
+  the threshold.
+- Direct USB playback with the current HAL-flag build was worse:
+  max wrong-source leakage `-13.19 dB` and both expected channel levels near
+  the minimum threshold.
+- Final isolation after both runs PASS: HAL inactive and lock absent.
+- Implication:
+  HAL/CoreAudio alone is not a sufficient root cause. The remaining work must
+  inspect direct engine audio params/control state, selected-pair semantics,
+  USB packet cadence as interpreted by the device, and the physical analog
+  route. The current direct USB tools are diagnostics, not readiness evidence.
+
+## 2026-06-17 Selected-Pair Direct USB Update
+
+- `src/tools/opena8dj-usb-play.m` now supports selected output pair
+  `A|B|C|D|all` and optional `lead_frames`. Default behavior remains `all`
+  with zero lead.
+- Selected Pair A direct USB with `opena8dj-usb-play-plain-gain05` still
+  failed: max wrong-source leakage `-35.28 dB`, R->L `-18.05 dB`, no clipping.
+- Selected Pair A with `8192` lead frames improved L->R to `-46.82 dB`, but
+  right expected level dropped below threshold (`0.00366`) and R->L was still
+  `-16.05 dB`.
+- Conclusion:
+  selected-pair support improved the diagnostic shape but did not create a
+  valid direct bypass oracle. The next direct-engine task is not more physical
+  repetition; it is explicit logging/modeling of `AUDIO_PARAMS`, output stream
+  byte cadence, and device control state before/during direct playback.

@@ -2442,3 +2442,67 @@ Evidence:
 - `local-analysis/channel-matrix/20260617-cpp-mainline-parity-config-pairA-chmatrix/tone-matrix.json`
 - `local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s/metrics.json`
 - `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
+
+## 2026-06-17: Reject Direct USB Tools As Readiness Evidence
+
+Decision:
+- Do not use the current direct USB playback tools as evidence that C++ is
+  better than mainline.
+- Keep them as diagnostics only. They are useful for isolating the failure
+  below HAL/CoreAudio, but their current behavior is not product-quality output.
+
+Reason:
+- `opena8dj-usb-play-plain-gain05` bypassed HAL/CoreAudio publication and
+  completed physical playback/capture, but Pair A matrix still failed:
+  max wrong-source leakage `-44.78 dB`, right-to-left `-29.97 dB`.
+- That run showed severe L/R asymmetry: left expected max `0.09584`, right
+  expected max `0.01005`.
+- `opena8dj-usb-play` built with current HAL flags was worse:
+  max wrong-source leakage `-13.19 dB` with both expected channels near the
+  minimum threshold.
+- Therefore the remaining defect is not solely a HAL/CoreAudio callback issue,
+  and the direct USB tools themselves need a stricter control/audio-param
+  model before they can serve as a clean bypass oracle.
+
+Alternatives discarded:
+- Treat the `-44.78 dB` direct result as close enough: rejected because the
+  threshold is `-45 dB`, R->L leakage is poor, and right-channel level is not
+  comparable.
+- Prefer direct USB over HAL for readiness: rejected because direct HAL-flags
+  output is dramatically worse and the tool writes the stereo WAV to all four
+  pairs rather than modeling selected-pair routing.
+
+Evidence:
+- `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/channel-matrix/20260617-direct-usb-halflags-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/runtime-isolation/post-direct-usb-halflags-matrix.json`
+
+## 2026-06-17: Add Selected-Pair Direct USB Diagnostic, Still Reject Direct Path
+
+Decision:
+- Keep the selected-pair direct USB playback support because it makes the
+  diagnostic more precise.
+- Do not treat the selected-pair direct results as readiness evidence.
+
+Reason:
+- The previous direct USB tool wrote the stereo WAV to all four output pairs,
+  so it was not a clean Pair A routing bypass.
+- The tool now accepts `[A|B|C|D|all]` and optional `lead_frames` while
+  preserving default `all` behavior.
+- Selected Pair A with no lead still failed: max wrong-source leakage
+  `-35.28 dB`, R->L `-18.05 dB`, right expected max only `0.00607`.
+- Selected Pair A with `8192` lead frames improved L->R to `-46.82 dB`, but
+  still failed because right expected max dropped to `0.00366` and R->L was
+  only `-16.05 dB`.
+
+Alternatives discarded:
+- Use direct selected Pair A as a product route: rejected because right-channel
+  level is not valid and the matrix fails hard.
+- Assume prebuffer solves direct USB: rejected because it only improved one
+  leakage direction while worsening right-channel expected level.
+
+Evidence:
+- `src/tools/opena8dj-usb-play.m`
+- `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-chmatrix/tone-matrix.json`
+- `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+- `local-analysis/runtime-isolation/post-direct-usb-selected-lead8192-matrix.json`

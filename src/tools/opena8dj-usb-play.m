@@ -28,10 +28,46 @@ static void SleepFrames(uint32_t frames, uint32_t sampleRate)
     nanosleep(&ts, NULL);
 }
 
+static int ParsePair(const char *text)
+{
+    if (text == NULL || strcmp(text, "all") == 0 || strcmp(text, "ALL") == 0) {
+        return -1;
+    }
+    if (strlen(text) != 1) {
+        return -2;
+    }
+    char c = text[0];
+    if (c >= 'a' && c <= 'd') {
+        c = (char)(c - 'a' + 'A');
+    }
+    if (c < 'A' || c > 'D') {
+        return -2;
+    }
+    return (int)(c - 'A');
+}
+
 int main(int argc, char **argv)
 {
     @autoreleasepool {
         const char *path = argc > 1 ? argv[1] : "build/test-recordings/opena8dj-reference.wav";
+        int selectedPair = -1;
+        uint32_t leadFrames = 0;
+        if (argc > 2) {
+            selectedPair = ParsePair(argv[2]);
+            if (selectedPair < -1) {
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames]\n", argv[0]);
+                return 2;
+            }
+        }
+        if (argc > 3) {
+            char *end = NULL;
+            unsigned long parsed = strtoul(argv[3], &end, 10);
+            if (end == argv[3] || *end != '\0' || parsed > UINT32_MAX) {
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames]\n", argv[0]);
+                return 2;
+            }
+            leadFrames = (uint32_t)parsed;
+        }
         NSData *data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path]];
         if (data == nil || data.length < 44) {
             fprintf(stderr, "could not read wav: %s\n", path);
@@ -88,8 +124,10 @@ int main(int argc, char **argv)
 
         const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
         fprintf(stderr,
-                "usb_play path=%s rate=%u channels=%u source_frames=%u duration=%.3f\n",
+                "usb_play path=%s pair=%s lead_frames=%u rate=%u channels=%u source_frames=%u duration=%.3f\n",
                 path,
+                selectedPair < 0 ? "all" : (const char *[]){"A", "B", "C", "D"}[selectedPair],
+                leadFrames,
                 sampleRate,
                 channels,
                 sourceFrames,
@@ -109,13 +147,18 @@ int main(int argc, char **argv)
                 float left = (float)src[0] / 32768.0f;
                 float right = channels > 1 ? (float)src[1] / 32768.0f : left;
                 for (uint32_t pair = 0; pair < 4; pair++) {
+                    if (selectedPair >= 0 && (uint32_t)selectedPair != pair) {
+                        continue;
+                    }
                     out[i * 8 + pair * 2] = left;
                     out[i * 8 + pair * 2 + 1] = right;
                 }
             }
             OpenA8DJUSBWriteOutput(out, todo, 8);
             frame += todo;
-            SleepFrames(todo, sampleRate);
+            if (frame > leadFrames) {
+                SleepFrames(todo, sampleRate);
+            }
         }
 
         SleepFrames(sampleRate / 2, sampleRate);

@@ -4060,3 +4060,81 @@ Operational note:
   - `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
   - `local-analysis/runtime-isolation/post-default-rebuild-final.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Direct USB Pair A Matrix Isolation
+
+- Purpose:
+  - Separate HAL/CoreAudio callback behavior from the lower USB/device/analog
+    path by playing the same decorrelated matrix fixture through the direct USB
+    tools while capturing the physical Pair A route with iRig.
+- Commands:
+  - `make -B usb-play-plain-gain05 build/audio-record`
+  - locked manual direct USB run with `build/opena8dj-usb-play-plain-gain05`
+    and output directory
+    `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-chmatrix`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-direct-usb-gain05-matrix.json`
+  - `make -B usb-play`
+  - locked manual direct USB run with `build/opena8dj-usb-play` and output
+    directory
+    `local-analysis/channel-matrix/20260617-direct-usb-halflags-pairA-chmatrix`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-direct-usb-halflags-matrix.json`
+  - `make -B usb-play-plain-gain05`
+  - locked manual direct USB selected-Pair-A run with
+    `build/opena8dj-usb-play-plain-gain05 <reference> A` and output directory
+    `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-chmatrix`
+  - locked manual direct USB selected-Pair-A run with
+    `build/opena8dj-usb-play-plain-gain05 <reference> A 8192` and output
+    directory
+    `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-lead8192-chmatrix`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-direct-usb-selected-lead8192-matrix.json`
+  - `build/opena8dj-usb-play-plain-gain05 <reference> Z` for parser rejection
+    smoke, using an existing fixture and no USB access.
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `git diff --check && scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-selected-direct-tool.json`
+- Results:
+  - `opena8dj-usb-play-plain-gain05` completed playback and captured without
+    clipping, but the matrix still failed:
+    max wrong-source leakage `-44.78 dB`, left-to-right `-44.78 dB`,
+    right-to-left `-29.97 dB`.
+  - That run had strong channel asymmetry: left expected max `0.09584`, right
+    expected max only `0.01005`. It is not a valid quality improvement claim
+    even though one leakage direction was close to threshold.
+  - `opena8dj-usb-play` built with current HAL flags was much worse:
+    max wrong-source leakage `-13.19 dB`, left expected max `0.00558`, right
+    expected max `0.00610`.
+  - Added direct USB tool support for selected pairs and optional lead prebuffer
+    while preserving default `all` output.
+  - Selected Pair A with no lead still failed:
+    max wrong-source leakage `-35.28 dB`, left-to-right `-42.54 dB`,
+    right-to-left `-18.05 dB`, left expected max `0.04414`, right expected max
+    `0.00607`.
+  - Selected Pair A with `8192` lead frames improved L->R to `-46.82 dB`, but
+    still failed because right expected level fell to `0.00366` and R->L was
+    only `-16.05 dB`.
+  - Invalid pair parsing returns usage/status `2` before USB access.
+  - Offline gates PASS after the tool change: Debug `17/17`, Release `18/18`.
+  - Latest release benchmark:
+    `pack_mib_s=1657.57`, `decode_into_mib_s=585.28`,
+    `route_frames_s=9.10222e+08`,
+    `route_advanced_frames_s=5.05947e+08`.
+  - Promotion readiness remains `FAIL` with
+    `branch_promotion_allowed=false`.
+  - Diff whitespace check PASS.
+  - Both direct runs bypassed HAL publication and finished with isolation PASS:
+    HAL inactive, lock absent.
+- Interpretation:
+  - The remaining defect is not isolated to HAL/CoreAudio alone.
+  - The current direct USB tools are diagnostic only and must not be used for
+    readiness claims. They point at USB/audio-param/direct-engine behavior or
+    physical route/control-state differences that still need isolation.
+- Evidence paths:
+  - `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-usb-halflags-pairA-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/runtime-isolation/post-direct-usb-gain05-matrix.json`
+  - `local-analysis/runtime-isolation/post-direct-usb-halflags-matrix.json`
+  - `local-analysis/runtime-isolation/post-direct-usb-selected-lead8192-matrix.json`
+  - `local-analysis/runtime-isolation/final-after-selected-direct-tool.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
