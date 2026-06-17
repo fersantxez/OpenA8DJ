@@ -3220,3 +3220,36 @@ Risk:
   - Prepared transport contracts are still offline. They are not physical
     readiness and cannot justify promotion until bound to the runtime and
     measured against mainline.
+
+## 2026-06-17 Subagent: Pascal Prepared Transport Runtime Reality Check
+
+- Agent:
+  - Pascal (`019ed798-3e9c-7f41-8f84-a94f82051179`).
+- Mission:
+  - Read-only review of prepared transport contracts and the smallest path to a
+    runtime implementation that is measurable instead of decorative accounting.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Existing prepared contracts enforce zero fallback allocations, zero HAL
+    steady requeues, bounded completion gap, clean routing/timecode, and batch
+    ring publication reduction.
+  - A bridge that only calls `PreparedTransportBackend` while the HAL still
+    performs the same `enqueueIORequestWithData` cadence would be simulation,
+    not a CPU fix.
+  - The first useful runtime change must visibly change real queue pressure or
+    fail when real fallback/queue pressure remains unchanged.
+- Integrated action:
+  - Added an opt-in HAL experiment,
+    `HAL_CAPTURE_PACED_PLAYBACK_REFILL=1`, that keeps capture/timecode active
+    but refills playback using the independent playback queue path. This can
+    reduce playback enqueue cadence when combined with coalesced playback
+    transfers while leaving the default path unchanged.
+- Risk:
+  - This is still a HAL experiment, not DriverKit slot ownership. It must pass
+    HAL candidate safety and same-session physical A/B before it can influence
+    readiness.

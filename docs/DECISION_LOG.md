@@ -5858,3 +5858,46 @@ Next implication:
 - The next implementation must reduce IOUSBHost/Mach enqueue cadence or move
   USB scheduling into a prepared DriverKit-style transport without breaking the
   timing/layout assumptions needed for audio quality, routing, and timecode.
+
+## 2026-06-17: Add Opt-In Capture-Paced Playback Refill Experiment
+
+Decision:
+- Add, but do not enable by default,
+  `HAL_CAPTURE_PACED_PLAYBACK_REFILL`.
+- The experiment keeps capture ISO active for input/timecode while refilling the
+  playback queue through the existing independent playback queue path.
+
+Reason:
+- `HAL_PLAYBACK_CAPTURE_PACED=0` reduced CPU but broke quality, so fully
+  detaching playback from capture is rejected.
+- The default capture-paced path preserves timing but drives roughly one OUT
+  submission per IN completion, producing high IOUSBHost/Mach enqueue CPU.
+- This experiment tests the narrower hypothesis: keep capture alive and use
+  capture completions as refill opportunities, but allow playback transfers to
+  be coalesced and kept in flight.
+
+Evidence before hardware:
+- Default HAL build: PASS.
+- Experimental build:
+  `make -B hal HAL_CAPTURE_PACED_PLAYBACK_REFILL=1
+  HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_PLAYBACK_QUEUE=4`: PASS.
+- Full offline gates after the change:
+  - Debug CTest `43/43` passed.
+  - Release CTest `44/44` passed.
+  - Evidence schema `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `branch_promotion_allowed=false`,
+    `physical_measurement_valid_for_promotion=false`.
+
+Alternatives discarded:
+- A pure prepared-transport bridge with no runtime queue-pressure change:
+  rejected as decorative accounting.
+- Promoting this experiment because offline gates pass: rejected; hardware
+  sound quality, CPU, timecode, and same-session mainline comparison are still
+  unproven.
+
+Next implication:
+- The experiment may enter a lock-gated HAL candidate safety window, followed
+  by short physical soundcheck only if safety passes. It must be rejected if it
+  repeats the playback-completion-paced quality collapse or fails to reduce real
+  driver CPU/enqueue pressure.

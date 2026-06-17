@@ -9090,3 +9090,45 @@ Full offline gate rerun:
   - Product readiness correctly remains blocked because physical quality,
     same-session mainline superiority, validated DVS/timecode vinyl evidence,
     and promotion metrics are still absent or failing.
+
+## 2026-06-17 Capture-Paced Playback Refill Experiment Offline Gate
+
+- Purpose:
+  - Add a controlled HAL experiment that keeps capture active for input/timecode
+    while allowing playback to refill through the independent playback queue
+    path.
+  - Test a narrower CPU hypothesis than the rejected
+    `HAL_PLAYBACK_CAPTURE_PACED=0` switch: preserve capture-paced operation but
+    reduce OUT enqueue cadence with coalesced playback transfers.
+- Code change:
+  - Added `HAL_CAPTURE_PACED_PLAYBACK_REFILL ?= 0` to `Makefile`.
+  - Added `OPENA8DJ_CAPTURE_PACED_PLAYBACK_REFILL` guards in
+    `src/hal/OpenA8DJUSB.m`.
+  - Default behavior remains disabled.
+- Commands:
+  - `make -B hal`
+  - `make -B hal HAL_CAPTURE_PACED_PLAYBACK_REFILL=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_PLAYBACK_QUEUE=4`
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline build and filesystem evidence only; no HAL load, driver install,
+    audio playback, capture, CoreAudio mutation, USB reset, default-device
+    change, or hardware action.
+- Result:
+  - Default HAL build: PASS.
+  - Experimental HAL build: PASS.
+  - Debug CTest: `43/43` passed.
+  - Release CTest: `44/44` passed.
+  - Evidence schema: `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`:
+    - `base_commit=af057f1`;
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+- Interpretation:
+  - The experiment is eligible for a lock-gated HAL candidate safety check.
+  - It is not product readiness and does not establish quality, timecode, CPU
+    superiority, or branch promotion.
+  - Reject it if physical soundcheck repeats the previous coalescing quality
+    collapse or if real driver CPU/enqueue pressure does not improve.

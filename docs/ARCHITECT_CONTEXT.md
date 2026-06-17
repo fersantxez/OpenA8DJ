@@ -2317,6 +2317,16 @@ Current implication:
   - Subagent Linnaeus mapped the offline prepared transport contracts to HAL
     integration points. The next real implementation should move toward prepared
     transport/DriverKit slot ownership and avoid steady HAL direct requeue work.
+  - Subagent Pascal warned that a prepared-transport bridge without real
+    `enqueueIORequestWithData` cadence reduction would be decorative accounting.
+    In response, the HAL now has an opt-in
+    `HAL_CAPTURE_PACED_PLAYBACK_REFILL=1` experiment. It keeps capture active
+    for input/timecode but allows playback to refill through the independent
+    playback queue path so coalesced OUT transfers can be tested without
+    disabling capture-paced operation entirely.
+  - The experiment compiled and full offline gates passed, but it has no
+    physical quality or CPU superiority evidence yet and is not enabled by
+    default.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on
