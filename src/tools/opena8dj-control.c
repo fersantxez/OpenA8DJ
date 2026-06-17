@@ -223,6 +223,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t transferLedgerOutputActiveUnderrunFrames;
     uint64_t transferLedgerOutputElasticDropFrames;
     uint64_t transferLedgerOutputElasticReplayFrames;
+    uint64_t playbackPayloadGuardChecks;
+    uint64_t playbackPayloadGuardMismatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -870,6 +872,11 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                (unsigned long long)stats->transferLedgerOutputElasticDropFrames,
                (unsigned long long)stats->transferLedgerOutputElasticReplayFrames);
     }
+    if (STREAM_STATS_HAS_FIELD(payloadLength, playbackPayloadGuardMismatches)) {
+        printf("  playback-payload-guard: checks=%llu mismatches=%llu\n",
+               (unsigned long long)stats->playbackPayloadGuardChecks,
+               (unsigned long long)stats->playbackPayloadGuardMismatches);
+    }
     printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu late-write-frames=%llu late-write-batches=%llu\n",
            (unsigned long long)stats->outputFramesWritten,
            (unsigned long long)stats->outputFramesRead,
@@ -1072,6 +1079,12 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("transferLedgerOutputElasticReplayFrames=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, transferLedgerOutputElasticReplayFrames) ?
                                 stats->transferLedgerOutputElasticReplayFrames : 0));
+    printf("playbackPayloadGuardChecks=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackPayloadGuardMismatches) ?
+                                stats->playbackPayloadGuardChecks : 0));
+    printf("playbackPayloadGuardMismatches=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackPayloadGuardMismatches) ?
+                                stats->playbackPayloadGuardMismatches : 0));
     printf("playbackScheduleErrors=%llu\n", (unsigned long long)playbackScheduleErrors);
     printf("playbackReschedules=%llu\n", (unsigned long long)stats->playbackReschedules);
     printf("outputRingFrames=%u\n", stats->outputRingFrames);

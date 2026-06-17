@@ -39,6 +39,8 @@ COUNTERS = [
     "transferLedgerOutputActiveUnderrunFrames",
     "transferLedgerOutputElasticDropFrames",
     "transferLedgerOutputElasticReplayFrames",
+    "playbackPayloadGuardChecks",
+    "playbackPayloadGuardMismatches",
     "playbackScheduleErrors",
     "playbackReschedules",
     "outputFramesWritten",
@@ -200,6 +202,8 @@ def analyze(path):
         flags.append("transfer_ledger_playback_completion_gap")
     if counters["transferLedgerOutputActiveUnderrunFrames"]["delta"] > 0:
         flags.append("transfer_ledger_active_underruns")
+    if counters["playbackPayloadGuardMismatches"]["delta"] > 0:
+        flags.append("playback_payload_guard_mismatches")
     if counters["playbackScheduleErrors"]["delta"] > 0:
         flags.append("playback_schedule_errors")
 
@@ -233,6 +237,10 @@ def analyze(path):
             counters["transferLedgerPlaybackCompleteEntries"]["delta"],
         "transfer_ledger_output_read_frames_per_second":
             counters["transferLedgerOutputReadFrames"]["per_second"],
+        "playback_payload_guard_checks_per_second":
+            counters["playbackPayloadGuardChecks"]["per_second"],
+        "playback_payload_guard_mismatches_per_second":
+            counters["playbackPayloadGuardMismatches"]["per_second"],
         "capture_transaction_errors_per_capture_transfer": capture_error_per_transfer,
         "capture_status_failures_per_capture_transfer": (
             counters["captureStatusFailures"]["delta"] / capture_tx_delta

@@ -170,6 +170,10 @@
 #define OPENA8DJ_ENABLE_TRANSFER_LEDGER 1
 #endif
 
+#ifndef OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
+#define OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD 0
+#endif
+
 static const uint16_t kVendorID = 0x17cc;
 static const uint16_t kProductID = 0x1978;
 static const uint8_t kEndpointControlOut = 0x01;
@@ -496,6 +500,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t transferLedgerOutputActiveUnderrunFrames;
     uint64_t transferLedgerOutputElasticDropFrames;
     uint64_t transferLedgerOutputElasticReplayFrames;
+    uint64_t playbackPayloadGuardChecks;
+    uint64_t playbackPayloadGuardMismatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1737,6 +1743,8 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 @property(nonatomic) BOOL inUse;
 @property(nonatomic) uint64_t ledgerSequence;
 @property(nonatomic) uint64_t ledgerFirstFrameNumber;
+@property(nonatomic) uint64_t playbackPayloadDigest;
+@property(nonatomic) NSUInteger playbackPayloadLength;
 @end
 
 @implementation OpenA8DJIsoTransfer
@@ -1806,6 +1814,19 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     return transfer;
 }
+
+#if OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
+static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
+{
+    const uint8_t *cursor = bytes;
+    uint64_t hash = 1469598103934665603ull;
+    for (NSUInteger index = 0; index < length; index++) {
+        hash ^= cursor[index];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+#endif
 
 @implementation OpenA8DJUSBEngine {
     dispatch_queue_t _queue;
@@ -4958,6 +4979,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     [self fillPlaybackBytes:transfer.data.mutableBytes
                      length:transfer.data.length
                 outputStats:&outputStats];
+#if OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
+    transfer.playbackPayloadLength = transfer.data.length;
+    transfer.playbackPayloadDigest = PlaybackPayloadDigest(transfer.data.bytes, transfer.data.length);
+#else
+    transfer.playbackPayloadLength = 0;
+    transfer.playbackPayloadDigest = 0;
+#endif
 
     IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -5115,6 +5143,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (status == kIOReturnSuccess && failedTransactions == 0 && shortTransfers == 0) {
         atomic_store(&_playbackScheduleFailureStreak, 0);
     }
+#if OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
+    if (transfer.playbackPayloadLength == transfer.data.length) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackPayloadGuardChecks)
+                               value:1];
+        uint64_t completionDigest = PlaybackPayloadDigest(transfer.data.bytes, transfer.data.length);
+        if (completionDigest != transfer.playbackPayloadDigest) {
+            [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackPayloadGuardMismatches)
+                                   value:1];
+        }
+    } else {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackPayloadGuardMismatches)
+                               value:1];
+    }
+#endif
 #if OPENA8DJ_ENABLE_TRACE
     if (status == kIOReturnSuccess && transactions != NULL) {
         _debugPlaybackTransfers++;

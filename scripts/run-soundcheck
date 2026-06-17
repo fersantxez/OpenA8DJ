@@ -227,6 +227,8 @@ STREAM_STATS_TSV_COLUMNS = [
     "transferLedgerOutputActiveUnderrunFrames",
     "transferLedgerOutputElasticDropFrames",
     "transferLedgerOutputElasticReplayFrames",
+    "playbackPayloadGuardChecks",
+    "playbackPayloadGuardMismatches",
     "playbackScheduleErrors",
     "playbackReschedules",
     "outputRingFrames",
