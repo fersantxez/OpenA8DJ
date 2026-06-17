@@ -43,6 +43,9 @@
 #ifndef OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME
 #define OPENA8DJ_IGNORE_OUTPUT_SAMPLE_TIME 0
 #endif
+#ifndef OPENA8DJ_FLUSH_OUTPUT_IN_WRITE_MIX
+#define OPENA8DJ_FLUSH_OUTPUT_IN_WRITE_MIX 0
+#endif
 
 #ifndef OPENA8DJ_BACKGROUND_WARM_OPEN
 #define OPENA8DJ_BACKGROUND_WARM_OPEN 0
@@ -2193,9 +2196,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_DoIOOperation(AudioServerPlugInDriver
         const Float32 *output = (const Float32 *)ioMainBuffer;
         EnsureOutputCycle(inIOBufferFrameSize, inIOCycleInfo);
         CopyClientOutputToOutput(StreamIndex(inStreamObjectID), output);
+#if OPENA8DJ_FLUSH_OUTPUT_IN_WRITE_MIX
         if (OutputCycleHasExpectedStreams()) {
             FlushOutputCycle();
         }
+#endif
         return kAudioHardwareNoError;
     }
     return kAudioHardwareNoError;

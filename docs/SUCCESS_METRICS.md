@@ -1536,3 +1536,18 @@ Latest promotion evaluation:
 - Required next metric:
   - A new candidate must reduce lag jumps and residual after local correction,
     not merely improve raw correlation or hide latency with offline alignment.
+
+## 2026-06-17 Output Flush Timing Candidate
+
+- Candidate:
+  - `HAL_FLUSH_OUTPUT_IN_WRITE_MIX=0` by default.
+  - This aligns C++ output-cycle flushing with mainline's `EndIOOperation`
+    behavior.
+- Offline guard:
+  - `static_policy_check` now requires the default to remain `0`.
+- Pass criteria before any quality claim:
+  - Locked physical music run must pass strict music thresholds.
+  - Same-route C++ A/B must reduce lag jumps and residual after local lag
+    correction versus the prior C++ default.
+  - Same-day comparison must show C++ CPU p95 no worse than mainline C.
+  - Traktor/timecode remains unproven until a separate physical DVS gate passes.

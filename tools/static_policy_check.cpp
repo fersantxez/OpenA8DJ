@@ -146,6 +146,7 @@ int main(int argc, char** argv) {
       {"HAL_PLAYBACK_PAYLOAD_GUARD", "0"},
       {"HAL_OUTPUT_SAMPLE_TIME_FOLLOWER", "0"},
       {"HAL_IGNORE_OUTPUT_SAMPLE_TIME", "0"},
+      {"HAL_FLUSH_OUTPUT_IN_WRITE_MIX", "0"},
       {"HAL_HOT_PATH_TIMING", "0"},
       {"HAL_STREAM_STATS_ATOMIC_ACCUMULATORS", "0"},
       {"HAL_OUTPUT_START_BYTE", "4"},

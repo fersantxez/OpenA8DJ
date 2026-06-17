@@ -2356,3 +2356,38 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Implement the ISO layout reuse path behind offline/contract evidence first,
     then require locked physical evidence for hot-path timing, quality, CPU,
     stream stats, and rate shape before any readiness claim.
+
+## Mencius: HAL Timebase And Sample-Time Scout - 2026-06-17
+
+- Mission:
+  - Read-only comparison of mainline HAL timing, zero timestamp, output
+    `sampleTime`, timeline write, and pacing behavior against C++.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+- Findings:
+  - Mainline public HAL time is anchored to `mach_absolute_time()` by default;
+    `HAL_USB_ZERO_TIMESTAMP` is `0`, so USB zero timestamp is not the likely
+    explanation for current lag jumps unless logs prove otherwise.
+  - Mainline and C++ both consume `mOutputTime.mSampleTime` and use the same
+    `8192/4096/8192` output latency constants.
+  - C++ had one relevant timing divergence: it could flush output inside
+    `WriteMix` once expected streams were present, while mainline waits until
+    `EndIOOperation`.
+  - C++ also has a continuity exception in timeline write that mainline lacks;
+    existing diagnostic evidence must determine whether timeline resets are
+    actually present before changing that path.
+- Architect integration:
+  - Added `HAL_FLUSH_OUTPUT_IN_WRITE_MIX`, default `0`, to align C++ with
+    mainline end-of-cycle flush timing.
+  - Added the default to static policy checks so the early flush cannot become
+    product default accidentally.
+- Next recommended action:
+  - Test the new output-flush timing under the hardware lock with same-route
+    real-music quality, window-trace timebase classification, CPU profile, and
+    promotion-readiness evidence. Do not claim improvement from compilation.

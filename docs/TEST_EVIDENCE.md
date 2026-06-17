@@ -6378,3 +6378,32 @@ Operational note:
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-window-trace.json`
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-window-trace.json`
+
+## 2026-06-17: Output Flush Timing Mainline Alignment
+
+- Purpose:
+  - Remove a C++-specific timing difference where output could flush inside
+    `WriteMix` before `EndIOOperation`.
+  - Keep a diagnostic flag for controlled A/B while matching mainline by
+    default.
+- Change:
+  - Added `HAL_FLUSH_OUTPUT_IN_WRITE_MIX ?= 0`.
+  - Added `OPENA8DJ_FLUSH_OUTPUT_IN_WRITE_MIX` to HAL build flags.
+  - Guarded the early `WriteMix` flush behind that flag.
+  - Added the default to `static_policy_check`.
+- Commands:
+  - `git diff --check`
+  - `make -B hal`
+  - `cmake --build build/cpp-release --target opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - HAL build PASS.
+  - Static policy PASS with `22` rejected/default checks and `0` failures.
+  - Offline gates PASS:
+    Debug CTest `17/17`, Release CTest `18/18`, evidence schema PASS,
+    hardware-lock policy PASS, stream-stats contract PASS, static policy PASS.
+- Interpretation:
+  - This is a timing candidate only. It does not prove sound quality,
+    performance, routing, Traktor, or timecode readiness until a locked
+    physical A/B passes.

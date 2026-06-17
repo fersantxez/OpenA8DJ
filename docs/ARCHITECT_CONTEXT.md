@@ -1463,3 +1463,14 @@ Next technical target:
     but C++ still cannot be promoted because current-family physical runs still
     show lag jumps, residual after local correction, high CPU, and no physical
     timecode/Traktor proof.
+- Output-cycle flush alignment:
+  - Mainline writes mixed output to the USB timeline from `EndIOOperation`,
+    while C++ had also flushed early from `WriteMix` once expected streams were
+    present. That early flush can change when a cycle enters the output
+    timeline even when the CoreAudio `sampleTime` is the same.
+  - C++ now defaults `HAL_FLUSH_OUTPUT_IN_WRITE_MIX=0`, matching mainline's
+    end-of-cycle flush behavior. The old behavior remains available only as an
+    explicit diagnostic flag.
+  - This is a candidate timing change, not readiness evidence. It needs a
+    locked same-route physical music/CPU A/B before any quality or performance
+    claim.

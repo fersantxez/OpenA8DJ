@@ -3953,3 +3953,43 @@ Next implication:
 - The next product change should target stable latency/timebase behavior, not
   just faster USB enqueue code. A candidate must reduce lag jumps and residual
   after local correction while also lowering CPU.
+
+## 2026-06-17: Align Output Flush Timing With Mainline
+
+Decision:
+- Add `HAL_FLUSH_OUTPUT_IN_WRITE_MIX`, default `0`.
+- Keep output-cycle flush at `EndIOOperation` by default, matching mainline.
+- Keep the previous early `WriteMix` flush behavior as an explicit diagnostic
+  flag only.
+- Add the default to `static_policy_check` so accidental promotion of the early
+  flush fails offline gates.
+
+Reason:
+- The timebase audit found that C++ and mainline both consume CoreAudio
+  `mOutputTime.mSampleTime`, both default `HAL_USB_ZERO_TIMESTAMP=0`, and both
+  use the same `8192/4096/8192` output latency constants.
+- A real behavioral difference remained: C++ flushed output inside `WriteMix`
+  after expected streams arrived, while mainline waited until `EndIOOperation`.
+  That can shift when data enters the USB timeline within a cycle without
+  changing packet bytes or routing.
+- Aligning with mainline is a narrower, lower-risk timing hypothesis than
+  retrying already rejected sample-time follower, ignore-sample-time, explicit
+  scheduling, coalescing, or ISO64/q8 paths.
+
+Alternatives discarded:
+- Leave early flush as product default: rejected because it is a C++-specific
+  timing difference with no evidence that it improves quality.
+- Remove the early flush code entirely: rejected because it remains useful for
+  a controlled A/B if future evidence points back to it.
+- Claim improvement from compilation: rejected; this requires physical
+  real-music and CPU evidence.
+
+Evidence:
+- `make -B hal`
+- `./build/cpp-release/opena8djcpp_static_policy_check`
+
+Next implication:
+- Before promotion or readiness claims, run a locked physical same-route A/B
+  against the previous C++ baseline and mainline. Required wins: fewer lag
+  jumps, lower residual after local correction, strict music thresholds, and
+  CPU no worse than mainline.
