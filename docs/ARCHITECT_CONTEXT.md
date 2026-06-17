@@ -1641,5 +1641,8 @@ Next technical target:
   `20260617-iso12q8-irig-pairA-12s-cpp-hal` fails quality and CPU:
   quality `0.963395`, SNR floor `9.675760 dB`, lag jumps `32`, click outliers
   `1`, driver CPU p95 `16.6%`, and `coreaudiod` p95 `35.4%`.
+- The selected run has `fixture/reference.wav` and `captured.wav`; the
+  comparator marks native WAV reanalysis as `AVAILABLE_NOT_YET_USED`, so the
+  next implementation target is a native C++ reanalysis of those WAVs.
 - Offline gates pass, but this does not improve physical sound; it improves the
   integrity of the readiness claim.

@@ -30,6 +30,8 @@ struct RunStats {
   std::filesystem::path path;
   bool metrics_present = false;
   bool cpu_present = false;
+  bool reference_wav_present = false;
+  bool captured_wav_present = false;
   double quality = std::numeric_limits<double>::quiet_NaN();
   double snr = std::numeric_limits<double>::quiet_NaN();
   double mid = std::numeric_limits<double>::quiet_NaN();
@@ -215,6 +217,8 @@ RunStats read_run(const std::filesystem::path& path) {
   const std::string metrics = read_file(metrics_path);
   run.metrics_present = !metrics.empty();
   run.cpu_present = std::filesystem::is_regular_file(cpu_path);
+  run.reference_wav_present = std::filesystem::is_regular_file(path / "fixture/reference.wav");
+  run.captured_wav_present = std::filesystem::is_regular_file(path / "captured.wav");
   run.quality = number_or_nan(json_number(metrics, "quality_alignment_score"));
   run.snr = number_or_nan(min_present(json_number(metrics, "left_snr_db"),
                                       json_number(metrics, "right_snr_db")));
@@ -377,6 +381,14 @@ void print_run(const RunStats& run, const std::string& indent) {
             << ",\n";
   std::cout << indent << "  \"cpu_profile_present\": " << (run.cpu_present ? "true" : "false")
             << ",\n";
+  std::cout << indent << "  \"reference_wav_present\": "
+            << (run.reference_wav_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"captured_wav_present\": "
+            << (run.captured_wav_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"native_wav_reanalysis\": \""
+            << (run.reference_wav_present && run.captured_wav_present ? "AVAILABLE_NOT_YET_USED"
+                                                                       : "BLOCKED_MISSING_WAV")
+            << "\",\n";
   std::cout << indent << "  \"practical_pass\": " << (practical_pass(run) ? "true" : "false")
             << ",\n";
   std::cout << indent << "  \"quality_alignment_score\": ";
@@ -478,6 +490,8 @@ void print_superiority_report(const RunStats& candidate,
   std::cout << "  \"branch_promotion_supported\": " << (result ? "true" : "false") << ",\n";
   std::cout << "  \"candidate_evidence_present\": "
             << (candidate_evidence_present ? "true" : "false") << ",\n";
+  std::cout << "  \"analysis_source\": \"metrics_json_and_cpu_profile_tsv\",\n";
+  std::cout << "  \"native_wav_reanalysis_required_before_promotion\": true,\n";
   if (baseline_run) {
     std::cout << "  \"baseline\": ";
     print_run(*baseline_run, "  ");

@@ -440,6 +440,9 @@ Latest native product-superiority evidence:
   mid/high residual `1.653871/1.494546`, quiet mid `-34.529464 dBFS`,
   lag jumps `32`, click outliers `1`, driver CPU p95 `16.6%`, and
   `coreaudiod` p95 `35.4%`.
+- Comparator source is still `metrics_json_and_cpu_profile_tsv`. The selected
+  run has WAVs, but native WAV reanalysis is only marked
+  `AVAILABLE_NOT_YET_USED`; promotion still requires that analyzer layer.
 - Full offline gates still pass because this is an honest readiness report:
   Debug CTest `29/29`, Release CTest `30/30`, evidence schema `30/30`.
 

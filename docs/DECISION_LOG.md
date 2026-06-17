@@ -4709,6 +4709,9 @@ Reason:
 - The latest available same-run product evidence still fails both audiophile
   quality and CPU/resource thresholds, so the evidence bundle must say that
   plainly.
+- The selected run has raw WAV evidence available. The comparator now records
+  that native WAV reanalysis is `AVAILABLE_NOT_YET_USED`, so this is not
+  mistaken for a full independent C++ audio-quality analyzer.
 
 Alternatives discarded:
 - Leave the decision only in Python promotion scripts: rejected because the C++

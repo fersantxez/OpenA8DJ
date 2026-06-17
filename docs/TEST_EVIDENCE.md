@@ -7592,6 +7592,10 @@ Operational note:
     `1.653871/1.494546`, quiet mid `-34.529464 dBFS`, lag jumps `32`,
     click outliers `1`, clipping `0`, driver CPU p95 `16.6%`, and
     `coreaudiod` p95 `35.4%`.
+  - Source-trace update:
+    comparator uses `metrics.json` plus `cpu-profile.tsv`; the selected run has
+    both `fixture/reference.wav` and `captured.wav`, so native WAV reanalysis is
+    marked `AVAILABLE_NOT_YET_USED` and remains required before promotion.
   - Failed comparator gates:
     `music_quality_alignment`, `music_snr_floor_db`,
     `music_mid_residual_ratio`, `music_high_residual_ratio`,
