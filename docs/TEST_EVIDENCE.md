@@ -29,7 +29,7 @@
 - Result:
   - Offline gates PASS after adding timeline instrumentation:
     Debug CTest `17/17`, Release CTest `18/18`, stream-stats contract
-    `168` fields and `0` mismatches.
+    `196` fields and `0` mismatches.
   - Default direct USB run with raw monotonic timestamps still failed strict
     quality: alignment `0.936915`, SNR `8.82 dB`, mid/high residual
     `1.444318/1.419246`.
@@ -77,7 +77,7 @@
     `local-analysis/physical-stream-stats-raw-capture-playback/20260617T133414Z-fe668ef-retry`.
   - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-stream-stats-raw-capture-playback-physical.json`
 - Result:
-  - Stream-stats contract PASS: `168` HAL fields, `168` control-tool fields,
+  - Stream-stats contract PASS: `196` HAL fields, `196` control-tool fields,
     `0` mismatches, last field `captureTransfersCompletedRaw`.
   - Offline gates PASS.
   - Debug CTest: `100% tests passed, 0 tests failed out of 17`.
@@ -6216,3 +6216,60 @@ Operational note:
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/cpu-profile.tsv`
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`
   - `local-analysis/mainline-ab/20260617-sameday-ab-085735/final-runtime-after-force-unload.json`
+
+## 2026-06-17: Hot-Path Timing And Corrected Stream-Stats Denominators
+
+- Purpose:
+  - Measure callback-adjacent HAL cost without changing default product builds.
+  - Correct stream-stats evidence so raw transfer completions and sampled
+    transaction counters are not mixed.
+- Commands:
+  - `make hal build/opena8dj-control`
+  - `python3 -m py_compile scripts/analyze-stream-stats.py scripts/run-soundcheck scripts/check-stream-stats-contract.py`
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `make -B HAL_HOT_PATH_TIMING=1 hal build/opena8dj-control`
+  - `scripts/run-cpp-offline-gates`
+  - Locked physical run using `HAL_HOT_PATH_TIMING=1`, temporary HAL install,
+    Pair A playback through Open Audio 8 DJ, and iRig Stream capture.
+- Offline result:
+  - PASS.
+  - Debug CTest: `17/17`.
+  - Release CTest: `18/18`.
+  - Stream-stats contract: `196` fields, `0` mismatches.
+  - Offline evidence: `local-analysis/cpp-offline/current-offline-gates.json`.
+- Physical result:
+  - Safety load PASS.
+  - Soundcheck FAIL:
+    quality `0.970666`, SNR `10.78 dB`, lag jumps `19`,
+    mid/high residual `1.378008/1.352014`, quiet mid-band noise
+    `-31.35 dBFS`, clipping `0`.
+  - Hot-path average ticks:
+    capture handler `3755.08`, capture decode `6.05`, capture requeue
+    `1825.69`, playback queue `1862.70`, playback fill `289.26`,
+    playback enqueue `1493.53`, playback completion `20.14`.
+  - Corrected transfer accounting:
+    raw capture transfers `1000.35/s`, sampled capture transfers `62.43/s`,
+    playback completed `1000.22/s`, sampled playback transfers `62.43/s`.
+    Capture sampled transfer composition is about `4.36` valid transactions
+    and `3.64` zero-complete transactions per 8-slot transfer, with all `8.0`
+    slots classified.
+  - Interpretation:
+    this is not enough to justify a fixed full-8-slot OUT layout. At this
+    packet size/rate, full 8-slot playback every millisecond would over-read
+    output audio; any pacing fix must preserve ~48 kHz output consumption.
+- Safety:
+  - Hardware lock used.
+  - Final runtime isolation PASS: HAL inactive, lock absent, no forbidden
+    OpenA8DJ/mainline processes.
+- Decision:
+  - Keep `HAL_HOT_PATH_TIMING=0` by default.
+  - Treat this as diagnostic evidence only.
+  - C++ remains not ready for hardware-readiness claims, Traktor/timecode
+    claims, or branch promotion.
+- Evidence paths:
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/summary.txt`
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/safety/summary.txt`
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/soundcheck/summary.txt`
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/soundcheck/metrics.json`
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/stream-stats-summary.json`
+  - `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/runtime-isolation-final.json`

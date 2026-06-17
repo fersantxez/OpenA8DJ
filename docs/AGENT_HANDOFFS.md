@@ -2274,3 +2274,48 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Fix stream-stats/control-tool observability first, then continue
     cadence-preserving CPU reductions. Do not retry ISO64/coalescing as product
     candidates without a new physical-quality hypothesis.
+
+## Confucius: Transport Cadence Analyst - 2026-06-17
+
+- Mission:
+  - Compare C++ transport/cadence behavior with read-only mainline and explain
+    the corrected zero-complete capture pattern.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. Notes written to
+    `local-analysis/subagent-transport-cadence-notes.txt`.
+  - Integrated with architect-side stream-stats denominator correction and rate
+    analysis.
+- Findings:
+  - Mainline default build geometry is ISO64/q8 while the current C++ default
+    geometry is ISO8/q8.
+  - Capture and playback `firstFrameNumber`, isochronous options, completion
+    reuse defaults, fast ISO config defaults, and audio-param reset/start
+    intent are not the strongest divergences.
+  - Capture-paced playback propagates only non-zero capture completions into
+    playback requests. With ISO8, that gives roughly 4-5 playback
+    transactions per transfer in the latest physical run.
+- Architect interpretation:
+  - Exact ISO64/q8 has already been physically rejected for C++ quality, even
+    though it reduces CPU.
+  - The partial ISO8 layout also matches output-rate math; forcing all 8 slots
+    would over-read audio. The next candidate must preserve ~48 kHz output
+    consumption while improving quality and CPU.
+- Files affected by architect while waiting:
+  - `Makefile`
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/opena8dj-control.c`
+  - `scripts/run-soundcheck`
+  - `scripts/analyze-stream-stats.py`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/TEST_EVIDENCE.md`
+- Next recommended action:
+  - Do not repeat plain ISO64/q8. Investigate pacing/rate-preserving transport
+    smoothing only if it can be modelled offline first and then measured
+    under lock against physical quality and CPU.

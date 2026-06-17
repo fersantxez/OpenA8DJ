@@ -15,6 +15,7 @@ from pathlib import Path
 
 COUNTERS = [
     "captureTransfersCompleted",
+    "captureTransfersSampled",
     "captureTransactionErrors",
     "captureStatusFailures",
     "captureZeroCompleteTransactions",
@@ -24,6 +25,7 @@ COUNTERS = [
     "filteredCaptureTransactions",
     "playbackTransfersSubmitted",
     "playbackTransfersCompleted",
+    "playbackTransfersSampled",
     "playbackTransferErrors",
     "captureTransferPoolFallbackAllocations",
     "playbackTransferPoolFallbackAllocations",
@@ -64,6 +66,20 @@ COUNTERS = [
     "captureUSBTimestampZero",
     "playbackZeroCompleteTransactions",
     "playbackQueueAttempts",
+    "hotPathCaptureHandlerTicksSum",
+    "hotPathCaptureHandlerTicksSamples",
+    "hotPathCaptureDecodeTicksSum",
+    "hotPathCaptureDecodeTicksSamples",
+    "hotPathCaptureRequeueTicksSum",
+    "hotPathCaptureRequeueTicksSamples",
+    "hotPathPlaybackQueueTicksSum",
+    "hotPathPlaybackQueueTicksSamples",
+    "hotPathPlaybackFillTicksSum",
+    "hotPathPlaybackFillTicksSamples",
+    "hotPathPlaybackEnqueueTicksSum",
+    "hotPathPlaybackEnqueueTicksSamples",
+    "hotPathPlaybackCompletionTicksSum",
+    "hotPathPlaybackCompletionTicksSamples",
 ]
 
 
@@ -74,6 +90,20 @@ GAUGES = [
     "transferLedgerPlaybackFirstFrameMax",
     "playbackInFlightAtQueueMax",
     "playbackInFlightAtCompletionMax",
+    "hotPathCaptureHandlerTicksMin",
+    "hotPathCaptureHandlerTicksMax",
+    "hotPathCaptureDecodeTicksMin",
+    "hotPathCaptureDecodeTicksMax",
+    "hotPathCaptureRequeueTicksMin",
+    "hotPathCaptureRequeueTicksMax",
+    "hotPathPlaybackQueueTicksMin",
+    "hotPathPlaybackQueueTicksMax",
+    "hotPathPlaybackFillTicksMin",
+    "hotPathPlaybackFillTicksMax",
+    "hotPathPlaybackEnqueueTicksMin",
+    "hotPathPlaybackEnqueueTicksMax",
+    "hotPathPlaybackCompletionTicksMin",
+    "hotPathPlaybackCompletionTicksMax",
 ]
 
 
@@ -117,6 +147,14 @@ def delta(rows, key):
     if len(values) < 2:
         return math.nan
     return values[-1] - values[0]
+
+
+def average_timing(counters, prefix):
+    sum_delta = counters[f"{prefix}TicksSum"]["delta"]
+    samples_delta = counters[f"{prefix}TicksSamples"]["delta"]
+    if math.isfinite(sum_delta) and samples_delta > 0:
+        return sum_delta / samples_delta
+    return math.nan
 
 
 def load_rows(path):
@@ -163,8 +201,17 @@ def analyze(path):
         write_read_delta = math.nan
 
     capture_tx_delta = counters["captureTransfersCompleted"]["delta"]
+    capture_sampled_delta = counters["captureTransfersSampled"]["delta"]
+    capture_ratio_delta = capture_sampled_delta if capture_sampled_delta > 0 else capture_tx_delta
+    capture_ratio_denominator = "captureTransfersSampled" if capture_sampled_delta > 0 else "captureTransfersCompleted"
     capture_errors_delta = counters["captureTransactionErrors"]["delta"]
+    capture_expected_delta = counters["captureExpectedTransactions"]["delta"]
+    capture_zero_delta = counters["captureZeroCompleteTransactions"]["delta"]
     capture_error_per_transfer = (
+        capture_errors_delta / capture_ratio_delta
+        if math.isfinite(capture_errors_delta) and capture_ratio_delta > 0 else math.nan
+    )
+    capture_error_per_raw_transfer = (
         capture_errors_delta / capture_tx_delta
         if math.isfinite(capture_errors_delta) and capture_tx_delta > 0 else math.nan
     )
@@ -221,7 +268,9 @@ def analyze(path):
         "output_write_minus_read_frames_last": write_read_delta,
         "output_read_frames_per_second": counters["outputFramesRead"]["per_second"],
         "capture_transfers_per_second": counters["captureTransfersCompleted"]["per_second"],
+        "capture_transfers_sampled_per_second": counters["captureTransfersSampled"]["per_second"],
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
+        "playback_transfers_sampled_per_second": counters["playbackTransfersSampled"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,
         "capture_transfer_pool_fallback_allocations_per_second":
             counters["captureTransferPoolFallbackAllocations"]["per_second"],
@@ -241,26 +290,61 @@ def analyze(path):
             counters["playbackPayloadGuardChecks"]["per_second"],
         "playback_payload_guard_mismatches_per_second":
             counters["playbackPayloadGuardMismatches"]["per_second"],
+        "hot_path_average_ticks": {
+            "capture_handler": average_timing(counters, "hotPathCaptureHandler"),
+            "capture_decode": average_timing(counters, "hotPathCaptureDecode"),
+            "capture_requeue": average_timing(counters, "hotPathCaptureRequeue"),
+            "playback_queue": average_timing(counters, "hotPathPlaybackQueue"),
+            "playback_fill": average_timing(counters, "hotPathPlaybackFill"),
+            "playback_enqueue": average_timing(counters, "hotPathPlaybackEnqueue"),
+            "playback_completion": average_timing(counters, "hotPathPlaybackCompletion"),
+        },
+        "capture_transaction_ratio_denominator": capture_ratio_denominator,
+        "capture_expected_transactions_per_capture_transfer": (
+            capture_expected_delta / capture_ratio_delta
+            if math.isfinite(capture_expected_delta) and capture_ratio_delta > 0 else math.nan
+        ),
+        "capture_classified_transactions_per_capture_transfer": (
+            (capture_expected_delta + capture_zero_delta + counters["captureOtherByteCountTransactions"]["delta"]) /
+            capture_ratio_delta
+            if (math.isfinite(capture_expected_delta) and
+                math.isfinite(capture_zero_delta) and
+                math.isfinite(counters["captureOtherByteCountTransactions"]["delta"]) and
+                capture_ratio_delta > 0) else math.nan
+        ),
         "capture_transaction_errors_per_capture_transfer": capture_error_per_transfer,
+        "capture_transaction_errors_per_raw_capture_transfer": capture_error_per_raw_transfer,
+        "capture_transaction_errors_per_sampled_capture_transfer": (
+            capture_errors_delta / capture_sampled_delta
+            if math.isfinite(capture_errors_delta) and capture_sampled_delta > 0 else math.nan
+        ),
         "capture_status_failures_per_capture_transfer": (
-            counters["captureStatusFailures"]["delta"] / capture_tx_delta
-            if math.isfinite(counters["captureStatusFailures"]["delta"]) and capture_tx_delta > 0 else math.nan
+            counters["captureStatusFailures"]["delta"] / capture_ratio_delta
+            if math.isfinite(counters["captureStatusFailures"]["delta"]) and capture_ratio_delta > 0 else math.nan
         ),
         "capture_zero_complete_per_capture_transfer": (
+            counters["captureZeroCompleteTransactions"]["delta"] / capture_ratio_delta
+            if math.isfinite(counters["captureZeroCompleteTransactions"]["delta"]) and capture_ratio_delta > 0 else math.nan
+        ),
+        "capture_zero_complete_per_raw_capture_transfer": (
             counters["captureZeroCompleteTransactions"]["delta"] / capture_tx_delta
             if math.isfinite(counters["captureZeroCompleteTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
         ),
+        "capture_zero_complete_per_sampled_capture_transfer": (
+            counters["captureZeroCompleteTransactions"]["delta"] / capture_sampled_delta
+            if math.isfinite(counters["captureZeroCompleteTransactions"]["delta"]) and capture_sampled_delta > 0 else math.nan
+        ),
         "capture_other_size_per_capture_transfer": (
-            counters["captureOtherByteCountTransactions"]["delta"] / capture_tx_delta
-            if math.isfinite(counters["captureOtherByteCountTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
+            counters["captureOtherByteCountTransactions"]["delta"] / capture_ratio_delta
+            if math.isfinite(counters["captureOtherByteCountTransactions"]["delta"]) and capture_ratio_delta > 0 else math.nan
         ),
         "capture_short_per_capture_transfer": (
-            counters["captureShortTransfers"]["delta"] / capture_tx_delta
-            if math.isfinite(counters["captureShortTransfers"]["delta"]) and capture_tx_delta > 0 else math.nan
+            counters["captureShortTransfers"]["delta"] / capture_ratio_delta
+            if math.isfinite(counters["captureShortTransfers"]["delta"]) and capture_ratio_delta > 0 else math.nan
         ),
         "filtered_capture_per_capture_transfer": (
-            counters["filteredCaptureTransactions"]["delta"] / capture_tx_delta
-            if math.isfinite(counters["filteredCaptureTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
+            counters["filteredCaptureTransactions"]["delta"] / capture_ratio_delta
+            if math.isfinite(counters["filteredCaptureTransactions"]["delta"]) and capture_ratio_delta > 0 else math.nan
         ),
         "counters": counters,
         "gauges": gauges,

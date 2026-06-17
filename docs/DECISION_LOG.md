@@ -3782,3 +3782,53 @@ Evidence:
 - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/metrics.json`
 - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/cpu-profile.tsv`
 - `local-analysis/mainline-ab/20260617-sameday-ab-085735/final-runtime-after-force-unload.json`
+
+## 2026-06-17: Add Opt-In Hot-Path Timing And Fix Stream-Stats Denominators
+
+Decision:
+- Add `HAL_HOT_PATH_TIMING=1` as an opt-in diagnostic build flag, default off.
+- Export `captureTransfersSampled` and `playbackTransfersSampled` alongside
+  raw transfer counts.
+- Make `scripts/analyze-stream-stats.py` report which denominator it used for
+  capture transaction ratios and keep raw-vs-sampled ratios separate.
+- Do not treat hot-path timing builds as product-performance evidence.
+
+Reason:
+- CPU profiles showed the OpenA8DJ driver spends most time in USB enqueue /
+  completion work, but the prior evidence lacked precise callback section
+  timing.
+- Raw transfer counters and sampled transaction counters were being mixed in
+  summaries. That can hide or exaggerate capture transaction behavior.
+- The corrected locked run shows the real capture shape: about `1000.35` raw
+  capture transfers/s, `62.43` sampled transfers/s, and within sampled
+  transfers about `4.36` valid transactions plus `3.64` zero-complete
+  transactions per 8-slot transfer, with all `8.0` slots classified.
+- The partial capture-paced OUT layout is not automatically a defect: at
+  48 kHz and the current bytes-per-packet calculation, forcing all 8 slots
+  every millisecond would read output audio far faster than 48 kHz.
+- The same run still failed physical quality:
+  `quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps,
+  mid/high residual `1.378008/1.352014`, quiet mid-band noise `-31.35 dBFS`.
+
+Alternatives discarded:
+- Use the earlier raw denominator ratio (`0.227` zero-complete per raw
+  transfer) as the primary conclusion: rejected because the transaction
+  counters are sampled while raw completions are not.
+- Enable timing in default/product builds: rejected because it adds extra
+  accounting to callback-adjacent paths.
+- Claim a performance improvement from timing evidence: rejected because this
+  is instrumentation only and the physical quality gate still fails.
+
+Evidence:
+- `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/soundcheck/summary.txt`
+- `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/soundcheck/metrics.json`
+- `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/stream-stats-summary.json`
+- `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/runtime-isolation-final.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- The current product HAL is still not ready and still does not beat mainline.
+- Next transport experiments must improve physical quality and CPU without
+  violating the measured output read rate. Already-rejected paths remain
+  blocked: output-only, fixed OUT pacing, coalesced playback, ISO64/q8, and
+  `VALID_CAPTURE_OUT_LAYOUT=1`.

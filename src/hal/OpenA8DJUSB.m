@@ -193,6 +193,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ENABLE_HOT_STREAM_STATS 1
 #endif
 
+#ifndef OPENA8DJ_ENABLE_HOT_PATH_TIMING
+#define OPENA8DJ_ENABLE_HOT_PATH_TIMING 0
+#endif
+
 #ifndef OPENA8DJ_HOT_STREAM_STATS_INTERVAL
 #define OPENA8DJ_HOT_STREAM_STATS_INTERVAL 1
 #endif
@@ -578,6 +582,34 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackTransfersSubmitted;
     uint64_t playbackTransfersCompletedRaw;
     uint64_t captureTransfersCompletedRaw;
+    uint64_t hotPathCaptureHandlerTicksMin;
+    uint64_t hotPathCaptureHandlerTicksMax;
+    uint64_t hotPathCaptureHandlerTicksSum;
+    uint64_t hotPathCaptureHandlerTicksSamples;
+    uint64_t hotPathCaptureDecodeTicksMin;
+    uint64_t hotPathCaptureDecodeTicksMax;
+    uint64_t hotPathCaptureDecodeTicksSum;
+    uint64_t hotPathCaptureDecodeTicksSamples;
+    uint64_t hotPathCaptureRequeueTicksMin;
+    uint64_t hotPathCaptureRequeueTicksMax;
+    uint64_t hotPathCaptureRequeueTicksSum;
+    uint64_t hotPathCaptureRequeueTicksSamples;
+    uint64_t hotPathPlaybackQueueTicksMin;
+    uint64_t hotPathPlaybackQueueTicksMax;
+    uint64_t hotPathPlaybackQueueTicksSum;
+    uint64_t hotPathPlaybackQueueTicksSamples;
+    uint64_t hotPathPlaybackFillTicksMin;
+    uint64_t hotPathPlaybackFillTicksMax;
+    uint64_t hotPathPlaybackFillTicksSum;
+    uint64_t hotPathPlaybackFillTicksSamples;
+    uint64_t hotPathPlaybackEnqueueTicksMin;
+    uint64_t hotPathPlaybackEnqueueTicksMax;
+    uint64_t hotPathPlaybackEnqueueTicksSum;
+    uint64_t hotPathPlaybackEnqueueTicksSamples;
+    uint64_t hotPathPlaybackCompletionTicksMin;
+    uint64_t hotPathPlaybackCompletionTicksMax;
+    uint64_t hotPathPlaybackCompletionTicksSum;
+    uint64_t hotPathPlaybackCompletionTicksSamples;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1822,6 +1854,11 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
                  sumOffset:(size_t)sumOffset
              samplesOffset:(size_t)samplesOffset
                      delta:(uint64_t)delta;
+- (void)addHotPathTimingMinOffset:(size_t)minOffset
+                         maxOffset:(size_t)maxOffset
+                         sumOffset:(size_t)sumOffset
+                     samplesOffset:(size_t)samplesOffset
+                             delta:(uint64_t)delta;
 - (void)addTimingMinOffset:(size_t)minOffset
                  maxOffset:(size_t)maxOffset
                  sumOffset:(size_t)sumOffset
@@ -3153,6 +3190,33 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         _streamStats.playbackQueueFailureStartupSilenceFrames += outputStats->startupSilenceFrames;
     }
     pthread_mutex_unlock(&_streamStatsMutex);
+}
+
+- (void)addHotPathTimingMinOffset:(size_t)minOffset
+                         maxOffset:(size_t)maxOffset
+                         sumOffset:(size_t)sumOffset
+                     samplesOffset:(size_t)samplesOffset
+                             delta:(uint64_t)delta
+{
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    if (delta == 0) {
+        return;
+    }
+    pthread_mutex_lock(&_streamStatsMutex);
+    StreamStatsAddTimingLocked(&_streamStats,
+                               minOffset,
+                               maxOffset,
+                               sumOffset,
+                               samplesOffset,
+                               delta);
+    pthread_mutex_unlock(&_streamStatsMutex);
+#else
+    (void)minOffset;
+    (void)maxOffset;
+    (void)sumOffset;
+    (void)samplesOffset;
+    (void)delta;
+#endif
 }
 
 - (void)addTimingMinOffset:(size_t)minOffset
@@ -5024,6 +5088,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   transactions:(IOUSBHostIsochronousTransaction *)transactions
 {
     uint64_t captureCompletionTime = mach_absolute_time();
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathCaptureStartTime = captureCompletionTime;
+    uint64_t hotPathDecodeTicks = 0;
+    uint64_t hotPathRequeueTicks = 0;
+#endif
     uint64_t captureCompletionDelta = 0;
     if (_lastCaptureCompletionHostTime != 0 && captureCompletionTime > _lastCaptureCompletionHostTime) {
         captureCompletionDelta = captureCompletionTime - _lastCaptureCompletionHostTime;
@@ -5143,7 +5212,16 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
             [self appendDiagnosticPackedInputBytes:captureBytes + transaction->offset length:count];
 #endif
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+            uint64_t hotPathDecodeStartTime = mach_absolute_time();
+#endif
             uint32_t decodedFrames = [self decodeCaptureBytes:captureBytes + transaction->offset length:count];
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+            uint64_t hotPathDecodeEndTime = mach_absolute_time();
+            if (hotPathDecodeEndTime > hotPathDecodeStartTime) {
+                hotPathDecodeTicks += hotPathDecodeEndTime - hotPathDecodeStartTime;
+            }
+#endif
             [self updateClockAnchorWithUSBTime:transaction->timeStamp decodedFrames:decodedFrames];
             captureTransactions++;
             captureByteCount += count;
@@ -5325,7 +5403,16 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 
     [self releasePooledTransfer:transfer];
     if (atomic_load(&_streaming) && [self captureISOEnabled]) {
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+        uint64_t hotPathRequeueStartTime = mach_absolute_time();
+#endif
         [self queueCaptureTransfer];
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+        uint64_t hotPathRequeueEndTime = mach_absolute_time();
+        if (hotPathRequeueEndTime > hotPathRequeueStartTime) {
+            hotPathRequeueTicks = hotPathRequeueEndTime - hotPathRequeueStartTime;
+        }
+#endif
     }
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
     if (playbackRequestCount > 0 && atomic_load(&_streaming)) {
@@ -5346,6 +5433,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             }
         }
     }
+#endif
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathCaptureEndTime = mach_absolute_time();
+    if (hotPathCaptureEndTime > hotPathCaptureStartTime) {
+        [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureHandlerTicksMin)
+                              maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureHandlerTicksMax)
+                              sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureHandlerTicksSum)
+                          samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureHandlerTicksSamples)
+                                  delta:hotPathCaptureEndTime - hotPathCaptureStartTime];
+    }
+    [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureDecodeTicksMin)
+                          maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureDecodeTicksMax)
+                          sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureDecodeTicksSum)
+                      samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureDecodeTicksSamples)
+                              delta:hotPathDecodeTicks];
+    [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureRequeueTicksMin)
+                          maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureRequeueTicksMax)
+                          sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureRequeueTicksSum)
+                      samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureRequeueTicksSamples)
+                              delta:hotPathRequeueTicks];
 #endif
 }
 
@@ -5552,6 +5659,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 
 - (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count
 {
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackQueueStartTime = mach_absolute_time();
+    uint64_t hotPathPlaybackFillTicks = 0;
+    uint64_t hotPathPlaybackEnqueueTicks = 0;
+#endif
     if (!atomic_load(&_streaming) || _playbackPipe == nil || requests == NULL || count == 0) {
         return NO;
     }
@@ -5580,9 +5692,18 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     }
     uint64_t firstFrameNumber = [self nextPlaybackFirstFrameNumberForCount:count];
     OpenA8DJOutputFillStats outputStats = {0};
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackFillStartTime = mach_absolute_time();
+#endif
     [self fillPlaybackBytes:transfer.data.mutableBytes
                      length:transfer.data.length
                 outputStats:&outputStats];
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackFillEndTime = mach_absolute_time();
+    if (hotPathPlaybackFillEndTime > hotPathPlaybackFillStartTime) {
+        hotPathPlaybackFillTicks = hotPathPlaybackFillEndTime - hotPathPlaybackFillStartTime;
+    }
+#endif
 #if OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
     transfer.playbackPayloadLength = transfer.data.length;
     transfer.playbackPayloadDigest = PlaybackPayloadDigest(transfer.data.bytes, transfer.data.length);
@@ -5644,6 +5765,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                    shortTransactions:0
                           outputStats:&outputStats];
 #endif
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackEnqueueStartTime = mach_absolute_time();
+#endif
     BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
                                           transactionList:transactions
                                      transactionListCount:transfer.transactionCount
@@ -5651,6 +5775,12 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                                   options:IOUSBHostIsochronousTransferOptionsNone
                                                     error:&error
                                         completionHandler:completionHandler];
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackEnqueueEndTime = mach_absolute_time();
+    if (hotPathPlaybackEnqueueEndTime > hotPathPlaybackEnqueueStartTime) {
+        hotPathPlaybackEnqueueTicks = hotPathPlaybackEnqueueEndTime - hotPathPlaybackEnqueueStartTime;
+    }
+#endif
     if (!queued) {
         atomic_fetch_sub(&_playbackTransfersInFlight, 1);
         [self releasePooledTransfer:transfer];
@@ -5682,6 +5812,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                               value:(uint32_t)transfer.data.length
                               extra:atomic_load(&_playbackTransfersInFlight)];
 #endif
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackQueueEndTime = mach_absolute_time();
+    if (hotPathPlaybackQueueEndTime > hotPathPlaybackQueueStartTime) {
+        [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackQueueTicksMin)
+                              maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackQueueTicksMax)
+                              sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackQueueTicksSum)
+                          samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackQueueTicksSamples)
+                                  delta:hotPathPlaybackQueueEndTime - hotPathPlaybackQueueStartTime];
+    }
+    [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackFillTicksMin)
+                          maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackFillTicksMax)
+                          sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackFillTicksSum)
+                      samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackFillTicksSamples)
+                              delta:hotPathPlaybackFillTicks];
+    [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackEnqueueTicksMin)
+                          maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackEnqueueTicksMax)
+                          sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackEnqueueTicksSum)
+                      samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackEnqueueTicksSamples)
+                              delta:hotPathPlaybackEnqueueTicks];
+#endif
     return YES;
 }
 
@@ -5690,6 +5840,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                    transactions:(IOUSBHostIsochronousTransaction *)transactions
 {
     uint64_t playbackCompletionTime = mach_absolute_time();
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackCompletionStartTime = playbackCompletionTime;
+#endif
     uint64_t playbackCompletionDelta = 0;
     if (_lastPlaybackCompletionHostTime != 0 && playbackCompletionTime > _lastPlaybackCompletionHostTime) {
         playbackCompletionDelta = playbackCompletionTime - _lastPlaybackCompletionHostTime;
@@ -5856,6 +6009,16 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #elif OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
     if (atomic_load(&_streaming) && ![self captureISOEnabled]) {
         [self fillPlaybackQueue];
+    }
+#endif
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathPlaybackCompletionEndTime = mach_absolute_time();
+    if (hotPathPlaybackCompletionEndTime > hotPathPlaybackCompletionStartTime) {
+        [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackCompletionTicksMin)
+                              maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackCompletionTicksMax)
+                              sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackCompletionTicksSum)
+                          samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathPlaybackCompletionTicksSamples)
+                                  delta:hotPathPlaybackCompletionEndTime - hotPathPlaybackCompletionStartTime];
     }
 #endif
 }

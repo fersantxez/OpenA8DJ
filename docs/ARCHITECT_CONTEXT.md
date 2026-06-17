@@ -16,9 +16,26 @@ Branch: `driverkit/cpp-redesign`
   collapse physical quality. Runtime isolation after cleanup is clean.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
-  `OpenA8DJStreamStatsPayload` field list (`168` fields, `0` mismatches in the
+  `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the
   latest run). This removes stale-tool/payload-drift as an avoidable
   explanation before hardware runs.
+- 2026-06-17 hot-path timing is now opt-in (`HAL_HOT_PATH_TIMING=1`) and off
+  by default. A locked iRig run showed physical quality still FAILs
+  (`quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps) and
+  showed the dominant callback-adjacent cost is USB enqueue/requeue, not
+  sample packing: average ticks were capture handler `3755`, capture requeue
+  `1826`, playback enqueue `1494`, playback fill `289`, playback completion
+  `20`.
+- Stream-stats analysis now exports raw and sampled transfer denominators
+  separately. The corrected capture view for the same run is about `1000.35`
+  raw capture transfers/s and `62.43` sampled transfers/s; among sampled
+  transfers, capture has about `4.36` valid transactions and `3.64`
+  zero-complete transactions per 8-slot transfer, with all `8.0` slots
+  classified. Do not compare sampled transaction counters against raw transfer
+  counts. Also do not assume the partial layout is automatically a bug: at
+  48 kHz, queuing all 8 slots every millisecond would read roughly 88k output
+  frames/s, while the observed partial layout corresponds to the measured
+  ~48k output read rate.
 - Raw capture/playback completion telemetry is now fixed. Locked short iRig
   runs changed reported playback submitted/completed from `8131/508` to
   `8123/8123`, then corrected capture/playback comparison to
@@ -1386,3 +1403,15 @@ Next technical target:
     no branch promotion, no Legacy move, and no timecode readiness claim.
     Optimization must now target product HAL CPU and physical alignment/quality
     directly.
+- Transport cadence subagent finding:
+  - C++ ISO8 default versus mainline ISO64 default is the major build-geometry
+    divergence, but the exact C++ ISO64/q8 candidate was already physically
+    rejected (`quality_alignment_score` around `0.67`, SNR below `0 dB`).
+  - Capture/playback `firstFrameNumber=0`, `IOUSBHostIsochronousTransferOptionsNone`,
+    default completion handler reuse off, fast ISO config off, and audio-param
+    reset/start intent are aligned enough that they are not the immediate
+    divergence.
+  - Next experiments must respect audio-rate math. Forcing full OUT request
+    layouts from ISO8 capture-paced completions would over-read output audio;
+    any smoothing/coalescing idea must prove average output frames/s,
+    physical quality, and CPU against mainline.
