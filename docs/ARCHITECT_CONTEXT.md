@@ -1554,3 +1554,14 @@ Next technical target:
   - Still missing:
     routing/timecode-profile batch policy over the backend, real USB adapter,
     and physical proof against mainline.
+- Prepared transport routing/timecode contract:
+  - Added `opena8djcpp_prepared_transport_routing_timecode_contract`.
+  - It validates S24 playback routing through the prepared backend and validates
+    timecode-vinyl, timecode-cd-line, and phono profiles for decks A/B/C/D after
+    Mode2 decode and backend capture-ring traversal.
+  - Current evidence:
+    `12` profile/deck rows PASS, playback routing PASS with `0` mismatches,
+    `0` HAL steady requeues, and `0` fallback allocations.
+  - Still missing:
+    real DriverKit/USB adapter, physical quality and CPU proof, recovery, and
+    same-session mainline comparison.

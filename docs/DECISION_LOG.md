@@ -4369,3 +4369,37 @@ Next implication:
 - The backend now has offline proof for Mode2 packet/ring movement. The next
   missing layer is routing/timecode-profile batch policy over this backend, then
   a real DriverKit/USB adapter when environment and lock window allow.
+
+## 2026-06-17: Add Prepared Transport Routing/Timecode Contract
+
+Decision:
+- Add S24 batch routing in the pure C++ core.
+- Add `tools/prepared_transport_routing_timecode_contract.cpp` and wire it into
+  CTest plus `scripts/run-cpp-offline-gates`.
+
+Reason:
+- Packet/ring movement alone does not prove the product path preserves deck
+  identity or DVS/timecode behavior.
+- The new gate validates playback routing through `PreparedTransportBackend`
+  and validates timecode-vinyl, timecode-cd-line, and phono profiles across
+  decks A/B/C/D after Mode2 decode and backend capture-ring traversal.
+- This keeps the next DriverKit/USB candidate bound to the behavior that
+  matters for Traktor/timecode without touching hardware.
+
+Alternatives discarded:
+- Rely on the existing standalone DVS packet gate only: rejected because it
+  bypasses the prepared backend/ring path.
+- Defer deck/profile validation to physical Traktor: rejected because the
+  mapping and profile invariants are testable offline first.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json`
+- Current result:
+  playback routing PASS with `0` mismatches; `12` profile/deck rows PASS;
+  `hal_steady_requeues=0`; `fallback_allocations=0`.
+
+Next implication:
+- The C++ core now has offline proof for packet, ring, routing, and timecode
+  profile flow over the prepared backend. Remaining blockers are a real
+  DriverKit/USB adapter, physical quality/CPU evidence, recovery validation,
+  and same-session mainline comparison.

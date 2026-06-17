@@ -187,6 +187,34 @@ void test_advanced_routing_matrix() {
   assert(!route_interleaved_f32(input, output, frames, invalid));
 }
 
+void test_s24_routing_batch() {
+  std::array<S24Frame, 3> input{};
+  std::array<S24Frame, 3> output{};
+  for (std::uint32_t frame = 0; frame < input.size(); ++frame) {
+    for (std::uint32_t channel = 0; channel < kOutputChannels; ++channel) {
+      input[frame][channel] = static_cast<std::int32_t>((frame * 100U) + channel);
+    }
+  }
+
+  const RoutingPlan reversed(RoutingMatrix(RoutingMatrix::Mapping{7, 6, 5, 4, 3, 2, 1, 0}));
+  assert(route_s24_frames(input, output, reversed));
+  for (std::uint32_t frame = 0; frame < input.size(); ++frame) {
+    assert(output[frame][0] == input[frame][7]);
+    assert(output[frame][7] == input[frame][0]);
+  }
+
+  const RoutingMatrix muted(RoutingMatrix::muted());
+  assert(route_s24_frames(input, output, muted));
+  for (const auto& frame : output) {
+    for (const auto sample : frame) {
+      assert(sample == 0);
+    }
+  }
+
+  const RoutingMatrix invalid(RoutingMatrix::Mapping{0, 1, 2, 3, 4, 5, 6, kInputChannels});
+  assert(!route_s24_frames(input, output, invalid));
+}
+
 S24Frame synthetic_s24_frame(std::uint32_t frame_index) {
   S24Frame frame{};
   for (std::uint32_t channel = 0; channel < kOutputChannels; ++channel) {
@@ -586,6 +614,7 @@ int main() {
   test_identity_routing();
   test_custom_and_invalid_routing();
   test_advanced_routing_matrix();
+  test_s24_routing_batch();
   test_s24_big_endian_conversion();
   test_mode2_roundtrip_all_start_bytes();
   test_mode2_decode_into_matches_allocating_decoder();

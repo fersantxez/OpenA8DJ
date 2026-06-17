@@ -54,4 +54,36 @@ bool route_interleaved_f32(std::span<const float> input,
   return true;
 }
 
+bool route_s24_frames(std::span<const S24Frame> input,
+                      std::span<S24Frame> output,
+                      const RoutingMatrix& routing) {
+  const RoutingPlan plan(routing);
+  return route_s24_frames(input, output, plan);
+}
+
+bool route_s24_frames(std::span<const S24Frame> input,
+                      std::span<S24Frame> output,
+                      const RoutingPlan& plan) {
+  if (!plan.valid() || output.size() < input.size()) {
+    return false;
+  }
+
+  if (plan.is_identity()) {
+    std::copy(input.begin(), input.end(), output.begin());
+    return true;
+  }
+
+  const auto& routes = plan.routes();
+  for (std::size_t frame = 0; frame < input.size(); ++frame) {
+    for (std::uint32_t output_channel = 0; output_channel < kOutputChannels; ++output_channel) {
+      const auto route = routes[output_channel];
+      output[frame][output_channel] =
+          route.is_muted()
+              ? 0
+              : input[frame][route.source_channel] * static_cast<std::int32_t>(route.gain);
+    }
+  }
+  return true;
+}
+
 }  // namespace opena8djcpp

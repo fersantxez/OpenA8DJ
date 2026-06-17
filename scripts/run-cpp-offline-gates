@@ -37,6 +37,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
+./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
@@ -95,6 +96,7 @@ surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
+prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
 static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
@@ -301,6 +303,16 @@ summary = {
         "channel_identity_failures": prepared_transport_packet.get("channel_identity_failures"),
         "product_safe": prepared_transport_packet.get("product_safe"),
         "evidence": "local-analysis/cpp-offline/prepared-transport-packet-contract.json",
+    },
+    "prepared_transport_routing_timecode_contract": {
+        "status": prepared_transport_routing_timecode.get("result"),
+        "schema": prepared_transport_routing_timecode.get("schema"),
+        "playback_routing": prepared_transport_routing_timecode.get("playback_routing"),
+        "rows": prepared_transport_routing_timecode.get("row_count"),
+        "failures": prepared_transport_routing_timecode.get("failures"),
+        "hal_steady_requeues": prepared_transport_routing_timecode.get("hal_steady_requeues"),
+        "fallback_allocations": prepared_transport_routing_timecode.get("fallback_allocations"),
+        "evidence": "local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json",
     },
     "static_policy": {
         "status": static.get("result"),

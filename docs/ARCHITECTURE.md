@@ -86,3 +86,18 @@ integration layer on top of `PreparedTransportBackend`:
 
 This remains an offline model. The future DriverKit/USB adapter must preserve
 the same invariants when the bytes come from hardware.
+
+## Routing And Timecode Over Prepared Transport
+
+`opena8djcpp_prepared_transport_routing_timecode_contract` validates behavior
+above the packet/ring layer:
+
+- S24 playback batches can be routed before entering the prepared backend.
+- Routed playback batches emerge from the backend with zero channel mismatches.
+- Timecode-vinyl, timecode-cd-line, and phono profile captures are decoded,
+  passed through the backend capture ring, converted according to profile
+  source maps, and analyzed per deck.
+- Decks A/B/C/D must remain isolated; leakage RMS must stay at zero in the
+  synthetic fixture.
+
+This is the offline contract for Traktor/timecode behavior before hardware.

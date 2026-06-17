@@ -1781,3 +1781,18 @@ Current status:
 - PASS offline with default `start_byte=4`, transfer bytes `352`, `12`
   transfers, `131` capture decoded frames, and `131` playback decoded frames.
 - This is still not physical readiness and not a better-than-mainline claim.
+
+## 2026-06-17 Prepared Transport Routing/Timecode Gate
+
+Required for routing/timecode integration:
+- `opena8djcpp_prepared_transport_routing_timecode_contract` must PASS.
+- Playback routing mismatches must be `0`.
+- Timecode-vinyl, timecode-cd-line, and phono must pass for decks A/B/C/D.
+- HAL steady-state requeues must be `0`.
+- Fallback allocations must be `0`.
+- Synthetic deck leakage RMS must be `0`.
+
+Current status:
+- PASS offline with `12` profile/deck rows, playback routing PASS,
+  `0` mismatches, `0` HAL steady requeues, and `0` fallback allocations.
+- This is still not physical Traktor readiness; it is an offline prerequisite.

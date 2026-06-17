@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
       root / "tools/transport_budget_model.cpp",
       root / "tools/driverkit_prepared_transport_contract.cpp",
       root / "tools/prepared_transport_packet_contract.cpp",
+      root / "tools/prepared_transport_routing_timecode_contract.cpp",
       root / "tools/driverkit_surface_model.cpp",
       root / "tools/evidence_schema_check.cpp",
       root / "tools/static_policy_check.cpp",

@@ -771,3 +771,37 @@ PASS/FAIL semantics:
 - PASS means packet pack/decode and prepared transport rings agree offline.
 - PASS does not mean hardware, DriverKit, or physical sound quality is ready.
 - FAIL blocks the prepared transport path before physical testing.
+
+## Offline Prepared Transport Routing/Timecode Contract
+
+Purpose:
+
+- verify that playback routing and timecode profile/deck capture behavior still
+  hold when routed through `PreparedTransportBackend`.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_prepared_transport_routing_timecode_contract
+./build/cpp-offline/opena8djcpp_prepared_transport_routing_timecode_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json`;
+- `prepared_transport_routing_timecode_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means routing and synthetic timecode profile/deck behavior survive the
+  prepared backend path offline.
+- PASS does not mean Traktor, hardware, or physical sound quality is ready.
+- FAIL blocks the prepared transport path before physical testing.

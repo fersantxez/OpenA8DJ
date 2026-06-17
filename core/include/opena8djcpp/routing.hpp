@@ -1,6 +1,7 @@
 #pragma once
 
 #include "opena8djcpp/audio_model.hpp"
+#include "opena8djcpp/mode2_packet.hpp"
 
 #include <array>
 #include <cstdint>
@@ -135,5 +136,13 @@ bool route_interleaved_f32(std::span<const float> input,
                            std::span<float> output,
                            std::uint32_t frames,
                            const RoutingPlan& plan);
+
+bool route_s24_frames(std::span<const S24Frame> input,
+                      std::span<S24Frame> output,
+                      const RoutingPlan& plan);
+
+bool route_s24_frames(std::span<const S24Frame> input,
+                      std::span<S24Frame> output,
+                      const RoutingMatrix& routing);
 
 }  // namespace opena8djcpp

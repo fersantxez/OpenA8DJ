@@ -457,3 +457,17 @@ The prepared transport backend now accepts and emits bounded `S24Frame` spans:
 `opena8djcpp_prepared_transport_packet_contract` proves this path with Mode2
 pack/decode bytes outside the hot path. A real backend must keep the same span
 API allocation-free after stream start.
+
+## Routing And Timecode Batch Boundary
+
+S24 routing is now available as a bounded batch operation. The prepared
+transport timecode gate exercises:
+
+- playback routing before publishing to the backend playback ring;
+- Mode2 decode into S24 capture frames;
+- backend capture-ring traversal;
+- profile source-map conversion to float timecode input;
+- per-deck timecode analysis with zero leakage in the synthetic fixture.
+
+No logs, allocations, or system calls are required in the modeled real-time
+boundary.

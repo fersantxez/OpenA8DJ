@@ -6997,3 +6997,66 @@ Operational note:
   - Readiness remains blocked by routing/timecode-profile batch policy over the
     backend, a real DriverKit/USB adapter, and physical same-session proof
     against mainline.
+
+## 2026-06-17 Prepared Transport Routing/Timecode Contract
+
+- Purpose:
+  - Validate playback routing and timecode profile/deck capture behavior through
+    `PreparedTransportBackend`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_core_tests opena8djcpp_prepared_transport_routing_timecode_contract`
+  - `./build/cpp-offline/opena8djcpp_core_tests`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_routing_timecode_contract`
+- Result:
+  - PASS.
+  - Playback routing: PASS, `mismatches=0`.
+  - Profile/deck rows: `12`.
+  - Failures: `0`.
+  - HAL steady requeues: `0`.
+  - Fallback allocations: `0`.
+  - Each profile/deck row wrote `1023` frames with frequency error `0`,
+    jitter p95 `0`, and leakage RMS `0`.
+- Safety:
+  - Offline packet/core model only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json`
+- Interpretation:
+  - The prepared backend now has offline proof for routing and synthetic
+    timecode profile/deck behavior.
+  - This is not a physical Traktor or vinyl-readiness pass.
+
+## 2026-06-17 Offline Gates After Routing/Timecode Prepared Transport
+
+- Purpose:
+  - Verify routing/timecode prepared transport integration, packet/ring
+    integration, static policy, and the existing offline surface together.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `21/21` passed.
+  - Release CTest: `22/22` passed.
+  - Prepared routing/timecode contract: PASS, `rows=12`, `failures=0`,
+    playback routing PASS with `0` mismatches, `hal_steady_requeues=0`,
+    `fallback_allocations=0`.
+  - Static policy: PASS, `audited_files=16`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-routing-timecode-prepared-transport`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json`
+  - `local-analysis/audio-stack-guard/final-after-routing-timecode-prepared-transport`
+- Interpretation:
+  - Offline routing/timecode integration remains green.
+  - Readiness remains blocked by a real DriverKit/USB adapter, recovery and
+    physical same-session quality/CPU proof against mainline.
