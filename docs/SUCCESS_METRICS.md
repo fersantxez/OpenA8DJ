@@ -1796,3 +1796,22 @@ Current status:
 - PASS offline with `12` profile/deck rows, playback routing PASS,
   `0` mismatches, `0` HAL steady requeues, and `0` fallback allocations.
 - This is still not physical Traktor readiness; it is an offline prerequisite.
+
+## 2026-06-17 Prepared Transport Recovery Gate
+
+Required for restart/recovery hygiene:
+- `opena8djcpp_prepared_transport_recovery_contract` must PASS.
+- Invalid configs must be rejected and leave the backend not started.
+- A backend that was never started must not report `product_safe`.
+- Operations after `stop()` must return `false`/`0` and preserve caller output
+  buffers.
+- Restart must produce `0` stale capture/playback frame mismatches.
+- Restart must reset counters and timestamp history; a lower timestamp in the
+  new session must not count as a regression.
+- Final clean-session counters must report `0` HAL steady requeues, `0`
+  fallback allocations, `0` ring overruns/underruns, and `product_safe=true`.
+
+Current status:
+- PASS offline in the focused build run.
+- This is not physical recovery readiness; it is a required offline prerequisite
+  for a future DriverKit/USB adapter and locked hardware recovery test.

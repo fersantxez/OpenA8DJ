@@ -132,6 +132,9 @@ std::uint32_t PreparedTransportBackend::hal_read_capture(std::span<S24Frame> fra
 
 PreparedTransportSafety PreparedTransportBackend::safety() const {
   PreparedTransportSafety out{};
+  if (!started_) {
+    return out;
+  }
   out.prepared_slots_only = counters_.fallback_allocations == 0;
   out.cadence_safe =
       counters_.max_completion_gap_ratio <= kPreparedTransportMaxCompletionGapRatio &&

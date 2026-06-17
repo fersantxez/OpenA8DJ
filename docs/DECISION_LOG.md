@@ -4403,3 +4403,42 @@ Next implication:
   profile flow over the prepared backend. Remaining blockers are a real
   DriverKit/USB adapter, physical quality/CPU evidence, recovery validation,
   and same-session mainline comparison.
+
+## 2026-06-17: Add Prepared Transport Recovery Contract
+
+Decision:
+- Add `tools/prepared_transport_recovery_contract.cpp` and wire it into CTest,
+  `scripts/run-cpp-offline-gates`, and static policy.
+- Make `PreparedTransportBackend::safety()` return all-false when the backend
+  is not started.
+
+Reason:
+- Packet/routing/timecode gates prove steady-state behavior, but not recovery.
+  A product driver must survive stop/start and invalid configuration attempts
+  without carrying stale frames, timestamp history, or counters into a new
+  stream session.
+- A never-started instance previously had all counters at zero, which could
+  look product-safe if a caller only checked `safety().product_safe`. That is a
+  false readiness signal, so the safety contract now requires an active
+  session.
+
+Alternatives discarded:
+- Treat recovery as physical-only: rejected because stale rings, invalid
+  config handling, stopped operations, and timestamp-history reset are
+  deterministic offline invariants.
+- Leave `safety()` counter-only: rejected because zero counters before start are
+  not product evidence.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-transport-recovery-contract.json`
+- Required result:
+  invalid config failures `0`, false unstarted safe failures `0`, stopped
+  operation failures `0`, stale frame mismatches `0`, counter reset failures
+  `0`, timestamp reset failures `0`, HAL steady requeues `0`, fallback
+  allocations `0`, and final clean-session `product_safe=true`.
+
+Next implication:
+- The prepared backend now has offline proof for steady-state packet/routing/
+  timecode behavior and restart hygiene. Remaining blockers are a real
+  DriverKit/USB adapter and physical same-session quality/CPU proof against
+  mainline.

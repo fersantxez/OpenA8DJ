@@ -471,3 +471,27 @@ transport timecode gate exercises:
 
 No logs, allocations, or system calls are required in the modeled real-time
 boundary.
+
+## Recovery Boundary
+
+Prepared transport recovery must be a control-plane operation, not a callback
+operation:
+
+- invalid stream configs fail closed before any prepared-slot counters are
+  published;
+- `stop()` prevents all HAL/backend operations and clears prepared rings;
+- `start()` for a new session clears capture/playback rings, counters, and
+  timestamp history;
+- a backend that is not started cannot report `product_safe`;
+- no stale capture or playback frames may cross from one stream session into
+  the next.
+
+Offline gate:
+
+- `opena8djcpp_prepared_transport_recovery_contract`.
+- Required result has zero invalid-config failures, zero false unstarted-safe
+  failures, zero stopped-operation failures, zero stale-frame mismatches, zero
+  counter-reset failures, and zero timestamp-reset failures.
+
+This is still an offline model. A real DriverKit adapter must satisfy the same
+contract before a locked hardware recovery test is requested.

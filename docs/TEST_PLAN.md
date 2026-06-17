@@ -805,3 +805,39 @@ PASS/FAIL semantics:
   prepared backend path offline.
 - PASS does not mean Traktor, hardware, or physical sound quality is ready.
 - FAIL blocks the prepared transport path before physical testing.
+
+## Offline Prepared Transport Recovery Contract
+
+Purpose:
+
+- verify lifecycle hygiene around invalid config, stop, restart, counters,
+  timestamps, and stale-frame isolation for `PreparedTransportBackend`.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_prepared_transport_recovery_contract
+./build/cpp-offline/opena8djcpp_prepared_transport_recovery_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/prepared-transport-recovery-contract.json`;
+- `prepared_transport_recovery_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means invalid starts fail closed, stopped operations are blocked,
+  unstarted safety is not falsely product-safe, restart clears stale frames,
+  and counters/timestamp history reset for the new session.
+- PASS does not mean hardware recovery, DriverKit recovery, or physical sound
+  quality is ready.
+- FAIL blocks the prepared transport path before physical testing.

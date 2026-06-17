@@ -2502,3 +2502,32 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Next recommended action:
   - Implement an offline DriverKit transport contract/model first, then only
     request a locked physical window if all offline gates pass.
+
+## Sagan: Prepared Transport Recovery Reviewer - 2026-06-17
+
+- Mission:
+  - Read-only review of `PreparedTransportBackend` lifecycle invariants and
+    recommended checks for a recovery contract.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+  - Architect integrated the findings into
+    `tools/prepared_transport_recovery_contract.cpp` and
+    `PreparedTransportBackend::safety()`.
+- Findings:
+  - Existing tests proved stable flow but not restart as a barrier against
+    stale frames, old counters, or old timestamp history.
+  - A never-started backend could look product-safe if safety stayed
+    counter-only; that needed an explicit rejection.
+  - The recovery gate should cover invalid configs, post-stop operation
+    rejection, restart counter reset, timestamp-history reset, stale-frame
+    isolation, and explicit invalid-restart policy.
+- Next recommended action:
+  - Keep recovery as an offline gate and require the future real DriverKit/USB
+    adapter to satisfy the same contract before any locked hardware recovery
+    window.

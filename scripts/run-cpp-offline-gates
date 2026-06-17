@@ -38,6 +38,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
+./build/cpp-release/opena8djcpp_prepared_transport_recovery_contract | tee "$EVIDENCE_DIR/prepared-transport-recovery-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
@@ -97,6 +98,7 @@ driverkit_shell = load_json("driverkit-shell-contract.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
 prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
+prepared_transport_recovery = load_json("prepared-transport-recovery-contract.json")
 static = load_json("static-policy.json")
 hardware_lock_policy = load_json("hardware-lock-policy.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
@@ -313,6 +315,25 @@ summary = {
         "hal_steady_requeues": prepared_transport_routing_timecode.get("hal_steady_requeues"),
         "fallback_allocations": prepared_transport_routing_timecode.get("fallback_allocations"),
         "evidence": "local-analysis/cpp-offline/prepared-transport-routing-timecode-contract.json",
+    },
+    "prepared_transport_recovery_contract": {
+        "status": prepared_transport_recovery.get("result"),
+        "schema": prepared_transport_recovery.get("schema"),
+        "invalid_config_failures": prepared_transport_recovery.get("invalid_config_failures"),
+        "false_unstarted_safe_failures": prepared_transport_recovery.get("false_unstarted_safe_failures"),
+        "stopped_operation_failures": prepared_transport_recovery.get("stopped_operation_failures"),
+        "stale_frame_mismatches": prepared_transport_recovery.get("stale_frame_mismatches"),
+        "counter_reset_failures": prepared_transport_recovery.get("counter_reset_failures"),
+        "timestamp_reset_failures": prepared_transport_recovery.get("timestamp_reset_failures"),
+        "hal_steady_requeues": prepared_transport_recovery.get("hal_steady_requeues"),
+        "fallback_allocations": prepared_transport_recovery.get("fallback_allocations"),
+        "capture_ring_overruns": prepared_transport_recovery.get("capture_ring_overruns"),
+        "capture_ring_underruns": prepared_transport_recovery.get("capture_ring_underruns"),
+        "playback_ring_overruns": prepared_transport_recovery.get("playback_ring_overruns"),
+        "playback_ring_underruns": prepared_transport_recovery.get("playback_ring_underruns"),
+        "timestamp_regressions": prepared_transport_recovery.get("timestamp_regressions"),
+        "product_safe": prepared_transport_recovery.get("product_safe"),
+        "evidence": "local-analysis/cpp-offline/prepared-transport-recovery-contract.json",
     },
     "static_policy": {
         "status": static.get("result"),

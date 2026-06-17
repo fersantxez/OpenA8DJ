@@ -1565,3 +1565,14 @@ Next technical target:
   - Still missing:
     real DriverKit/USB adapter, physical quality and CPU proof, recovery, and
     same-session mainline comparison.
+- Prepared transport recovery contract:
+  - Added `opena8djcpp_prepared_transport_recovery_contract`.
+  - It rejects invalid configs, rejects false `product_safe` before start,
+    verifies operations after `stop()` fail without mutating sentinels, verifies
+    restart clears stale capture/playback frames, and verifies counters plus
+    timestamp history reset for the new stream session.
+  - `PreparedTransportBackend::safety()` now requires `started_`; zero counters
+    on a never-started backend are not readiness evidence.
+  - Still missing:
+    real DriverKit/USB adapter, physical quality and CPU proof, and
+    same-session mainline comparison.

@@ -7060,3 +7060,74 @@ Operational note:
   - Offline routing/timecode integration remains green.
   - Readiness remains blocked by a real DriverKit/USB adapter, recovery and
     physical same-session quality/CPU proof against mainline.
+
+## 2026-06-17 Prepared Transport Recovery Contract
+
+- Purpose:
+  - Validate lifecycle/recovery hygiene for `PreparedTransportBackend` before a
+    real DriverKit/USB adapter exists.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_core_tests opena8djcpp_prepared_transport_recovery_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_core_tests`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_recovery_contract`
+  - `./build/cpp-offline/opena8djcpp_static_policy_check`
+- Result:
+  - PASS.
+  - Invalid config failures: `0`.
+  - False unstarted safe failures: `0`.
+  - Stopped operation failures: `0`.
+  - Stale frame mismatches: `0`.
+  - Counter reset failures: `0`.
+  - Timestamp reset failures: `0`.
+  - Final clean session: `product_safe=true`, `0` HAL steady requeues, `0`
+    fallback allocations, `0` ring overruns/underruns.
+  - Static policy: PASS, `audited_files=17`, forbidden hits `0`.
+- Safety:
+  - Offline core model only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-transport-recovery-contract.json`
+- Interpretation:
+  - The prepared backend now has offline proof that stop/start boundaries do
+    not leak old frames, counters, or timestamp history.
+  - This is not physical recovery readiness.
+
+## 2026-06-17 Offline Gates After Prepared Transport Recovery
+
+- Purpose:
+  - Verify the complete offline surface after adding prepared transport
+    recovery/lifecycle validation.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `22/22` passed.
+  - Release CTest: `23/23` passed.
+  - Prepared recovery contract: PASS.
+  - Recovery failures:
+    invalid config `0`, false unstarted safe `0`, stopped operation `0`, stale
+    frame mismatches `0`, counter reset `0`, timestamp reset `0`.
+  - Recovery final clean-session counters:
+    `0` HAL steady requeues, `0` fallback allocations, `0` ring
+    overruns/underruns, `0` timestamp regressions, `product_safe=true`.
+  - Static policy: PASS, `audited_files=17`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-prepared-transport-recovery`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`, `global_cpu_idle_pct=84.43`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/prepared-transport-recovery-contract.json`
+  - `local-analysis/audio-stack-guard/final-after-prepared-transport-recovery`
+- Interpretation:
+  - Offline prepared transport coverage now includes packet, ring, routing,
+    timecode profile/deck behavior, and lifecycle recovery hygiene.
+  - Readiness remains blocked by a real DriverKit/USB adapter and physical
+    same-session quality/CPU proof against mainline.
