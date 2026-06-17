@@ -1,3 +1,5 @@
+#include "evidence_json.hpp"
+
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -14,14 +16,6 @@ std::string read_file(const std::filesystem::path& path) {
   }
   return std::string((std::istreambuf_iterator<char>(input)),
                      std::istreambuf_iterator<char>());
-}
-
-bool contains(std::string_view haystack, std::string_view needle) {
-  return haystack.find(needle) != std::string_view::npos;
-}
-
-bool file_contains(const std::filesystem::path& path, std::string_view needle) {
-  return contains(read_file(path), needle);
 }
 
 std::filesystem::path repo_root(char** argv) {
@@ -46,6 +40,31 @@ void print_string_array(const char* name, const std::vector<std::string>& values
   std::cout << "],\n";
 }
 
+bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
+}
+
+bool last_string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_last(json, key).value_or("") == expected;
+}
+
+bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
+  return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
+}
+
+bool number_field_is(std::string_view json, std::string_view key, double expected) {
+  return opena8djcpp::evidence_json::json_number(json, key).value_or(expected + 1.0) == expected;
+}
+
+bool string_array_has(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
+}
+
+bool gate_array_has_name(std::string_view json, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_object_array_contains_string_field(json, "gates", "name",
+                                                                            expected);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -68,55 +87,71 @@ int main(int argc, char** argv) {
       !migration.empty() && !hardware_policy.empty();
 
   const bool offline_clean =
-      contains(capture_route, "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
-      contains(direct_usb,
-               "offline_existing_direct_usb_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
-      contains(historical_route,
-               "offline_readonly_mainline_reference_and_cpp_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
-      contains(hal_safety,
-               "offline_existing_hal_safety_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
-      contains(physical_frontier,
-               "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
-      contains(migration, "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch");
+      string_field_is(capture_route, "safety",
+                      "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
+      string_field_is(direct_usb, "safety",
+                      "offline_existing_direct_usb_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
+      string_field_is(historical_route, "safety",
+                      "offline_readonly_mainline_reference_and_cpp_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
+      string_field_is(hal_safety, "safety",
+                      "offline_existing_hal_safety_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
+      string_field_is(physical_frontier, "safety",
+                      "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
+      string_field_is(migration, "safety",
+                      "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch");
   const bool product_blocked =
-      contains(promotion, "\"result\": \"FAIL\"") &&
-      contains(promotion, "\"branch_promotion_allowed\": false") &&
-      contains(promotion, "\"name\": \"capture_route_measurement_valid_for_promotion\"") &&
-      contains(promotion, "\"name\": \"same_session_mainline_cpp_physical_compare\"") &&
-      contains(promotion, "\"name\": \"runtime_cpu_beats_mainline\"") &&
-      contains(promotion, "\"name\": \"traktor_timecode_physical\"");
+      last_string_field_is(promotion, "result", "FAIL") &&
+      bool_field_is(promotion, "branch_promotion_allowed", false) &&
+      gate_array_has_name(promotion, "capture_route_measurement_valid_for_promotion") &&
+      gate_array_has_name(promotion, "same_session_mainline_cpp_physical_compare") &&
+      gate_array_has_name(promotion, "runtime_cpu_beats_mainline") &&
+      gate_array_has_name(promotion, "traktor_timecode_physical");
   const bool route_not_valid_for_promotion =
-      contains(capture_route, "\"measurement_valid_for_promotion\": false") &&
-      contains(capture_route, "shared_capture_route_unhealthy") &&
-      contains(capture_route, "same_session_mainline_cpp_physical_ab_on_validated_route");
+      string_field_is(capture_route, "result", "PASS") &&
+      bool_field_is(capture_route, "measurement_valid_for_promotion", false) &&
+      bool_field_is(capture_route, "digital_payload_clean", true) &&
+      bool_field_is(capture_route, "shared_route_unhealthy", true) &&
+      string_array_has(capture_route, "promotion_blockers", "shared_capture_route_unhealthy") &&
+      string_array_has(capture_route, "required_physical_experiments",
+                       "same_session_mainline_cpp_physical_ab_on_validated_route");
+  const auto latest_direct_usb = opena8djcpp::evidence_json::json_object(direct_usb, "latest_run");
   const bool direct_usb_blocks_route_claim =
-      contains(direct_usb, "\"internal_clean\": true") &&
-      contains(direct_usb, "\"capture_failed\": true") &&
-      contains(direct_usb, "DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS");
+      string_field_is(direct_usb, "result", "PASS") && latest_direct_usb.has_value() &&
+      bool_field_is(*latest_direct_usb, "internal_clean", true) &&
+      bool_field_is(*latest_direct_usb, "capture_failed", true) &&
+      string_field_is(direct_usb, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS");
   const bool historical_route_not_current =
-      contains(historical_route, "\"historical_reference_currently_valid_for_promotion\": false") &&
-      contains(historical_route, "historical_reference_is_not_current_same_session_evidence");
+      string_field_is(historical_route, "result", "PASS") &&
+      bool_field_is(historical_route, "historical_reference_currently_valid_for_promotion", false) &&
+      string_array_has(historical_route, "promotion_blockers",
+                       "historical_reference_is_not_current_same_session_evidence");
   const bool hal_safety_is_only_precondition =
-      contains(hal_safety, "\"result\": \"PASS\"") &&
-      contains(hal_safety, "\"driver_installed_or_activated_now\": false") &&
-      contains(hal_safety, "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+      string_field_is(hal_safety, "result", "PASS") &&
+      bool_field_is(hal_safety, "driver_installed_or_activated_now", false) &&
+      string_field_is(hal_safety, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
   const bool no_product_candidate_runs =
-      contains(physical_frontier, "\"product_candidate_runs\": 0") &&
-      contains(physical_frontier, "DIAGNOSTIC_ONLY_NO_EXISTING_PHYSICAL_RUN_PROVES_SUPERIORITY");
+      string_field_is(physical_frontier, "result", "PASS") &&
+      number_field_is(physical_frontier, "product_candidate_runs", 0.0) &&
+      string_field_is(physical_frontier, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_NO_EXISTING_PHYSICAL_RUN_PROVES_SUPERIORITY");
   const bool migration_ready_only_offline =
-      contains(migration, "\"result\": \"PASS\"") &&
-      contains(migration, "\"migration_candidate_supported\": true") &&
-      contains(migration, "\"product_ready\": false") &&
-      contains(migration, "\"branch_promotion_supported\": false") &&
-      contains(migration, "driverkit_usb_request_shutdown_safe");
+      string_field_is(migration, "result", "PASS") &&
+      bool_field_is(migration, "migration_candidate_supported", true) &&
+      bool_field_is(migration, "product_ready", false) &&
+      bool_field_is(migration, "branch_promotion_supported", false) &&
+      gate_array_has_name(migration, "driverkit_usb_request_shutdown_safe");
   const bool scripts_present =
       std::filesystem::is_regular_file(root / "scripts/physical-window-preflight") &&
       std::filesystem::is_regular_file(root / "scripts/run-physical-superiority-window") &&
       std::filesystem::is_regular_file(root / "scripts/run-known-good-route-soundcheck");
   const bool lock_policy_covers_window =
-      contains(hardware_policy, "\"result\": \"PASS\"") &&
-      contains(hardware_policy, "scripts/run-physical-superiority-window") &&
-      contains(hardware_policy, "scripts/run-known-good-route-soundcheck");
+      string_field_is(hardware_policy, "result", "PASS") &&
+      string_array_has(hardware_policy, "sensitive_paths",
+                       "scripts/run-physical-superiority-window") &&
+      string_array_has(hardware_policy, "sensitive_paths",
+                       "scripts/run-known-good-route-soundcheck");
 
   std::vector<std::string> required_next_actions;
   required_next_actions.push_back("lock_gated_known_good_non_audio8_route_revalidation");

@@ -9844,3 +9844,43 @@ Full offline gate rerun:
     source for route revalidation.
   - Product A/B, branch promotion, audiophile quality, CPU superiority, and
     Traktor/timecode-vinyl claims remain blocked.
+
+## 2026-06-17 Structured Physical-Readiness Evidence Parsing
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a small standard-library evidence JSON reader for offline gates.
+  - Refactored `opena8djcpp_physical_window_readiness_gate` so critical
+    readiness fields are validated by structured field reads instead of broad
+    text matches.
+  - Added `opena8djcpp_evidence_json_contract` to lock down nested object,
+    string array, object-array, boolean, number, and final-result parsing.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_evidence_json_contract opena8djcpp_physical_window_readiness_gate`
+  - `./build/cpp-offline/opena8djcpp_evidence_json_contract`
+  - `./build/cpp-offline/opena8djcpp_physical_window_readiness_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused JSON contract: PASS.
+  - Focused physical-window readiness gate: PASS.
+  - Debug CTest: `52/52` passed.
+  - Release CTest: `53/53` passed, including `opena8djcpp_offline_bench`.
+  - Evidence schema: `required_files=52`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+  - `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - Offline analysis is harder to fool with stale or misleading text in JSON
+    artifacts.
+  - `ready_for_route_revalidation_window=true` remains diagnostic only.
+  - `ready_for_product_physical_ab=false` and
+    `ready_for_branch_promotion=false` remain hard blocked.

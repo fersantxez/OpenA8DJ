@@ -6456,3 +6456,38 @@ Next implication:
 - The next real physical route revalidation still requires a separate
   non-Audio8 output physically wired into the same capture chain, or a current
   valid Audio 8/mainline route after HAL loading followed by same-session A/B.
+
+## 2026-06-17: Structured Reads for Physical-Window Readiness Evidence
+
+Decision:
+- Added `tools/evidence_json.hpp` and `opena8djcpp_evidence_json_contract`.
+- Refactored `opena8djcpp_physical_window_readiness_gate` to validate critical
+  source artifacts through structured JSON field reads:
+  `result`, `safety`, `branch_promotion_allowed`,
+  `measurement_valid_for_promotion`, `digital_payload_clean`,
+  `shared_route_unhealthy`, direct-USB `latest_run`, promotion blockers,
+  required physical experiments, migration gates, and hardware-lock paths.
+
+Reason:
+- Promotion readiness is a high-risk decision surface. Broad string matching
+  can pass if a stale, nested, or unrelated field happens to contain the right
+  text.
+- The gate should fail unless the expected fields and arrays are present in the
+  expected artifacts.
+
+Evidence:
+- `opena8djcpp_evidence_json_contract`: PASS.
+- `opena8djcpp_physical_window_readiness_gate`: PASS.
+- Full offline gates after the change: Debug CTest `52/52`, Release CTest
+  `53/53`, evidence schema `required_files=52`, `missing_files=0`.
+
+Alternatives discarded:
+- Add a third-party JSON dependency: rejected for this narrow offline tooling
+  path; the needed shape is small and deterministic.
+- Keep broad text matching: rejected because it weakens blocker integrity for
+  sound-quality, CPU, timecode, and branch-promotion claims.
+
+Next implication:
+- Future readiness gates should prefer structured reads for critical fields.
+  Text matching is acceptable only for narrow diagnostics that cannot authorize
+  hardware windows, product readiness, or branch promotion.

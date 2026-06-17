@@ -2153,6 +2153,13 @@ Prepared transport migration metric:
   revalidation can be planned. It must keep
   `ready_for_product_physical_ab=false` and `ready_for_branch_promotion=false`
   until route revalidation and same-session mainline-vs-C++ physical A/B pass.
+- Critical readiness gates must parse required evidence fields structurally,
+  not rely on broad text search. Minimum protected fields include promotion
+  `result`, `branch_promotion_allowed`, named failed gates, capture-route
+  `measurement_valid_for_promotion`, direct-USB `latest_run.internal_clean` and
+  `latest_run.capture_failed`, historical-route freshness blockers, HAL
+  `driver_installed_or_activated_now`, migration `product_ready` /
+  `branch_promotion_supported`, and hardware-lock `sensitive_paths`.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.
