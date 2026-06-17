@@ -123,6 +123,7 @@ Expected evidence:
   play.log
   metrics.json
   linear-matrix.json
+  tone-matrix.json
 PLAN
 
 if [[ "$RUN_PHYSICAL" != 1 ]]; then
@@ -187,9 +188,16 @@ PY
 
 "$ROOT/scripts/analyze-soundcheck-linear-matrix.py" "$RUN_DIR" \
   --max-lag "$((RATE * 2))" \
+  --nonnegative-lag \
   --analysis-seconds "$SECONDS" \
   --json-out "$RUN_DIR/linear-matrix.json"
+
+"$ROOT/scripts/analyze-channel-matrix-tones.py" "$RUN_DIR" \
+  --skip-seconds "$PRE_ROLL_SECONDS" \
+  --analysis-seconds "$SECONDS" \
+  --json-out "$RUN_DIR/tone-matrix.json"
 
 echo "result=PHYSICAL_COMPLETE"
 echo "run_dir=$RUN_DIR"
 echo "linear_matrix=$RUN_DIR/linear-matrix.json"
+echo "tone_matrix=$RUN_DIR/tone-matrix.json"

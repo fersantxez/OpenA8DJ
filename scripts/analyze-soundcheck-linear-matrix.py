@@ -68,6 +68,92 @@ def solve_two_input_fit(ref_left, ref_right, got):
     return a, b, gram_condition_number(ll, lr, rr)
 
 
+def score_pair_lag(ref_pair, got_pair, ref_start, got_start, lag, sample_count, stride):
+    left_dot = 0.0
+    right_dot = 0.0
+    ref_left_energy = 0.0
+    ref_right_energy = 0.0
+    got_left_energy = 0.0
+    got_right_energy = 0.0
+    used = 0
+    for offset in range(0, sample_count, max(1, stride)):
+        ri = ref_start + offset
+        gi = got_start + offset + lag
+        if ri < 0 or gi < 0 or ri >= len(ref_pair) or gi >= len(got_pair):
+            continue
+        ref_left, ref_right = ref_pair[ri]
+        got_left, got_right = got_pair[gi]
+        left_dot += ref_left * got_left
+        right_dot += ref_right * got_right
+        ref_left_energy += ref_left * ref_left
+        ref_right_energy += ref_right * ref_right
+        got_left_energy += got_left * got_left
+        got_right_energy += got_right * got_right
+        used += 1
+    if used == 0:
+        return None
+    left_score = 0.0
+    if ref_left_energy > 0.0 and got_left_energy > 0.0:
+        left_score = abs(left_dot) / math.sqrt(ref_left_energy * got_left_energy)
+    right_score = 0.0
+    if ref_right_energy > 0.0 and got_right_energy > 0.0:
+        right_score = abs(right_dot) / math.sqrt(ref_right_energy * got_right_energy)
+    return 0.5 * (left_score + right_score)
+
+
+def scan_pair_lags(ref_pair,
+                   got_pair,
+                   ref_start,
+                   got_start,
+                   start_lag,
+                   end_lag,
+                   step,
+                   sample_count,
+                   stride):
+    best_lag = 0
+    best_score = None
+    for lag in range(start_lag, end_lag + 1, max(1, step)):
+        score = score_pair_lag(ref_pair,
+                               got_pair,
+                               ref_start,
+                               got_start,
+                               lag,
+                               sample_count,
+                               stride)
+        if score is None:
+            continue
+        if best_score is None or score > best_score:
+            best_lag = lag
+            best_score = score
+    return best_lag, best_score if best_score is not None else 0.0
+
+
+def find_pair_lag(ref_pair, got_pair, ref_start, got_start, max_lag, nonnegative, sample_count):
+    start = 0 if nonnegative else -max_lag
+    coarse_step = max(1, max_lag // 2048)
+    coarse_lag, _ = scan_pair_lags(ref_pair,
+                                   got_pair,
+                                   ref_start,
+                                   got_start,
+                                   start,
+                                   max_lag,
+                                   coarse_step,
+                                   sample_count,
+                                   64)
+    fine_radius = max(8, coarse_step * 2)
+    fine_start = max(start, coarse_lag - fine_radius)
+    fine_end = min(max_lag, coarse_lag + fine_radius)
+    return scan_pair_lags(ref_pair,
+                          got_pair,
+                          ref_start,
+                          got_start,
+                          fine_start,
+                          fine_end,
+                          1,
+                          sample_count,
+                          32)
+
+
 def fit_matrix(analyzer, ref_pair, got_pair, rate):
     ref_left = column(ref_pair, 0)
     ref_right = column(ref_pair, 1)
@@ -122,6 +208,7 @@ def clamp_pair(ref, got, ref_start, got_start, frames):
 def analyze_run(analyzer,
                 run_dir,
                 max_lag,
+                nonnegative_lag,
                 analysis_seconds,
                 correlation_warning,
                 condition_warning):
@@ -137,15 +224,13 @@ def analyze_run(analyzer,
     got_start = int(metrics["capture_start"])
     compared_frames = int(metrics["compared_frames"])
     if max_lag > 0:
-        ref_mono = analyzer.pair_to_mono(ref)
-        got_mono = analyzer.pair_to_mono(got)
-        global_lag, global_corr = analyzer.find_best_lag(ref_mono,
-                                                         got_mono,
-                                                         ref_start,
-                                                         got_start,
-                                                         max_lag,
-                                                         min(compared_frames, ref_rate),
-                                                         64)
+        global_lag, global_corr = find_pair_lag(ref,
+                                                got,
+                                                ref_start,
+                                                got_start,
+                                                max_lag,
+                                                nonnegative_lag,
+                                                min(compared_frames, ref_rate))
     else:
         ref_mono = analyzer.pair_to_mono(ref)
         got_mono = analyzer.pair_to_mono(got)
@@ -173,6 +258,11 @@ def analyze_run(analyzer,
         warnings.append("fit_is_ill_conditioned_use_decorrelated_physical_fixture")
     if fit["residual_over_predicted_rms"] >= 0.25:
         warnings.append("linear_matrix_leaves_large_residual_non_linear_or_unmodelled_component")
+    needs_decorrelated_fixture = (
+        abs(fit["input_lr_correlation"]) >= correlation_warning or
+        fit["gram_condition_number"] >= condition_warning
+    )
+    large_unmodelled_residual = fit["residual_over_predicted_rms"] >= 0.25
 
     return {
         "result": "PASS_DIAGNOSTIC",
@@ -192,7 +282,10 @@ def analyze_run(analyzer,
         "warnings": warnings,
         "classification": (
             "needs_decorrelated_physical_matrix_fixture"
-            if warnings else "linear_matrix_estimate_well_conditioned"
+            if needs_decorrelated_fixture else
+            "linear_matrix_rejected_large_physical_residual"
+            if large_unmodelled_residual else
+            "linear_matrix_estimate_well_conditioned"
         ),
     }
 
@@ -201,6 +294,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("run_dirs", nargs="+", type=Path)
     parser.add_argument("--max-lag", type=int, default=0)
+    parser.add_argument("--nonnegative-lag", action="store_true")
     parser.add_argument("--analysis-seconds", type=float, default=8.0)
     parser.add_argument("--correlation-warning", type=float, default=0.20)
     parser.add_argument("--condition-warning", type=float, default=25.0)
@@ -212,6 +306,7 @@ def main():
         analyze_run(analyzer,
                     run_dir,
                     args.max_lag,
+                    args.nonnegative_lag,
                     args.analysis_seconds,
                     args.correlation_warning,
                     args.condition_warning)

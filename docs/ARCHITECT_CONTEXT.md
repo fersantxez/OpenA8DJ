@@ -443,3 +443,11 @@ Next technical target:
   The default mode is prepare-only and does not touch audio hardware. The
   generated fixture smoke has L/R correlation about `0.00056`, suitable for a
   future lock-gated iRig Pair A matrix/crosstalk test.
+- Locked Pair A decorrelated matrix was executed through iRig Stream:
+  `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix`.
+  Tone-domain analysis passes with no clipping and leakage below `-49 dB`
+  (`left_to_right=-59.48 dB`, `right_to_left=-49.67 dB`,
+  `max_wrong_source=-51.27 dB`). This reduces the likelihood that gross Pair A
+  L/R crosstalk is causing the music failure. It does not clear readiness
+  because physical music quality and runtime CPU remain failing, and physical
+  Traktor/timecode remains unvalidated.

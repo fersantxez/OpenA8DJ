@@ -1191,3 +1191,44 @@ Evidence:
 - `scripts/run-channel-matrix-gate`
 - `local-analysis/channel-matrix/offline-prepare-smoke`
 - `local-analysis/channel-matrix/20260617T014008Z-pairA-decorrelated-matrix`
+
+## 2026-06-17: Pair A Decorrelated Tone Matrix Passes, Residual Blocker Remains
+
+Decision:
+- Treat the Pair A/iRig physical route as not showing gross L/R crosstalk for
+  the decorrelated fixture.
+- Do not use sample-by-sample linear residual from this fixture as the routing
+  verdict; the frequency-domain tone matrix is the appropriate crosstalk gate.
+- Keep physical music quality and runtime CPU as release blockers.
+
+Reason:
+- The locked physical channel-matrix run captured the generated fixture with
+  no clipping and strong expected tones on the expected channels.
+- Frequency-domain matrix metrics passed with leakage below the `-45 dB`
+  threshold:
+  - left-to-right leakage `-59.48 dB`;
+  - right-to-left leakage `-49.67 dB`;
+  - max wrong-source leakage `-51.27 dB`;
+  - expected floor amplitude `0.06577`.
+- The sample-domain 2x2 linear fit still rejects the capture because latency,
+  phase, and analog filtering leave large residual. That is useful as a
+  coloration clue, not as crosstalk proof.
+
+Alternatives discarded:
+- Blame Pair A L/R crosstalk for the music failure: rejected by decorrelated
+  tone evidence.
+- Promote because channel matrix passed: rejected because music quality,
+  runtime CPU, and physical Traktor/timecode are still failing/unvalidated.
+
+Evidence:
+- Safety load PASS:
+  `local-analysis/physical-channel-matrix/20260617-physical-matrix-safety`.
+- Physical matrix run:
+  `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix`.
+- Tone matrix:
+  `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`.
+- Linear diagnostic:
+  `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/linear-matrix.json`.
+- Cleanup and isolation:
+  `local-analysis/audio-stack-guard/20260617-after-channel-matrix-unload` and
+  `local-analysis/runtime-isolation/after-channel-matrix-physical-unload.json`.

@@ -573,11 +573,15 @@ Minimum future PASS requirements:
 
 Current status:
 
-- `BLOCKED_HARDWARE_FORBIDDEN` for physical execution.
 - Offline prep PASS:
   `local-analysis/channel-matrix/offline-prepare-smoke`.
 - Existing correlated-music matrix classification:
   `local-analysis/soundcheck-linear-matrix/recent-failed-physical-music.json`.
+- Pair A physical tone-domain matrix PASS, limited to the iRig Stream capture
+  path:
+  `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`.
+- A/B/C/D full physical matrix and Traktor/timecode physical validation remain
+  `BLOCKED_UNVALIDATED`.
 
 ## Readiness Levels
 

@@ -2453,3 +2453,51 @@ Operational note:
   - `local-analysis/cpp-offline/current-offline-gates.json`
   - `local-analysis/cpp-offline/hardware-lock-policy.json`
   - `local-analysis/promotion-readiness-after-channel-matrix-prep.json`
+
+## 2026-06-17: Locked Pair A Decorrelated Channel Matrix
+
+- Commands:
+  - `make hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-channel-matrix/20260617-physical-matrix-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-channel-matrix-gate --run-physical --run-id 20260617-irig-pairA-decorrelated-matrix --pair A --rate 48000 --seconds 8 --peak 0.30 --capture-device "iRig Stream" --capture-channels 1,2`
+  - `scripts/audio-stack-guard --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/20260617-after-channel-matrix-unload`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-channel-matrix-physical-unload.json`
+  - `scripts/analyze-channel-matrix-tones.py local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix --skip-seconds 1 --analysis-seconds 8 --json-out local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`
+- Result:
+  - HAL candidate safety PASS and left the candidate loaded.
+  - Physical decorrelated matrix run completed with iRig Stream capture.
+  - Tone-domain channel matrix PASS.
+  - Cleanup/unload PASS; final runtime isolation PASS, HAL inactive, lock
+    absent.
+- Key metrics:
+  - Capture device UID:
+    `AppleUSBAudioEngine:IK Multimedia:iRig Stream:152349:2,1`.
+  - `captured.wav`: rate `48000`, frames `576512`, RMS `0.11460675`, peak
+    `0.50494385`, clipped frames `0`.
+  - Tone matrix expected floor amplitude `0.06576757351262598`.
+  - Left-to-right leakage `-59.48258382334637 dB`.
+  - Right-to-left leakage `-49.667972003183024 dB`.
+  - Max wrong-source leakage `-51.26562016103985 dB`.
+  - Linear sample-domain diagnostic still rejects the capture with
+    `classification=linear_matrix_rejected_large_physical_residual`; treat this
+    as phase/filtering/residual evidence, not as crosstalk failure.
+- Evidence paths:
+  - `local-analysis/physical-channel-matrix/20260617-physical-matrix-safety`
+  - `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix`
+  - `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/linear-matrix.json`
+  - `local-analysis/audio-stack-guard/20260617-after-channel-matrix-unload`
+  - `local-analysis/runtime-isolation/after-channel-matrix-physical-unload.json`
+- Interpretation:
+  - Pair A physical route does not show gross L/R crosstalk or deck leakage
+    through the iRig path.
+  - The remaining blockers are physical music quality/residual, CPU versus
+    mainline, and physical Traktor/timecode validation.
+- Post-update verification:
+  - `python3 -m py_compile scripts/analyze-channel-matrix-tones.py scripts/analyze-soundcheck-linear-matrix.py`
+  - `bash -n scripts/run-channel-matrix-gate`
+  - `scripts/run-cpp-offline-gates` PASS: Debug `16/16`, Release `17/17`.
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-physical-channel-matrix.json`
+    remains FAIL with blockers `physical_music_quality`,
+    `runtime_cpu_beats_mainline`, `latest_physical_investigation`, and
+    `traktor_timecode_physical`.

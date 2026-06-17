@@ -572,6 +572,7 @@ Expected artifacts:
 - `play.log`
 - `metrics.json`
 - `linear-matrix.json`
+- `tone-matrix.json`
 
 PASS semantics are intentionally strict and not yet promotion semantics:
 
@@ -581,5 +582,15 @@ PASS semantics are intentionally strict and not yet promotion semantics:
 - expected L->L and R->R terms must dominate;
 - opposite-channel leakage must be low enough to explain neither the current
   residual nor audible deck leakage;
+- the frequency-domain `tone-matrix.json` is the authoritative crosstalk/routing
+  verdict for this fixture;
+- `linear-matrix.json` is diagnostic only because analog phase/filtering can
+  leave large sample-domain residual even when tone routing is correct;
 - if the run fails, do not run Traktor/timecode or branch promotion from that
   candidate.
+
+Current Pair A evidence:
+
+- `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`
+  is `PASS` through iRig Stream.
+- This does not satisfy the full A/B/C/D or timecode physical matrix.
