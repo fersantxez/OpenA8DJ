@@ -3758,3 +3758,65 @@ Operational note:
   - `local-analysis/stream-stats/cpp-iso64q8-stopisoc-soundcheck-summary.json`
   - `local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`
   - `local-analysis/runtime-isolation/after-cpp-iso64q8-stopisoc-force-unload.json`
+
+## 2026-06-17: Input Decode Control And Comparable Physical CPU Run
+
+- Commit under test: worktree change after `b4a76ca`, not committed at run time.
+- Commands:
+  - Build:
+    `make -B hal build/audio-wav-play build/opena8dj-control`
+  - Offline gates:
+    `scripts/run-cpp-offline-gates`
+  - Runtime isolation before hardware:
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/before-inputdecode-physical.json`
+  - Candidate safety for corrected capture-channel run:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 45 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-inputdecode-off/20260617-inputdecode-off-dense-ch12/hal-candidate-safety`
+  - Comparable physical soundcheck with stereo iRig channels:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --cpu-profile --audio-stack-wait 45 --audio-stack-enumeration-timeout 8 --audio-stack-min-idle-pct 20 --run-dir local-analysis/soundcheck/20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s`
+  - Final unload and isolation:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --enumeration-timeout 8 --run-dir local-analysis/audio-stack-guard/after-inputdecode-off-dense-ch12-unload`
+    and
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-inputdecode-off-dense-ch12-unload.json`
+  - Promotion evaluation:
+    `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-inputdecode-off-ch12.json`
+- Results:
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - `dvs_packet_input_decode` PASS and reports `playback_decode_off=PASS`.
+  - Safety PASS; final isolation PASS with HAL inactive and lock absent.
+  - The comparable iRig Pair A soundcheck still FAILS quality:
+    `quality_alignment_score=0.680121`, SNR `-0.83 dB`,
+    `lag_jumps_gt_2_frames=42`, `capture_clipped_frames=0`.
+  - Driver CPU is now within the configured p95 target but does not beat the
+    current mainline p95:
+    `opena8dj_driver_p95=6.3%`, down from C++ ISO64/q8 StopIO `9.8%`
+    versus mainline `6.0%`.
+  - CoreAudio CPU is still worse than mainline:
+    `coreaudiod_p95=43.2%` versus mainline `8.0%` in the same baseline bundle
+    and versus the stricter promotion threshold `1.7%`. Row inspection shows
+    this is dominated by startup spikes, but the current gate counts it.
+  - Stream end-state remains clean:
+    `outputUnderruns=0`, `outputActiveUnderruns=0`,
+    `outputTimelineResets=0`, `playbackTransferErrors=0`.
+  - Promotion readiness remains FAIL. Blockers are physical music quality,
+    runtime CPU because of coreaudiod p95, latest physical investigation
+    `FAIL_NOT_READY`, and missing physical Traktor/timecode validation.
+- Incident note:
+  - An initial soundcheck used `--capture-channels 2`; `audio-record` recorded
+    `channels=2,2`, duplicating iRig channel 2 into both output WAV channels.
+    That run is not valid stereo quality evidence and was superseded by
+    `20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s` with
+    `channels=1,2`.
+  - A manual preflight attempted to call non-existent shell helper functions
+    `acquire_audio_gate_lock` and `release_audio_gate_lock`. Because the shell
+    did not use `set -e`, `audio-list` and `opena8dj-control` still ran after
+    the helper failure. This touched enumeration/control without an effective
+    lock. It did not change defaults, reset USB, install drivers, or reboot, but
+    it violated the lock discipline and must not be repeated. The correct helper
+    names are `opena8dj_acquire_hardware_lock` and
+    `opena8dj_release_hardware_lock`; prefer scripts with built-in lock handling.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/physical-inputdecode-off/20260617-inputdecode-off-dense-ch12/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s`
+  - `local-analysis/promotion-readiness-after-inputdecode-off-ch12.json`
+  - `local-analysis/runtime-isolation/after-inputdecode-off-dense-ch12-unload.json`

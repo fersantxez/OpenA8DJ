@@ -2232,3 +2232,53 @@ Next decision pressure:
 - Independently validate the physical capture/reference route before making
   any sound-quality claim; the current shared route made mainline and C++
   fail similarly.
+
+## 2026-06-17: Disable Input Decode By Default And Require Explicit DVS Enable
+
+Decision:
+- Port the mainline control-plane semantics for `inputDecodeEnabled` into the
+  C++ HAL and `opena8dj-control`.
+- Default input decode is off for playback/output-only use. Timecode vinyl,
+  CD-line, and phono profiles explicitly enable input decode.
+- Keep the mode-2 capture fast-skip active when input checks are disabled and
+  input decode is not active.
+- Do not claim product readiness. The change is a measured CPU improvement,
+  not an audio-quality proof.
+
+Reason:
+- `sudo -n sample` on the ISO64/q8 StopIO candidate showed residual active CPU
+  in `decodeCaptureBytes` / `appendInputByte` during playback-only. That work
+  is unnecessary when no input/DVS client has enabled input capture.
+- Mainline already uses a safer policy: input decode is disabled by default,
+  but profiles/control can enable it for DVS/timecode input use.
+- Physical comparable Pair A/iRig dense run after the port measured
+  `opena8dj_driver_p95=6.3%`, down from C++ ISO64/q8 StopIO `9.8%` and within
+  the configured driver p95 target, but still above the current mainline
+  baseline `6.0%`.
+- The same run still fails quality:
+  `quality_alignment_score=0.680121`, SNR `-0.83 dB`,
+  `lag_jumps_gt_2_frames=42`. CoreAudio p95 also remains worse than mainline
+  at `43.2%`, dominated by startup spikes but still counted by the current
+  gate.
+
+Alternatives discarded:
+- Re-enable input decode unconditionally: rejected for playback because it
+  adds measured CPU cost and does no useful playback work.
+- Use the older compile-time `HAL_INPUT_DECODE_ACTIVE_GATING=1` approach as
+  the product fix: rejected because an earlier physical run regressed badly.
+  The accepted approach is explicit control-plane enablement, matching
+  mainline and preserving DVS/timecode paths.
+- Promote because driver p95 now nearly matches mainline: rejected because
+  physical music quality, coreaudiod CPU, and physical Traktor/timecode gates
+  still fail or are missing.
+
+Evidence:
+- Profile:
+  `local-analysis/profiling/20260617-iso64-stopisoc-sample/playback-only/opena8dj-driver.sample.txt`.
+- Offline gates:
+  `local-analysis/cpp-offline/current-offline-gates.json`, PASS.
+- Physical soundcheck:
+  `local-analysis/soundcheck/20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s`,
+  FAIL quality but driver p95 `6.3%`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-inputdecode-off-ch12.json`, FAIL.

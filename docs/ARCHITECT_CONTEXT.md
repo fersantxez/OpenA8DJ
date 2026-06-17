@@ -771,3 +771,35 @@ Next technical target:
   physical music quality route fails for both mainline and C++, C++ CPU still
   does not beat mainline, physical Traktor/timecode vinyl validation is absent,
   and the A/B/C/D physical matrix is absent.
+
+## 2026-06-17 Input Decode Control Update
+
+- C++ now mirrors the mainline input decode control policy:
+  input decode is off by default for playback/output-only use and is enabled
+  explicitly by timecode vinyl, CD-line, and phono profiles.
+- Offline gates remain PASS after the change:
+  Debug `17/17`, Release `18/18`, with `dvs_packet_input_decode` reporting
+  `playback_decode_off=PASS`.
+- The comparable physical Pair A/iRig dense run confirms a driver CPU
+  improvement:
+  - mainline `0.3.135`: driver p95 `6.0%`, coreaudiod p95 `8.0%`;
+  - previous C++ ISO64/q8 StopIO: driver p95 `9.8%`, coreaudiod p95 `11.5%`;
+  - C++ input-decode-off with stereo iRig capture `1,2`: driver p95 `6.3%`,
+    coreaudiod p95 `43.2%`.
+- The change does not solve sound quality:
+  `quality_alignment_score=0.680121`, SNR `-0.83 dB`,
+  `lag_jumps_gt_2_frames=42`. This is essentially the same degraded iRig route
+  class as the current mainline/C++ ISO64 runs, not audiophile evidence.
+- Current state after testing: HAL inactive, hardware lock absent, audio stack
+  health PASS.
+- Incident to fix in process:
+  one manual preflight used the wrong lock helper function names and proceeded
+  to enumerate/control without an effective lock. One initial soundcheck also
+  used `--capture-channels 2`, causing `audio-record` to duplicate iRig channel
+  2 as `channels=2,2`; that run is superseded by the corrected `1,2` evidence.
+  Future manual hardware commands must use `opena8dj_acquire_hardware_lock` or,
+  preferably, scripts with built-in lock handling.
+- Current blockers before any branch promotion or hardware readiness claim:
+  physical music quality PASS, coreaudiod CPU below mainline/threshold,
+  physical Traktor/timecode vinyl validation, physical A/B/C/D matrix, and a
+  resolved explanation for the degraded iRig route.

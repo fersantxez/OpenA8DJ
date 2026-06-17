@@ -58,6 +58,7 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputInvertLeftMask;
     uint8_t inputInvertRightMask;
     uint8_t inputSource[kInputPairs];
+    uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
 
 typedef struct OpenA8DJInputStatsPayload {
@@ -439,12 +440,20 @@ static void ResetInputTransforms(OpenA8DJControlPayload *state)
 
 static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
 {
+    if (strcmp(name, "playback") == 0 ||
+        strcmp(name, "output-only") == 0 ||
+        strcmp(name, "spotify") == 0 ||
+        strcmp(name, "vlc") == 0) {
+        state->inputDecodeEnabled = 0;
+        return true;
+    }
     if (strcmp(name, "timecode-vinyl") == 0 || strcmp(name, "tc-vinyl") == 0) {
         state->inputMode = 0;
         state->gndLiftTCVinyl = 1;
         state->gndLiftTCCDLine = 0;
         state->gndLiftPhono = 0;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -457,6 +466,7 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         state->gndLiftTCCDLine = 1;
         state->gndLiftPhono = 0;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -466,6 +476,7 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         state->gndLiftTCCDLine = 0;
         state->gndLiftPhono = 1;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -697,8 +708,14 @@ static bool ReadOneState(int fd, OpenA8DJControlPayload *state)
         if (header.length > 0 && !ReadFull(fd, payload, header.length)) {
             return false;
         }
-        if (header.type == kIPCTypeControlState && header.length >= sizeof(*state)) {
-            memcpy(state, payload, sizeof(*state));
+        if (header.type == kIPCTypeControlState &&
+            header.length >= offsetof(OpenA8DJControlPayload, inputDecodeEnabled)) {
+            memset(state, 0, sizeof(*state));
+            size_t copyLength = header.length < sizeof(*state) ? header.length : sizeof(*state);
+            memcpy(state, payload, copyLength);
+            if (header.length < sizeof(*state)) {
+                state->inputDecodeEnabled = 1;
+            }
             return true;
         }
     }
@@ -836,6 +853,7 @@ static void PrintState(const OpenA8DJControlPayload *state)
     printf("  gnd-cd-line:       %s\n", state->gndLiftTCCDLine ? "on" : "off");
     printf("  gnd-phono:         %s\n", state->gndLiftPhono ? "on" : "off");
     printf("  software-lock:     %s\n", state->softwareLock ? "on" : "off");
+    printf("  input-decode:      %s\n", state->inputDecodeEnabled ? "on" : "off");
     printf("  input-transform:   A=%s B=%s C=%s D=%s\n",
            InputTransformName(InputTransformForPair(state, 0)),
            InputTransformName(InputTransformForPair(state, 1)),
@@ -1330,12 +1348,13 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "  %s transfer-ledger [count] [--from sequence] [--all]\n", argv0);
-    fprintf(stderr, "  %s profile timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
+    fprintf(stderr, "  %s profile playback|timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
     fprintf(stderr, "  %s gnd-vinyl on|off\n", argv0);
     fprintf(stderr, "  %s gnd-cd-line on|off\n", argv0);
     fprintf(stderr, "  %s gnd-phono on|off\n", argv0);
     fprintf(stderr, "  %s software-lock on|off\n", argv0);
+    fprintf(stderr, "  %s input-decode on|off\n", argv0);
     fprintf(stderr, "  %s input-transform A|B|C|D normal|swap|invert-left|invert-right|invert-both|swap-invert-left|swap-invert-right|swap-invert-both\n", argv0);
     fprintf(stderr, "  %s input-source A|B|C|D A|B|C|D\n", argv0);
 }
@@ -1525,6 +1544,8 @@ int main(int argc, char **argv)
             state.gndLiftPhono = value;
         } else if (strcmp(argv[1], "software-lock") == 0) {
             state.softwareLock = value;
+        } else if (strcmp(argv[1], "input-decode") == 0) {
+            state.inputDecodeEnabled = value;
         } else {
             Usage(argv[0]);
             close(fd);

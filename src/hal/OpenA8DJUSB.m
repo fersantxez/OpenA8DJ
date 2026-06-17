@@ -320,6 +320,7 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputInvertLeftMask;
     uint8_t inputInvertRightMask;
     uint8_t inputSource[kStreams];
+    uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
 
 typedef struct OpenA8DJInputStatsPayload {
@@ -1726,6 +1727,8 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
     return (uint8_t)((stream << 1) | ((~group) & 1));
 }
 
+static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
+
 @class OpenA8DJIsoTransfer;
 
 @interface OpenA8DJUSBEngine : NSObject
@@ -1737,6 +1740,7 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 - (void)stop;
 - (void)close;
 - (uint32_t)readInput:(float *)outInterleaved frames:(uint32_t)frames channels:(uint32_t)channels;
+- (void)setInputDecodeEnabled:(BOOL)enabled;
 - (void)setInputDecodeActive:(BOOL)active;
 - (void)writeOutput:(const float *)inInterleaved frames:(uint32_t)frames channels:(uint32_t)channels;
 - (void)writeOutput:(const float *)inInterleaved
@@ -1967,6 +1971,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_uint _inputInvertLeftMask;
     atomic_uint _inputInvertRightMask;
     atomic_uint _inputSourceMap;
+    atomic_bool _inputDecodeEnabled;
     atomic_bool _inputDecodeActive;
     uint8_t _outputFrameBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _outputByteInFrame;
@@ -2087,6 +2092,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_inputInvertLeftMask, 0);
         atomic_init(&_inputInvertRightMask, 0);
         atomic_init(&_inputSourceMap, kInputSourceIdentityMap);
+        atomic_init(&_inputDecodeEnabled, atomic_load(&gInputDecodeEnabledPreference));
         atomic_init(&_inputDecodeActive, false);
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
@@ -2677,6 +2683,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         uint8_t source = (uint8_t)((sourceMap >> (stream * 4)) & 0x0f);
         payload->inputSource[stream] = source < kStreams ? source : (uint8_t)stream;
     }
+    payload->inputDecodeEnabled = atomic_load(&_inputDecodeEnabled) ? 1 : 0;
 }
 
 - (void)storeControlPayload:(const OpenA8DJControlPayload *)payload
@@ -2700,6 +2707,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         sourceMap |= ((uint32_t)source) << (stream * 4);
     }
     atomic_store(&_inputSourceMap, sourceMap);
+    [self setInputDecodeEnabled:(payload->inputDecodeEnabled != 0)];
 }
 
 - (BOOL)readControls
@@ -3807,8 +3815,12 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
             [self sendControlStateToClient:fd];
             break;
         case kIPCTypeControlSet:
-            if (length >= sizeof(OpenA8DJControlPayload)) {
-                [self storeControlPayload:(const OpenA8DJControlPayload *)payload];
+            if (length >= offsetof(OpenA8DJControlPayload, inputDecodeEnabled)) {
+                OpenA8DJControlPayload state;
+                [self loadControlPayload:&state];
+                NSUInteger copyLength = length < sizeof(state) ? length : sizeof(state);
+                memcpy(&state, payload, copyLength);
+                [self storeControlPayload:&state];
                 (void)[self writeControls];
                 [self sendControlStateToClient:fd];
             }
@@ -4303,7 +4315,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     uint64_t outputPanicFlags = 0;
     OpenA8DJInputStatsPayload inputStatsDelta;
     memset(&inputStatsDelta, 0, sizeof(inputStatsDelta));
-#if OPENA8DJ_ENABLE_INPUT_DECODE && OPENA8DJ_INPUT_DECODE_ACTIVE_GATING && !OPENA8DJ_ENABLE_INPUT_CHECKS
+#if OPENA8DJ_ENABLE_INPUT_DECODE && !OPENA8DJ_ENABLE_INPUT_CHECKS
     if (!atomic_load(&_inputDecodeActive)) {
         const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
         _inputMode2Index += length;
@@ -5492,20 +5504,33 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 
 - (uint32_t)readInput:(float *)outInterleaved frames:(uint32_t)frames channels:(uint32_t)channels
 {
-    atomic_store(&_inputDecodeActive, true);
+    BOOL decodeEnabled = atomic_load(&_inputDecodeEnabled);
+    atomic_store(&_inputDecodeActive, decodeEnabled);
     if (channels != kChannels) {
+        memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
+        return 0;
+    }
+    if (!decodeEnabled) {
         memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
         return 0;
     }
     return RingRead(&_inputRing, outInterleaved, frames, true);
 }
 
-- (void)setInputDecodeActive:(BOOL)active
+- (void)setInputDecodeEnabled:(BOOL)enabled
 {
-    atomic_store(&_inputDecodeActive, active);
-    if (!active) {
+    atomic_store(&gInputDecodeEnabledPreference, enabled);
+    atomic_store(&_inputDecodeEnabled, enabled);
+    if (!enabled) {
+        atomic_store(&_inputDecodeActive, false);
         RingClear(&_inputRing);
     }
+}
+
+- (void)setInputDecodeActive:(BOOL)active
+{
+    BOOL decodeEnabled = atomic_load(&_inputDecodeEnabled);
+    atomic_store(&_inputDecodeActive, active && decodeEnabled);
 }
 
 - (void)writeOutput:(const float *)inInterleaved
