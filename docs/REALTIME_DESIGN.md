@@ -588,3 +588,28 @@ Offline gate:
 The future real USB adapter must preserve this lifecycle with real DriverKit or
 USBDriverKit async request objects. The audio path must not allocate replacement
 requests or repair lifecycle errors while audio is flowing.
+
+## DriverKit USB Shutdown Boundary
+
+Stream stop must not pretend that live asynchronous USB requests completed
+normally. The runtime boundary has separate accounting for normal completion
+and shutdown cancellation:
+
+- stop first flushes any newly formed submit descriptors;
+- live requests are cancelled explicitly;
+- cancelled bytes/frames are not counted as completed bytes/frames;
+- late completions after cancellation are rejected by generation checks;
+- restart after cancellation must start from a clean request pool.
+
+Offline gate:
+
+- `opena8djcpp_driverkit_usb_request_shutdown_contract`.
+- Required result has `inflight_requests_at_stop=3`, `cancelled_requests=3`,
+  `live_requests_after_stop=0`, `fallback_allocations=0`,
+  `invalid_completions=0`, `stale_completions=0`,
+  `late_completions_after_cancel=0` for the skeleton shutdown row, plus a
+  separate negative row proving late completion after cancel is rejected.
+- `restart_after_cancel_safe=true` is mandatory.
+
+This prevents a future DriverKit/USB adapter from hiding stop/restart bugs as
+successful completions. It still does not prove physical USB behavior.

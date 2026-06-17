@@ -17,6 +17,7 @@ python3 scripts/check-hal-bundle-complete \
 ./build/cpp-offline/opena8djcpp_usb_submit_payload_contract > "$EVIDENCE_DIR/usb-submit-payload-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_submit_binding_contract > "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_request_lifecycle_contract > "$EVIDENCE_DIR/driverkit-usb-request-lifecycle-contract.json"
+./build/cpp-offline/opena8djcpp_driverkit_usb_request_shutdown_contract > "$EVIDENCE_DIR/driverkit-usb-request-shutdown-contract.json"
 ctest --test-dir build/cpp-offline --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
 
 cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
@@ -50,6 +51,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract | tee "$EVIDENCE_DIR/driverkit-prepared-hotpath-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_usb_submit_binding_contract | tee "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_usb_request_lifecycle_contract | tee "$EVIDENCE_DIR/driverkit-usb-request-lifecycle-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_usb_request_shutdown_contract | tee "$EVIDENCE_DIR/driverkit-usb-request-shutdown-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_recovery_contract | tee "$EVIDENCE_DIR/prepared-transport-recovery-contract.json"
@@ -163,6 +165,7 @@ driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.
 driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json")
 driverkit_usb_submit_binding = load_json("driverkit-usb-submit-binding-contract.json")
 driverkit_usb_request_lifecycle = load_json("driverkit-usb-request-lifecycle-contract.json")
+driverkit_usb_request_shutdown = load_json("driverkit-usb-request-shutdown-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
 prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
 prepared_transport_recovery = load_json("prepared-transport-recovery-contract.json")
@@ -773,6 +776,30 @@ summary = {
         "failures": driverkit_usb_request_lifecycle.get("failures"),
         "evidence": "local-analysis/cpp-offline/driverkit-usb-request-lifecycle-contract.json",
     },
+    "driverkit_usb_request_shutdown_contract": {
+        "status": driverkit_usb_request_shutdown.get("result"),
+        "schema": driverkit_usb_request_shutdown.get("schema"),
+        "inflight_requests_at_stop": driverkit_usb_request_shutdown.get(
+            "inflight_requests_at_stop"
+        ),
+        "cancelled_requests": driverkit_usb_request_shutdown.get("cancelled_requests"),
+        "live_requests_after_stop": driverkit_usb_request_shutdown.get(
+            "live_requests_after_stop"
+        ),
+        "restart_after_cancel_safe": driverkit_usb_request_shutdown.get(
+            "restart_after_cancel_safe"
+        ),
+        "late_completion_rejected": driverkit_usb_request_shutdown.get(
+            "late_completion_rejected"
+        ),
+        "late_completion_after_cancel_count": driverkit_usb_request_shutdown.get(
+            "late_completion_after_cancel_count"
+        ),
+        "submitted_frames": driverkit_usb_request_shutdown.get("submitted_frames"),
+        "completed_frames": driverkit_usb_request_shutdown.get("completed_frames"),
+        "cancelled_frames": driverkit_usb_request_shutdown.get("cancelled_frames"),
+        "evidence": "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
+    },
     "prepared_transport_packet_contract": {
         "status": prepared_transport_packet.get("result"),
         "schema": prepared_transport_packet.get("schema"),
@@ -989,6 +1016,15 @@ summary = {
         ),
         "driverkit_usb_request_lifecycle_completed_frames": prepared_transport_migration.get(
             "driverkit_usb_request_lifecycle_completed_frames"
+        ),
+        "driverkit_usb_request_shutdown_inflight_requests_at_stop": prepared_transport_migration.get(
+            "driverkit_usb_request_shutdown_inflight_requests_at_stop"
+        ),
+        "driverkit_usb_request_shutdown_cancelled_requests": prepared_transport_migration.get(
+            "driverkit_usb_request_shutdown_cancelled_requests"
+        ),
+        "driverkit_usb_request_shutdown_live_requests_after_stop": prepared_transport_migration.get(
+            "driverkit_usb_request_shutdown_live_requests_after_stop"
         ),
         "failing_gates": [
             gate.get("name")

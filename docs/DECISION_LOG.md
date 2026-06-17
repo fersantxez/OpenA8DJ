@@ -6336,3 +6336,46 @@ Next implication:
   slots to real async USB request objects and preserve the same counters.
   Product superiority still requires lock-gated physical same-session quality,
   routing, timecode vinyl, CPU, and recovery evidence against mainline.
+
+## 2026-06-17: Require USB Request Shutdown/Cancel/Restart Contract
+
+Decision:
+- The DriverKit shell now owns the prepared USB request pool during stream
+  runtime.
+- Stream stop distinguishes normal completions from shutdown cancellations.
+- Added `opena8djcpp_driverkit_usb_request_shutdown_contract`.
+- `prepared-transport-migration-gate` now requires
+  `driverkit_usb_request_shutdown_safe=PASS`.
+
+Reason:
+- A physical USB adapter can fail during stop/restart even if steady-state
+  submit/complete/recycle accounting is correct.
+- Treating live stop requests as normal completions would hide lifecycle bugs
+  and overstate hardware readiness.
+
+Evidence:
+- Focal gate PASS:
+  - `inflight_requests_at_stop=3`;
+  - `cancelled_requests=3`;
+  - `live_requests_after_stop=0`;
+  - `submit_calls=4`;
+  - `completion_calls=1`;
+  - `recycle_calls=4`;
+  - `submitted_frames=352`;
+  - `completed_frames=88`;
+  - `cancelled_frames=264`;
+  - `restart_after_cancel_safe=true`;
+  - `late_completion_rejected=true`.
+- Migration gate PASS now includes
+  `driverkit_usb_request_shutdown_safe=PASS`.
+
+Alternatives discarded:
+- Drain live requests as if they completed normally during stop: rejected
+  because it hides cancellation behavior and creates misleading accounting.
+- Leave shutdown behavior to real hardware testing: rejected because this
+  invariant is cheap and safer to prove offline first.
+
+Next implication:
+- The next USB/DriverKit adapter must map cancellation and late completion
+  behavior to real async request objects. This does not prove physical audio
+  quality, CPU superiority, or timecode readiness.

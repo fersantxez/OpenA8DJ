@@ -2401,6 +2401,15 @@ Current implication:
   - Current full offline evidence after this integration: Debug CTest `49/49`,
     Release CTest `50/50`, evidence schema `required_files=50`,
     `missing_files=0`. Promotion remains blocked.
+  - The DriverKit skeleton now owns the modeled USB request pool at runtime and
+    distinguishes normal completion from shutdown cancellation. The new
+    `opena8djcpp_driverkit_usb_request_shutdown_contract` stops with `3` live
+    requests, cancels all `3`, leaves `0` live requests, rejects a late
+    completion after cancel, and proves restart-after-cancel safety. Migration
+    now requires `driverkit_usb_request_shutdown_safe=PASS`.
+  - Current full offline evidence after this shutdown integration: Debug CTest
+    `50/50`, Release CTest `51/51`, evidence schema `required_files=51`,
+    `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

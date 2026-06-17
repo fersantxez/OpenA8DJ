@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
       root / "tools/driverkit_prepared_transport_contract.cpp",
       root / "tools/driverkit_usb_submit_binding_contract.cpp",
       root / "tools/driverkit_usb_request_lifecycle_contract.cpp",
+      root / "tools/driverkit_usb_request_shutdown_contract.cpp",
       root / "tools/prepared_transport_packet_contract.cpp",
       root / "tools/prepared_transport_routing_timecode_contract.cpp",
       root / "tools/prepared_transport_recovery_contract.cpp",

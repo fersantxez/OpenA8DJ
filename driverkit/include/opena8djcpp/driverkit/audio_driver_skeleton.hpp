@@ -2,6 +2,7 @@
 
 #include "opena8djcpp/driverkit_model.hpp"
 #include "opena8djcpp/prepared_transport.hpp"
+#include "opena8djcpp/usb_request_pool.hpp"
 #include "opena8djcpp/usb_submit_plan.hpp"
 
 #include <array>
@@ -24,6 +25,9 @@ struct AudioStreamConfig {
   std::uint32_t usb_bytes_per_slot = kMode2DefaultTransferBytes;
   std::uint32_t usb_initial_capture_slots = 8;
   std::uint32_t usb_initial_playback_slots = 8;
+  std::uint32_t usb_request_slots = 8;
+  std::uint32_t usb_request_completion_depth = 4;
+  bool usb_retain_submit_descriptors = false;
 };
 
 struct AudioIOMemoryDescriptorModel {
@@ -50,6 +54,9 @@ struct DriverKitRuntimeCounters {
   std::uint64_t zero_timestamp_regressions = 0;
   std::uint64_t configuration_changes = 0;
   std::uint64_t rejected_configuration_changes = 0;
+  std::uint64_t usb_request_submit_failures = 0;
+  std::uint64_t usb_request_completion_failures = 0;
+  std::uint64_t usb_request_drain_failures = 0;
 };
 
 // Compile this target only inside a DriverKit-capable Xcode project. The pure
@@ -78,10 +85,12 @@ class AudioDriverSkeleton {
   [[nodiscard]] const PreparedTransportCounters& transport_counters() const;
   [[nodiscard]] const DriverKitRuntimeCounters& runtime_counters() const;
   [[nodiscard]] const PreparedUsbSubmitPlannerCounters& usb_submit_counters() const;
+  [[nodiscard]] const PreparedUsbRequestPoolCounters& usb_request_counters() const;
   [[nodiscard]] std::span<const UsbSubmitDescriptor> usb_submit_descriptors() const;
   [[nodiscard]] ZeroTimestampModel zero_timestamp() const;
   [[nodiscard]] PreparedTransportSafety transport_safety() const;
   [[nodiscard]] PreparedUsbSubmitPlannerSafety usb_submit_safety() const;
+  [[nodiscard]] PreparedUsbRequestPoolSafety usb_request_safety() const;
 
  private:
   [[nodiscard]] bool validate_stream_config(const AudioStreamConfig& config) const;
@@ -92,17 +101,27 @@ class AudioDriverSkeleton {
   [[nodiscard]] bool queue_usb_slots_for_period(std::span<const S24Frame> capture_frames,
                                                 std::span<const S24Frame> playback_frames);
   [[nodiscard]] bool queue_usb_slot(UsbSlotDirection direction);
+  [[nodiscard]] bool drain_new_usb_submit_descriptors();
+  [[nodiscard]] bool submit_usb_descriptor(const UsbSubmitDescriptor& descriptor);
+  [[nodiscard]] bool complete_oldest_usb_request();
+  [[nodiscard]] bool drain_usb_requests();
+  [[nodiscard]] std::uint64_t cancel_usb_requests();
   [[nodiscard]] std::uint64_t next_usb_timestamp(UsbSlotDirection direction);
 
   DriverKitDeviceModel device_model_ = make_driverkit_device_model();
   AudioStreamConfig stream_config_{};
   PreparedTransportBackend transport_{};
   PreparedUsbSubmitPlanner usb_submit_planner_{};
+  PreparedUsbRequestPool usb_request_pool_{};
+  std::array<PreparedUsbRequestHandle, kPreparedUsbRequestMaxSlots> inflight_usb_requests_{};
   DriverKitRuntimeCounters runtime_counters_{};
   ZeroTimestampModel zero_timestamp_{};
   AudioDriverState state_ = AudioDriverState::Created;
   std::uint64_t next_capture_usb_sequence_ = 0;
   std::uint64_t next_playback_usb_sequence_ = 0;
+  std::uint32_t submitted_usb_descriptor_count_ = 0;
+  std::uint32_t inflight_usb_request_head_ = 0;
+  std::uint32_t inflight_usb_request_count_ = 0;
   bool stream_configured_ = false;
   bool have_zero_timestamp_ = false;
 };

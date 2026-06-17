@@ -2102,6 +2102,13 @@ Prepared transport migration metric:
   `driverkit_usb_request_lifecycle_completed_bytes=185856`, and
   `driverkit_usb_request_lifecycle_completed_frames=5808`. Otherwise the
   future USB path has not proven bounded preallocated request lifecycle.
+- It must also report `driverkit_usb_request_shutdown_safe=PASS`,
+  `driverkit_usb_request_shutdown_inflight_requests_at_stop>0`,
+  `driverkit_usb_request_shutdown_cancelled_requests` equal to the in-flight
+  count, `driverkit_usb_request_shutdown_live_requests_after_stop=0`,
+  `restart_after_cancel_safe=true`, and
+  `late_completion_rejected=true`. Otherwise stop/restart lifecycle is not
+  safe enough to prepare a hardware window.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

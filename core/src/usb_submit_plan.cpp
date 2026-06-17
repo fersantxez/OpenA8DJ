@@ -85,6 +85,10 @@ void PreparedUsbSubmitPlanner::finish() {
   update_reduction_ratio();
 }
 
+void PreparedUsbSubmitPlanner::clear_descriptors() {
+  descriptor_count_ = 0;
+}
+
 PreparedUsbSubmitPlannerSafety PreparedUsbSubmitPlanner::safety() const {
   PreparedUsbSubmitPlannerSafety out{};
   if (!started_) {

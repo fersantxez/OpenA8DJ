@@ -9698,3 +9698,59 @@ Full offline gate rerun:
   - This is not a real DriverKit/USBDriverKit submit implementation, not a
     physical sound-quality result, not Traktor/timecode-vinyl readiness, and
     not CPU superiority over mainline.
+
+## 2026-06-17 Offline DriverKit USB Request Shutdown Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added skeleton-owned request pool runtime behavior.
+  - Added explicit shutdown cancellation accounting, distinct from normal
+    completion accounting.
+  - Added late-completion-after-cancel rejection and restart-after-cancel gate.
+  - No HAL install, dext install, CoreAudio, USB, hardware, reset, service
+    restart, or default-device action was performed.
+- Gate:
+  - `opena8djcpp_driverkit_usb_request_shutdown_contract`.
+  - Result: PASS.
+  - `inflight_requests_at_stop=3`.
+  - `cancelled_requests=3`.
+  - `live_requests_after_stop=0`.
+  - `submit_calls=4`.
+  - `completion_calls=1`.
+  - `recycle_calls=4`.
+  - `fallback_allocations=0`.
+  - `invalid_completions=0`.
+  - `stale_completions=0` in the shutdown row.
+  - `submitted_frames=352`.
+  - `completed_frames=88`.
+  - `cancelled_frames=264`.
+  - `restart_after_cancel_safe=true`.
+  - `late_completion_rejected=true`.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `driverkit_usb_request_shutdown_safe=PASS`.
+  - `driverkit_usb_request_shutdown_inflight_requests_at_stop=3.000000`.
+  - `driverkit_usb_request_shutdown_cancelled_requests=3.000000`.
+  - `driverkit_usb_request_shutdown_live_requests_after_stop=0.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_usb_request_shutdown_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_usb_request_shutdown_contract`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `50/50` passed.
+  - Release CTest: `51/51` passed.
+  - Evidence schema: `required_files=51`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - Stop/restart now has a measured offline contract and cannot be silently
+    treated as successful USB completion.
+  - This is not a real DriverKit/USBDriverKit submit implementation, not a
+    physical sound-quality result, not Traktor/timecode-vinyl readiness, and
+    not CPU superiority over mainline.

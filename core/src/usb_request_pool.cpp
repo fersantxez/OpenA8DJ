@@ -13,6 +13,7 @@ bool PreparedUsbRequestPool::start(const PreparedUsbRequestPoolConfig& config) {
   for (auto& request : requests_) {
     request.descriptor = {};
     request.in_use = false;
+    request.last_cancelled_generation = 0;
   }
   started_ = true;
   return true;
@@ -50,12 +51,15 @@ bool PreparedUsbRequestPool::complete(PreparedUsbRequestHandle handle) {
   }
 
   auto& request = requests_[handle.slot];
-  if (!request.in_use) {
-    counters_.invalid_completions += 1;
-    return false;
-  }
   if (request.generation != handle.generation) {
     counters_.stale_completions += 1;
+    if (request.last_cancelled_generation == handle.generation) {
+      counters_.late_completions_after_cancel += 1;
+    }
+    return false;
+  }
+  if (!request.in_use) {
+    counters_.invalid_completions += 1;
     return false;
   }
 
@@ -68,16 +72,42 @@ bool PreparedUsbRequestPool::complete(PreparedUsbRequestHandle handle) {
   return true;
 }
 
+std::uint64_t PreparedUsbRequestPool::cancel_all() {
+  if (!started_) {
+    return 0;
+  }
+  std::uint64_t cancelled = 0;
+  for (std::uint32_t index = 0; index < config_.request_slots; ++index) {
+    auto& request = requests_[index];
+    if (!request.in_use) {
+      continue;
+    }
+    account_cancel(request.descriptor);
+    request.in_use = false;
+    request.last_cancelled_generation = request.generation;
+    request.generation += 1;
+    request.descriptor = {};
+    counters_.live_requests -= 1;
+    counters_.recycle_calls += 1;
+    cancelled += 1;
+  }
+  return cancelled;
+}
+
 PreparedUsbRequestPoolSafety PreparedUsbRequestPool::safety() const {
   PreparedUsbRequestPoolSafety out{};
   out.preallocated_only = counters_.fallback_allocations == 0;
-  out.lifecycle_safe = counters_.invalid_completions == 0 && counters_.stale_completions == 0 &&
-                       counters_.submit_calls == counters_.completion_calls &&
-                       counters_.completion_calls == counters_.recycle_calls;
-  out.accounting_safe = counters_.submitted_bytes == counters_.completed_bytes &&
-                        counters_.submitted_frames == counters_.completed_frames &&
-                        counters_.submitted_capture_bytes == counters_.completed_capture_bytes &&
-                        counters_.submitted_playback_bytes == counters_.completed_playback_bytes;
+  out.lifecycle_safe =
+      counters_.invalid_completions == 0 && counters_.stale_completions == 0 &&
+      counters_.submit_calls == counters_.completion_calls + counters_.cancel_calls &&
+      counters_.recycle_calls == counters_.completion_calls + counters_.cancel_calls;
+  out.accounting_safe =
+      counters_.submitted_bytes == counters_.completed_bytes + counters_.cancelled_bytes &&
+      counters_.submitted_frames == counters_.completed_frames + counters_.cancelled_frames &&
+      counters_.submitted_capture_bytes ==
+          counters_.completed_capture_bytes + counters_.cancelled_capture_bytes &&
+      counters_.submitted_playback_bytes ==
+          counters_.completed_playback_bytes + counters_.cancelled_playback_bytes;
   out.drained = counters_.live_requests == 0;
   out.product_safe =
       out.preallocated_only && out.lifecycle_safe && out.accounting_safe && out.drained;
@@ -116,6 +146,19 @@ void PreparedUsbRequestPool::account_completion(const UsbSubmitDescriptor& descr
   } else {
     counters_.playback_completion_calls += 1;
     counters_.completed_playback_bytes += descriptor.byte_count;
+  }
+}
+
+void PreparedUsbRequestPool::account_cancel(const UsbSubmitDescriptor& descriptor) {
+  counters_.cancel_calls += 1;
+  counters_.cancelled_bytes += descriptor.byte_count;
+  counters_.cancelled_frames += descriptor.frame_count;
+  if (descriptor.direction == UsbSlotDirection::Capture) {
+    counters_.capture_cancel_calls += 1;
+    counters_.cancelled_capture_bytes += descriptor.byte_count;
+  } else {
+    counters_.playback_cancel_calls += 1;
+    counters_.cancelled_playback_bytes += descriptor.byte_count;
   }
 }
 

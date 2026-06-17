@@ -3324,3 +3324,30 @@ Risk:
   - This is still a fake runtime boundary. The next implementation must bind
     equivalent counters to real DriverKit/USB work before any lock-gated
     hardware candidate can claim CPU direction.
+
+## 2026-06-17 Subagent: Pasteur USB Shutdown Auditor
+
+- Agent:
+  - Pasteur (`019ed7de-a957-7f62-84f6-d130065e7f22`).
+- Mission:
+  - Read-only audit of the next offline blocker after commit `f863300`.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Descriptor, payload, binding, and request pool contracts existed, but
+    request lifecycle still lived partly as a standalone model.
+  - The next offline blocker was shutdown/cancel/restart ownership: stop with
+    live requests, explicit cancellation accounting, late completions rejected,
+    and restart after cancel.
+- Integrated action:
+  - Added skeleton-owned request pool behavior and
+    `opena8djcpp_driverkit_usb_request_shutdown_contract`.
+  - The migration gate now requires `driverkit_usb_request_shutdown_safe=PASS`.
+- Risk:
+  - This remains offline DriverKit-shell modeling. It does not prove real
+    USBDriverKit submits, dext installation, physical audio quality, CPU
+    superiority, or Traktor/timecode vinyl readiness.

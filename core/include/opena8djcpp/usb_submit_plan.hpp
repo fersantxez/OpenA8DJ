@@ -70,6 +70,7 @@ class PreparedUsbSubmitPlanner {
                                               std::uint64_t sequence,
                                               std::uint64_t sample_timestamp);
   void finish();
+  void clear_descriptors();
 
   [[nodiscard]] const PreparedUsbSubmitPlannerConfig& config() const {
     return config_;

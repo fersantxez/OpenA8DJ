@@ -30,20 +30,28 @@ struct PreparedUsbRequestPoolCounters {
   std::uint64_t completion_calls = 0;
   std::uint64_t capture_completion_calls = 0;
   std::uint64_t playback_completion_calls = 0;
+  std::uint64_t cancel_calls = 0;
+  std::uint64_t capture_cancel_calls = 0;
+  std::uint64_t playback_cancel_calls = 0;
   std::uint64_t recycle_calls = 0;
   std::uint64_t fallback_allocations = 0;
   std::uint64_t invalid_completions = 0;
   std::uint64_t stale_completions = 0;
+  std::uint64_t late_completions_after_cancel = 0;
   std::uint64_t live_requests = 0;
   std::uint64_t max_live_requests = 0;
   std::uint64_t submitted_bytes = 0;
   std::uint64_t completed_bytes = 0;
+  std::uint64_t cancelled_bytes = 0;
   std::uint64_t submitted_frames = 0;
   std::uint64_t completed_frames = 0;
+  std::uint64_t cancelled_frames = 0;
   std::uint64_t submitted_capture_bytes = 0;
   std::uint64_t completed_capture_bytes = 0;
+  std::uint64_t cancelled_capture_bytes = 0;
   std::uint64_t submitted_playback_bytes = 0;
   std::uint64_t completed_playback_bytes = 0;
+  std::uint64_t cancelled_playback_bytes = 0;
 };
 
 struct PreparedUsbRequestPoolSafety {
@@ -65,6 +73,7 @@ class PreparedUsbRequestPool {
 
   [[nodiscard]] PreparedUsbRequestHandle submit(const UsbSubmitDescriptor& descriptor);
   [[nodiscard]] bool complete(PreparedUsbRequestHandle handle);
+  [[nodiscard]] std::uint64_t cancel_all();
 
   [[nodiscard]] const PreparedUsbRequestPoolConfig& config() const {
     return config_;
@@ -80,12 +89,14 @@ class PreparedUsbRequestPool {
   struct RequestSlot {
     UsbSubmitDescriptor descriptor{};
     std::uint32_t generation = 1;
+    std::uint32_t last_cancelled_generation = 0;
     bool in_use = false;
   };
 
   [[nodiscard]] std::uint32_t find_free_slot() const;
   void account_submit(const UsbSubmitDescriptor& descriptor);
   void account_completion(const UsbSubmitDescriptor& descriptor);
+  void account_cancel(const UsbSubmitDescriptor& descriptor);
 
   PreparedUsbRequestPoolConfig config_{};
   PreparedUsbRequestPoolCounters counters_{};

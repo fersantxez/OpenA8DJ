@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-request-lifecycle-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
@@ -137,6 +138,12 @@ int main(int argc, char** argv) {
                                           "\"driverkit_usb_request_lifecycle_submit_calls\": 66") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"driverkit_usb_request_lifecycle_completed_frames\": 5808") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_request_shutdown_contract\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_request_shutdown_cancelled_requests\": 3") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_request_shutdown_live_requests_after_stop\": 0") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",

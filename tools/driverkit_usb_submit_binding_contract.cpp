@@ -95,6 +95,7 @@ BindingResult run_binding_contract() {
       .usb_bytes_per_slot = kMode2DefaultTransferBytes,
       .usb_initial_capture_slots = 8,
       .usb_initial_playback_slots = 8,
+      .usb_retain_submit_descriptors = true,
   };
   if (!driver.start_driver() || !driver.configure_stream(config) || !driver.start_stream()) {
     return result;

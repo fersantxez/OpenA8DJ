@@ -241,6 +241,8 @@ int main(int argc, char** argv) {
       read_file(base / "driverkit-usb-submit-binding-contract.json");
   const auto driverkit_usb_request_lifecycle =
       read_file(base / "driverkit-usb-request-lifecycle-contract.json");
+  const auto driverkit_usb_request_shutdown =
+      read_file(base / "driverkit-usb-request-shutdown-contract.json");
   const auto packet = read_file(base / "prepared-transport-packet-contract.json");
   const auto routing_timecode =
       read_file(base / "prepared-transport-routing-timecode-contract.json");
@@ -315,6 +317,12 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_completed_bytes"));
   const double driverkit_usb_request_completed_frames =
       number_or_nan(json_number(driverkit_usb_request_lifecycle, "stable_completed_frames"));
+  const double driverkit_usb_request_shutdown_inflight =
+      number_or_nan(json_number(driverkit_usb_request_shutdown, "inflight_requests_at_stop"));
+  const double driverkit_usb_request_shutdown_cancelled =
+      number_or_nan(json_number(driverkit_usb_request_shutdown, "cancelled_requests"));
+  const double driverkit_usb_request_shutdown_live_after =
+      number_or_nan(json_number(driverkit_usb_request_shutdown, "live_requests_after_stop"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(driverkit_hotpath) && result_pass(packet) &&
@@ -443,6 +451,20 @@ int main(int argc, char** argv) {
       finite(driverkit_usb_request_completed_frames) &&
       driverkit_usb_request_completed_frames == 5808.0 &&
       number_is_zero(driverkit_usb_request_lifecycle, "failures");
+  const bool driverkit_usb_request_shutdown_safe =
+      result_pass(driverkit_usb_request_shutdown) &&
+      finite(driverkit_usb_request_shutdown_inflight) &&
+      driverkit_usb_request_shutdown_inflight > 0.0 &&
+      finite(driverkit_usb_request_shutdown_cancelled) &&
+      driverkit_usb_request_shutdown_cancelled == driverkit_usb_request_shutdown_inflight &&
+      finite(driverkit_usb_request_shutdown_live_after) &&
+      driverkit_usb_request_shutdown_live_after == 0.0 &&
+      json_bool(driverkit_usb_request_shutdown, "restart_after_cancel_safe").value_or(false) &&
+      json_bool(driverkit_usb_request_shutdown, "late_completion_rejected").value_or(false) &&
+      number_is_zero(driverkit_usb_request_shutdown, "fallback_allocations") &&
+      number_is_zero(driverkit_usb_request_shutdown, "invalid_completions") &&
+      number_is_zero(driverkit_usb_request_shutdown, "stale_completions") &&
+      number_is_zero(driverkit_usb_request_shutdown, "late_completions_after_cancel");
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -473,6 +495,7 @@ int main(int argc, char** argv) {
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
       {"driverkit_usb_submit_binding_safe", driverkit_usb_submit_binding_safe},
       {"driverkit_usb_request_lifecycle_safe", driverkit_usb_request_lifecycle_safe},
+      {"driverkit_usb_request_shutdown_safe", driverkit_usb_request_shutdown_safe},
       {"performance_hypothesis_supported_by_hot_path_timing", performance_hypothesis_supported},
       {"product_promotion_still_blocked", product_promotion_blocked},
       {"quality_claim_still_blocked", quality_claim_blocked},
@@ -535,6 +558,12 @@ int main(int argc, char** argv) {
                driverkit_usb_request_completed_bytes);
   print_number("driverkit_usb_request_lifecycle_completed_frames",
                driverkit_usb_request_completed_frames);
+  print_number("driverkit_usb_request_shutdown_inflight_requests_at_stop",
+               driverkit_usb_request_shutdown_inflight);
+  print_number("driverkit_usb_request_shutdown_cancelled_requests",
+               driverkit_usb_request_shutdown_cancelled);
+  print_number("driverkit_usb_request_shutdown_live_requests_after_stop",
+               driverkit_usb_request_shutdown_live_after);
   print_number("driverkit_prepared_hotpath_max_ring_publications_per_period",
                hotpath_max_publications);
   print_number("driverkit_prepared_hotpath_min_publication_reduction_ratio",
