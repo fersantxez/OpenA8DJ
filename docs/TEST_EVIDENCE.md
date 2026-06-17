@@ -2146,3 +2146,45 @@ Operational note:
   - Queue depth is relevant to click behavior and coreaudiod CPU, but as a
     standalone change it does not solve quality and worsens driver CPU.
   - Do not make `8/8` default without a later positive combined hypothesis.
+
+## 2026-06-17: Output Prefetch 64 Physical Rejection
+
+- Commands:
+  - `make HAL_OUTPUT_PREFETCH_FRAMES=64 usb-play hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-prefetch64/20260616-205818/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-dir "$HOME/Music" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Forced HAL unload under hardware lock, followed by `audio-stack-guard`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-prefetch64-failed-unload.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/prefetch64-summary.json`
+  - `make usb-play hal > local-analysis/build-flags/default-restore-after-prefetch64.log`
+- Result:
+  - Build PASS with `OPENA8DJ_OUTPUT_PREFETCH_FRAMES=64`.
+  - HAL candidate safety PASS.
+  - Physical soundcheck FAIL.
+  - Post-failure unload/recovery PASS; final isolation PASS.
+  - Default build restored to `OPENA8DJ_OUTPUT_PREFETCH_FRAMES=256`.
+- Evidence paths:
+  - `local-analysis/physical-prefetch64/20260616-205818`
+  - `local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal`
+  - `local-analysis/stream-stats/prefetch64-summary.json`
+  - `local-analysis/audio-stack-guard/20260616-force-unload-prefetch64`
+  - `local-analysis/runtime-isolation/post-prefetch64-failed-unload.json`
+  - `local-analysis/build-flags/default-restore-after-prefetch64.log`
+- Key metrics:
+  - `quality_alignment_score=0.956371`
+  - `snr_db=10.40`
+  - `click_outliers=4`
+  - `lag_jumps_gt_2_frames=48`
+  - `mid_band_residual_ratio=1.431220`
+  - `high_band_residual_ratio=1.365281`
+  - `quiet_mid_band_noise_dbfs=-35.98`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver p95 CPU `39.5%`
+  - coreaudiod p95 CPU `4.1%`
+  - Stream stats: `outputLateWriteFrames_delta=0`,
+    `outputLateWriteBatches_delta=0`, no active underruns, no timeline resets,
+    no panic flags, capture transaction errors per capture transfer `2.2728`.
+- Interpretation:
+  - Mainline prefetch parity is not a standalone fix in C++.
+  - Do not combine with `queue8` until a separate transport/capture-error
+    hypothesis explains the persistent residual/lag.

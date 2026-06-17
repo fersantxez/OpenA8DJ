@@ -369,5 +369,15 @@ Next technical target:
 - `queue8` did improve click outliers to `0` and coreaudiod p95 to `3.1%`, but
   OpenA8DJ driver CPU worsened to p95 `37.2%`. Treat it as a clue, not a
   default. The local build was restored to default `64/64`.
-- Current next one-factor candidate: `HAL_OUTPUT_PREFETCH_FRAMES=64` with
-  default queues restored.
+- Standalone `HAL_OUTPUT_PREFETCH_FRAMES=64` also failed:
+  `quality_alignment_score=0.956371`, `snr_db=10.40`,
+  `click_outliers=4`, `lag_jumps_gt_2_frames=48`,
+  `mid_band_residual_ratio=1.431220`,
+  `high_band_residual_ratio=1.365281`, quiet mid-band noise `-35.98 dBFS`,
+  OpenA8DJ driver p95 `39.5%`.
+- The local build was restored to default `HAL_OUTPUT_PREFETCH_FRAMES=256`.
+- Current interpretation: parity knobs are not enough. The repeated pattern is
+  no software underruns/late writes/timeline resets, stable output read rate,
+  persistent capture transaction errors around `2.273` per capture transfer,
+  high driver CPU, and bad analog residual/lag. Next work should inspect USB
+  transaction request/complete semantics and capture error classification.

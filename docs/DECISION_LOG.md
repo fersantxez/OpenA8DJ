@@ -979,3 +979,43 @@ Follow-up:
 - If prefetch alone improves quality without driver CPU regression, consider a
   later controlled combination with `queue8`; do not combine before a positive
   one-factor result.
+
+## 2026-06-17: Reject Output Prefetch 64 As Standalone Candidate
+
+Decision:
+- Keep `HAL_OUTPUT_PREFETCH_FRAMES=256` as the C++ default.
+- Do not combine `prefetch64` with `queue8`; the standalone prefetch result did
+  not improve the product gates.
+
+Reason:
+- Physical soundcheck with `HAL_OUTPUT_PREFETCH_FRAMES=64` failed:
+  `quality_alignment_score=0.956371`, `snr_db=10.40`,
+  `click_outliers=4`, `lag_jumps_gt_2_frames=48`,
+  `mid_band_residual_ratio=1.431220`,
+  `high_band_residual_ratio=1.365281`, quiet mid-band noise `-35.98 dBFS`.
+- Compared with the hotstats/atomic-write baseline, prefetch64 worsened
+  quality alignment and lag jumps, and driver CPU p95 increased to `39.5%`.
+- Stream stats still showed no active underruns, late writes, timeline resets,
+  or panic flags. Capture transaction error ratio stayed around `2.273`.
+
+Alternatives discarded:
+- Adopt mainline prefetch `64` for parity: rejected because parity did not
+  translate into better physical evidence in the C++ HAL.
+- Test `queue8 + prefetch64`: rejected because both one-factor runs failed
+  driver CPU/quality gates.
+
+Evidence:
+- Build/safety: `local-analysis/physical-prefetch64/20260616-205818`
+- Soundcheck: `local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal`
+- Stream stats: `local-analysis/stream-stats/prefetch64-summary.json`
+- Recovery/audit:
+  - `local-analysis/audio-stack-guard/20260616-force-unload-prefetch64`
+  - `local-analysis/runtime-isolation/post-prefetch64-failed-unload.json`
+- Default rebuild restored `OPENA8DJ_OUTPUT_PREFETCH_FRAMES=256`:
+  `local-analysis/build-flags/default-restore-after-prefetch64.log`.
+
+Follow-up:
+- The remaining pattern is stable: no software underruns/late writes, but
+  persistent analog residual/lag and high driver CPU. Next work should inspect
+  capture transaction error semantics and USB transaction request sizes/status
+  rather than more parity knobs.
