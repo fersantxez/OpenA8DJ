@@ -2327,6 +2327,13 @@ Current implication:
   - The experiment compiled and full offline gates passed, but it has no
     physical quality or CPU superiority evidence yet and is not enabled by
     default.
+  - Lock-gated physical testing of
+    `HAL_CAPTURE_PACED_PLAYBACK_REFILL=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2
+    HAL_PLAYBACK_QUEUE=4` rejected that experiment: driver CPU p95 improved to
+    about `18.2%`, and playback submissions fell to `3351`, but quality
+    collapsed (`quality_alignment_score=0.157019`, SNR `-21.74 dB`,
+    `lag_jumps_gt_2_frames=35`). The final guard unloaded the HAL and reported
+    audio stack health PASS.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

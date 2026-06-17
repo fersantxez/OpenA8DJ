@@ -5901,3 +5901,52 @@ Next implication:
   by short physical soundcheck only if safety passes. It must be rejected if it
   repeats the playback-completion-paced quality collapse or fails to reduce real
   driver CPU/enqueue pressure.
+
+## 2026-06-17: Reject Capture-Paced Playback Refill As Product Candidate
+
+Decision:
+- Do not promote or continue tuning
+  `HAL_CAPTURE_PACED_PLAYBACK_REFILL=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2
+  HAL_PLAYBACK_QUEUE=4` as a product candidate.
+
+Reason:
+- The experiment reduced playback submission pressure but collapsed physical
+  quality, matching the failure mode of the earlier playback-completion-paced
+  probe.
+- Capture remained active, so the failure is not explained by disabling
+  input/timecode. The independent coalesced OUT refill timing is still wrong
+  for this hardware route.
+
+Evidence:
+- `local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig`.
+- Build hash: `4150dac3b7a1ab74518dc0166cac4928bf2d62e32291f376c6f8d94f32d834d7`.
+- HAL candidate safety: PASS.
+- Soundcheck:
+  - `quality_alignment_score=0.157019`;
+  - SNR `-21.74 dB`;
+  - `lag_jumps_gt_2_frames=35`;
+  - no clipping.
+- CPU:
+  - `opena8dj_driver` median `16.1%`, p95 `18.2%`, max `18.3%`;
+  - `coreaudiod` median `2.2%`, p95 `28.9%`, max `42.1%`;
+  - total watched audio/UI median `18.9%`, p95 `47.4%`.
+- Stream stats:
+  - playback submissions `3351`;
+  - capture completions `12139`;
+  - zero transfer-pool fallback allocations;
+  - zero output underruns / active underruns / elastic drops.
+- Driver sample:
+  - `queue_playback=206`, down from `594` in the default profile;
+  - `usbhost_enqueue=1259`, down from `1608`;
+  - capture requeue remains dominant (`queue_capture=1117`).
+- Final guard:
+  - `opena8dj_state=unloaded`;
+  - `opena8dj_driver_pids=none`;
+  - `audio_stack_health=PASS`.
+
+Next implication:
+- Do not spend more iterations on independent coalesced playback refill inside
+  the HAL. The next viable direction must preserve the hardware's physical
+  timing/layout more closely, or move to a lower-overhead prepared
+  DriverKit/USBDriverKit transport that reduces enqueue cadence without
+  changing the audible timing contract.

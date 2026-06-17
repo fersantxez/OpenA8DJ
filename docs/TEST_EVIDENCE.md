@@ -9132,3 +9132,56 @@ Full offline gate rerun:
     superiority, or branch promotion.
   - Reject it if physical soundcheck repeats the previous coalescing quality
     collapse or if real driver CPU/enqueue pressure does not improve.
+
+## 2026-06-17 Capture-Paced Playback Refill Physical Rejection
+
+- Candidate:
+  - Commit: `f6684c9`.
+  - Build flags:
+    `HAL_CAPTURE_PACED_PLAYBACK_REFILL=1
+    HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_PLAYBACK_QUEUE=4`.
+  - HAL hash:
+    `4150dac3b7a1ab74518dc0166cac4928bf2d62e32291f376c6f8d94f32d834d7`.
+- Commands:
+  - `make -B hal HAL_CAPTURE_PACED_PLAYBACK_REFILL=1 HAL_PLAYBACK_COALESCE_TRANSFERS=2 HAL_PLAYBACK_QUEUE=4`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig/cpp-soundcheck --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail --sample-driver-process --sample-driver-delay 1 --sample-driver-seconds 7`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 2 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig/final-unload-guard`
+- Safety:
+  - HAL candidate safety: PASS.
+  - Final unload guard: PASS.
+  - Final state: `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`, `audio_stack_health=PASS`,
+    global idle `95.79%`.
+- Soundcheck result:
+  - FAIL.
+  - `quality_alignment_score=0.157019`.
+  - SNR `-21.74 dB`.
+  - `lag_jumps_gt_2_frames=35`.
+  - Mid/high residual ratios `17.909039` / `11.724034`.
+  - `capture_clipped_frames=0`.
+- CPU:
+  - `opena8dj_driver`: median `16.1%`, p95 `18.2%`, max `18.3%`.
+  - `coreaudiod`: median `2.2%`, p95 `28.9%`, max `42.1%`.
+  - Total watched audio/UI: median `18.9%`, p95 `47.4%`, max `77.0%`.
+- Stream stats:
+  - `playbackTransfersSubmitted=3351`.
+  - `captureTransfersCompleted=12139`.
+  - `captureTransferPoolFallbackAllocations=0`.
+  - `playbackTransferPoolFallbackAllocations=0`.
+  - `outputUnderruns=0`, `outputActiveUnderruns=0`,
+    `outputElasticDrops=0`, `outputTimelineResets=0`.
+- Driver sample:
+  - `driver-sample/status.json`: PASS.
+  - `dominant_interpretation=usbhost_async_enqueue_from_capture_and_playback_paths`.
+  - `queue_playback=206`, `queue_capture=1117`,
+    `usbhost_enqueue=1259`, `iokit_async=620`, `fill_playback=83`.
+- Interpretation:
+  - The experiment reduced playback queue samples and playback submissions, but
+    the physical audio result is unusable.
+  - Capture stayed active, so the failure is not an output-only/timecode-off
+    artifact.
+  - This candidate is rejected for product/readiness; no same-session mainline
+    comparison is useful until a candidate passes basic physical soundcheck.
+- Evidence:
+  - `local-analysis/physical-superiority-window/20260617T220551Z-cpp-capture-refill-irig`
