@@ -7830,3 +7830,53 @@ Operational note:
 - Interpretation:
   - Offline DVS/timecode coverage is useful and green.
   - It is not physical Traktor/timecode-vinyl readiness.
+
+## 2026-06-17 Prepared Transport Migration Gate
+
+- Scope:
+  - Offline-only aggregation over existing C++ evidence.
+  - No hardware, CoreAudio, USB, Traktor, driver install, defaults, service
+    restart, or physical audio touched.
+- Changes:
+  - Added `opena8djcpp_prepared_transport_migration_gate`.
+  - Added explicit `max_completion_gap_ratio` accounting to the prepared slot
+    scheduler counters and contract output.
+  - Wired the migration gate into `scripts/run-cpp-offline-gates` after the
+    promotion evaluator so it can block overclaiming from fresh evidence.
+- Focused commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_prepared_transport_migration_gate`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate`
+- Focused result before full gate rerun:
+  - Migration gate result: PASS.
+  - Migration candidate supported: `true`.
+  - Product ready: `false`.
+  - Branch promotion supported: `false`.
+  - Physical A/B required before claim: `true`.
+  - Fixed queue/requeue/enqueue to playback-fill ratio: `17.914629`.
+  - All aggregate sub-gates PASS, including product-promotion-still-blocked
+    and quality-claim-still-blocked.
+- Interpretation:
+  - Prepared transport is now the next justified performance candidate.
+  - It is not proof that C++ is better than mainline.
+
+Full offline gate rerun:
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Overall offline status: PASS.
+  - Debug CTest: `34/34` passed.
+  - Release CTest: `35/35` passed.
+  - Evidence schema: `35` required files, `0` missing.
+  - Static policy: `26` audited files, `0` forbidden hits, `0` default policy
+    failures.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - USB touched: `false`.
+- New evidence:
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Product status after rerun:
+  - Physical product comparator remains FAIL.
+  - Branch promotion supported: `false`.
+  - Timecode product readiness: `false`.
+  - Selected product run still fails quality and CPU gates.

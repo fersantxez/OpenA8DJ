@@ -2780,3 +2780,37 @@ Risk:
 - Next action:
   - Move toward prepared transport implementation evidence, not more HAL
     micro-flag probes.
+
+## 2026-06-17 Subagent: Goodall Prepared Migration Gate Reviewer
+
+- Agent:
+  - Goodall (`019ed6b6-9e3f-7dc0-af72-61056b76e967`).
+- Mission:
+  - Review what a useful `prepared_transport_migration_gate` must require.
+  - No edits, no hardware, no CoreAudio/USB/system changes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.`
+- Findings integrated:
+  - The migration gate must remain an offline migration gate, not readiness.
+  - It must require zero HAL steady-state requeues, stable backend lead, no
+    fallback allocation, strict cadence, monotonic timestamps, clean recovery,
+    routing A/B/C/D, preserved offline timecode, and explicit physical-readiness
+    blocking.
+  - It must not allow synthetic timecode PASS to imply Traktor/timecode-vinyl
+    readiness.
+- Files affected by integration:
+  - `tools/prepared_transport_migration_gate.cpp`.
+  - `core/include/opena8djcpp/prepared_transport.hpp`.
+  - `core/src/prepared_transport.cpp`.
+  - `tools/prepared_slot_scheduler_contract.cpp`.
+  - `scripts/run-cpp-offline-gates`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/TEST_EVIDENCE.md`.
+- Next action:
+  - Bind prepared transport into the runtime candidate path, then run a
+    lock-gated same-session A/B hardware window only after offline gates pass.

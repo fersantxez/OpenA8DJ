@@ -2022,3 +2022,11 @@ Timecode readiness aggregation:
   - product timecode ready: `false`.
 - Product readiness requires physical Traktor scope/lock evidence for the
   relevant decks and profiles, not just synthetic timecode signal PASS.
+
+Prepared transport migration metric:
+- `local-analysis/cpp-offline/prepared-transport-migration-gate.json` must PASS
+  before building the next low-CPU runtime candidate.
+- Its PASS only supports an offline migration direction. It must still report
+  product readiness and branch promotion as false until same-session physical
+  A/B evidence beats mainline on quality, functionality, timecode, CPU, and
+  recovery.

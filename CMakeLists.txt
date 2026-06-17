@@ -189,6 +189,9 @@ target_link_libraries(opena8djcpp_prepared_slot_scheduler_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_prepared_transport_migration_gate
+  tools/prepared_transport_migration_gate.cpp)
+
 add_executable(opena8djcpp_dvs_signal_smoke
   tools/dvs_signal_smoke.cpp)
 
@@ -269,6 +272,7 @@ add_test(NAME opena8djcpp_prepared_transport_packet_contract COMMAND opena8djcpp
 add_test(NAME opena8djcpp_prepared_transport_routing_timecode_contract COMMAND opena8djcpp_prepared_transport_routing_timecode_contract)
 add_test(NAME opena8djcpp_prepared_transport_recovery_contract COMMAND opena8djcpp_prepared_transport_recovery_contract)
 add_test(NAME opena8djcpp_prepared_slot_scheduler_contract COMMAND opena8djcpp_prepared_slot_scheduler_contract)
+add_test(NAME opena8djcpp_prepared_transport_migration_gate COMMAND opena8djcpp_prepared_transport_migration_gate)
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
 add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)

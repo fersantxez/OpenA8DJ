@@ -51,7 +51,11 @@ bool PreparedSlotScheduler::complete_period(const PreparedSlotSchedulerStepOptio
   if (options.fallback_allocation_attempt) {
     counters_.fallback_allocations += 2;
   }
-  if (config_.playback_completion_gap_periods > kPreparedTransportMaxCompletionGapRatio) {
+  const double completion_gap_ratio =
+      static_cast<double>(config_.playback_completion_gap_periods);
+  counters_.max_completion_gap_ratio =
+      std::max(counters_.max_completion_gap_ratio, completion_gap_ratio);
+  if (completion_gap_ratio > kPreparedTransportMaxCompletionGapRatio) {
     counters_.completion_gap_violations += 1;
   }
 

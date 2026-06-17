@@ -81,6 +81,7 @@ struct PreparedSlotSchedulerCounters {
   std::uint64_t playback_starved_periods = 0;
   std::uint64_t backend_requeue_budget_violations = 0;
   std::uint64_t completion_gap_violations = 0;
+  double max_completion_gap_ratio = 0.0;
   std::uint32_t capture_in_flight = 0;
   std::uint32_t playback_in_flight = 0;
   std::uint32_t min_capture_in_flight = 0;

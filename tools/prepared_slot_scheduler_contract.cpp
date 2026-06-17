@@ -62,6 +62,7 @@ void print_row(const Scenario& scenario,
             << ", \"backend_requeue_budget_violations\": "
             << counters.backend_requeue_budget_violations
             << ", \"completion_gap_violations\": " << counters.completion_gap_violations
+            << ", \"max_completion_gap_ratio\": " << counters.max_completion_gap_ratio
             << ", \"min_capture_in_flight\": " << counters.min_capture_in_flight
             << ", \"min_playback_in_flight\": " << counters.min_playback_in_flight
             << ", \"max_capture_in_flight\": " << counters.max_capture_in_flight
@@ -172,6 +173,8 @@ int main() {
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.prepared-slot-scheduler-contract.v1\",\n"
             << "  \"meaning\": \"offline prepared-slot lead/requeue contract; PASS is not physical readiness\",\n"
+            << "  \"thresholds\": {\"max_completion_gap_ratio\": "
+            << kPreparedTransportMaxCompletionGapRatio << "},\n"
             << "  \"rows\": [\n";
   for (std::size_t index = 0; index < scenarios.size(); ++index) {
     const auto result = run(scenarios[index]);

@@ -4911,3 +4911,36 @@ Evidence:
 Next implication:
 - Physical Traktor/timecode validation remains a required later hardware-window
   gate after music quality, CPU, route health, and safety preflight are sane.
+
+## 2026-06-17: Add Prepared Transport Migration Gate
+
+Decision:
+- Add `tools/prepared_transport_migration_gate.cpp`.
+- Keep it as an offline migration gate, not a readiness gate.
+- Report `product_ready=false`, `branch_promotion_supported=false`, and
+  `physical_ab_required_before_claim=true` even when the gate passes.
+
+Reason:
+- Stored hot-path timing points at fixed queue/requeue/enqueue cost, with a
+  fixed-transport-to-playback-fill ratio of `17.914629`.
+- The prepared transport contracts already model zero HAL steady-state
+  requeues, no fallback allocations, safe routing/timecode, and clean recovery.
+- These facts support building the next controlled transport candidate, but
+  they do not prove sound quality, timecode vinyl lock, or CPU superiority
+  against mainline.
+
+Alternatives discarded:
+- Treat prepared transport contract PASS as product readiness: rejected because
+  the selected physical product comparison still fails.
+- Continue isolated HAL flag experiments: rejected because several previous
+  CPU/cadence knobs were physically rejected or failed quality.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+- `local-analysis/cpp-offline/hot-path-timing-analysis.json`
+- `local-analysis/cpp-offline/physical-run-product-superiority.json`
+
+Next implication:
+- The next implementation direction is runtime binding for prepared transport,
+  followed by a lock-gated same-session A/B hardware window against mainline.
+  No branch promotion or quality claim is allowed before that evidence.
