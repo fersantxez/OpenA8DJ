@@ -2010,3 +2010,24 @@ Current implication:
   USB device, bundles, fixture files, or known-good output are missing.
 - Preflight PASS is not evidence of route health. The locked known-good route
   capture remains mandatory before judging mainline or C++ audio quality.
+
+### 2026-06-17 Route-Only iRig Output Attempt
+
+- Ran a lock-gated route-only check with `iRig Stream` as both explicit
+  non-Audio8 output and capture device.
+- No HAL candidate was installed, loaded, unloaded, or reloaded.
+- The runner played and recorded successfully, but the capture was essentially
+  idle/noise instead of the deterministic reference:
+  - captured RMS about `-68.1 dBFS`;
+  - reference RMS about `-21.2/-22.1 dBFS`;
+  - alignment score about `0.004`;
+  - SNR about `-36.4 dB`.
+
+Current implication:
+- The current system sees iRig and Audio 8 DJ, but `iRig Stream` output is not
+  a valid known-good source into the shared iRig capture route.
+- Do not run or trust a promotion-quality mainline/C++ physical A/B until a
+  real non-Audio8 source is physically routed into the same mixer/REC OUT ->
+  iRig path and the known-good route gate passes.
+- This is a route/cabling/source blocker, not evidence that C++ quality is
+  worse or better than mainline.

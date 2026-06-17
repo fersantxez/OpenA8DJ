@@ -1225,6 +1225,13 @@ scripts/run-known-good-route-soundcheck \
   soundcheck thresholds for that run.
 - FAIL blocks driver quality comparison until the physical route is fixed or a
   cleaner route is selected.
+- Current route blocker:
+  - A route-only attempt with `iRig Stream` as both playback source and capture
+    device failed: captured RMS stayed near `-68.1 dBFS` while the reference was
+    around `-21.2/-22.1 dBFS`, with alignment about `0.004`.
+  - That source must not be used as promotion-quality known-good evidence.
+  - The next known-good attempt needs a real non-Audio8 output physically wired
+    into the same mixer/REC OUT -> iRig capture path.
 
 Physical superiority window runner:
 - Script:

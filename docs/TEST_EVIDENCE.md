@@ -8412,3 +8412,38 @@ Full offline gate rerun:
     physical window, but the actual known-good physical route must still be
     proven by capture under lock.
   - No superiority/readiness claim changes.
+
+## 2026-06-17 Route-Only Known-Good Attempt
+
+- Scope:
+  - Lock-gated route-only physical check.
+  - Played the deterministic reference through `iRig Stream` output and
+    recorded `iRig Stream` channels `1,2`.
+  - Did not install, load, unload, or reload HAL candidates.
+  - Did not change default devices, reset USB, restart CoreAudio/USB services,
+    or run mainline/C++ Audio 8 playback.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --route-only --run-dir local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture --capture-device "iRig Stream" --capture-channels 1,2 --known-good-output-device "iRig Stream" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 12 --skip-build`
+- Result:
+  - Read-only preflight PASS.
+  - Playback and recording both completed.
+  - Known-good route verdict FAIL.
+  - Captured signal was near idle/noise level rather than the reference:
+    captured RMS about `-68.1 dBFS` per channel versus reference RMS about
+    `-21.2/-22.1 dBFS`.
+  - Alignment score was about `0.004`, SNR about `-36.4 dB`, and analyzer
+    failed quality alignment, SNR, and click guards.
+  - Hardware lock was released after the run.
+- Evidence paths:
+  - `local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture/physical-window-preflight.json`
+  - `local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture/known-good-route/summary.txt`
+  - `local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture/known-good-route/metrics.json`
+  - `local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture/known-good-route/captured.wav`
+- Interpretation:
+  - This does not prove the iRig capture device is dead; the device recorded
+    low-level input and remained visible.
+  - It proves that the selected `iRig Stream` output is not a valid known-good
+    source into the current iRig capture path.
+  - A promotion-quality mainline/C++ A/B remains blocked until a real
+    non-Audio8 source is physically routed into the same mixer/REC OUT -> iRig
+    capture path and passes the known-good route gate.

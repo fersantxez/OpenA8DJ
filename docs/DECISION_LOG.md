@@ -5369,3 +5369,35 @@ Next implication:
 - The next physical A/B command must first pass this read-only preflight, then
   prove the known-good route by capture. A visible output device alone is not a
   claim that the physical cabling is correct.
+
+## 2026-06-17: Block Physical A/B When Known-Good Route Has No Signal
+
+Decision:
+- Treat the route-only attempt using `iRig Stream` output -> `iRig Stream`
+  capture as a failed known-good route, not as a driver-quality signal.
+- Do not proceed to promotion-quality mainline/C++ A/B on top of that route.
+
+Reason:
+- The selected source did not arrive at the iRig capture path with usable
+  signal. The capture was near idle/noise level and essentially uncorrelated
+  with the deterministic reference.
+- A/B testing mainline and C++ through an unvalidated or no-signal capture path
+  would produce false confidence and could not support an audiophile-quality
+  claim.
+
+Evidence:
+- Route-only physical preflight passed.
+- Playback and recording completed under the hardware lock.
+- Known-good route result was FAIL.
+- Captured RMS was about `-68.1 dBFS` while the reference RMS was about
+  `-21.2/-22.1 dBFS`.
+- Alignment score was about `0.004`; SNR was about `-36.4 dB`.
+- Evidence directory:
+  `local-analysis/physical-superiority-window/20260617T194016Z-route-only-irig-output-to-irig-capture`.
+
+Next implication:
+- The next admissible physical step is to provide or select a real non-Audio8
+  source physically routed into the same mixer/REC OUT -> iRig capture path,
+  then rerun the known-good route gate.
+- Driver install/reload and mainline/C++ A/B should remain blocked for
+  product claims until that route gate passes.
