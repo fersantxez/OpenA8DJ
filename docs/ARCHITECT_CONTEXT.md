@@ -25,6 +25,16 @@ Branch: `driverkit/cpp-redesign`
   `variable_timebase_or_route_capture_instability`. This means the current
   physical frontier is not a simple static gain/crossfeed correction and does
   not prove better sound than mainline.
+- A lock-gated hardware pass after commit `8cb4669` confirmed the devices are
+  recoverable: iRig Stream and Audio 8 DJ were visible on USB, the C++ HAL
+  safety gate loaded and enumerated `Open Audio 8 DJ` as `8 in / 8 out`, then
+  it was unloaded after testing. The physical HAL soundcheck still failed:
+  quality `0.962986`, SNR floor `10.317819 dB`, `26` lag jumps, driver CPU
+  p95 `22.6%`, and coreaudiod p95 `32.4%`. A direct USB/iRig test also failed:
+  quality `0.959037`, SNR floor `9.697139 dB`, native lag jumps `20`, and
+  classification `uncorrelated_residual_or_capture_path_dominant`. This
+  separates the problem: strong residual/noise exists even outside HAL, while
+  HAL/CoreAudio still adds unacceptable CPU and lag behavior.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
   `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the

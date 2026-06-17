@@ -34,11 +34,15 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - Physical capture forensics must find at least one same-session candidate with
   strict quality and no dominant route/timebase instability before any
   audiophile-quality claim. Current archived evidence fails this: the C++
-  forensic gate reports `0` strict quality candidates; best analyzed run
+  forensic gate reports `0` strict quality candidates across `62` WAV-backed
+  runs; best analyzed run
   quality `0.978050`, SNR floor `9.845114 dB`, lag stddev `10.974947`
   frames, classification `variable_timebase_or_route_capture_instability`.
 - This metric is intentionally stricter than "the analyzer ran." Analyzer
   `PASS` only means the forensic pass is healthy.
+- The latest lock-gated HAL and direct USB runs both fail this metric:
+  HAL quality `0.962986` / SNR floor `10.317819 dB`; direct USB quality
+  `0.959037` / SNR floor `9.697139 dB`.
 
 ### Mainline C Reference
 

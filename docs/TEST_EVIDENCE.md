@@ -57,6 +57,51 @@
   - `local-analysis/cpp-offline/current-offline-gates.json`.
   - `local-analysis/cpp-offline/physical-capture-forensics.json`.
 
+## 2026-06-17: Lock-Gated HAL Reload, iRig Soundcheck, And Direct USB Split
+
+- Commands:
+  - `make hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 10 --run-dir local-analysis/hal-candidate-safety/20260617T183412Z-cpp-8cb4669-leave-loaded`
+  - `scripts/run-soundcheck --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617T183449Z-cpp-8cb4669-irig-pairA-12s-after-forensics --audio-stack-recover-on-fail --stream-stats-snapshots`
+  - `scripts/audio-stack-guard --recover --force-unload-opena8dj --wait 2 --enumeration-timeout 10 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/20260617T183615Z-post-soundcheck-unload`
+  - `scripts/run-direct-usb-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --mode dense --target-peak-db -16 --collect-usb-diagnostics --run-dir local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`
+  - `./build/cpp-release/opena8djcpp_soundcheck_wav_quality local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`
+- Device state:
+  - iRig Stream visible as USB audio at `48000 Hz`.
+  - Audio 8 DJ visible in IOUSB as Native Instruments VID `0x17cc`, PID
+    `0x1978`.
+  - C++ HAL safety gate PASS; `Open Audio 8 DJ` enumerated as `8 in / 8 out`
+    while loaded.
+  - Post-test unload PASS; lock absent; iRig still visible; no OpenA8DJ HAL
+    left active.
+- HAL soundcheck result:
+  - FAIL.
+  - quality `0.962986`, SNR floor `10.317819 dB`, mid/high residual
+    `1.418575/1.347502`, quiet mid noise `-35.04 dBFS`, lag jumps `26`,
+    clipped frames `0`.
+  - Driver CPU p95 `22.6%`; coreaudiod p95 `32.4%`, p95 after 5s `2.2%`.
+  - Stream stats after playback: underruns `0`, active underruns `0`,
+    panic flags `0`, late writes `0`, timeline resets `0`.
+- Direct USB/iRig result:
+  - FAIL.
+  - summary quality `0.959036648`, SNR floor `9.697139 dB`, mid/high residual
+    `1.420546/1.410032`, clipped frames `0`.
+  - first captured energy occurred `0.194278s` after first direct USB write.
+  - Native C++ WAV analysis classified the run as
+    `uncorrelated_residual_or_capture_path_dominant` with quality `0.959037`,
+    SNR floor `9.697139 dB`, and native lag jumps `20`.
+- Interpretation:
+  - Hardware enumeration is recovered enough for controlled tests.
+  - C++ is still not audiophile, not better than mainline, and not promotable.
+  - Direct USB failing with similar SNR/residual means the large physical
+    residual is not only a CoreAudio/HAL issue. HAL/CoreAudio still adds
+    unacceptable CPU and lag behavior on top.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260617T183412Z-cpp-8cb4669-leave-loaded`.
+  - `local-analysis/soundcheck/20260617T183449Z-cpp-8cb4669-irig-pairA-12s-after-forensics`.
+  - `local-analysis/audio-stack-guard/20260617T183615Z-post-soundcheck-unload`.
+  - `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`.
+
 ## 2026-06-17: Direct USB Timeline Instrumentation And Reset No-Wait Rejection
 
 - Change:

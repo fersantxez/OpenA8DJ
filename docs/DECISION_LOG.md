@@ -38,6 +38,44 @@ Next implication:
   distinguish capture-route/timebase instability from true driver output
   quality. Branch promotion remains blocked.
 
+## 2026-06-17: Hardware Recovered, Product Quality Still Rejected
+
+Decision:
+- Accept the lock-gated HAL safety pass as proof that iRig and Audio 8 DJ can
+  currently be recovered for controlled tests.
+- Reject the current C++ HAL candidate for product quality and performance.
+- Reject direct USB as an audiophile-quality escape hatch; it is useful
+  diagnostically, but it still fails SNR/residual quality.
+
+Reason:
+- The HAL safety gate loaded commit `8cb4669`, enumerated `Open Audio 8 DJ` as
+  `8 in / 8 out`, and post-test recovery unloaded it cleanly.
+- The HAL soundcheck failed quality and CPU: quality `0.962986`, SNR floor
+  `10.317819 dB`, `26` lag jumps, driver CPU p95 `22.6%`, coreaudiod p95
+  `32.4%`.
+- Direct USB bypassed HAL/CoreAudio playback but still failed physical quality:
+  native quality `0.959037`, SNR floor `9.697139 dB`, residual ratios around
+  `1.42/1.41`, and classification
+  `uncorrelated_residual_or_capture_path_dominant`.
+
+Alternatives discarded:
+- Continue optimizing HAL CPU only: rejected as insufficient because direct USB
+  still shows strong physical residual outside HAL.
+- Promote direct USB timing because summary lag jumps were `0`: rejected
+  because the native C++ WAV analyzer saw `20` window lag jumps and the SNR
+  remained around `9.7 dB`.
+
+Evidence:
+- `local-analysis/hal-candidate-safety/20260617T183412Z-cpp-8cb4669-leave-loaded`.
+- `local-analysis/soundcheck/20260617T183449Z-cpp-8cb4669-irig-pairA-12s-after-forensics`.
+- `local-analysis/audio-stack-guard/20260617T183615Z-post-soundcheck-unload`.
+- `local-analysis/direct-usb-soundcheck/20260617T183629Z-pairA-12s-after-hal-fail`.
+
+Next implication:
+- Next physical work should isolate the capture/analog route with a known-good
+  non-Audio8 source or a loopback fixture, and separately reduce HAL CPU/lag.
+  Do not claim C++ is better than mainline.
+
 ## 2026-06-17: Instrument Direct USB Timeline, Keep Reset Reply Wait Default
 
 Decision:
