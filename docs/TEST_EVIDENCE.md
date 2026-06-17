@@ -4240,3 +4240,96 @@ Operational note:
   - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/cpu-summary.json`
   - `local-analysis/promotion-readiness-after-iso10q8.json`
   - `local-analysis/runtime-isolation/after-iso10q8-soundcheck-unload.json`
+
+## 2026-06-17: Input-Decode Gating And Playback-Only Stream Usage Probe
+
+- Purpose:
+  - Make `HAL_INPUT_DECODE_ACTIVE_GATING` effective at stream start.
+  - Make `audio-wav-play` explicitly disable input stream usage for
+    playback-only soundchecks while still selecting the target output pair.
+  - Test whether removing accidental input work improves CPU or quality.
+- Code changes:
+  - Default `HAL_INPUT_DECODE_ACTIVE_GATING=1`.
+  - At USB stream start, input decode remains inactive until an input read or
+    control-plane profile activates it.
+  - `audio-wav-play` now sets input `IOProcStreamUsage` to all-off when stream
+    usage is enabled for playback.
+- Commands:
+  - `make -B hal build/audio-wav-play build/opena8dj-control`
+  - `git diff --check`
+  - `scripts/run-cpp-offline-gates`
+  - `build/audio-wav-play` parser smoke, expecting usage/status `2`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-input-decode-gating-build.json`
+  - First locked `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded`
+  - Second locked safety retry with `--wait 8`, followed by locked
+    `scripts/run-soundcheck` and cleanup.
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py ...`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py ...`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py ...`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
+- Offline/build results:
+  - HAL/tools build PASS.
+  - Diff whitespace PASS.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Release bench:
+    `pack_mib_s=1627.01`, `decode_into_mib_s=577.291`,
+    `route_frames_s=9.48938e+08`,
+    `route_advanced_frames_s=4.90103e+08`.
+  - Parser smoke PASS without hardware access.
+  - Runtime isolation before physical PASS: HAL inactive, lock absent.
+- Physical safety:
+  - First safety run failed immediately after HAL load because CoreAudio spiked:
+    `coreaudiod=160.3%`, `opena8dj_driver=0.0%`.
+  - Cleanup succeeded and isolation stayed PASS.
+  - Retry with `--wait 8` passed candidate safety, proving the first failure
+    was at least partly a startup/enumeration window.
+- Physical soundcheck result:
+  - Run:
+    `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal`.
+  - Result: FAIL.
+  - `quality_alignment_score=0.959187`.
+  - analog SNR `10.14 dB`.
+  - mid/high residual ratios `1.467121/1.368783`.
+  - quiet mid noise `-35.11 dBFS`.
+  - `lag_jumps_gt_2_frames=30`.
+  - no clipping and no click outliers.
+  - stream counters after run: no output underruns, active underruns, elastic
+    drops/replays, timeline resets, late writes, or playback errors.
+- CPU result:
+  - driver p50/p95/max `23.6/24.2/24.4%`.
+  - coreaudiod p50/p95/max `2.7/21.9/62.0%`.
+  - Compared with ISO8/q8 prior run: coreaudiod p95 improved, but driver p95
+    worsened and music quality worsened.
+  - Compared with mainline target: still FAIL by a wide margin.
+- Offline diagnosis from captured evidence:
+  - Failure modes classify the run as
+    `timebase_or_alignment_instability`.
+  - Static L/R mix, polarity, and simple memoryless nonlinearity are not
+    sufficient explanations.
+  - Drift estimate `-180.6 ppm`, lag span `1645` frames.
+  - Runtime discontinuity analysis finds no strong CPU or stream-stat
+    correlation and no capture clipping; window lag jumps remain present.
+  - LTI transfer correction worsens SNR; this is not a simple fixed EQ/linear
+    transfer issue.
+- Interpretation:
+  - The harness/policy correction is kept because playback-only tests should
+    not request input streams.
+  - It is not a product-quality improvement.
+  - It does not solve the music residual or CPU gate.
+  - Promotion remains forbidden:
+    `branch_promotion_allowed=false`.
+  - Next technical target remains the timebase/cadence path, not input decode.
+- Final state:
+  - HAL unloaded/inactive.
+  - Hardware lock absent.
+  - Runtime isolation PASS.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-inputdecode-gated-playback-usage/hal-candidate-safety/summary.txt`
+  - `local-analysis/physical-product/20260617-inputdecode-gated-playback-usage-wait8/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/cpu-profile.tsv`
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
+  - `local-analysis/runtime-isolation/after-inputdecode-gated-wait8-unload.json`

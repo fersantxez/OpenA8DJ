@@ -186,3 +186,33 @@ Latest promotion evaluation:
   real-music PASS, CPU at or below mainline under comparable conditions, full
   A/B/C/D physical routing, Traktor/timecode physical validation, and final
   runtime isolation/rollback evidence.
+
+## 2026-06-17 Input-Decode-Gated Probe Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Offline gates remain PASS.
+- The input-decode/stream-usage correction is accepted only as harness and
+  control-plane correctness:
+  playback-only runs should not activate input decode or request input stream
+  usage.
+- The physical product gate still fails:
+  `quality_alignment_score=0.959187`, SNR `10.14 dB`,
+  mid/high residual ratios `1.467121/1.368783`, quiet mid noise
+  `-35.11 dBFS`, and `30` lag jumps.
+- CPU remains above mainline:
+  driver p95 `24.2%`, `coreaudiod` p95 `21.9%`, versus the mainline driver
+  target around `<= 6.5%`.
+- Failure analysis points at timebase/alignment instability rather than input
+  decode, fixed EQ, simple L/R mix, polarity, clipping, or simple nonlinearity.
+- Physical Traktor/timecode vinyl remains unvalidated.
+- Full A/B/C/D physical routing remains unvalidated.
+- Final cleanup evidence:
+  `local-analysis/runtime-isolation/after-inputdecode-gated-wait8-unload.json`
+  PASS, HAL inactive, lock absent.
+
+Decision: do not move C mainline to Legacy, do not move C++ to `main`, and do
+not claim better sound quality, functionality, or performance than mainline.

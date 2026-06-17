@@ -939,3 +939,45 @@ Next technical target:
   - Full A/B/C/D physical routing remains unvalidated.
 - Final runtime state after the latest locked gate:
   HAL inactive, hardware lock absent, no OpenA8DJ process expected.
+
+## 2026-06-17 Current Product Truth After Input-Decode-Gated Probe
+
+- Worktree and branch remain isolated:
+  `/Users/fer/dev/audio8djcpp` on `driverkit/cpp-redesign`.
+- Mainline `/Users/fer/dev/opena8dj` and Rust
+  `/Users/fer/dev/audio8djrust` remain read-only from this C++ effort.
+- `HAL_INPUT_DECODE_ACTIVE_GATING=1` is now the default and output-only
+  playback probes disable input stream usage.
+- This is a harness/control-plane correctness fix, not a product-quality win.
+- Offline gates remain green after the change:
+  Debug `17/17`, Release `18/18`.
+- Latest locked physical soundcheck:
+  `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal`.
+- Result remains FAIL:
+  - `quality_alignment_score=0.959187`.
+  - SNR `10.14 dB`.
+  - mid/high residual ratios `1.467121/1.368783`.
+  - quiet mid noise `-35.11 dBFS`.
+  - `lag_jumps_gt_2_frames=30`.
+  - driver p95 `24.2%`.
+  - `coreaudiod` p95 `21.9%`.
+- Stream counters after the run did not show output underruns, active
+  underruns, elastic drops/replays, timeline resets, late writes, or playback
+  errors. The audible/metric failure is below the current gross underrun
+  counters.
+- Offline analysis of the captured run points to
+  `timebase_or_alignment_instability`:
+  drift estimate `-180.6 ppm`, lag span `1645` frames, and weak CPU/stream
+  counter correlation.
+- Static L/R mix, polarity, simple memoryless nonlinearity, capture clipping,
+  and fixed LTI/EQ correction are rejected as sufficient explanations.
+- Promotion readiness remains FAIL:
+  `local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
+  returns `branch_promotion_allowed=false`.
+- Current default remains ISO8/q8 as the stronger quality candidate, but it is
+  not a readiness candidate.
+- Next technical target:
+  isolate and improve USB/device timebase, cadence, scheduling, and packet
+  pacing without regressing the passing Pair A matrix evidence.
+- Current safety state after cleanup:
+  HAL inactive, hardware lock absent, no C mainline or Rust mutation expected.

@@ -2544,3 +2544,46 @@ Evidence:
 - `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/metrics.json`
 - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/metrics.json`
 - `local-analysis/promotion-readiness-after-iso10q8.json`
+
+## 2026-06-17: Keep Playback-Only Input Usage Fix, Reject It As Product Improvement
+
+Decision:
+- Keep `HAL_INPUT_DECODE_ACTIVE_GATING=1` by default.
+- Keep playback-only `audio-wav-play` input stream usage all-off when stream
+  usage selection is enabled.
+- Do not treat this as a product quality or performance improvement.
+- Do not promote C++ over mainline.
+
+Reason:
+- The change makes the control-plane intent real: output-only probes should
+  not activate input decode at USB stream start, and the harness should not
+  request input streams for playback-only runs.
+- Offline gates pass after the change.
+- The locked physical soundcheck still fails:
+  `quality_alignment_score=0.959187`, SNR `10.14 dB`, mid/high residual
+  ratios `1.467121/1.368783`, and `30` lag jumps.
+- Compared with the prior ISO8/q8 run, `coreaudiod` p95 improved, but driver
+  p95 worsened to `24.2%` and real-music quality worsened.
+- Failure analysis classifies the run as
+  `timebase_or_alignment_instability`; static L/R mix, polarity, simple
+  memoryless nonlinearity, and fixed LTI/EQ correction do not explain it.
+
+Alternatives discarded:
+- Promote because `coreaudiod` p95 improved: rejected because driver CPU and
+  music quality worsened, and the mainline CPU gate still fails.
+- Revert the harness/control-plane fix solely because the physical product
+  gate failed: rejected because the fix improves test semantics. It is kept as
+  harness correctness, not as readiness evidence.
+- Continue optimizing input decode first: rejected for now because the latest
+  evidence points at timebase/cadence rather than accidental input work.
+
+Evidence:
+- `local-analysis/runtime-isolation/after-input-decode-gating-build.json`
+- `local-analysis/physical-product/20260617-inputdecode-gated-playback-usage/hal-candidate-safety/summary.txt`
+- `local-analysis/physical-product/20260617-inputdecode-gated-playback-usage-wait8/hal-candidate-safety/summary.txt`
+- `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+- `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+- `local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
+- `local-analysis/runtime-isolation/after-inputdecode-gated-wait8-unload.json`

@@ -4070,7 +4070,11 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     [self resetTransferLedger];
     [self resetClockAnchorForNewStream];
     RingClear(&_inputRing);
+#if OPENA8DJ_INPUT_DECODE_ACTIVE_GATING
     atomic_store(&_inputDecodeActive, false);
+#else
+    atomic_store(&_inputDecodeActive, atomic_load(&_inputDecodeEnabled));
+#endif
     OutputTimelineClear(&_outputTimeline);
     memset(_inputBytes, 0, sizeof(_inputBytes));
     memset(_inputByteCount, 0, sizeof(_inputByteCount));

@@ -183,6 +183,29 @@ static void ConfigureOutputStreamUsage(AudioObjectID device,
     }
 }
 
+static void ConfigureInputStreamUsage(AudioObjectID device,
+                                      AudioDeviceIOProcID ioProcID)
+{
+    struct UsagePayload {
+        AudioDeviceIOProcID ioProcID;
+        UInt32 numberStreams;
+        UInt32 streamIsOn[4];
+    } usage;
+    memset(&usage, 0, sizeof(usage));
+    usage.ioProcID = ioProcID;
+    usage.numberStreams = 4;
+    OSStatus status = SetProperty(device,
+                                  kAudioDevicePropertyIOProcStreamUsage,
+                                  kAudioObjectPropertyScopeInput,
+                                  sizeof(usage),
+                                  &usage);
+    if (status != kAudioHardwareNoError) {
+        fprintf(stderr,
+                "warning: input stream usage was not accepted: %d\n",
+                (int)status);
+    }
+}
+
 static AudioObjectID FindDeviceByUID(CFStringRef targetUID)
 {
     AudioObjectPropertyAddress address = {
@@ -358,6 +381,7 @@ int main(int argc, char **argv)
         return 6;
     }
     if (state.useStreamUsage) {
+        ConfigureInputStreamUsage(device, ioProcID);
         ConfigureOutputStreamUsage(device, ioProcID, state.pairIndex);
     }
     status = AudioDeviceStart(device, ioProcID);

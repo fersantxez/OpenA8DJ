@@ -837,3 +837,56 @@ Latest promotion evaluation:
   - The candidate must pass real music, CPU, full routing, and timecode gates
     before any claim that it is better than mainline.
   - "Compiles" and "HAL loads" remain non-product metrics.
+
+## 2026-06-17 Updated Snapshot After Input-Decode-Gated Playback Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`.
+
+- Branch promotion allowed: `false`.
+- Offline gates: PASS.
+  - Debug `17/17`.
+  - Release `18/18`.
+  - Release bench:
+    `pack_mib_s=1627.01`,
+    `decode_into_mib_s=577.291`,
+    `route_frames_s=9.48938e+08`,
+    `route_advanced_frames_s=4.90103e+08`.
+- Harness/control-plane semantics: PASS.
+  - Playback-only probes no longer activate input decode at stream start.
+  - `audio-wav-play` disables input stream usage for playback-only runs when
+    stream usage is enabled.
+- Physical music quality: FAIL.
+  - Latest run:
+    `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.959187`.
+  - SNR `10.14 dB`.
+  - mid/high residual ratios `1.467121/1.368783`.
+  - quiet mid noise `-35.11 dBFS`.
+  - `lag_jumps_gt_2_frames=30`.
+- Runtime CPU beats mainline: FAIL.
+  - Latest C++ driver p95 `24.2%`.
+  - Latest C++ `coreaudiod` p95 `21.9%`.
+  - Mainline target remains around driver p95 `<= 6.5%` under comparable
+    conditions.
+- Timebase/cadence quality: FAIL.
+  - Failure-mode analysis classifies the run as
+    `timebase_or_alignment_instability`.
+  - Estimated drift `-180.6 ppm`, lag span `1645` frames.
+  - Runtime discontinuity analysis found no strong CPU or stream-stat
+    correlation, so current counters are insufficient to explain or prove
+    correction.
+- Full physical routing: FAIL/BLOCKED.
+  - Pair A matrix evidence exists for ISO8/q8 and ISO10/q8.
+  - A/B/C/D physical output matrix is still required.
+  - 8 inputs and 8 outputs are represented in code and offline tests, but
+    physical input/routing coverage is incomplete.
+- Traktor/timecode vinyl physical validation: FAIL/BLOCKED.
+  - Timecode policy exists in core and must stay enabled for vinyl/CD-line
+    profiles.
+  - No physical Traktor/DVS evidence exists for the C++ candidate.
+- Current threshold interpretation:
+  - The input-decode/stream-usage change is kept as test correctness.
+  - It is not a product improvement and cannot support readiness.
+  - Next PASS evidence must improve real-music residual, lag stability, and
+    runtime CPU against mainline at the same time.

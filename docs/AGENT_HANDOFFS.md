@@ -1062,3 +1062,49 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     quality regressions.
   - Add physical A/B/C/D matrix and timecode/DVS gates only after real music
     and CPU improve enough to justify more hardware time.
+
+### Architect Input-Decode-Gated Playback Probe
+
+- Status:
+  - Continued locally in the C++ worktree. No new subagent was spawned in this
+    iteration because the prior explorer attempts had already hit the agent
+    thread limit.
+  - Physical commands were run under the global hardware lock and cleaned up.
+- Files affected:
+  - `Makefile`
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/audio-wav-play.c`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - `HAL_INPUT_DECODE_ACTIVE_GATING=1` is now the default.
+  - USB stream start now honors the input-decode-active gating flag instead of
+    unconditionally enabling input decode when input decode support exists.
+  - `audio-wav-play` disables input stream usage for playback-only probes while
+    still selecting the requested output pair.
+  - Offline gates passed after the change.
+  - First HAL safety attempt failed on a startup CoreAudio CPU spike
+    (`coreaudiod=160.3%`) and was safely cleaned up.
+  - Safety retry with `--wait 8` passed, then the real-music soundcheck failed:
+    quality `0.959187`, SNR `10.14 dB`, mid/high residual
+    `1.467121/1.368783`, `30` lag jumps, driver p95 `24.2%`.
+  - Offline failure analyzers reject input decode, static mix/polarity,
+    clipping, fixed LTI/EQ, and simple nonlinearity as sufficient causes.
+    The strongest current classification is timebase/alignment instability.
+- Risks:
+  - The current gross stream counters are clean, so the remaining defect may be
+    hidden in device cadence, USB packet pacing, timestamping, or analog/capture
+    timing rather than explicit underrun counters.
+  - CoreAudio startup spikes can cause false safety failures if the window is
+    too short, but the steady product CPU remains too high regardless.
+- Next recommended action:
+  - Keep the harness/control-plane fix.
+  - Do not promote.
+  - Instrument and optimize the timebase/cadence path next, with evidence that
+    improves real-music residual and CPU together.
+  - Do not expand to Traktor/timecode or full A/B/C/D physical gates until the
+    real-music Pair A gate improves enough to justify more hardware time.
