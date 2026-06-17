@@ -1,0 +1,14 @@
+OpenA8DJ transfer ledger
+latestSequence=6
+overwritten=0
+startSequence=1
+capacity=131072
+count=6
+entrySize=136
+sequence	event	hostTime	firstFrameNumber	outputReadStartFrame	outputReadEndFrame	transferBytes	completedBytes	failedTransactions	shortTransactions	outputFramesRead	outputStartupSilenceFrames	outputActiveUnderrunFrames	outputElasticDropFrames	outputElasticReplayFrames	transactionCount	inFlight	status	pooled
+1	capture_queue	1000	0	0	0	0	0	0	0	0	0	0	0	0	3	64	0x00000000	1
+2	playback_queue	1010	48000	48000	48064	2560	0	0	0	64	0	0	0	0	10	1	0x00000000	1
+3	capture_complete	1020	0	0	0	2560	2560	2	0	64	0	0	0	0	3	63	0x00000000	1
+4	playback_complete	1030	48000	48000	48064	2560	2560	0	0	64	0	0	0	0	10	0	0x00000000	1
+5	playback_queue	1040	48064	48064	48128	2560	0	0	0	128	0	0	0	0	10	1	0x00000000	1
+6	playback_complete	1050	48064	48064	48128	2560	2560	0	0	128	0	0	0	0	10	0	0x00000000	1

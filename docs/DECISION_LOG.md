@@ -2027,3 +2027,70 @@ Next decision pressure:
   and analyze `transfer-ledger-after.tsv` with
   `scripts/analyze-transfer-ledger.py` against `stream-stats-during.tsv`,
   captured WAV lag windows, and CPU profile before changing cadence again.
+
+## 2026-06-17: Expand Transfer Ledger Export And Bound Full Dumps
+
+Decision:
+- Increase the preallocated HAL transfer-ledger ring from `4,096` to `131,072`
+  entries.
+- Extend the IPC request with `startSequence` and make
+  `opena8dj-control transfer-ledger --all` export all entries available at the
+  initial snapshot in bounded IPC chunks.
+- Make full transfer-ledger recording diagnostic-only by default:
+  product builds use `HAL_TRANSFER_LEDGER=0`, while physical ledger diagnosis
+  must build with `HAL_TRANSFER_LEDGER=1`.
+- Update `run-soundcheck --stream-stats-snapshots` to save the full bounded
+  ledger, and update `scripts/analyze-transfer-ledger.py` to parse the real CLI
+  header format, old fixtures, and full-window evidence.
+
+Reason:
+- The first physical ledger export was only the final ~29 entries and had
+  `overwritten > 0`, so it could not prove event continuity through the music
+  window.
+- Parser semantics were too aggressive: it treated the title line as a TSV
+  header, treated expected capture zero-complete transactions as product
+  failures, and summed cumulative output counters across rows.
+- A live `--all` dump can race the HAL writer. The CLI now prints only rows up
+  to the initial `latestSequence`, so `count`, `latestSequence`, and row count
+  remain reproducible.
+- The bounded ledger writes roughly `6,400` rows/second and touches multiple
+  atomics per transfer. It is necessary for diagnosis but must not contaminate
+  final CPU/performance claims.
+
+Alternatives discarded:
+- Keep the 4,096-entry ring: rejected because a 12s music run writes about
+  `91k` ledger entries and would overwrite most evidence.
+- Increase IPC payload size: rejected because chunked export keeps the control
+  plane bounded and avoids large stack/socket payloads.
+- Treat output active-underrun snapshots after playback tail as product failure:
+  rejected because stream-stat deltas during the run showed zero active
+  underruns; these remain warnings unless correlated with active playback.
+- Leave the full ledger enabled by default for product candidates: rejected
+  because performance must be measured without diagnostic write amplification.
+
+Evidence:
+- Build: `make -B hal build/opena8dj-control`, PASS.
+- Offline gates: `scripts/run-cpp-offline-gates`, PASS after the export/parser
+  changes.
+- Fixture parser: `core/tests/fixtures/transfer-ledger-full-window.tsv`,
+  analyzer PASS.
+- Physical bounded ledger run:
+  `local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal`,
+  product soundcheck FAIL but transfer-ledger analysis PASS.
+- Ledger analysis:
+  `local-analysis/transfer-ledger/bounded-full-ledger-soundcheck-analysis.json`,
+  `91,647` rows, `overwritten=0`, continuous, no playback failed/short
+  transactions, no sequence gaps, no first-frame regressions.
+- Stream summary:
+  `local-analysis/stream-stats/bounded-full-ledger-soundcheck-summary.json`,
+  no output underruns, no active underruns, no timeline resets, no playback
+  transfer errors, no pool fallback allocations.
+- Cleanup:
+  `local-analysis/runtime-isolation/after-bounded-full-ledger-soundcheck-unload.json`,
+  PASS, HAL inactive, lock absent.
+
+Next decision pressure:
+- The quality failure survives clean transaction evidence. Next optimization
+  must target post-packed-byte behavior: USB/device scheduling/state, analog
+  route/reference mismatch, or a controlled comparison against the mainline
+  physical path, not another blind byte-order/start-byte sweep.

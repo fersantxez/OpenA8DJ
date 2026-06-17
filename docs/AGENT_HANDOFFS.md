@@ -790,27 +790,90 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 
 - Mission: continue Beauvoir's transaction-level recommendation after agent
   thread limit prevented spawning a new sidecar agent.
-- Status: completed for instrumentation; physical evidence still pending.
+- Status: completed for bounded full-ledger instrumentation and physical
+  diagnosis; product readiness still failed.
 - Result:
   - Added `build/opena8dj-control transfer-ledger [count]`.
   - Added HAL IPC export for a bounded latest-entry transfer ledger window.
   - Added `transfer-ledger-after.tsv` capture to
     `scripts/run-soundcheck --stream-stats-snapshots`.
   - Added `scripts/analyze-transfer-ledger.py` plus synthetic PASS evidence.
-  - Verified build, help surface, offline gates, and runtime isolation.
+  - Extended the export to `transfer-ledger --all [--from sequence]` with a
+    matching `startSequence` request field and a larger preallocated
+    `131072`-entry HAL ledger ring.
+  - Fixed the analyzer to parse real CLI headers, full-window ledgers, and
+    distinguish capture zero-complete observations from playback transport
+    failures.
+  - Fixed `--all` row offset and bounded live dumps to the initial
+    `latestSequence` so row count, declared count, and coverage match even
+    while the HAL continues streaming.
+  - Made the full transfer ledger diagnostic-only by default:
+    `HAL_TRANSFER_LEDGER=0` for product builds, `HAL_TRANSFER_LEDGER=1` for
+    explicit physical diagnosis.
+  - Verified build, help surface, offline gates, runtime isolation, fixture
+    analysis, and a locked physical bounded-ledger run.
+  - Physical bounded-ledger run:
+    `local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal`.
+    Product quality FAIL (`quality_alignment_score=0.960392`, SNR `10.37 dB`,
+    `33` lag jumps), but ledger analysis PASS (`91647` contiguous rows,
+    `overwritten=0`, no playback failed/short transactions, no sequence gaps).
 - Files affected:
   - `src/hal/OpenA8DJUSB.m`
   - `src/tools/opena8dj-control.c`
   - `scripts/run-soundcheck`
   - `scripts/analyze-transfer-ledger.py`
+  - `core/tests/fixtures/transfer-ledger-full-window.tsv`
   - `docs/ARCHITECT_CONTEXT.md`
   - `docs/DECISION_LOG.md`
+  - `docs/SUCCESS_METRICS.md`
   - `docs/TEST_EVIDENCE.md`
   - `docs/AGENT_HANDOFFS.md`
 - Risk:
-  - The export has not yet been exercised against a live physical run because
-    this step intentionally avoided hardware. Next locked soundcheck must
-    confirm `transfer-ledger-after.tsv` contains useful entries.
+  - Clean transaction transport evidence does not explain or fix physical music
+    quality. The candidate remains `FAIL_NOT_READY`.
+  - CPU evidence from ledger-enabled builds is diagnostic only. Re-measure
+    product CPU after installing a `HAL_TRANSFER_LEDGER=0` candidate.
+  - The stream-stats analyzer still flags a bounded-snapshot playback completion
+    gap at the post-run edge; this is not a sound-quality pass/fail by itself
+    and needs an active-playback window model before being promoted to a hard
+    gate.
 - Next action:
-  - Run one default physical music soundcheck under lock with stream stats
-    snapshots and analyze the new ledger before changing transport cadence.
+  - Stop blind byte-order/start-byte sweeps. Investigate the post-packed-byte
+    failure: USB/device scheduling/state, analog route/reference mismatch, or a
+    controlled mainline-vs-C++ physical route comparison with identical
+    capture conditions.
+
+### Pauli
+
+- Mission: read-only audit of transfer-ledger semantics while the architect
+  implemented full export fixes.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Flagged IPC struct mismatch risk for `startSequence` between HAL and CLI.
+  - Flagged analyzer false-PASS risk for tail-only truncated evidence and
+    `overwritten > 0`.
+  - Flagged false-FAIL risk from treating all capture failed transactions as
+    product failures.
+  - Flagged post-tail active-underrun snapshots as unsafe hard failures without
+    active-playback window context.
+  - Recommended full merged ledger coverage with `overwritten=0`, no duplicate
+    or missing sequences, category-aware capture semantics, and separate analog
+    capture metrics.
+- Integrated action:
+  - IPC structs now match for `startSequence`.
+  - `--all` full export plus analyzer coverage checks now require declared
+    count/expected count/row count continuity and fail overwritten evidence.
+  - Capture zero-complete observations are warnings, not playback transport
+    failures.
+  - Tail/post-playback active-underrun snapshots are warnings unless correlated
+    to active playback by stream stats.
+- Remaining risk:
+  - `run-soundcheck` saves ledger evidence but does not yet make ledger analysis
+    a hard integrated subgate. This should be added once the active-playback
+    window model is explicit.

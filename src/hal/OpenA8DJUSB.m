@@ -167,7 +167,7 @@
 #endif
 
 #ifndef OPENA8DJ_ENABLE_TRANSFER_LEDGER
-#define OPENA8DJ_ENABLE_TRANSFER_LEDGER 1
+#define OPENA8DJ_ENABLE_TRANSFER_LEDGER 0
 #endif
 
 #ifndef OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD
@@ -214,7 +214,7 @@ enum {
     kOutputReplayHoldFrames = 8,
     kOutputMaxReplayFrames = 192,
     kOutputStatsFlushTransferInterval = 16,
-    kTransferLedgerCapacity = 4096,
+    kTransferLedgerCapacity = 131072,
     kOutputSampleTimeJitterToleranceFrames = 1024,
     kPlaybackScheduleLeadFrames = 100,
     kPlaybackScheduleMaxLeadFrames = kPlaybackScheduleLeadFrames + (kPlaybackQueueTarget * kIsoFramesPerTransfer) + 64,
@@ -568,6 +568,7 @@ typedef struct OpenA8DJTransferLedgerSnapshot {
 typedef struct OpenA8DJTransferLedgerRequest {
     uint32_t maxEntries;
     uint32_t reserved;
+    uint64_t startSequence;
 } __attribute__((packed)) OpenA8DJTransferLedgerRequest;
 
 typedef struct OpenA8DJTransferLedgerDumpHeader {
@@ -738,6 +739,7 @@ static uint64_t __attribute__((unused)) ExpectedPlaybackIsoTransferTicks(void)
     return ExpectedIsoTransferTicksForFrames(kPlaybackIsoFramesPerTransfer);
 }
 
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
 static void AtomicMaxValue(atomic_uint_fast64_t *value, uint64_t candidate)
 {
     uint_fast64_t current = atomic_load_explicit(value, memory_order_relaxed);
@@ -768,6 +770,7 @@ static void AtomicMinObservedValue(atomic_uint_fast64_t *value,
                                                   memory_order_relaxed)) {
     }
 }
+#endif
 
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
 typedef struct OpenA8DJAtomicTimingStats {
@@ -3133,7 +3136,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 
 #if OPENA8DJ_ENABLE_TRANSFER_LEDGER
     uint64_t latest = atomic_load_explicit(&_transferLedgerSequence, memory_order_acquire);
-    uint64_t available = latest < kTransferLedgerCapacity ? latest : kTransferLedgerCapacity;
+    uint64_t earliest = latest > kTransferLedgerCapacity ? latest - kTransferLedgerCapacity + 1 : 1;
+    uint64_t available = latest > 0 && latest >= earliest ? latest - earliest + 1 : 0;
     uint32_t maxEntries = request.maxEntries;
     if (maxEntries == 0 || maxEntries > kTransferLedgerIPCMaxEntries) {
         maxEntries = kTransferLedgerIPCMaxEntries;
@@ -3142,8 +3146,20 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     if (maxEntries > maxByCapacity) {
         maxEntries = (uint32_t)maxByCapacity;
     }
-    uint32_t count = available < maxEntries ? (uint32_t)available : maxEntries;
-    uint64_t start = count > 0 ? latest - count + 1 : latest + 1;
+    uint64_t requestedStart = request.startSequence != 0 ? request.startSequence : 0;
+    if (available == 0) {
+        requestedStart = latest + 1;
+    } else if (requestedStart == 0) {
+        requestedStart = latest - ((available < maxEntries ? available : maxEntries) - 1);
+    } else if (requestedStart < earliest) {
+        requestedStart = earliest;
+    } else if (requestedStart > latest) {
+        requestedStart = latest + 1;
+    }
+
+    uint64_t requestedAvailable = latest >= requestedStart ? latest - requestedStart + 1 : 0;
+    uint32_t count = requestedAvailable < maxEntries ? (uint32_t)requestedAvailable : maxEntries;
+    uint64_t start = requestedStart;
 
     uint32_t copied = 0;
     uint64_t firstCopiedSequence = start;

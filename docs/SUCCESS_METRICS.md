@@ -203,12 +203,20 @@ improve product quality:
 | native-output music quality alignment | `0.003598` |
 | native-output analog SNR | `-63.94 dB` |
 | native-output clipped capture frames | `520014` |
+| bounded full-ledger music quality alignment | `0.960392` |
+| bounded full-ledger analog SNR | `10.37 dB` |
+| bounded full-ledger lag jumps > 2 frames | `33` |
+| bounded full-ledger row coverage | `91,647 / 91,647`, `overwritten=0` |
+| bounded full-ledger playback transport failures | `0` |
 
 Interpretation:
 
 - Offline C++ gates currently pass.
 - The HAL written, consumed, and packed output bytes can be perfect while the
   analog/iRig music capture still fails.
+- A full transaction ledger can pass continuity/playback-transport checks while
+  the product-quality gate still fails. Ledger PASS is necessary observability,
+  not readiness.
 - `HAL_OUTPUT_NATIVE=1` is rejected and must not be used as a candidate.
 - No claim that C++ is better than mainline is allowed until physical music
   quality, runtime CPU, physical timecode/Traktor, and latest investigation
@@ -647,8 +655,14 @@ Current status:
   and output read ranges before any further scheduling or CPU-optimization
   candidate can be promoted. It must be summarized with
   `scripts/analyze-transfer-ledger.py`; a ledger with sequence gaps,
-  completion status errors, failed/short transactions, active underrun frames,
-  or playback first-frame regressions blocks promotion.
+  completion status errors, playback failed/short transactions, coverage
+  mismatch, overwrite during the run, or playback first-frame regressions
+  blocks promotion. Active-underrun and capture zero-complete transaction
+  observations are warnings unless stream-stat deltas prove they occurred
+  during active playback/capture in a product-relevant way.
+- Product CPU/performance claims must be measured with
+  `HAL_TRANSFER_LEDGER=0`. Full ledger runs are diagnostic evidence only and
+  cannot be used to claim low CPU.
 - A/B/C/D full physical matrix and Traktor/timecode physical validation remain
   `BLOCKED_UNVALIDATED`.
 

@@ -3580,3 +3580,60 @@ Operational note:
   - Not readiness. This does not improve sound quality by itself and does not
     change the failed promotion result. It prepares the next locked physical
     default soundcheck to explain queue/complete timing rather than guessing.
+
+## 2026-06-17: Bounded Full Transfer Ledger Physical Diagnosis
+
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `python3 -m py_compile scripts/analyze-transfer-ledger.py scripts/run-soundcheck`
+  - `scripts/analyze-transfer-ledger.py core/tests/fixtures/transfer-ledger-full-window.tsv --json-out local-analysis/transfer-ledger/full-window-fixture-analysis-after-bounded-all.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-ledger/20260617-bounded-full-ledger/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - `scripts/analyze-transfer-ledger.py local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal/transfer-ledger-after.tsv --json-out local-analysis/transfer-ledger/bounded-full-ledger-soundcheck-analysis.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal/stream-stats-during.tsv --json-out local-analysis/stream-stats/bounded-full-ledger-soundcheck-summary.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-bounded-full-ledger-soundcheck-unload.json`
+- Result:
+  - Increased transfer-ledger ring capacity to `131072` entries and added
+    bounded chunked `transfer-ledger --all` export.
+  - After the physical diagnostic, changed product default to
+    `HAL_TRANSFER_LEDGER=0`; future full-ledger physical diagnosis must build
+    explicitly with `HAL_TRANSFER_LEDGER=1`.
+  - Fixed transfer-ledger analyzer parsing for real CLI output and adjusted
+    semantics so capture zero-complete transaction observations are warnings,
+    not playback transport failures.
+  - Fixture analysis PASS.
+  - Offline gates PASS: debug `17/17`, release `18/18`.
+  - HAL candidate safety PASS and iRig/Open Audio 8 DJ were visible before the
+    physical run.
+  - Physical music soundcheck FAIL:
+    `quality_alignment_score=0.960392`, `analog_snr_db=10.37`,
+    `lag_jumps_gt_2_frames=33`, mid residual ratio `1.411563`, high residual
+    ratio `1.354488`, quiet mid noise `-35.40 dBFS`, `click_outliers=0`,
+    `capture_clipped_frames=0`.
+  - Transfer ledger analysis PASS:
+    `91,647` rows, `overwritten=0`, continuous coverage, `0` sequence gaps,
+    `0` playback failed/short transactions, `0` completion status failures,
+    `0` playback first-frame regressions. Warnings remain for capture
+    zero-complete observations and tail/post-playback output active-underrun
+    snapshots.
+  - Stream-stats summary shows no output underruns, active underruns, timeline
+    resets, playback transfer errors, or transfer-pool fallback allocations
+    during the run. It reports `transfer_ledger_playback_completion_gap`
+    because the post-run ledger includes two more playback queues than
+    completes at the bounded snapshot edge.
+  - Sequential build verification after the default change:
+    `make -B hal build/opena8dj-control` PASS with
+    `OPENA8DJ_ENABLE_TRANSFER_LEDGER=0`, and
+    `make -B HAL_TRANSFER_LEDGER=1 hal build/opena8dj-control` PASS with the
+    diagnostic ledger enabled.
+  - Final runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+- Evidence paths:
+  - `local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal`
+  - `local-analysis/transfer-ledger/bounded-full-ledger-soundcheck-analysis.json`
+  - `local-analysis/stream-stats/bounded-full-ledger-soundcheck-summary.json`
+  - `local-analysis/runtime-isolation/after-bounded-full-ledger-soundcheck-unload.json`
+- Product status:
+  - `FAIL_NOT_READY`. Clean transaction transport evidence is not enough:
+    physical music quality is still far below thresholds and still does not
+    objectively beat mainline.

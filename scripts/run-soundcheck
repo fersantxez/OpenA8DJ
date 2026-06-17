@@ -278,9 +278,14 @@ def capture_stream_stats(root, control, timeout_seconds):
         return "", f"stream-stats-error={error}"
 
 
-def capture_transfer_ledger(root, control, timeout_seconds, count=48):
+def capture_transfer_ledger(root, control, timeout_seconds, count=48, all_entries=False):
+    command = [str(control), "transfer-ledger"]
+    if all_entries:
+        command.append("--all")
+    else:
+        command.append(str(count))
     try:
-        result = subprocess.run([str(control), "transfer-ledger", str(count)],
+        result = subprocess.run(command,
                                 cwd=str(root),
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT,
@@ -327,7 +332,7 @@ def write_stream_stats_snapshot(root, base_dir, label, timeout_seconds):
 def write_transfer_ledger_snapshot(root, base_dir, label, timeout_seconds):
     control = root / "build" / "opena8dj-control"
     path = base_dir / f"transfer-ledger-{label}.tsv"
-    text, error = capture_transfer_ledger(root, control, timeout_seconds)
+    text, error = capture_transfer_ledger(root, control, max(timeout_seconds, 10.0), all_entries=True)
     with open(path, "w", encoding="utf-8") as file:
         file.write(f"# sample_time={time.time():.3f}\n")
         if error:

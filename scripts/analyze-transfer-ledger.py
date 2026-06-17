@@ -42,13 +42,17 @@ def read_ledger(path: Path) -> tuple[dict[str, str], list[dict[str, str]]]:
             continue
         if line.startswith("#"):
             continue
-        if "=" in line and "\t" not in line and header is None:
+        if line == "OpenA8DJ transfer ledger":
+            continue
+        if "=" in line and "\t" not in line:
             key, value = line.split("=", 1)
             metadata[key.strip()] = value.strip()
             continue
         columns = raw_line.split("\t")
-        if header is None:
+        if columns and columns[0] == "sequence":
             header = columns
+            continue
+        if header is None:
             continue
         row = {name: columns[index] if index < len(columns) else ""
                for index, name in enumerate(header)}
@@ -111,6 +115,14 @@ def summarize(path: Path) -> dict:
     metadata, rows = read_ledger(path)
     counts = event_counts(rows)
     gaps = sequence_gaps(rows)
+    metadata_latest = to_int(metadata.get("latestSequence", "0"))
+    metadata_overwritten = to_int(metadata.get("overwritten", "0"))
+    metadata_start = to_int(metadata.get("startSequence", "0"))
+    metadata_count = to_int(metadata.get("count", "0"))
+    expected_count = (
+        metadata_latest - metadata_start + 1
+        if metadata_latest >= metadata_start and metadata_start > 0 else 0
+    )
     non_success_status_rows = [
         {
             "sequence": to_int(row.get("sequence", "0")),
@@ -121,7 +133,7 @@ def summarize(path: Path) -> dict:
         if row.get("event", "").endswith("_complete") and
         row.get("status", "0x00000000") not in ("0x00000000", "0", "")
     ]
-    failed_transaction_rows = [
+    playback_failed_transaction_rows = [
         {
             "sequence": to_int(row.get("sequence", "0")),
             "event": row.get("event", ""),
@@ -129,17 +141,41 @@ def summarize(path: Path) -> dict:
             "shortTransactions": to_int(row.get("shortTransactions", "0")),
         }
         for row in rows
-        if to_int(row.get("failedTransactions", "0")) > 0 or
+        if row.get("event", "") == "playback_complete" and
+        (to_int(row.get("failedTransactions", "0")) > 0 or
+         to_int(row.get("shortTransactions", "0")) > 0)
+    ]
+    capture_failed_transaction_rows = [
+        {
+            "sequence": to_int(row.get("sequence", "0")),
+            "failedTransactions": to_int(row.get("failedTransactions", "0")),
+            "shortTransactions": to_int(row.get("shortTransactions", "0")),
+        }
+        for row in rows
+        if row.get("event", "") == "capture_complete" and
+        to_int(row.get("failedTransactions", "0")) > 0
+    ]
+    short_transaction_rows = [
+        {
+            "sequence": to_int(row.get("sequence", "0")),
+            "event": row.get("event", ""),
+            "shortTransactions": to_int(row.get("shortTransactions", "0")),
+        }
+        for row in rows
+        if
         to_int(row.get("shortTransactions", "0")) > 0
     ]
-    output_active_underrun_frames = sum(
-        to_int(row.get("outputActiveUnderrunFrames", "0")) for row in rows
+    output_active_underrun_frames = max(
+        (to_int(row.get("outputActiveUnderrunFrames", "0")) for row in rows),
+        default=0,
     )
-    output_elastic_drop_frames = sum(
-        to_int(row.get("outputElasticDropFrames", "0")) for row in rows
+    output_elastic_drop_frames = max(
+        (to_int(row.get("outputElasticDropFrames", "0")) for row in rows),
+        default=0,
     )
-    output_elastic_replay_frames = sum(
-        to_int(row.get("outputElasticReplayFrames", "0")) for row in rows
+    output_elastic_replay_frames = max(
+        (to_int(row.get("outputElasticReplayFrames", "0")) for row in rows),
+        default=0,
     )
     max_in_flight = max((to_int(row.get("inFlight", "0")) for row in rows), default=0)
     queue_count = counts.get("playback_queue", 0)
@@ -152,28 +188,55 @@ def summarize(path: Path) -> dict:
         failures.append("unknown_events")
     if len(gaps) > 0:
         failures.append("sequence_gaps")
+    if metadata_overwritten > 0:
+        failures.append("ledger_overwritten")
+    if metadata_count and metadata_count != len(rows):
+        failures.append("declared_count_mismatch")
+    if expected_count and expected_count != len(rows):
+        failures.append("coverage_count_mismatch")
     if non_success_status_rows:
         failures.append("non_success_status")
-    if failed_transaction_rows:
-        failures.append("failed_or_short_transactions")
-    if output_active_underrun_frames > 0:
-        failures.append("active_underrun_frames")
+    if playback_failed_transaction_rows:
+        failures.append("playback_failed_or_short_transactions")
+    if short_transaction_rows:
+        failures.append("short_transactions")
     if first_frame_regressions(rows) > 0:
         failures.append("playback_first_frame_regressions")
-    if not math.isfinite(balance_delta) or abs(balance_delta) > 1:
+    if metadata_overwritten == 0 and metadata_count and (
+        not math.isfinite(balance_delta) or abs(balance_delta) > 1
+    ):
         failures.append("playback_queue_complete_imbalance")
+    warnings = []
+    if output_active_underrun_frames > 0:
+        warnings.append("output_active_underrun_frames_observed")
+    if capture_failed_transaction_rows:
+        warnings.append("capture_failed_transactions_observed")
     return {
         "schema": "opena8djcpp.transfer-ledger-analysis.v1",
         "path": str(path),
         "metadata": metadata,
+        "coverage": {
+            "latest_sequence": metadata_latest,
+            "overwritten": metadata_overwritten,
+            "start_sequence": metadata_start,
+            "declared_count": metadata_count,
+            "expected_count_from_metadata": expected_count,
+            "row_count": len(rows),
+            "continuous": len(gaps) == 0 and (not expected_count or expected_count == len(rows)),
+            "full_ring_window": metadata_overwritten == 0,
+        },
         "row_count": len(rows),
         "event_counts": counts,
         "sequence_gaps": gaps[:16],
         "sequence_gap_count": len(gaps),
         "non_success_status_count": len(non_success_status_rows),
         "non_success_status_rows": non_success_status_rows[:16],
-        "failed_transaction_row_count": len(failed_transaction_rows),
-        "failed_transaction_rows": failed_transaction_rows[:16],
+        "playback_failed_transaction_row_count": len(playback_failed_transaction_rows),
+        "playback_failed_transaction_rows": playback_failed_transaction_rows[:16],
+        "capture_failed_transaction_row_count": len(capture_failed_transaction_rows),
+        "capture_failed_transaction_rows": capture_failed_transaction_rows[:16],
+        "short_transaction_row_count": len(short_transaction_rows),
+        "short_transaction_rows": short_transaction_rows[:16],
         "playback_queue_complete_delta": balance_delta,
         "playback_first_frame_regressions": first_frame_regressions(rows),
         "max_in_flight": max_in_flight,
@@ -183,6 +246,7 @@ def summarize(path: Path) -> dict:
         "host_delta": {
             event: host_delta_stats(rows, event) for event in sorted(EVENTS)
         },
+        "warnings": warnings,
         "failures": failures,
         "result": "PASS" if not failures else "FAIL",
     }

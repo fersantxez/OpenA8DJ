@@ -176,6 +176,18 @@ Branch: `driverkit/cpp-redesign`
   bytes produced by the driver. The next hypothesis must move after packed
   output bytes: actual USB/device scheduling/state, hardware interpretation,
   analog route/reference path, or physical capture-route mismatch.
+- 2026-06-17 bounded transfer-ledger physical run adds clean transaction
+  evidence to the same negative conclusion. `transfer-ledger-after.tsv` from
+  `local-analysis/soundcheck/20260617-bounded-full-ledger-irig-pairA-12s-cpp-hal`
+  covers `91,647` contiguous entries, `overwritten=0`, with no sequence gaps,
+  no playback failed/short transactions, no completion status errors, no
+  playback first-frame regressions, and no stream-stat active underruns during
+  the run. Product quality still fails: quality alignment `0.960392`, SNR
+  `10.37 dB`, and `33` lag jumps. This blocks readiness and promotion.
+- Full transfer-ledger recording is now diagnostic-only by default. Product
+  builds use `HAL_TRANSFER_LEDGER=0`; physical ledger diagnosis must explicitly
+  build with `HAL_TRANSFER_LEDGER=1`. CPU claims from ledger-enabled runs are
+  invalid for product readiness.
 
 ## Known Baseline Inputs
 
