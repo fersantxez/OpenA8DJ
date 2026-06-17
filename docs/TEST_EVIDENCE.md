@@ -2582,3 +2582,184 @@ Operational note:
     CPU reduction versus one failing control run, do not beat prior C++ CPU
     variants, remain far above mainline CPU, and do not improve physical music
     quality.
+
+## 2026-06-17: Fast Prefetch Clear Physical Rejection
+
+- Commands:
+  - `make HAL_FAST_OUTPUT_PREFETCH_CLEAR=1 hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-fast-prefetch-clear/20260617-a1c8b50/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-fast-prefetch-clear-a1c8b50-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal HAL unload under global lock, then
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-fast-prefetch-clear-manual-unload.json`
+- Result:
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL.
+  - Final isolation PASS.
+- Key metrics:
+  - quality alignment `0.9546986682558902`
+  - SNR about `9.53 dB`
+  - lag jumps `39`
+  - mid/high residual ratios `1.4338336857980034/1.3737879670112414`
+  - driver CPU median/p95/max `34.6%/36.8%/37.4%`
+- Interpretation:
+  - Rejected as a default: CPU improves, but quality is materially worse than
+    the latest default-like controls.
+
+## 2026-06-17: Hot Stream Stats Interval 16 Physical A/B
+
+- Commands:
+  - `make HAL_HOT_STREAM_STATS_INTERVAL=16 hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-hotstats-interval16/20260617-a1c8b50/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-hotstats-interval16-a1c8b50-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal HAL unload under global lock, then
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-hotstats-interval16-manual-unload.json`
+- Result:
+  - HAL candidate safety PASS.
+  - Physical music soundcheck still FAIL as a product gate.
+  - Final isolation PASS.
+  - Default promoted from interval `1` to `16` as a partial CPU improvement,
+    not as readiness.
+- Key metrics:
+  - quality alignment `0.9640011789236339`
+  - SNR about `10.28 dB`
+  - click outliers `5`
+  - lag jumps `41`
+  - mid/high residual ratios `1.429448005646557/1.3625351838892474`
+  - driver CPU median/p95/max `34.5%/35.7%/36.3%`
+  - coreaudiod p95 `2.9%`
+  - total watched audio/UI p95 `53.5%`
+- Comparison:
+  - latest default control driver p95 `38.5%`;
+  - interval16 driver p95 `35.7%`;
+  - mainline threshold `6.5%`.
+- Evidence paths:
+  - `local-analysis/physical-hotstats-interval16/20260617-a1c8b50/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-hotstats-interval16-a1c8b50-irig-pairA-16s-cpp-hal`
+  - `local-analysis/runtime-isolation/after-hotstats-interval16-manual-unload.json`
+- Interpretation:
+  - Good enough to reduce default stats overhead because it does not materially
+    alter the failing music signature and improves CPU. Not good enough for
+    readiness or promotion.
+
+## 2026-06-17: Tone Response Compensation Diagnostic
+
+- Commands:
+  - `python3 -m py_compile scripts/analyze-tone-response-compensation.py`
+  - `scripts/analyze-tone-response-compensation.py --tone-matrix-json local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json --json-out local-analysis/tone-response-compensation/recent-music-runs.json <six existing soundcheck run dirs>`
+- Result:
+  - Offline diagnostic completed without touching hardware, CoreAudio, USB, or
+    system services.
+  - The simple tone-response shape model does not explain the music residual.
+- Key metrics:
+  - SNR delta range after response-shape fit: about `-0.19 dB` to `+1.88 dB`.
+  - Mid residual delta range: about `-4.94` to `-5.02`, where negative means
+    the response-shaped prediction made the mid-band residual ratio worse.
+- Evidence paths:
+  - `scripts/analyze-tone-response-compensation.py`
+  - `local-analysis/tone-response-compensation/recent-music-runs.json`
+- Interpretation:
+  - A simple three-band response model derived from the passing tone matrix is
+    not sufficient to explain the failed music quality. Next quality work needs
+    a better controlled physical reference or a deeper format/phase/non-linear
+    model.
+
+## 2026-06-17: SciPy LTI Transfer Quality Diagnostic
+
+- Commands:
+  - `python3 -m venv .venv`
+  - `.venv/bin/python -m pip install -r requirements-analysis.txt`
+  - `.venv/bin/python -m py_compile scripts/analyze-lti-transfer-quality.py`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py --json-out local-analysis/lti-transfer-quality/recent-music-runs.json <six existing soundcheck run dirs>`
+- Result:
+  - Local analysis environment created under `.venv` only.
+  - NumPy `2.0.2` and SciPy `1.13.1` installed locally.
+  - Offline LTI/Welch/CSD diagnostic completed without touching hardware,
+    CoreAudio, USB, HAL install state, or system services.
+- Key metrics:
+  - Mid-band mean coherence across tested runs/channels: about `0.075` to
+    `0.124`.
+  - High-band mean coherence across tested runs/channels: about `0.020` to
+    `0.045`.
+  - LTI SNR deltas were negative in every run: about `-0.78 dB` to `-2.37 dB`.
+  - LTI-predicted mid/high residual ratios were worse than scalar-gain
+    residual ratios in every run.
+- Evidence paths:
+  - `requirements-analysis.txt`
+  - `scripts/analyze-lti-transfer-quality.py`
+  - `local-analysis/lti-transfer-quality/recent-music-runs.json`
+- Interpretation:
+  - The failed music captures are not explained by a stable linear transfer
+    function between the generated reference and iRig capture. The quality
+    blocker is more likely non-linear/time-varying behavior, output-format
+    semantics, or a physical reference mismatch requiring a stricter isolation
+    test.
+
+## 2026-06-17: Soundcheck Failure-Mode Diagnostic
+
+- Commands:
+  - `.venv/bin/python -m py_compile scripts/analyze-soundcheck-failure-modes.py`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py --json-out local-analysis/soundcheck-failure-modes/recent-music-runs.json <six existing soundcheck run dirs>`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py --drift-max-lag 128 --json-out local-analysis/soundcheck-failure-modes/recent-music-runs-local128.json <six existing soundcheck run dirs>`
+- Result:
+  - Offline diagnostic PASS. It read existing WAV/JSON evidence only and did
+    not touch hardware, CoreAudio, USB, HAL install state, or system services.
+- Key metrics:
+  - Static 2x2 L/R matrix improves SNR only about `0.13-0.24 dB` in tested
+    default-like runs.
+  - Cubic memoryless model improves SNR only about `0.002-0.004 dB`.
+  - No capture clipping in the tested runs.
+  - Local-lag drift for recent default-like runs is small, around `-28` to
+    `-34 ppm`, while SNR remains about `9-10 dB`.
+- Evidence paths:
+  - `scripts/analyze-soundcheck-failure-modes.py`
+  - `local-analysis/soundcheck-failure-modes/recent-music-runs.json`
+  - `local-analysis/soundcheck-failure-modes/recent-music-runs-local128.json`
+- Interpretation:
+  - Simple mix/polarity, static L/R matrix, simple memoryless non-linearity,
+    clipping, and simple drift are not sufficient explanations. The next
+    quality isolation should target reference-route mismatch, runtime
+    discontinuities, or output format/phase semantics.
+
+## 2026-06-17: Stats-Off Physical Rejection
+
+- Candidate:
+  - `HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0`
+  - HAL binary hash:
+    `449f8baf8ce1ca74802de5507138e116886493a4aabaeb88488da410bdff2991`
+- Commands:
+  - `make -B hal HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0`
+  - `scripts/run-cpp-offline-gates`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-stats-off/20260617-a1c8b50-stats-off/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-stats-off-a1c8b50-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal HAL unload under global lock, then
+    `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-stats-off.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-stats-off.json`
+- Result:
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL.
+  - Final isolation PASS: HAL inactive, lock absent, no OpenA8DJ/mainline
+    holder processes.
+  - Promotion readiness FAIL.
+- Key quality metrics:
+  - `quality_alignment_score=0.9602873731433063`
+  - `analog_snr_db=10.48`
+  - `lag_jumps_gt_2_frames=37`
+  - `click_outliers=0`
+  - `mid_band_residual_ratio=1.424930143914946`
+  - `high_band_residual_ratio=1.3626602759181339`
+  - `quiet_mid_band_noise_dbfs=-36.12216401783407`
+  - `capture_clipped_frames=0`
+- CPU metrics:
+  - OpenA8DJ driver median/p95/max `35.9%/36.8%/37.0%`
+  - coreaudiod median/p95/max `2.6%/3.4%/53.8%`
+  - total watched audio/UI median/p95/max `53.3%/55.0%/115.9%`
+- Evidence paths:
+  - `local-analysis/physical-stats-off/20260617-a1c8b50-stats-off/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-stats-off-a1c8b50-irig-pairA-16s-cpp-hal`
+  - `local-analysis/promotion-readiness-after-stats-off.json`
+  - `local-analysis/runtime-isolation/final-after-stats-off.json`
+- Interpretation:
+  - Stats-off is rejected as a default. It removes observability, does not
+    improve quality, and does not improve CPU relative to the current
+    interval-16 default.

@@ -366,14 +366,27 @@ physical window.
 
 ## HAL CPU Experiment Flags
 
-The HAL build currently keeps atomic sampled stream-stat accumulators disabled
-by default:
+The HAL build currently samples hot stream stats every 16 capture/playback
+completion callbacks by default:
 
 ```sh
 make hal
 ```
 
 This is equivalent to:
+
+```sh
+make HAL_HOT_STREAM_STATS_INTERVAL=16 hal
+```
+
+Use interval `1` only when dense per-transfer stats are needed for a specific
+diagnostic:
+
+```sh
+make HAL_HOT_STREAM_STATS_INTERVAL=1 hal
+```
+
+Atomic sampled stream-stat accumulators remain disabled by default:
 
 ```sh
 make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal
@@ -392,6 +405,38 @@ CPU or quality claim for this flag requires a locked physical soundcheck and
 comparison against the recorded mainline/C++ baselines. The first locked
 physical run with the flag enabled did not clear those gates, so the default
 must remain disabled until better evidence exists.
+
+Do not use stats-off as a default CPU profile:
+
+```sh
+make HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0 hal
+```
+
+That variant passed offline and install safety, but the locked physical run
+still failed quality and measured driver p95 at `36.8%`, worse than the
+interval-16 default. It is only useful as a diagnostic A/B if a future question
+specifically needs telemetry removed.
+
+## Analysis Environment
+
+Precise offline audio analysis can use the local Python environment under the
+worktree:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-analysis.txt
+```
+
+This environment is local-only and ignored by git. It is used for FFT/CSD/Welch
+analysis scripts such as:
+
+```sh
+.venv/bin/python scripts/analyze-lti-transfer-quality.py --help
+.venv/bin/python scripts/analyze-soundcheck-failure-modes.py --help
+```
+
+Do not install these packages globally as part of the build. They are analysis
+dependencies, not runtime driver dependencies.
 
 ## Migration Order
 

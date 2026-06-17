@@ -469,3 +469,102 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Risk:
   - `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS` is the lowest-risk CPU candidate, but
     it still needs offline monotonicity/snapshot checks before any physical run.
+
+### Nietzsche
+
+- Mission: read-only HAL hot-path audit after atomic stream stats were
+  rejected, focused on CPU changes that preserve audio bytes and USB cadence.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Recommended increasing hot stream stats interval as the next low-risk CPU
+    experiment.
+  - Flagged remaining CPU hotspots: stream-stats accounting, transfer-pool
+    scan/cursor behavior, output packing, timeline/prefetch locks, and input
+    decode.
+- Integrated action:
+  - Tested and promoted `HAL_HOT_STREAM_STATS_INTERVAL=16` as a partial CPU
+    improvement only.
+- Risk:
+  - CPU remains far above mainline, and physical music quality still fails.
+
+### Feynman
+
+- Mission: read-only analysis of physical evidence to decide whether the
+  failing music captures are caused by CPU/timing pressure or a signal-quality
+  model mismatch.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Found no strong correlation between residual windows and driver CPU.
+  - Noted that stream stats during active playback looked cleaner than the
+    after-stop drain counters.
+  - Recommended offline EQ/LTI/reference-route diagnostics before more blind
+    HAL changes.
+- Integrated action:
+  - Added tone-response and LTI diagnostics.
+- Risk:
+  - The root cause remains unresolved; LTI/EQ rejection narrows the search but
+    does not prove a fix.
+
+### Wegener
+
+- Mission: read-only signal-quality audit over existing C++ physical evidence
+  and analysis scripts.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Confirmed the current physical music failure is stable across many runs:
+    SNR around `9.5-10.5 dB`, residual mid/high around `1.4x`, and lag jumps
+    around `39-48`.
+  - Confirmed LTI and tone-response compensation do not explain the residual.
+  - Weakened simple L/R mix, swap, polarity, and crosstalk explanations.
+  - Kept reference-route mismatch and runtime/timeline discontinuity as the
+    most useful next hypotheses.
+- Integrated action:
+  - Added `scripts/analyze-soundcheck-failure-modes.py`.
+- Risk:
+  - The next decisive evidence likely requires a more controlled physical
+    reference-route test under lock.
+
+### Gauss
+
+- Mission: read-only CPU/hot-path audit for low-risk changes after interval16,
+  separating telemetry-only changes from changes that may alter audio quality.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Recommended first testing stats-off/diagnostic-off variants that do not
+    touch payload bytes or USB cadence.
+  - Prioritized future lower-risk CPU work around batched stats publication and
+    HAL cycle-buffer clear optimization.
+  - Warned against reusing `iso64`, unrolled pack, reset-audio-params-off, or
+    aggressive prefetch clear as readiness candidates based on existing
+    evidence.
+- Integrated action:
+  - Tested `HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0` physically and
+    rejected it: CPU p95 stayed `36.8%`, quality still failed, and observability
+    was reduced.
+- Risk:
+  - Remaining CPU work must target actual transfer/timeline/packing cost, not
+    superficial telemetry removal.

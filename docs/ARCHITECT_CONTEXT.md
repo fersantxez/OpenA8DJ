@@ -466,3 +466,47 @@ Next technical target:
   because the guard health check passed and therefore did not enter recovery.
   Final isolation PASS:
   `local-analysis/runtime-isolation/after-atomic-stream-stats-manual-unload.json`.
+- `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1` was physically rejected:
+  `local-analysis/soundcheck/20260617-fast-prefetch-clear-a1c8b50-irig-pairA-16s-cpp-hal`.
+  It lowered driver CPU p95 to `36.8%` but worsened quality alignment to
+  `0.954699` and SNR to about `9.53 dB`.
+- `HAL_HOT_STREAM_STATS_INTERVAL=16` is now the preferred default CPU cleanup.
+  It does not change audio bytes or USB scheduling, improved driver CPU p95 to
+  `35.7%` in the locked Pair A/iRig run, and kept the broad failing music
+  signature similar to default. It is not readiness: physical music quality and
+  mainline CPU gates still fail.
+- A local analysis venv was created under `.venv` using
+  `requirements-analysis.txt` (`numpy==2.0.2`, `scipy==1.13.1`) for precise
+  offline FFT/CSD/Welch diagnostics.
+- Offline tone-response and LTI diagnostics do not support a simple EQ/linear
+  transfer explanation for the music failures:
+  - `local-analysis/tone-response-compensation/recent-music-runs.json`
+  - `local-analysis/lti-transfer-quality/recent-music-runs.json`
+  The LTI run shows very low mid/high coherence and negative SNR deltas after
+  transfer-function prediction. Next quality work should isolate non-linear,
+  time-varying, output-format, or reference-route mismatch causes.
+- Added a stronger offline failure-mode classifier:
+  `scripts/analyze-soundcheck-failure-modes.py`.
+  Evidence:
+  `local-analysis/soundcheck-failure-modes/recent-music-runs.json` and
+  `local-analysis/soundcheck-failure-modes/recent-music-runs-local128.json`.
+  It rejects simple L/R swap/polarity/static matrix and simple memoryless
+  cubic non-linearity as sufficient explanations. With local lag search,
+  recent drift is small (`~ -28` to `-34 ppm`, except rejected `queue8`),
+  while scalar/matrix/cubic SNR stays around `9-10 dB`. The blocker is still
+  a physical reference-route/runtime discontinuity/format issue, not an EQ
+  calibration.
+- Physical stats-off candidate was tested and rejected:
+  `HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0`.
+  Evidence:
+  `local-analysis/physical-stats-off/20260617-a1c8b50-stats-off/hal-candidate-safety`
+  and
+  `local-analysis/soundcheck/20260617-stats-off-a1c8b50-irig-pairA-16s-cpp-hal`.
+  It passed install safety and offline gates, but physical music still failed
+  (`quality_alignment_score=0.960287`, SNR `10.48 dB`,
+  `lag_jumps_gt_2_frames=37`, mid/high residual
+  `1.424930/1.362660`) and driver CPU p95 worsened to `36.8%`. Therefore it is
+  not a default and not a useful CPU optimization.
+- Final post-run isolation after stats-off PASS:
+  `local-analysis/runtime-isolation/final-after-stats-off.json`. HAL inactive,
+  lock absent, and no OpenA8DJ/mainline holder processes were detected.

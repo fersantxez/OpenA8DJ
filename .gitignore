@@ -4,6 +4,7 @@
 # Build and release artifacts
 build/
 dist/
+.venv/
 *.pkg
 *.dmg
 *.zip

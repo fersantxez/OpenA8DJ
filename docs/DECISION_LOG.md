@@ -1290,3 +1290,179 @@ Follow-up:
 - The next CPU work should target real hot-path cost, not stats accounting:
   output/capture queue depth, transfer batching, property polling behavior, or
   a measured scheduling/lifecycle change with no quality regression.
+
+## 2026-06-17: Promote Hot Stream Stats Interval 16 As Partial CPU Improvement
+
+Decision:
+- Change the default from `HAL_HOT_STREAM_STATS_INTERVAL=1` to
+  `HAL_HOT_STREAM_STATS_INTERVAL=16`.
+- Keep `HAL_HOT_STREAM_STATS=1`; do not remove stream observability.
+- Treat this as a partial CPU improvement only. It does not clear hardware
+  readiness or branch promotion.
+
+Reason:
+- This reduces `_streamStatsMutex` accounting frequency in sampled capture and
+  playback completion stats without changing audio bytes, routing, USB request
+  sizes, transfer coalescing, sample rates, or playback scheduling.
+- The locked Pair A/iRig run with interval 16 kept the same broad music-quality
+  failure shape as default, but reduced driver CPU p95 from the latest default
+  control `38.5%` to `35.7%`.
+- It also reduced total watched audio/UI p95 from `57.9%` to `53.5%`, and the
+  soundcheck click count was within the script threshold (`5`, threshold `10`).
+
+Alternatives discarded:
+- `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`: rejected by locked physical soundcheck.
+  It reduced driver CPU p95 to `36.8%`, but worsened quality alignment to
+  `0.954699` and SNR to about `9.53 dB`.
+- `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1`: already rejected as a default by
+  physical evidence.
+- Disable hot stats entirely: still rejected because observability is needed
+  while physical quality and CPU are unresolved.
+
+Evidence:
+- Hot stats interval 16 safety:
+  `local-analysis/physical-hotstats-interval16/20260617-a1c8b50/hal-candidate-safety`.
+- Hot stats interval 16 soundcheck:
+  `local-analysis/soundcheck/20260617-hotstats-interval16-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Fast prefetch rejected soundcheck:
+  `local-analysis/soundcheck/20260617-fast-prefetch-clear-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Final isolation after hotstats16 unload PASS:
+  `local-analysis/runtime-isolation/after-hotstats-interval16-manual-unload.json`.
+- Tone-response compensation diagnostic:
+  `local-analysis/tone-response-compensation/recent-music-runs.json`.
+
+Remaining blockers:
+- Physical music quality still fails: quality alignment around `0.964`, SNR
+  around `10.28 dB`, lag jumps `41`, and mid/high residual ratios
+  `1.429448/1.362535`.
+- Driver CPU p95 `35.7%` is improved but still far above the mainline threshold
+  `6.5%`.
+- Physical Traktor/timecode remains unvalidated.
+
+## 2026-06-17: Tone Response Shape Does Not Explain Music Residual Offline
+
+Decision:
+- Do not claim that Pair A music residual is explained by simple physical
+  tone-response/EQ coloration.
+- Keep a dedicated offline diagnostic script for future response-shape checks:
+  `scripts/analyze-tone-response-compensation.py`.
+
+Reason:
+- A three-band per-channel response model derived from the passing physical
+  decorrelated tone matrix was fit against six existing music captures.
+- After applying response shape and re-fitting global gain, SNR moved only
+  modestly (`-0.19 dB` to `+1.88 dB`) and the mid-band residual ratio worsened
+  by about `4.94` to `5.02` absolute across the runs.
+- That means the current tone-response model does not account for the bad
+  music residual. The blocker remains either a more complex non-linear/phase
+  behavior, format issue not exposed by tone leakage, or external route/capture
+  mismatch that needs a better controlled reference.
+
+Evidence:
+- `scripts/analyze-tone-response-compensation.py`
+- `local-analysis/tone-response-compensation/recent-music-runs.json`
+
+## 2026-06-17: LTI Transfer Analysis Rejects Simple Linear Route Explanation
+
+Decision:
+- Add a SciPy/NumPy offline analysis environment and
+  `scripts/analyze-lti-transfer-quality.py`.
+- Do not pursue simple EQ/linear phase compensation as the next product fix.
+- Keep the next quality investigation focused on non-linear/time-varying
+  behavior, output format semantics, or a physical reference mismatch that a
+  stable linear transfer function cannot model.
+
+Reason:
+- The LTI analysis estimates per-channel transfer functions using Welch/CSD,
+  reconstructs a predicted capture, and compares scalar-gain residual against
+  LTI-predicted residual.
+- Across six existing Pair A/iRig music captures, mid/high coherence is very
+  low:
+  - mid-band mean coherence is about `0.075` to `0.124`;
+  - high-band mean coherence is about `0.020` to `0.045`.
+- Applying the estimated transfer function does not improve the music gate:
+  LTI SNR deltas are negative in every tested run, about `-0.78 dB` to
+  `-2.37 dB`, and mid/high residual ratios worsen.
+- Therefore the failed music residual is not explained by a stable linear
+  channel response between the generated reference and iRig capture.
+
+Evidence:
+- Analysis dependencies: `requirements-analysis.txt`.
+- Script: `scripts/analyze-lti-transfer-quality.py`.
+- Result JSON:
+  `local-analysis/lti-transfer-quality/recent-music-runs.json`.
+
+Implication:
+- A better physical reference is still needed, but not as a simple EQ
+  calibration. The next high-value physical test should isolate whether the
+  reference file sent to CoreAudio is actually the signal appearing at the
+  Audio 8 DJ analog outs, or whether a format/phase/non-linear effect appears
+  before the iRig capture.
+
+## 2026-06-17: Failure-Mode Classifier Rejects Simple Mix/Polarity/Non-Linearity
+
+Decision:
+- Add `scripts/analyze-soundcheck-failure-modes.py` as an offline diagnostic
+  for existing physical soundcheck WAVs.
+- Do not chase simple L/R swap, polarity inversion, static 2x2 matrix, or
+  memoryless cubic compensation as the next product fix.
+
+Reason:
+- Across recent failing Pair A/iRig music captures, the best identity/swap/
+  polarity scalar model still stays near `9-10 dB` SNR.
+- A static 2x2 matrix improves SNR by only about `0.13-0.24 dB`.
+- A cubic memoryless model improves SNR by only about `0.002-0.004 dB`.
+- Capture clipping is absent.
+- With local lag search (`--drift-max-lag 128`), default-like runs show
+  small net drift but persistent residual, so drift alone does not explain the
+  music failure.
+
+Evidence:
+- Script: `scripts/analyze-soundcheck-failure-modes.py`.
+- Wide-lag diagnostic:
+  `local-analysis/soundcheck-failure-modes/recent-music-runs.json`.
+- Local-lag diagnostic:
+  `local-analysis/soundcheck-failure-modes/recent-music-runs-local128.json`.
+
+Implication:
+- The next physical quality test should isolate the real analog reference route
+  and runtime discontinuities. A decorrelated or impulse/MLS physical fixture
+  with direct reference capture is higher value than more EQ fitting.
+
+## 2026-06-17: Reject Stats-Off As CPU Default
+
+Decision:
+- Do not promote `HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0`.
+- Keep `HAL_OUTPUT_WRITE_STATS=1`, `HAL_HOT_STREAM_STATS=1`, and
+  `HAL_HOT_STREAM_STATS_INTERVAL=16` as the current default.
+
+Reason:
+- Stats-off removes completion/write telemetry, but locked physical evidence
+  did not show a CPU win. Driver CPU p95 was `36.8%`, worse than the
+  interval-16 run (`35.7%`) and still far above the mainline threshold
+  (`6.5%`).
+- Music quality did not improve: quality alignment `0.960287`, SNR
+  `10.48 dB`, lag jumps `37`, and mid/high residual ratios
+  `1.424930/1.362660`.
+- Removing observability while the root cause is unresolved is not an
+  acceptable default unless it buys a material CPU reduction, which it did not.
+
+Alternatives discarded:
+- Promote stats-off because it removes hot-path accounting: rejected by
+  measured CPU.
+- Keep stats-off for quality: rejected because the failing music signature
+  remains.
+- Continue with interval 16: accepted as the current partial CPU cleanup
+  because it preserves observability and has better measured p95.
+
+Evidence:
+- Build under test:
+  `make -B hal HAL_OUTPUT_WRITE_STATS=0 HAL_HOT_STREAM_STATS=0`.
+- Safety:
+  `local-analysis/physical-stats-off/20260617-a1c8b50-stats-off/hal-candidate-safety`.
+- Soundcheck:
+  `local-analysis/soundcheck/20260617-stats-off-a1c8b50-irig-pairA-16s-cpp-hal`.
+- Promotion readiness after run:
+  `local-analysis/promotion-readiness-after-stats-off.json`.
+- Final isolation:
+  `local-analysis/runtime-isolation/final-after-stats-off.json`.
