@@ -77,6 +77,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ISO_FRAMES_PER_TRANSFER 8
 #endif
 
+#ifndef OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER
+#define OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER OPENA8DJ_ISO_FRAMES_PER_TRANSFER
+#endif
+
 #ifndef OPENA8DJ_CAPTURE_QUEUE_DEPTH
 #define OPENA8DJ_CAPTURE_QUEUE_DEPTH 64
 #endif
@@ -225,8 +229,9 @@ enum {
     kBytesPerSampleUSB = 4,
     kOutputUSBBytesPerFrame = kStreams * kBytesPerSampleUSB * kChannelsPerStream,
     kIsoFramesPerTransfer = OPENA8DJ_ISO_FRAMES_PER_TRANSFER,
+    kPlaybackBaseIsoFramesPerTransfer = OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER,
     kPlaybackCoalesceTransfers = OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS < 1 ? 1 : OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS,
-    kPlaybackIsoFramesPerTransfer = kIsoFramesPerTransfer * kPlaybackCoalesceTransfers,
+    kPlaybackIsoFramesPerTransfer = kPlaybackBaseIsoFramesPerTransfer * kPlaybackCoalesceTransfers,
     kIsoBytesPerFrame = 512,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
@@ -244,7 +249,7 @@ enum {
     kTransferLedgerCapacity = 131072,
     kOutputSampleTimeJitterToleranceFrames = 1024,
     kPlaybackScheduleLeadFrames = 100,
-    kPlaybackScheduleMaxLeadFrames = kPlaybackScheduleLeadFrames + (kPlaybackQueueTarget * kIsoFramesPerTransfer) + 64,
+    kPlaybackScheduleMaxLeadFrames = kPlaybackScheduleLeadFrames + (kPlaybackQueueTarget * kPlaybackIsoFramesPerTransfer) + 64,
     kPlaybackScheduleFallbackThreshold = 64,
     kClockDriftTolerance = 5,
     kA8DJControlStateBytes = 6
@@ -1759,6 +1764,7 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 - (void)stopIPCServer;
 - (void)broadcastIPCType:(uint8_t)type bytes:(const uint8_t *)bytes length:(NSUInteger)length;
 - (BOOL)getClockAnchor:(OpenA8DJUSBClockAnchor *)outAnchor;
+- (BOOL)getDiagnostics:(OpenA8DJUSBDiagnostics *)outDiagnostics;
 - (BOOL)sampleStableUSBFrame:(uint64_t *)outFrame hostTime:(uint64_t *)outHostTime;
 - (void)updateUSBFrameClockWithFrame:(uint64_t)frameNumber hostTime:(uint64_t)hostTime;
 - (void)queueCaptureTransfer;
@@ -2071,6 +2077,14 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     bool _pendingReady;
     NSData *_pendingReply;
     uint8_t _controlState[256];
+    uint8_t _lastAudioParamsResetRateCode;
+    uint8_t _lastAudioParamsResetDepth;
+    uint8_t _lastAudioParamsResetOk;
+    uint8_t _lastAudioParamsStreamRateCode;
+    uint8_t _lastAudioParamsStreamDepth;
+    uint8_t _lastAudioParamsStreamOk;
+    uint16_t _lastAudioParamsResetBytesPerPacket;
+    uint16_t _lastAudioParamsStreamBytesPerPacket;
     pthread_mutex_t _ipcClientsMutex;
     int _ipcListenFd;
     int _ipcClients[16];
@@ -2628,6 +2642,19 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     }
     const uint8_t *bytes = reply.bytes;
     BOOL ok = replyLength >= 2 && bytes[0] == kCommandAudioParams && bytes[1] == 1;
+    pthread_mutex_lock(&_ep1Mutex);
+    if (name != NULL && strcmp(name, "reset") == 0) {
+        _lastAudioParamsResetRateCode = rateCode;
+        _lastAudioParamsResetDepth = depth;
+        _lastAudioParamsResetBytesPerPacket = bpp;
+        _lastAudioParamsResetOk = ok ? 1 : 0;
+    } else if (name != NULL && strcmp(name, "stream") == 0) {
+        _lastAudioParamsStreamRateCode = rateCode;
+        _lastAudioParamsStreamDepth = depth;
+        _lastAudioParamsStreamBytesPerPacket = bpp;
+        _lastAudioParamsStreamOk = ok ? 1 : 0;
+    }
+    pthread_mutex_unlock(&_ep1Mutex);
     USBTrace("audio params %s rateCode=0x%02x depth=%u bpp=%u ok=%d",
              name != NULL ? name : "set",
              rateCode,
@@ -3539,6 +3566,78 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
 
     return stats;
+}
+
+- (BOOL)getDiagnostics:(OpenA8DJUSBDiagnostics *)outDiagnostics
+{
+    if (outDiagnostics == NULL) {
+        return NO;
+    }
+
+    OpenA8DJUSBDiagnostics diagnostics;
+    memset(&diagnostics, 0, sizeof(diagnostics));
+    diagnostics.size = (uint32_t)sizeof(diagnostics);
+    diagnostics.running = atomic_load(&_running) ? 1 : 0;
+    diagnostics.streaming = atomic_load(&_streaming) ? 1 : 0;
+    diagnostics.sampleRate = _sampleRate;
+    diagnostics.specDataAlignment = _spec.dataAlignment;
+    diagnostics.specNumAnalogAudioIn = _spec.numAnalogAudioIn;
+    diagnostics.specNumAnalogAudioOut = _spec.numAnalogAudioOut;
+    diagnostics.specFwVersion = _spec.fwVersion;
+
+    pthread_mutex_lock(&_ep1Mutex);
+    memcpy(diagnostics.control, _controlState, sizeof(diagnostics.control));
+    diagnostics.lastAudioParamsResetRateCode = _lastAudioParamsResetRateCode;
+    diagnostics.lastAudioParamsResetDepth = _lastAudioParamsResetDepth;
+    diagnostics.lastAudioParamsResetOk = _lastAudioParamsResetOk;
+    diagnostics.lastAudioParamsStreamRateCode = _lastAudioParamsStreamRateCode;
+    diagnostics.lastAudioParamsStreamDepth = _lastAudioParamsStreamDepth;
+    diagnostics.lastAudioParamsStreamOk = _lastAudioParamsStreamOk;
+    diagnostics.lastAudioParamsResetBytesPerPacket = _lastAudioParamsResetBytesPerPacket;
+    diagnostics.lastAudioParamsStreamBytesPerPacket = _lastAudioParamsStreamBytesPerPacket;
+    pthread_mutex_unlock(&_ep1Mutex);
+
+    OpenA8DJStreamStatsPayload stats = [self streamStatsSnapshot];
+    diagnostics.playbackExplicitScheduling = stats.playbackExplicitScheduling;
+    diagnostics.outputByteInFrame = stats.outputByteInFrame;
+    diagnostics.outputRingFrames = stats.outputRingFrames;
+    diagnostics.outputTargetLatencyFrames = stats.outputTargetLatencyFrames;
+    diagnostics.playbackLeadFrames = stats.playbackLeadFrames;
+    diagnostics.playbackQueueTarget = stats.playbackQueueTarget;
+    diagnostics.playbackTransfersInFlight = stats.playbackTransfersInFlight;
+    diagnostics.captureTransfers = stats.captureTransfers;
+    diagnostics.playbackTransfers = stats.playbackTransfers;
+    diagnostics.outputFramesWritten = stats.outputFramesWritten;
+    diagnostics.outputFramesRead = stats.outputFramesRead;
+    diagnostics.outputStartupSilenceFrames = stats.outputStartupSilenceFrames;
+    diagnostics.outputUnderruns = stats.outputUnderruns;
+    diagnostics.outputActiveUnderruns = stats.outputActiveUnderruns;
+    diagnostics.outputElasticDrops = stats.outputElasticDrops;
+    diagnostics.outputElasticReplays = stats.outputElasticReplays;
+    diagnostics.outputTimelineResets = stats.outputTimelineResets;
+    diagnostics.outputLateWriteFrames = stats.outputLateWriteFrames;
+    diagnostics.outputLateWriteBatches = stats.outputLateWriteBatches;
+    diagnostics.playbackQueueFailures = stats.playbackQueueFailures;
+    diagnostics.playbackQueueBytesMin = stats.playbackQueueBytesMin;
+    diagnostics.playbackQueueBytesMax = stats.playbackQueueBytesMax;
+    diagnostics.playbackQueueBytesSum = stats.playbackQueueBytesSum;
+    diagnostics.playbackQueueBytesSamples = stats.playbackQueueBytesSamples;
+    diagnostics.playbackQueueTransactionsMin = stats.playbackQueueTransactionsMin;
+    diagnostics.playbackQueueTransactionsMax = stats.playbackQueueTransactionsMax;
+    diagnostics.playbackQueueTransactionsSum = stats.playbackQueueTransactionsSum;
+    diagnostics.playbackQueueTransactionsSamples = stats.playbackQueueTransactionsSamples;
+    diagnostics.playbackRequestCountMin = stats.playbackRequestCountMin;
+    diagnostics.playbackRequestCountMax = stats.playbackRequestCountMax;
+    diagnostics.playbackRequestCountSum = stats.playbackRequestCountSum;
+    diagnostics.playbackRequestCountSamples = stats.playbackRequestCountSamples;
+    diagnostics.playbackCompleteCountMin = stats.playbackCompleteCountMin;
+    diagnostics.playbackCompleteCountMax = stats.playbackCompleteCountMax;
+    diagnostics.playbackCompleteCountSum = stats.playbackCompleteCountSum;
+    diagnostics.playbackCompleteCountSamples = stats.playbackCompleteCountSamples;
+    diagnostics.cadenceExpectedTransferTicks = stats.cadenceExpectedTransferTicks;
+
+    *outDiagnostics = diagnostics;
+    return YES;
 }
 
 - (void)startStreamKeepalive
@@ -5187,6 +5286,20 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     if (requests == NULL || count == 0) {
         return NO;
     }
+    if (count >= kPlaybackIsoFramesPerTransfer) {
+        NSUInteger offset = 0;
+        while (offset + kPlaybackIsoFramesPerTransfer <= count) {
+            if (![self queuePlaybackWithRequests:&requests[offset] count:kPlaybackIsoFramesPerTransfer]) {
+                return NO;
+            }
+            offset += kPlaybackIsoFramesPerTransfer;
+        }
+        if (offset == count) {
+            return YES;
+        }
+        requests = &requests[offset];
+        count -= offset;
+    }
     if (kPlaybackCoalesceTransfers <= 1) {
         return [self queuePlaybackWithRequests:requests count:count];
     }
@@ -5726,6 +5839,21 @@ bool OpenA8DJUSBGetClockAnchor(OpenA8DJUSBClockAnchor *outAnchor)
         return false;
     }
     return [engine getClockAnchor:outAnchor];
+}
+
+bool OpenA8DJUSBGetDiagnostics(OpenA8DJUSBDiagnostics *outDiagnostics)
+{
+    pthread_mutex_lock(&gEngineMutex);
+    OpenA8DJUSBEngine *engine = gEngine;
+    pthread_mutex_unlock(&gEngineMutex);
+    if (engine == nil) {
+        if (outDiagnostics != NULL) {
+            memset(outDiagnostics, 0, sizeof(*outDiagnostics));
+            outDiagnostics->size = (uint32_t)sizeof(*outDiagnostics);
+        }
+        return false;
+    }
+    return [engine getDiagnostics:outDiagnostics];
 }
 
 uint32_t OpenA8DJUSBReadInput(float *outInterleaved, uint32_t frames, uint32_t channels)

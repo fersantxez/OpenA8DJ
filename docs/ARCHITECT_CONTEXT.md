@@ -902,3 +902,40 @@ Next technical target:
   valid direct bypass oracle. The next direct-engine task is not more physical
   repetition; it is explicit logging/modeling of `AUDIO_PARAMS`, output stream
   byte cadence, and device control state before/during direct playback.
+
+## 2026-06-17 Current Product Truth After ISO Sweep
+
+- Worktree and branch remain isolated:
+  `/Users/fer/dev/audio8djcpp` on `driverkit/cpp-redesign`.
+- Mainline `/Users/fer/dev/opena8dj` and Rust
+  `/Users/fer/dev/audio8djrust` remain read-only from this C++ effort.
+- Offline gates are green:
+  Debug `17/17`, Release `18/18`.
+- Direct USB selected-Pair-A sweep:
+  - ISO8/q8 PASS, max wrong-source leakage about `-53.55 dB`.
+  - ISO10 PASS, max wrong-source leakage about `-54.23 dB`.
+  - ISO12 PASS, max wrong-source leakage about `-50.44 dB`.
+  - ISO14 PASS, max wrong-source leakage about `-50.00 dB`.
+  - ISO16 FAIL, max wrong-source leakage about `-44.02 dB`.
+- HAL product Pair A matrix:
+  - ISO8/q8 PASS, max wrong-source leakage about `-52 dB`.
+  - ISO10/q8 PASS, max wrong-source leakage `-52.30 dB`.
+- Real-music product quality still fails:
+  - ISO8/q8: alignment `0.964724`, SNR `10.00 dB`,
+    mid/high residual `1.432051/1.356290`, `29` lag jumps.
+  - ISO10/q8: alignment `0.969379`, SNR `10.18 dB`,
+    mid/high residual `1.514509/1.396638`, `35` lag jumps.
+- Runtime CPU still fails mainline:
+  - ISO8/q8 driver p95 `23.1%`.
+  - ISO10/q8 driver p95 `19.6%`.
+  - Mainline budget remains around driver p95 `<= 6.5%`.
+- Current default remains ISO8/q8 because it is the stronger quality candidate
+  than ISO10/q8 on real music, even though ISO10/q8 reduces driver CPU.
+- Product state:
+  - Not ready for hardware readiness claim.
+  - Not ready for branch promotion.
+  - Not proven better than mainline.
+  - Physical Traktor/timecode vinyl remains unvalidated.
+  - Full A/B/C/D physical routing remains unvalidated.
+- Final runtime state after the latest locked gate:
+  HAL inactive, hardware lock absent, no OpenA8DJ process expected.

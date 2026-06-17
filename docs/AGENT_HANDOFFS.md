@@ -1020,3 +1020,45 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Next recommended action:
   - Stop using the direct USB tool as a quality oracle until it logs and
     validates audio params, control state, and selected-pair packet cadence.
+
+### Architect ISO Sweep And Product-Gate Continuation
+
+- Status:
+  - Continued locally. A prior attempt to spawn another explorer was blocked
+    by the agent thread limit, so the architect integrated the next hardware
+    gates directly under the global hardware lock.
+- Files affected:
+  - `Makefile`
+  - `src/hal/OpenA8DJUSB.h`
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/opena8dj-usb-play.m`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Added direct USB diagnostics and absolute-deadline pacing to remove a tool
+    timing artifact from the previous direct USB evidence.
+  - Direct selected-Pair-A ISO sweep shows short cadence is required:
+    ISO8/10/12/14 pass the matrix; ISO16 fails.
+  - ISO10/q8 HAL Pair A matrix passes at about `-52.30 dB` wrong-source
+    leakage.
+  - ISO10/q8 real music still fails: residual ratios
+    `1.514509/1.396638`, `35` lag jumps, driver p95 `19.6%`.
+  - ISO8/q8 remains the current default quality candidate because it has
+    better real-music residual and fewer lag jumps than ISO10/q8, despite
+    higher driver CPU.
+  - Promotion readiness remains `FAIL` and
+    `branch_promotion_allowed=false`.
+- Risks:
+  - Matrix success can hide real-music residual/timebase defects.
+  - CPU remains far above the mainline budget.
+  - A/B/C/D physical routing and Traktor/timecode vinyl are not yet validated.
+- Next recommended action:
+  - Keep ISO8/q8 as the default while investigating the music residual and
+    lag-jump mechanism.
+  - Optimize the USB completion cadence without moving into ISO16 or ISO64
+    quality regressions.
+  - Add physical A/B/C/D matrix and timecode/DVS gates only after real music
+    and CPU improve enough to justify more hardware time.

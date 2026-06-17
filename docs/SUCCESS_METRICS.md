@@ -802,3 +802,38 @@ Latest promotion evaluation:
 - Traktor/timecode vinyl physical validation: FAIL/BLOCKED.
 - Branch promotion: forbidden. C++ has not objectively beaten mainline on
   quality, functionality/routing, or resource consumption.
+
+## 2026-06-17 Updated Snapshot After ISO8/ISO10 Physical Gates
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-iso10q8.json`.
+
+- Branch promotion allowed: `false`.
+- Offline gates: PASS.
+- Physical Pair A channel matrix: PASS for the current short-cadence C++
+  candidates.
+  - ISO8/q8 HAL: max wrong-source leakage about `-52 dB`.
+  - ISO10/q8 HAL: max wrong-source leakage `-52.30 dB`.
+- Physical music quality: FAIL.
+  - ISO8/q8: `quality_alignment_score=0.964724`, SNR `10.00 dB`,
+    mid/high residual `1.432051/1.356290`, `29` lag jumps.
+  - ISO10/q8: `quality_alignment_score=0.969379`, SNR `10.18 dB`,
+    mid/high residual `1.514509/1.396638`, `35` lag jumps.
+- Runtime CPU beats mainline: FAIL.
+  - ISO8/q8 driver p95 `23.1%`.
+  - ISO10/q8 driver p95 `19.6%`.
+  - Mainline target remains driver p95 `<= 6.5%` under comparable conditions.
+- Full physical routing: FAIL/BLOCKED.
+  - Pair A matrix evidence exists.
+  - A/B/C/D physical output matrix is still required.
+  - 8 inputs and 8 outputs are represented in code and offline tests, but
+    physical capture verification is incomplete.
+- Traktor/timecode vinyl physical validation: FAIL/BLOCKED.
+  - Timecode policy exists in core and must remain enabled for vinyl/CD-line
+    profiles.
+  - No physical Traktor/DVS evidence exists for the C++ candidate.
+- Current threshold interpretation:
+  - A passing Pair A matrix is necessary evidence, not product readiness.
+  - The candidate must pass real music, CPU, full routing, and timecode gates
+    before any claim that it is better than mainline.
+  - "Compiles" and "HAL loads" remain non-product metrics.

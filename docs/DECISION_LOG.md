@@ -2506,3 +2506,41 @@ Evidence:
 - `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-chmatrix/tone-matrix.json`
 - `local-analysis/channel-matrix/20260617-direct-usb-gain05-pairA-selected-lead8192-chmatrix/tone-matrix.json`
 - `local-analysis/runtime-isolation/post-direct-usb-selected-lead8192-matrix.json`
+
+## 2026-06-17: Keep ISO8/q8 As Default Candidate, Reject ISO10 Promotion
+
+Decision:
+- Keep ISO8/q8 as the current C++ default quality candidate.
+- Reject ISO64/q8 and ISO10/q8 as product defaults for now.
+- Do not declare hardware readiness and do not promote C++ over mainline.
+
+Reason:
+- Direct USB and HAL Pair A matrix evidence show that short ISO cadence fixes
+  the gross selected-pair leakage seen with the older direct tool.
+- ISO64/q8 reduces CPU but fails physical quality badly and is not acceptable
+  for an audiophile path.
+- ISO10/q8 lowers driver CPU versus ISO8/q8, but the real-music gate is worse:
+  mid/high residual ratios `1.514509/1.396638` and `35` lag jumps, versus
+  ISO8/q8 residual ratios `1.432051/1.356290` and `29` lag jumps.
+- ISO10/q8 still fails the mainline resource gate:
+  driver p95 `19.6%`, coreaudiod p95 `84.3%`.
+- Pair A matrix passing is necessary but not sufficient. It does not prove
+  full A/B/C/D routing, Traktor/timecode functionality, real music quality, or
+  resource superiority.
+
+Alternatives discarded:
+- Promote ISO10/q8 because it is cheaper than ISO8/q8: rejected because the
+  quality gate worsens and CPU is still above mainline.
+- Promote ISO8/q8 because Pair A matrix beats the stored mainline matrix:
+  rejected because real music and CPU still fail, and physical A/B/C/D plus
+  timecode vinyl are unvalidated.
+- Return to ISO64/q8 for CPU: rejected because quality degraded far below the
+  acceptable matrix threshold.
+
+Evidence:
+- `local-analysis/channel-matrix/20260617-direct-iso10-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+- `local-analysis/channel-matrix/20260617-direct-iso16-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+- `local-analysis/channel-matrix/20260617-cpp-iso10q8-hal-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/metrics.json`
+- `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/metrics.json`
+- `local-analysis/promotion-readiness-after-iso10q8.json`

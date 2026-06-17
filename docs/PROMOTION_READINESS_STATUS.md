@@ -160,3 +160,29 @@ mainline.
 
 Decision: branch promotion remains forbidden. Do not move C mainline to
 Legacy, do not move C++ to `main`, and do not claim audiophile readiness.
+
+## 2026-06-17 ISO8/ISO10 Product-Gate Status
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-iso10q8.json`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Offline gates remain PASS.
+- Pair A physical matrix now passes for the short-cadence HAL candidates:
+  ISO8/q8 around `-52 dB` max wrong-source leakage, ISO10/q8
+  `-52.30 dB`.
+- This is not readiness. The real-music gate still fails:
+  - ISO8/q8: alignment `0.964724`, SNR `10.00 dB`,
+    mid/high residual `1.432051/1.356290`, `29` lag jumps.
+  - ISO10/q8: alignment `0.969379`, SNR `10.18 dB`,
+    mid/high residual `1.514509/1.396638`, `35` lag jumps.
+- Runtime CPU still fails mainline:
+  ISO8/q8 driver p95 `23.1%`, ISO10/q8 driver p95 `19.6%`, versus mainline
+  target around `<= 6.5%`.
+- ISO8/q8 remains the default candidate because ISO10/q8 is cheaper but worse
+  on music residual and lag jumps.
+- Required before branch promotion:
+  real-music PASS, CPU at or below mainline under comparable conditions, full
+  A/B/C/D physical routing, Traktor/timecode physical validation, and final
+  runtime isolation/rollback evidence.

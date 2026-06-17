@@ -4138,3 +4138,105 @@ Operational note:
   - `local-analysis/runtime-isolation/post-direct-usb-selected-lead8192-matrix.json`
   - `local-analysis/runtime-isolation/final-after-selected-direct-tool.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Direct ISO Sweep, ISO10 HAL Product Gate, And Readiness Rejection
+
+- Purpose:
+  - Replace speculation about USB cadence with measured direct-USB and HAL
+    evidence.
+  - Preserve the audiophile gate boundary: matrix improvement is not enough
+    when real music quality and CPU still fail.
+- Commands:
+  - `make -B usb-play usb-play-plain-gain05`
+  - `build/opena8dj-usb-play <fixture> Z` for parser rejection smoke before
+    USB access.
+  - `scripts/run-cpp-offline-gates`
+  - Direct locked ISO sweep using separately built direct tools:
+    `build/opena8dj-usb-play-iso10`,
+    `build/opena8dj-usb-play-iso12`,
+    `build/opena8dj-usb-play-iso14`,
+    `build/opena8dj-usb-play-iso16`.
+  - `make -B hal build/audio-wav-play build/audio-record build/opena8dj-control HAL_ISO_FRAMES=10 HAL_PLAYBACK_ISO_FRAMES=10`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded`
+  - Locked HAL Pair A channel matrix for ISO10/q8.
+  - Locked HAL real-music soundcheck for ISO10/q8.
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-iso10q8.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-iso10q8-soundcheck-unload.json`
+- Build and offline results:
+  - `make -B usb-play usb-play-plain-gain05` PASS.
+  - Invalid direct pair parser smoke PASS: status `2` before USB access.
+  - Offline C++ gates PASS: Debug `17/17`, Release `18/18`.
+  - Latest release benchmark:
+    `pack_mib_s=1652.84`, `decode_into_mib_s=584.749`,
+    `route_frames_s=9.35811e+08`,
+    `route_advanced_frames_s=4.20131e+08`.
+- Direct USB ISO sweep:
+  - ISO10 selected Pair A PASS:
+    max wrong-source leakage `-54.23 dB`, L->R `-54.23 dB`,
+    R->L `-53.89 dB`, active underruns `0`.
+  - ISO12 selected Pair A PASS:
+    max wrong-source leakage `-50.44 dB`, L->R `-50.44 dB`,
+    R->L `-48.83 dB`, active underruns `0`.
+  - ISO14 selected Pair A PASS:
+    max wrong-source leakage `-50.00 dB`, L->R `-52.01 dB`,
+    R->L `-48.21 dB`, active underruns `0`.
+  - ISO16 selected Pair A FAIL:
+    max wrong-source leakage `-44.02 dB`, L->R `-46.72 dB`,
+    R->L `-41.87 dB`, active underruns `0`.
+  - Previous direct ISO8/q8 evidence remains the strongest measured direct
+    quality candidate so far:
+    max wrong-source leakage `-53.55 dB`, L->R `-62.75 dB`,
+    R->L `-51.88 dB`.
+- HAL ISO10/q8 product evidence:
+  - Candidate safety PASS with HAL intentionally left loaded for the locked
+    product gate.
+  - Pair A channel matrix PASS:
+    max wrong-source leakage `-52.30 dB`, L->R `-55.26 dB`,
+    R->L `-50.67 dB`, no clipping.
+  - Real-music quality FAIL:
+    `quality_alignment_score=0.969379`, analog SNR `10.18 dB`,
+    mid/high residual ratios `1.514509/1.396638`,
+    quiet mid noise `-35.09 dBFS`, `35` lag jumps greater than 2 frames.
+  - Runtime CPU FAIL against mainline:
+    driver p50/p95/max `19.1/19.6/19.7%`; coreaudiod p50/p95/max
+    `2.6/84.3/87.4%`.
+  - Stream counters were clean: no output underruns, active underruns,
+    drops/replays, resets, or late writes.
+- ISO8/q8 comparison:
+  - HAL Pair A matrix also PASS:
+    max wrong-source leakage about `-52 dB`.
+  - Real-music quality still FAIL:
+    `quality_alignment_score=0.964724`, analog SNR `10.00 dB`,
+    mid/high residual ratios `1.432051/1.356290`, `29` lag jumps.
+  - Driver CPU p95 was worse than ISO10 (`23.1%`), but ISO8 had better
+    music residual and fewer lag jumps.
+- Interpretation:
+  - ISO64/q8 is rejected for product default because it reduces CPU but fails
+    physical quality badly.
+  - ISO10 is rejected as default for now despite lower driver CPU because it
+    worsens music residual and lag jumps versus ISO8, while still failing the
+    mainline CPU gate.
+  - ISO8/q8 remains the current default quality candidate, not a readiness
+    candidate.
+  - Matrix Pair A improvement over mainline-like evidence is real but
+    insufficient. Real music, runtime CPU, full A/B/C/D routing, and physical
+    Traktor/timecode gates remain blocking.
+  - Promotion remains forbidden:
+    `branch_promotion_allowed=false`.
+- Final state:
+  - HAL unloaded/inactive.
+  - Hardware lock absent.
+  - Runtime isolation PASS.
+  - No C mainline or Rust worktree changes.
+- Evidence paths:
+  - `local-analysis/channel-matrix/20260617-direct-iso10-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-iso12-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-iso14-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-iso16-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-direct-usb-iso8q8-pairA-selected-lead8192-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-cpp-iso10q8-hal-pairA-chmatrix/tone-matrix.json`
+  - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/metrics.json`
+  - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/cpu-summary.json`
+  - `local-analysis/promotion-readiness-after-iso10q8.json`
+  - `local-analysis/runtime-isolation/after-iso10q8-soundcheck-unload.json`

@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 
 #include <math.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,28 @@ static void SleepFrames(uint32_t frames, uint32_t sampleRate)
     nanosleep(&ts, NULL);
 }
 
+static uint64_t MonotonicNsec(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((uint64_t)ts.tv_sec * 1000000000ull) + (uint64_t)ts.tv_nsec;
+}
+
+static void SleepUntilNsec(uint64_t deadline)
+{
+    for (;;) {
+        uint64_t now = MonotonicNsec();
+        if (now >= deadline) {
+            return;
+        }
+        uint64_t remaining = deadline - now;
+        struct timespec ts;
+        ts.tv_sec = (time_t)(remaining / 1000000000ull);
+        ts.tv_nsec = (long)(remaining % 1000000000ull);
+        nanosleep(&ts, NULL);
+    }
+}
+
 static int ParsePair(const char *text)
 {
     if (text == NULL || strcmp(text, "all") == 0 || strcmp(text, "ALL") == 0) {
@@ -44,6 +67,95 @@ static int ParsePair(const char *text)
         return -2;
     }
     return (int)(c - 'A');
+}
+
+static void PrintDiagnostics(const char *label)
+{
+    OpenA8DJUSBDiagnostics diagnostics;
+    if (!OpenA8DJUSBGetDiagnostics(&diagnostics)) {
+        fprintf(stderr, "direct_diag label=%s available=0\n", label);
+        fflush(stderr);
+        return;
+    }
+
+    fprintf(stderr,
+            "direct_diag label=%s available=1 size=%u running=%u streaming=%u rate=%.0f "
+            "fw=%u align=%u analog_in=%u analog_out=%u "
+            "control=%02x:%02x:%02x:%02x:%02x:%02x "
+            "audio_reset_rate=0x%02x audio_reset_depth=%u audio_reset_bpp=%u audio_reset_ok=%u "
+            "audio_stream_rate=0x%02x audio_stream_depth=%u audio_stream_bpp=%u audio_stream_ok=%u "
+            "output_byte=%u ring_frames=%u target_latency=%u lead=%u queue_target=%u in_flight=%u "
+            "capture_transfers=%" PRIu64 " playback_transfers=%" PRIu64 " "
+            "frames_written=%" PRIu64 " frames_read=%" PRIu64 " startup_silence=%" PRIu64 " "
+            "underruns=%" PRIu64 " active_underruns=%" PRIu64 " elastic_drops=%" PRIu64 " "
+            "elastic_replays=%" PRIu64 " timeline_resets=%" PRIu64 " late_frames=%" PRIu64 " "
+            "late_batches=%" PRIu64 " queue_failures=%" PRIu64 " "
+            "queue_bytes_min=%" PRIu64 " queue_bytes_max=%" PRIu64 " queue_bytes_sum=%" PRIu64 " "
+            "queue_bytes_samples=%" PRIu64 " queue_tx_min=%" PRIu64 " queue_tx_max=%" PRIu64 " "
+            "queue_tx_sum=%" PRIu64 " queue_tx_samples=%" PRIu64 " "
+            "request_count_min=%" PRIu64 " request_count_max=%" PRIu64 " request_count_sum=%" PRIu64 " "
+            "request_count_samples=%" PRIu64 " complete_count_min=%" PRIu64 " complete_count_max=%" PRIu64 " "
+            "complete_count_sum=%" PRIu64 " complete_count_samples=%" PRIu64 " expected_ticks=%" PRIu64 "\n",
+            label,
+            diagnostics.size,
+            diagnostics.running,
+            diagnostics.streaming,
+            diagnostics.sampleRate,
+            diagnostics.specFwVersion,
+            diagnostics.specDataAlignment,
+            diagnostics.specNumAnalogAudioIn,
+            diagnostics.specNumAnalogAudioOut,
+            diagnostics.control[0],
+            diagnostics.control[1],
+            diagnostics.control[2],
+            diagnostics.control[3],
+            diagnostics.control[4],
+            diagnostics.control[5],
+            diagnostics.lastAudioParamsResetRateCode,
+            diagnostics.lastAudioParamsResetDepth,
+            diagnostics.lastAudioParamsResetBytesPerPacket,
+            diagnostics.lastAudioParamsResetOk,
+            diagnostics.lastAudioParamsStreamRateCode,
+            diagnostics.lastAudioParamsStreamDepth,
+            diagnostics.lastAudioParamsStreamBytesPerPacket,
+            diagnostics.lastAudioParamsStreamOk,
+            diagnostics.outputByteInFrame,
+            diagnostics.outputRingFrames,
+            diagnostics.outputTargetLatencyFrames,
+            diagnostics.playbackLeadFrames,
+            diagnostics.playbackQueueTarget,
+            diagnostics.playbackTransfersInFlight,
+            diagnostics.captureTransfers,
+            diagnostics.playbackTransfers,
+            diagnostics.outputFramesWritten,
+            diagnostics.outputFramesRead,
+            diagnostics.outputStartupSilenceFrames,
+            diagnostics.outputUnderruns,
+            diagnostics.outputActiveUnderruns,
+            diagnostics.outputElasticDrops,
+            diagnostics.outputElasticReplays,
+            diagnostics.outputTimelineResets,
+            diagnostics.outputLateWriteFrames,
+            diagnostics.outputLateWriteBatches,
+            diagnostics.playbackQueueFailures,
+            diagnostics.playbackQueueBytesMin,
+            diagnostics.playbackQueueBytesMax,
+            diagnostics.playbackQueueBytesSum,
+            diagnostics.playbackQueueBytesSamples,
+            diagnostics.playbackQueueTransactionsMin,
+            diagnostics.playbackQueueTransactionsMax,
+            diagnostics.playbackQueueTransactionsSum,
+            diagnostics.playbackQueueTransactionsSamples,
+            diagnostics.playbackRequestCountMin,
+            diagnostics.playbackRequestCountMax,
+            diagnostics.playbackRequestCountSum,
+            diagnostics.playbackRequestCountSamples,
+            diagnostics.playbackCompleteCountMin,
+            diagnostics.playbackCompleteCountMax,
+            diagnostics.playbackCompleteCountSum,
+            diagnostics.playbackCompleteCountSamples,
+            diagnostics.cadenceExpectedTransferTicks);
+    fflush(stderr);
 }
 
 int main(int argc, char **argv)
@@ -121,6 +233,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "OpenA8DJUSBStart failed\n");
             return 6;
         }
+        PrintDiagnostics("after-start");
 
         const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
         fprintf(stderr,
@@ -133,9 +246,11 @@ int main(int argc, char **argv)
                 sourceFrames,
                 (double)sourceFrames / (double)sampleRate);
         fflush(stderr);
+        PrintDiagnostics("before-play");
         enum { chunkFrames = 256 };
         float out[chunkFrames * 8];
         uint32_t frame = 0;
+        uint64_t playbackStartNsec = MonotonicNsec();
         while (frame < sourceFrames) {
             uint32_t todo = sourceFrames - frame;
             if (todo > chunkFrames) {
@@ -157,12 +272,17 @@ int main(int argc, char **argv)
             OpenA8DJUSBWriteOutput(out, todo, 8);
             frame += todo;
             if (frame > leadFrames) {
-                SleepFrames(todo, sampleRate);
+                double elapsedFrames = (double)(frame - leadFrames);
+                uint64_t elapsedNsec = (uint64_t)((elapsedFrames * 1000000000.0) / (double)sampleRate);
+                SleepUntilNsec(playbackStartNsec + elapsedNsec);
             }
         }
 
+        PrintDiagnostics("after-play");
         SleepFrames(sampleRate / 2, sampleRate);
+        PrintDiagnostics("before-stop");
         OpenA8DJUSBStop();
+        PrintDiagnostics("after-stop");
         fprintf(stderr, "usb_play completed frames=%u\n", sourceFrames);
         fflush(stderr);
     }
