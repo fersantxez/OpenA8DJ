@@ -366,8 +366,8 @@ physical window.
 
 ## HAL CPU Experiment Flags
 
-The HAL build currently enables atomic sampled stream-stat accumulators by
-default:
+The HAL build currently keeps atomic sampled stream-stat accumulators disabled
+by default:
 
 ```sh
 make hal
@@ -376,20 +376,22 @@ make hal
 This is equivalent to:
 
 ```sh
-make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1 hal
+make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal
 ```
 
-The fallback path remains available for A/B validation:
+The opt-in experimental path remains available for A/B validation:
 
 ```sh
-make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal
+make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1 hal
 ```
 
 The flag only changes sampled stream-stat accounting in the USB completion hot
 path. It does not change audio packet bytes, routing, sample rates, advertised
 channels, USB scheduling policy, install behavior, or DriverKit artifacts. Any
 CPU or quality claim for this flag requires a locked physical soundcheck and
-comparison against the recorded mainline/C++ baselines.
+comparison against the recorded mainline/C++ baselines. The first locked
+physical run with the flag enabled did not clear those gates, so the default
+must remain disabled until better evidence exists.
 
 ## Migration Order
 

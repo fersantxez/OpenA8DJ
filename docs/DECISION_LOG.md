@@ -1236,10 +1236,12 @@ Evidence:
 ## 2026-06-17: Add Atomic Stream-Stats Accumulators As CPU Candidate
 
 Decision:
-- Enable `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1` by default for the HAL build.
-- Keep `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0` as an explicit fallback path.
-- Treat this as a runtime CPU candidate only; do not claim audio readiness or
-  promotion until locked physical music/CPU evidence improves.
+- Add `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS` as an experimental HAL build flag.
+- Keep the production/default HAL build on
+  `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0` after physical validation rejected
+  the flag as a default.
+- Treat this as a rejected-default runtime CPU experiment; do not claim audio
+  readiness or promotion from it.
 
 Reason:
 - The previous hot stream stats path updated `_streamStats` under
@@ -1270,3 +1272,21 @@ Evidence:
   `local-analysis/runtime-isolation/after-atomic-stream-stats-offline.json`.
 - Promotion readiness remains FAIL:
   `local-analysis/promotion-readiness-after-atomic-stream-stats.json`.
+- Locked physical soundcheck rejected the flag as a default:
+  `local-analysis/soundcheck/20260617-atomic-stream-stats-a11012f-irig-pairA-16s-cpp-hal`.
+- Physical metrics with the flag enabled:
+  - driver CPU median/p95/max `36.6%/37.6%/37.9%`;
+  - quality alignment `0.963004`;
+  - SNR `10.34 dB`;
+  - click outliers `106`;
+  - lag jumps `41`;
+  - mid/high residual ratios `1.413150/1.367878`.
+- Cleanup required a manual minimal unload because `audio-stack-guard`
+  health passed and therefore did not enter recovery despite
+  `--unload-opena8dj`; final isolation PASS:
+  `local-analysis/runtime-isolation/after-atomic-stream-stats-manual-unload.json`.
+
+Follow-up:
+- The next CPU work should target real hot-path cost, not stats accounting:
+  output/capture queue depth, transfer batching, property polling behavior, or
+  a measured scheduling/lifecycle change with no quality regression.

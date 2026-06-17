@@ -2539,3 +2539,46 @@ Operational note:
   - This validates build and offline invariants only. Atomic stream stats still
     need a locked physical soundcheck to prove whether driver CPU p95 improves
     without worsening music quality or observability.
+
+## 2026-06-17: Atomic Stream-Stats Physical Soundcheck Rejection
+
+- Commit under test:
+  - `a11012f` (`Add atomic stream stats accumulators`)
+- Commands:
+  - `make hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-atomic-stream-stats/20260617-a11012f/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-atomic-stream-stats-a11012f-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Manual minimal unload under the global lock: move active
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` to
+    `/Library/Audio/Plug-Ins/HAL.disabled/OpenA8DJ.driver.manual-unloaded-20260616-220452`
+    and terminate `Core Audio Driver (OpenA8DJ.driver)` PID `62309`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-atomic-stream-stats-manual-unload.json`
+- Result:
+  - HAL candidate safety PASS.
+  - Physical music soundcheck FAIL.
+  - Final manual unload/isolation PASS: HAL inactive, lock absent, no OpenA8DJ
+    driver process.
+- Key quality metrics:
+  - `quality_alignment_score=0.9630037066274131`
+  - `analog_snr_db=10.34`
+  - `click_outliers=106`
+  - `lag_jumps_gt_2_frames=41`
+  - `mid_band_residual_ratio=1.4131498493677057`
+  - `high_band_residual_ratio=1.3678775330794208`
+  - `quiet_mid_band_noise_dbfs=-36.078859229311256`
+  - `capture_clipped_frames=0`
+- CPU comparison:
+  - atomic stream stats: driver median/p95/max `36.6%/37.6%/37.9%`;
+  - default-after-unrolled control: `37.5%/38.5%/38.7%`;
+  - hotstats-write-late prior run: `35.2%/36.0%/36.4%`;
+  - queue8 prior run: `35.9%/37.2%/37.9%`;
+  - mainline threshold remains `6.5%` driver p95.
+- Evidence paths:
+  - `local-analysis/physical-atomic-stream-stats/20260617-a11012f/hal-candidate-safety`
+  - `local-analysis/soundcheck/20260617-atomic-stream-stats-a11012f-irig-pairA-16s-cpp-hal`
+  - `local-analysis/runtime-isolation/after-atomic-stream-stats-manual-unload.json`
+- Interpretation:
+  - Atomic stream stats are rejected as a default. They provide only a small
+    CPU reduction versus one failing control run, do not beat prior C++ CPU
+    variants, remain far above mainline CPU, and do not improve physical music
+    quality.
