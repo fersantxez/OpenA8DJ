@@ -1232,3 +1232,41 @@ Evidence:
 - Cleanup and isolation:
   `local-analysis/audio-stack-guard/20260617-after-channel-matrix-unload` and
   `local-analysis/runtime-isolation/after-channel-matrix-physical-unload.json`.
+
+## 2026-06-17: Add Atomic Stream-Stats Accumulators As CPU Candidate
+
+Decision:
+- Enable `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1` by default for the HAL build.
+- Keep `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0` as an explicit fallback path.
+- Treat this as a runtime CPU candidate only; do not claim audio readiness or
+  promotion until locked physical music/CPU evidence improves.
+
+Reason:
+- The previous hot stream stats path updated `_streamStats` under
+  `_streamStatsMutex` from the capture and playback isochronous completion
+  path.
+- The new path uses relaxed atomic counters and min/max/sum/sample timing
+  accumulators, then overlays those counters into the existing snapshot outside
+  the hot completion updates.
+- The change does not modify packet layout, audio payload bytes, routing,
+  scheduling policy, sample rate policy, or device topology.
+
+Alternatives discarded:
+- Disable hot stats to reduce CPU: rejected because observability is still
+  required while quality and transport blockers are unresolved.
+- Increase the stats interval as the default optimization: deferred because it
+  would reduce evidence density without removing the lock from the sampled hot
+  path.
+- Touch timeline or USB scheduling at the same time: rejected because the next
+  CPU experiment should be isolated enough for a clear physical comparison.
+
+Evidence:
+- Both flag paths compile:
+  `make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal && make hal`.
+- Tool/HAL combined builds compile both fallback and default paths:
+  `make usb-play hal && make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 usb-play hal && make usb-play hal`.
+- Offline gates PASS: Debug `16/16`, Release `17/17`.
+- Runtime isolation after offline validation PASS:
+  `local-analysis/runtime-isolation/after-atomic-stream-stats-offline.json`.
+- Promotion readiness remains FAIL:
+  `local-analysis/promotion-readiness-after-atomic-stream-stats.json`.

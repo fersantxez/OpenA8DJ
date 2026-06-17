@@ -158,6 +158,10 @@
 #define OPENA8DJ_HOT_STREAM_STATS_INTERVAL 1
 #endif
 
+#ifndef OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+#define OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS 0
+#endif
+
 #ifndef OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
 #define OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM 1
 #endif
@@ -567,6 +571,160 @@ static uint64_t ExpectedIsoTransferTicks(void)
     double ticks = (ticksPerSecond * (double)kIsoFramesPerTransfer) / 8000.0;
     return ticks > 0.0 ? (uint64_t)llround(ticks) : 0;
 }
+
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+typedef struct OpenA8DJAtomicTimingStats {
+    atomic_uint_fast64_t min;
+    atomic_uint_fast64_t max;
+    atomic_uint_fast64_t sum;
+    atomic_uint_fast64_t samples;
+} OpenA8DJAtomicTimingStats;
+
+typedef struct OpenA8DJAtomicTimingSnapshot {
+    uint64_t min;
+    uint64_t max;
+    uint64_t sum;
+    uint64_t samples;
+} OpenA8DJAtomicTimingSnapshot;
+
+typedef struct OpenA8DJAtomicStreamStats {
+    atomic_uint_fast64_t captureTransfers;
+    atomic_uint_fast64_t playbackTransfers;
+    atomic_uint_fast64_t captureTransactions;
+    atomic_uint_fast64_t playbackTransactions;
+    atomic_uint_fast64_t captureBytes;
+    atomic_uint_fast64_t playbackBytes;
+    atomic_uint_fast64_t captureTransactionFailures;
+    atomic_uint_fast64_t playbackTransactionFailures;
+    atomic_uint_fast64_t captureShortTransfers;
+    atomic_uint_fast64_t playbackShortTransfers;
+    atomic_uint_fast64_t filteredCaptureTransactions;
+    atomic_uint_fast64_t captureStatusFailures;
+    atomic_uint_fast64_t captureZeroCompleteTransactions;
+    atomic_uint_fast64_t captureExpectedTransactions;
+    atomic_uint_fast64_t captureOtherByteCountTransactions;
+    OpenA8DJAtomicTimingStats captureCompletionDelta;
+    OpenA8DJAtomicTimingStats playbackCompletionDelta;
+    OpenA8DJAtomicTimingStats captureToPlaybackQueueDelta;
+} OpenA8DJAtomicStreamStats;
+
+static void AtomicTimingReset(OpenA8DJAtomicTimingStats *timing)
+{
+    atomic_store_explicit(&timing->min, 0, memory_order_relaxed);
+    atomic_store_explicit(&timing->max, 0, memory_order_relaxed);
+    atomic_store_explicit(&timing->sum, 0, memory_order_relaxed);
+    atomic_store_explicit(&timing->samples, 0, memory_order_relaxed);
+}
+
+static void AtomicTimingRecord(OpenA8DJAtomicTimingStats *timing, uint64_t value)
+{
+    uint_fast64_t oldSamples = atomic_fetch_add_explicit(&timing->samples,
+                                                         1,
+                                                         memory_order_relaxed);
+    if (oldSamples == 0) {
+        atomic_store_explicit(&timing->min, value, memory_order_relaxed);
+    } else {
+        uint_fast64_t currentMin = atomic_load_explicit(&timing->min, memory_order_relaxed);
+        while (value < currentMin &&
+               !atomic_compare_exchange_weak_explicit(&timing->min,
+                                                      &currentMin,
+                                                      value,
+                                                      memory_order_relaxed,
+                                                      memory_order_relaxed)) {
+        }
+    }
+    uint_fast64_t currentMax = atomic_load_explicit(&timing->max, memory_order_relaxed);
+    while (value > currentMax &&
+           !atomic_compare_exchange_weak_explicit(&timing->max,
+                                                  &currentMax,
+                                                  value,
+                                                  memory_order_relaxed,
+                                                  memory_order_relaxed)) {
+    }
+    atomic_fetch_add_explicit(&timing->sum, value, memory_order_relaxed);
+}
+
+static OpenA8DJAtomicTimingSnapshot AtomicTimingSnapshot(const OpenA8DJAtomicTimingStats *timing)
+{
+    OpenA8DJAtomicTimingSnapshot snapshot;
+    snapshot.min = atomic_load_explicit(&timing->min, memory_order_relaxed);
+    snapshot.max = atomic_load_explicit(&timing->max, memory_order_relaxed);
+    snapshot.sum = atomic_load_explicit(&timing->sum, memory_order_relaxed);
+    snapshot.samples = atomic_load_explicit(&timing->samples, memory_order_relaxed);
+    return snapshot;
+}
+
+static void AtomicStreamStatsReset(OpenA8DJAtomicStreamStats *stats)
+{
+    atomic_store_explicit(&stats->captureTransfers, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->playbackTransfers, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureTransactions, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->playbackTransactions, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureBytes, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->playbackBytes, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureTransactionFailures, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->playbackTransactionFailures, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureShortTransfers, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->playbackShortTransfers, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->filteredCaptureTransactions, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureStatusFailures, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureZeroCompleteTransactions, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureExpectedTransactions, 0, memory_order_relaxed);
+    atomic_store_explicit(&stats->captureOtherByteCountTransactions, 0, memory_order_relaxed);
+    AtomicTimingReset(&stats->captureCompletionDelta);
+    AtomicTimingReset(&stats->playbackCompletionDelta);
+    AtomicTimingReset(&stats->captureToPlaybackQueueDelta);
+}
+
+static void AtomicStreamStatsApplySnapshot(OpenA8DJStreamStatsPayload *payload,
+                                           const OpenA8DJAtomicStreamStats *stats)
+{
+    payload->captureTransfers =
+        atomic_load_explicit(&stats->captureTransfers, memory_order_relaxed);
+    payload->playbackTransfers =
+        atomic_load_explicit(&stats->playbackTransfers, memory_order_relaxed);
+    payload->captureTransactions =
+        atomic_load_explicit(&stats->captureTransactions, memory_order_relaxed);
+    payload->playbackTransactions =
+        atomic_load_explicit(&stats->playbackTransactions, memory_order_relaxed);
+    payload->captureBytes = atomic_load_explicit(&stats->captureBytes, memory_order_relaxed);
+    payload->playbackBytes = atomic_load_explicit(&stats->playbackBytes, memory_order_relaxed);
+    payload->captureTransactionFailures =
+        atomic_load_explicit(&stats->captureTransactionFailures, memory_order_relaxed);
+    payload->playbackTransactionFailures =
+        atomic_load_explicit(&stats->playbackTransactionFailures, memory_order_relaxed);
+    payload->captureShortTransfers =
+        atomic_load_explicit(&stats->captureShortTransfers, memory_order_relaxed);
+    payload->playbackShortTransfers =
+        atomic_load_explicit(&stats->playbackShortTransfers, memory_order_relaxed);
+    payload->filteredCaptureTransactions =
+        atomic_load_explicit(&stats->filteredCaptureTransactions, memory_order_relaxed);
+    payload->captureStatusFailures =
+        atomic_load_explicit(&stats->captureStatusFailures, memory_order_relaxed);
+    payload->captureZeroCompleteTransactions =
+        atomic_load_explicit(&stats->captureZeroCompleteTransactions, memory_order_relaxed);
+    payload->captureExpectedTransactions =
+        atomic_load_explicit(&stats->captureExpectedTransactions, memory_order_relaxed);
+    payload->captureOtherByteCountTransactions =
+        atomic_load_explicit(&stats->captureOtherByteCountTransactions, memory_order_relaxed);
+    OpenA8DJAtomicTimingSnapshot timing =
+        AtomicTimingSnapshot(&stats->captureCompletionDelta);
+    payload->captureCompletionDeltaMin = timing.min;
+    payload->captureCompletionDeltaMax = timing.max;
+    payload->captureCompletionDeltaSum = timing.sum;
+    payload->captureCompletionDeltaSamples = timing.samples;
+    timing = AtomicTimingSnapshot(&stats->playbackCompletionDelta);
+    payload->playbackCompletionDeltaMin = timing.min;
+    payload->playbackCompletionDeltaMax = timing.max;
+    payload->playbackCompletionDeltaSum = timing.sum;
+    payload->playbackCompletionDeltaSamples = timing.samples;
+    timing = AtomicTimingSnapshot(&stats->captureToPlaybackQueueDelta);
+    payload->captureToPlaybackQueueDeltaMin = timing.min;
+    payload->captureToPlaybackQueueDeltaMax = timing.max;
+    payload->captureToPlaybackQueueDeltaSum = timing.sum;
+    payload->captureToPlaybackQueueDeltaSamples = timing.samples;
+}
+#endif
 
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
 static uint64_t CadenceOutlierThresholdTicks(void)
@@ -1457,6 +1615,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJStreamStatsPayload _streamStats;
     pthread_mutex_t _streamStatsMutex;
     atomic_uint_fast64_t _outputFramesWrittenAtomic;
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+    OpenA8DJAtomicStreamStats _atomicStreamStats;
+#endif
     OpenA8DJUSBClockAnchor _clockAnchor;
     pthread_mutex_t _clockAnchorMutex;
     uint64_t _clockAnchorResets;
@@ -1579,6 +1740,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
         atomic_init(&_outputFramesWrittenAtomic, 0);
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+        AtomicStreamStatsReset(&_atomicStreamStats);
+#endif
         atomic_init(&_captureHotStreamStatsCounter, 0);
         atomic_init(&_playbackHotStreamStatsCounter, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -2571,6 +2735,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
     atomic_store(&_outputFramesWrittenAtomic, 0);
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+    AtomicStreamStatsReset(&_atomicStreamStats);
+#endif
     atomic_store(&_captureHotStreamStatsCounter, 0);
     atomic_store(&_playbackHotStreamStatsCounter, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -2584,6 +2751,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_lock(&_streamStatsMutex);
     stats = _streamStats;
     pthread_mutex_unlock(&_streamStatsMutex);
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+    AtomicStreamStatsApplySnapshot(&stats, &_atomicStreamStats);
+#endif
 
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
@@ -4002,6 +4172,40 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t captureStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
     uint64_t captureStatsCounter = atomic_fetch_add(&_captureHotStreamStatsCounter, 1) + 1;
     if (captureStatsInterval == 1 || (captureStatsCounter % captureStatsInterval) == 0) {
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+        AtomicTimingRecord(&_atomicStreamStats.captureCompletionDelta, captureCompletionDelta);
+        AtomicTimingRecord(&_atomicStreamStats.captureToPlaybackQueueDelta, captureToPlaybackQueueDelta);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureTransfers,
+                                  1,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureTransactions,
+                                  captureTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureBytes,
+                                  captureByteCount,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureTransactionFailures,
+                                  failedTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureStatusFailures,
+                                  statusFailures,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureZeroCompleteTransactions,
+                                  zeroCompleteTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureExpectedTransactions,
+                                  expectedTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureOtherByteCountTransactions,
+                                  otherByteCountTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.filteredCaptureTransactions,
+                                  filteredTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.captureShortTransfers,
+                                  shortTransfers,
+                                  memory_order_relaxed);
+#else
         pthread_mutex_lock(&_streamStatsMutex);
         StreamStatsAddTimingLocked(&_streamStats,
                                    offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaMin),
@@ -4026,6 +4230,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _streamStats.filteredCaptureTransactions += filteredTransactions;
         _streamStats.captureShortTransfers += shortTransfers;
         pthread_mutex_unlock(&_streamStatsMutex);
+#endif
     }
 #else
     (void)captureCompletionDelta;
@@ -4461,6 +4666,24 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t playbackStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
     uint64_t playbackStatsCounter = atomic_fetch_add(&_playbackHotStreamStatsCounter, 1) + 1;
     if (playbackStatsInterval == 1 || (playbackStatsCounter % playbackStatsInterval) == 0) {
+#if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
+        AtomicTimingRecord(&_atomicStreamStats.playbackCompletionDelta, playbackCompletionDelta);
+        atomic_fetch_add_explicit(&_atomicStreamStats.playbackTransfers,
+                                  1,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.playbackTransactions,
+                                  playbackTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.playbackBytes,
+                                  playbackBytes,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.playbackTransactionFailures,
+                                  failedTransactions,
+                                  memory_order_relaxed);
+        atomic_fetch_add_explicit(&_atomicStreamStats.playbackShortTransfers,
+                                  shortTransfers,
+                                  memory_order_relaxed);
+#else
         pthread_mutex_lock(&_streamStatsMutex);
         StreamStatsAddTimingLocked(&_streamStats,
                                    offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaMin),
@@ -4474,6 +4697,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _streamStats.playbackTransactionFailures += failedTransactions;
         _streamStats.playbackShortTransfers += shortTransfers;
         pthread_mutex_unlock(&_streamStatsMutex);
+#endif
     }
 #else
     (void)playbackCompletionDelta;

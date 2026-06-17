@@ -2501,3 +2501,41 @@ Operational note:
     remains FAIL with blockers `physical_music_quality`,
     `runtime_cpu_beats_mainline`, `latest_physical_investigation`, and
     `traktor_timecode_physical`.
+
+## 2026-06-17: Atomic Stream-Stats Accumulators Offline Verification
+
+- Commands:
+  - `make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal && make hal`
+  - `make usb-play hal && make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 usb-play hal && make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-atomic-stream-stats.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-atomic-stream-stats-offline.json`
+- Result:
+  - Fallback and default HAL builds compile.
+  - Fallback and default `usb-play`/HAL combined builds compile.
+  - Offline gates PASS: Debug `16/16`, Release `17/17`.
+  - Runtime isolation PASS: HAL inactive, hardware untouched, USB untouched,
+    lock absent, forbidden mainline LaunchAgents disabled/inactive.
+  - Promotion readiness remains FAIL.
+- Key offline bench metrics:
+  - `pack_mib_s=1625.85`
+  - `decode_mib_s=577.663`
+  - `decode_into_mib_s=577.663`
+  - `decode_allocating_mib_s=567.074`
+  - `float_to_s24_frames_s=8.6452e+07`
+  - `route_frames_s=9.67171e+08`
+  - `route_reversed_frames_s=5.12459e+08`
+  - `route_advanced_frames_s=5.02714e+08`
+- Blocking readiness gates after this change:
+  - `physical_music_quality`
+  - `runtime_cpu_beats_mainline`
+  - `latest_physical_investigation`
+  - `traktor_timecode_physical`
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-after-atomic-stream-stats.json`
+  - `local-analysis/runtime-isolation/after-atomic-stream-stats-offline.json`
+- Interpretation:
+  - This validates build and offline invariants only. Atomic stream stats still
+    need a locked physical soundcheck to prove whether driver CPU p95 improves
+    without worsening music quality or observability.

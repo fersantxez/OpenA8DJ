@@ -451,3 +451,14 @@ Next technical target:
   L/R crosstalk is causing the music failure. It does not clear readiness
   because physical music quality and runtime CPU remain failing, and physical
   Traktor/timecode remains unvalidated.
+- Current CPU candidate: `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1` is now the
+  default HAL build setting. It replaces `_streamStatsMutex` updates from the
+  sampled capture/playback isochronous completion stats path with relaxed
+  atomic accumulators, while retaining `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0`
+  as a fallback. Offline gates and isolation pass, but no physical CPU or music
+  claim exists yet for this candidate.
+- Promotion evaluator after the atomic stream-stats offline check remains FAIL:
+  `local-analysis/promotion-readiness-after-atomic-stream-stats.json`.
+  Blocking gates remain `physical_music_quality`,
+  `runtime_cpu_beats_mainline`, `latest_physical_investigation`, and
+  `traktor_timecode_physical`.

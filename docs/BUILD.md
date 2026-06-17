@@ -364,6 +364,33 @@ matching `scripts/run-channel-matrix-gate --run-physical` path is a hardware
 gate, not a build step, and requires the global audio lock plus an authorized
 physical window.
 
+## HAL CPU Experiment Flags
+
+The HAL build currently enables atomic sampled stream-stat accumulators by
+default:
+
+```sh
+make hal
+```
+
+This is equivalent to:
+
+```sh
+make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1 hal
+```
+
+The fallback path remains available for A/B validation:
+
+```sh
+make HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0 hal
+```
+
+The flag only changes sampled stream-stat accounting in the USB completion hot
+path. It does not change audio packet bytes, routing, sample rates, advertised
+channels, USB scheduling policy, install behavior, or DriverKit artifacts. Any
+CPU or quality claim for this flag requires a locked physical soundcheck and
+comparison against the recorded mainline/C++ baselines.
+
 ## Migration Order
 
 1. Add CMake core/test skeleton.
