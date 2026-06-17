@@ -1,5 +1,34 @@
 # Decision Log
 
+## 2026-06-17: Promotion Evaluator Must Use Latest Paired Soundcheck Evidence
+
+Decision:
+- Make `scripts/evaluate-promotion-readiness.py` select the latest existing
+  `local-analysis/soundcheck/*/metrics.json` and `cpu-profile.tsv` by default.
+- Add a `latest_music_cpu_pair` gate requiring the music metrics and CPU profile
+  to come from the same soundcheck directory.
+
+Reason:
+- The evaluator previously used fixed default paths. That still produced a
+  `FAIL`, but it could hide the fact that newer physical evidence was worse or
+  better than the fixed run.
+- Promotion depends on current evidence, not any older convenient passing or
+  failing artifact.
+
+Alternatives discarded:
+- Keep manual `--music` and `--cpu` paths only: rejected because the default
+  promotion command must be safe and hard to misuse.
+- Permit unpaired latest music/CPU files: rejected because quality and resource
+  claims must refer to the same physical run.
+
+Evidence:
+- `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  returns `FAIL` and selects
+  `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`
+  for both music and CPU evidence.
+- Current blockers remain physical music quality, runtime CPU, physical
+  investigation readiness, and unvalidated physical Traktor/timecode.
+
 ## 2026-06-17: Keep Audio-Params Reset Enabled But Testable
 
 Decision:

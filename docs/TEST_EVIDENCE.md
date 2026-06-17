@@ -1912,3 +1912,26 @@ Operational note:
 - Interpretation:
   - The reset behavior is now a controlled physical-test variable. No physical
     quality claim follows from this offline-only change.
+
+## 2026-06-17: Promotion Readiness Evaluator Freshness Gate
+
+- Commands:
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Result:
+  - Expected FAIL.
+  - `branch_promotion_allowed=false`.
+  - New `latest_music_cpu_pair` gate: PASS.
+  - Selected evidence pair:
+    `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`.
+- Current blocking metrics:
+  - Physical music: `quality_alignment_score=0.9600756683268455`,
+    `snr_db_min=2.712692078645948`,
+    `mid_band_residual_ratio=1.56528730655531`,
+    `high_band_residual_ratio=1.4613998707666849`,
+    `quiet_mid_band_noise_dbfs=-36.807388625414724`,
+    `lag_jumps_gt_2_frames=35`.
+  - Runtime CPU: OpenA8DJ driver p95 `36.7%`, coreaudiod p95 `56.4%`.
+- Interpretation:
+  - The promotion command now defaults to the latest paired physical quality
+    and CPU evidence instead of a fixed older run. This improves readiness
+    rigor only; it does not improve the candidate.

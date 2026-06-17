@@ -97,6 +97,11 @@ Interpretation:
 - Latest promotion evaluation evidence is
   `local-analysis/promotion-readiness-current.json`; it returns `FAIL` with
   `branch_promotion_allowed=false`.
+- The promotion evaluator now selects the latest paired soundcheck metrics and
+  CPU profile by default. The current selected pair is
+  `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`,
+  and the `latest_music_cpu_pair` gate passes only because both artifacts come
+  from that same physical run.
 
 ## Required Before Branch Promotion
 

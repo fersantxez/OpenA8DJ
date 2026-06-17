@@ -16,12 +16,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def latest_file(pattern, fallback):
+    matches = [path for path in ROOT.glob(pattern) if path.is_file()]
+    if not matches:
+        return fallback
+    return max(matches, key=lambda path: (path.stat().st_mtime, str(path)))
+
+
 DEFAULTS = {
     "offline": ROOT / "local-analysis/cpp-offline/current-offline-gates.json",
     "simulated": ROOT / "local-analysis/simulated-output/2026-06-16T165629-sim-A-big-start4-gain05/metrics.json",
     "tone": ROOT / "local-analysis/hardware-quality/20260616-170024-start-byte-2v4-tone-long/start-byte-4/tone-analysis.txt",
-    "music": ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/metrics.json",
-    "cpu": ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/cpu-profile.tsv",
+    "music": latest_file(
+        "local-analysis/soundcheck/*/metrics.json",
+        ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/metrics.json",
+    ),
+    "cpu": latest_file(
+        "local-analysis/soundcheck/*/cpu-profile.tsv",
+        ROOT / "local-analysis/soundcheck/20260616-185543-irig-pairA-24s-cpp-hal/cpu-profile.tsv",
+    ),
     "physical_investigation": ROOT / "local-analysis/usb-physical-investigation-summary.json",
 }
 
@@ -116,6 +129,17 @@ def check_file(path, name):
     return gate(name, exists, {"path": str(path)}, "" if exists else "required evidence file is missing")
 
 
+def evidence_metadata(path):
+    if not path.is_file():
+        return {"path": str(path), "exists": False}
+    return {
+        "path": str(path),
+        "exists": True,
+        "mtime_ns": path.stat().st_mtime_ns,
+        "parent": str(path.parent),
+    }
+
+
 def evaluate(args):
     paths = {
         "offline": Path(args.offline),
@@ -134,6 +158,10 @@ def evaluate(args):
             "result": "NOT_READY",
             "branch_promotion_allowed": False,
             "baseline": BASELINE,
+            "evidence_selection": {
+                "music": evidence_metadata(paths["music"]),
+                "cpu": evidence_metadata(paths["cpu"]),
+            },
             "gates": gates,
         }
 
@@ -152,6 +180,11 @@ def evaluate(args):
     bench = load_json(bench_path) if bench_path.is_file() else {}
 
     gates.extend([
+        gate("latest_music_cpu_pair",
+             paths["music"].parent == paths["cpu"].parent,
+             {"music": evidence_metadata(paths["music"]),
+              "cpu": evidence_metadata(paths["cpu"])},
+             "music metrics and CPU profile must come from the same soundcheck run"),
         gate("offline_all_gates",
              offline.get("status") == "PASS" and not offline.get("hardware_touched", True),
              {"status": offline.get("status"),
@@ -305,6 +338,10 @@ def evaluate(args):
         "branch_promotion_allowed": passed,
         "baseline": BASELINE,
         "evidence": {key: str(path) for key, path in paths.items()},
+        "evidence_selection": {
+            "music": evidence_metadata(paths["music"]),
+            "cpu": evidence_metadata(paths["cpu"]),
+        },
         "gates": gates,
     }
 
