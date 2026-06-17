@@ -659,3 +659,50 @@ Next technical target:
   are expected to stay at `0` in any candidate run. A nonzero value means the
   preallocated pool was exhausted and the HAL allocated transfer objects in the
   streaming path, which is a CPU/latency blocker before any quality claim.
+- Commit `bff59cc` added playback payload guard instrumentation. A locked
+  physical Pair A/iRig run produced about `1600` guard checks/s and `0`
+  mismatches while music still failed (`quality_alignment_score=0.958179`,
+  SNR `10.29 dB`, lag jumps `22`). Queue-to-completion payload mutation is
+  therefore not the current dominant blocker.
+- Explicit scheduling with USB clock anchor is rejected for this HAL path:
+  alignment `0.025535`, SNR `-33.82 dB`, `14` click outliers, playback
+  completion rate about `23/s`, and timeline resets `35`.
+- Fixed OUT pacing is rejected: alignment `-0.153805`, SNR `-28.47 dB`, lag
+  jumps `40`, and mid/high residual ratios `39.366597/25.403255`.
+- A fresh default 1 kHz physical tone is mixed evidence, not readiness:
+  `sideband_ratio=0.006623`, strongest sideband `1060 Hz` at `-42.74 dB`,
+  residual ratio `0.456797`, click outliers `40`. This beats the historical
+  final `0.3.24` sideband floor but does not beat the best mainline floor
+  `0.004942` and fails click/strongest-sideband targets.
+- Current model diagnostics on the new evidence reject simple explanations:
+  static L/R mix, polarity, tone-response compensation, LTI transfer fitting,
+  and simple memoryless non-linearity do not explain the aligned default
+  music failure. The current signature is timebase/alignment instability or a
+  physical/reference mismatch not represented by the offline byte oracle.
+- Operational isolation note: a second accidental `apply_patch` hit
+  `/Users/fer/dev/opena8dj/scripts/audio-stack-guard` while adding
+  `--force-unload-opena8dj`. Only the newly added `force-unload` lines were
+  removed immediately. A follow-up grep over the mainline diff confirmed no
+  `force-unload` lines remain. The mainline still contains pre-existing
+  unrelated local modifications and was not reset.
+- Added bounded transaction-level transfer ledger export in the C++ HAL/control
+  path:
+  - `build/opena8dj-control transfer-ledger [count]` returns the latest stable
+    ledger entries as TSV.
+  - `scripts/run-soundcheck --stream-stats-snapshots` now captures
+    `transfer-ledger-after.tsv`.
+  - `scripts/analyze-transfer-ledger.py` summarizes that TSV to JSON and fails
+    on sequence gaps, completion status errors, failed/short transactions,
+    active underrun frames, playback first-frame regressions, and obvious
+    playback queue/complete imbalance.
+  - The streaming path still only writes into the preallocated circular ledger;
+    IPC/file output happens only on explicit control request after/during a
+    run. This is diagnostic infrastructure, not a sound-quality improvement
+    claim.
+- Latest verification after the transfer-ledger export:
+  - `make -B hal build/opena8dj-control`: PASS.
+  - `python3 -m py_compile scripts/run-soundcheck`: PASS.
+  - `scripts/run-cpp-offline-gates`: PASS, debug `17/17`, release `18/18`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out
+    local-analysis/runtime-isolation/after-transfer-ledger-run-soundcheck-hook.json`:
+    PASS, HAL inactive, lock absent, no OpenA8DJ HAL process.

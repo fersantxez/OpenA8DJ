@@ -1917,3 +1917,113 @@ Evidence:
 Next decision pressure:
 - The next candidate must investigate device/USB scheduling or physical route
   behavior after packed output bytes, not superficial HAL byte-format changes.
+
+## 2026-06-17: Reject Payload Mutation, Explicit Scheduling, And Fixed OUT As Readiness Paths
+
+Decision:
+- Keep queue-to-completion playback payload mutation out of the active fault
+  set unless new evidence appears.
+- Reject `HAL_EXPLICIT_SCHED=1 HAL_USB_CLOCK_ANCHOR=1 HAL_USB_STABLE_FRAME=1`
+  for the current Audio 8 DJ HAL path.
+- Reject `HAL_PLAYBACK_CAPTURE_PACED=0` fixed OUT pacing for the current HAL
+  path.
+- Do not claim that the current C++ default is better than mainline based on
+  tone-only evidence.
+
+Reason:
+- Payload guard ran about `1600` checks/s during a failing physical music run
+  and reported `0` mismatches. The physical quality failure persisted, so the
+  buffer handed to IOUSBHost is stable between queue and completion.
+- Explicit scheduling made the path much worse: music alignment about
+  `0.0255`, SNR about `-33.8 dB`, click outliers `14`, playback completion
+  rate about `23/s`, and timeline resets `35`.
+- Fixed OUT pacing also made the path much worse: alignment about `-0.154`,
+  SNR about `-28.5 dB`, and lag jumps `40`.
+- A fresh default 1 kHz physical tone is not enough for promotion:
+  `sideband_ratio=0.006623` beats the historical final `0.3.24` floor but not
+  the best mainline sideband ratio `0.004942`; strongest sideband `-42.74 dB`
+  and `40` click outliers fail the stricter target.
+
+Alternatives discarded:
+- Promote explicit scheduling because it uses nonzero first-frame numbers:
+  rejected because the physical output rate collapsed and timeline reset.
+- Promote fixed OUT because it decouples playback from capture completion
+  shape: rejected because physical music became decorrelated and SNR negative.
+- Declare tone PASS as product readiness: rejected because tone is only one
+  gate, the tone does not beat best mainline, music still fails, CPU still
+  fails, and Traktor/timecode physical evidence is absent.
+
+Evidence:
+- Payload guard:
+  `local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal`
+  and `local-analysis/stream-stats/payload-guard-bff59cc-summary.json`.
+- Explicit scheduling rejection:
+  `local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal`
+  and `local-analysis/stream-stats/explicit-sched-bff59cc-summary.json`.
+- Fixed OUT rejection:
+  `local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal`
+  and `local-analysis/stream-stats/fixed-out-bff59cc-summary.json`.
+- Physical tone:
+  `local-analysis/physical-tone/20260617-bff59cc-default/tone-1khz-irig-pairA/tone-analysis.txt`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-after-bff59cc-default-tone.json`,
+  FAIL.
+
+Next decision pressure:
+- The next useful quality work should either improve the aligned default music
+  path without harming the already decent tone sidebands, or produce a more
+  controlled physical reference that resolves the timebase/alignment
+  instability seen in music captures.
+
+## 2026-06-17: Add Bounded Transfer-Ledger Export Before More Physical Knob Sweeps
+
+Decision:
+- Add an explicit IPC/CLI export for the latest transaction-level transfer
+  ledger entries.
+- Hook `scripts/run-soundcheck --stream-stats-snapshots` so future physical
+  runs save `transfer-ledger-after.tsv`.
+- Add an offline analyzer for the saved ledger so transaction evidence has
+  PASS/FAIL semantics instead of being raw text only.
+- Do not treat this as a product-quality improvement; it is observability for
+  the next physical diagnosis.
+
+Reason:
+- Existing aggregate stream stats ruled out several broad categories but could
+  not align individual queue/complete events with the physical music timebase
+  instability.
+- The HAL already wrote a bounded preallocated circular ledger in the transfer
+  path. Exporting a small stable window on request gives needed transaction
+  evidence without per-buffer logging or file I/O.
+- Blind scheduling/format sweeps have produced clear regressions. More physical
+  testing should capture the missing transaction evidence first.
+
+Alternatives discarded:
+- Add logs from the transfer callbacks: rejected because callback logging is
+  real-time unsafe and would perturb CPU/jitter.
+- Export the entire 4096-entry ledger through the existing IPC frame: rejected
+  because the IPC payload is capped at 4096 bytes. The command now returns a
+  bounded latest-entry window.
+- Keep relying only on aggregate stream stats: rejected because the current
+  failure requires event ordering, first-frame numbers, in-flight state, bytes,
+  status, and output-read ranges.
+
+Evidence:
+- Build:
+  `make -B hal build/opena8dj-control`, PASS.
+- Help surface:
+  `build/opena8dj-control --help 2>&1 | rg -n "transfer-ledger|stream-stats|input-stats"`,
+  PASS.
+- Offline gates:
+  `scripts/run-cpp-offline-gates`, PASS, debug `17/17`, release `18/18`.
+- Analyzer smoke:
+  `scripts/analyze-transfer-ledger.py local-analysis/transfer-ledger/synthetic-pass.tsv --json-out local-analysis/transfer-ledger/synthetic-pass-analysis.json`,
+  PASS.
+- Runtime isolation:
+  `local-analysis/runtime-isolation/after-transfer-ledger-run-soundcheck-hook.json`,
+  PASS.
+
+Next decision pressure:
+- Run one locked physical default music soundcheck with the new ledger export
+  and analyze `transfer-ledger-after.tsv` with
+  `scripts/analyze-transfer-ledger.py` against `stream-stats-during.tsv`,
+  captured WAV lag windows, and CPU profile before changing cadence again.

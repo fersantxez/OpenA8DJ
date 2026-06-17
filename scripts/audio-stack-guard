@@ -9,6 +9,7 @@ enumeration_timeout="5"
 min_idle_pct="20"
 recover="0"
 unload_opena8dj="0"
+force_unload_opena8dj="0"
 close_media_apps="1"
 run_dir=""
 
@@ -29,6 +30,7 @@ Options:
   --run-dir DIR               Directory for logs (default: local-analysis/audio-stack-guard/<timestamp>)
   --recover                   Try to recover if checks fail
   --unload-opena8dj           During recovery, move active OpenA8DJ HAL out of the active HAL directory
+  --force-unload-opena8dj     Move active OpenA8DJ HAL out before the final health evaluation
   --keep-media-apps           Do not close VLC/Spotify/Traktor/NIHardwareAgent during recovery
   -h, --help                  Show this help
 USAGE
@@ -52,6 +54,8 @@ while [ "$#" -gt 0 ]; do
       recover="1"; shift ;;
     --unload-opena8dj)
       unload_opena8dj="1"; shift ;;
+    --force-unload-opena8dj)
+      force_unload_opena8dj="1"; shift ;;
     --keep-media-apps)
       close_media_apps="0"; shift ;;
     -h|--help)
@@ -225,6 +229,18 @@ recover_stack() {
   } > "$run_dir/recovery.log" 2>&1
 }
 
+force_unload_stack() {
+  {
+    echo "force_unload_started=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "initial_opena8dj_state=$(hal_state)"
+    unload_active_hal
+    kill_pattern_force 'Core Audio Driver \(OpenA8DJ.driver\)'
+    sleep 1
+    echo "force_unload_finished=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    echo "final_opena8dj_state=$(hal_state)"
+  } > "$run_dir/force-unload.log" 2>&1
+}
+
 evaluate() {
   top_snapshot "$run_dir/top.txt"
   local idle_pct
@@ -274,6 +290,10 @@ evaluate() {
     return 1
   } > "$run_dir/summary.txt"
 }
+
+if [ "$force_unload_opena8dj" = "1" ]; then
+  force_unload_stack
+fi
 
 if evaluate; then
   cat "$run_dir/summary.txt"

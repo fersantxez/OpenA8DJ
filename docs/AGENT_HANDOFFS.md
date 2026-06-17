@@ -754,3 +754,63 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Native output is unsafe for this hardware route. It should not be loaded
     again except as a deliberately isolated forensic test with explicit
     clipping/noise safeguards.
+
+### Beauvoir
+
+- Mission: read-only USB transport forensics after packed output bytes were
+  proven internally correct but physical music still failed.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Recommended transaction-level transfer forensics: queue/complete host time,
+    first-frame numbers, transaction indexes, request/complete counts, status,
+    offsets, timestamps, and in-flight deltas.
+  - Recommended explicit scheduling and capture-paced/fixed OUT A/B only as
+    controlled physical diagnostics, not as readiness paths.
+- Integrated action:
+  - Added and tested playback payload guard instrumentation. It reported
+    `0` mismatches in a failing physical music run, ruling out
+    queue-to-completion payload mutation.
+  - Ran explicit-scheduling and fixed-OUT physical A/Bs. Both are rejected by
+    metrics and must not be promoted.
+  - Added `--force-unload-opena8dj` to `scripts/audio-stack-guard` in the C++
+    worktree for explicit post-test cleanup.
+- Risk:
+  - The remaining useful transport evidence is still aggregate. If the next
+    physical run cannot explain the music timebase instability, add a bounded
+    export of transaction-level ledger records rather than more blind knob
+    sweeps.
+
+### Architect Local Integration
+
+- Mission: continue Beauvoir's transaction-level recommendation after agent
+  thread limit prevented spawning a new sidecar agent.
+- Status: completed for instrumentation; physical evidence still pending.
+- Result:
+  - Added `build/opena8dj-control transfer-ledger [count]`.
+  - Added HAL IPC export for a bounded latest-entry transfer ledger window.
+  - Added `transfer-ledger-after.tsv` capture to
+    `scripts/run-soundcheck --stream-stats-snapshots`.
+  - Added `scripts/analyze-transfer-ledger.py` plus synthetic PASS evidence.
+  - Verified build, help surface, offline gates, and runtime isolation.
+- Files affected:
+  - `src/hal/OpenA8DJUSB.m`
+  - `src/tools/opena8dj-control.c`
+  - `scripts/run-soundcheck`
+  - `scripts/analyze-transfer-ledger.py`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Risk:
+  - The export has not yet been exercised against a live physical run because
+    this step intentionally avoided hardware. Next locked soundcheck must
+    confirm `transfer-ledger-after.tsv` contains useful entries.
+- Next action:
+  - Run one default physical music soundcheck under lock with stream stats
+    snapshots and analyze the new ledger before changing transport cadence.

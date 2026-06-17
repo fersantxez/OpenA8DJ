@@ -3459,3 +3459,124 @@ Operational note:
   - `latest_physical_investigation`: still `FAIL_NOT_READY`.
   - `traktor_timecode_physical`: no locked physical Traktor/timecode-vinyl
     evidence yet.
+
+## 2026-06-17: Payload Guard, Scheduling A/B, And Default Tone Recheck
+
+- Commands:
+  - `make -B hal build/opena8dj-control HAL_PLAYBACK_PAYLOAD_GUARD=1`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/payload-guard/20260617-bff59cc/hal-candidate-safety`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal --json-out local-analysis/stream-stats/payload-guard-bff59cc-summary.json`
+  - `make -B hal build/opena8dj-control HAL_PLAYBACK_PAYLOAD_GUARD=1 HAL_EXPLICIT_SCHED=1 HAL_USB_CLOCK_ANCHOR=1 HAL_USB_STABLE_FRAME=1`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - `make -B hal build/opena8dj-control HAL_PLAYBACK_PAYLOAD_GUARD=1 HAL_PLAYBACK_CAPTURE_PACED=0 HAL_EXPLICIT_SCHED=0 HAL_USB_CLOCK_ANCHOR=0 HAL_USB_STABLE_FRAME=0`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - `scripts/analyze-soundcheck-linear-matrix.py local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal --analysis-seconds 8 --json-out local-analysis/soundcheck-linear-matrix/20260617-payload-explicit-fixed.json`
+  - `scripts/analyze-tone-response-compensation.py --tone-matrix-json local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json --json-out local-analysis/tone-response-compensation/20260617-payload-explicit-fixed.json local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py --json-out local-analysis/lti-transfer-quality/20260617-payload-explicit-fixed.json local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py --json-out local-analysis/soundcheck-failure-modes/20260617-payload-explicit-fixed.json local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal`
+  - `make -B hal build/opena8dj-control HAL_PLAYBACK_CAPTURE_PACED=1 HAL_EXPLICIT_SCHED=0 HAL_USB_CLOCK_ANCHOR=0 HAL_USB_STABLE_FRAME=0 HAL_PLAYBACK_PAYLOAD_GUARD=0`
+  - Locked physical 1 kHz tone via `build/audio-record` plus
+    `build/audio-pair-tone A 10 1000 0.12`, analyzed with
+    `scripts/analyze-tone-capture.py ... --auto-window`.
+  - `scripts/audio-stack-guard --force-unload-opena8dj --run-dir local-analysis/physical-tone/20260617-bff59cc-default/force-unload-after-tone`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-physical-tone-default-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --tone local-analysis/physical-tone/20260617-bff59cc-default/tone-1khz-irig-pairA/tone-analysis.txt --json-out local-analysis/promotion-readiness-after-bff59cc-default-tone.json`
+- Result:
+  - Payload guard soundcheck still failed strict music quality:
+    `quality_alignment_score=0.958179`, `analog_snr_db=10.29`,
+    `lag_jumps_gt_2_frames=22`, mid/high residual ratios
+    `1.434533/1.368567`, no clipping.
+  - Payload guard checks ran at about `1600/s` with `0` mismatches. This
+    rules out queue-to-completion playback buffer mutation as the current
+    physical-quality blocker.
+  - Explicit scheduling plus USB clock anchor is physically rejected:
+    `quality_alignment_score=0.025535`, `analog_snr_db=-33.82`,
+    `click_outliers=14`, `lag_jumps_gt_2_frames=42`. Stream stats showed
+    playback completed only about `23/s`, output read about `11 kframes/s`,
+    and `35` timeline resets.
+  - Fixed OUT pacing is physically rejected:
+    `quality_alignment_score=-0.153805`, `analog_snr_db=-28.47`,
+    `lag_jumps_gt_2_frames=40`, mid/high residual ratios
+    `39.366597/25.403255`.
+  - Capture ISO invariants PASS for all three new runs: zero-complete slots are
+    expected, status failures are `0`, and useful transactions remain about
+    `2.73` per transfer.
+  - Static L/R matrix, tone-response compensation, LTI transfer fitting, and
+    simple failure-mode models do not explain the aligned payload-guard music
+    failure. The aligned run is classified as timebase/alignment instability
+    with drift about `-176.6 ppm` and lag span `1650` frames.
+  - Default 1 kHz physical tone after reverting to product-like flags:
+    `sideband_ratio=0.006623`, strongest sideband `1060 Hz` at `-42.74 dB`,
+    residual ratio `0.456797`, peak `0.28137207`, click outliers `40`.
+    This beats the historical final `0.3.24` sideband ratio floor
+    `0.008407`, but does not beat the best recorded mainline floor
+    `0.004942`, does not beat strongest-sideband targets, and fails
+    click-outlier requirements.
+  - `scripts/audio-stack-guard --force-unload-opena8dj` PASS in cold smoke and
+    post-tone cleanup. Final runtime isolation PASS: HAL inactive, lock absent,
+    no OpenA8DJ process.
+  - Promotion readiness remains FAIL. Branch promotion and "better than
+    mainline" claims remain forbidden.
+- Evidence paths:
+  - `local-analysis/soundcheck/20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal`
+  - `local-analysis/stream-stats/payload-guard-bff59cc-summary.json`
+  - `local-analysis/soundcheck/20260617-explicit-sched-bff59cc-irig-pairA-12s-cpp-hal`
+  - `local-analysis/stream-stats/explicit-sched-bff59cc-summary.json`
+  - `local-analysis/soundcheck/20260617-fixed-out-bff59cc-irig-pairA-12s-cpp-hal`
+  - `local-analysis/stream-stats/fixed-out-bff59cc-summary.json`
+  - `local-analysis/soundcheck-linear-matrix/20260617-payload-explicit-fixed.json`
+  - `local-analysis/tone-response-compensation/20260617-payload-explicit-fixed.json`
+  - `local-analysis/lti-transfer-quality/20260617-payload-explicit-fixed.json`
+  - `local-analysis/soundcheck-failure-modes/20260617-payload-explicit-fixed.json`
+  - `local-analysis/physical-tone/20260617-bff59cc-default/tone-1khz-irig-pairA/tone-analysis.txt`
+  - `local-analysis/promotion-readiness-after-bff59cc-default-tone.json`
+  - `local-analysis/runtime-isolation/post-physical-tone-default-unload.json`
+- Operational note:
+  - While adding `--force-unload-opena8dj`, `apply_patch` was accidentally
+    applied in `/Users/fer/dev/opena8dj`. Only the newly added
+    `force-unload` lines were removed immediately. A follow-up grep over
+    mainline diff confirmed no `force-unload` lines remain there. The mainline
+    file still has pre-existing unrelated local changes and was not reset.
+
+## 2026-06-17: Transaction-Level Transfer Ledger Export
+
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `python3 -m py_compile scripts/run-soundcheck`
+  - `python3 -m py_compile scripts/analyze-transfer-ledger.py`
+  - `build/opena8dj-control --help 2>&1 | rg -n "transfer-ledger|stream-stats|input-stats"`
+  - `git diff --check`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-transfer-ledger-run-soundcheck-hook.json`
+  - `scripts/analyze-transfer-ledger.py local-analysis/transfer-ledger/synthetic-pass.tsv --json-out local-analysis/transfer-ledger/synthetic-pass-analysis.json`
+- Result:
+  - Added HAL IPC messages `kIPCTypeTransferLedgerGet` and
+    `kIPCTypeTransferLedger`.
+  - Added `build/opena8dj-control transfer-ledger [count]`, returning a bounded
+    latest-entry TSV dump with sequence, event, host time, first-frame number,
+    output read range, bytes, transaction counts, status, in-flight, and pool
+    state.
+  - Added automatic `transfer-ledger-after.tsv` capture to
+    `scripts/run-soundcheck --stream-stats-snapshots`.
+  - Added offline `scripts/analyze-transfer-ledger.py` for TSV-to-JSON
+    validation of event counts, sequence gaps, completion statuses,
+    failed/short transactions, playback queue/complete balance, output
+    underrun/elastic frames, in-flight maxima, and per-event host deltas.
+  - The hot path still writes only to the existing preallocated circular ledger;
+    IPC/file output is under explicit control request and outside the transfer
+    callback.
+  - Build PASS.
+  - `opena8dj-control --help` exposes `transfer-ledger`.
+  - Offline gates PASS: debug `17/17`, release `18/18`.
+  - Synthetic transfer-ledger analysis PASS.
+  - Runtime isolation PASS: HAL inactive, hardware not touched, lock absent,
+    no OpenA8DJ HAL process.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/runtime-isolation/after-transfer-ledger-run-soundcheck-hook.json`
+  - `local-analysis/transfer-ledger/synthetic-pass-analysis.json`
+- Product status:
+  - Not readiness. This does not improve sound quality by itself and does not
+    change the failed promotion result. It prepares the next locked physical
+    default soundcheck to explain queue/complete timing rather than guessing.

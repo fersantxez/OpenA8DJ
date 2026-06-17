@@ -28,7 +28,9 @@ enum {
     kIPCTypeInputStatsGet = 8,
     kIPCTypeInputStats = 9,
     kIPCTypeStreamStatsGet = 10,
-    kIPCTypeStreamStats = 11
+    kIPCTypeStreamStats = 11,
+    kIPCTypeTransferLedgerGet = 12,
+    kIPCTypeTransferLedger = 13
 };
 
 enum {
@@ -226,6 +228,44 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackPayloadGuardChecks;
     uint64_t playbackPayloadGuardMismatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
+
+typedef struct OpenA8DJTransferLedgerRequest {
+    uint32_t maxEntries;
+    uint32_t reserved;
+} __attribute__((packed)) OpenA8DJTransferLedgerRequest;
+
+typedef struct OpenA8DJTransferLedgerDumpHeader {
+    uint64_t latestSequence;
+    uint64_t overwritten;
+    uint64_t startSequence;
+    uint32_t capacity;
+    uint32_t count;
+    uint32_t entrySize;
+    uint32_t reserved;
+} __attribute__((packed)) OpenA8DJTransferLedgerDumpHeader;
+
+typedef struct OpenA8DJTransferLedgerEntry {
+    uint64_t sequence;
+    uint64_t hostTime;
+    uint64_t firstFrameNumber;
+    uint64_t outputReadStartFrame;
+    uint64_t outputReadEndFrame;
+    uint64_t transferBytes;
+    uint64_t completedBytes;
+    uint64_t failedTransactions;
+    uint64_t shortTransactions;
+    uint64_t outputFramesRead;
+    uint64_t outputStartupSilenceFrames;
+    uint64_t outputActiveUnderrunFrames;
+    uint64_t outputElasticDropFrames;
+    uint64_t outputElasticReplayFrames;
+    uint32_t event;
+    uint32_t transactionCount;
+    uint32_t inFlight;
+    uint32_t status;
+    uint32_t pooled;
+    uint32_t reserved;
+} __attribute__((packed)) OpenA8DJTransferLedgerEntry;
 
 typedef struct OpenA8DJWakeState {
     AudioDeviceID device;
@@ -746,6 +786,45 @@ static bool ReadStreamStats(int fd, OpenA8DJStreamStatsPayload *stats, size_t *p
     }
 }
 
+static bool ReadTransferLedger(int fd,
+                               uint32_t maxEntries,
+                               uint8_t *payload,
+                               size_t payloadCapacity,
+                               size_t *payloadLength)
+{
+    OpenA8DJTransferLedgerRequest request;
+    memset(&request, 0, sizeof(request));
+    request.maxEntries = maxEntries;
+    if (!SendIPC(fd, kIPCTypeTransferLedgerGet, &request, sizeof(request))) {
+        return false;
+    }
+    while (true) {
+        OpenA8DJIPCHeader header;
+        if (!ReadFull(fd, &header, sizeof(header))) {
+            return false;
+        }
+        if (header.magic != kIPCMagic || header.version != kIPCVersion || header.length > 4096) {
+            return false;
+        }
+        uint8_t incoming[4096];
+        if (header.length > 0 && !ReadFull(fd, incoming, header.length)) {
+            return false;
+        }
+        if (header.type == kIPCTypeTransferLedger) {
+            if ((size_t)header.length > payloadCapacity) {
+                return false;
+            }
+            if (header.length > 0) {
+                memcpy(payload, incoming, header.length);
+            }
+            if (payloadLength != NULL) {
+                *payloadLength = header.length;
+            }
+            return true;
+        }
+    }
+}
+
 static void PrintState(const OpenA8DJControlPayload *state)
 {
     printf("Audio 8 DJ controls\n");
@@ -789,6 +868,77 @@ static void PrintInputStats(const OpenA8DJInputStatsPayload *stats)
                stats->leftPeak[i],
                stats->rightPeak[i],
                corr);
+    }
+}
+
+static const char *TransferLedgerEventName(uint32_t event)
+{
+    switch (event) {
+        case 1:
+            return "capture_queue";
+        case 2:
+            return "capture_complete";
+        case 3:
+            return "playback_queue";
+        case 4:
+            return "playback_complete";
+        default:
+            return "unknown";
+    }
+}
+
+static void PrintTransferLedger(const uint8_t *payload, size_t payloadLength)
+{
+    if (payloadLength < sizeof(OpenA8DJTransferLedgerDumpHeader)) {
+        fprintf(stderr, "transfer ledger payload is too short\n");
+        return;
+    }
+
+    OpenA8DJTransferLedgerDumpHeader header;
+    memcpy(&header, payload, sizeof(header));
+    printf("OpenA8DJ transfer ledger\n");
+    printf("latestSequence=%llu\n", (unsigned long long)header.latestSequence);
+    printf("overwritten=%llu\n", (unsigned long long)header.overwritten);
+    printf("startSequence=%llu\n", (unsigned long long)header.startSequence);
+    printf("capacity=%u\n", header.capacity);
+    printf("count=%u\n", header.count);
+    printf("entrySize=%u\n", header.entrySize);
+    printf("sequence\tevent\thostTime\tfirstFrameNumber\toutputReadStartFrame\toutputReadEndFrame\ttransferBytes\tcompletedBytes\tfailedTransactions\tshortTransactions\toutputFramesRead\toutputStartupSilenceFrames\toutputActiveUnderrunFrames\toutputElasticDropFrames\toutputElasticReplayFrames\ttransactionCount\tinFlight\tstatus\tpooled\n");
+
+    if (header.entrySize != sizeof(OpenA8DJTransferLedgerEntry)) {
+        fprintf(stderr, "unsupported transfer ledger entry size: %u\n", header.entrySize);
+        return;
+    }
+
+    size_t availableEntries = (payloadLength - sizeof(header)) / sizeof(OpenA8DJTransferLedgerEntry);
+    if (header.count < availableEntries) {
+        availableEntries = header.count;
+    }
+    for (size_t index = 0; index < availableEntries; index++) {
+        OpenA8DJTransferLedgerEntry entry;
+        memcpy(&entry,
+               payload + sizeof(header) + (index * sizeof(entry)),
+               sizeof(entry));
+        printf("%llu\t%s\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%llu\t%u\t%u\t0x%08x\t%u\n",
+               (unsigned long long)entry.sequence,
+               TransferLedgerEventName(entry.event),
+               (unsigned long long)entry.hostTime,
+               (unsigned long long)entry.firstFrameNumber,
+               (unsigned long long)entry.outputReadStartFrame,
+               (unsigned long long)entry.outputReadEndFrame,
+               (unsigned long long)entry.transferBytes,
+               (unsigned long long)entry.completedBytes,
+               (unsigned long long)entry.failedTransactions,
+               (unsigned long long)entry.shortTransactions,
+               (unsigned long long)entry.outputFramesRead,
+               (unsigned long long)entry.outputStartupSilenceFrames,
+               (unsigned long long)entry.outputActiveUnderrunFrames,
+               (unsigned long long)entry.outputElasticDropFrames,
+               (unsigned long long)entry.outputElasticReplayFrames,
+               entry.transactionCount,
+               entry.inFlight,
+               entry.status,
+               entry.pooled);
     }
 }
 
@@ -1143,6 +1293,7 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s\n", argv0);
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
+    fprintf(stderr, "  %s transfer-ledger [count]\n", argv0);
     fprintf(stderr, "  %s profile timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
     fprintf(stderr, "  %s gnd-vinyl on|off\n", argv0);
@@ -1200,6 +1351,30 @@ int main(int argc, char **argv)
             return 1;
         }
         PrintStreamStats(&stats, payloadLength);
+        close(fd);
+        return 0;
+    }
+
+    if ((argc == 2 || argc == 3) && strcmp(argv[1], "transfer-ledger") == 0) {
+        uint32_t maxEntries = 0;
+        if (argc == 3) {
+            char *end = NULL;
+            unsigned long parsed = strtoul(argv[2], &end, 10);
+            if (end == argv[2] || *end != '\0' || parsed > UINT32_MAX) {
+                Usage(argv[0]);
+                close(fd);
+                return 2;
+            }
+            maxEntries = (uint32_t)parsed;
+        }
+        uint8_t payload[4096];
+        size_t payloadLength = 0;
+        if (!ReadTransferLedger(fd, maxEntries, payload, sizeof(payload), &payloadLength)) {
+            fprintf(stderr, "Could not read OpenA8DJ transfer ledger\n");
+            close(fd);
+            return 1;
+        }
+        PrintTransferLedger(payload, payloadLength);
         close(fd);
         return 0;
     }

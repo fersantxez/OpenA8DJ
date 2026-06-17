@@ -256,7 +256,9 @@ enum {
     kIPCTypeInputStatsGet = 8,
     kIPCTypeInputStats = 9,
     kIPCTypeStreamStatsGet = 10,
-    kIPCTypeStreamStats = 11
+    kIPCTypeStreamStats = 11,
+    kIPCTypeTransferLedgerGet = 12,
+    kIPCTypeTransferLedger = 13
 };
 
 typedef struct OpenA8DJIPCHeader {
@@ -562,6 +564,28 @@ typedef struct OpenA8DJTransferLedgerSnapshot {
     uint64_t outputElasticDropFrames;
     uint64_t outputElasticReplayFrames;
 } OpenA8DJTransferLedgerSnapshot;
+
+typedef struct OpenA8DJTransferLedgerRequest {
+    uint32_t maxEntries;
+    uint32_t reserved;
+} __attribute__((packed)) OpenA8DJTransferLedgerRequest;
+
+typedef struct OpenA8DJTransferLedgerDumpHeader {
+    uint64_t latestSequence;
+    uint64_t overwritten;
+    uint64_t startSequence;
+    uint32_t capacity;
+    uint32_t count;
+    uint32_t entrySize;
+    uint32_t reserved;
+} __attribute__((packed)) OpenA8DJTransferLedgerDumpHeader;
+
+enum {
+    kTransferLedgerIPCMaxPayloadBytes = 4096,
+    kTransferLedgerIPCMaxEntries =
+        (kTransferLedgerIPCMaxPayloadBytes - (int)sizeof(OpenA8DJTransferLedgerDumpHeader)) /
+        (int)sizeof(OpenA8DJTransferLedgerEntry)
+};
 
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
 typedef struct OpenA8DJDiagnosticEvent {
@@ -3094,6 +3118,62 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     return snapshot;
 }
 
+- (uint16_t)copyTransferLedgerDump:(OpenA8DJTransferLedgerRequest)request
+                             bytes:(uint8_t *)bytes
+                          capacity:(size_t)capacity
+{
+    if (bytes == NULL || capacity < sizeof(OpenA8DJTransferLedgerDumpHeader)) {
+        return 0;
+    }
+
+    OpenA8DJTransferLedgerDumpHeader header;
+    memset(&header, 0, sizeof(header));
+    header.capacity = kTransferLedgerCapacity;
+    header.entrySize = (uint32_t)sizeof(OpenA8DJTransferLedgerEntry);
+
+#if OPENA8DJ_ENABLE_TRANSFER_LEDGER
+    uint64_t latest = atomic_load_explicit(&_transferLedgerSequence, memory_order_acquire);
+    uint64_t available = latest < kTransferLedgerCapacity ? latest : kTransferLedgerCapacity;
+    uint32_t maxEntries = request.maxEntries;
+    if (maxEntries == 0 || maxEntries > kTransferLedgerIPCMaxEntries) {
+        maxEntries = kTransferLedgerIPCMaxEntries;
+    }
+    size_t maxByCapacity = (capacity - sizeof(header)) / sizeof(OpenA8DJTransferLedgerEntry);
+    if (maxEntries > maxByCapacity) {
+        maxEntries = (uint32_t)maxByCapacity;
+    }
+    uint32_t count = available < maxEntries ? (uint32_t)available : maxEntries;
+    uint64_t start = count > 0 ? latest - count + 1 : latest + 1;
+
+    uint32_t copied = 0;
+    uint64_t firstCopiedSequence = start;
+    for (uint32_t index = 0; index < count; index++) {
+        uint64_t sequence = start + index;
+        size_t ledgerIndex = (size_t)((sequence - 1) % kTransferLedgerCapacity);
+        OpenA8DJTransferLedgerEntry entry = _transferLedger[ledgerIndex];
+        if (entry.sequence != sequence) {
+            continue;
+        }
+        if (copied == 0) {
+            firstCopiedSequence = sequence;
+        }
+        memcpy(bytes + sizeof(header) + ((size_t)copied * sizeof(entry)),
+               &entry,
+               sizeof(entry));
+        copied++;
+    }
+
+    header.latestSequence = latest;
+    header.overwritten = latest > kTransferLedgerCapacity ?
+        latest - kTransferLedgerCapacity : 0;
+    header.startSequence = copied > 0 ? firstCopiedSequence : start;
+    header.count = copied;
+#endif
+
+    memcpy(bytes, &header, sizeof(header));
+    return (uint16_t)(sizeof(header) + ((size_t)header.count * sizeof(OpenA8DJTransferLedgerEntry)));
+}
+
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
@@ -3355,6 +3435,16 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     (void)IPCSend(fd, kIPCTypeStreamStats, &stats, sizeof(stats));
 }
 
+- (void)sendTransferLedgerToClient:(int)fd
+                            request:(OpenA8DJTransferLedgerRequest)request
+{
+    uint8_t payload[kTransferLedgerIPCMaxPayloadBytes];
+    uint16_t length = [self copyTransferLedgerDump:request
+                                             bytes:payload
+                                          capacity:sizeof(payload)];
+    (void)IPCSend(fd, kIPCTypeTransferLedger, payload, length);
+}
+
 - (void)resetClockAnchorWithSeedBump:(BOOL)bumpSeed
 {
     pthread_mutex_lock(&_clockAnchorMutex);
@@ -3584,6 +3674,15 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         case kIPCTypeStreamStatsGet:
             [self sendStreamStatsToClient:fd];
             break;
+        case kIPCTypeTransferLedgerGet: {
+            OpenA8DJTransferLedgerRequest request;
+            memset(&request, 0, sizeof(request));
+            if (payload != NULL && length >= sizeof(request)) {
+                memcpy(&request, payload, sizeof(request));
+            }
+            [self sendTransferLedgerToClient:fd request:request];
+            break;
+        }
         default:
             break;
     }

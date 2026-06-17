@@ -278,6 +278,23 @@ def capture_stream_stats(root, control, timeout_seconds):
         return "", f"stream-stats-error={error}"
 
 
+def capture_transfer_ledger(root, control, timeout_seconds, count=48):
+    try:
+        result = subprocess.run([str(control), "transfer-ledger", str(count)],
+                                cwd=str(root),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                text=True,
+                                timeout=timeout_seconds)
+        if result.returncode != 0:
+            return result.stdout, f"transfer-ledger-rc={result.returncode}"
+        return result.stdout, None
+    except subprocess.TimeoutExpired:
+        return "", f"transfer-ledger-timeout={timeout_seconds:.3f}s"
+    except OSError as error:
+        return "", f"transfer-ledger-error={error}"
+
+
 def parse_stream_stats(text):
     values = {}
     for line in text.splitlines():
@@ -303,6 +320,21 @@ def write_stream_stats_snapshot(root, base_dir, label, timeout_seconds):
         else:
             file.write(text)
             if text and not text.endswith("\n"):
+                file.write("\n")
+    return path
+
+
+def write_transfer_ledger_snapshot(root, base_dir, label, timeout_seconds):
+    control = root / "build" / "opena8dj-control"
+    path = base_dir / f"transfer-ledger-{label}.tsv"
+    text, error = capture_transfer_ledger(root, control, timeout_seconds)
+    with open(path, "w", encoding="utf-8") as file:
+        file.write(f"# sample_time={time.time():.3f}\n")
+        if error:
+            file.write(f"{error}\n")
+        if text:
+            file.write(text)
+            if not text.endswith("\n"):
                 file.write("\n")
     return path
 
@@ -825,6 +857,7 @@ def run_soundcheck_body(root, base_dir, fixture_dir, args):
 
     if args.stream_stats_snapshots:
         write_stream_stats_snapshot(root, base_dir, "after", args.monitor_command_timeout)
+        write_transfer_ledger_snapshot(root, base_dir, "after", args.monitor_command_timeout)
 
     if player_rc != 0 or recorder_rc != 0:
         write_summary(base_dir / "summary.txt", [
@@ -834,7 +867,8 @@ def run_soundcheck_body(root, base_dir, fixture_dir, args):
             *(["stream_stats_before=stream-stats-before.txt",
                "stream_stats_during=stream-stats-during.txt",
                "stream_stats_during_tsv=stream-stats-during.tsv",
-               "stream_stats_after=stream-stats-after.txt"] if args.stream_stats_snapshots else []),
+               "stream_stats_after=stream-stats-after.txt",
+               "transfer_ledger_after=transfer-ledger-after.tsv"] if args.stream_stats_snapshots else []),
             f"run_dir={base_dir}",
         ])
         raise SystemExit(f"soundcheck playback/record failed; see {base_dir}")
@@ -897,6 +931,7 @@ def run_soundcheck_body(root, base_dir, fixture_dir, args):
             "stream_stats_during=stream-stats-during.txt",
             "stream_stats_during_tsv=stream-stats-during.tsv",
             "stream_stats_after=stream-stats-after.txt",
+            "transfer_ledger_after=transfer-ledger-after.tsv",
         ])
     summary.append(f"run_dir={base_dir}")
     write_summary(base_dir / "summary.txt", summary)

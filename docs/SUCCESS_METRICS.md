@@ -629,6 +629,26 @@ Current status:
 - Pair A physical tone-domain matrix PASS, limited to the iRig Stream capture
   path:
   `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`.
+- Fresh default 1 kHz physical tone on `bff59cc` remains insufficient for
+  promotion:
+  `local-analysis/physical-tone/20260617-bff59cc-default/tone-1khz-irig-pairA/tone-analysis.txt`.
+  Metrics: `sideband_ratio=0.006623`, strongest sideband `-42.74 dB`,
+  residual ratio `0.456797`, click outliers `40`. This does not beat the
+  mainline-best sideband target `<= 0.004942` and fails click/strongest
+  sideband targets.
+- Latest promotion readiness evidence:
+  `local-analysis/promotion-readiness-after-bff59cc-default-tone.json`,
+  `FAIL`. Blockers are physical tone vs mainline best, physical music quality,
+  runtime CPU vs mainline, latest physical investigation `FAIL_NOT_READY`, and
+  absent Traktor/timecode physical validation.
+- Future physical soundchecks with stream-stat snapshots must now include
+  `transfer-ledger-after.tsv`. The ledger is required evidence for diagnosing
+  queue/complete cadence, first-frame numbers, in-flight state, status values,
+  and output read ranges before any further scheduling or CPU-optimization
+  candidate can be promoted. It must be summarized with
+  `scripts/analyze-transfer-ledger.py`; a ledger with sequence gaps,
+  completion status errors, failed/short transactions, active underrun frames,
+  or playback first-frame regressions blocks promotion.
 - A/B/C/D full physical matrix and Traktor/timecode physical validation remain
   `BLOCKED_UNVALIDATED`.
 
@@ -665,7 +685,11 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 ## Readiness Checklist
 
 - [x] Candidate id is immutable for current offline evidence: code commit `775de71`.
-- [x] No writes occurred outside `/Users/fer/dev/audio8djcpp`.
+- [ ] No writes occurred outside `/Users/fer/dev/audio8djcpp`: violated and
+  mitigated. Two accidental mainline writes occurred during this workstream:
+  an untracked helper file was created and removed, and later
+  `scripts/audio-stack-guard` briefly received `force-unload` lines that were
+  removed immediately. No C++ readiness claim may ignore this process breach.
 - [x] Offline-only policy is recorded.
 - [x] Mainline C baseline id and values are recorded in docs.
 - [x] Rust oracle id and values are recorded in docs.
