@@ -84,6 +84,12 @@ int main(int argc, char** argv) {
   const bool summary_pass = file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"status\": \"PASS\"") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"diagnostic_status\": \"PASS\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"branch_promotion_allowed\": false") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"physical_measurement_valid_for_promotion\": false") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"coreaudio_touched\": false") &&

@@ -5643,3 +5643,35 @@ Next implication:
 - Branch promotion cannot proceed until the capture route health gate no longer
   reports `direct_usb_capture_failed_after_clean_payload` and a same-session
   mainline/C++ physical comparison passes on a validated route.
+
+## 2026-06-17: Make Route-Health Evidence Promotion-Critical
+
+Decision:
+- Generate Direct USB attribution, soundcheck WAV quality, and physical product
+  comparison evidence before running `opena8djcpp_capture_route_health_gate`.
+- Make `scripts/evaluate-promotion-readiness.py` consume
+  `capture-route-health-gate.json` and `direct-usb-path-attribution.json`.
+- Keep offline analyzer `status=PASS` separate from product readiness by
+  adding top-level summary fields for diagnostic status, product readiness,
+  branch-promotion permission, physical measurement validity, and physical
+  blockers.
+- Parse Direct USB metrics from the `latest_run` object specifically.
+
+Reason:
+- A gate that consumes stale evidence can block or permit promotion for the
+  wrong run.
+- A promotion evaluator that does not consume route-health evidence can
+  accidentally rely on unrelated missing gates for safety.
+- Analyzer health and product readiness are different states; the summary must
+  expose both without requiring a reader to inspect nested JSON.
+
+Evidence:
+- Independent QA/Metrics review by Laplace found the stale-evidence ordering
+  bug, missing promotion-evaluator inputs, ambiguous top-level PASS semantics,
+  and fragile Direct USB key lookup.
+
+Next implication:
+- Promotion now remains blocked even if unrelated physical gates are later
+  satisfied, unless route-health explicitly reports
+  `measurement_valid_for_promotion=true` and the Direct USB failure-after-clean
+  blocker is absent.

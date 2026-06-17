@@ -51,6 +51,14 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   `direct_usb_capture_failed_after_clean_payload=false` before physical quality
   evidence can support promotion. The current value is `true`, with latest
   attribution `post_usb_device_analog_or_capture_route_dominant`.
+- `current-offline-gates.json` may report analyzer `status=PASS` only as
+  diagnostic health. Product readiness must be read from
+  `product_readiness_status`, `branch_promotion_allowed`, and
+  `physical_measurement_valid_for_promotion`.
+- Promotion readiness must fail if either
+  `measurement_valid_for_promotion=false` or
+  `direct_usb_capture_failed_after_clean_payload=true`, even when unrelated
+  missing physical gates would already block promotion.
 - iRig idle capture must remain below idle-noise guardrails before it can be
   used as a trustworthy external capture device. Current idle evidence passes
   diagnostic guardrails: max RMS `-66.94 dBFS`, max peak `-41.65 dBFS`, max

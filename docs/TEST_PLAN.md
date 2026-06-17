@@ -1135,6 +1135,10 @@ Capture route health gate:
 - Run as part of `scripts/run-cpp-offline-gates`.
 - It consumes existing physical evidence only.
 - It must not touch hardware, CoreAudio, USB, drivers, defaults, or services.
+- `scripts/run-cpp-offline-gates` must generate the consumed soundcheck,
+  physical product comparison, and Direct USB attribution artifacts before
+  invoking the capture route health gate; stale consumed evidence is a test
+  failure even if the analyzer executable returns success.
 - It consumes `direct-usb-path-attribution.json` and exposes
   `direct_usb_capture_failed_after_clean_payload`. This must be `false` before
   any same-route physical result can support promotion.
@@ -1143,6 +1147,10 @@ Capture route health gate:
 - Product promotion requires `measurement_valid_for_promotion=true`; otherwise
   the next step is a lock-gated capture route revalidation rather than driver
   promotion.
+- `scripts/evaluate-promotion-readiness.py` must treat
+  `measurement_valid_for_promotion=false` or
+  `direct_usb_capture_failed_after_clean_payload=true` as first-class
+  promotion failures.
 
 Prepared DriverKit hot path gate:
 - Run as part of `scripts/run-cpp-offline-gates`.

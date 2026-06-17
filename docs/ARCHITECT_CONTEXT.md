@@ -2204,3 +2204,30 @@ Current implication:
 - The current route cannot support audiophile, timecode, CPU, or branch
   promotion claims until `direct_usb_capture_failed_after_clean_payload=false`
   and `measurement_valid_for_promotion=true`.
+
+## 2026-06-17 QA Tightening After Metrics Review
+
+- Independent read-only QA/Metrics review found that the first Direct USB route
+  blocker integration still had four readiness risks:
+  - route-health gate could consume stale Direct USB/soundcheck/physical
+    evidence inside a full offline run;
+  - promotion readiness did not consume route-health or Direct USB attribution
+    as first-class gates;
+  - top-level offline `PASS` could be misread as product readiness;
+  - Direct USB metric parsing was not anchored to `latest_run`.
+- Integrated fixes:
+  - `scripts/run-cpp-offline-gates` now regenerates consumed physical evidence
+    and Direct USB attribution before route-health evaluation.
+  - `scripts/evaluate-promotion-readiness.py` now fails promotion explicitly on
+    invalid capture-route measurement or Direct USB capture failure after clean
+    payload.
+  - `current-offline-gates.json` now separates `diagnostic_status` from
+    `product_readiness_status`, `branch_promotion_allowed`, and
+    `physical_measurement_valid_for_promotion`.
+  - `opena8djcpp_capture_route_health_gate` now reads Direct USB metrics from
+    the `latest_run` object.
+
+Current implication:
+- A stale or nested Direct USB artifact cannot silently weaken the blocker.
+- Product readiness remains `NOT_READY` until route health is valid and a
+  same-session mainline/C++ physical A/B passes on that valid route.

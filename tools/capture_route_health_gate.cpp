@@ -1,5 +1,6 @@
 #include <cctype>
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -109,6 +110,59 @@ std::optional<bool> json_bool(const std::string& json, const std::string& key) {
   return std::nullopt;
 }
 
+std::optional<std::string> json_object(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return std::nullopt;
+  }
+  const std::size_t colon = json.find(':', key_pos + needle.size());
+  if (colon == std::string::npos) {
+    return std::nullopt;
+  }
+  std::size_t start = colon + 1U;
+  while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+    ++start;
+  }
+  if (start >= json.size() || json[start] != '{') {
+    return std::nullopt;
+  }
+
+  std::uint32_t depth = 0;
+  bool in_string = false;
+  bool escaped = false;
+  for (std::size_t index = start; index < json.size(); ++index) {
+    const char c = json[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (in_string && c == '\\') {
+      escaped = true;
+      continue;
+    }
+    if (c == '"') {
+      in_string = !in_string;
+      continue;
+    }
+    if (in_string) {
+      continue;
+    }
+    if (c == '{') {
+      ++depth;
+    } else if (c == '}') {
+      if (depth == 0) {
+        return std::nullopt;
+      }
+      --depth;
+      if (depth == 0) {
+        return json.substr(start, index - start + 1U);
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 std::optional<std::string> json_string(const std::string& json, const std::string& key) {
   const std::string needle = "\"" + key + "\"";
   const std::size_t key_pos = json.find(needle);
@@ -187,6 +241,7 @@ int main(int argc, char** argv) {
   const auto physical = read_file(root / "local-analysis/cpp-offline/physical-run-product-superiority.json");
   const auto direct_usb =
       read_file(root / "local-analysis/cpp-offline/direct-usb-path-attribution.json");
+  const std::string direct_usb_latest = json_object(direct_usb, "latest_run").value_or(direct_usb);
 
   const double mainline_quality =
       number_or_nan(json_number_after_anchor(route_summary, "mainline-0.3.135",
@@ -207,34 +262,34 @@ int main(int argc, char** argv) {
   const double physical_snr = number_or_nan(json_number(physical, "snr_floor_db"));
   const double physical_quality = number_or_nan(json_number(physical, "quality_alignment_score"));
   const double direct_usb_capture_quality =
-      number_or_nan(json_number(direct_usb, "capture_quality_alignment_score"));
+      number_or_nan(json_number(direct_usb_latest, "capture_quality_alignment_score"));
   const double direct_usb_capture_snr =
-      number_or_nan(json_number(direct_usb, "capture_snr_floor_db"));
+      number_or_nan(json_number(direct_usb_latest, "capture_snr_floor_db"));
   const double direct_usb_mid_ratio =
-      number_or_nan(json_number(direct_usb, "capture_mid_band_residual_ratio"));
+      number_or_nan(json_number(direct_usb_latest, "capture_mid_band_residual_ratio"));
   const double direct_usb_high_ratio =
-      number_or_nan(json_number(direct_usb, "capture_high_band_residual_ratio"));
+      number_or_nan(json_number(direct_usb_latest, "capture_high_band_residual_ratio"));
   const double direct_usb_drift_ppm =
-      number_or_nan(json_number(direct_usb, "failure_drift_ppm"));
+      number_or_nan(json_number(direct_usb_latest, "failure_drift_ppm"));
   const double direct_usb_mid_coherence =
-      number_or_nan(json_number(direct_usb, "lti_mid_coherence"));
+      number_or_nan(json_number(direct_usb_latest, "lti_mid_coherence"));
   const double direct_usb_usb_alignment =
-      number_or_nan(json_number(direct_usb, "usb_alignment_score"));
+      number_or_nan(json_number(direct_usb_latest, "usb_alignment_score"));
   const double direct_usb_usb_snr =
-      number_or_nan(json_number(direct_usb, "usb_snr_floor_db"));
+      number_or_nan(json_number(direct_usb_latest, "usb_snr_floor_db"));
   const double direct_usb_usb_check_errors =
-      number_or_nan(json_number(direct_usb, "usb_check_errors"));
+      number_or_nan(json_number(direct_usb_latest, "usb_check_errors"));
   const double direct_usb_usb_panic_flags =
-      number_or_nan(json_number(direct_usb, "usb_panic_flags"));
+      number_or_nan(json_number(direct_usb_latest, "usb_panic_flags"));
   const auto direct_usb_attribution =
-      json_string(direct_usb, "attribution").value_or("missing");
+      json_string(direct_usb_latest, "attribution").value_or("missing");
   const bool shared_route_unhealthy =
       json_bool(quality_root, "shared_fixture_or_capture_path_unhealthy").value_or(false);
   const bool digital_payload_clean = json_bool(quality_root, "digital_payload_clean").value_or(false);
   const bool direct_usb_internal_clean =
-      json_bool(direct_usb, "internal_clean").value_or(false);
+      json_bool(direct_usb_latest, "internal_clean").value_or(false);
   const bool direct_usb_capture_failed =
-      json_bool(direct_usb, "capture_failed").value_or(false);
+      json_bool(direct_usb_latest, "capture_failed").value_or(false);
 
   const bool common_route_low =
       finite(mainline_quality) && finite(cpp_route_quality) && finite(mainline_snr) &&

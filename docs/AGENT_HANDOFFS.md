@@ -2984,3 +2984,55 @@ Risk:
     only when a real non-Audio8 output is physically routed into the same
     mixer/REC OUT -> iRig chain. Do not claim C++ superiority before that
     route gate passes.
+
+## 2026-06-17 Subagent: Laplace QA/Metrics Reviewer
+
+- Agent:
+  - Laplace (`019ed747-8792-77c1-8b5d-068f4bd39b6d`).
+- Mission:
+  - Read-only review of the new capture-route/Direct-USB gate semantics.
+  - Verify whether the gate prevents false audiophile, performance, timecode,
+    and branch-promotion claims when the physical capture route is invalid.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - `run-cpp-offline-gates` generated `capture-route-health-gate.json` before
+    regenerating the Direct USB attribution, soundcheck WAV quality, and
+    physical product comparison evidence that the gate consumes.
+  - `evaluate-promotion-readiness.py` did not consume
+    `capture-route-health-gate.json` or `direct-usb-path-attribution.json` as
+    first-class promotion blockers.
+  - The top-level offline summary exposed analyzer `PASS` but lacked an equally
+    visible product-readiness status.
+  - `capture_route_health_gate` parsed JSON keys globally instead of anchoring
+    Direct USB metrics to `latest_run`.
+- Integrated action:
+  - Reordered offline evidence generation so Direct USB attribution and
+    consumed physical-quality artifacts are current before route-health
+    evaluation.
+  - Added explicit promotion gates for capture-route validity and
+    Direct-USB-failed-after-clean-payload.
+  - Added top-level offline summary fields for diagnostic status, product
+    readiness, promotion permission, physical measurement validity, and route
+    blockers.
+  - Scoped Direct USB parsing to the `latest_run` object.
+- Files affected:
+  - `scripts/run-cpp-offline-gates`.
+  - `scripts/evaluate-promotion-readiness.py`.
+  - `tools/capture_route_health_gate.cpp`.
+  - `tools/evidence_schema_check.cpp`.
+  - `docs/AGENT_HANDOFFS.md`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/TEST_EVIDENCE.md`.
+  - `docs/TEST_PLAN.md`.
+  - `docs/SUCCESS_METRICS.md`.
+- Next action:
+  - Re-run full offline gates and require
+    `product_readiness_status=FAIL/NOT_READY` plus
+    `branch_promotion_allowed=false` until a validated physical route and
+    same-session mainline/C++ comparison exist.

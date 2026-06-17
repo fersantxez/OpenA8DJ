@@ -8723,3 +8723,43 @@ Full offline gate rerun:
     clean internal payload.
   - The next product-relevant physical work is route validation, not packer
     churn or branch promotion.
+
+## 2026-06-17 QA Metrics Tightening Follow-Up
+
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline-only analysis of existing evidence files.
+  - No audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action.
+- Result:
+  - Debug CTest: `41/41` passed.
+  - Release CTest: `42/42` passed.
+  - Evidence schema: `required_files=42`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `current-offline-gates.json`:
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `product_readiness_status=FAIL`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+  - `promotion-readiness-offline-check.json` now lists explicit failures for:
+    - missing same-session physical compare;
+    - `capture_route_measurement_valid_for_promotion`;
+    - `direct_usb_capture_route_not_failed_after_clean_payload`;
+    - physical latency;
+    - same-session mainline/C++ compare;
+    - physical music quality;
+    - runtime CPU;
+    - latest physical investigation;
+    - physical Traktor/timecode.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/cpp-offline/promotion-readiness-offline-check.json`.
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`.
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+- Interpretation:
+  - The analyzer stack is healthy, but product readiness is explicitly failed.
+  - A clean internal Direct USB payload followed by failed physical capture is
+    now a first-class promotion failure, not incidental context.
+  - No superiority claim over mainline C is supported.

@@ -82,6 +82,8 @@ DEFAULTS = {
         "local-analysis/physical-superiority-window/**/same-session-physical-compare.json",
         ROOT / "local-analysis/physical-superiority-window/REQUIRED-same-session-physical-compare.json",
     ),
+    "capture_route_health": ROOT / "local-analysis/cpp-offline/capture-route-health-gate.json",
+    "direct_usb_attribution": ROOT / "local-analysis/cpp-offline/direct-usb-path-attribution.json",
 }
 
 
@@ -128,7 +130,15 @@ def load_json(path):
         return json.load(handle)
 
 
+def load_json_or_empty(path):
+    if not path.is_file():
+        return {}
+    return load_json(path)
+
+
 def parse_key_values(path):
+    if not path.is_file():
+        return {}
     values = {}
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         for line in handle:
@@ -211,35 +221,25 @@ def evaluate(args):
         "usb_integrity": Path(args.usb_integrity),
         "physical_matrix": Path(args.physical_matrix),
         "same_session_compare": Path(args.same_session_compare),
+        "capture_route_health": Path(args.capture_route_health),
+        "direct_usb_attribution": Path(args.direct_usb_attribution),
     }
     gates = []
     for name, path in paths.items():
         gates.append(check_file(path, f"evidence:{name}"))
 
-    if any(item["result"] != "PASS" for item in gates):
-        return {
-            "result": "NOT_READY",
-            "branch_promotion_allowed": False,
-            "baseline": BASELINE,
-            "evidence_selection": {
-                "product_run": str(paths["music"].parent)
-                if paths["music"].parent == paths["cpu"].parent else None,
-                "music": evidence_metadata(paths["music"]),
-                "cpu": evidence_metadata(paths["cpu"]),
-            },
-            "gates": gates,
-        }
-
-    offline = load_json(paths["offline"])
-    simulated = load_json(paths["simulated"])
+    offline = load_json_or_empty(paths["offline"])
+    simulated = load_json_or_empty(paths["simulated"])
     tone = parse_key_values(paths["tone"])
-    music = load_json(paths["music"])
-    physical_investigation = load_json(paths["physical_investigation"])
-    physical_latency = load_json(paths["physical_latency"])
-    physical_marker = load_json(paths["physical_marker"])
+    music = load_json_or_empty(paths["music"])
+    physical_investigation = load_json_or_empty(paths["physical_investigation"])
+    physical_latency = load_json_or_empty(paths["physical_latency"])
+    physical_marker = load_json_or_empty(paths["physical_marker"])
     usb_integrity = parse_key_values(paths["usb_integrity"])
-    physical_matrix = load_json(paths["physical_matrix"])
-    same_session_compare = load_json(paths["same_session_compare"])
+    physical_matrix = load_json_or_empty(paths["physical_matrix"])
+    same_session_compare = load_json_or_empty(paths["same_session_compare"])
+    capture_route_health = load_json_or_empty(paths["capture_route_health"])
+    direct_usb_attribution = load_json_or_empty(paths["direct_usb_attribution"])
     cpu = cpu_profile(paths["cpu"])
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
@@ -315,6 +315,27 @@ def evaluate(args):
              offline.get("hardware_lock_policy", {}).get("audited_scripts", 0) >= 4 and
              offline.get("hardware_lock_policy", {}).get("missing_requirements", 1) == 0,
              offline.get("hardware_lock_policy", {})),
+        gate("capture_route_measurement_valid_for_promotion",
+             capture_route_health.get("measurement_valid_for_promotion") is True and
+             not capture_route_health.get("promotion_blockers") and
+             capture_route_health.get("direct_usb_capture_failed_after_clean_payload") is not True,
+             {"path": str(paths["capture_route_health"]),
+              "measurement_valid_for_promotion":
+              capture_route_health.get("measurement_valid_for_promotion"),
+              "direct_usb_capture_failed_after_clean_payload":
+              capture_route_health.get("direct_usb_capture_failed_after_clean_payload"),
+              "direct_usb_attribution": capture_route_health.get("direct_usb_attribution"),
+              "promotion_blockers": capture_route_health.get("promotion_blockers", []),
+              "required_physical_experiments":
+              capture_route_health.get("required_physical_experiments", [])},
+             "physical capture route must be validated before audio quality, CPU, timecode, or branch promotion claims"),
+        gate("direct_usb_capture_route_not_failed_after_clean_payload",
+             direct_usb_attribution.get("latest_run", {}).get("internal_clean") is True and
+             direct_usb_attribution.get("latest_run", {}).get("capture_failed") is not True,
+             {"path": str(paths["direct_usb_attribution"]),
+              "readiness_claim": direct_usb_attribution.get("readiness_claim"),
+              "latest_run": direct_usb_attribution.get("latest_run", {})},
+             "a clean written/consumed/packed USB payload followed by failed physical capture blocks promotion"),
         gate("offline_transfer_pool_model",
              offline.get("transfer_pool_model", {}).get("status") == "PASS" and
              offline.get("transfer_pool_model", {}).get("rows", 0) >= 6 and
@@ -552,6 +573,8 @@ def main():
     parser.add_argument("--usb-integrity", default=str(DEFAULTS["usb_integrity"]))
     parser.add_argument("--physical-matrix", default=str(DEFAULTS["physical_matrix"]))
     parser.add_argument("--same-session-compare", default=str(DEFAULTS["same_session_compare"]))
+    parser.add_argument("--capture-route-health", default=str(DEFAULTS["capture_route_health"]))
+    parser.add_argument("--direct-usb-attribution", default=str(DEFAULTS["direct_usb_attribution"]))
     parser.add_argument("--json-out")
     args = parser.parse_args()
 
