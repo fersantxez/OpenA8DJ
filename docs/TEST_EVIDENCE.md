@@ -2188,3 +2188,24 @@ Operational note:
   - Mainline prefetch parity is not a standalone fix in C++.
   - Do not combine with `queue8` until a separate transport/capture-error
     hypothesis explains the persistent residual/lag.
+
+## 2026-06-17: Capture Transaction Detail Tooling
+
+- Commands:
+  - `make build/opena8dj-control`
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-prefetch64-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/prefetch64-summary-v2.json`
+- Result:
+  - PASS.
+  - `opena8dj-control stream-stats` machine output now includes:
+    `captureStatusFailures`, `captureZeroCompleteTransactions`,
+    `captureExpectedTransactions`, `captureOtherByteCountTransactions`,
+    `captureShortTransfers`, and `filteredCaptureTransactions`.
+  - `run-soundcheck` now writes those fields to `stream-stats-during.tsv`.
+  - `analyze-stream-stats.py` now summarizes per-capture-transfer ratios for
+    those components while remaining compatible with older TSVs.
+- Interpretation:
+  - The stable aggregate `captureTransactionErrors/transfer ~= 2.273` needs
+    decomposition before it can drive another transport change. Future physical
+    runs will identify whether errors are status failures, zero-complete,
+    short/other-size filtered transactions, or a mixture.

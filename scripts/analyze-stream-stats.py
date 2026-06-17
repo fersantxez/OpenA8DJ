@@ -16,6 +16,12 @@ from pathlib import Path
 COUNTERS = [
     "captureTransfersCompleted",
     "captureTransactionErrors",
+    "captureStatusFailures",
+    "captureZeroCompleteTransactions",
+    "captureExpectedTransactions",
+    "captureOtherByteCountTransactions",
+    "captureShortTransfers",
+    "filteredCaptureTransactions",
     "playbackTransfersSubmitted",
     "playbackTransfersCompleted",
     "playbackTransferErrors",
@@ -185,6 +191,26 @@ def analyze(path):
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,
         "capture_transaction_errors_per_capture_transfer": capture_error_per_transfer,
+        "capture_status_failures_per_capture_transfer": (
+            counters["captureStatusFailures"]["delta"] / capture_tx_delta
+            if math.isfinite(counters["captureStatusFailures"]["delta"]) and capture_tx_delta > 0 else math.nan
+        ),
+        "capture_zero_complete_per_capture_transfer": (
+            counters["captureZeroCompleteTransactions"]["delta"] / capture_tx_delta
+            if math.isfinite(counters["captureZeroCompleteTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
+        ),
+        "capture_other_size_per_capture_transfer": (
+            counters["captureOtherByteCountTransactions"]["delta"] / capture_tx_delta
+            if math.isfinite(counters["captureOtherByteCountTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
+        ),
+        "capture_short_per_capture_transfer": (
+            counters["captureShortTransfers"]["delta"] / capture_tx_delta
+            if math.isfinite(counters["captureShortTransfers"]["delta"]) and capture_tx_delta > 0 else math.nan
+        ),
+        "filtered_capture_per_capture_transfer": (
+            counters["filteredCaptureTransactions"]["delta"] / capture_tx_delta
+            if math.isfinite(counters["filteredCaptureTransactions"]["delta"]) and capture_tx_delta > 0 else math.nan
+        ),
         "counters": counters,
         "gauges": gauges,
     }

@@ -969,6 +969,12 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("streaming=%u\n", stats->streaming);
     printf("captureTransfersCompleted=%llu\n", (unsigned long long)stats->captureTransfers);
     printf("captureTransactionErrors=%llu\n", (unsigned long long)stats->captureTransactionFailures);
+    printf("captureStatusFailures=%llu\n", (unsigned long long)stats->captureStatusFailures);
+    printf("captureZeroCompleteTransactions=%llu\n", (unsigned long long)stats->captureZeroCompleteTransactions);
+    printf("captureExpectedTransactions=%llu\n", (unsigned long long)stats->captureExpectedTransactions);
+    printf("captureOtherByteCountTransactions=%llu\n", (unsigned long long)stats->captureOtherByteCountTransactions);
+    printf("captureShortTransfers=%llu\n", (unsigned long long)stats->captureShortTransfers);
+    printf("filteredCaptureTransactions=%llu\n", (unsigned long long)stats->filteredCaptureTransactions);
     printf("playbackTransfersSubmitted=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackQueueAttempts) ?
                                 stats->playbackQueueAttempts : stats->playbackTransfers));
