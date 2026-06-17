@@ -7506,3 +7506,50 @@ Operational note:
     audio quality or CPU.
   - C++ remains not ready for hardware-readiness claims, branch promotion, or
     replacement of the C mainline.
+
+## 2026-06-17 Prepared Slot Scheduler Contract
+
+- Purpose:
+  - Turn the next low-CPU DriverKit transport direction into a compiled core
+    contract instead of a loose design note.
+  - Model prepared capture/playback slot lead, backend-only requeue, fallback
+    allocation rejection, completion-gap rejection, and lead starvation without
+    opening audio, USB, CoreAudio, HAL, or DriverKit services.
+- Change:
+  - Added `PreparedSlotScheduler` to the C++ core.
+  - Added `opena8djcpp_prepared_slot_scheduler_contract`.
+  - Wired the contract into CMake, CTest, `scripts/run-cpp-offline-gates`,
+    evidence schema, and static policy audit.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_core_tests opena8djcpp_prepared_slot_scheduler_contract`
+  - `./build/cpp-offline/opena8djcpp_core_tests`
+  - `./build/cpp-offline/opena8djcpp_prepared_slot_scheduler_contract`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Prepared slot scheduler contract: PASS.
+  - Rows: `8`.
+  - Safe scenarios: `2`.
+  - Minimum HAL steady requeues for safe scenarios: `0`.
+  - Negative scenarios rejected:
+    HAL direct requeue, fallback allocation, pool leak, coalesced completion
+    gap, backend requeue-budget violation, and backend lead starvation.
+  - Full offline gates: PASS.
+  - Debug CTest: `28/28` passed.
+  - Release CTest: `29/29` passed.
+  - Evidence schema: PASS, `required_files=29`, missing `0`.
+  - Static policy: PASS, audited files `20`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-slot-scheduler-contract.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Interpretation:
+  - This is architecture progress toward a lower-CPU prepared transport path.
+  - It does not prove physical sound quality, lower runtime CPU, DriverKit
+    execution, or superiority over mainline.
+  - The future physical/DriverKit adapter must preserve these invariants while
+    also passing same-session quality, CPU, routing, and timecode gates.

@@ -4658,3 +4658,35 @@ Next implication:
 - Future physical windows must produce same-run `metrics.json` and
   `cpu-profile.tsv` evidence. Promotion remains forbidden until this evaluator
   returns `PASS` and `branch_promotion_allowed=true`.
+
+## 2026-06-17: Add Prepared Slot Scheduler Contract
+
+Decision:
+- Add `PreparedSlotScheduler` to the C++ core and gate it with
+  `opena8djcpp_prepared_slot_scheduler_contract`.
+
+Reason:
+- Existing physical evidence shows the simple ISO/cadence frontier is
+  exhausted: high cadence keeps quality closer but costs too much CPU, while
+  lower enqueue cadence can hit CPU but destroys quality.
+- The next viable architecture must reduce HAL hot-path USB work without
+  changing audio cadence. That requires a prepared-slot backend contract with
+  explicit lead, backend requeue budget, no fallback allocation, and zero HAL
+  steady-state requeues.
+- Encoding that contract in C++ makes future DriverKit/USB adapter work
+  measurable before any hardware window.
+
+Alternatives discarded:
+- Add another HAL timing flag first: rejected because recent physical flags
+  have mostly moved along the same failed quality/CPU frontier.
+- Keep this only in `transfer_pool_model`: rejected because the product core
+  needs reusable state/counters/safety semantics, not just a standalone model.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-slot-scheduler-contract.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- The future runtime adapter must satisfy the scheduler contract and then prove
+  physical quality and CPU against mainline. This contract does not by itself
+  authorize driver installation, hardware readiness, or branch promotion.

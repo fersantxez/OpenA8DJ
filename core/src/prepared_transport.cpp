@@ -4,6 +4,148 @@
 
 namespace opena8djcpp {
 
+bool PreparedSlotScheduler::start(const PreparedSlotSchedulerConfig& config) {
+  if (config.capture_target_slots == 0 || config.playback_target_slots == 0 ||
+      config.capture_pool_slots == 0 || config.playback_pool_slots == 0 ||
+      config.capture_pool_slots > kPreparedTransportMaxSlots ||
+      config.playback_pool_slots > kPreparedTransportMaxSlots ||
+      config.capture_target_slots > kPreparedTransportMaxSlots ||
+      config.playback_target_slots > kPreparedTransportMaxSlots ||
+      config.playback_completion_gap_periods == 0 ||
+      config.max_backend_requeues_per_period == 0 ||
+      config.unavailable_capture_slots > config.capture_pool_slots ||
+      config.unavailable_playback_slots > config.playback_pool_slots) {
+    return false;
+  }
+
+  config_ = config;
+  counters_ = {};
+  started_ = true;
+  for (std::uint32_t index = 0; index < config_.capture_target_slots; ++index) {
+    queue_capture_slot(true);
+  }
+  for (std::uint32_t index = 0; index < config_.playback_target_slots; ++index) {
+    queue_playback_slot(true);
+  }
+  counters_.min_capture_in_flight = counters_.capture_in_flight;
+  counters_.min_playback_in_flight = counters_.playback_in_flight;
+  record_lead();
+  return true;
+}
+
+void PreparedSlotScheduler::stop() {
+  started_ = false;
+  counters_.capture_in_flight = 0;
+  counters_.playback_in_flight = 0;
+}
+
+bool PreparedSlotScheduler::complete_period(const PreparedSlotSchedulerStepOptions& options) {
+  if (!started_) {
+    return false;
+  }
+
+  counters_.periods += 1;
+  if (options.hal_direct_requeue_attempt) {
+    counters_.hal_steady_requeues += 2;
+  }
+  if (options.fallback_allocation_attempt) {
+    counters_.fallback_allocations += 2;
+  }
+  if (config_.playback_completion_gap_periods > kPreparedTransportMaxCompletionGapRatio) {
+    counters_.completion_gap_violations += 1;
+  }
+
+  if (counters_.capture_in_flight == 0) {
+    counters_.capture_starved_periods += 1;
+  } else {
+    counters_.capture_in_flight -= 1;
+  }
+
+  if ((counters_.periods % config_.playback_completion_gap_periods) == 0) {
+    if (counters_.playback_in_flight == 0) {
+      counters_.playback_starved_periods += 1;
+    } else {
+      counters_.playback_in_flight -= 1;
+    }
+  }
+
+  const auto before_requeues = counters_.backend_steady_requeues;
+  if (!options.suppress_backend_requeue) {
+    refill_to_targets();
+  }
+  const auto period_requeues = counters_.backend_steady_requeues - before_requeues;
+  if (period_requeues > config_.max_backend_requeues_per_period) {
+    counters_.backend_requeue_budget_violations += 1;
+  }
+
+  record_lead();
+  return true;
+}
+
+PreparedSlotSchedulerSafety PreparedSlotScheduler::safety() const {
+  PreparedSlotSchedulerSafety out{};
+  if (!started_) {
+    return out;
+  }
+  out.prepared_slots_only = counters_.fallback_allocations == 0;
+  out.lead_safe = counters_.capture_starved_periods == 0 &&
+                  counters_.playback_starved_periods == 0 &&
+                  counters_.min_capture_in_flight >= config_.capture_target_slots &&
+                  counters_.min_playback_in_flight >= config_.playback_target_slots;
+  out.cadence_safe = counters_.completion_gap_violations == 0;
+  out.hal_hot_path_safe = counters_.hal_steady_requeues == 0;
+  out.backend_budget_safe = counters_.backend_requeue_budget_violations == 0;
+  out.product_safe = out.prepared_slots_only && out.lead_safe && out.cadence_safe &&
+                     out.hal_hot_path_safe && out.backend_budget_safe;
+  return out;
+}
+
+void PreparedSlotScheduler::queue_capture_slot(bool prepare) {
+  if (config_.unavailable_capture_slots + counters_.capture_in_flight >=
+      config_.capture_pool_slots) {
+    counters_.fallback_allocations += 1;
+  }
+  counters_.capture_in_flight += 1;
+  if (prepare) {
+    counters_.backend_prepare_enqueues += 1;
+  } else {
+    counters_.backend_steady_requeues += 1;
+  }
+}
+
+void PreparedSlotScheduler::queue_playback_slot(bool prepare) {
+  if (config_.unavailable_playback_slots + counters_.playback_in_flight >=
+      config_.playback_pool_slots) {
+    counters_.fallback_allocations += 1;
+  }
+  counters_.playback_in_flight += 1;
+  if (prepare) {
+    counters_.backend_prepare_enqueues += 1;
+  } else {
+    counters_.backend_steady_requeues += 1;
+  }
+}
+
+void PreparedSlotScheduler::refill_to_targets() {
+  while (counters_.capture_in_flight < config_.capture_target_slots) {
+    queue_capture_slot(false);
+  }
+  while (counters_.playback_in_flight < config_.playback_target_slots) {
+    queue_playback_slot(false);
+  }
+}
+
+void PreparedSlotScheduler::record_lead() {
+  counters_.min_capture_in_flight =
+      std::min(counters_.min_capture_in_flight, counters_.capture_in_flight);
+  counters_.min_playback_in_flight =
+      std::min(counters_.min_playback_in_flight, counters_.playback_in_flight);
+  counters_.max_capture_in_flight =
+      std::max(counters_.max_capture_in_flight, counters_.capture_in_flight);
+  counters_.max_playback_in_flight =
+      std::max(counters_.max_playback_in_flight, counters_.playback_in_flight);
+}
+
 bool PreparedTransportBackend::start(const PreparedTransportConfig& config) {
   if (config.iso_frames == 0 || config.capture_slots == 0 || config.playback_slots == 0 ||
       config.capture_slots > kPreparedTransportMaxSlots ||

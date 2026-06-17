@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
       root / "local-analysis/cpp-offline/driverkit-runtime-contract.json",
       root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
+      root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
       root / "local-analysis/cpp-offline/loopback-quality-analysis.json",
       root / "local-analysis/cpp-offline/capture-matrix-quality-analysis.json",

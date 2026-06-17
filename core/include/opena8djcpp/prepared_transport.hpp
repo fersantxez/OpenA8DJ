@@ -54,6 +54,82 @@ struct PreparedTransportSafety {
   bool product_safe = false;
 };
 
+struct PreparedSlotSchedulerConfig {
+  std::uint32_t capture_target_slots = 8;
+  std::uint32_t playback_target_slots = 8;
+  std::uint32_t capture_pool_slots = kPreparedTransportMaxSlots;
+  std::uint32_t playback_pool_slots = kPreparedTransportMaxSlots;
+  std::uint32_t unavailable_capture_slots = 0;
+  std::uint32_t unavailable_playback_slots = 0;
+  std::uint32_t playback_completion_gap_periods = 1;
+  std::uint32_t max_backend_requeues_per_period = 2;
+};
+
+struct PreparedSlotSchedulerStepOptions {
+  bool hal_direct_requeue_attempt = false;
+  bool fallback_allocation_attempt = false;
+  bool suppress_backend_requeue = false;
+};
+
+struct PreparedSlotSchedulerCounters {
+  std::uint64_t periods = 0;
+  std::uint64_t backend_prepare_enqueues = 0;
+  std::uint64_t backend_steady_requeues = 0;
+  std::uint64_t hal_steady_requeues = 0;
+  std::uint64_t fallback_allocations = 0;
+  std::uint64_t capture_starved_periods = 0;
+  std::uint64_t playback_starved_periods = 0;
+  std::uint64_t backend_requeue_budget_violations = 0;
+  std::uint64_t completion_gap_violations = 0;
+  std::uint32_t capture_in_flight = 0;
+  std::uint32_t playback_in_flight = 0;
+  std::uint32_t min_capture_in_flight = 0;
+  std::uint32_t min_playback_in_flight = 0;
+  std::uint32_t max_capture_in_flight = 0;
+  std::uint32_t max_playback_in_flight = 0;
+};
+
+struct PreparedSlotSchedulerSafety {
+  bool prepared_slots_only = false;
+  bool lead_safe = false;
+  bool cadence_safe = false;
+  bool hal_hot_path_safe = false;
+  bool backend_budget_safe = false;
+  bool product_safe = false;
+};
+
+class PreparedSlotScheduler {
+ public:
+  [[nodiscard]] bool start(const PreparedSlotSchedulerConfig& config);
+  void stop();
+
+  [[nodiscard]] bool started() const {
+    return started_;
+  }
+
+  [[nodiscard]] bool complete_period(const PreparedSlotSchedulerStepOptions& options = {});
+
+  [[nodiscard]] const PreparedSlotSchedulerConfig& config() const {
+    return config_;
+  }
+
+  [[nodiscard]] const PreparedSlotSchedulerCounters& counters() const {
+    return counters_;
+  }
+
+  [[nodiscard]] PreparedSlotSchedulerSafety safety() const;
+
+ private:
+  void queue_capture_slot(bool prepare);
+  void queue_playback_slot(bool prepare);
+  void refill_to_targets();
+  void record_lead();
+
+  PreparedSlotSchedulerConfig config_{};
+  PreparedSlotSchedulerCounters counters_{};
+  bool started_ = false;
+};
+
 class PreparedTransportBackend {
  public:
   [[nodiscard]] bool start(const PreparedTransportConfig& config);

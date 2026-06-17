@@ -605,6 +605,64 @@ void test_prepared_transport_batch_contract() {
   assert(transport.safety().product_safe);
 }
 
+void test_prepared_slot_scheduler_contract() {
+  PreparedSlotScheduler scheduler;
+  assert(scheduler.start(PreparedSlotSchedulerConfig{.capture_target_slots = 8,
+                                                     .playback_target_slots = 8,
+                                                     .capture_pool_slots = 16,
+                                                     .playback_pool_slots = 16}));
+  for (std::uint32_t period = 0; period < 64; ++period) {
+    assert(scheduler.complete_period());
+  }
+  const auto counters = scheduler.counters();
+  assert(counters.backend_prepare_enqueues == 16);
+  assert(counters.backend_steady_requeues == 128);
+  assert(counters.hal_steady_requeues == 0);
+  assert(counters.fallback_allocations == 0);
+  assert(counters.capture_starved_periods == 0);
+  assert(counters.playback_starved_periods == 0);
+  assert(counters.backend_requeue_budget_violations == 0);
+  assert(counters.completion_gap_violations == 0);
+  assert(counters.min_capture_in_flight == 8);
+  assert(counters.min_playback_in_flight == 8);
+  assert(scheduler.safety().product_safe);
+
+  PreparedSlotScheduler hal_requeue;
+  assert(hal_requeue.start(PreparedSlotSchedulerConfig{}));
+  assert(hal_requeue.complete_period(
+      PreparedSlotSchedulerStepOptions{.hal_direct_requeue_attempt = true}));
+  assert(!hal_requeue.safety().hal_hot_path_safe);
+  assert(!hal_requeue.safety().product_safe);
+
+  PreparedSlotScheduler coalesced;
+  assert(coalesced.start(
+      PreparedSlotSchedulerConfig{.playback_completion_gap_periods = 2}));
+  assert(coalesced.complete_period());
+  assert(!coalesced.safety().cadence_safe);
+  assert(!coalesced.safety().product_safe);
+
+  PreparedSlotScheduler leaked;
+  assert(leaked.start(PreparedSlotSchedulerConfig{.capture_target_slots = 8,
+                                                 .playback_target_slots = 8,
+                                                 .capture_pool_slots = 8,
+                                                 .playback_pool_slots = 8,
+                                                 .unavailable_capture_slots = 1}));
+  assert(!leaked.safety().prepared_slots_only);
+  assert(!leaked.safety().product_safe);
+
+  PreparedSlotScheduler starved;
+  assert(starved.start(PreparedSlotSchedulerConfig{.capture_target_slots = 2,
+                                                  .playback_target_slots = 2}));
+  for (std::uint32_t period = 0; period < 4; ++period) {
+    assert(starved.complete_period(
+        PreparedSlotSchedulerStepOptions{.suppress_backend_requeue = true}));
+  }
+  assert(starved.counters().capture_starved_periods > 0);
+  assert(starved.counters().playback_starved_periods > 0);
+  assert(!starved.safety().lead_safe);
+  assert(!starved.safety().product_safe);
+}
+
 }  // namespace
 
 int main() {
@@ -627,6 +685,7 @@ int main() {
   test_input_profile_decode_contract();
   test_prepared_transport_backend_contract();
   test_prepared_transport_batch_contract();
+  test_prepared_slot_scheduler_contract();
 
   std::cout << "opena8djcpp_core_contract PASS\n";
   return 0;

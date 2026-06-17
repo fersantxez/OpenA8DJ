@@ -242,6 +242,29 @@ Latest offline evidence:
 Decision: this is metrics-integrity hardening only. It does not improve sound
 quality, CPU, routing, or timecode behavior, and it does not permit promotion.
 
+## 2026-06-17 Prepared Slot Scheduler Status
+
+Latest offline evidence:
+`local-analysis/cpp-offline/prepared-slot-scheduler-contract.json`.
+
+- Offline gates remain PASS.
+- The C++ core now models a prepared-slot backend with:
+  - zero HAL steady-state requeues in safe scenarios;
+  - explicit capture/playback lead;
+  - fallback allocation rejection;
+  - completion-gap rejection;
+  - backend requeue-budget rejection;
+  - lead starvation rejection.
+- Contract result: PASS, `8` rows, `2` safe scenarios, `0` failures.
+- This is not a physical CPU win yet. It only defines the invariant the next
+  DriverKit/USB adapter must preserve to have a credible chance of reducing
+  runtime CPU without changing cadence.
+
+Decision: branch promotion remains forbidden. The next candidate must convert
+this prepared-slot invariant into runtime behavior and then prove same-session
+physical quality, CPU, routing, and Traktor/timecode performance against
+mainline.
+
 ## 2026-06-17 Cadence Diagnostic Status
 
 Latest promotion evaluation:
