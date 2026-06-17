@@ -18,6 +18,7 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | iRig/Riff Recovery Subagent | Recover `iRig Stream` in CoreAudio under hardware lock after user authorization for USB/audio resets. | `local-analysis/hardware-quality/20260616-155613-riff-recovery-subagent` |
 | Ramanujan | Read-only offline performance inspection for CPU/jitter optimization opportunities. | findings integrated in this document |
 | Leibniz | Implement stronger offline timeline/jitter model. | `tools/jitter_model.cpp`, `local-analysis/cpp-offline/jitter-model.json` |
+| Lorentz | Read-only HAL/USB CPU audit for cadence-preserving optimizations. | findings integrated in this document |
 | Linnaeus | Read-only analysis of existing physical music failure evidence. | findings integrated in this document |
 | Lagrange | Read-only promotion/readiness gap audit. | findings integrated in this document |
 
@@ -603,3 +604,31 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     first coalescing variants either destabilized CoreAudio on load or failed
     physical music quality. Future variants need smaller, separately isolated
     changes that preserve playback cadence and pass safety gates.
+
+### Lorentz
+
+- Mission: read-only HAL/USB CPU audit for low-risk changes that preserve USB
+  cadence, payload bytes, sample rate, defaults, routing, and physical quality.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Confirmed hot stream stats should remain sampled rather than disabled;
+    default build already uses `HAL_HOT_STREAM_STATS_INTERVAL=16`.
+  - Identified per-stream/per-frame input stats locking as a safe CPU target:
+    preserve input decode and stats math, but aggregate locally per capture
+    transfer and merge once.
+  - Identified transfer-pool free-list work and HAL double-copy reduction as
+    future candidates, both requiring stricter offline simulators before any
+    physical run.
+- Integrated action:
+  - Merged output timeline start-frame resolution into the timeline write lock.
+  - Replaced per-sample input stats mutex locking with stack-local aggregation
+    plus one merge per transfer.
+- Risk:
+  - These are callback-overhead changes only; they do not prove better audio
+    or lower physical runtime CPU until a locked hardware A/B run passes.

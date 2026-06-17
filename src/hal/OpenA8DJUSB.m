@@ -278,6 +278,63 @@ typedef struct OpenA8DJInputStatsPayload {
     double rightPeak[kStreams];
 } __attribute__((packed)) OpenA8DJInputStatsPayload;
 
+static void InputStatsAddSample(OpenA8DJInputStatsPayload *stats,
+                                uint32_t stream,
+                                float left,
+                                float right)
+{
+    if (stats == NULL || stream >= kStreams) {
+        return;
+    }
+    double l = left;
+    double r = right;
+    double la = fabs(l);
+    double ra = fabs(r);
+    stats->frames[stream]++;
+    stats->leftSquare[stream] += l * l;
+    stats->rightSquare[stream] += r * r;
+    stats->cross[stream] += l * r;
+    if (la > stats->leftPeak[stream]) {
+        stats->leftPeak[stream] = la;
+    }
+    if (ra > stats->rightPeak[stream]) {
+        stats->rightPeak[stream] = ra;
+    }
+}
+
+static bool InputStatsHasSamples(const OpenA8DJInputStatsPayload *stats)
+{
+    if (stats == NULL) {
+        return false;
+    }
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        if (stats->frames[stream] > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void InputStatsMerge(OpenA8DJInputStatsPayload *dst,
+                            const OpenA8DJInputStatsPayload *src)
+{
+    if (dst == NULL || src == NULL) {
+        return;
+    }
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        dst->frames[stream] += src->frames[stream];
+        dst->leftSquare[stream] += src->leftSquare[stream];
+        dst->rightSquare[stream] += src->rightSquare[stream];
+        dst->cross[stream] += src->cross[stream];
+        if (src->leftPeak[stream] > dst->leftPeak[stream]) {
+            dst->leftPeak[stream] = src->leftPeak[stream];
+        }
+        if (src->rightPeak[stream] > dst->rightPeak[stream]) {
+            dst->rightPeak[stream] = src->rightPeak[stream];
+        }
+    }
+}
+
 typedef struct OpenA8DJStreamStatsPayload {
     uint8_t streaming;
     uint8_t clockAnchorValid;
@@ -1086,10 +1143,12 @@ static uint32_t OutputTimelineAvailable(OutputTimelineRing *ring)
 static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
                                     const float *frames,
                                     uint32_t frameCount,
-                                    int64_t startFrame,
+                                    double sampleTime,
+                                    bool sampleTimeValid,
                                     uint32_t startLatencyFrames,
                                     uint32_t restartLatencyFrames,
                                     uint32_t targetLatencyFrames,
+                                    int64_t *outStartFrame,
                                     uint32_t *outResetCount,
                                     uint32_t *outLateWriteFrames)
 {
@@ -1101,6 +1160,27 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
     uint32_t resetCount = 0;
     uint32_t lateWriteFrames = 0;
     pthread_mutex_lock(&ring->mutex);
+    int64_t startFrame = 0;
+    if (sampleTimeValid && isfinite(sampleTime)) {
+        startFrame = (int64_t)llround(sampleTime);
+#if OPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER
+        if (ring->hasWritten) {
+            int64_t continuousFrame = ring->maxWrittenFrame + 1;
+            int64_t delta = startFrame - continuousFrame;
+            if (delta < 0) {
+                delta = -delta;
+            }
+            if (delta <= (int64_t)kOutputSampleTimeJitterToleranceFrames) {
+                startFrame = continuousFrame;
+            }
+        }
+#endif
+    } else if (ring->hasWritten) {
+        startFrame = ring->maxWrittenFrame + 1;
+    } else {
+        startFrame = (int64_t)startLatencyFrames;
+    }
+
     if (!ring->hasWritten) {
         OutputTimelineResetLocked(ring, startFrame, startLatencyFrames);
     } else {
@@ -1144,6 +1224,9 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
     }
     if (outLateWriteFrames != NULL) {
         *outLateWriteFrames = lateWriteFrames;
+    }
+    if (outStartFrame != NULL) {
+        *outStartFrame = startFrame;
     }
     return dropped;
 }
@@ -3103,26 +3186,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #endif
 }
 
-- (void)addInputStatsForStream:(uint32_t)stream left:(float)left right:(float)right
+- (void)mergeInputStats:(const OpenA8DJInputStatsPayload *)stats
 {
-    if (stream >= kStreams) {
+    if (!InputStatsHasSamples(stats)) {
         return;
     }
-    double l = left;
-    double r = right;
-    double la = fabs(l);
-    double ra = fabs(r);
     pthread_mutex_lock(&_inputStatsMutex);
-    _inputStats.frames[stream]++;
-    _inputStats.leftSquare[stream] += l * l;
-    _inputStats.rightSquare[stream] += r * r;
-    _inputStats.cross[stream] += l * r;
-    if (la > _inputStats.leftPeak[stream]) {
-        _inputStats.leftPeak[stream] = la;
-    }
-    if (ra > _inputStats.rightPeak[stream]) {
-        _inputStats.rightPeak[stream] = ra;
-    }
+    InputStatsMerge(&_inputStats, stats);
     pthread_mutex_unlock(&_inputStatsMutex);
 }
 
@@ -3572,7 +3642,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 }
 
-- (BOOL)appendInputByte:(uint8_t)byte stream:(uint32_t)stream
+- (BOOL)appendInputByte:(uint8_t)byte
+                 stream:(uint32_t)stream
+             inputStats:(OpenA8DJInputStatsPayload *)inputStats
 {
     if (stream >= kStreams) {
         return NO;
@@ -3602,7 +3674,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     _pendingInput[stream * 2] = leftSample;
     _pendingInput[stream * 2 + 1] = rightSample;
-    [self addInputStatsForStream:stream left:leftSample right:rightSample];
+    InputStatsAddSample(inputStats, stream, leftSample, rightSample);
     _inputByteCount[stream] = 0;
     _pendingInputMask |= (uint8_t)(1u << stream);
     if (_pendingInputMask == 0x0f) {
@@ -3634,6 +3706,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint32_t decodedFrames = 0;
     uint64_t inputCheckErrors = 0;
     uint64_t outputPanicFlags = 0;
+    OpenA8DJInputStatsPayload inputStatsDelta;
+    memset(&inputStatsDelta, 0, sizeof(inputStatsDelta));
 #if OPENA8DJ_ENABLE_INPUT_DECODE && OPENA8DJ_INPUT_DECODE_ACTIVE_GATING && !OPENA8DJ_ENABLE_INPUT_CHECKS
     if (!atomic_load(&_inputDecodeActive)) {
         const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
@@ -3690,11 +3764,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             continue;
         }
         uint32_t stream = groupOffset % kStreams;
-        if ([self appendInputByte:bytes[offset] stream:stream]) {
+        if ([self appendInputByte:bytes[offset] stream:stream inputStats:&inputStatsDelta]) {
             decodedFrames++;
         }
     }
 #endif
+    [self mergeInputStats:&inputStatsDelta];
     if (inputCheckErrors > 0) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, inputCheckErrors)
                                value:inputCheckErrors];
@@ -4768,41 +4843,17 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 #endif
     int64_t startFrame = 0;
-    if (sampleTimeValid && isfinite(sampleTime)) {
-        startFrame = (int64_t)llround(sampleTime);
-#if OPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER
-        pthread_mutex_lock(&_outputTimeline.mutex);
-        if (_outputTimeline.hasWritten) {
-            int64_t continuousFrame = _outputTimeline.maxWrittenFrame + 1;
-            int64_t delta = startFrame - continuousFrame;
-            if (delta < 0) {
-                delta = -delta;
-            }
-            if (delta <= (int64_t)kOutputSampleTimeJitterToleranceFrames) {
-                startFrame = continuousFrame;
-            }
-        }
-        pthread_mutex_unlock(&_outputTimeline.mutex);
-#endif
-    } else {
-        pthread_mutex_lock(&_outputTimeline.mutex);
-        if (_outputTimeline.hasWritten) {
-            startFrame = _outputTimeline.maxWrittenFrame + 1;
-        } else {
-            startFrame = (int64_t)kOutputStartLatencyFrames;
-        }
-        pthread_mutex_unlock(&_outputTimeline.mutex);
-    }
-
     uint32_t timelineResets = 0;
     uint32_t lateWriteFrames = 0;
     uint32_t dropped = OutputTimelineWrite(&_outputTimeline,
                                            inInterleaved,
                                            frames,
-                                           startFrame,
+                                           sampleTime,
+                                           sampleTimeValid,
                                            kOutputStartLatencyFrames,
                                            kOutputRestartLatencyFrames,
                                            kOutputTargetLatencyFrames,
+                                           &startFrame,
                                            &timelineResets,
                                            &lateWriteFrames);
     if (timelineResets > 0) {

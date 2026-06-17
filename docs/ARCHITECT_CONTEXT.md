@@ -564,3 +564,8 @@ Next technical target:
   drops to `0.5x`, but playback completion spacing doubles from `64` to `128`
   frames (`completion_gap_ratio=2.0`). That matches the physical coalesce2
   rejection and prevents CPU-only wins from bypassing cadence/quality gates.
+- HAL hot-path hygiene now removes two avoidable lock costs without changing
+  USB cadence or payload: output timeline start-frame resolution is folded into
+  the single timeline write lock, and input stats are aggregated locally per
+  capture transfer before one locked merge. Offline gates pass, but this is not
+  a physical performance/readiness claim until locked A/B evidence exists.

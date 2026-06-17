@@ -1,5 +1,38 @@
 # Decision Log
 
+## 2026-06-17: Reduce HAL Hot-Path Locks Without Changing Cadence
+
+Decision:
+- Fold output timeline start-frame resolution into the existing
+  `OutputTimelineWrite` lock.
+- Aggregate input stats locally per capture transfer, then merge once under
+  `_inputStatsMutex`.
+- Do not treat this as a product-performance or audio-quality claim until a
+  locked physical A/B run proves lower CPU with equal or better quality.
+
+Reason:
+- Coalescing showed that CPU can improve while quality gets worse, so further
+  CPU work must preserve USB cadence and payload bytes.
+- These changes remove avoidable mutex acquisitions in callback-adjacent paths
+  without changing sample conversion, routing, output bytes, transfer count,
+  queue depth, sample rate, or device defaults.
+
+Alternatives discarded:
+- Disable stats: rejected because stats-off already reduced observability and
+  did not produce a valid readiness candidate.
+- Coalesce playback completions: rejected by physical quality and the new
+  burst cadence gate.
+- Transfer-pool cursor: rejected by prior HAL safety failure.
+
+Evidence:
+- `make -B hal usb-play`: PASS.
+- `make -B hal HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`: PASS.
+- `scripts/run-cpp-offline-gates`: PASS.
+- `local-analysis/runtime-isolation/post-hal-hotpath-lock-reduction.json`:
+  PASS, HAL inactive, lock absent.
+- `local-analysis/promotion-readiness-current.json`: FAIL,
+  `branch_promotion_allowed=false`.
+
 ## 2026-06-17: Reject CPU Wins That Violate Playback Cadence
 
 Decision:

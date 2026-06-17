@@ -1,5 +1,50 @@
 # Test Evidence
 
+## 2026-06-17: HAL Hot-Path Lock Reduction
+
+- Change:
+  - Moved output `startFrame` resolution into `OutputTimelineWrite`, so the
+    HAL write path acquires `_outputTimeline.mutex` once instead of resolving
+    sample-time continuity under a separate lock and then locking again to
+    write frames.
+  - Changed input stats accounting from one `_inputStatsMutex` lock per
+    completed input stream sample to stack-local aggregation in
+    `decodeCaptureBytes` plus one merge lock per capture transfer.
+  - Preserves existing behavior: same `sampleTimeValid` handling, same
+    `OPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER` tolerance, same timeline
+    reset/drop/late-write counters, same input RMS/peak/cross math, same
+    payload bytes, same USB cadence, same queue depths, same
+    sample-rate/default-device policy.
+- Commands:
+  - `make -B hal usb-play`
+  - `make -B hal HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1`
+  - `make -B hal usb-play`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-hal-hotpath-lock-reduction.json`
+- Result:
+  - HAL default build PASS.
+  - `usb-play` default build PASS.
+  - `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` build PASS.
+  - Offline gates PASS.
+  - Default CTest: `100% tests passed, 0 tests failed out of 16`.
+  - Release CTest: `100% tests passed, 0 tests failed out of 17`.
+  - Evidence schema: PASS, `22` required files, `0` missing.
+  - Promotion readiness: FAIL, `branch_promotion_allowed=false`.
+  - Runtime isolation: PASS, HAL inactive, lock absent.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Release benchmark from the same gate:
+  - `pack_mib_s=1628.8`
+  - `decode_into_mib_s=586.682`
+  - `route_frames_s=9.648e+08`
+  - `route_advanced_frames_s=4.99203e+08`
+- Readiness note:
+  - This is a low-risk CPU/callback hygiene change only. It must not be
+    counted as better-than-mainline evidence until a locked physical
+    A/B soundcheck shows equal or better quality and lower runtime CPU.
+
 ## 2026-06-17: Playback Burst Cadence Model Gate
 
 - Change:

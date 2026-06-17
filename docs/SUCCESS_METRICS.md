@@ -184,13 +184,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1654.72 MiB/s` over `5` repeats, min `1631.29`, max `1658.32` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `587.810 MiB/s` over `5` repeats, min `582.355`, max `590.359` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `577.083 MiB/s` over `5` repeats, min `539.559`, max `580.745` | informational |
-| Float32 to S24 conversion throughput | median `88,319,700 frames/s` over `5` repeats, min `87,562,500`, max `88,402,900` | `1,000,000 frames/s` |
-| identity routing throughput | median `823,705,000 frames/s` over `5` repeats, min `766,783,000`, max `837,855,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `511,002,000 frames/s` over `5` repeats, min `509,471,000`, max `518,754,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `500,832,000 frames/s` over `5` repeats, min `489,798,000`, max `506,355,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1628.80 MiB/s` over `5` repeats, min `1622.91`, max `1658.37` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `586.682 MiB/s` over `5` repeats, min `572.898`, max `590.301` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `577.864 MiB/s` over `5` repeats, min `535.466`, max `583.069` | informational |
+| Float32 to S24 conversion throughput | median `86,294,300 frames/s` over `5` repeats, min `84,961,100`, max `86,860,200` | `1,000,000 frames/s` |
+| identity routing throughput | median `964,800,000 frames/s` over `5` repeats, min `909,039,000`, max `975,725,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `510,174,000 frames/s` over `5` repeats, min `505,501,000`, max `527,497,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `499,203,000 frames/s` over `5` repeats, min `497,467,000`, max `500,833,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
