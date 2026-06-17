@@ -153,6 +153,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS 0
 #endif
 
+#ifndef OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+#define OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS 0
+#endif
+
 #ifndef OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS
 #define OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS 0
 #endif
@@ -2237,7 +2241,11 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _captureTransferPool = [NSMutableArray arrayWithCapacity:kCaptureQueueDepth];
         _playbackTransferPool = [NSMutableArray arrayWithCapacity:kPlaybackQueueMax];
 #if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+        __unsafe_unretained OpenA8DJUSBEngine *rawSelf = self;
+#else
         __weak OpenA8DJUSBEngine *weakSelf = self;
+#endif
 #endif
         for (uint32_t i = 0; i < kCaptureQueueDepth; i++) {
             OpenA8DJIsoTransfer *transfer =
@@ -2249,12 +2257,21 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
                 __unsafe_unretained OpenA8DJIsoTransfer *rawTransfer = transfer;
                 transfer.captureCompletionHandler =
                     ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+                        OpenA8DJUSBEngine *engine = rawSelf;
+                        if (engine != nil) {
+                            [engine handleCaptureTransfer:rawTransfer
+                                                  status:status
+                                            transactions:transactionList];
+                        }
+#else
                         OpenA8DJUSBEngine *strongSelf = weakSelf;
                         if (strongSelf != nil) {
                             [strongSelf handleCaptureTransfer:rawTransfer
                                                        status:status
                                                  transactions:transactionList];
                         }
+#endif
                     };
 #endif
                 [_captureTransferPool addObject:transfer];
@@ -2271,12 +2288,21 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
                 __unsafe_unretained OpenA8DJIsoTransfer *rawTransfer = transfer;
                 transfer.playbackCompletionHandler =
                     ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+                        OpenA8DJUSBEngine *engine = rawSelf;
+                        if (engine != nil) {
+                            [engine handlePlaybackTransfer:rawTransfer
+                                                   status:status
+                                             transactions:transactionList];
+                        }
+#else
                         OpenA8DJUSBEngine *strongSelf = weakSelf;
                         if (strongSelf != nil) {
                             [strongSelf handlePlaybackTransfer:rawTransfer
                                                         status:status
                                                   transactions:transactionList];
                         }
+#endif
                     };
 #endif
                 [_playbackTransferPool addObject:transfer];
@@ -5036,15 +5062,28 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #else
     OpenA8DJIsoCompletionHandler completionHandler = nil;
 #endif
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+    __unsafe_unretained OpenA8DJUSBEngine *rawSelf = self;
+#else
     __weak OpenA8DJUSBEngine *weakSelf = self;
+#endif
     if (completionHandler == nil) {
         completionHandler = ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+            OpenA8DJUSBEngine *engine = rawSelf;
+            if (engine != nil) {
+                [engine handleCaptureTransfer:transfer
+                                      status:status
+                                transactions:transactionList];
+            }
+#else
             OpenA8DJUSBEngine *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 [strongSelf handleCaptureTransfer:transfer
                                            status:status
                                      transactions:transactionList];
             }
+#endif
         };
     }
     NSError *error = nil;
@@ -5076,6 +5115,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
         USBTrace("isoc IN queue failed: %s", NSErrorText(error));
         if (atomic_load(&_streaming)) {
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+            __weak OpenA8DJUSBEngine *weakSelf = self;
+#endif
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1000000), _queue, ^{
                 [weakSelf queueCaptureTransfer];
             });
@@ -5735,15 +5777,28 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #else
     OpenA8DJIsoCompletionHandler completionHandler = nil;
 #endif
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+    __unsafe_unretained OpenA8DJUSBEngine *rawSelf = self;
+#else
     __weak OpenA8DJUSBEngine *weakSelf = self;
+#endif
     if (completionHandler == nil) {
         completionHandler = ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+#if OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
+            OpenA8DJUSBEngine *engine = rawSelf;
+            if (engine != nil) {
+                [engine handlePlaybackTransfer:transfer
+                                        status:status
+                                  transactions:transactionList];
+            }
+#else
             OpenA8DJUSBEngine *strongSelf = weakSelf;
             if (strongSelf != nil) {
                 [strongSelf handlePlaybackTransfer:transfer
                                             status:status
                                       transactions:transactionList];
             }
+#endif
         };
     }
     NSError *error = nil;
@@ -5797,7 +5852,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         _debugPlaybackQueueFailures++;
 #endif
         USBTrace("isoc OUT queue failed: %s", NSErrorText(error));
+#if !OPENA8DJ_RAW_ISOC_COMPLETION_HANDLERS
         (void)weakSelf;
+#endif
         return NO;
     }
     atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);

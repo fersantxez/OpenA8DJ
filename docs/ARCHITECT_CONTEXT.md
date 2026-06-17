@@ -13,7 +13,9 @@ Branch: `driverkit/cpp-redesign`
   readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
   improvement over mainline. ISO8/current-cadence builds remain high CPU and
   still fail strict music quality; ISO64 and playback coalescing reduce CPU but
-  collapse physical quality. Runtime isolation after cleanup is clean.
+  collapse physical quality. The raw/reused completion-handler probe reduced
+  driver CPU only slightly while still failing physical quality, so it remains
+  rejected as a default. Runtime isolation after cleanup is clean.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
   `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the

@@ -4144,3 +4144,37 @@ Next implication:
 - Promotion remains forbidden. The next useful candidate must either validate
   the fixture with a healthy same-session reference or reduce HAL CPU while
   preserving the best current physical quality family.
+
+## 2026-06-17: Reject Raw Reused Isoc Completion Handlers As Default
+
+Decision:
+- Add `HAL_RAW_ISOC_COMPLETIONS` as an explicit experimental build knob, but
+  keep the product default at `0`.
+- Keep `HAL_REUSE_ISOC_COMPLETIONS=0` as the product default.
+
+Reason:
+- The hot driver sample showed real cost in per-transfer Objective-C block and
+  weak-reference machinery around `IOUSBHost` isochronous completions.
+- The raw/reused completion experiment compiled and reduced driver CPU
+  slightly versus the current default family, but it did not come close to the
+  mainline CPU gate and did not fix physical music quality.
+- The raw completion path is a higher-lifetime-risk implementation style, so
+  it needs objective product wins before promotion.
+
+Alternatives discarded:
+- Promote raw completions for the small CPU reduction: rejected because quality
+  still fails, CPU still fails, and the lifetime model is riskier than weak
+  completions.
+
+Evidence:
+- Build:
+  `make -B hal HAL_REUSE_ISOC_COMPLETIONS=1 HAL_RAW_ISOC_COMPLETIONS=1`.
+- Physical soundcheck:
+  `local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s`.
+- Metrics:
+  quality alignment `0.973571`, SNR `10.53 dB`, lag jumps `57`,
+  mid/high residual `1.401298/1.352559`, OpenA8DJ driver steady CPU about
+  `21-22%`.
+- Cleanup:
+  `local-analysis/audio-stack-guard/force-unload-after-raw-reuse-check`
+  reported HAL unloaded, no OpenA8DJ driver pids, and audio stack PASS.

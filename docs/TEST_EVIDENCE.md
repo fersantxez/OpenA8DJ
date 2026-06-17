@@ -6571,3 +6571,70 @@ Operational note:
   - Current C++ still does not objectively beat mainline.
   - Route/fixture health must be validated for audiophile claims, and CPU must
     be reduced without falling back to physically rejected cadence families.
+
+## 2026-06-17 Raw Reused Isoc Completion Handler Probe
+
+- Purpose:
+  - Test whether the hot-sample evidence around Objective-C weak/block
+    completion overhead can reduce HAL CPU without changing USB transfer
+    cadence or audio format.
+- Change:
+  - Added experimental `HAL_RAW_ISOC_COMPLETIONS`.
+  - The default remains `HAL_RAW_ISOC_COMPLETIONS=0` and
+    `HAL_REUSE_ISOC_COMPLETIONS=0`.
+- Commands:
+  - `make -B hal HAL_REUSE_ISOC_COMPLETIONS=1 HAL_RAW_ISOC_COMPLETIONS=1`
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/preflight-guard`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --run-dir local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 20 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/force-unload-after-raw-reuse-check`
+  - `make -B hal`
+- Safety:
+  - Preflight guard PASS.
+  - HAL candidate safety PASS.
+  - Soundcheck FAIL.
+  - The first shell cleanup tried a non-existent `scripts/force-unload-hal`
+    helper, leaving HAL idle-loaded. Follow-up `audio-stack-guard
+    --force-unload-opena8dj` unloaded it successfully.
+  - Final guard reported `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`, `audio_stack_health=PASS`.
+  - Local HAL artifact was rebuilt back to default flags afterward.
+- Physical result:
+  - `quality_alignment_score=0.973571 < 0.980`.
+  - `analog_snr_db=10.53 < 35.00`.
+  - `lag_jumps_gt_2_frames=57 > 0`.
+  - Mid/high residual ratios `1.401298/1.352559`, both over strict gates.
+  - Quiet mid noise `-35.47 dBFS > -58 dBFS`.
+  - No capture clipping.
+- CPU result:
+  - OpenA8DJ driver settled around `21-22%` during playback.
+  - This is a small directional improvement versus the default family, but
+    still far above mainline-level CPU and not enough to offset the quality
+    failure.
+- Interpretation:
+  - Raw reused completions are rejected as a product default.
+  - The hot-sample hypothesis is partially supported for CPU overhead, but the
+    remaining blocker is still the `IOUSBHost` enqueue cadence plus unresolved
+    physical residual/lag quality.
+
+## 2026-06-17 Offline Gates After Raw Completion Knob
+
+- Purpose:
+  - Verify that adding `HAL_RAW_ISOC_COMPLETIONS` does not weaken offline,
+    realtime, timecode, DriverKit shell, stream-stats, or static policy gates.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `17/17` passed.
+  - Release CTest: `18/18` passed.
+  - Static policy: PASS, `rejected_default_checks=23`,
+    `default_policy_failures=0`.
+  - Stream-stats contract: PASS, HAL/control field count `196`, mismatches `0`.
+  - USB touched: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The experiment is safely represented as a blocked default. Offline PASS
+    does not change physical readiness; raw completions remain rejected by
+    physical evidence.

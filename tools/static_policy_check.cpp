@@ -142,6 +142,7 @@ int main(int argc, char** argv) {
       {"HAL_UNROLLED_OUTPUT_PACK", "0"},
       {"HAL_TRANSFER_POOL_CURSOR", "0"},
       {"HAL_REUSE_ISOC_COMPLETIONS", "0"},
+      {"HAL_RAW_ISOC_COMPLETIONS", "0"},
       {"HAL_FAST_ISO_TRANSFER_CONFIG", "0"},
       {"HAL_PLAYBACK_PAYLOAD_GUARD", "0"},
       {"HAL_OUTPUT_SAMPLE_TIME_FOLLOWER", "0"},

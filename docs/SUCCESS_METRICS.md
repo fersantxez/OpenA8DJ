@@ -1640,3 +1640,27 @@ Meaning:
 - The next promotable candidate needs simultaneous absolute quality PASS,
   same-session mainline comparison PASS, CPU PASS, routing PASS, recovery PASS,
   and physical Traktor/timecode evidence.
+
+## 2026-06-17 Raw Completion Handler Probe
+
+Latest evidence:
+`local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s`.
+
+Result: rejected.
+
+| metric | raw/reuse result | required |
+| --- | ---: | ---: |
+| quality alignment | `0.973571` | `>= 0.980000` |
+| SNR floor | `10.53 dB` | `>= 35 dB` |
+| lag jumps > 2 frames | `57` | `0` |
+| mid residual ratio | `1.401298` | below strict product threshold |
+| high residual ratio | `1.352559` | below strict product threshold |
+| driver CPU | about `21-22%` steady | `<= 6.5%` current mainline gate |
+
+Policy:
+- `HAL_RAW_ISOC_COMPLETIONS=0` is a required product default unless a future
+  same-session candidate proves both quality and CPU wins.
+- Raw completion handlers are allowed only as an isolated diagnostic build
+  because they trade Objective-C weak-reference safety for less callback
+  overhead.
+- A partial CPU reduction cannot override physical quality failure.
