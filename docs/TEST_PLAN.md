@@ -1273,6 +1273,12 @@ scripts/run-known-good-route-soundcheck \
 ```
 
 - The output source must not be OpenA8DJ, Open Audio 8 DJ, or Audio 8 DJ.
+- The output source must also be a real wired route source into the shared
+  capture chain. Built-in speakers / acoustic paths such as `MacBook Air
+  Speakers` are rejected by default because they can only produce room leakage
+  or silence at the iRig input, not a valid cable-route proof. The explicit
+  `--allow-built-in-output-acoustic-diagnostic` escape hatch is diagnostic
+  only and cannot support promotion.
 - The wrapper must not change default devices, sample rate, CoreAudio services,
   USB state, HAL install/load state, or DriverKit state.
 - Evidence must include:
@@ -1291,6 +1297,10 @@ scripts/run-known-good-route-soundcheck \
   - That source must not be used as promotion-quality known-good evidence.
   - The next known-good attempt needs a real non-Audio8 output physically wired
     into the same mixer/REC OUT -> iRig capture path.
+  - Current CoreAudio visibility after the latest preflight shows `iRig
+    Stream`, `MacBook Air Microphone`, and `MacBook Air Speakers`. Because
+    `MacBook Air Speakers` is an acoustic/built-in source, it is blocked before
+    lock acquisition and cannot be used as route-validation evidence.
 
 Physical superiority window runner:
 - Script:

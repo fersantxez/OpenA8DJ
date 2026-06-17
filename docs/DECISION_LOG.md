@@ -6420,3 +6420,39 @@ Next implication:
   known-good non-Audio8 source into the same iRig capture route under the
   hardware lock. Mainline-vs-C++ A/B, timecode vinyl, and branch promotion
   remain blocked until that route passes.
+
+## 2026-06-17: Reject Built-In Speakers as Wired Route Evidence
+
+Decision:
+- `scripts/physical-window-preflight`,
+  `scripts/run-known-good-route-soundcheck`, and
+  `scripts/run-physical-superiority-window` now reject built-in speaker /
+  acoustic output sources by default for known-good route validation.
+- Added `--allow-built-in-output-acoustic-diagnostic` as an explicit diagnostic
+  escape hatch only.
+- `opena8djcpp_hardware_lock_policy_check` now requires this protection.
+
+Reason:
+- The currently visible non-Audio8 output is `MacBook Air Speakers`, which is
+  not a wired source into the mixer/REC OUT -> iRig route.
+- Accepting built-in speakers would let room leakage or silence masquerade as
+  capture-route evidence and could poison later sound-quality and CPU claims.
+
+Evidence:
+- Current CoreAudio enumeration: `iRig Stream`, `MacBook Air Microphone`, and
+  `MacBook Air Speakers`.
+- `scripts/physical-window-preflight --route-only ... --known-good-output-device "MacBook Air Speakers"` exits `1` with failing gate
+  `known_good_output_not_builtin_acoustic`.
+- `scripts/run-physical-superiority-window --execute --route-only ... --known-good-output-device "MacBook Air Speakers"` exits `2` at preflight before lock acquisition.
+- `scripts/run-known-good-route-soundcheck --output-device "MacBook Air Speakers" ...` exits `2` before playback/capture.
+
+Alternatives discarded:
+- Run an acoustic speaker-to-iRig test as route proof: rejected because it does
+  not test the wired shared capture route.
+- Reuse the same iRig device as output and capture: already proven diagnostic
+  only and not usable for promotion.
+
+Next implication:
+- The next real physical route revalidation still requires a separate
+  non-Audio8 output physically wired into the same capture chain, or a current
+  valid Audio 8/mainline route after HAL loading followed by same-session A/B.

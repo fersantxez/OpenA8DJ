@@ -2153,6 +2153,9 @@ Prepared transport migration metric:
   revalidation can be planned. It must keep
   `ready_for_product_physical_ab=false` and `ready_for_branch_promotion=false`
   until route revalidation and same-session mainline-vs-C++ physical A/B pass.
+- A known-good route source must be a wired non-Audio8 output into the shared
+  capture chain. Built-in speakers / acoustic paths are not valid promotion
+  evidence and must be rejected unless explicitly marked diagnostic-only.
 - `local-analysis/cpp-offline/audiophile-tone-gate.json` must be present and
   PASS before a candidate can be considered for physical promotion. Minimum
   expectations:

@@ -2421,6 +2421,11 @@ Current implication:
     `missing_files=0`. The run touched no hardware, USB, CoreAudio, driver
     install/activation, service restart, default device, sample-rate, or buffer
     setting.
+  - Current route-revalidation inspection sees `iRig Stream`,
+    `MacBook Air Microphone`, and `MacBook Air Speakers`. The built-in speakers
+    are now rejected as a known-good route source by default because an acoustic
+    path cannot validate the wired mixer/REC OUT -> iRig route. The runner
+    blocks this case before lock acquisition.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

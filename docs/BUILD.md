@@ -811,6 +811,11 @@ prevents a route check from silently changing system audio state.
 Do not use this wrapper as a product claim. It is a route-health prerequisite
 for later Audio 8 DJ and mainline/C++ same-session comparisons.
 
+The selected known-good output must be a wired source into the same capture
+chain. Built-in speakers / acoustic paths such as `MacBook Air Speakers` are
+rejected by default. `--allow-built-in-output-acoustic-diagnostic` exists only
+for diagnostics and cannot create promotion evidence.
+
 ## Physical Superiority Window Runner
 
 The full physical evidence window is scripted but dry-run by default:

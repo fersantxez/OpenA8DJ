@@ -61,6 +61,20 @@ def audio8ish(value: str) -> bool:
     )
 
 
+def built_in_or_acoustic_output(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "builtinspeakerdevice",
+            "built-in output",
+            "built in output",
+            "macbook air speakers",
+            "macbook speakers",
+        )
+    )
+
+
 def parse_audio_list(text: str) -> list[dict[str, object]]:
     devices: list[dict[str, object]] = []
     pattern = re.compile(
@@ -171,6 +185,7 @@ def main() -> int:
     parser.add_argument("--candidate-only", action="store_true")
     parser.add_argument("--skip-known-good", action="store_true")
     parser.add_argument("--allow-same-device-loopback-diagnostic", action="store_true")
+    parser.add_argument("--allow-built-in-output-acoustic-diagnostic", action="store_true")
     parser.add_argument("--json-out", default="")
     args = parser.parse_args()
 
@@ -201,6 +216,15 @@ def main() -> int:
             or str(capture.get("name", "")).lower() == str(known_good.get("name", "")).lower()
         )
     )
+    known_good_identity = " ".join(
+        (
+            args.known_good_output_device,
+            args.known_good_output_device_uid,
+            str((known_good or {}).get("name", "")),
+            str((known_good or {}).get("uid", "")),
+        )
+    )
+    built_in_known_good_output = requires_known_good and built_in_or_acoustic_output(known_good_identity)
 
     gates = [
         gate("audio_list_available", audio_rc == 0 and bool(devices), {"return_code": audio_rc, "device_count": len(devices)}, audio_stderr.strip()),
@@ -215,6 +239,7 @@ def main() -> int:
         gate("known_good_output_not_audio8", not audio8ish(args.known_good_output_device + " " + args.known_good_output_device_uid), {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid}, "known-good source must not be OpenA8DJ/Audio 8"),
         gate("known_good_output_visible", not requires_known_good or (known_good is not None and int(known_good.get("outputs", 0)) >= 2), {"device": known_good or {}}, "known-good source must be a visible CoreAudio output with at least two channels"),
         gate("known_good_output_not_capture_device", not same_known_good_capture_device or args.allow_same_device_loopback_diagnostic, {"capture": capture or {}, "known_good": known_good or {}, "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic}, "known-good source must not be the same CoreAudio device as the capture device unless explicitly diagnostic"),
+        gate("known_good_output_not_builtin_acoustic", not built_in_known_good_output or args.allow_built_in_output_acoustic_diagnostic, {"device": known_good or {}, "allow_built_in_output_acoustic_diagnostic": args.allow_built_in_output_acoustic_diagnostic}, "built-in speakers/acoustic paths cannot validate the wired iRig route"),
         gate("hardware_lock_free", not bool(lock.get("present")) or lock.get("owner_alive") is False, lock, "hardware lock is currently owned"),
     ]
 
@@ -228,6 +253,8 @@ def main() -> int:
         "candidate_only": args.candidate_only,
         "skip_known_good": args.skip_known_good,
         "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic,
+        "allow_built_in_output_acoustic_diagnostic": args.allow_built_in_output_acoustic_diagnostic,
+        "known_good_output_builtin_or_acoustic": built_in_known_good_output,
         "devices": devices,
         "capture_channels": args.capture_channels,
         "audio8_coreaudio_visible": open_audio8 is not None,

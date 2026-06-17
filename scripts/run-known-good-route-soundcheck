@@ -24,6 +24,9 @@ Options:
   --allow-same-device-loopback-diagnostic
                               Allow output and capture device names to match;
                               diagnostic only, never promotion evidence
+  --allow-built-in-output-acoustic-diagnostic
+                              Allow built-in speakers/acoustic path;
+                              diagnostic only, never promotion evidence
   --skip-build               Do not build tools before running
   -h, --help                 Show this help
 USAGE
@@ -55,6 +58,17 @@ looks_virtual_capture() {
   return 1
 }
 
+built_in_or_acoustic_output() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    *builtinspeakerdevice*|*built-in\ output*|*built\ in\ output*|*macbook\ air\ speakers*|*macbook\ speakers*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 json_wav_duration() {
   /usr/bin/python3 - "$1" <<'PY'
 import sys, wave
@@ -76,6 +90,7 @@ seconds=""
 postroll_seconds="2"
 max_lag="360000"
 allow_same_device_loopback_diagnostic=0
+allow_built_in_output_acoustic_diagnostic=0
 skip_build=0
 
 while [ "$#" -gt 0 ]; do
@@ -90,6 +105,7 @@ while [ "$#" -gt 0 ]; do
     --postroll-seconds) postroll_seconds="$2"; shift 2 ;;
     --max-lag) max_lag="$2"; shift 2 ;;
     --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
+    --allow-built-in-output-acoustic-diagnostic) allow_built_in_output_acoustic_diagnostic=1; shift ;;
     --skip-build) skip_build=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -105,6 +121,16 @@ if [ -n "$output_device" ]; then
 fi
 if [ -n "$output_device_uid" ]; then
   reject_audio8_source "$output_device_uid"
+fi
+if [ "$allow_built_in_output_acoustic_diagnostic" -ne 1 ]; then
+  if [ -n "$output_device" ] && built_in_or_acoustic_output "$output_device"; then
+    echo "known-good output source must be a wired route source, not built-in/acoustic output: $output_device" >&2
+    exit 2
+  fi
+  if [ -n "$output_device_uid" ] && built_in_or_acoustic_output "$output_device_uid"; then
+    echo "known-good output source must be a wired route source, not built-in/acoustic output UID: $output_device_uid" >&2
+    exit 2
+  fi
 fi
 if [ -z "$capture_device" ]; then
   echo "--capture-device is required" >&2

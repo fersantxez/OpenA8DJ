@@ -9801,3 +9801,46 @@ Full offline gate rerun:
     window.
   - It is still not ready to claim audiophile quality, product physical A/B,
     Traktor/timecode-vinyl readiness, CPU superiority, or branch promotion.
+
+## 2026-06-17 Built-In Speaker Route Source Rejection
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Hardened the known-good route harness so built-in speakers / acoustic paths
+    cannot be accepted as wired route-validation evidence by default.
+  - This protects the next physical window from treating room leakage or
+    silence as proof that the mixer/REC OUT -> iRig capture route is valid.
+  - No playback, recording, HAL install/load, CoreAudio restart, USB reset,
+    default-device change, sample-rate change, or buffer-size change was
+    performed.
+- Current visible CoreAudio devices:
+  - `iRig Stream` with `2 in / 2 out`.
+  - `MacBook Air Microphone` with `1 in / 0 out`.
+  - `MacBook Air Speakers` with `0 in / 2 out`.
+- Commands:
+  - `make build/audio-list >/dev/null && build/audio-list`
+  - `python3 -m py_compile scripts/physical-window-preflight`
+  - `bash -n scripts/run-known-good-route-soundcheck scripts/run-physical-superiority-window`
+  - `scripts/physical-window-preflight --route-only --capture-device "iRig Stream" --capture-channels 1,2 --known-good-output-device "MacBook Air Speakers" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --json-out local-analysis/physical-superiority-window/preflight-builtin-speaker-route-block.json`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --route-only --run-dir local-analysis/physical-superiority-window/builtin-speaker-route-block-runner --capture-device "iRig Stream" --capture-channels 1,2 --known-good-output-device "MacBook Air Speakers" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 12 --skip-build`
+  - `scripts/run-known-good-route-soundcheck --output-device "MacBook Air Speakers" --capture-device "iRig Stream" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 1 --skip-build`
+- Results:
+  - Preflight exited `1` with failing gate
+    `known_good_output_not_builtin_acoustic`.
+  - The physical superiority runner exited `2` at preflight, before lock
+    acquisition.
+  - The direct known-good route script exited `2` before playback/capture with
+    `known-good output source must be a wired route source, not built-in/acoustic output`.
+  - Hardware lock was free after the runner check.
+- Evidence:
+  - `local-analysis/physical-superiority-window/preflight-builtin-speaker-route-block.json`
+  - `local-analysis/physical-superiority-window/builtin-speaker-route-block-runner/summary.txt`
+  - `local-analysis/known-good-route-direct-builtin-speaker-reject.stderr`
+- Interpretation:
+  - iRig is currently visible enough for preflight inspection.
+  - The current machine state still lacks a valid visible non-Audio8 wired
+    source for route revalidation.
+  - Product A/B, branch promotion, audiophile quality, CPU superiority, and
+    Traktor/timecode-vinyl claims remain blocked.
