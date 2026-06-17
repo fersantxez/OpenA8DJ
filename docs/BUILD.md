@@ -868,3 +868,26 @@ rejected for branch promotion.
 
 Preflight PASS means the requested devices and files are visible. It does not
 prove the physical route; the known-good route capture must still pass.
+
+## Privileged Driver Sampling During Soundcheck
+
+For CPU attribution diagnostics, `scripts/run-soundcheck` can sample the active
+Core Audio driver helper while playback is running:
+
+```sh
+scripts/run-soundcheck \
+  --skip-build \
+  --capture-device "iRig Stream" \
+  --capture-channels 1,2 \
+  --pair A \
+  --seconds 12 \
+  --sample-driver-process \
+  --sample-driver-delay 1 \
+  --sample-driver-seconds 7 \
+  --run-dir local-analysis/soundcheck/<timestamp>
+```
+
+This requires `sudo -n sample` to be available. Output is written to
+`driver-sample/status.json`, `driver-sample/opena8dj-driver.sample.txt`, and
+`driver-sample/analysis.json`. This is diagnostic evidence only; it does not
+replace physical quality gates or same-session mainline comparison.

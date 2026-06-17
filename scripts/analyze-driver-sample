@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import re
+from pathlib import Path
+
+
+KEYWORDS = {
+    "usb_queue": "org.opena8dj.driver.usb",
+    "capture_completion_callback": "_isochCompletionCallback",
+    "capture_completion_block": "queueCaptureTransfer]_block_invoke",
+    "playback_completion_block": "queuePlaybackWithRequests:count:]_block_invoke",
+    "handle_capture": "handleCaptureTransfer:status:transactions:",
+    "queue_playback": "queuePlaybackWithRequests:count:",
+    "queue_capture": "queueCaptureTransfer",
+    "fill_playback": "fillPlaybackBytes:length:outputStats:",
+    "load_output_frame": "loadNextOutputFrameWithStats:",
+    "checkout_transfer": "checkoutTransferFromPool:requests:count:nextIndex",
+    "configure_transfer": "ConfigureIsoTransfer",
+    "usbhost_enqueue": "enqueueIORequestWithData",
+    "iokit_async": "IOConnectCallAsyncMethod",
+    "mach_message": "mach_msg2_trap",
+    "write_output": "writeOutput:frames:channels:sampleTime:sampleTimeValid:",
+}
+
+
+def sample_count(line: str) -> int:
+    match = re.search(r"[+!:| ](\d+)\s", line)
+    if match:
+        return int(match.group(1))
+    stripped = line.lstrip()
+    match = re.match(r"(\d+)\s", stripped)
+    if match:
+        return int(match.group(1))
+    return 0
+
+
+def analyze(path: Path) -> dict:
+    text = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    totals = {name: 0 for name in KEYWORDS}
+    max_line_samples = {name: 0 for name in KEYWORDS}
+    example_lines = {name: "" for name in KEYWORDS}
+    opena8dj_lines = []
+    total_thread_samples = 0
+    total_usb_queue_samples = 0
+
+    for line in text:
+        count = sample_count(line)
+        if "Thread_" in line and count > 0:
+            total_thread_samples += count
+        if "org.opena8dj.driver.usb" in line and count > 0:
+            total_usb_queue_samples += count
+        if "OpenA8DJHAL" in line or "IOUSBHost" in line or "IOConnectCallAsyncMethod" in line:
+            opena8dj_lines.append({"samples": count, "line": line.strip()})
+        for name, keyword in KEYWORDS.items():
+            if keyword not in line:
+                continue
+            totals[name] += count
+            if count > max_line_samples[name]:
+                max_line_samples[name] = count
+                example_lines[name] = line.strip()
+
+    top_lines = sorted(opena8dj_lines, key=lambda row: row["samples"], reverse=True)[:40]
+    return {
+        "schema": "opena8djcpp.driver-sample-analysis.v1",
+        "sample": str(path),
+        "line_count": len(text),
+        "total_thread_samples_observed": total_thread_samples,
+        "usb_queue_samples": total_usb_queue_samples,
+        "keyword_totals": totals,
+        "keyword_max_line_samples": max_line_samples,
+        "keyword_examples": example_lines,
+        "top_opena8dj_or_usbhost_lines": top_lines,
+        "dominant_interpretation": (
+            "usbhost_async_enqueue_from_capture_and_playback_paths"
+            if totals["usbhost_enqueue"] > totals["fill_playback"]
+            else "driver_internal_payload_or_ring_work"
+        ),
+        "readiness_claim": "DIAGNOSTIC_ONLY_PROCESS_SAMPLE_NOT_PRODUCT_READINESS",
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("sample")
+    parser.add_argument("--json-out", default="")
+    args = parser.parse_args()
+    result = analyze(Path(args.sample))
+    output = json.dumps(result, indent=2) + "\n"
+    if args.json_out:
+        Path(args.json_out).write_text(output, encoding="utf-8")
+    print(output, end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

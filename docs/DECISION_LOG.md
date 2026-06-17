@@ -5787,3 +5787,74 @@ Next implication:
   scheduling so CPU drops without changing the audio timing model.
 - No branch promotion is allowed; C++ remains below mainline on CPU and below
   product gates on physical quality.
+
+## 2026-06-17: Reject Simple Playback-Completion-Paced Switch
+
+Decision:
+- Do not switch the product default to
+  `HAL_PLAYBACK_CAPTURE_PACED=0 HAL_PLAYBACK_COALESCE_TRANSFERS=2
+  HAL_PLAYBACK_QUEUE=4`.
+
+Reason:
+- The probe reduced playback submissions and CPU, but physical quality
+  collapsed. That proves the CPU lever exists but the naive timing model is
+  wrong.
+
+Evidence:
+- `local-analysis/physical-superiority-window/20260617T221500Z-cpp-playback-paced0-coalesce2-q4-irig`.
+- Result:
+  - quality `0.035313`;
+  - SNR floor `-19.04 dB`;
+  - lag jumps `41`;
+  - driver CPU p95 after 5s about `16.6%`;
+  - playback submissions `3354`.
+
+Next implication:
+- Implement a deliberate pacing model with target lead in microframes and
+  validated packet layout. Do not continue random coalescing/queue tuning as
+  product work.
+
+## 2026-06-17: Treat IOUSBHost Enqueue Cadence As The Primary CPU Blocker
+
+Decision:
+- Do not pursue further default-candidate changes based only on local pack,
+  stats, completion-handler, or transfer-pool micro-optimizations.
+- Keep C++ HAL default unpromoted and use the prepared transport / DriverKit
+  direction as the next architecture path for CPU reduction.
+
+Reason:
+- A lock-gated default C++ HAL soundcheck with `sudo -n sample` captured the
+  active driver stack during playback.
+- The sample shows the dominant active path on `org.opena8dj.driver.usb` is
+  IOUSBHost async enqueue from capture and playback completion paths, not audio
+  packing/routing.
+- The same run failed audio quality badly, so the profile is diagnostic
+  attribution only, not readiness evidence.
+
+Evidence:
+- `local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck`.
+- `driver-sample/analysis.json`:
+  - `dominant_interpretation=usbhost_async_enqueue_from_capture_and_playback_paths`;
+  - `usbhost_enqueue=1608`;
+  - `iokit_async=795`;
+  - `queue_playback=594`;
+  - `queue_capture=1286`;
+  - `fill_playback=78`.
+- Soundcheck:
+  - `quality_alignment_score=0.260184`;
+  - SNR floor about `-11.89 dB`;
+  - `lag_jumps_gt_2_frames=38`;
+  - `opena8dj_driver` CPU p95 `23.5%`.
+
+Alternatives discarded:
+- Claim CPU root cause from hot-path timing counters alone: rejected because
+  process sampling gives stronger attribution to IOUSBHost/Mach async enqueue.
+- Keep tuning coalesce/ISO flags directly: rejected because those probes reduce
+  submission count by breaking physical quality.
+- Promote C++ because offline gates pass: rejected; physical quality and CPU
+  superiority remain objectively false.
+
+Next implication:
+- The next implementation must reduce IOUSBHost/Mach enqueue cadence or move
+  USB scheduling into a prepared DriverKit-style transport without breaking the
+  timing/layout assumptions needed for audio quality, routing, and timecode.

@@ -3140,3 +3140,83 @@ Risk:
 - Next action:
   - Keep using route sentinel checks before physical windows, but do not treat
     device visibility as sound-quality readiness.
+
+## 2026-06-17 Subagent: Gauss C++ Transport Pacing Analyst
+
+- Agent:
+  - Gauss (`019ed787-212e-7943-b2e3-cfc85591ff95`).
+- Mission:
+  - Read-only analysis of the C++ HAL data plane to explain high submission
+    count and propose a safer pacing direction.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - C++ default ISO8/capture-paced mode naturally produces about one playback
+    submission per capture completion, roughly 1000/s.
+  - Simple coalescing is insufficient because it changes timing/layout without
+    preserving the hardware assumptions.
+  - Recommended direction is a deliberate playback scheduler with target lead
+    in microframes while capture remains active for input/timecode.
+- Integrated action:
+  - Ran a lock-gated playback-completion-paced probe with coalesce=2/q4.
+  - Probe reduced submissions/CPU but failed physical quality, so the simple
+    switch was rejected.
+
+## 2026-06-17 Subagent: Hooke Mainline Transport Comparator
+
+- Agent:
+  - Hooke (`019ed787-73b1-7330-90fe-fb95f54032c0`).
+- Mission:
+  - Read-only comparison of mainline and C++ transport behavior.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Mainline and C++ share the capture-paced concept.
+  - Mainline's lower CPU is best explained by `HAL_ISO_FRAMES=64` in its
+    Makefile, versus C++ default ISO8.
+  - Explicit scheduling and reused completion handlers are off in both defaults
+    and do not explain the observed CPU gap.
+  - Stats/logging are not the primary CPU gap.
+- Integrated action:
+  - CPU work is now framed as reducing IOUSBHost submissions while preserving
+    the timing quality that naive ISO64/coalescing probes fail to preserve.
+
+## 2026-06-17 Subagent: Linnaeus Prepared Transport Mapping
+
+- Agent:
+  - Linnaeus (`019ed78e-7db8-75a1-b5a4-c6e83b6eff5f`).
+- Mission:
+  - Read-only review of prepared transport, prepared slot scheduler, and HAL
+    integration points.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - `PreparedTransportBackend` already models the desired split: HAL publishes
+    and consumes rings while backend completion owns transport period work.
+  - `PreparedSlotScheduler` and prepared hot-path contracts reject HAL direct
+    steady requeue, fallback allocations, coalesced completion gaps, starvation,
+    and unsafe publication rates.
+  - HAL integration points are `workerLoop`, `queueCaptureTransfer`,
+    `handleCaptureTransfer`, `queueCapturePacedPlaybackWithRequests`,
+    `queuePlaybackWithRequests`, and the `writeOutput`/`fillPlaybackBytes`
+    payload boundary.
+- Integrated action:
+  - Combined Linnaeus' mapping with a new privileged process sample from the
+    default C++ HAL. The sample confirms the CPU bottleneck is IOUSBHost async
+    enqueue cadence, aligning with the prepared transport direction.
+- Risk:
+  - Prepared transport contracts are still offline. They are not physical
+    readiness and cannot justify promotion until bound to the runtime and
+    measured against mainline.

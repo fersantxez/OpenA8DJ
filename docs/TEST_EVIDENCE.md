@@ -8988,6 +8988,11 @@ Full offline gate rerun:
     it produces roughly one playback submission per capture callback, around
     1000/s in observed runs. A correct fix needs a pacing redesign, not a
     larger transfer knob applied blindly.
+  - Playback-completion-paced diagnostic:
+    `20260617T221500Z-cpp-playback-paced0-coalesce2-q4-irig` lowered playback
+    submissions to `3354` and CPU p95 after 5s to about `16.6%`, but quality
+    collapsed to `0.035313` with SNR floor `-19.04 dB`. This rejects a simple
+    `HAL_PLAYBACK_CAPTURE_PACED=0` plus coalesce=2/q4 switch as a product fix.
 
 ## 2026-06-17 Offline Gates After Physical Runner Hardening
 
@@ -9011,3 +9016,77 @@ Full offline gate rerun:
   - The offline suite correctly refuses product readiness because physical
     quality, CPU superiority, route validity, and timecode vinyl hardware
     evidence remain blocked.
+
+## 2026-06-17 Default C++ HAL Soundcheck With Privileged Driver Sample
+
+- Purpose:
+  - Add reproducible CPU attribution to physical soundcheck evidence using
+    `sudo -n sample` on `Core Audio Driver (OpenA8DJ.driver)` during playback.
+  - Confirm whether high C++ driver CPU is dominated by USB enqueue cadence or
+    by audio packing/routing work.
+- Code change:
+  - `scripts/run-soundcheck` now accepts `--sample-driver-process`,
+    `--sample-driver-delay`, and `--sample-driver-seconds`.
+  - Added `scripts/analyze-driver-sample` to convert the large `sample` text
+    report into `driver-sample/analysis.json`.
+- Commands:
+  - `make -B hal`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/profiling/20260617T215041Z-default-sudo-sample/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-file "$HOME/Music/DJ/20250902_santxez_2024_curation/A-Ninetyfour, James My & Criss - Nueva Mexico (Extended Mix) 128.mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail --sample-driver-process --sample-driver-delay 1 --sample-driver-seconds 7`
+  - `scripts/analyze-driver-sample local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck/driver-sample/opena8dj-driver.sample.txt --json-out local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck/driver-sample/analysis.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 2 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/profiling/20260617T215041Z-default-sudo-sample/final-unload-guard`
+- Safety:
+  - HAL candidate safety PASS before playback.
+  - `sudo -n sample` succeeded without user interaction.
+  - Final guard PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    hardware lock absent, iRig still visible as `2 in / 2 out` at 48 kHz.
+- Physical soundcheck result:
+  - FAIL: `quality_alignment_score=0.260184`, SNR floor about `-11.89 dB`,
+    `lag_jumps_gt_2_frames=38`, mid/high residual ratios
+    `4.280193/3.768322`, no clipping.
+  - CPU profile: `opena8dj_driver` median `22.45%`, p95 `23.5%`;
+    `coreaudiod` median `1.9%`, p95 `13.2%`.
+- Driver sample result:
+  - `driver-sample/status.json`: PASS.
+  - `driver-sample/analysis.json` classifies the dominant active path as
+    `usbhost_async_enqueue_from_capture_and_playback_paths`.
+  - Key observed sample weights:
+    `usb_queue=1069`, `capture_completion_callback=949`,
+    `queue_playback=594`, `queue_capture=1286`,
+    `usbhost_enqueue=1608`, `iokit_async=795`,
+    while `fill_playback=78`.
+- Interpretation:
+  - The CPU bottleneck is objectively in IOUSBHost async enqueue cadence from
+    capture/playback paths, not in packet packing/routing.
+  - This reinforces the prepared transport direction and rejects more random
+    hot-path micro-optimizations as the primary path to mainline-level CPU.
+  - This run is diagnostic only and does not improve readiness; quality was far
+    below both product thresholds and mainline comparison requirements.
+- Evidence:
+  - `local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck`
+  - `local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck/driver-sample/analysis.json`
+  - `local-analysis/profiling/20260617T215041Z-default-sudo-sample/final-unload-guard`
+
+## 2026-06-17 Offline Gates After Driver Sampling Tooling
+
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline only; no hardware/audio/CoreAudio/USB/HAL install or activation.
+- Result:
+  - Debug CTest: `43/43` passed.
+  - Release CTest: `44/44` passed.
+  - Evidence schema: `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`:
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `product_readiness_status=FAIL`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+- Interpretation:
+  - The privileged driver sampling instrumentation did not regress offline
+    contracts.
+  - Product readiness correctly remains blocked because physical quality,
+    same-session mainline superiority, validated DVS/timecode vinyl evidence,
+    and promotion metrics are still absent or failing.

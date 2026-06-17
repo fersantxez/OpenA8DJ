@@ -531,6 +531,124 @@ def sample_cpu():
     return totals
 
 
+def opena8dj_driver_pid():
+    try:
+        result = subprocess.run([
+            "pgrep",
+            "-f",
+            r"[C]ore Audio Driver \(OpenA8DJ.driver\)",
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=1.0)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    for line in result.stdout.splitlines():
+        value = line.strip()
+        if value.isdigit():
+            return value
+    return ""
+
+
+def start_driver_sample(base_dir, args):
+    sample_dir = base_dir / "driver-sample"
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    status_path = sample_dir / "status.json"
+    pid = opena8dj_driver_pid()
+    if not pid:
+        status_path.write_text(json.dumps({
+            "schema": "opena8djcpp.soundcheck-driver-sample.v1",
+            "result": "SKIPPED",
+            "reason": "opena8dj_driver_pid_not_found",
+        }, indent=2) + "\n", encoding="utf-8")
+        return None
+    output_path = sample_dir / "opena8dj-driver.sample.txt"
+    command = [
+        "sudo",
+        "-n",
+        "sample",
+        pid,
+        str(max(1, int(math.ceil(args.sample_driver_seconds)))),
+        "-file",
+        str(output_path),
+    ]
+    try:
+        process = subprocess.Popen(command,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   text=True)
+    except OSError as error:
+        status_path.write_text(json.dumps({
+            "schema": "opena8djcpp.soundcheck-driver-sample.v1",
+            "result": "SKIPPED",
+            "pid": pid,
+            "reason": f"sample_start_failed:{error}",
+        }, indent=2) + "\n", encoding="utf-8")
+        return None
+    status_path.write_text(json.dumps({
+        "schema": "opena8djcpp.soundcheck-driver-sample.v1",
+        "result": "RUNNING",
+        "pid": pid,
+        "duration_seconds": max(1, int(math.ceil(args.sample_driver_seconds))),
+        "output": str(output_path),
+        "command": command,
+    }, indent=2) + "\n", encoding="utf-8")
+    return {
+        "process": process,
+        "pid": pid,
+        "output": output_path,
+        "status": status_path,
+        "started_at": time.time(),
+    }
+
+
+def finish_driver_sample(sampler):
+    if not sampler:
+        return
+    process = sampler["process"]
+    try:
+        stdout, stderr = process.communicate(timeout=3.0)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        try:
+            stdout, stderr = process.communicate(timeout=1.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            stdout, stderr = process.communicate()
+    output_path = sampler["output"]
+    analysis_path = output_path.parent / "analysis.json"
+    analysis_rc = None
+    analysis_error = ""
+    if output_path.exists():
+        analyzer = repo_root() / "scripts" / "analyze-driver-sample"
+        try:
+            analysis = subprocess.run([
+                str(analyzer),
+                str(output_path),
+                "--json-out",
+                str(analysis_path),
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=3.0)
+            analysis_rc = analysis.returncode
+            analysis_error = analysis.stderr.strip()
+        except (OSError, subprocess.TimeoutExpired) as error:
+            analysis_rc = -1
+            analysis_error = str(error)
+    sampler["status"].write_text(json.dumps({
+        "schema": "opena8djcpp.soundcheck-driver-sample.v1",
+        "result": "PASS" if process.returncode == 0 and output_path.exists() else "FAIL",
+        "pid": sampler["pid"],
+        "returncode": process.returncode,
+        "elapsed_seconds": time.time() - sampler["started_at"],
+        "output": str(output_path),
+        "output_exists": output_path.exists(),
+        "analysis": str(analysis_path),
+        "analysis_exists": analysis_path.exists(),
+        "analysis_returncode": analysis_rc,
+        "analysis_error": analysis_error,
+        "stdout": stdout.strip(),
+        "stderr": stderr.strip(),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
 def stress_worker_count(value):
     if value == "auto":
         return max(1, min(4, (os.cpu_count() or 2) // 2))
@@ -597,6 +715,8 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
     legacy_stream_file = None
     stream_tsv_file = None
     cpu_file = None
+    driver_sampler = None
+    driver_sample_started = False
     try:
         if args.monitor_stream_stats:
             stream_stats_txt = base_dir / ("stream-stats-during.txt" if args.stream_stats_snapshots else "stream-stats.txt")
@@ -618,6 +738,11 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
                     and elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
                 stop_cpu_stress(stress_workers)
                 stress_finished = True
+            if (args.sample_driver_process
+                    and not driver_sample_started
+                    and elapsed >= args.sample_driver_delay):
+                driver_sampler = start_driver_sample(base_dir, args)
+                driver_sample_started = True
             stats_text = ""
             stats_error = ""
             if args.monitor_stream_stats:
@@ -650,6 +775,7 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
             sample_index += 1
             time.sleep(interval)
     finally:
+        finish_driver_sample(driver_sampler)
         stop_cpu_stress(stress_workers)
         if stream_tsv_file:
             stream_tsv_file.close()
@@ -757,6 +883,12 @@ def main():
     parser.add_argument("--cpu-stress-after", type=float, default=5.0)
     parser.add_argument("--cpu-stress-seconds", type=float, default=8.0)
     parser.add_argument("--cpu-stress-workers", default="auto")
+    parser.add_argument("--sample-driver-process", action="store_true",
+                        help="diagnostic: run sudo sample on the OpenA8DJ Core Audio driver during playback")
+    parser.add_argument("--sample-driver-delay", type=float, default=1.0,
+                        help="seconds after playback start before driver sampling begins")
+    parser.add_argument("--sample-driver-seconds", type=float, default=7.0,
+                        help="duration for sudo sample when --sample-driver-process is enabled")
     parser.add_argument("--monitor-command-timeout", type=float, default=1.0)
     parser.add_argument("--monitor-stream-stats", action="store_true", default=True)
     parser.add_argument("--no-monitor-stream-stats", action="store_false", dest="monitor_stream_stats",
@@ -972,6 +1104,12 @@ def run_soundcheck_body(root, base_dir, fixture_dir, args):
             "stream_stats_during_tsv=stream-stats-during.tsv",
             "stream_stats_after=stream-stats-after.txt",
             "transfer_ledger_after=transfer-ledger-after.tsv",
+        ])
+    if args.sample_driver_process:
+        summary.extend([
+            "driver_sample_status=driver-sample/status.json",
+            "driver_sample_output=driver-sample/opena8dj-driver.sample.txt",
+            "driver_sample_analysis=driver-sample/analysis.json",
         ])
     summary.append(f"run_dir={base_dir}")
     write_summary(base_dir / "summary.txt", summary)

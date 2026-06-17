@@ -2299,6 +2299,24 @@ Current implication:
     cadence, around 1000 submissions/s in observed runs. The required fix is a
     pacing/transport redesign that keeps input/timecode support while reducing
     callback and enqueue overhead.
+  - Read-only subagent review confirmed mainline obtains lower CPU primarily
+    from a larger effective ISO transfer cadence (`HAL_ISO_FRAMES=64` in
+    mainline versus C++ default ISO8), not from explicit scheduling or reused
+    completion handlers.
+  - A playback-completion-paced C++ probe reduced CPU but broke quality, so the
+    next implementation must preserve the physical timing/layout assumptions
+    instead of simply batching transfers.
+  - A default C++ HAL run with integrated `sudo -n sample` confirms the active
+    CPU path is IOUSBHost async enqueue from `handleCaptureTransfer` /
+    `queuePlaybackWithRequests` and `queueCaptureTransfer`, not packet packing
+    or routing. Evidence:
+    `local-analysis/profiling/20260617T215041Z-default-sudo-sample/soundcheck/driver-sample/analysis.json`.
+  - The same run failed physical quality badly (`quality_alignment_score=0.260184`,
+    SNR about `-11.89 dB`, `lag_jumps_gt_2_frames=38`), so it is CPU attribution
+    evidence only, not a better candidate.
+  - Subagent Linnaeus mapped the offline prepared transport contracts to HAL
+    integration points. The next real implementation should move toward prepared
+    transport/DriverKit slot ownership and avoid steady HAL direct requeue work.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on
