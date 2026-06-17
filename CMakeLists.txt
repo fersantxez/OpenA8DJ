@@ -19,6 +19,7 @@ add_library(opena8djcpp_core
   core/src/metrics.cpp
   core/src/prepared_transport.cpp
   core/src/runtime_adapter.cpp
+  core/src/usb_submit_plan.cpp
   core/src/timecode.cpp
   core/src/timecode_analysis.cpp
   core/src/driverkit_model.cpp)
@@ -204,6 +205,13 @@ target_link_libraries(opena8djcpp_runtime_adapter_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_usb_submit_plan_contract
+  tools/usb_submit_plan_contract.cpp)
+
+target_link_libraries(opena8djcpp_usb_submit_plan_contract
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_prepared_transport_pressure_gate
   tools/prepared_transport_pressure_gate.cpp)
 
@@ -320,6 +328,7 @@ add_test(NAME opena8djcpp_prepared_transport_routing_timecode_contract COMMAND o
 add_test(NAME opena8djcpp_prepared_transport_recovery_contract COMMAND opena8djcpp_prepared_transport_recovery_contract)
 add_test(NAME opena8djcpp_prepared_slot_scheduler_contract COMMAND opena8djcpp_prepared_slot_scheduler_contract)
 add_test(NAME opena8djcpp_runtime_adapter_contract COMMAND opena8djcpp_runtime_adapter_contract)
+add_test(NAME opena8djcpp_usb_submit_plan_contract COMMAND opena8djcpp_usb_submit_plan_contract)
 add_test(NAME opena8djcpp_prepared_transport_pressure_gate COMMAND opena8djcpp_prepared_transport_pressure_gate)
 add_test(NAME opena8djcpp_prepared_transport_migration_gate COMMAND opena8djcpp_prepared_transport_migration_gate)
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)

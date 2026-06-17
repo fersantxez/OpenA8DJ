@@ -516,3 +516,23 @@ Offline gate:
 This is not a substitute for real `IOUserAudioDriver`, `IOUserAudioDevice`, or
 `IOUserAudioStream` binding. It is the measured contract those classes must
 preserve.
+
+## USB Submit Descriptor Boundary
+
+The low-CPU path must reduce real USB submit/enqueue calls below the logical
+audio cadence without changing the logical ISO8 cadence visible to routing,
+timestamps, capture, playback, or timecode.
+
+Offline gate:
+
+- `opena8djcpp_usb_submit_plan_contract`.
+- The stable row maps `528` logical capture/playback slots into `66` prepared
+  submit descriptors, split `33/33` between capture and playback.
+- Required result has zero partial submits, descriptor overflows, slot-order
+  errors, and timestamp regressions.
+- Negative rows reject unbatched submits, order errors, timestamp regressions,
+  and partial flushes.
+
+A real DriverKit/USB backend must preallocate and recycle descriptors according
+to this plan. The audio callback must not allocate descriptors, repair order,
+flush partial batches, or perform direct submit work per logical slot.

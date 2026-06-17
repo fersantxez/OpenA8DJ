@@ -2075,6 +2075,12 @@ Prepared transport migration metric:
   `runtime_adapter_stable_usb_submit_calls <= 66`, and
   `runtime_adapter_stable_logical_audio_periods >= 256`; otherwise the runtime
   bridge is only decorative and cannot proceed toward hardware.
+- It must also report
+  `usb_submit_plan_stable_logical_slots >= 528`,
+  `usb_submit_plan_stable_usb_submit_calls <= 66`, and
+  `usb_submit_plan_stable_usb_submit_reduction_ratio >= 8.0`; otherwise the
+  runtime bridge lacks an ordered descriptor plan and cannot proceed toward
+  hardware.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

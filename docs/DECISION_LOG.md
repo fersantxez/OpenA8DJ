@@ -6155,3 +6155,39 @@ Next implication:
 - The next non-offline implementation must bind these counters to the real
   DriverKit/USB path. Product superiority still requires lock-gated physical
   same-session evidence against mainline.
+
+## 2026-06-17: Require Ordered USB Submit Descriptor Plan
+
+Decision:
+- Add `PreparedUsbSubmitPlanner` as a pure C++ core model for batched USB
+  submit descriptors.
+- Require `prepared-transport-migration-gate` to pass
+  `usb_submit_descriptor_plan_safe` before a low-CPU hardware candidate is
+  allowed.
+
+Reason:
+- Runtime counters alone can still be decorative if they do not prove how
+  logical capture/playback slots map into physical USB submit descriptors.
+- The next DriverKit/USB binding needs a contract for slot sequence, direction,
+  timestamps, byte counts, partial submit rejection, and descriptor overflow
+  rejection.
+
+Evidence:
+- `opena8djcpp_usb_submit_plan_contract`: PASS.
+- Stable row:
+  - `stable_logical_slots=528`;
+  - `stable_usb_submit_calls=66`;
+  - `stable_usb_submit_reduction_ratio=8`;
+  - `stable_total_bytes=185856`;
+  - capture/playback submits split as `33/33`.
+- Negative rows reject unbatched submits, slot-order errors, timestamp
+  regressions, and partial flushes.
+- Full offline gates:
+  - Debug CTest `46/46` passed.
+  - Release CTest `47/47` passed.
+  - Evidence schema `required_files=47`, `missing_files=0`.
+
+Next implication:
+- The real runtime adapter must allocate and recycle actual DriverKit/USB
+  descriptors according to this plan; until then, CPU superiority remains an
+  offline hypothesis, not a product claim.

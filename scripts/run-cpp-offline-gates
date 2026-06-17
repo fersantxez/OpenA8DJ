@@ -49,6 +49,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_prepared_transport_recovery_contract | tee "$EVIDENCE_DIR/prepared-transport-recovery-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_slot_scheduler_contract | tee "$EVIDENCE_DIR/prepared-slot-scheduler-contract.json"
 ./build/cpp-release/opena8djcpp_runtime_adapter_contract | tee "$EVIDENCE_DIR/runtime-adapter-contract.json"
+./build/cpp-release/opena8djcpp_usb_submit_plan_contract | tee "$EVIDENCE_DIR/usb-submit-plan-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_pressure_gate | tee "$EVIDENCE_DIR/prepared-transport-pressure-gate.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
@@ -158,6 +159,7 @@ prepared_transport_routing_timecode = load_json("prepared-transport-routing-time
 prepared_transport_recovery = load_json("prepared-transport-recovery-contract.json")
 prepared_slot_scheduler = load_json("prepared-slot-scheduler-contract.json")
 runtime_adapter = load_json("runtime-adapter-contract.json")
+usb_submit_plan = load_json("usb-submit-plan-contract.json")
 prepared_transport_pressure = load_json("prepared-transport-pressure-gate.json")
 prepared_transport_migration = load_json("prepared-transport-migration-gate.json")
 static = load_json("static-policy.json")
@@ -768,6 +770,20 @@ summary = {
         "failures": runtime_adapter.get("failures"),
         "evidence": "local-analysis/cpp-offline/runtime-adapter-contract.json",
     },
+    "usb_submit_plan_contract": {
+        "status": usb_submit_plan.get("result"),
+        "schema": usb_submit_plan.get("schema"),
+        "rows": usb_submit_plan.get("row_count"),
+        "safe_rows": usb_submit_plan.get("safe_rows"),
+        "stable_logical_slots": usb_submit_plan.get("stable_logical_slots"),
+        "stable_usb_submit_calls": usb_submit_plan.get("stable_usb_submit_calls"),
+        "stable_total_bytes": usb_submit_plan.get("stable_total_bytes"),
+        "stable_usb_submit_reduction_ratio": usb_submit_plan.get(
+            "stable_usb_submit_reduction_ratio"
+        ),
+        "failures": usb_submit_plan.get("failures"),
+        "evidence": "local-analysis/cpp-offline/usb-submit-plan-contract.json",
+    },
     "prepared_transport_pressure_gate": {
         "status": prepared_transport_pressure.get("result"),
         "schema": prepared_transport_pressure.get("schema"),
@@ -821,6 +837,15 @@ summary = {
         ),
         "runtime_adapter_stable_logical_audio_periods": prepared_transport_migration.get(
             "runtime_adapter_stable_logical_audio_periods"
+        ),
+        "usb_submit_plan_stable_logical_slots": prepared_transport_migration.get(
+            "usb_submit_plan_stable_logical_slots"
+        ),
+        "usb_submit_plan_stable_usb_submit_calls": prepared_transport_migration.get(
+            "usb_submit_plan_stable_usb_submit_calls"
+        ),
+        "usb_submit_plan_stable_usb_submit_reduction_ratio": prepared_transport_migration.get(
+            "usb_submit_plan_stable_usb_submit_reduction_ratio"
         ),
         "failing_gates": [
             gate.get("name")

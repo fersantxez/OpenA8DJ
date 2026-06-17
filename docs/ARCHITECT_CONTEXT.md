@@ -2369,8 +2369,14 @@ Current implication:
     reject unbatched submits, logical gaps, slot-order errors, HAL requeues,
     and fallback allocations. The migration gate now requires this adapter via
     `runtime_adapter_batched_submit_counters_exposed=PASS`.
-  - Current full offline evidence after this integration: Debug CTest `45/45`,
-    Release CTest `46/46`, evidence schema `required_files=46`,
+  - The prepared USB submit planner now models the descriptor content behind
+    that counter contract. Its stable row maps `528` logical capture/playback
+    slots into `66` submit descriptors (`33` capture, `33` playback), with
+    `stable_total_bytes=185856`, zero partial submits, zero descriptor
+    overflows, zero ordering errors, and zero timestamp regressions. The
+    migration gate now requires `usb_submit_descriptor_plan_safe=PASS`.
+  - Current full offline evidence after this integration: Debug CTest `46/46`,
+    Release CTest `47/47`, evidence schema `required_files=47`,
     `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the

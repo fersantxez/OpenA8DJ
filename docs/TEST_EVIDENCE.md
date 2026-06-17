@@ -9319,9 +9319,9 @@ Full offline gate rerun:
   - `branch_promotion_supported=false`.
   - `product_ready=false`.
 - Full offline gate result:
-  - Debug CTest: `45/45` passed.
-  - Release CTest: `46/46` passed.
-  - Evidence schema: `required_files=46`, `missing_files=0`,
+  - Debug CTest: `46/46` passed.
+  - Release CTest: `47/47` passed.
+  - Evidence schema: `required_files=47`, `missing_files=0`,
     `summary_pass=true`, `manifest_pass=true`.
 - Interpretation:
   - The next low-CPU path now has an executable offline contract: preserve
@@ -9346,7 +9346,7 @@ Full offline gate rerun:
 - Result:
   - Full offline gates PASS after adding `promotion_hard_blockers` to
     `local-analysis/cpp-offline/current-offline-gates.json`.
-  - `opena8djcpp_evidence_schema_check`: PASS with `required_files=46`,
+  - `opena8djcpp_evidence_schema_check`: PASS with `required_files=47`,
     `missing_files=0`, `summary_pass=true`, `manifest_pass=true`.
 - Required hard blockers now checked in schema:
   - `same_session_mainline_cpp_physical_ab_missing`;
@@ -9404,9 +9404,9 @@ Full offline gate rerun:
   - `ctest --test-dir build/cpp-offline -R 'opena8djcpp_(runtime_adapter_contract|prepared_slot_scheduler_contract|prepared_transport_migration_gate|static_policy_check)' --output-on-failure`
   - `./scripts/run-cpp-offline-gates`
 - Full offline gate result:
-  - Debug CTest: `45/45` passed.
-  - Release CTest: `46/46` passed.
-  - Evidence schema: `required_files=46`, `missing_files=0`,
+  - Debug CTest: `46/46` passed.
+  - Release CTest: `47/47` passed.
+  - Evidence schema: `required_files=47`, `missing_files=0`,
     `summary_pass=true`, `manifest_pass=true`.
 - Interpretation:
   - The runtime adapter is only a fake/simulated runtime boundary over the core
@@ -9414,3 +9414,63 @@ Full offline gate rerun:
     ISO8 to USB submit batching contract offline.
   - This is not a runtime HAL/DriverKit implementation and does not justify
     hardware or promotion claims by itself.
+
+## 2026-06-17 Offline USB Submit Descriptor Plan Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a pure C++ prepared USB submit descriptor planner.
+  - The planner maps ordered logical capture/playback ISO8 slots into batched
+    USB submit descriptors without touching HAL, DriverKit runtime, CoreAudio,
+    USB, hardware, installs, resets, or default devices.
+- Files:
+  - `core/include/opena8djcpp/usb_submit_plan.hpp`
+  - `core/src/usb_submit_plan.cpp`
+  - `tools/usb_submit_plan_contract.cpp`
+  - `CMakeLists.txt`
+  - `tools/static_policy_check.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `scripts/run-cpp-offline-gates`
+- Gate:
+  - `opena8djcpp_usb_submit_plan_contract`.
+  - Result: PASS.
+  - Row count `5`.
+  - Safe rows `1`.
+  - Stable row `usb_submit_batch8_stable`:
+    - `stable_logical_slots=528`;
+    - `stable_usb_submit_calls=66`;
+    - `stable_usb_submit_reduction_ratio=8`;
+    - `stable_total_bytes=185856`;
+    - capture/playback submit split `33/33`;
+    - zero partial submits, descriptor overflows, slot-order errors, and
+      timestamp regressions.
+  - Negative rows reject unbatched submits, slot-order errors, timestamp
+    regressions, and partial flushes.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `usb_submit_descriptor_plan_safe=PASS`.
+  - `usb_submit_plan_stable_logical_slots=528.000000`.
+  - `usb_submit_plan_stable_usb_submit_calls=66.000000`.
+  - `usb_submit_plan_stable_usb_submit_reduction_ratio=8.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_usb_submit_plan_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_usb_submit_plan_contract`
+  - `ctest --test-dir build/cpp-offline -R 'opena8djcpp_(usb_submit_plan_contract|runtime_adapter_contract|prepared_slot_scheduler_contract|static_policy_check)' --output-on-failure`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `46/46` passed.
+  - Release CTest: `47/47` passed.
+  - Evidence schema: `required_files=47`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The C++ line now has an offline descriptor-level contract for reducing USB
+    submit calls without changing logical ISO8 cadence.
+  - This still is not a real DriverKit/USB binding and does not prove hardware
+    quality, Traktor/timecode-vinyl readiness, or CPU superiority over mainline.
