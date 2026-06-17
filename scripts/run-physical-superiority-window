@@ -323,11 +323,16 @@ if [ "$route_only" -eq 1 ]; then
   exit "$known_good_rc"
 fi
 
+last_soundcheck_rc=0
+
 run_audio8_soundcheck() {
   local label="$1"
   local bundle="$2"
   local out_dir="$3"
 
+  mkdir -p "$out_dir"
+  local hal_safety_rc=0
+  set +e
   "$root/scripts/test-hal-candidate-safety" \
     --candidate "$bundle" \
     --cycles 1 \
@@ -336,6 +341,20 @@ run_audio8_soundcheck() {
     --enumeration-timeout 8 \
     --min-idle-pct 20 \
     --run-dir "$run_dir/$label-hal-candidate-safety"
+  hal_safety_rc=$?
+  set -e
+  if [ "$hal_safety_rc" -ne 0 ]; then
+    {
+      echo "label=$label"
+      echo "hal_safety_rc=$hal_safety_rc"
+      echo "soundcheck_rc=124"
+      echo "native_rc=124"
+      echo "out_dir=$out_dir"
+      echo "soundcheck_skipped=hal_candidate_safety_failed"
+    } > "$out_dir/window-soundcheck-status.txt"
+    last_soundcheck_rc=124
+    return 0
+  fi
 
   local soundcheck_args=(
     "$root/scripts/run-soundcheck"
@@ -364,26 +383,61 @@ run_audio8_soundcheck() {
   if [ -n "$music_file" ]; then
     soundcheck_args+=(--music-file "$music_file")
   fi
+  local soundcheck_rc=0
+  local native_rc=0
+  set +e
   "${soundcheck_args[@]}"
+  soundcheck_rc=$?
+  set -e
 
-  "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$out_dir" \
-    > "$out_dir/native-quality.json" \
-    2> "$out_dir/native-quality.err"
+  if [ -f "$out_dir/captured.wav" ]; then
+    set +e
+    "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$out_dir" \
+      > "$out_dir/native-quality.json" \
+      2> "$out_dir/native-quality.err"
+    native_rc=$?
+    set -e
+  else
+    native_rc=125
+    {
+      echo "native quality skipped: missing captured.wav"
+    } > "$out_dir/native-quality.err"
+  fi
+
+  {
+    echo "label=$label"
+    echo "hal_safety_rc=$hal_safety_rc"
+    echo "soundcheck_rc=$soundcheck_rc"
+    echo "native_rc=$native_rc"
+    echo "out_dir=$out_dir"
+  } > "$out_dir/window-soundcheck-status.txt"
+
+  last_soundcheck_rc="$soundcheck_rc"
+  return 0
 }
+
+mainline_soundcheck_rc=0
+cpp_soundcheck_rc=0
 
 if [ "$candidate_only" -ne 1 ]; then
   run_audio8_soundcheck "mainline" "$mainline_candidate" "$run_dir/mainline-soundcheck"
+  mainline_soundcheck_rc="$last_soundcheck_rc"
   unload_active_hal "$run_dir/post-mainline-unload-guard"
 fi
 
 run_audio8_soundcheck "cpp" "$candidate" "$run_dir/cpp-soundcheck"
+cpp_soundcheck_rc="$last_soundcheck_rc"
 
 same_session_rc=0
-if [ "$candidate_only" -ne 1 ]; then
+if [ "$candidate_only" -ne 1 ] && [ -f "$run_dir/cpp-soundcheck/metrics.json" ] && [ -f "$run_dir/mainline-soundcheck/metrics.json" ]; then
+  set +e
   "$root/build/cpp-release/opena8djcpp_physical_run_compare" \
     --candidate "$run_dir/cpp-soundcheck" \
     --baseline "$run_dir/mainline-soundcheck" \
     > "$run_dir/same-session-physical-compare.json"
+  compare_tool_rc=$?
+  set -e
+  [ "$compare_tool_rc" -eq 0 ] || same_session_rc=1
   same_session_result="$(/usr/bin/python3 - "$run_dir/same-session-physical-compare.json" <<'PY'
 import json, sys
 try:
@@ -394,6 +448,10 @@ except Exception:
 PY
 )"
   [ "$same_session_result" = "PASS" ] || same_session_rc=1
+elif [ "$candidate_only" -ne 1 ]; then
+  printf '{"schema":"opena8djcpp.physical-run-compare.v2","mode":"same_session","result":"FAIL","branch_promotion_supported":false,"readiness_claim":"BLOCKED_MISSING_MAINLINE_OR_CPP_METRICS"}\n' \
+    > "$run_dir/same-session-physical-compare.json"
+  same_session_rc=1
 else
   printf '{"schema":"opena8djcpp.physical-run-compare.v2","mode":"candidate_only","result":"FAIL","branch_promotion_supported":false,"readiness_claim":"BLOCKED_NO_SAME_SESSION_MAINLINE"}\n' \
     > "$run_dir/same-session-physical-compare.json"
@@ -419,10 +477,12 @@ set -e
     echo "mainline_hal_candidate_safety=$run_dir/mainline-hal-candidate-safety"
     echo "mainline_soundcheck=$run_dir/mainline-soundcheck"
     echo "mainline_native_quality=$run_dir/mainline-soundcheck/native-quality.json"
+    echo "mainline_soundcheck_rc=$mainline_soundcheck_rc"
   fi
   echo "cpp_hal_candidate_safety=$run_dir/cpp-hal-candidate-safety"
   echo "cpp_soundcheck=$run_dir/cpp-soundcheck"
   echo "cpp_native_quality=$run_dir/cpp-soundcheck/native-quality.json"
+  echo "cpp_soundcheck_rc=$cpp_soundcheck_rc"
   echo "same_session_compare=$run_dir/same-session-physical-compare.json"
   echo "same_session_rc=$same_session_rc"
   echo "promotion_readiness=$run_dir/promotion-readiness.json"
@@ -431,7 +491,7 @@ set -e
   echo "run_dir=$run_dir"
 } | tee "$run_dir/summary.txt"
 
-if [ "$promotion_rc" -eq 0 ] && [ "$same_session_rc" -eq 0 ] && [ "$known_good_rc" -eq 0 ]; then
+if [ "$promotion_rc" -eq 0 ] && [ "$same_session_rc" -eq 0 ] && [ "$known_good_rc" -eq 0 ] && [ "$mainline_soundcheck_rc" -eq 0 ] && [ "$cpp_soundcheck_rc" -eq 0 ]; then
   exit 0
 fi
 exit 1

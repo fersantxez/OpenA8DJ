@@ -8932,3 +8932,82 @@ Full offline gate rerun:
   - Product readiness still correctly fails because route validation,
     same-session mainline/C++ physical comparison, CPU superiority, and
     physical Traktor/timecode evidence remain unproven.
+
+## 2026-06-17 Physical Mainline/C++ Windows After Runner Hardening
+
+- Safety:
+  - All physical runs used the global hardware lock.
+  - No default device changes, USB resets, service restarts, Traktor launch, or
+    reboot actions were performed in these windows.
+  - The lock was absent after each run, and CoreAudio continued to list iRig
+    Stream as `2 in / 2 out` at 48 kHz.
+- Harness fix validated:
+  - `scripts/run-physical-superiority-window` now records baseline and C++
+    evidence even when a soundcheck fails.
+  - HAL candidate safety failure skips audio for that candidate but no longer
+    prevents cleanup and final summary generation.
+- Key evidence:
+  - Same-session raw/reuse:
+    `local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig`.
+    Mainline quality `0.432891`, SNR floor `-6.077903 dB`,
+    driver CPU p95 `5.9%`; C++ quality `0.167722`, SNR floor
+    `-20.752349 dB`, driver CPU p95 `22.8%`.
+  - Same-session default C++:
+    `local-analysis/physical-superiority-window/20260617T213050Z-mainline-vs-cpp-default-irig`.
+    Mainline quality `-0.007262`, SNR floor `-27.600303 dB`,
+    driver CPU p95 `5.7%`; C++ quality `0.098614`, SNR floor
+    `-22.189076 dB`, driver CPU p95 `23.4%`.
+  - Candidate-only default C++ with process sample attempt:
+    `local-analysis/process-sample/20260617T214100Z-cpp-default`.
+    Quality `0.938703`, SNR `4.31 dB`, lag jumps `31`; `sample` was blocked
+    by macOS privileges without `sudo`.
+  - Hot-path timing diagnostic:
+    `local-analysis/physical-superiority-window/20260617T213650Z-cpp-default-hotpath-irig`.
+    Average hot-path ticks were dominated by capture requeue and playback
+    enqueue, but the internal timing did not explain the full process CPU
+    reported by `ps`.
+  - Playback coalescing diagnostics:
+    `20260617T214550Z-cpp-coalesce8-irig` reduced playback submissions to
+    `866` and CPU p95 after 5s to about `14.2%`, but quality collapsed to
+    `-0.002801` and SNR floor to `-43.79 dB`.
+    `20260617T215000Z-cpp-coalesce2-irig` reduced playback submissions to
+    `4042` and CPU p95 after 5s to about `17.6%`, but quality remained only
+    `0.082032` with SNR floor `-23.88 dB`.
+  - No-hot-stats diagnostic:
+    `20260617T215750Z-cpp-no-hotstats-retry-irig` kept quality near
+    `0.961358` but CPU p95 after 5s was still about `24.0%`; hot stream stats
+    are not the dominant CPU cause.
+- Interpretation:
+  - C++ is not better than mainline. No branch promotion or readiness claim is
+    supported.
+  - C++ default and raw/reuse both fail physical quality gates and consume far
+    more driver CPU than mainline in same-session windows.
+  - Simple playback coalescing lowers CPU but breaks timing/audio quality, so
+    it is rejected as a direct product fix.
+  - The likely architectural problem is the capture-paced playback data plane:
+    it produces roughly one playback submission per capture callback, around
+    1000/s in observed runs. A correct fix needs a pacing redesign, not a
+    larger transfer knob applied blindly.
+
+## 2026-06-17 Offline Gates After Physical Runner Hardening
+
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline only; no audio device open, USB action, CoreAudio mutation,
+    HAL/DriverKit install/load, default-device change, or hardware action.
+- Result:
+  - Debug CTest: `43/43` passed.
+  - Release CTest: `44/44` passed.
+  - `local-analysis/cpp-offline/current-offline-gates.json`:
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `product_readiness_status=FAIL`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+- Interpretation:
+  - The runner hardening and documentation updates did not regress offline
+    gates.
+  - The offline suite correctly refuses product readiness because physical
+    quality, CPU superiority, route validity, and timecode vinyl hardware
+    evidence remain blocked.

@@ -5748,3 +5748,42 @@ Next implication:
 - Product promotion remains blocked by route validation, Direct USB capture
   failure after clean payload, same-session mainline/C++ A/B, CPU, and physical
   Traktor/timecode evidence.
+
+## 2026-06-17: Harden Physical Runner And Reject Simple CPU Knobs
+
+Decision:
+- Change `scripts/run-physical-superiority-window` so a failed mainline
+  soundcheck does not abort before C++ evidence is collected.
+- Treat HAL safety failure as a hard audio blocker for that candidate, but
+  continue to cleanup and final summary.
+- Reject `HAL_REUSE_ISOC_COMPLETIONS=1/HAL_RAW_ISOC_COMPLETIONS=1`, simple
+  playback coalescing, and disabling hot stream stats as product fixes.
+
+Reason:
+- The previous runner lost same-session evidence whenever the baseline failed.
+  That made the comparison inconclusive.
+- A candidate that fails HAL safety must not play audio, but the overall window
+  still needs evidence and cleanup.
+- CPU and quality evidence shows:
+  - raw/reuse did not improve quality or CPU enough and was worse than mainline
+    in the current same-session run;
+  - coalescing reduces playback submissions and CPU, but breaks physical
+    quality badly;
+  - disabling hot stream stats does not materially reduce CPU.
+
+Evidence:
+- Raw/reuse same-session window:
+  `local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig`.
+- Default same-session window:
+  `local-analysis/physical-superiority-window/20260617T213050Z-mainline-vs-cpp-default-irig`.
+- Coalescing probes:
+  `local-analysis/physical-superiority-window/20260617T214550Z-cpp-coalesce8-irig`,
+  `local-analysis/physical-superiority-window/20260617T215000Z-cpp-coalesce2-irig`.
+- No-hot-stats probe:
+  `local-analysis/physical-superiority-window/20260617T215750Z-cpp-no-hotstats-retry-irig`.
+
+Next implication:
+- The next performance fix must redesign capture/playback pacing or transport
+  scheduling so CPU drops without changing the audio timing model.
+- No branch promotion is allowed; C++ remains below mainline on CPU and below
+  product gates on physical quality.

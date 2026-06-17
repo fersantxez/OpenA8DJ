@@ -2277,3 +2277,34 @@ Current implication:
   - No sound-quality, CPU, timecode, or branch-promotion claim follows from
     this. The dominant blocker remains live route validation and same-session
     physical A/B evidence.
+
+## 2026-06-17 Current Physical Quality/CPU Context
+
+- Current verified state:
+  - iRig Stream is visible in CoreAudio as `2 in / 2 out` at 48 kHz after
+    physical windows.
+  - The global hardware lock is absent after completed runs.
+  - C++ HAL safety can pass and enumerate Audio 8 DJ as 8x8 when loaded.
+- Current physical evidence:
+  - Same-session mainline/C++ windows now complete even when either soundcheck
+    fails.
+  - Both mainline and C++ are failing the current iRig physical route quality
+    gates, but C++ is not objectively better.
+  - C++ driver CPU p95 is roughly `22-24%` in current default/raw windows,
+    versus roughly `5-6%` for mainline in the same-session windows.
+  - Simple playback coalescing reduces transfer count and CPU but breaks audio
+    quality, so it is not a product path.
+- Open technical blocker:
+  - The C++ data plane appears to be submitting playback at the capture callback
+    cadence, around 1000 submissions/s in observed runs. The required fix is a
+    pacing/transport redesign that keeps input/timecode support while reducing
+    callback and enqueue overhead.
+- Operational blocker:
+  - Post-reboot automatic recovery/login back into Codex did not work in the
+    earlier reboot attempt and must be fixed separately before relying on
+    unattended reboot recovery.
+- Readiness truth:
+  - Not ready for branch promotion.
+  - Not ready to claim audiophile quality.
+  - Not ready to claim better CPU/performance than mainline.
+  - Timecode vinyl remains unproven physically.

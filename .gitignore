@@ -5,6 +5,7 @@
 build/
 dist/
 .venv/
+.venv-analysis/
 *.pkg
 *.dmg
 *.zip

@@ -3110,3 +3110,33 @@ Risk:
 - Next action:
   - Use the HAL safety result as a precondition only. The next physical step is
     still route validation and same-session mainline/C++ A/B under lock.
+
+## 2026-06-17 Subagent: Meitner Hardware Route Sentinel
+
+- Agent:
+  - Meitner (`019ed761-dc08-76f2-9724-6cd29676c5a7`).
+- Mission:
+  - Read-only verification of lock state, iRig visibility, Audio 8 DJ
+    visibility, HAL loaded state, and obvious lingering audio/test processes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Lock absent.
+  - iRig Stream visible over USB/CoreAudio as a 48 kHz 2x2 device.
+  - Audio 8 DJ visible over USB.
+  - OpenA8DJ HAL was not loaded at final read.
+  - No suspicious lingering `ffmpeg`, `sox`, Traktor, Native Instruments,
+    OpenA8DJ, or soundcheck processes were found.
+- Files:
+  - `local-analysis/route-sentinel/20260617T210043Z-route-sentinel.md`.
+- Integrated action:
+  - Proceeded with locked physical windows using iRig as capture.
+  - Later physical evidence showed the route/device was visible and stable
+    enough for capture attempts, but not promotion-quality.
+- Next action:
+  - Keep using route sentinel checks before physical windows, but do not treat
+    device visibility as sound-quality readiness.
