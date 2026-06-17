@@ -232,6 +232,73 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     itself improve the failed analog music quality, runtime CPU, or physical
     Traktor/timecode evidence.
 
+### Averroes
+
+- Mission: read-only mainline CPU/quality archaeology sidecar after several
+  C++ HAL lifecycle variants failed physical or safety gates.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Confirmed mainline had no new committed changes beyond `08745b7`; useful
+    evidence is in the dirty 0.3.135 worktree and local docs.
+  - Ranked high-priority unported items:
+    background preopen / stop-isoc / stop grace lifecycle, atomic
+    `outputFramesWritten`, fast output prefetch clear, hot stream stats gating,
+    reset audio params before stream, reusable ISO completion handlers, and
+    strict/legacy transfer-pool variants.
+  - Recommended not retesting already rejected C++ variants: ISO64/q8,
+    input-decode active gating, queue-before, and transfer-pool cursor.
+- Integrated action:
+  - Ported lifecycle flags, fast prefetch clear, and atomic output-write stats
+    behind build flags.
+  - Physical evidence rejected lifecycle-preopen defaults and fastclear/write
+    stats defaults in C++; they remain available only behind explicit flags.
+- Evidence:
+  - `local-analysis/soundcheck/20260616-lifecycle-preopen-irig-pairA-16s-cpp-hal`
+  - `local-analysis/soundcheck/20260616-fastclear-writestats-irig-pairA-16s-cpp-hal`
+- Risk:
+  - Mainline parity knobs do not automatically transfer safely to the C++ HAL
+    lifecycle. Every default still needs physical proof.
+
+### Zeno
+
+- Mission: read-only HAL safety failure analysis for the pool-cursor run where
+  `coreaudiod` reached `172.2%` CPU during load while the OpenA8DJ driver stayed
+  near idle.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Confirmed pool-cursor failure should be treated as a real HAL load safety
+    failure, not as permission to run soundcheck.
+  - Ranked the leading hypothesis as CoreAudio/HAL lifecycle interaction during
+    load/enumeration: `coreaudiod` spiked while the OpenA8DJ driver process was
+    nearly idle.
+  - Noted that pool-cursor is only directly used in transfer-pool checkout, so
+    the load-time spike is correlated with the build but not proven as direct
+    execution of that cursor path.
+  - Recommended correcting `HAL_OUTPUT_AMPLITUDE_STATS` drift before further
+    candidates.
+- Integrated action:
+  - Kept `HAL_TRANSFER_POOL_CURSOR=0` by default.
+  - Set `HAL_OUTPUT_AMPLITUDE_STATS=0` by default and tested it; physical run
+    still failed, so it remains an overhead cleanup, not a quality fix.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260616-pool-cursor-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-ampstats-off-irig-pairA-16s-cpp-hal`
+- Risk:
+  - No further transfer-pool cursor physical tests should run until the load
+    safety failure has a bounded explanation.
+
 ## Integration Notes
 
 - No subagent may declare readiness independently.

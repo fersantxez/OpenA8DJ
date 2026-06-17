@@ -1572,3 +1572,196 @@ Operational note:
   - CoreAudio p95 `74.0%`
 - Readiness note:
   - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=1` is rejected as a default.
+
+## 2026-06-16: Process/Lock Cleanup Before Pool-Cursor Test
+
+- Commands:
+  - `lsof +D "$HOME/.opena8dj/hardware-gate.lock"`
+  - `pgrep -fl 'Core Audio Driver \(OpenA8DJ.driver\)|OpenA8DJ.driver|opena8dj|OpenA8DJ'`
+  - `lsof +D /Users/fer/dev/opena8dj`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-pool-cursor-physical.json`
+  - Lock acquisition smoke using `$HOME/.opena8dj/hardware-gate.lock`.
+  - `build/audio-list | egrep -i 'Audio 8|Audio8|Open Audio|iRig|Stream'`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Result:
+  - Hardware lock was absent.
+  - No process had the hardware lock directory open.
+  - No OpenA8DJ HAL process, soundcheck process, Traktor, ffmpeg, sox, VLC, or
+    Spotify process required killing.
+  - The only `/Users/fer/dev/opena8dj` handles were the current Codex runtime
+    cwd context; those were not killed because they keep this session alive and
+    do not own audio hardware.
+  - Runtime isolation audit: PASS.
+  - Lock acquisition smoke: PASS.
+  - iRig visible as `iRig Stream`, `in=2 out=2 rate=48000`.
+- Evidence path:
+  - `local-analysis/runtime-isolation/pre-pool-cursor-physical.json`
+
+## 2026-06-16: Transfer Pool Cursor Safety Rejection
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make HAL_TRANSFER_POOL_CURSOR=1 HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=0 HAL_INPUT_DECODE_ACTIVE_GATING=0 usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-pool-cursor-cpp-lockpolicy-leave-loaded`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Variant flags:
+  - `HAL_TRANSFER_POOL_CURSOR=1`
+  - `HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=0`
+  - `HAL_INPUT_DECODE_ACTIVE_GATING=0`
+- Result:
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: FAIL.
+  - Physical soundcheck was not run.
+  - The safety script unloaded the HAL after failure; recovery guard: PASS.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-pool-cursor-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/runtime-isolation/pre-pool-cursor-physical.json`
+- Key safety metrics:
+  - `core_audio_enumeration=PASS`
+  - `audio_stack_guard=FAIL`
+  - `opena8dj_state=loaded`
+  - `opena8dj_driver_pids=99244`
+  - `process.opena8dj_driver.cpu_pct=0.1`
+  - `process.coreaudiod.cpu_pct=172.2`
+  - `total_watched_cpu_pct=192.1`
+  - Recovery after unload: `audio_stack_health=PASS`, OpenA8DJ driver pids
+    `none`.
+- Readiness note:
+  - `HAL_TRANSFER_POOL_CURSOR=1` is rejected for physical testing unless a
+    later code change explains and removes the CoreAudio load-time spike.
+
+## 2026-06-16: Output Amplitude Stats Off Physical Rejection
+
+- Commands:
+  - `rm -f build/opena8dj-usb-play build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL && make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-ampstats-off-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-ampstats-off-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-ampstats-off-failed-unload.json`
+- Result:
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL.
+  - Post-unload runtime isolation: PASS.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-ampstats-off-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-ampstats-off-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-ampstats-off-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-ampstats-off-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=0.914358`
+  - `analog_snr_db=7.28`
+  - `lag_jumps_gt_2_frames=16`
+  - `mid_band_residual_ratio=1.445203`
+  - `high_band_residual_ratio=1.360556`
+  - `quiet_mid_band_noise_dbfs=-31.53`
+- Readiness note:
+  - Disabling amplitude stats alone did not fix quality or readiness. The
+    default remains off because it removes nonessential hot-path diagnostics.
+
+## 2026-06-16: Mainline Preopen/Stop-ISOC Lifecycle Physical Rejection
+
+- Commands:
+  - `make usb-play hal` with `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`,
+    `HAL_OUTPUT_WRITE_STATS=1`, `HAL_BACKGROUND_PREOPEN_ON_INIT=1`,
+    `HAL_STOP_ISOC_ON_STOP=1`, `HAL_STOP_GRACE_USEC=10000000`.
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-lifecycle-preopen-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-lifecycle-preopen-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-lifecycle-preopen-failed-unload.json`
+- Result:
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL, severe regression.
+  - Post-unload runtime isolation: PASS.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-lifecycle-preopen-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-lifecycle-preopen-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-lifecycle-preopen-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-lifecycle-preopen-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=0.159859`
+  - `analog_snr_db=-16.87`
+  - `lag_jumps_gt_2_frames=59`
+  - `mid_band_residual_ratio=6.709325`
+  - `high_band_residual_ratio=6.058707`
+  - `quiet_mid_band_noise_dbfs=-33.26`
+- Readiness note:
+  - Mainline-style preopen/stop-ISOC lifecycle defaults are rejected in C++.
+    Code remains behind flags for future analysis; defaults are neutral again.
+
+## 2026-06-16: Fast Prefetch Clear / Atomic Write Stats Physical Rejection
+
+- Commands:
+  - `make usb-play hal` with `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`,
+    `HAL_OUTPUT_WRITE_STATS=1`, `HAL_BACKGROUND_PREOPEN_ON_INIT=0`,
+    `HAL_STOP_ISOC_ON_STOP=0`.
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-fastclear-writestats-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -12 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-fastclear-writestats-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-fastclear-writestats-failed-unload.json`
+- Result:
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck: FAIL, severe regression.
+  - Post-unload runtime isolation: PASS.
+- Evidence paths:
+  - `local-analysis/hal-candidate-safety/20260616-fastclear-writestats-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-fastclear-writestats-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-fastclear-writestats-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-fastclear-writestats-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=-0.048481`
+  - `analog_snr_db=-32.06`
+  - `lag_jumps_gt_2_frames=46`
+  - `mid_band_residual_ratio=39.925652`
+  - `high_band_residual_ratio=35.368149`
+  - `quiet_mid_band_noise_dbfs=-33.61`
+- Readiness note:
+  - These code paths are not valid defaults. Any future use needs one-factor
+    isolation and a written explanation before another physical run.
+
+## 2026-06-16: Stale Hardware-Holder Cleanup Audit
+
+- Commands:
+  - Acquired `$HOME/.opena8dj/hardware-gate.lock` and audited targeted
+    OpenA8DJ/soundcheck/capture/playback processes.
+  - `lsof -nP` filtered for OpenA8DJ/iRig/Audio 8 DJ holders.
+  - Removed the cleanup command's own stale lock after its owner PID exited.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-kill-stale-open-holders-clean.json`
+- Result:
+  - No OpenA8DJ HAL, soundcheck, capture, playback, ffmpeg/sox/afplay, Traktor,
+    VLC, or Spotify process was found to kill.
+  - HAL was absent/inactive.
+  - Mainline supervisors remained disabled and unloaded.
+  - Runtime isolation audit: PASS.
+- Evidence paths:
+  - `local-analysis/runtime-isolation/post-kill-stale-open-holders-clean.json`
+- Readiness note:
+  - The only OpenA8DJ path holders observed were Codex/node working-directory
+    handles on the read-only mainline path; those were not hardware/audio
+    holders and were left alive to preserve this session.
+
+## 2026-06-16: Safe-Default HAL Parity Knobs Offline Rerun
+
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Debug offline gates: PASS, 15/15.
+  - Release offline gates: PASS, 16/16.
+  - Release bench: PASS.
+- Key metrics:
+  - `pack_mib_s=1651.47`
+  - `decode_mib_s=588.084`
+  - `route_frames_s=9.70304e+08`
+  - `decode_into_output_overflows=0`
+  - `check_errors=0`
+  - `panic_flags=0`
+- Readiness note:
+  - This validates the source tree with rejected HAL parity paths behind safe
+    defaults. It does not prove physical audio quality.

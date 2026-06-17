@@ -554,3 +554,107 @@ Evidence:
 - `local-analysis/audio-stack-guard/20260616-queue-before-force-unload/force-unload.log`
 - `local-analysis/runtime-isolation/post-queue-before-failed-unload.json`
 - `local-analysis/promotion-readiness-current.json`
+
+## 2026-06-16: Reject Transfer-Pool Cursor Variant For Safety
+
+Decision:
+- Keep `HAL_TRANSFER_POOL_CURSOR=0` as the default and do not run physical audio
+  with `HAL_TRANSFER_POOL_CURSOR=1` in the current code.
+
+Reason:
+- The variant passed offline gates, but failed the HAL candidate safety gate
+  before any soundcheck.
+- During the safety load/enumeration window, the OpenA8DJ driver process was
+  nearly idle (`0.1%`), while `coreaudiod` spiked to `172.2%`. That is a system
+  safety failure and not an acceptable basis for an audio-quality run.
+- The safety script unloaded the HAL and recovery passed, so this was contained
+  without leaving the system in a dirty state.
+
+Alternatives discarded:
+- Run soundcheck anyway: rejected because the safety gate exists specifically to
+  block high-risk audio-stack states before physical playback/capture.
+- Treat the spike as harmless transitory load: rejected until a bounded
+  lifecycle explanation and a repeatable safe-load metric prove it.
+
+Evidence:
+- `local-analysis/hal-candidate-safety/20260616-pool-cursor-cpp-lockpolicy-leave-loaded`
+- `local-analysis/runtime-isolation/pre-pool-cursor-physical.json`
+
+## 2026-06-16: Disable Output Amplitude Stats By Default
+
+Decision:
+- Set C++ `HAL_OUTPUT_AMPLITUDE_STATS=0` by default while keeping the knob
+  available for explicit diagnostic builds.
+
+Reason:
+- Mainline and Rust-derived notes both keep output amplitude stats disabled by
+  default.
+- C++ had the flag enabled by default, which adds per-output-frame peak and
+  clipping work in the USB output fill path.
+- The current blocker includes high driver CPU during output-only physical
+  soundchecks, so default candidates should not carry nonessential hot-path
+  diagnostics.
+
+Alternatives discarded:
+- Remove amplitude stats entirely: rejected because the field is still useful
+  in targeted diagnostics.
+- Keep stats enabled until quality is fixed: rejected because CPU/resource
+  superiority is a product gate, and this default diverges from mainline.
+
+Evidence:
+- C++ default before change: `Makefile: HAL_OUTPUT_AMPLITUDE_STATS ?= 1`.
+- Mainline default: `/Users/fer/dev/opena8dj/Makefile:
+  HAL_OUTPUT_AMPLITUDE_STATS ?= 0`.
+
+## 2026-06-16: Reject Mainline Preopen/Stop-ISOC Lifecycle Defaults In C++
+
+Decision:
+- Keep the newly ported lifecycle knobs available, but set
+  `HAL_BACKGROUND_PREOPEN_ON_INIT=0` and `HAL_STOP_ISOC_ON_STOP=0` by default
+  after physical rejection.
+
+Reason:
+- The mainline-style lifecycle candidate passed safety and offline gates, but
+  locked physical music capture regressed severely:
+  `quality_alignment_score=0.159859`, `analog_snr_db=-16.87`, and
+  `lag_jumps_gt_2_frames=59`.
+- This is worse than the prior less-bad lifecycle baseline and cannot be used
+  as a default or promotion candidate.
+
+Alternatives discarded:
+- Keep the defaults because they match mainline: rejected because the C++ host
+  lifecycle is not yet equivalent enough for those defaults to be safe.
+- Run a longer soundcheck: rejected because the short controlled run already
+  shows a severe failure and the gates are designed to stop there.
+
+Evidence:
+- `local-analysis/hal-candidate-safety/20260616-lifecycle-preopen-cpp-lockpolicy-leave-loaded`
+- `local-analysis/soundcheck/20260616-lifecycle-preopen-irig-pairA-16s-cpp-hal`
+- `local-analysis/audio-stack-guard/20260616-lifecycle-preopen-force-unload/force-unload.log`
+- `local-analysis/runtime-isolation/post-lifecycle-preopen-failed-unload.json`
+
+## 2026-06-16: Reject Fast Prefetch Clear And Atomic Write Stats Defaults
+
+Decision:
+- Keep the code paths available, but set `HAL_FAST_OUTPUT_PREFETCH_CLEAR=0`
+  and `HAL_OUTPUT_WRITE_STATS=0` by default.
+
+Reason:
+- The isolated fast-clear/write-stats candidate passed offline and safety
+  gates, but locked physical capture regressed severely:
+  `quality_alignment_score=-0.048481`, `analog_snr_db=-32.06`,
+  `lag_jumps_gt_2_frames=46`.
+- The failure is too large to treat as normal run variance. It must not be a
+  candidate until a targeted explanation exists.
+
+Alternatives discarded:
+- Keep these defaults because they are CPU optimizations: rejected because
+  product quality gates outrank theoretical CPU savings.
+- Keep only atomic write stats on: deferred until a separate controlled
+  one-factor run is justified; the combined run was not safe enough to promote.
+
+Evidence:
+- `local-analysis/hal-candidate-safety/20260616-fastclear-writestats-cpp-lockpolicy-leave-loaded`
+- `local-analysis/soundcheck/20260616-fastclear-writestats-irig-pairA-16s-cpp-hal`
+- `local-analysis/audio-stack-guard/20260616-fastclear-writestats-force-unload/force-unload.log`
+- `local-analysis/runtime-isolation/post-fastclear-writestats-failed-unload.json`

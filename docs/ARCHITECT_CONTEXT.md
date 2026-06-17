@@ -235,3 +235,27 @@ Next technical target:
   failed physically: `quality_alignment_score=0.674742`,
   `analog_snr_db=-0.41`, `lag_jumps_gt_2_frames=21`, OpenA8DJ driver CPU p95
   `36.0%`, CoreAudio p95 `74.0%`. Keep the default at `0`.
+- Current process/lock audit before the next hardware step found no live
+  hardware-lock owner, no active HAL bundle, no OpenA8DJ driver process, and no
+  mainline QA/soundcheck process to kill. The only `/Users/fer/dev/opena8dj`
+  handles were the Codex runtime cwd context, which must remain alive for this
+  session.
+- Transfer-pool cursor experiment `HAL_TRANSFER_POOL_CURSOR=1` passed offline
+  gates but failed the HAL candidate safety gate before soundcheck:
+  `coreaudiod` reached `172.2%` CPU while the OpenA8DJ driver itself was `0.1%`.
+  The safety script unloaded the HAL and recovery passed. Keep the default at
+  `0` and do not test this variant physically until the load-time CoreAudio
+  spike is explained.
+- Output amplitude stats now default to off (`HAL_OUTPUT_AMPLITUDE_STATS=0`) to
+  match mainline/Rust defaults and remove nonessential per-frame diagnostic work
+  from the output hot path. Re-enable only for targeted diagnostic runs.
+- Mainline-style preopen/stop-ISOC lifecycle code is ported but rejected as a
+  default for this C++ HAL after physical regression:
+  `quality_alignment_score=0.159859`, `analog_snr_db=-16.87`,
+  `lag_jumps_gt_2_frames=59`. Defaults are back to
+  `HAL_BACKGROUND_PREOPEN_ON_INIT=0` and `HAL_STOP_ISOC_ON_STOP=0`.
+- Fast prefetch clear and atomic output-write stats are also ported but rejected
+  as defaults after an isolated physical run regressed to
+  `quality_alignment_score=-0.048481`, `analog_snr_db=-32.06`,
+  `lag_jumps_gt_2_frames=46`. Defaults are back to
+  `HAL_FAST_OUTPUT_PREFETCH_CLEAR=0` and `HAL_OUTPUT_WRITE_STATS=0`.
