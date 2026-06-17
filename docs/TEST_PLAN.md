@@ -1216,6 +1216,11 @@ scripts/run-known-good-route-soundcheck \
 - The output source must not be OpenA8DJ, Open Audio 8 DJ, or Audio 8 DJ.
 - The wrapper must not change default devices, sample rate, CoreAudio services,
   USB state, HAL install/load state, or DriverKit state.
+- Evidence must include:
+  - `metrics.json` from the historical Python analyzer;
+  - `native-quality.json` from the compiled C++ WAV analyzer;
+  - `summary.txt`, `play.log`, `record.log`, `analysis.txt`, and
+    `analysis.err`.
 - PASS means the selected known-good source plus shared capture route met the
   soundcheck thresholds for that run.
 - FAIL blocks driver quality comparison until the physical route is fixed or a

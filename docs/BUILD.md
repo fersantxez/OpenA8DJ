@@ -792,9 +792,12 @@ scripts/run-known-good-route-soundcheck \
   --run-dir local-analysis/known-good-route/<timestamp>-known-good-irig
 ```
 
-The wrapper builds `build/audio-wav-play` and `build/audio-record`, starts the
-capture, plays the reference WAV through the selected output, and then runs
-`scripts/analyze-soundcheck-capture.py`.
+The wrapper builds `build/audio-wav-play`, `build/audio-record`, and the native
+C++ soundcheck analyzer, starts the capture, plays the reference WAV through
+the selected output, and then writes both analyzer outputs:
+
+- `metrics.json` from `scripts/analyze-soundcheck-capture.py`;
+- `native-quality.json` from `opena8djcpp_soundcheck_wav_quality`.
 
 `audio-wav-play` now supports `--device` and `--device-uid` for diagnostics.
 When one of those options is used, it does not set device sample rate by

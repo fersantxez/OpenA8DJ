@@ -136,6 +136,8 @@ mkdir -p "$run_dir/fixture"
 
 if [ "$skip_build" -ne 1 ]; then
   make -C "$root" build/audio-wav-play build/audio-record >/dev/null
+  cmake -S "$root" -B "$root/build/cpp-release" -DCMAKE_BUILD_TYPE=Release >/dev/null
+  cmake --build "$root/build/cpp-release" --target opena8djcpp_soundcheck_wav_quality >/dev/null
 fi
 
 cp "$reference_wav" "$run_dir/fixture/reference.wav"
@@ -144,6 +146,9 @@ capture="$run_dir/captured.wav"
 record_log="$run_dir/record.log"
 play_log="$run_dir/play.log"
 metrics="$run_dir/metrics.json"
+native_metrics="$run_dir/native-quality.json"
+analysis_log="$run_dir/analysis.txt"
+analysis_err="$run_dir/analysis.err"
 
 record_seconds="$(/usr/bin/python3 - "$seconds" "$postroll_seconds" <<'PY'
 import sys
@@ -192,6 +197,7 @@ if [ "$player_rc" -ne 0 ] || [ "$recorder_rc" -ne 0 ]; then
   exit 1
 fi
 
+set +e
 /usr/bin/python3 "$root/scripts/analyze-soundcheck-capture.py" "$reference" "$capture" \
   --max-seconds "$seconds" \
   --max-lag "$max_lag" \
@@ -202,13 +208,29 @@ fi
   --max-mid-band-residual-ratio 1.36 \
   --max-high-band-residual-ratio 1.35 \
   --max-quiet-mid-band-noise-dbfs -58 \
-  --json-out "$metrics"
+  --json-out "$metrics" \
+  > "$analysis_log" 2> "$analysis_err"
+analysis_rc=$?
+
+native_rc=0
+if [ -x "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" ]; then
+  "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$run_dir" \
+    > "$native_metrics" 2> "$run_dir/native-quality.err" || native_rc=$?
+else
+  native_rc=127
+  printf '{"schema":"opena8djcpp.soundcheck-wav-quality.v1","result":"FAIL","error":"native_analyzer_missing"}\n' \
+    > "$native_metrics"
+fi
+set -e
 
 result="$(/usr/bin/python3 - "$metrics" <<'PY'
 import json, sys
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    data = json.load(handle)
-print(data.get("result", "missing"))
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    print(data.get("result") or data.get("verdict") or "missing")
+except Exception:
+    print("missing")
 PY
 )"
 
@@ -221,7 +243,12 @@ PY
   echo "reference=$reference"
   echo "capture=$capture"
   echo "metrics=$metrics"
+  echo "native_metrics=$native_metrics"
+  echo "analysis_log=$analysis_log"
+  echo "analysis_err=$analysis_err"
+  echo "analysis_rc=$analysis_rc"
+  echo "native_rc=$native_rc"
   echo "run_dir=$run_dir"
 } > "$run_dir/summary.txt"
 
-[ "$result" = "PASS" ]
+[ "$analysis_rc" -eq 0 ] && [ "$native_rc" -eq 0 ] && [ "$result" = "PASS" ]

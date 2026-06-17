@@ -8182,6 +8182,8 @@ Full offline gate rerun:
   - Extended `src/tools/audio-wav-play.c` with explicit output device name/UID
     selection for diagnostics.
   - Added `scripts/run-known-good-route-soundcheck`.
+  - Hardened the wrapper so analyzer FAIL still writes `summary.txt`.
+  - Added native C++ quality evidence output as `native-quality.json`.
   - Extended `tools/hardware_lock_policy_check.cpp` to audit the new wrapper.
 - Focused commands:
   - `make build/audio-wav-play`
@@ -8200,6 +8202,16 @@ Full offline gate rerun:
     `1`.
   - Hardware lock policy PASS with `7` audited scripts and `0` missing
     requirements.
+- Post-commit full offline gate:
+  - Commit: `e8f3cf3`.
+  - Debug CTest: `41/41` PASS.
+  - Release CTest: `42/42` PASS.
+  - Evidence schema: PASS, `42` required files, `0` missing.
+  - `prepared_transport_migration_gate`: PASS as offline migration only;
+    `branch_promotion_supported=false`.
+  - `physical_run_product_superiority`: FAIL; existing physical run still
+    fails quality and CPU gates.
+  - `timecode_readiness_gate`: PASS offline, `product_timecode_ready=false`.
 - Interpretation:
   - The next route isolation step is now scripted and auditable.
   - This is not physical quality evidence and does not change readiness.
