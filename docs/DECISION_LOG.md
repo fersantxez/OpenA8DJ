@@ -6237,3 +6237,54 @@ Next implication:
   logical ISO8 cadence contract and the Mode2 payload contract. Product
   superiority still requires lock-gated physical same-session A/B evidence
   against mainline.
+
+## 2026-06-17: Bind DriverKit Shell To Prepared USB Submit Plan
+
+Decision:
+- Add prepared USB submit binding state to `AudioDriverSkeleton`.
+- Add `opena8djcpp_driverkit_usb_submit_binding_contract`.
+- Require `prepared-transport-migration-gate` to pass
+  `driverkit_usb_submit_binding_safe`.
+
+Reason:
+- Core-only USB submit tests can still be bypassed by the DriverKit shell.
+- The future `IOUserAudioDriver` / USB backend needs the same logical ISO8,
+  descriptor, payload, timestamp, and lifecycle contract at the runtime
+  boundary before any hardware window is justified.
+
+Evidence:
+- `opena8djcpp_driverkit_usb_submit_binding_contract`: PASS.
+- Stable DriverKit binding:
+  - `periods=256`;
+  - `transport_frame_mismatches=0`;
+  - `transport_safe=true`;
+  - `usb_submit_safe=true`;
+  - `logical_slots=528`;
+  - `usb_submit_calls=66`;
+  - `descriptors=66`;
+  - `capture_descriptors=33`;
+  - `playback_descriptors=33`;
+  - `total_bytes=185856`;
+  - `total_frames=5808`;
+  - `check_errors=0`;
+  - `panic_flags=0`;
+  - `output_overflows=0`;
+  - payload/direction/timestamp mismatches all `0`;
+  - `stopped=true`.
+- Full offline gates:
+  - Debug CTest `48/48` passed.
+  - Release CTest `49/49` passed.
+  - Evidence schema `required_files=49`, `missing_files=0`.
+
+Alternatives discarded:
+- Keep the DriverKit shell as a frame-only transport bridge: rejected because it
+  would not prove the low-CPU USB submit plan survives the runtime boundary.
+- Treat the core USB submit contract as sufficient: rejected because product
+  risk is at the binding between runtime callbacks, prepared slots, and actual
+  USB submission.
+
+Next implication:
+- The next implementation step can move from offline DriverKit shell binding
+  toward a real DriverKit/USBDriverKit submit adapter. Product superiority and
+  branch promotion remain blocked until lock-gated same-session physical A/B
+  proves quality, routing, timecode vinyl, CPU, and recovery against mainline.

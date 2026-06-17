@@ -2087,6 +2087,13 @@ Prepared transport migration metric:
   panic flags, output overflows, prefix mismatches, descriptor mismatches,
   direction-order errors, and timestamp mismatches. Otherwise the batching
   model is counting submits without proving complete payload integrity.
+- It must also report `driverkit_usb_submit_binding_safe=PASS`,
+  `driverkit_usb_submit_binding_logical_slots=528`,
+  `driverkit_usb_submit_binding_usb_submit_calls=66`,
+  `driverkit_usb_submit_binding_total_bytes=185856`, and
+  `driverkit_usb_submit_binding_total_frames=5808`, with zero transport frame
+  mismatches and zero payload/timestamp/direction failures. Otherwise the
+  DriverKit runtime shell is not bound to the low-CPU submit plan.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

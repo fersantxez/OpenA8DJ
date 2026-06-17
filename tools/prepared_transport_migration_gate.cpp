@@ -237,6 +237,8 @@ int main(int argc, char** argv) {
   const auto base = root / "local-analysis/cpp-offline";
   const auto driverkit_prepared = read_file(base / "driverkit-prepared-transport-contract.json");
   const auto driverkit_hotpath = read_file(base / "driverkit-prepared-hotpath-contract.json");
+  const auto driverkit_usb_submit_binding =
+      read_file(base / "driverkit-usb-submit-binding-contract.json");
   const auto packet = read_file(base / "prepared-transport-packet-contract.json");
   const auto routing_timecode =
       read_file(base / "prepared-transport-routing-timecode-contract.json");
@@ -291,6 +293,14 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(driverkit_hotpath, "max_ring_publications_per_period"));
   const double hotpath_min_reduction =
       number_or_nan(json_number(driverkit_hotpath, "min_publication_reduction_ratio"));
+  const double driverkit_usb_binding_logical_slots =
+      number_or_nan(json_number(driverkit_usb_submit_binding, "logical_slots"));
+  const double driverkit_usb_binding_submit_calls =
+      number_or_nan(json_number(driverkit_usb_submit_binding, "usb_submit_calls"));
+  const double driverkit_usb_binding_total_bytes =
+      number_or_nan(json_number(driverkit_usb_submit_binding, "total_bytes"));
+  const double driverkit_usb_binding_total_frames =
+      number_or_nan(json_number(driverkit_usb_submit_binding, "total_frames"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(driverkit_hotpath) && result_pass(packet) &&
@@ -383,6 +393,28 @@ int main(int argc, char** argv) {
       hotpath_min_reduction >= 8.0 && number_is_zero(driverkit_hotpath, "failures") &&
       number_is_zero(driverkit_hotpath, "hal_steady_requeues") &&
       number_is_zero(driverkit_hotpath, "fallback_allocations");
+  const bool driverkit_usb_submit_binding_safe =
+      result_pass(driverkit_usb_submit_binding) &&
+      json_bool(driverkit_usb_submit_binding, "transport_safe").value_or(false) &&
+      json_bool(driverkit_usb_submit_binding, "usb_submit_safe").value_or(false) &&
+      json_bool(driverkit_usb_submit_binding, "stopped").value_or(false) &&
+      finite(driverkit_usb_binding_logical_slots) &&
+      driverkit_usb_binding_logical_slots == 528.0 &&
+      finite(driverkit_usb_binding_submit_calls) &&
+      driverkit_usb_binding_submit_calls == 66.0 &&
+      finite(driverkit_usb_binding_total_bytes) &&
+      driverkit_usb_binding_total_bytes == 185856.0 &&
+      finite(driverkit_usb_binding_total_frames) &&
+      driverkit_usb_binding_total_frames == 5808.0 &&
+      number_is_zero(driverkit_usb_submit_binding, "transport_frame_mismatches") &&
+      number_is_zero(driverkit_usb_submit_binding, "check_errors") &&
+      number_is_zero(driverkit_usb_submit_binding, "panic_flags") &&
+      number_is_zero(driverkit_usb_submit_binding, "output_overflows") &&
+      number_is_zero(driverkit_usb_submit_binding, "prefix_mismatches") &&
+      number_is_zero(driverkit_usb_submit_binding, "descriptor_byte_mismatches") &&
+      number_is_zero(driverkit_usb_submit_binding, "descriptor_frame_mismatches") &&
+      number_is_zero(driverkit_usb_submit_binding, "direction_order_errors") &&
+      number_is_zero(driverkit_usb_submit_binding, "timestamp_mismatches");
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -411,6 +443,7 @@ int main(int argc, char** argv) {
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
+      {"driverkit_usb_submit_binding_safe", driverkit_usb_submit_binding_safe},
       {"performance_hypothesis_supported_by_hot_path_timing", performance_hypothesis_supported},
       {"product_promotion_still_blocked", product_promotion_blocked},
       {"quality_claim_still_blocked", quality_claim_blocked},
@@ -453,6 +486,14 @@ int main(int argc, char** argv) {
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);
   print_number("driverkit_runtime_pressure_total_frames", runtime_pressure_total_frames);
   print_number("driverkit_prepared_hotpath_total_frames", hotpath_total_frames);
+  print_number("driverkit_usb_submit_binding_logical_slots",
+               driverkit_usb_binding_logical_slots);
+  print_number("driverkit_usb_submit_binding_usb_submit_calls",
+               driverkit_usb_binding_submit_calls);
+  print_number("driverkit_usb_submit_binding_total_bytes",
+               driverkit_usb_binding_total_bytes);
+  print_number("driverkit_usb_submit_binding_total_frames",
+               driverkit_usb_binding_total_frames);
   print_number("driverkit_prepared_hotpath_max_ring_publications_per_period",
                hotpath_max_publications);
   print_number("driverkit_prepared_hotpath_min_publication_reduction_ratio",

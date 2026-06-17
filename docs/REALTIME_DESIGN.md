@@ -540,3 +540,27 @@ A real DriverKit/USB backend must preallocate and recycle descriptors according
 to this plan. The audio callback must not allocate descriptors, repair order,
 flush partial batches, perform direct submit work per logical slot, or recompute
 payload layout dynamically.
+
+## DriverKit USB Submit Binding Boundary
+
+The offline DriverKit shell now owns a prepared USB submit planner alongside
+the prepared transport backend:
+
+- stream start configures the planner with preallocated submit slots;
+- the shell prequeues the initial capture/playback slots before data flow;
+- each ISO8 backend period records capture and playback slots at the runtime
+  boundary;
+- stream stop finishes the planner and prevents stale descriptors from carrying
+  into the next stream session.
+
+Offline gate:
+
+- `opena8djcpp_driverkit_usb_submit_binding_contract`.
+- Required result has `256` ISO8 periods, `528` logical slots, `66` USB submit
+  calls/descriptors, `185856` bytes, `5808` Mode2 payload frames, zero
+  transport frame mismatches, zero Mode2 check/panic/overflow failures, zero
+  payload prefix mismatches, and clean stop.
+
+This still does not submit real USB requests. It proves the runtime shell must
+preserve the low-CPU submit plan before a DriverKit/USBDriverKit adapter is
+allowed to become a hardware candidate.

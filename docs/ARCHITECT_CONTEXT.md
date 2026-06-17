@@ -2383,8 +2383,15 @@ Current implication:
     direction-order errors, and zero timestamp mismatches. This corrected the
     earlier ambiguity between `528` logical ISO8 slots and `5808` Mode2 payload
     frames.
-  - Current full offline evidence after this integration: Debug CTest `47/47`,
-    Release CTest `48/48`, evidence schema `required_files=48`,
+  - The DriverKit skeleton now binds stream lifecycle to the same prepared USB
+    submit planner. `opena8djcpp_driverkit_usb_submit_binding_contract` runs
+    `256` ISO8 periods through the DriverKit shell, validates transport frame
+    identity, then requires the DriverKit-facing binding to expose `528`
+    logical slots, `66` submit calls/descriptors, `185856` bytes, `5808` Mode2
+    payload frames, and zero Mode2/payload/timestamp/direction errors. The
+    migration gate now requires `driverkit_usb_submit_binding_safe=PASS`.
+  - Current full offline evidence after this integration: Debug CTest `48/48`,
+    Release CTest `49/49`, evidence schema `required_files=49`,
     `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the

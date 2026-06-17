@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-runtime-contract.json",
       root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
       root / "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
@@ -123,6 +124,12 @@ int main(int argc, char** argv) {
                                           "\"usb_submit_payload_descriptors\": 66") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"usb_submit_payload_total_frames\": 5808") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_submit_binding_contract\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_submit_binding_usb_submit_calls\": 66") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"driverkit_usb_submit_binding_total_frames\": 5808") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",

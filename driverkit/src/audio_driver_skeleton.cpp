@@ -16,6 +16,7 @@ bool AudioDriverSkeleton::stop_driver() {
     return false;
   }
   if (transport_.started()) {
+    finish_usb_submit_binding();
     transport_.stop();
   }
   stream_config_ = {};
@@ -53,6 +54,10 @@ bool AudioDriverSkeleton::start_stream() {
   if (!transport_.start(stream_config_.transport)) {
     return false;
   }
+  if (!start_usb_submit_binding()) {
+    transport_.stop();
+    return false;
+  }
   have_zero_timestamp_ = false;
   zero_timestamp_ = {};
   return true;
@@ -62,6 +67,7 @@ bool AudioDriverSkeleton::stop_stream() {
   if (!transport_.started()) {
     return false;
   }
+  finish_usb_submit_binding();
   transport_.stop();
   return true;
 }
@@ -117,7 +123,13 @@ std::uint32_t AudioDriverSkeleton::read_capture(std::span<S24Frame> frames) {
 bool AudioDriverSkeleton::complete_backend_period(std::span<const S24Frame> capture_frames,
                                                   std::span<S24Frame> playback_frames,
                                                   std::uint64_t sample_timestamp) {
-  return transport_.backend_complete_period(capture_frames, playback_frames, sample_timestamp);
+  const bool transport_ok =
+      transport_.backend_complete_period(capture_frames, playback_frames, sample_timestamp);
+  return transport_ok && queue_usb_slots_for_period(capture_frames, playback_frames);
+}
+
+void AudioDriverSkeleton::finish_usb_submit_binding() {
+  usb_submit_planner_.finish();
 }
 
 AudioDriverState AudioDriverSkeleton::state() const {
@@ -140,12 +152,24 @@ const DriverKitRuntimeCounters& AudioDriverSkeleton::runtime_counters() const {
   return runtime_counters_;
 }
 
+const PreparedUsbSubmitPlannerCounters& AudioDriverSkeleton::usb_submit_counters() const {
+  return usb_submit_planner_.counters();
+}
+
+std::span<const UsbSubmitDescriptor> AudioDriverSkeleton::usb_submit_descriptors() const {
+  return usb_submit_planner_.descriptors();
+}
+
 ZeroTimestampModel AudioDriverSkeleton::zero_timestamp() const {
   return zero_timestamp_;
 }
 
 PreparedTransportSafety AudioDriverSkeleton::transport_safety() const {
   return transport_.safety();
+}
+
+PreparedUsbSubmitPlannerSafety AudioDriverSkeleton::usb_submit_safety() const {
+  return usb_submit_planner_.safety();
 }
 
 bool AudioDriverSkeleton::validate_stream_config(const AudioStreamConfig& config) const {
@@ -156,7 +180,12 @@ bool AudioDriverSkeleton::validate_stream_config(const AudioStreamConfig& config
          config.transport.iso_frames > 0 && config.transport.capture_slots > 0 &&
          config.transport.playback_slots > 0 &&
          config.transport.capture_slots <= kPreparedTransportMaxSlots &&
-         config.transport.playback_slots <= kPreparedTransportMaxSlots;
+         config.transport.playback_slots <= kPreparedTransportMaxSlots &&
+         config.usb_slots_per_submit > 0 &&
+         config.usb_slots_per_submit <= kPreparedTransportMaxSlots &&
+         config.usb_bytes_per_slot > 0 &&
+         config.usb_initial_capture_slots <= kPreparedTransportMaxSlots &&
+         config.usb_initial_playback_slots <= kPreparedTransportMaxSlots;
 }
 
 bool AudioDriverSkeleton::validate_io_memory_layout(
@@ -183,6 +212,62 @@ bool AudioDriverSkeleton::validate_io_memory_layout(
     }
   }
   return input_channels == kInputChannels && output_channels == kOutputChannels;
+}
+
+bool AudioDriverSkeleton::start_usb_submit_binding() {
+  next_capture_usb_sequence_ = 0;
+  next_playback_usb_sequence_ = 0;
+  if (!usb_submit_planner_.start(PreparedUsbSubmitPlannerConfig{
+          .slots_per_submit = stream_config_.usb_slots_per_submit,
+          .frames_per_slot = stream_config_.transport.iso_frames,
+          .bytes_per_slot = stream_config_.usb_bytes_per_slot,
+      })) {
+    return false;
+  }
+  return queue_initial_usb_slots();
+}
+
+bool AudioDriverSkeleton::queue_initial_usb_slots() {
+  for (std::uint32_t index = 0; index < stream_config_.usb_initial_capture_slots; ++index) {
+    if (!queue_usb_slot(UsbSlotDirection::Capture)) {
+      return false;
+    }
+  }
+  for (std::uint32_t index = 0; index < stream_config_.usb_initial_playback_slots; ++index) {
+    if (!queue_usb_slot(UsbSlotDirection::Playback)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AudioDriverSkeleton::queue_usb_slots_for_period(std::span<const S24Frame> capture_frames,
+                                                     std::span<const S24Frame> playback_frames) {
+  if (!usb_submit_planner_.started() || stream_config_.transport.iso_frames == 0 ||
+      capture_frames.size() != playback_frames.size() ||
+      (capture_frames.size() % stream_config_.transport.iso_frames) != 0) {
+    return false;
+  }
+  const auto slots = capture_frames.size() / stream_config_.transport.iso_frames;
+  for (std::size_t slot = 0; slot < slots; ++slot) {
+    if (!queue_usb_slot(UsbSlotDirection::Capture) ||
+        !queue_usb_slot(UsbSlotDirection::Playback)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool AudioDriverSkeleton::queue_usb_slot(UsbSlotDirection direction) {
+  return usb_submit_planner_.queue_slot(direction, next_usb_timestamp(direction));
+}
+
+std::uint64_t AudioDriverSkeleton::next_usb_timestamp(UsbSlotDirection direction) {
+  auto& sequence =
+      direction == UsbSlotDirection::Capture ? next_capture_usb_sequence_
+                                             : next_playback_usb_sequence_;
+  sequence += 1;
+  return sequence * stream_config_.transport.iso_frames;
 }
 
 }  // namespace opena8djcpp::driverkit

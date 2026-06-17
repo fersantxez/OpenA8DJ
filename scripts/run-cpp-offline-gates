@@ -15,6 +15,7 @@ python3 scripts/check-hal-bundle-complete \
   --json-out "$EVIDENCE_DIR/hal-bundle-complete.json"
 ./build/cpp-offline/opena8djcpp_usb_submit_plan_contract > "$EVIDENCE_DIR/usb-submit-plan-contract.json"
 ./build/cpp-offline/opena8djcpp_usb_submit_payload_contract > "$EVIDENCE_DIR/usb-submit-payload-contract.json"
+./build/cpp-offline/opena8djcpp_driverkit_usb_submit_binding_contract > "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ctest --test-dir build/cpp-offline --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
 
 cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
@@ -46,6 +47,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_extension_scaffold_contract | tee "$EVIDENCE_DIR/driverkit-extension-scaffold-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract | tee "$EVIDENCE_DIR/driverkit-prepared-hotpath-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_usb_submit_binding_contract | tee "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_recovery_contract | tee "$EVIDENCE_DIR/prepared-transport-recovery-contract.json"
@@ -157,6 +159,7 @@ driverkit_runtime = load_json("driverkit-runtime-contract.json")
 driverkit_extension_scaffold = load_json("driverkit-extension-scaffold-contract.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json")
+driverkit_usb_submit_binding = load_json("driverkit-usb-submit-binding-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
 prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
 prepared_transport_recovery = load_json("prepared-transport-recovery-contract.json")
@@ -700,6 +703,40 @@ summary = {
         "fallback_allocations": driverkit_prepared_hotpath.get("fallback_allocations"),
         "evidence": "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
     },
+    "driverkit_usb_submit_binding_contract": {
+        "status": driverkit_usb_submit_binding.get("result"),
+        "schema": driverkit_usb_submit_binding.get("schema"),
+        "periods": driverkit_usb_submit_binding.get("periods"),
+        "transport_frame_mismatches": driverkit_usb_submit_binding.get(
+            "transport_frame_mismatches"
+        ),
+        "transport_safe": driverkit_usb_submit_binding.get("transport_safe"),
+        "usb_submit_safe": driverkit_usb_submit_binding.get("usb_submit_safe"),
+        "logical_slots": driverkit_usb_submit_binding.get("logical_slots"),
+        "usb_submit_calls": driverkit_usb_submit_binding.get("usb_submit_calls"),
+        "descriptors": driverkit_usb_submit_binding.get("descriptors"),
+        "capture_descriptors": driverkit_usb_submit_binding.get("capture_descriptors"),
+        "playback_descriptors": driverkit_usb_submit_binding.get("playback_descriptors"),
+        "total_bytes": driverkit_usb_submit_binding.get("total_bytes"),
+        "total_frames": driverkit_usb_submit_binding.get("total_frames"),
+        "decoded_frames": driverkit_usb_submit_binding.get("decoded_frames"),
+        "check_errors": driverkit_usb_submit_binding.get("check_errors"),
+        "panic_flags": driverkit_usb_submit_binding.get("panic_flags"),
+        "output_overflows": driverkit_usb_submit_binding.get("output_overflows"),
+        "prefix_mismatches": driverkit_usb_submit_binding.get("prefix_mismatches"),
+        "descriptor_byte_mismatches": driverkit_usb_submit_binding.get(
+            "descriptor_byte_mismatches"
+        ),
+        "descriptor_frame_mismatches": driverkit_usb_submit_binding.get(
+            "descriptor_frame_mismatches"
+        ),
+        "direction_order_errors": driverkit_usb_submit_binding.get(
+            "direction_order_errors"
+        ),
+        "timestamp_mismatches": driverkit_usb_submit_binding.get("timestamp_mismatches"),
+        "stopped": driverkit_usb_submit_binding.get("stopped"),
+        "evidence": "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
+    },
     "prepared_transport_packet_contract": {
         "status": prepared_transport_packet.get("result"),
         "schema": prepared_transport_packet.get("schema"),
@@ -886,6 +923,18 @@ summary = {
         ),
         "usb_submit_payload_total_frames": prepared_transport_migration.get(
             "usb_submit_payload_total_frames"
+        ),
+        "driverkit_usb_submit_binding_logical_slots": prepared_transport_migration.get(
+            "driverkit_usb_submit_binding_logical_slots"
+        ),
+        "driverkit_usb_submit_binding_usb_submit_calls": prepared_transport_migration.get(
+            "driverkit_usb_submit_binding_usb_submit_calls"
+        ),
+        "driverkit_usb_submit_binding_total_bytes": prepared_transport_migration.get(
+            "driverkit_usb_submit_binding_total_bytes"
+        ),
+        "driverkit_usb_submit_binding_total_frames": prepared_transport_migration.get(
+            "driverkit_usb_submit_binding_total_frames"
         ),
         "failing_gates": [
             gate.get("name")

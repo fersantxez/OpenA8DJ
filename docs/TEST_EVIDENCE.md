@@ -9541,3 +9541,82 @@ Full offline gate rerun:
   - This is stronger offline evidence for a future low-CPU USB path, but it is
     not physical sound-quality evidence, not Traktor/timecode-vinyl readiness,
     and not CPU superiority over mainline.
+
+## 2026-06-17 Offline DriverKit USB Submit Binding Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Bound `AudioDriverSkeleton` stream lifecycle to the prepared USB submit
+    planner.
+  - Added an offline contract proving the DriverKit shell preserves the same
+    logical ISO8, descriptor, payload, timestamp, and stop semantics already
+    required by the core USB submit gates.
+  - No HAL install, dext install, CoreAudio, USB, hardware, reset, service
+    restart, or default-device action was performed.
+- Files:
+  - `driverkit/include/opena8djcpp/driverkit/audio_driver_skeleton.hpp`
+  - `driverkit/src/audio_driver_skeleton.cpp`
+  - `tools/driverkit_usb_submit_binding_contract.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+  - `scripts/run-cpp-offline-gates`
+  - `CMakeLists.txt`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/REALTIME_DESIGN.md`
+  - `docs/TEST_EVIDENCE.md`
+- Gate:
+  - `opena8djcpp_driverkit_usb_submit_binding_contract`.
+  - Result: PASS.
+  - `periods=256`.
+  - `transport_frame_mismatches=0`.
+  - `transport_safe=true`.
+  - `usb_submit_safe=true`.
+  - `logical_slots=528`.
+  - `usb_submit_calls=66`.
+  - `descriptors=66`.
+  - `capture_descriptors=33`.
+  - `playback_descriptors=33`.
+  - `total_bytes=185856`.
+  - `total_frames=5808`.
+  - `decoded_frames=5742`.
+  - `check_errors=0`.
+  - `panic_flags=0`.
+  - `output_overflows=0`.
+  - `prefix_mismatches=0`.
+  - Descriptor byte/frame mismatches, direction-order errors, and timestamp
+    mismatches are all `0`.
+  - `stopped=true`.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `driverkit_usb_submit_binding_safe=PASS`.
+  - `driverkit_usb_submit_binding_logical_slots=528.000000`.
+  - `driverkit_usb_submit_binding_usb_submit_calls=66.000000`.
+  - `driverkit_usb_submit_binding_total_bytes=185856.000000`.
+  - `driverkit_usb_submit_binding_total_frames=5808.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_usb_submit_binding_contract opena8djcpp_driverkit_runtime_contract opena8djcpp_driverkit_prepared_hotpath_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_usb_submit_binding_contract`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_usb_submit_binding_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `48/48` passed.
+  - Release CTest: `49/49` passed.
+  - Evidence schema: `required_files=49`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The DriverKit shell can no longer remain frame-only while the core carries
+    the USB batching contract. Offline migration requires the DriverKit-facing
+    runtime boundary to preserve the same low-CPU submit/payload contract.
+  - This is not a real DriverKit/USBDriverKit submit implementation, not a
+    physical sound-quality result, not Traktor/timecode-vinyl readiness, and
+    not CPU superiority over mainline.
