@@ -3551,3 +3551,41 @@ Evidence:
 - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-response-compensation.json`
 - `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
 - `local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`
+
+## 2026-06-17: Reject Branch Promotion After Same-Day Mainline A/B
+
+Decision:
+- Do not move C++ to `main`.
+- Do not move C mainline to `Legacy`.
+- Keep C++ as an experimental product-HAL candidate until it beats mainline in
+  both physical quality and CPU on comparable same-day evidence.
+
+Reason:
+- A same-day A/B was run using copied candidate bundles, not by writing into the
+  mainline worktree.
+- Both candidates failed absolute audiophile quality gates.
+- C++ product HAL did not beat mainline overall:
+  quality `0.134709` for C++ versus `0.246599` for mainline.
+- C++ product HAL CPU is much worse:
+  driver p95 `23.2%` versus mainline `5.6%`, and coreaudiod p95 `20.5%`
+  versus mainline `10.3%`.
+- C++ improved some secondary metrics on this fixture:
+  lower mid/high residual ratios, fewer lag jumps, and slightly better SNR
+  floor. These partial wins are useful but insufficient.
+
+Alternatives discarded:
+- Promote because C++ has cleaner direct USB internal evidence: rejected because
+  product HAL A/B is the relevant comparison and currently fails.
+- Promote because C++ improves residual/lag metrics in the A/B: rejected because
+  global alignment and CPU are worse and both candidates fail absolute gates.
+- Repeat mainline until it gets a worse run: rejected as biased. The accepted
+  measurement is the first safety-passing same-route retry after external CPU
+  interference was cleared.
+
+Evidence:
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck/metrics.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck/cpu-profile.tsv`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/metrics.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/cpu-profile.tsv`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/final-runtime-after-force-unload.json`

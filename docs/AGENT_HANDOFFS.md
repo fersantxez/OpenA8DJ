@@ -2196,3 +2196,38 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     `cpu-profile.tsv`, decorrelated `tone-matrix.json`, runtime isolation, and
     a comparison report proving C++ quality is at least mainline and CPU is no
     worse than mainline.
+
+## Architect Integration: Same-Day Mainline A/B Rejection - 2026-06-17
+
+- Trigger:
+  - Rawls identified same-day product HAL A/B as the minimum objective evidence
+    needed before any branch promotion.
+- Safety:
+  - Hardware lock used for HAL load/reload, CoreAudio restart, playback, and
+    iRig capture.
+  - Mainline remained read-only; the mainline HAL bundle was copied into
+    `/Users/fer/dev/audio8djcpp/local-analysis`.
+  - Final force-unload cleanup left HAL inactive and lock absent.
+- Evidence:
+  - Root:
+    `local-analysis/mainline-ab/20260617-sameday-ab-085735`.
+  - Comparison:
+    `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`.
+- Findings:
+  - C++ product HAL safety load PASS, soundcheck FAIL:
+    quality `0.134709`, SNR `-12.66 dB`, mid/high residual
+    `4.904891/4.494813`, lag jumps `18`, driver CPU p95 `23.2%`,
+    coreaudiod p95 `20.5%`.
+  - Mainline HAL retry safety load PASS, soundcheck FAIL:
+    quality `0.246599`, SNR `-13.28 dB`, mid/high residual
+    `5.774651/5.636904`, lag jumps `41`, driver CPU p95 `5.6%`,
+    coreaudiod p95 `10.3%`.
+  - C++ has partial wins in residual ratios, lag jumps, and SNR floor.
+  - C++ loses global quality alignment and CPU, so it does not beat mainline.
+- Decision:
+  - `FAIL_CPP_NOT_BETTER_THAN_MAINLINE`.
+  - Do not move C++ to `main`.
+  - Do not move C mainline to `Legacy`.
+- Next recommended action:
+  - Focus on product HAL CPU and physical alignment/quality. Direct USB packet
+    correctness is no longer the dominant blocker for branch promotion.

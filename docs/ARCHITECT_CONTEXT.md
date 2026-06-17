@@ -1336,3 +1336,26 @@ Next technical target:
     validated capture route, plus fixed-candidate CPU and timecode evidence.
     Until that exists, do not move C++ to `main` and do not move C mainline to
     `Legacy`.
+- Same-day product HAL A/B status:
+  - Evidence:
+    `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`.
+  - Result:
+    `FAIL_CPP_NOT_BETTER_THAN_MAINLINE`.
+  - Both candidates failed absolute audiophile quality gates on the same
+    fixture and iRig route.
+  - C++ product HAL:
+    quality `0.134709`, SNR `-12.66 dB`, mid/high residual
+    `4.904891/4.494813`, lag jumps `18`, driver CPU p95 `23.2%`,
+    coreaudiod p95 `20.5%`.
+  - Mainline HAL:
+    quality `0.246599`, SNR `-13.28 dB`, mid/high residual
+    `5.774651/5.636904`, lag jumps `41`, driver CPU p95 `5.6%`,
+    coreaudiod p95 `10.3%`.
+  - Interpretation:
+    C++ has useful partial wins in residual ratio and lag jumps, but it loses
+    global quality alignment and CPU. The objective claim "better than
+    mainline" is false for the current product HAL.
+  - Current boundary:
+    no branch promotion, no Legacy move, and no timecode readiness claim.
+    Optimization must now target product HAL CPU and physical alignment/quality
+    directly.

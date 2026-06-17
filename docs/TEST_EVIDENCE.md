@@ -5946,3 +5946,65 @@ Operational note:
   - `local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-response-compensation.json`
   - `local-analysis/promotion-readiness/20260617-after-decorrelated-direct-usb.json`
   - `local-analysis/runtime-isolation/20260617-after-decorrelated-direct-usb.json`
+
+## 2026-06-17: Same-Day C++ HAL vs Mainline HAL A/B, Promotion Rejected
+
+- Purpose:
+  - Measure the C++ product HAL and the read-only mainline HAL artifact on the
+    same day, same physical iRig route, same Audio 8 DJ, same Pair A output,
+    same 48 kHz / 512-frame CoreAudio config, and same deterministic fixture.
+- Safety:
+  - Hardware lock used for HAL load/reload, CoreAudio restart, playback, and
+    iRig capture.
+  - Mainline worktree remained read-only. The mainline bundle was copied into
+    C++ evidence before installation.
+  - Final cleanup forced the active HAL out of `/Library/Audio/Plug-Ins/HAL`
+    and final runtime isolation PASSed with HAL inactive and lock absent.
+- Candidate snapshots:
+  - C++ commit `0809d21a94147db92ffb787a66dc589e0b9b6872`.
+  - Mainline commit `08745b73d23d4f6e410ab8308926a9584120be89`.
+  - C++ HAL sha256:
+    `f466c73673ad2cc2533c01bbae7ba2a9c3d44cd153db99ea198c61b42b40df4b`.
+  - Mainline HAL sha256:
+    `569c7303a1a9672d40c56eeee914eadccdbcd541562e1d2d674d1a3ffb9b90dc`.
+- C++ HAL result:
+  - Safety load PASS.
+  - Soundcheck FAIL:
+    quality `0.134709`, SNR floor `-12.66 dB`, mid/high residual
+    `4.904891/4.494813`, quiet mid-band noise `-23.34 dBFS`,
+    lag jumps `18`, clipping `0`.
+  - CPU p95:
+    driver `23.2%`, coreaudiod `20.5%`.
+- Mainline HAL result:
+  - First safety attempt was blocked by external `mediaremoted` CPU, not by
+    enumeration failure. Recovery ran and HAL was unloaded.
+  - Retry safety load PASS.
+  - Soundcheck FAIL:
+    quality `0.246599`, SNR floor `-13.28 dB`, mid/high residual
+    `5.774651/5.636904`, quiet mid-band noise `-24.03 dBFS`,
+    lag jumps `41`, clipping `0`.
+  - CPU p95:
+    driver `5.6%`, coreaudiod `10.3%`.
+- Comparison:
+  - Both candidates fail absolute audiophile gates.
+  - C++ does not beat mainline overall:
+    quality is worse by `-0.111889`, driver CPU is much worse
+    (`23.2%` vs `5.6%`), and coreaudiod CPU is worse (`20.5%` vs `10.3%`).
+  - C++ is better only on residual ratios, lag jumps, and SNR floor in this
+    fixture, but those partial wins are not enough for readiness.
+- Decision:
+  - `FAIL_CPP_NOT_BETTER_THAN_MAINLINE`.
+  - Do not move C++ to `main`.
+  - Do not move C mainline to `Legacy`.
+  - Next C++ work must target product HAL CPU and physical alignment/quality,
+    not direct USB packet correctness alone.
+- Evidence paths:
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/manifest.txt`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-hal-safety/summary.txt`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck/metrics.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck/cpu-profile.tsv`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-hal-safety-retry/summary.txt`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/metrics.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck/cpu-profile.tsv`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/final-runtime-after-force-unload.json`

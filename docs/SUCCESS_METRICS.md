@@ -1448,3 +1448,30 @@ Latest promotion evaluation:
   - Branch promotion remains forbidden until C++ beats or equals mainline in the
     same physical route for quality, CPU, routing, latency, recovery, and
     timecode.
+
+## 2026-06-17 Same-Day Mainline A/B Gate Status
+
+- Evidence:
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`.
+- Gate result:
+  - `FAIL_CPP_NOT_BETTER_THAN_MAINLINE`.
+- Absolute quality gate:
+  - C++ FAIL:
+    quality `0.134709`, SNR `-12.66 dB`, mid/high residual
+    `4.904891/4.494813`, quiet mid `-23.34 dBFS`, lag jumps `18`.
+  - Mainline FAIL:
+    quality `0.246599`, SNR `-13.28 dB`, mid/high residual
+    `5.774651/5.636904`, quiet mid `-24.03 dBFS`, lag jumps `41`.
+- Relative quality gate:
+  - C++ does not beat mainline overall because quality alignment is worse by
+    `-0.111889`.
+  - C++ is better on residual ratios, lag jumps, and SNR floor, but those wins
+    do not overcome failed absolute quality and worse global alignment.
+- Relative CPU gate:
+  - C++ FAIL:
+    driver p95 `23.2%` versus mainline `5.6%`.
+    coreaudiod p95 `20.5%` versus mainline `10.3%`.
+- Promotion semantics:
+  - `PASS` requires C++ to clear absolute quality thresholds and be no worse
+    than mainline on same-day quality and CPU.
+  - Current status forbids moving C++ to `main` or C mainline to `Legacy`.
