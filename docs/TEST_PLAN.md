@@ -841,3 +841,39 @@ PASS/FAIL semantics:
 - PASS does not mean hardware recovery, DriverKit recovery, or physical sound
   quality is ready.
 - FAIL blocks the prepared transport path before physical testing.
+
+## Offline DriverKit Runtime Bridge Contract
+
+Purpose:
+
+- verify the executable boundary between the DriverKit shell and the prepared
+  transport backend without installing or activating a dext.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_driverkit_runtime_contract
+./build/cpp-offline/opena8djcpp_driverkit_runtime_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/driverkit-runtime-contract.json`;
+- `driverkit_runtime_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the offline DriverKit shell can validate config, start/stop a
+  stream, move playback/capture batches through the prepared backend, and fail
+  closed after shutdown.
+- PASS does not mean an AudioDriverKit dext exists, installs, runs, or beats
+  mainline.
+- FAIL blocks dext binding work.

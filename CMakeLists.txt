@@ -141,6 +141,13 @@ target_link_libraries(opena8djcpp_driverkit_shell_contract
   PRIVATE
     opena8djcpp_driverkit_shell)
 
+add_executable(opena8djcpp_driverkit_runtime_contract
+  tools/driverkit_runtime_contract.cpp)
+
+target_link_libraries(opena8djcpp_driverkit_runtime_contract
+  PRIVATE
+    opena8djcpp_driverkit_shell)
+
 add_executable(opena8djcpp_driverkit_prepared_transport_contract
   tools/driverkit_prepared_transport_contract.cpp)
 
@@ -216,6 +223,7 @@ add_test(NAME opena8djcpp_timecode_signal_analysis COMMAND opena8djcpp_timecode_
 add_test(NAME opena8djcpp_realtime_audit COMMAND opena8djcpp_realtime_audit)
 add_test(NAME opena8djcpp_driverkit_surface_model COMMAND opena8djcpp_driverkit_surface_model)
 add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit_shell_contract)
+add_test(NAME opena8djcpp_driverkit_runtime_contract COMMAND opena8djcpp_driverkit_runtime_contract)
 add_test(NAME opena8djcpp_driverkit_prepared_transport_contract COMMAND opena8djcpp_driverkit_prepared_transport_contract)
 add_test(NAME opena8djcpp_prepared_transport_packet_contract COMMAND opena8djcpp_prepared_transport_packet_contract)
 add_test(NAME opena8djcpp_prepared_transport_routing_timecode_contract COMMAND opena8djcpp_prepared_transport_routing_timecode_contract)

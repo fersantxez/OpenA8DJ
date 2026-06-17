@@ -1,6 +1,10 @@
 #pragma once
 
 #include "opena8djcpp/driverkit_model.hpp"
+#include "opena8djcpp/prepared_transport.hpp"
+
+#include <cstdint>
+#include <span>
 
 namespace opena8djcpp::driverkit {
 
@@ -10,18 +14,41 @@ enum class AudioDriverState {
   Stopped,
 };
 
+struct AudioStreamConfig {
+  std::uint32_t sample_rate = 48000;
+  std::uint32_t buffer_frames = 64;
+  PreparedTransportConfig transport{};
+};
+
 // Compile this target only inside a DriverKit-capable Xcode project. The pure
 // C++ core stays independent so offline gates can run without system mutation.
 class AudioDriverSkeleton {
  public:
   [[nodiscard]] bool start_driver();
   [[nodiscard]] bool stop_driver();
+  [[nodiscard]] bool configure_stream(const AudioStreamConfig& config);
+  [[nodiscard]] bool start_stream();
+  [[nodiscard]] bool stop_stream();
+  [[nodiscard]] bool stream_started() const;
+  [[nodiscard]] bool write_playback(std::span<const S24Frame> frames);
+  [[nodiscard]] std::uint32_t read_capture(std::span<S24Frame> frames);
+  [[nodiscard]] bool complete_backend_period(std::span<const S24Frame> capture_frames,
+                                             std::span<S24Frame> playback_frames,
+                                             std::uint64_t sample_timestamp);
   [[nodiscard]] AudioDriverState state() const;
   [[nodiscard]] const DriverKitDeviceModel& device_model() const;
+  [[nodiscard]] const AudioStreamConfig& stream_config() const;
+  [[nodiscard]] const PreparedTransportCounters& transport_counters() const;
+  [[nodiscard]] PreparedTransportSafety transport_safety() const;
 
  private:
+  [[nodiscard]] bool validate_stream_config(const AudioStreamConfig& config) const;
+
   DriverKitDeviceModel device_model_ = make_driverkit_device_model();
+  AudioStreamConfig stream_config_{};
+  PreparedTransportBackend transport_{};
   AudioDriverState state_ = AudioDriverState::Created;
+  bool stream_configured_ = false;
 };
 
 }  // namespace opena8djcpp::driverkit

@@ -1576,3 +1576,12 @@ Next technical target:
   - Still missing:
     real DriverKit/USB adapter, physical quality and CPU proof, and
     same-session mainline comparison.
+- Offline DriverKit runtime bridge:
+  - `AudioDriverSkeleton` now owns stream configuration and a
+    `PreparedTransportBackend`.
+  - Added `opena8djcpp_driverkit_runtime_contract`, which verifies that a
+    DriverKit-style shell can reject invalid stream configs, start a valid
+    48 kHz stream, move playback/capture frame batches through the prepared
+    backend, and shut down without leaving an active product-safe stream.
+  - This is still not a dext, not signed, not installed, and not hardware
+    evidence. It is the next offline executable boundary.

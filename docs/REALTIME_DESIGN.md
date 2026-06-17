@@ -495,3 +495,24 @@ Offline gate:
 
 This is still an offline model. A real DriverKit adapter must satisfy the same
 contract before a locked hardware recovery test is requested.
+
+## DriverKit Runtime Bridge Boundary
+
+The offline DriverKit shell now has a concrete runtime bridge:
+
+- configure stream outside the callback;
+- validate sample rate and prepared transport sizing before stream start;
+- use bounded span-based playback/capture methods for HAL-facing work;
+- route backend completion through `PreparedTransportBackend`;
+- stop the backend when the driver stops.
+
+Offline gate:
+
+- `opena8djcpp_driverkit_runtime_contract`.
+- Required result has zero lifecycle/config/frame/shutdown failures, zero HAL
+  steady requeues, zero fallback allocations, zero ring errors, zero timestamp
+  regressions, and `running_product_safe=true` only while the stream is active.
+
+This is not a substitute for real `IOUserAudioDriver`, `IOUserAudioDevice`, or
+`IOUserAudioStream` binding. It is the measured contract those classes must
+preserve.

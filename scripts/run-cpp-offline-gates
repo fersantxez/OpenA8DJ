@@ -35,6 +35,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_runtime_contract | tee "$EVIDENCE_DIR/driverkit-runtime-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
@@ -95,6 +96,7 @@ transport_budget = load_json("transport-budget-model.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
+driverkit_runtime = load_json("driverkit-runtime-contract.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
 prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
@@ -279,6 +281,28 @@ summary = {
         "system_extension_activated": driverkit_shell.get("system_extension_activated"),
         "device_model_valid": driverkit_shell.get("device_model_valid"),
         "evidence": "local-analysis/cpp-offline/driverkit-shell-contract.json",
+    },
+    "driverkit_runtime_contract": {
+        "status": driverkit_runtime.get("result"),
+        "schema": driverkit_runtime.get("schema"),
+        "system_extension_activated": driverkit_runtime.get("system_extension_activated"),
+        "driver_installed_or_activated": driverkit_runtime.get("driver_installed_or_activated"),
+        "sample_rate": driverkit_runtime.get("sample_rate"),
+        "buffer_frames": driverkit_runtime.get("buffer_frames"),
+        "lifecycle_failures": driverkit_runtime.get("lifecycle_failures"),
+        "config_failures": driverkit_runtime.get("config_failures"),
+        "frame_mismatches": driverkit_runtime.get("frame_mismatches"),
+        "shutdown_failures": driverkit_runtime.get("shutdown_failures"),
+        "hal_steady_requeues": driverkit_runtime.get("hal_steady_requeues"),
+        "fallback_allocations": driverkit_runtime.get("fallback_allocations"),
+        "capture_ring_overruns": driverkit_runtime.get("capture_ring_overruns"),
+        "capture_ring_underruns": driverkit_runtime.get("capture_ring_underruns"),
+        "playback_ring_overruns": driverkit_runtime.get("playback_ring_overruns"),
+        "playback_ring_underruns": driverkit_runtime.get("playback_ring_underruns"),
+        "timestamp_regressions": driverkit_runtime.get("timestamp_regressions"),
+        "channel_identity_failures": driverkit_runtime.get("channel_identity_failures"),
+        "running_product_safe": driverkit_runtime.get("running_product_safe"),
+        "evidence": "local-analysis/cpp-offline/driverkit-runtime-contract.json",
     },
     "driverkit_prepared_transport_contract": {
         "status": driverkit_prepared_transport.get("result"),

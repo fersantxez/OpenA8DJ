@@ -4442,3 +4442,41 @@ Next implication:
   timecode behavior and restart hygiene. Remaining blockers are a real
   DriverKit/USB adapter and physical same-session quality/CPU proof against
   mainline.
+
+## 2026-06-17: Add Offline DriverKit Runtime Bridge Contract
+
+Decision:
+- Extend `AudioDriverSkeleton` with stream configuration, stream start/stop,
+  HAL-style playback/capture methods, backend completion, and transport
+  counters/safety access.
+- Add `tools/driverkit_runtime_contract.cpp` and wire it into CTest,
+  `scripts/run-cpp-offline-gates`, and static policy.
+
+Reason:
+- The DriverKit shell previously only proved lifecycle state transitions. The
+  next executable boundary must show how AudioDriverKit-facing stream callbacks
+  will talk to `PreparedTransportBackend` without installing or activating a
+  system extension.
+- The runtime contract verifies valid/invalid sample-rate and transport config
+  handling, stream start sequencing, frame movement through playback/capture
+  rings, and shutdown behavior.
+
+Alternatives discarded:
+- Jump directly to a dext target: rejected because the HAL/backend runtime
+  contract is testable offline first, without touching System Extensions,
+  CoreAudio defaults, or USB devices.
+- Keep the shell state-only until hardware: rejected because it would leave the
+  DriverKit boundary unmeasured.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-runtime-contract.json`
+- Required result:
+  lifecycle/config/frame/shutdown failures `0`, HAL steady requeues `0`,
+  fallback allocations `0`, ring overruns/underruns `0`, timestamp regressions
+  `0`, channel identity failures `0`, and `running_product_safe=true`.
+
+Next implication:
+- The C++ line now has an offline DriverKit-style runtime bridge over the
+  prepared backend. Remaining blockers are real AudioDriverKit class binding,
+  USBDriverKit adapter implementation, signing/entitlements, and physical
+  same-session quality/CPU proof.

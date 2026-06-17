@@ -1815,3 +1815,23 @@ Current status:
 - PASS offline in the focused build run.
 - This is not physical recovery readiness; it is a required offline prerequisite
   for a future DriverKit/USB adapter and locked hardware recovery test.
+
+## 2026-06-17 DriverKit Runtime Bridge Gate
+
+Required for the executable DriverKit shell:
+- `opena8djcpp_driverkit_runtime_contract` must PASS.
+- Invalid stream configuration must be rejected before streaming.
+- Stream start before driver start must fail.
+- Valid stream config at 44.1 kHz or 48 kHz must be accepted; unsupported rates
+  must fail.
+- Playback/capture batch movement through the prepared backend must produce
+  `0` frame mismatches.
+- Shutdown must stop the stream and make `product_safe=false`.
+- Running counters must report `0` HAL steady requeues, `0` fallback
+  allocations, `0` ring overruns/underruns, `0` timestamp regressions, and
+  `0` channel identity failures.
+
+Current status:
+- PASS offline in the focused build run at 48 kHz, `64` buffer frames, `32`
+  frame batch.
+- This is not a signed/installed DriverKit driver and not physical readiness.

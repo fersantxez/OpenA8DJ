@@ -7131,3 +7131,77 @@ Operational note:
     timecode profile/deck behavior, and lifecycle recovery hygiene.
   - Readiness remains blocked by a real DriverKit/USB adapter and physical
     same-session quality/CPU proof against mainline.
+
+## 2026-06-17 DriverKit Runtime Bridge Contract
+
+- Purpose:
+  - Validate the offline DriverKit shell/runtime bridge over
+    `PreparedTransportBackend`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_shell_contract opena8djcpp_driverkit_runtime_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_shell_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_runtime_contract`
+  - `./build/cpp-offline/opena8djcpp_static_policy_check`
+- Result:
+  - PASS.
+  - Lifecycle failures: `0`.
+  - Config failures: `0`.
+  - Frame mismatches: `0`.
+  - Shutdown failures: `0`.
+  - Runtime counters:
+    `0` HAL steady requeues, `0` fallback allocations, `0` ring
+    overruns/underruns, `0` timestamp regressions, `0` channel identity
+    failures.
+  - Frame movement:
+    `32` backend capture frames, `32` backend playback frames, `32` HAL capture
+    reads, `32` HAL playback writes.
+  - Static policy: PASS, `audited_files=18`, forbidden hits `0`.
+- Safety:
+  - Offline DriverKit shell only.
+  - No system extension installed or activated, no audio devices opened, no
+    CoreAudio/USB mutation, no defaults changed, no hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-runtime-contract.json`
+- Interpretation:
+  - The DriverKit shell is no longer only a state-machine sketch; it now has a
+    measured offline runtime bridge into the prepared transport backend.
+  - This is not a real dext or hardware-readiness proof.
+
+## 2026-06-17 Offline Gates After DriverKit Runtime Bridge
+
+- Purpose:
+  - Verify the complete offline surface after adding the DriverKit shell/runtime
+    bridge to the prepared backend.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `23/23` passed.
+  - Release CTest: `24/24` passed.
+  - DriverKit runtime contract: PASS.
+  - Runtime failures:
+    lifecycle `0`, config `0`, frame mismatches `0`, shutdown `0`.
+  - Runtime counters:
+    `0` HAL steady requeues, `0` fallback allocations, `0` ring
+    overruns/underruns, `0` timestamp regressions, `0` channel identity
+    failures, `running_product_safe=true`.
+  - Static policy: PASS, `audited_files=18`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-driverkit-runtime-bridge`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`, `global_cpu_idle_pct=90.72`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/driverkit-runtime-contract.json`
+  - `local-analysis/audio-stack-guard/final-after-driverkit-runtime-bridge`
+- Interpretation:
+  - The C++ path now has an executable offline DriverKit-style runtime bridge.
+  - Readiness remains blocked by real AudioDriverKit class binding,
+    USBDriverKit transport, signing/entitlements, and physical same-session
+    quality/CPU proof against mainline.

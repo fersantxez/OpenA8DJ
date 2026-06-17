@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
       root / "tools/dvs_signal_smoke.cpp",
       root / "tools/realtime_audit.cpp",
       root / "tools/transport_budget_model.cpp",
+      root / "tools/driverkit_runtime_contract.cpp",
       root / "tools/driverkit_prepared_transport_contract.cpp",
       root / "tools/prepared_transport_packet_contract.cpp",
       root / "tools/prepared_transport_routing_timecode_contract.cpp",
