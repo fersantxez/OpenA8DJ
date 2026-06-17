@@ -1205,3 +1205,13 @@ Latest promotion evaluation:
   - Any recurrence of the fixed OUT failure family, negative SNR, decorrelated
     music, missing HAL input surface, or unstable CoreAudio enumeration rejects
     the candidate regardless of CPU.
+- Current status:
+  - `FAIL_REJECTED_FOR_PRODUCT`.
+  - Pre-fill-fix run proved that lower driver CPU can be meaningless:
+    `playbackTransfersSubmitted=0`, `playbackTransfersCompleted=0`, and
+    `outputFramesRead=0`.
+  - Fill-fix run restored playback but failed physical music quality:
+    `quality_alignment_score=0.183990`, SNR floor `-21.45 dB`, mid/high
+    residual `17.171794/11.452494`, and `41` lag jumps.
+  - Driver p95 `8.0%` does not pass because coreaudiod p95 was `28.3%` and
+    the capture was not audiophile-valid.

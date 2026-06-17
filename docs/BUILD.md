@@ -431,6 +431,26 @@ The isolated coalesce2 run passed HAL safety and reduced driver CPU p95 to
 `28.5%`, but it damaged physical music quality (`quality_alignment_score`
 `0.898854`, SNR `5.85 dB`). It remains an explicit experiment only.
 
+Do not use output-only no-capture ISO as a default CPU profile:
+
+```sh
+make HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1 hal
+```
+
+This variant is buildable and useful as a diagnostic, but physical evidence
+rejects it as a product optimization. The first locked run submitted no
+playback transfers until `writeOutput` was allowed to trigger playback fill in
+that mode. After that fix, playback resumed and driver p95 fell to `8.0%`, but
+the run still failed badly: `quality_alignment_score=0.183990`, SNR floor
+`-21.45 dB`, mid/high residual `17.171794/11.452494`, and coreaudiod p95
+`28.3%`.
+
+HAL bundle packaging must install the plist with explicit readable
+permissions. A stale build artifact with `Contents/Info.plist` mode `0600`
+caused CoreAudio enumeration to miss `org.opena8dj.Audio8DJ` even though USB
+saw the Audio 8 DJ. The HAL build rule uses `install -m 644` for the plist to
+prevent that regression.
+
 ## Analysis Environment
 
 Precise offline audio analysis can use the local Python environment under the

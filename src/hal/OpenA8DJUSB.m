@@ -5771,7 +5771,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #if OPENA8DJ_ENABLE_TRACE
     _debugOutputFramesWritten += frames;
 #endif
-#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED
+#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED || OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
     if (atomic_load(&_streaming) && _queue != nil) {
         __weak OpenA8DJUSBEngine *weakSelf = self;
         dispatch_async(_queue, ^{

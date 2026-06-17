@@ -5160,3 +5160,89 @@ Operational note:
   - `local-analysis/runtime-isolation/final-after-commit.json`.
   - `local-analysis/cpp-offline/current-offline-gates.json`.
   - `local-analysis/promotion-readiness-current.json`.
+
+## 2026-06-17: Output-Only No-Capture ISO Physical Rejection
+
+- Change:
+  - Fixed HAL bundle packaging so `Contents/Info.plist` is installed with mode
+    `0644` instead of preserving a stale `0600` mode in `build/OpenA8DJ.driver`.
+  - Added a playback queue fill trigger from `writeOutput` when
+    `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`; without it, output-only mode could
+    write CoreAudio frames into the timeline but never submit playback
+    transfers.
+- Physical safety:
+  - iRig preflight PASS: `iRig Stream` visible as `in=2 out=2 rate=48000`.
+  - Audio 8 DJ USB visible in IORegistry while HAL was inactive.
+  - First safety run with `Info.plist` mode `0600` failed device enumeration:
+    CoreAudio listed iRig, MacBook mic, and speakers, but not `Open Audio 8 DJ`.
+  - After the Makefile packaging fix, HAL safety PASS and CoreAudio listed
+    `Open Audio 8 DJ uid=org.opena8dj.Audio8DJ in=8 out=8 rate=48000`.
+- Commands:
+  - `make -B hal build/opena8dj-control HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`
+  - `make smoke-hal HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/hal-candidate-safety/20260617-output-only-no-capture-optin-perms-fixed`
+  - `scripts/run-soundcheck --skip-build --run-dir local-analysis/soundcheck/20260617-output-only-no-capture-optin-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --cpu-profile --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/hal-candidate-safety/20260617-output-only-no-capture-optin-fillfix`
+  - `scripts/run-soundcheck --skip-build --run-dir local-analysis/soundcheck/20260617-output-only-no-capture-optin-fillfix-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --cpu-profile --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-output-only-no-capture-optin-fillfix-reject`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-output-only-no-capture-optin-fillfix-reject.json`
+- Results:
+  - Pre-fill-fix soundcheck FAIL:
+    `quality_alignment_score=0.039808`, SNR floor `-59.81 dB`,
+    mid/high residual `3551.596610/2457.244317`, lag jumps `41`.
+  - Pre-fill-fix stream stats show no real playback:
+    `playbackTransfersSubmitted=0`, `playbackTransfersCompleted=0`,
+    `outputFramesRead=0`, while `outputFramesWritten=574464`.
+  - Fill-fix soundcheck FAIL:
+    `quality_alignment_score=0.183990`, SNR floor `-21.45 dB`,
+    mid/high residual `17.171794/11.452494`, lag jumps `41`.
+  - Fill-fix stream stats show playback resumed but with bad cadence/quality:
+    `playbackTransfersSubmitted=6617`, `playbackTransfersCompleted=414`,
+    `outputFramesRead=582912`, `outputFramesWritten=576512`.
+  - Fill-fix CPU:
+    OpenA8DJ driver p95 `8.0%`, coreaudiod p95 `28.3%`.
+  - Runtime isolation after rejection PASS: HAL inactive, lock absent, no
+    OpenA8DJ process.
+- Decision:
+  - Reject `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1` as a product optimization.
+  - The flag may remain as an explicit diagnostic experiment, default off.
+  - The packaging permission fix is valid and must stay.
+- Evidence paths:
+  - `local-analysis/hardware-preflight/20260617-060326-irig-before-optin/`
+  - `local-analysis/hal-candidate-safety/20260617-output-only-no-capture-optin/`
+  - `local-analysis/hal-candidate-safety/20260617-output-only-no-capture-optin-perms-fixed/`
+  - `local-analysis/hal-candidate-safety/20260617-output-only-no-capture-optin-fillfix/`
+  - `local-analysis/soundcheck/20260617-output-only-no-capture-optin-irig-pairA-12s-cpp-hal/`
+  - `local-analysis/soundcheck/20260617-output-only-no-capture-optin-fillfix-irig-pairA-12s-cpp-hal/`
+  - `local-analysis/physical-run-compare/20260617-output-only-no-capture-optin-fillfix-reject.json`
+  - `local-analysis/audio-stack-guard/after-output-only-no-capture-optin-fillfix-reject/`
+  - `local-analysis/runtime-isolation/after-output-only-no-capture-optin-fillfix-reject.json`
+
+## 2026-06-17: Final Verification After No-Capture ISO Rejection
+
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `git diff --check`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-output-only-no-capture-fillfix-reject.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-output-only-no-capture-fillfix-docs.json`
+- Result:
+  - HAL build restored to default:
+    `OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.
+  - Diff whitespace check PASS.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS: `22` required files, `0` missing.
+  - Release benchmark:
+    `pack_mib_s=1649.37`, `decode_into_mib_s=588.102`,
+    `route_frames_s=9.71656e+08`,
+    `route_advanced_frames_s=5.02111e+08`.
+  - Promotion readiness FAIL:
+    `branch_promotion_allowed=false`.
+  - Latest failing physical gates:
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, `traktor_timecode_physical`.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/promotion-readiness-after-output-only-no-capture-fillfix-reject.json`.
+  - `local-analysis/runtime-isolation/final-after-output-only-no-capture-fillfix-docs.json`.

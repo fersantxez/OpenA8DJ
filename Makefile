@@ -178,7 +178,7 @@ $(HAL_FLAGS_STAMP): FORCE
 
 $(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_FLAGS_STAMP)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
-	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
+	@install -m 644 $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	xcrun clang $(HAL_CFLAGS) -bundle $(HAL_FRAMEWORKS) -o $@ $(HAL_SRC)
 
 sign-hal: $(HAL_BIN)

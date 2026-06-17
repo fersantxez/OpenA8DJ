@@ -1169,8 +1169,15 @@ Next technical target:
   - Goal: playback-only diagnostics can avoid keeping ISO IN active when input
     decode/DVS is inactive, while preserving HAL input representation and
     restarting capture if input decode becomes active.
-  - It compiles in both default and opt-in forms, and the local build was
-    restored to default afterward.
-  - It is not physically validated and must not be promoted by build success.
-  - Major risk: prior fixed OUT pacing failed physical quality badly, so this
-    mode may lower CPU while degrading sound.
+  - Packaging fix: HAL `Contents/Info.plist` must be installed as `0644`;
+    stale `0600` permissions caused CoreAudio to miss `org.opena8dj.Audio8DJ`
+    even though USB saw the device.
+  - Physical result: rejected for product. The first run submitted no playback
+    transfers; after the write-side fill fix, playback resumed but quality
+    remained bad (`quality_alignment_score=0.183990`, SNR floor `-21.45 dB`,
+    mid/high residual `17.171794/11.452494`) and coreaudiod p95 rose to
+    `28.3%`.
+  - Interpretation:
+    capture ISO completion pacing appears to be part of the practical playback
+    timing model in this HAL path. Removing ISO IN is not a valid optimization
+    unless a new transport scheduler preserves physical quality and total CPU.

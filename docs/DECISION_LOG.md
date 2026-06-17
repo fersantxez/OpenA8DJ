@@ -3049,3 +3049,37 @@ Evidence:
 - Default HAL/control build PASS.
 - `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1` HAL/control build PASS.
 - Local build restored to default `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.
+
+## 2026-06-17: Reject Output-Only No-Capture ISO As Product Optimization
+
+Decision:
+- Reject `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1` as a product optimization.
+- Keep it default-off and diagnostic-only unless a future design proves
+  physical quality and total runtime CPU improvement.
+- Keep the HAL packaging fix that installs `Contents/Info.plist` with mode
+  `0644`; this is independent of the rejected transport experiment.
+
+Reason:
+- The first locked physical run with the flag built correctly but no
+  write-side fill trigger submitted playback: `playbackTransfersSubmitted=0`,
+  `playbackTransfersCompleted=0`, and `outputFramesRead=0` while CoreAudio
+  wrote `574464` frames.
+- After adding the write-side fill trigger, playback resumed, but physical
+  quality remained catastrophically below threshold:
+  `quality_alignment_score=0.183990`, SNR floor `-21.45 dB`, mid/high
+  residual `17.171794/11.452494`, and `41` lag jumps.
+- Driver CPU p95 improved to `8.0%`, but coreaudiod p95 rose to `28.3%` and
+  quality failed, so this is not a valid product improvement.
+
+Alternatives discarded:
+- Promote no-capture output-only mode for lower driver CPU: rejected because
+  physical music quality fails by a large margin.
+- Keep queuing capture ISO during playback-only output: retained as default
+  because current evidence shows capture completions are part of the practical
+  playback clocking model for this HAL path.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-output-only-no-capture-optin-irig-pairA-12s-cpp-hal/`
+- `local-analysis/soundcheck/20260617-output-only-no-capture-optin-fillfix-irig-pairA-12s-cpp-hal/`
+- `local-analysis/physical-run-compare/20260617-output-only-no-capture-optin-fillfix-reject.json`
+- `local-analysis/runtime-isolation/after-output-only-no-capture-optin-fillfix-reject.json`
