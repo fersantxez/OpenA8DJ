@@ -979,5 +979,15 @@ Next technical target:
 - Next technical target:
   isolate and improve USB/device timebase, cadence, scheduling, and packet
   pacing without regressing the passing Pair A matrix evidence.
+- ISO capture invariant tooling now classifies the latest run as packetization
+  PASS with a one-stop-transfer warning:
+  `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`.
+  Do not chase aggregate `captureTransactionErrors` as the primary defect
+  unless status failures, short transfers, other-size transactions, or larger
+  classified-slot gaps appear.
+- A dedicated diagnostic build profile exists:
+  `make hal-cadence-diagnostic`. It is for the next locked cadence/ledger
+  evidence run only; restore product flags with `make -B hal` before any CPU
+  or product-quality claim.
 - Current safety state after cleanup:
   HAL inactive, hardware lock absent, no C mainline or Rust mutation expected.

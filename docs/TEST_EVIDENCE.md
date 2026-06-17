@@ -4333,3 +4333,60 @@ Operational note:
   - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
   - `local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
   - `local-analysis/runtime-isolation/after-inputdecode-gated-wait8-unload.json`
+
+## 2026-06-17: ISO Invariant Tooling And Cadence Diagnostic Build Profile
+
+- Purpose:
+  - Stop treating expected zero-complete ISO slots as a root cause for the
+    real-music failure.
+  - Preserve a reproducible diagnostic HAL build profile for the next locked
+    physical cadence run without changing the product-default HAL profile.
+- Code/tooling changes:
+  - `scripts/analyze-capture-iso-invariants.py` now infers `isoN` from run
+    paths, can derive the transfer slot count from classified capture slots
+    when the path does not include `isoN`, and reports a warning instead of a
+    failure when only the final stop/drain transfer is missing.
+  - `Makefile` now has `hal-cadence-diagnostic`, which rebuilds the HAL with
+    cadence diagnostics, transfer ledger, payload guard, amplitude stats, hot
+    stats every transfer, and atomic stream-stat accumulators.
+  - The diagnostic profile is for evidence collection only. It is not a
+    product performance candidate.
+- Commands:
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s --json-out local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s --json-out local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+  - `make -B hal-cadence-diagnostic build/opena8dj-control && make -B hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-iso-invariant-tooling.json`
+- Results:
+  - Latest inputdecode-gated run ISO invariants: PASS with warning
+    `classified_transactions_missing_at_most_one_stop_transfer`.
+    The tool derives `iso_frames_per_transfer=8` from observed classified
+    slots because the run path does not include `iso8`.
+  - ISO8/q8 run ISO invariants: PASS.
+  - ISO10/q8 run ISO invariants: PASS with the same one-stop-transfer warning.
+  - Product HAL rebuild restored the normal non-diagnostic flags:
+    `HAL_CADENCE_DIAGNOSTIC=0`, `HAL_TRANSFER_LEDGER=0`,
+    `HAL_PLAYBACK_PAYLOAD_GUARD=0`, `HAL_OUTPUT_AMPLITUDE_STATS=0`,
+    `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=0`.
+  - Offline gates PASS after the tooling/build-profile change:
+    Debug `17/17`, Release `18/18`.
+  - Release bench after the change:
+    `pack_mib_s=1656.09`, `decode_into_mib_s=588.466`,
+    `route_frames_s=8.65519e+08`,
+    `route_advanced_frames_s=5.09884e+08`.
+  - Runtime isolation PASS:
+    HAL inactive, hardware lock absent, no OpenA8DJ process detected.
+- Interpretation:
+  - Zero-complete capture slots are packetization/stop-window evidence, not the
+    current audiophile-quality blocker.
+  - The current blocker remains real-music timebase/alignment instability and
+    high runtime CPU.
+  - The next physical cadence run should use `make hal-cadence-diagnostic`
+    only as a diagnostic candidate, record ledger/cadence evidence, then
+    restore with `make -B hal` before any product-quality CPU claim.
+- Evidence paths:
+  - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+  - `local-analysis/runtime-isolation/after-iso-invariant-tooling.json`

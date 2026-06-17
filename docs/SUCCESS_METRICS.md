@@ -876,6 +876,16 @@ Latest promotion evaluation:
   - Runtime discontinuity analysis found no strong CPU or stream-stat
     correlation, so current counters are insufficient to explain or prove
     correction.
+- Capture ISO packetization: PASS for the latest inputdecode-gated run after
+  corrected inference.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`.
+  - `iso_frames_per_transfer=8` derived from classified capture slots.
+  - No status failures, no short transfers, no other-size transactions, and
+    `bytes_per_expected_transaction=352`.
+  - Warning only:
+    `classified_transactions_missing_at_most_one_stop_transfer`.
+  - This PASS does not clear the physical music gate.
 - Full physical routing: FAIL/BLOCKED.
   - Pair A matrix evidence exists for ISO8/q8 and ISO10/q8.
   - A/B/C/D physical output matrix is still required.

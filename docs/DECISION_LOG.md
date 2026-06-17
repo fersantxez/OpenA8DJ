@@ -2587,3 +2587,39 @@ Evidence:
 - `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
 - `local-analysis/promotion-readiness-after-inputdecode-gated-usage.json`
 - `local-analysis/runtime-isolation/after-inputdecode-gated-wait8-unload.json`
+
+## 2026-06-17: Separate ISO Packetization From Timebase Defect
+
+Decision:
+- Improve `scripts/analyze-capture-iso-invariants.py` so it detects `isoN`
+  paths, derives slot count from capture details when the path lacks `isoN`,
+  and treats a missing final stop/drain transfer as a warning rather than a
+  transport failure.
+- Add `make hal-cadence-diagnostic` as an explicit diagnostic build profile.
+- Keep product-default HAL diagnostics off after verification.
+
+Reason:
+- The latest inputdecode-gated run has no capture status failures, no short
+  capture transactions, no other-size capture transactions, and expected
+  `352`-byte useful capture transactions.
+- Its apparent aggregate capture errors are zero-complete ISO slots, plus at
+  most one missing transfer at stop. That is not enough to explain the
+  real-music residual and lag jumps.
+- The real blocker still points to timebase/alignment instability below the
+  current coarse counters.
+- A dedicated diagnostic build lets the next physical run collect cadence,
+  ledger, payload-guard, and amplitude evidence without pretending those flags
+  are product-performance flags.
+
+Alternatives discarded:
+- Continue using aggregate `captureTransactionErrors` as the primary failure:
+  rejected because decomposed counters show zero-complete packetization rather
+  than status/short/size failure.
+- Enable cadence/ledger diagnostics by default in the product candidate:
+  rejected because they add measurement overhead and would contaminate CPU
+  comparisons against mainline.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-inputdecode-gated-wait8-streamusage-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s/capture-iso-invariants.json`

@@ -1108,3 +1108,40 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     improves real-music residual and CPU together.
   - Do not expand to Traktor/timecode or full A/B/C/D physical gates until the
     real-music Pair A gate improves enough to justify more hardware time.
+
+### Architect ISO-Invariant Tooling And Cadence Diagnostic Profile
+
+- Status:
+  - Completed locally without hardware access.
+  - Diagnostic HAL build was compiled once, then the product HAL build was
+    restored with normal diagnostic flags off.
+- Files affected:
+  - `Makefile`
+  - `scripts/analyze-capture-iso-invariants.py`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Latest inputdecode-gated capture ISO invariants now PASS with a one final
+    stop/drain transfer warning.
+  - ISO8/q8 capture ISO invariants PASS.
+  - ISO10/q8 capture ISO invariants PASS with the same one-stop-transfer
+    warning.
+  - The aggregate capture error counter is zero-complete ISO slot
+    packetization in these runs, not the current product-quality blocker.
+  - `make hal-cadence-diagnostic` gives the next physical cadence run transfer
+    ledger, cadence diagnostics, payload guard, amplitude stats, per-transfer
+    hot stats, and atomic stat accumulators.
+- Risks:
+  - The diagnostic HAL profile has extra overhead and cannot be used for
+    product CPU claims.
+  - It must be followed by `make -B hal` before any product candidate CPU or
+    quality run.
+- Next recommended action:
+  - Under lock, run a short diagnostic cadence capture only when a physical
+    window is justified.
+  - Use the ledger/cadence evidence to decide whether the next product change
+    should target queue ordering, transfer lead/depth, explicit scheduling, or
+    timeline write/read policy.

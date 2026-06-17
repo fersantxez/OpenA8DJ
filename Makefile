@@ -144,7 +144,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list package dmg checksums dist FORCE
+.PHONY: all clean probe claim hal hal-cadence-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list package dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -153,6 +153,15 @@ $(TOOL): $(SRC)
 	$(CC) $(CFLAGS) $(FRAMEWORKS) -o $@ $<
 
 hal: $(HAL_BIN)
+
+hal-cadence-diagnostic:
+	$(MAKE) -B hal \
+		HAL_CADENCE_DIAGNOSTIC=1 \
+		HAL_TRANSFER_LEDGER=1 \
+		HAL_PLAYBACK_PAYLOAD_GUARD=1 \
+		HAL_OUTPUT_AMPLITUDE_STATS=1 \
+		HAL_HOT_STREAM_STATS_INTERVAL=1 \
+		HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1
 
 $(HAL_FLAGS_STAMP): FORCE
 	@mkdir -p build

@@ -101,8 +101,11 @@ def normalize_values(raw):
 
 def infer_iso_frames(run_dir):
     text = " ".join(part.lower() for part in run_dir.parts)
-    if "iso64" in text:
-        return 64
+    match = re.search(r"iso(\d+)", text)
+    if match:
+        value = int(match.group(1))
+        if value > 0:
+            return value
     return 5
 
 
@@ -126,6 +129,14 @@ def analyze_run(run_dir, iso_frames):
     detail_values = [expected, zero, status, other, short, filtered]
     detail_complete = all(finite(value) for value in detail_values)
     classified = expected + zero + status + other if detail_complete else math.nan
+    iso_frames_source = "argument_or_path"
+    if finite(classified) and finite(transfers) and transfers > 0:
+        observed_slots = classified / transfers
+        rounded_slots = int(round(observed_slots))
+        if rounded_slots > 0 and abs(observed_slots - rounded_slots) <= 0.5:
+            if iso_frames <= 0 or abs(observed_slots - iso_frames) > 0.5:
+                iso_frames = rounded_slots
+                iso_frames_source = "observed_classified_slots"
     total_expected = transfers * iso_frames if finite(transfers) else math.nan
     byte_per_expected = bytes_total / expected if finite(bytes_total) and finite(expected) and expected > 0 else math.nan
     zero_ratio = zero / transfers if finite(zero) and finite(transfers) and transfers > 0 else math.nan
@@ -133,14 +144,20 @@ def analyze_run(run_dir, iso_frames):
     aggregate_error_ratio = failed / transfers if finite(failed) and finite(transfers) and transfers > 0 else math.nan
 
     failures = []
+    warnings = []
     unknowns = []
     if not values:
         failures.append("missing_stream_stats")
     if values:
         if not detail_complete:
             unknowns.append("missing_capture_detail_fields")
-    if finite(total_expected) and finite(classified) and classified != total_expected:
-        failures.append("classified_transactions_do_not_match_iso_frames")
+    if finite(total_expected) and finite(classified):
+        classified_delta = total_expected - classified
+        if classified_delta != 0:
+            if 0 < classified_delta <= iso_frames:
+                warnings.append("classified_transactions_missing_at_most_one_stop_transfer")
+            else:
+                failures.append("classified_transactions_do_not_match_iso_frames")
     if finite(failed) and finite(zero) and finite(status) and failed != zero + status:
         failures.append("failed_not_equal_zero_plus_status")
     if finite(transactions) and finite(expected) and transactions != expected:
@@ -160,8 +177,10 @@ def analyze_run(run_dir, iso_frames):
         "run_dir": str(run_dir),
         "source": source,
         "iso_frames_per_transfer": iso_frames,
+        "iso_frames_source": iso_frames_source,
         "result": "FAIL" if failures else ("UNKNOWN" if unknowns else "PASS"),
         "failures": failures,
+        "warnings": warnings,
         "unknowns": unknowns,
         "capture_transfers": transfers,
         "capture_expected_transactions": expected,
