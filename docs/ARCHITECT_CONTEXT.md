@@ -1705,3 +1705,23 @@ Next highest-value work:
   path from stereo-music correlation.
 - Keep native WAV attribution in the promotion path and tighten parity only
   after it matches Python behavior across multiple stored runs.
+
+### 2026-06-17 Native Hot-Path Timing Attribution
+
+- Added `opena8djcpp_hot_path_timing_analysis`.
+- It reads stored hot-path timing summaries only and does not touch hardware.
+- Latest selected stored diagnostic evidence:
+  `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/stream-stats-summary.json`.
+- Attribution:
+  `fixed_queue_requeue_enqueue_dominant`.
+- Average ticks in selected evidence:
+  capture handler `3755.083542`, capture requeue `1825.690345`,
+  playback queue `1862.696473`, playback enqueue `1493.531516`,
+  playback fill `289.256253`.
+- Fixed queue/requeue/enqueue to playback fill ratio: `17.914629`.
+
+Current implication:
+- The safest CPU work should target fixed transport queue/requeue/enqueue
+  overhead or callback cadence before touching audio packing/math.
+- The selected hot-path evidence is diagnostic and does not prove the current
+  product candidate is ready or better than mainline.

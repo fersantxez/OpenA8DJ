@@ -4832,3 +4832,31 @@ Evidence:
 Next implication:
 - The next physical window should use a decorrelated fixture and capture-path
   controls before any Traktor/timecode or branch-promotion claim.
+
+## 2026-06-17: Add Native Hot-Path Timing Attribution Analyzer
+
+Decision:
+- Add `tools/hot_path_timing_analysis.cpp`.
+- Wire it into the offline CMake/CTest/evidence path.
+
+Reason:
+- Sustained driver CPU is the current resource blocker, but the selected
+  product run has only process-level CPU.
+- Existing stored hot-path diagnostics contain nonzero per-segment timing; they
+  should be summarized by a native C++ tool rather than left as buried JSON.
+- The selected stored timing evidence points at fixed transport work:
+  capture requeue, playback queue, and playback enqueue are much larger than
+  playback fill.
+
+Alternatives discarded:
+- Change audio math first: rejected because stored timing evidence says
+  playback fill is not dominant.
+- Treat nested timings as additive CPU: rejected because nested/sampled timing
+  can exceed the capture handler when summed.
+
+Evidence:
+- `local-analysis/cpp-offline/hot-path-timing-analysis.json`
+
+Next implication:
+- The next optimization should target fixed transport queue/requeue/enqueue
+  overhead or callback cadence, then prove same-session quality did not regress.

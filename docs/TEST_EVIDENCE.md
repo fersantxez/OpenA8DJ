@@ -7732,3 +7732,41 @@ Operational note:
 - Readiness:
   - This is build evidence only. It does not prove CPU, quality, hardware
     readiness, or branch promotion.
+
+## 2026-06-17 Native Hot-Path Timing Attribution Analyzer
+
+- Scope:
+  - Offline-only analysis over stored
+    `local-analysis/hot-path-timing/*/stream-stats-summary.json`.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Changes:
+  - Added `opena8djcpp_hot_path_timing_analysis`.
+  - Wired it into CMake/CTest and `scripts/run-cpp-offline-gates`.
+  - Added `local-analysis/cpp-offline/hot-path-timing-analysis.json` to the
+    evidence schema.
+- Focused command:
+  - `./build/cpp-release/opena8djcpp_hot_path_timing_analysis | tee local-analysis/cpp-offline/hot-path-timing-analysis.json`
+- Focused result:
+  - Analyzer result: PASS.
+  - Selected evidence:
+    `local-analysis/hot-path-timing/20260617T140410Z-sampled-denom/stream-stats-summary.json`.
+  - Capture/playback transfer rates:
+    `1000.348525/1000.223419` per second.
+  - Average ticks:
+    capture handler `3755.083542`, capture requeue `1825.690345`,
+    playback queue `1862.696473`, playback enqueue `1493.531516`,
+    playback fill `289.256253`, playback completion `20.138712`,
+    capture decode `6.053225`.
+  - Attribution:
+    `fixed_queue_requeue_enqueue_dominant`.
+  - Fixed queue/requeue/enqueue to playback-fill ratio: `17.914629`.
+  - Nested timing policy:
+    `nested_or_sampled_do_not_sum_as_total_cpu`.
+- Interpretation:
+  - Stored hot-path timing evidence points at fixed transport queue/requeue and
+    enqueue costs, not audio packing/fill math.
+  - The timings are nested/sampled diagnostics and must not be summed as total
+    CPU.
+  - This supports the next CPU investigation direction but does not make the
+    current C++ candidate better than mainline.

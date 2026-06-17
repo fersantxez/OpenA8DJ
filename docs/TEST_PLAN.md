@@ -1079,3 +1079,32 @@ PASS/FAIL semantics:
 - It is not a product PASS.
 - Product CPU improvement still requires a separate same-session quality and
   CPU run against mainline thresholds.
+
+## Offline Hot-Path Timing Attribution Analyzer
+
+Purpose:
+
+- summarize stored hot-path timing evidence without touching hardware.
+- identify whether fixed queue/requeue/enqueue costs or playback fill/math
+  dominate the diagnostic timing.
+- preserve the rule that nested timings are not summed as total CPU.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_hot_path_timing_analysis
+./build/cpp-offline/opena8djcpp_hot_path_timing_analysis
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/hot-path-timing-analysis.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the analyzer ran and either found usable stored timing evidence or
+  explicitly reported that no stored hot-path timing evidence exists.
+- PASS is diagnostic only. It cannot prove product CPU superiority.
+- Future CPU improvements must still pass same-session product quality and CPU
+  gates.

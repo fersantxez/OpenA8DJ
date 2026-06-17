@@ -1988,3 +1988,15 @@ Current status:
   `external_process_cpu_only_hot_path_timing_absent`.
 - Driver CPU remains `16.6%` after 5s, so the sustained CPU blocker is real,
   but the current run does not prove which internal callback segment owns it.
+- Stored hot-path diagnostic evidence now has a native analyzer:
+  `opena8djcpp_hot_path_timing_analysis`.
+  The selected stored diagnostic classifies as
+  `fixed_queue_requeue_enqueue_dominant` with fixed queue/requeue/enqueue about
+  `17.914629x` playback fill.
+
+Readiness rule:
+- Any future CPU optimization must show both:
+  - lower same-session process CPU against mainline thresholds;
+  - hot-path attribution consistent with the intended fix.
+- A hot-path attribution improvement alone is not sufficient if physical sound
+  quality, residual, lag, or timecode gates regress.

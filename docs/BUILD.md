@@ -726,3 +726,17 @@ non-diagnostic packaging or install step:
 ```sh
 make -B hal
 ```
+
+## C++ Hot-Path Timing Analyzer
+
+The offline build includes `opena8djcpp_hot_path_timing_analysis`.
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_hot_path_timing_analysis
+./build/cpp-offline/opena8djcpp_hot_path_timing_analysis
+```
+
+The tool reads stored `stream-stats-summary.json` files under
+`local-analysis/hot-path-timing/`. It does not open audio devices, touch USB,
+install drivers, or activate system extensions.

@@ -45,6 +45,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_transport_budget_model | tee "$EVIDENCE_DIR/transport-budget-model.json"
+./build/cpp-release/opena8djcpp_hot_path_timing_analysis | tee "$EVIDENCE_DIR/hot-path-timing-analysis.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
@@ -110,6 +111,7 @@ dvs_packet = load_json("dvs-packet-input-decode.json")
 jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
 transport_budget = load_json("transport-budget-model.json")
+hot_path_timing = load_json("hot-path-timing-analysis.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
 capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
 soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
@@ -281,6 +283,19 @@ summary = {
         "lowest_median_driver_cpu_p95": transport_budget.get("summary", {}).get("lowest_median_driver_cpu_p95"),
         "lowest_estimated_usb_enqueue_calls_per_second": transport_budget.get("summary", {}).get("lowest_estimated_usb_enqueue_calls_per_second"),
         "evidence": "local-analysis/cpp-offline/transport-budget-model.json",
+    },
+    "hot_path_timing_analysis": {
+        "status": hot_path_timing.get("result"),
+        "mode": hot_path_timing.get("mode"),
+        "selected_run": hot_path_timing.get("selected_run"),
+        "capture_transfers_per_second": hot_path_timing.get("capture_transfers_per_second"),
+        "playback_transfers_per_second": hot_path_timing.get("playback_transfers_per_second"),
+        "dominant_subsegment": hot_path_timing.get("dominant_subsegment"),
+        "attribution": hot_path_timing.get("attribution"),
+        "fixed_queue_to_playback_fill_ratio": hot_path_timing.get("fixed_queue_to_playback_fill_ratio"),
+        "nested_sum_to_capture_handler_ratio": hot_path_timing.get("nested_sum_to_capture_handler_ratio"),
+        "nested_timing_policy": hot_path_timing.get("nested_timing_policy"),
+        "evidence": "local-analysis/cpp-offline/hot-path-timing-analysis.json",
     },
     "loopback_quality_analysis": {
         "status": loopback_quality.get("result"),
