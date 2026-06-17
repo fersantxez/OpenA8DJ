@@ -2740,3 +2740,37 @@ Alternatives discarded:
 Evidence:
 - `local-analysis/cpp-offline/transfer-pool-model.json`
 - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Reject Reused ISO Completion Handlers As Default
+
+Decision:
+- Keep `HAL_REUSE_ISOC_COMPLETIONS=0` as the product default.
+- Do not use reused completion handlers as a promotion or readiness argument.
+
+Reason:
+- The isolated locked probe with `HAL_REUSE_ISOC_COMPLETIONS=1` still failed
+  physical music quality:
+  quality `0.961164`, SNR floor `9.98 dB`, mid/high residual
+  `1.459843/1.377935`, quiet mid noise `-34.84 dBFS`, and `25` lag jumps.
+- Runtime CPU still failed mainline:
+  driver p95 `22.1%`, `coreaudiod` p95 `15.0%`.
+- Transport counters stayed clean at the gross level: no output active
+  underruns, timeline resets, late writes, or transfer-pool fallback
+  allocations. That means the flag does not address the dominant quality
+  failure.
+
+Alternatives discarded:
+- Promote reuse because it removes per-transfer block construction: rejected
+  by measured CPU and quality.
+- Combine reuse with other previously rejected transport flags immediately:
+  rejected because this isolated run did not create a positive baseline.
+- Treat fewer lag jumps than the prior probe as sufficient: rejected because
+  the run still has `25` lag jumps and fails SNR/residual thresholds.
+
+Evidence:
+- `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/metrics.json`
+- `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+- `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/failure-modes.json`
+- `local-analysis/runtime-isolation/after-reuse-isoc-completions-unload.json`
+- `local-analysis/promotion-readiness-after-reuse-isoc-completions.json`

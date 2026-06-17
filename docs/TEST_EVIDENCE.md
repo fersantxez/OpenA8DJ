@@ -4590,3 +4590,73 @@ Operational note:
 - Evidence paths:
   - `local-analysis/cpp-offline/transfer-pool-model.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Reused ISO Completion Handlers Product Probe
+
+- Purpose:
+  - Isolate `HAL_REUSE_ISOC_COMPLETIONS=1` as a CPU/hot-path candidate after a
+    previous combined transport variant was rejected.
+  - Verify whether avoiding per-transfer completion block creation improves CPU
+    without changing packet layout, routing, sample rate, ISO size, queue
+    depth, capture-paced cadence, or stream usage.
+- Build/run flags:
+  - `HAL_REUSE_ISOC_COMPLETIONS=1`.
+  - Current product geometry otherwise unchanged:
+    ISO8/q8, capture-paced playback, lead1, coalesce1, stream usage on,
+    diagnostics/ledger/payload guard off.
+- Commands:
+  - `make -B hal build/audio-wav-play build/audio-record build/audio-config build/opena8dj-control HAL_REUSE_ISOC_COMPLETIONS=1`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --run-dir local-analysis/physical-product/20260617-reuse-isoc-completions/hal-candidate-safety`
+  - `scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --capture-device "iRig Stream" --capture-channels 1,2 --pair A --seconds 12 --mode dense --target-peak-db -16 --stream-stats-snapshots --monitor-stream-stats --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal --json-out local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --run-dir local-analysis/audio-stack-guard/after-reuse-isoc-completions-unload`
+  - `make -B hal`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/after-reuse-isoc-completions-unload.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-reuse-isoc-completions.json`
+- Safety and cleanup:
+  - HAL candidate safety PASS.
+  - Final runtime isolation PASS: HAL inactive, hardware lock absent, no
+    OpenA8DJ process detected.
+  - Product HAL build restored after the probe.
+- Physical soundcheck result:
+  - Result: FAIL.
+  - `quality_alignment_score=0.961164`.
+  - SNR floor `9.98 dB`.
+  - mid/high residual ratios `1.459843/1.377935`.
+  - quiet mid noise `-34.84 dBFS`.
+  - `lag_jumps_gt_2_frames=25`.
+  - no clipping; click outliers `0`.
+- Runtime result:
+  - Promotion evaluator still FAIL.
+  - driver p95 `22.1%`, `coreaudiod` p95 `15.0%`.
+  - This remains far above mainline and does not improve quality enough to
+    justify enabling the flag.
+- Transport/runtime result:
+  - Capture ISO invariants PASS with warning
+    `classified_transactions_missing_in_stop_transfer_gap`.
+  - Stream stats show no output active underruns, no timeline resets, no late
+    writes, no capture/playback transfer-pool fallback allocations, and
+    playback/capture transfer delta `-1` at stop.
+- Failure-mode interpretation:
+  - Failure classifier still reports `timebase_or_alignment_instability`.
+  - Static L/R mix or polarity is not sufficient.
+  - Simple memoryless nonlinearity is not sufficient.
+- Product conclusion:
+  - Reject `HAL_REUSE_ISOC_COMPLETIONS=1` as a product default.
+  - Do not combine it with other rejected transport knobs unless the underlying
+    transport architecture changes and offline gates explain why the old
+    physical rejection no longer applies.
+- Evidence paths:
+  - `local-analysis/physical-product/20260617-reuse-isoc-completions/hal-candidate-safety/summary.txt`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/metrics.json`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/capture-iso-invariants.json`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/failure-modes.json`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/runtime-discontinuities.json`
+  - `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
+  - `local-analysis/runtime-isolation/after-reuse-isoc-completions-unload.json`
+  - `local-analysis/promotion-readiness-after-reuse-isoc-completions.json`

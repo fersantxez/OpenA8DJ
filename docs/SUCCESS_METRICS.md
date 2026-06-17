@@ -985,3 +985,29 @@ Latest promotion evaluation:
   - Do not count `HAL_CAPTURE_PACED_OUT_LEAD>1` as a candidate optimization
     until it preserves 1:1 transfer cadence and then passes physical music and
     CPU gates.
+
+## 2026-06-17 Updated Snapshot After Reused ISO Completion Handlers Probe
+
+Latest promotion evaluation:
+`local-analysis/promotion-readiness-after-reuse-isoc-completions.json`.
+
+- Branch promotion allowed: `false`.
+- Physical music quality: FAIL.
+  - Run:
+    `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal`.
+  - `quality_alignment_score=0.961164` versus required `>= 0.980000`.
+  - SNR floor `9.98 dB` versus required `>= 35.00 dB`.
+  - mid/high residual ratios `1.459843/1.377935` versus required maxima
+    `1.36/1.35`.
+  - quiet mid noise `-34.84 dBFS` versus required `<= -58.00 dBFS`.
+  - `lag_jumps_gt_2_frames=25` versus required `0`.
+- Runtime CPU beats mainline: FAIL.
+  - Product probe driver p95 `22.1%`.
+  - Product probe `coreaudiod` p95 `15.0%`.
+  - Mainline target remains around driver p95 `<= 6.5%` and `coreaudiod`
+    p95 `<= 1.7%` under comparable conditions.
+- Current threshold interpretation:
+  - `HAL_REUSE_ISOC_COMPLETIONS=1` is rejected as a product default.
+  - This result confirms that removing per-transfer block setup alone is not
+    enough; the remaining CPU problem is deeper in IOUSBHost enqueue/completion
+    behavior or transport architecture.

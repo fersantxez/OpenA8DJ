@@ -1036,3 +1036,16 @@ Next technical target:
     Debug `17/17`, Release `18/18`.
   - Next viable timing work must preserve 1:1 capture/playback cadence before
     asking for hardware time.
+- Latest locked CPU/hot-path probe:
+  `local-analysis/soundcheck/20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal`.
+  - Built with `HAL_REUSE_ISOC_COMPLETIONS=1` only.
+  - Quality still FAIL:
+    `quality_alignment_score=0.961164`, SNR floor `9.98 dB`, mid/high
+    residual `1.459843/1.377935`, quiet mid noise `-34.84 dBFS`, `25` lag
+    jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `22.1%`, `coreaudiod` p95 `15.0%`.
+  - Capture ISO invariants PASS with stop-window warning.
+  - No gross output underruns, timeline resets, late writes, or transfer-pool
+    fallback allocations.
+  - Decision: reject reused ISO completion handlers as product default.

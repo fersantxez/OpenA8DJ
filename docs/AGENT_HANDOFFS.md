@@ -1255,3 +1255,35 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Do not physically test implicit `HAL_CAPTURE_PACED_OUT_LEAD>1`.
   - If pursuing scheduling, implement a cadence-preserving explicit scheduler
     model first, then require offline PASS before lock/hardware.
+
+### Architect Reused ISO Completion Handlers Product Probe
+
+- Status:
+  - Completed under hardware lock.
+  - HAL unloaded after the run.
+  - Product HAL build restored.
+  - Runtime isolation PASS after cleanup.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Isolated `HAL_REUSE_ISOC_COMPLETIONS=1` failed quality:
+    quality `0.961164`, SNR floor `9.98 dB`, mid/high residual
+    `1.459843/1.377935`, `25` lag jumps.
+  - Runtime CPU still fails mainline:
+    driver p95 `22.1%`, `coreaudiod` p95 `15.0%`.
+  - Capture ISO invariants pass with stop-window warning.
+  - Stream stats show no output active underruns, timeline resets, late writes,
+    or transfer-pool fallback allocations.
+- Risks:
+  - The CPU problem remains dominated by IOUSBHost/transport behavior; small
+    hot-path cleanup flags have not delivered mainline-level resource use.
+  - Combining rejected knobs without a new model risks wasting hardware time.
+- Next recommended action:
+  - Keep `HAL_REUSE_ISOC_COMPLETIONS=0`.
+  - Focus on a transport redesign or a stronger scheduler model that preserves
+    1:1 cadence and can be proven offline before another physical run.
