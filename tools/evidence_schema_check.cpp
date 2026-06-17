@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/loopback-quality-analysis.json",
       root / "local-analysis/cpp-offline/capture-matrix-quality-analysis.json",
       root / "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
+      root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",

@@ -48,6 +48,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
+./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -111,6 +112,7 @@ transport_budget = load_json("transport-budget-model.json")
 loopback_quality = load_json("loopback-quality-analysis.json")
 capture_matrix_quality = load_json("capture-matrix-quality-analysis.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
+physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -308,6 +310,22 @@ summary = {
         "max_clean_wrong_source_leakage_db": channel_leakage_tone.get("max_clean_wrong_source_leakage_db"),
         "max_clean_inactive_deck_leakage_db": channel_leakage_tone.get("max_clean_inactive_deck_leakage_db"),
         "evidence": "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
+    },
+    "physical_run_product_superiority": {
+        "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",
+        "comparison_result": physical_run_product_superiority.get("result"),
+        "branch_promotion_supported": physical_run_product_superiority.get("branch_promotion_supported"),
+        "candidate_run": physical_run_product_superiority.get("candidate", {}).get("run"),
+        "candidate_quality_alignment_score": physical_run_product_superiority.get("candidate", {}).get("quality_alignment_score"),
+        "candidate_snr_floor_db": physical_run_product_superiority.get("candidate", {}).get("snr_floor_db"),
+        "candidate_driver_cpu_p95": physical_run_product_superiority.get("candidate", {}).get("driver_cpu_p95"),
+        "candidate_coreaudiod_cpu_p95": physical_run_product_superiority.get("candidate", {}).get("coreaudiod_cpu_p95"),
+        "failing_gates": [
+            gate.get("name")
+            for gate in physical_run_product_superiority.get("gates", [])
+            if gate.get("result") != "PASS"
+        ],
+        "evidence": "local-analysis/cpp-offline/physical-run-product-superiority.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

@@ -7553,3 +7553,65 @@ Operational note:
     execution, or superiority over mainline.
   - The future physical/DriverKit adapter must preserve these invariants while
     also passing same-session quality, CPU, routing, and timecode gates.
+
+## 2026-06-17 Native Product Superiority Comparator
+
+- Purpose:
+  - Strengthen the objective proof chain for audiophile readiness by making
+    the native C++ evidence bundle report whether the latest same-run physical
+    product evidence actually beats the mainline reference thresholds.
+  - Preserve the old physical-run summary mode while adding a default
+    `candidate_vs_mainline_reference` mode that reads existing evidence only.
+- Changes:
+  - Extended `tools/physical_run_compare.cpp` with latest complete
+    `local-analysis/soundcheck/*` selection, fixed mainline reference gates,
+    optional `--baseline RUN_DIR --candidate RUN_DIR`, and explicit
+    `branch_promotion_supported=false` when any product gate fails.
+  - Added `opena8djcpp_physical_run_compare` to CMake/CTest.
+  - Added
+    `local-analysis/cpp-offline/physical-run-product-superiority.json` to
+    `scripts/run-cpp-offline-gates`, the top-level offline summary, and the
+    evidence schema.
+  - Adjusted static policy so measuring the `coreaudiod` CPU column is allowed
+    while destructive service actions remain forbidden.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_run_compare`
+  - `make build/physical-run-compare`
+  - `./build/cpp-offline/opena8djcpp_physical_run_compare | tee local-analysis/cpp-offline/physical-run-product-superiority.json`
+  - `./build/physical-run-compare --latest-candidate | tee local-analysis/physical-run-compare/latest-product-superiority.json`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Native product comparator executed and valid JSON was verified.
+  - Latest selected complete candidate:
+    `20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+  - Comparator result: `FAIL`.
+  - `branch_promotion_supported=false`.
+  - Candidate metrics:
+    quality `0.963395`, SNR floor `9.675760 dB`, mid/high residual
+    `1.653871/1.494546`, quiet mid `-34.529464 dBFS`, lag jumps `32`,
+    click outliers `1`, clipping `0`, driver CPU p95 `16.6%`, and
+    `coreaudiod` p95 `35.4%`.
+  - Failed comparator gates:
+    `music_quality_alignment`, `music_snr_floor_db`,
+    `music_mid_residual_ratio`, `music_high_residual_ratio`,
+    `music_quiet_mid_noise_dbfs`, `music_lag_jumps_gt_2_frames`,
+    `music_click_outliers`, `driver_cpu_p95`, and `coreaudiod_cpu_p95`.
+  - Full offline gates after integration: PASS.
+  - Debug CTest: `29/29` passed.
+  - Release CTest: `30/30` passed.
+  - Evidence schema: PASS, `required_files=30`, missing `0`.
+  - Hardware touched: `false`.
+  - USB touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-run-product-superiority.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/physical-run-compare/latest-product-superiority.json`
+- Interpretation:
+  - This is a measurement-integrity improvement, not a sound-quality
+    improvement.
+  - The C++ line still cannot claim better sound quality, lower CPU, Traktor
+    timecode readiness, branch promotion readiness, or hardware readiness.

@@ -425,3 +425,25 @@ Latest promotion evaluation:
 Decision remains unchanged: keep `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=0`, do not
 move C mainline to Legacy, do not move C++ to `main`, and do not claim
 audiophile readiness.
+
+## 2026-06-17 Native Product Comparator Status
+
+Latest native product-superiority evidence:
+`local-analysis/cpp-offline/physical-run-product-superiority.json`.
+
+- Comparator result: `FAIL`.
+- Branch promotion support: `false`.
+- Latest selected candidate:
+  `20260617-iso12q8-irig-pairA-12s-cpp-hal`.
+- Candidate still fails mainline-reference product thresholds:
+  quality `0.963395 < 0.98`, SNR floor `9.675760 dB < 35 dB`,
+  mid/high residual `1.653871/1.494546`, quiet mid `-34.529464 dBFS`,
+  lag jumps `32`, click outliers `1`, driver CPU p95 `16.6%`, and
+  `coreaudiod` p95 `35.4%`.
+- Full offline gates still pass because this is an honest readiness report:
+  Debug CTest `29/29`, Release CTest `30/30`, evidence schema `30/30`.
+
+Decision remains unchanged: do not move C mainline to Legacy, do not move C++
+to `main`, do not claim audiophile readiness, and do not request physical
+readiness until same-session product evidence beats mainline quality and CPU
+and timecode physical validation exists.

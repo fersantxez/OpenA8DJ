@@ -4690,3 +4690,40 @@ Next implication:
 - The future runtime adapter must satisfy the scheduler contract and then prove
   physical quality and CPU against mainline. This contract does not by itself
   authorize driver installation, hardware readiness, or branch promotion.
+
+## 2026-06-17: Add Native Product Superiority Comparator
+
+Decision:
+- Extend `tools/physical_run_compare.cpp` from a summary helper into a native
+  product comparator with explicit `candidate_vs_mainline_reference` and
+  `candidate_vs_baseline_run` modes.
+- Add its output to the standard offline evidence bundle as
+  `local-analysis/cpp-offline/physical-run-product-superiority.json`.
+
+Reason:
+- The project objective is not compilation or clean counters; it is objectively
+  better sound quality, functionality, timecode behavior, and lower resource
+  use than mainline.
+- A native C++ comparator prevents cherry-picking: quality metrics and CPU must
+  be evaluated together, and missing or worse metrics fail closed.
+- The latest available same-run product evidence still fails both audiophile
+  quality and CPU/resource thresholds, so the evidence bundle must say that
+  plainly.
+
+Alternatives discarded:
+- Leave the decision only in Python promotion scripts: rejected because the C++
+  candidate should own a compiled, reproducible product-evidence check.
+- Treat a CPU-only win as progress toward promotion: rejected because previous
+  ISO-family runs can reduce CPU while failing quality and lag behavior.
+- Make the offline gate fail when product superiority fails: rejected because
+  the offline bundle should pass when it honestly records `FAIL` product
+  readiness; promotion remains blocked by the comparator and evaluator.
+
+Evidence:
+- `local-analysis/cpp-offline/physical-run-product-superiority.json`
+- `local-analysis/cpp-offline/current-offline-gates.json`
+
+Next implication:
+- Future physical windows must produce same-run product evidence that turns
+  this comparator to `PASS`, and promotion still requires the separate
+  promotion evaluator to return `branch_promotion_allowed=true`.

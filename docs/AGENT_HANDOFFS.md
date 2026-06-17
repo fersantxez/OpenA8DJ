@@ -2586,3 +2586,41 @@ Risk:
   shared offline WAV/quality helper after behavior settles.
 - Current real-capture analysis can pass routing/leakage while failing global
   SNR/correlation. That is expected and must not be over-interpreted.
+
+## 2026-06-17 Analysis Subagent: Product Evidence Priorities
+
+- Agent: Aquinas (`019ed681-f474-7192-a237-5af635ca67c2`).
+- Prompt summary:
+  - Read-only audit of `/Users/fer/dev/audio8djcpp` to identify the most
+    valuable measurement improvements for audiophile readiness.
+  - Mandatory warning included: do not touch `/Users/fer/dev/opena8dj` or
+    `/Users/fer/dev/audio8djrust`, only write in `/Users/fer/dev/audio8djcpp`,
+    and do not touch hardware/audio/CoreAudio/USB without the global lock and
+    authorized window.
+- Findings:
+  - Highest-value work is not more Mode2/packer work; the bottleneck is
+    real-music quality, timebase/lag behavior, leakage matrix evidence, CPU,
+    and physical timecode validation.
+  - Recommended first priority: reinforce or migrate real-music quality and
+    failure-mode analysis into C++ with objective parity to existing Python
+    metrics.
+  - Recommended guardrail: reject CPU-only wins because previous ISO-family
+    runs can reduce CPU while failing quality and lag.
+- Integrated action:
+  - Added native product-superiority reporting to
+    `tools/physical_run_compare.cpp`.
+  - Wired the comparator into CMake, CTest, `scripts/run-cpp-offline-gates`,
+    static policy, and evidence schema.
+- Files affected by integration:
+  - `tools/physical_run_compare.cpp`
+  - `CMakeLists.txt`
+  - `scripts/run-cpp-offline-gates`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+- Risk:
+  - The comparator currently reads existing analyzer metrics rather than
+    reimplementing WAV analysis itself. Next step is deeper C++ parity for
+    `analyze-soundcheck-capture.py` metrics.
+- Next action:
+  - Implement or reinforce native real-music/WAV metric parity for alignment,
+    SNR, residual bands, quiet noise, click outliers, clipping, and lag jumps.

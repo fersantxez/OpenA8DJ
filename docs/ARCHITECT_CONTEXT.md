@@ -1626,3 +1626,20 @@ Next technical target:
   - A stored physical direct-USB capture can pass routing/leakage while failing
     global SNR/correlation, reinforcing that no single metric is enough for
     audiophile readiness.
+
+### 2026-06-17 Native Product Superiority Comparator
+
+- Added native C++ product comparison evidence:
+  `local-analysis/cpp-offline/physical-run-product-superiority.json`.
+- The comparator reads existing soundcheck evidence only and checks the latest
+  complete candidate against mainline reference thresholds for music quality,
+  SNR, residuals, quiet noise, lag jumps, click outliers, clipping, driver CPU,
+  and `coreaudiod` CPU.
+- Current result is deliberately blocking:
+  `branch_promotion_supported=false`.
+- Latest selected candidate
+  `20260617-iso12q8-irig-pairA-12s-cpp-hal` fails quality and CPU:
+  quality `0.963395`, SNR floor `9.675760 dB`, lag jumps `32`, click outliers
+  `1`, driver CPU p95 `16.6%`, and `coreaudiod` p95 `35.4%`.
+- Offline gates pass, but this does not improve physical sound; it improves the
+  integrity of the readiness claim.
