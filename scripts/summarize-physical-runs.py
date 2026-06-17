@@ -101,6 +101,10 @@ def row_for_run(run_dir: Path, root: Path) -> dict[str, Any]:
             metrics.get("capture_clipped_frames", summary.get("capture_clipped_frames", ""))
         ),
         "first_energy_seconds": num(latency.get("first_energy_seconds", "")),
+        "record_first_energy_record_seconds": summary.get("record_first_energy_record_seconds", ""),
+        "player_after_start_seconds": summary.get("player_after_start_seconds", ""),
+        "player_after_first_write_seconds": summary.get("player_after_first_write_seconds", ""),
+        "first_energy_after_first_write_seconds": summary.get("first_energy_after_first_write_seconds", ""),
         "best_correlation": num(latency.get("best_correlation", "")),
         "aligned_snr_db": num(latency.get("aligned_snr_db", "")),
         "linear_fit_snr_db": num(latency.get("linear_fit_snr_db", "")),
@@ -136,6 +140,8 @@ def discover_runs(root: Path) -> list[Path]:
     bases = [
         root / "local-analysis" / "direct-usb-latency-marker",
         root / "local-analysis" / "direct-usb-soundcheck",
+        root / "local-analysis" / "direct-usb-timeline-instrumentation",
+        root / "local-analysis" / "direct-usb-reset-no-wait",
         root / "local-analysis" / "soundcheck",
     ]
     runs: list[Path] = []
