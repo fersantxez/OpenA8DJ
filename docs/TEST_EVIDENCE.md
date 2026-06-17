@@ -1,14 +1,17 @@
 # Test Evidence
 
-## 2026-06-17: Raw Playback Completion Counter Fix
+## 2026-06-17: Raw Capture And Playback Completion Counter Fix
 
 - Change:
   - Added `playbackTransfersCompletedRaw` to `OpenA8DJStreamStatsPayload`.
+  - Added `captureTransfersCompletedRaw` to `OpenA8DJStreamStatsPayload`.
   - Added `_playbackTransfersCompletedAtomic` and increment it once per
     playback completion, outside the hot-stream-stats sampling interval.
-  - `opena8dj-control stream-stats` now prints raw playback completions when
-    the field is present, falling back to the legacy sampled counter for older
-    HAL payloads.
+  - Added `_captureTransfersCompletedAtomic` and increment it once per capture
+    completion, outside the hot-stream-stats sampling interval.
+  - `opena8dj-control stream-stats` now prints raw capture and playback
+    completions when the fields are present, falling back to the legacy
+    sampled counters for older HAL payloads.
 - Commands:
   - `python3 scripts/check-stream-stats-contract.py`
   - `make -B hal`
@@ -17,10 +20,12 @@
     `local-analysis/physical-stream-stats-contract/20260617T132743Z-288f65a`.
   - Locked HAL safety and short iRig soundcheck after the fix:
     `local-analysis/physical-stream-stats-raw-completions/20260617T133008Z-288f65a`.
-  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-stream-stats-raw-completions-physical.json`
+  - Locked HAL safety and short iRig soundcheck after adding raw capture too:
+    `local-analysis/physical-stream-stats-raw-capture-playback/20260617T133414Z-fe668ef-retry`.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-stream-stats-raw-capture-playback-physical.json`
 - Result:
-  - Stream-stats contract PASS: `167` HAL fields, `167` control-tool fields,
-    `0` mismatches, last field `playbackTransfersCompletedRaw`.
+  - Stream-stats contract PASS: `168` HAL fields, `168` control-tool fields,
+    `0` mismatches, last field `captureTransfersCompletedRaw`.
   - Offline gates PASS.
   - Debug CTest: `100% tests passed, 0 tests failed out of 17`.
   - Release CTest: `100% tests passed, 0 tests failed out of 18`.
@@ -30,21 +35,23 @@
   - Before the fix, the same build-hardening line still reported
     `playbackTransfersSubmitted=8131` and `playbackTransfersCompleted=508`,
     proving the stale-tool/drift fix was not enough.
-  - After the raw completion fix, the short locked run reported
+  - After the raw playback completion fix, the short locked run reported
     `playbackTransfersSubmitted=8123` and `playbackTransfersCompleted=8123`.
-  - The same run reported `captureTransfersCompleted=508`, so C++ playback is
-    currently doing about `16x` more playback completions than capture
-    completions in this default physical path.
+  - After adding raw capture completions too, the retry short locked run
+    reported `captureTransfersCompleted=8137`,
+    `playbackTransfersSubmitted=8129`, and
+    `playbackTransfersCompleted=8129`.
+  - The earlier apparent `16x` playback/capture mismatch was a sampling
+    artifact, not a valid transport conclusion.
 - Physical quality result after the fix:
   - Soundcheck remains FAIL:
-    `quality_alignment_score=0.977635`, SNR `11.00 dB`,
-    `lag_jumps_gt_2_frames=21`,
-    mid/high residual `1.365994/1.351958`.
+    `quality_alignment_score=0.969899`, SNR `10.93 dB`,
+    `lag_jumps_gt_2_frames=20`,
+    mid/high residual `1.367151/1.355700`.
 - Interpretation:
   - The misleading `submitted/completed` mismatch is fixed.
-  - The new raw counters expose a real performance issue: C++ default playback
-    completion rate is high, and previous ISO64/coalesce experiments show that
-    naively reducing that rate breaks physical quality.
+  - The capture/playback completion-rate comparison is now trustworthy enough
+    to avoid the false `16x` hypothesis.
   - This is observability progress only. It is not a readiness or quality
     improvement claim.
 

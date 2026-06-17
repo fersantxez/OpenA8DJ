@@ -571,6 +571,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackPayloadGuardMismatches;
     uint64_t playbackTransfersSubmitted;
     uint64_t playbackTransfersCompletedRaw;
+    uint64_t captureTransfersCompletedRaw;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -2031,6 +2032,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_uint _playbackTransfersInFlight;
     atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersCompletedAtomic;
+    atomic_uint_fast64_t _captureTransfersCompletedAtomic;
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
     uint64_t _lastCaptureTransactionUSBTime;
@@ -2140,6 +2142,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_playbackTransfersInFlight, 0);
         atomic_init(&_playbackTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersCompletedAtomic, 0);
+        atomic_init(&_captureTransfersCompletedAtomic, 0);
         atomic_init(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
         AtomicStreamStatsReset(&_atomicStreamStats);
@@ -3543,6 +3546,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     atomic_store(&_outputFramesWrittenAtomic, 0);
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
+    atomic_store(&_captureTransfersCompletedAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
     AtomicStreamStatsReset(&_atomicStreamStats);
 #endif
@@ -3566,6 +3570,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
     stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);
     stats.playbackTransfersCompletedRaw = atomic_load(&_playbackTransfersCompletedAtomic);
+    stats.captureTransfersCompletedRaw = atomic_load(&_captureTransfersCompletedAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
@@ -4258,6 +4263,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     atomic_store(&_playbackTransfersInFlight, 0);
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
+    atomic_store(&_captureTransfersCompletedAtomic, 0);
     _lastCaptureCompletionHostTime = 0;
     _lastPlaybackCompletionHostTime = 0;
     _lastCaptureTransactionUSBTime = 0;
@@ -5154,6 +5160,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
 
     uint64_t captureToPlaybackQueueDelta = 0;
+    atomic_fetch_add_explicit(&_captureTransfersCompletedAtomic, 1, memory_order_relaxed);
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED
     if (playbackRequestCount > 0 && atomic_load(&_streaming)) {
         uint64_t playbackQueueTime = mach_absolute_time();

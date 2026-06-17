@@ -1,12 +1,14 @@
 # Decision Log
 
-## 2026-06-17: Separate Raw Playback Completions From Sampled Stream Stats
+## 2026-06-17: Separate Raw Capture/Playback Completions From Sampled Stream Stats
 
 Decision:
-- Add a raw playback completion counter and make `opena8dj-control` report it
-  as `playbackTransfersCompleted` when present.
+- Add raw capture and playback completion counters and make
+  `opena8dj-control` report them as `captureTransfersCompleted` and
+  `playbackTransfersCompleted` when present.
 - Keep the older sampled stream-stats counters for low-overhead diagnostics,
-  but do not compare sampled completions against raw submitted counts.
+  but do not compare sampled completions against raw submitted/completed
+  counts.
 
 Reason:
 - With `OPENA8DJ_HOT_STREAM_STATS_INTERVAL=16`, the existing
@@ -17,6 +19,12 @@ Reason:
 - After adding `playbackTransfersCompletedRaw`, the same style of locked
   soundcheck reports `playbackTransfersSubmitted=8123` and
   `playbackTransfersCompleted=8123`.
+- The apparent next conclusion, playback running `16x` faster than capture,
+  was also invalid because `captureTransfersCompleted` was sampled too.
+  Adding `captureTransfersCompletedRaw` makes the same style of retry run
+  report `captureTransfersCompleted=8137`,
+  `playbackTransfersSubmitted=8129`, and
+  `playbackTransfersCompleted=8129`.
 
 Alternatives discarded:
 - Disable hot-stream-stats sampling: rejected because it would add mutex work
@@ -24,25 +32,27 @@ Alternatives discarded:
 - Divide submitted by the sampling interval: rejected because it hides the real
   raw transfer rate and is wrong when sampling policy changes.
 - Rename existing public keys immediately: rejected because scripts already
-  consume `playbackTransfersCompleted`; the control tool can preserve the key
-  while using the raw field when available.
+  consume `captureTransfersCompleted` and `playbackTransfersCompleted`; the
+  control tool can preserve the keys while using raw fields when available.
 
 Evidence:
 - `local-analysis/physical-stream-stats-contract/20260617T132743Z-288f65a`:
   before fix, `8131` submitted versus `508` reported completed.
 - `local-analysis/physical-stream-stats-raw-completions/20260617T133008Z-288f65a`:
   after fix, `8123` submitted and `8123` completed.
-- The fixed run still failed quality:
-  alignment `0.977635`, SNR `11.00 dB`, `21` lag jumps.
+- `local-analysis/physical-stream-stats-raw-capture-playback/20260617T133414Z-fe668ef-retry`:
+  after adding raw capture too, `8137` capture completions, `8129` playback
+  submissions, and `8129` playback completions.
+- The fixed capture/playback run still failed quality:
+  alignment `0.969899`, SNR `10.93 dB`, `20` lag jumps.
 - Runtime isolation after cleanup:
-  `local-analysis/runtime-isolation/post-stream-stats-raw-completions-physical.json`,
+  `local-analysis/runtime-isolation/post-stream-stats-raw-capture-playback-physical.json`,
   PASS, HAL inactive, lock absent.
 
 Next implication:
-- C++ default playback currently completes about `16x` more often than capture
-  transfers (`8123` playback completions versus `508` capture completions in
-  the short run). This explains CPU pressure, but prior ISO64/coalesce tests
-  prove that reducing completion rate naively is not audiophile safe.
+- The `16x` playback/capture completion-rate hypothesis is rejected as a
+  measurement artifact. CPU work must use the new raw counters and cannot lean
+  on the older sampled transfer counters for rate comparisons.
 
 ## 2026-06-17: Make Stream-Stats Payload Drift A Gate Failure
 

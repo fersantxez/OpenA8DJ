@@ -238,6 +238,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackPayloadGuardMismatches;
     uint64_t playbackTransfersSubmitted;
     uint64_t playbackTransfersCompletedRaw;
+    uint64_t captureTransfersCompletedRaw;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1250,7 +1251,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
         stats->playbackScheduleOutOfWindow +
         stats->playbackScheduleFallbacks;
     printf("streaming=%u\n", stats->streaming);
-    printf("captureTransfersCompleted=%llu\n", (unsigned long long)stats->captureTransfers);
+    printf("captureTransfersCompleted=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, captureTransfersCompletedRaw) ?
+                                stats->captureTransfersCompletedRaw : stats->captureTransfers));
     printf("captureTransactionErrors=%llu\n", (unsigned long long)stats->captureTransactionFailures);
     printf("captureStatusFailures=%llu\n", (unsigned long long)stats->captureStatusFailures);
     printf("captureZeroCompleteTransactions=%llu\n", (unsigned long long)stats->captureZeroCompleteTransactions);
