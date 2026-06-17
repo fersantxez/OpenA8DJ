@@ -47,6 +47,11 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   clean packed USB payload or a clearly identified non-product route fault. The
   current result is diagnostic-only: packed USB is clean, but physical capture
   still fails after the device/analog/capture boundary.
+- iRig idle capture must remain below idle-noise guardrails before it can be
+  used as a trustworthy external capture device. Current idle evidence passes
+  diagnostic guardrails: max RMS `-66.94 dBFS`, max peak `-41.65 dBFS`, max
+  first-difference RMS `-68.87 dBFS`. This does not satisfy product quality; it
+  only permits the next route-isolation test with a known-good source.
 
 ### Mainline C Reference
 

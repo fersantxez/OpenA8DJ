@@ -65,6 +65,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
       root / "local-analysis/cpp-offline/direct-usb-path-attribution.json",
+      root / "local-analysis/cpp-offline/irig-idle-capture-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",

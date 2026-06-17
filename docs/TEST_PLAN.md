@@ -1180,6 +1180,19 @@ Direct USB path attribution:
   physical iRig capture still fails quality/SNR. This blocks packet/packer
   churn as the next explanation.
 
+iRig idle capture gate:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It consumes existing `local-analysis/irig-capture-isolation/**/
+  idle-capture-analysis.json` files only.
+- PASS means the latest saved iRig idle capture is below idle guardrails. It
+  does not prove Audio 8 output quality, mixer route quality, or product
+  readiness.
+- Current result: latest idle capture passes with max RMS `-66.94 dBFS`, max
+  peak `-41.65 dBFS`, and max first-difference RMS `-68.87 dBFS`.
+- Next physical test after this gate is known-good non-Audio8 source through
+  the same mixer/REC OUT -> iRig route. If that passes, test Audio 8 Pair A
+  directly into iRig to isolate the DAC/analog output from the mixer route.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.

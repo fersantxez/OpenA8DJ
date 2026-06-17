@@ -114,6 +114,39 @@ Next implication:
   removes mixer/EQ ambiguity. Only after the post-USB route is understood do
   HAL CPU/lag optimizations become product-decisive.
 
+## 2026-06-17: iRig Idle Capture Is Clean, Signal Route Still Unproven
+
+Decision:
+- Add `opena8djcpp_irig_idle_capture_gate` as a compiled evidence gate over
+  saved iRig idle captures.
+- Treat iRig idle cleanliness as route-isolation evidence only, not as product
+  quality or DAC proof.
+
+Reason:
+- A lock-gated capture opened only `iRig Stream` for recording. It did not play
+  audio, install/load HAL, restart CoreAudio, reset USB, or change default
+  devices.
+- The latest idle capture is quiet: max RMS `-66.94 dBFS`, max peak
+  `-41.65 dBFS`, and max first-difference RMS `-68.87 dBFS`.
+- This makes a permanently noisy iRig input less likely, while still leaving
+  the under-signal path unresolved: mixer/REC OUT, cabling, Audio 8 analog
+  output, or a route-specific interaction.
+
+Alternatives discarded:
+- Use idle capture as proof the physical route is healthy: rejected because no
+  signal was present and mixer/REC OUT behavior under signal is still unknown.
+- Keep optimizing packet format after clean USB diagnostics: rejected because
+  the current failing evidence remains post-USB/physical.
+
+Evidence:
+- `local-analysis/irig-capture-isolation/20260617T185109Z-irig-idle-12s`.
+- `local-analysis/cpp-offline/irig-idle-capture-gate.json`.
+
+Next implication:
+- The next minimum physical test is a known-good non-Audio8 source through the
+  same mixer/REC OUT -> iRig route using a deterministic reference. If that
+  passes, test Audio 8 Pair A directly to iRig without mixer/EQ ambiguity.
+
 ## 2026-06-17: Instrument Direct USB Timeline, Keep Reset Reply Wait Default
 
 Decision:

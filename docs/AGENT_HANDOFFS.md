@@ -26,8 +26,45 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Euler | Read-only physical evidence triage after diagnostic capture. | findings integrated in this document |
 | Carver | Read-only steady CPU/sample audit after v5 profiling. | recommended output-only no-capture ISO experiment; integrated as opt-in only |
 | Einstein | Read-only C++ versus mainline HAL CPU divergence audit. | findings integrated in this document |
+| Ohm | Read-only capture-route isolation review after clean Direct USB / failed iRig evidence. | known-good source first, then Audio 8 direct-to-iRig; integrated below |
 
 ## Findings Integrated
+
+### Ohm Capture Route Isolation Reviewer
+
+- Agent: `019ed6ea-d814-7c92-9173-f606afb367ed`.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Mission:
+  - Inspect current C++ evidence in read-only mode and identify the next
+    minimum physical test to separate iRig/mixer/capture route, Audio 8 analog
+    output/DAC, and reference/analyzer problems.
+- Findings:
+  - Do not run another HAL tweak as the next physical step.
+  - Use a known-good non-Audio8 source playing the same deterministic reference
+    through the existing mixer/REC OUT -> iRig route first.
+  - If that passes, test Audio 8 Pair A directly into iRig without mixer/EQ
+    ambiguity.
+  - Existing gates can prove clean USB before the device and bad physical
+    capture, but cannot separate Audio 8 DAC from mixer/iRig/cabling while all
+    captures share the same post-DAC route.
+- Files affected by integration:
+  - `tools/irig_idle_capture_gate.cpp`.
+  - `tools/direct_usb_path_attribution.cpp`.
+  - `scripts/run-cpp-offline-gates`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/SUCCESS_METRICS.md`.
+  - `docs/TEST_PLAN.md`.
+  - `docs/TEST_EVIDENCE.md`.
+- Next action:
+  - Run a lock-gated known-good-source route test when a controllable external
+    source is available. Do not claim DAC failure or product readiness before
+    that separation.
 
 ### Mainline C Archaeologist
 

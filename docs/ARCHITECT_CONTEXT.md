@@ -41,6 +41,13 @@ Branch: `driverkit/cpp-redesign`
   USB check errors `0`, and panic flags `0`. The same run's iRig capture still
   fails quality and SNR, so the current dominant physical residual is after the
   packed USB payload: Audio 8 DJ hardware/DAC/analog route/mixer/iRig capture.
+- A lock-gated iRig idle capture was added as route isolation evidence. With no
+  playback, no HAL, no CoreAudio restart, no USB reset, and no default changes,
+  iRig Stream recorded 12.01s at 48 kHz with max RMS `-66.94 dBFS`, max peak
+  `-41.65 dBFS`, and max first-difference RMS `-68.87 dBFS`. The new
+  `opena8djcpp_irig_idle_capture_gate` passes this as idle-noise evidence only:
+  it reduces the likelihood that iRig is permanently noisy, but it does not
+  distinguish Audio 8 analog output from mixer/REC OUT under signal.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
   `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the

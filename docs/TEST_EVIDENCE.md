@@ -112,8 +112,10 @@
   - `./build/cpp-offline/opena8djcpp_direct_usb_path_attribution | tee local-analysis/cpp-offline/direct-usb-path-attribution.json`
 - Result:
   - Gate PASS as diagnostic attribution, not product readiness.
-  - Direct USB runs with required artifacts: `1`.
-  - Internal clean runs: `1`.
+  - Direct USB runs with required artifacts: `6`.
+  - Internal clean runs: `2`.
+  - Capture failed after clean internal USB: `2`.
+  - Physical routing PASS runs: `1`.
   - Product candidate runs: `0`.
   - Latest run attribution:
     `post_usb_device_analog_or_capture_route_dominant`.
@@ -128,6 +130,39 @@
     analog route, mixer, or iRig capture path.
 - Evidence:
   - `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+
+## 2026-06-17: iRig Idle Capture Isolation Gate
+
+- Physical command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" ./build/audio-record 12 local-analysis/irig-capture-isolation/20260617T185109Z-irig-idle-12s/captured.wav "iRig Stream" 1,2 0.0003`
+- Safety:
+  - Lock acquired.
+  - No playback.
+  - No HAL install/load.
+  - No CoreAudio restart.
+  - No USB reset.
+  - No default-device or sample-rate changes requested.
+- Change:
+  - Added `opena8djcpp_irig_idle_capture_gate`.
+  - Integrated it into CMake, CTest, `scripts/run-cpp-offline-gates`, static
+    policy, and the evidence schema.
+- Focused result:
+  - Gate PASS as idle capture characterization, not product readiness.
+  - Latest idle capture duration: `12.010667s`.
+  - Sample rate: `48000`.
+  - Max RMS: `-66.938222 dBFS`.
+  - Max peak: `-41.649613 dBFS`.
+  - Max first-difference RMS: `-68.872876 dBFS`.
+  - `idle_capture_unhealthy=false`.
+- Interpretation:
+  - iRig idle noise is not high enough to explain the failing music/direct USB
+    captures by itself.
+  - This still does not prove the mixer/REC OUT route under signal or the Audio
+    8 analog/DAC output. The next useful physical check is a known-good
+    non-Audio8 source through the same mixer/REC OUT -> iRig path.
+- Evidence:
+  - `local-analysis/irig-capture-isolation/20260617T185109Z-irig-idle-12s`.
+  - `local-analysis/cpp-offline/irig-idle-capture-gate.json`.
 
 ## 2026-06-17: Direct USB Timeline Instrumentation And Reset No-Wait Rejection
 

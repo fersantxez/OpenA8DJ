@@ -266,6 +266,9 @@ add_executable(opena8djcpp_physical_capture_forensics
 add_executable(opena8djcpp_direct_usb_path_attribution
   tools/direct_usb_path_attribution.cpp)
 
+add_executable(opena8djcpp_irig_idle_capture_gate
+  tools/irig_idle_capture_gate.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -317,6 +320,7 @@ add_test(NAME opena8djcpp_physical_run_compare COMMAND opena8djcpp_physical_run_
 add_test(NAME opena8djcpp_physical_evidence_frontier COMMAND opena8djcpp_physical_evidence_frontier)
 add_test(NAME opena8djcpp_physical_capture_forensics COMMAND opena8djcpp_physical_capture_forensics)
 add_test(NAME opena8djcpp_direct_usb_path_attribution COMMAND opena8djcpp_direct_usb_path_attribution)
+add_test(NAME opena8djcpp_irig_idle_capture_gate COMMAND opena8djcpp_irig_idle_capture_gate)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

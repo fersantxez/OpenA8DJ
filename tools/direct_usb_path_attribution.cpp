@@ -22,6 +22,8 @@ constexpr double kCleanSnrGate = 120.0;
 struct DirectRun {
   std::filesystem::path dir;
   bool has_required_artifacts = false;
+  bool has_evidence_time = false;
+  std::filesystem::file_time_type evidence_time{};
 
   double written_alignment = std::numeric_limits<double>::quiet_NaN();
   double written_left_snr = std::numeric_limits<double>::quiet_NaN();
@@ -51,6 +53,8 @@ struct DirectRun {
   double failure_polynomial_improve_db = std::numeric_limits<double>::quiet_NaN();
   double lti_mid_coherence = std::numeric_limits<double>::quiet_NaN();
   double lti_snr_delta_db = std::numeric_limits<double>::quiet_NaN();
+  bool physical_routing_pass = false;
+  double max_wrong_source_leakage_db = std::numeric_limits<double>::quiet_NaN();
 
   std::string attribution;
   bool internal_clean = false;
@@ -195,15 +199,36 @@ void print_number(double value) {
   }
 }
 
+void update_evidence_time(DirectRun& run, const std::filesystem::path& path) {
+  std::error_code error;
+  const auto time = std::filesystem::last_write_time(path, error);
+  if (error) {
+    return;
+  }
+  if (!run.has_evidence_time || time > run.evidence_time) {
+    run.evidence_time = time;
+    run.has_evidence_time = true;
+  }
+}
+
 DirectRun read_run(const std::filesystem::path& dir) {
   DirectRun run{};
   run.dir = dir;
 
   const auto diagnostics = read_file(dir / "driver-diagnostics-analysis.txt");
   const auto native = read_file(dir / "native-wav-quality.json");
+  const auto metrics = read_file(dir / "metrics.json");
   const auto failure = read_file(dir / "failure-modes.json");
   const auto lti = read_file(dir / "lti-transfer-quality.json");
-  run.has_required_artifacts = !diagnostics.empty() && !native.empty();
+  const auto tone_matrix = read_file(dir / "tone-matrix.json");
+  run.has_required_artifacts = !diagnostics.empty() && (!native.empty() || !metrics.empty());
+  for (const auto& path : {dir / "driver-diagnostics-analysis.txt", dir / "native-wav-quality.json",
+                           dir / "metrics.json", dir / "failure-modes.json",
+                           dir / "lti-transfer-quality.json", dir / "tone-matrix.json"}) {
+    if (std::filesystem::is_regular_file(path)) {
+      update_evidence_time(run, path);
+    }
+  }
 
   run.written_alignment = number_or_nan(key_value_number(diagnostics, "written_alignment_score"));
   run.written_left_snr = number_or_nan(key_value_number(diagnostics, "written_left_snr_db"));
@@ -219,16 +244,17 @@ DirectRun read_run(const std::filesystem::path& dir) {
   run.usb_check_errors = number_or_nan(key_value_number(diagnostics, "usb_check_errors"));
   run.usb_panic_flags = number_or_nan(key_value_number(diagnostics, "usb_panic_flags"));
 
-  run.capture_quality = number_or_nan(json_number(native, "quality_alignment_score"));
-  run.capture_left_snr = number_or_nan(json_number(native, "left_snr_db"));
-  run.capture_right_snr = number_or_nan(json_number(native, "right_snr_db"));
-  run.capture_mid_ratio = number_or_nan(json_number(native, "mid_band_residual_ratio"));
-  run.capture_high_ratio = number_or_nan(json_number(native, "high_band_residual_ratio"));
-  run.capture_lag_jumps = number_or_nan(json_number(native, "lag_jumps_gt_2_frames"));
-  run.timing_explain_db = number_or_nan(json_number(native, "timing_explain_db"));
-  run.routing_matrix_explain_db = number_or_nan(json_number(native, "routing_matrix_explain_db"));
+  const auto& capture_json = native.empty() ? metrics : native;
+  run.capture_quality = number_or_nan(json_number(capture_json, "quality_alignment_score"));
+  run.capture_left_snr = number_or_nan(json_number(capture_json, "left_snr_db"));
+  run.capture_right_snr = number_or_nan(json_number(capture_json, "right_snr_db"));
+  run.capture_mid_ratio = number_or_nan(json_number(capture_json, "mid_band_residual_ratio"));
+  run.capture_high_ratio = number_or_nan(json_number(capture_json, "high_band_residual_ratio"));
+  run.capture_lag_jumps = number_or_nan(json_number(capture_json, "lag_jumps_gt_2_frames"));
+  run.timing_explain_db = number_or_nan(json_number(capture_json, "timing_explain_db"));
+  run.routing_matrix_explain_db = number_or_nan(json_number(capture_json, "routing_matrix_explain_db"));
   run.residual_classification =
-      json_string(native, "classification").value_or("missing_or_not_reanalyzed");
+      json_string(capture_json, "classification").value_or("missing_or_not_reanalyzed");
 
   run.failure_drift_ppm = number_or_nan(json_number(failure, "drift_ppm"));
   run.failure_matrix_improve_db = number_or_nan(json_number(failure, "snr_improvement_db"));
@@ -239,6 +265,9 @@ DirectRun read_run(const std::filesystem::path& dir) {
   }
   run.lti_mid_coherence = number_or_nan(json_number(lti, "min_mid_coherence"));
   run.lti_snr_delta_db = number_or_nan(json_number(lti, "min_lti_snr_delta_db"));
+  run.physical_routing_pass = json_string(tone_matrix, "result").value_or("missing") == "PASS";
+  run.max_wrong_source_leakage_db =
+      number_or_nan(json_number(tone_matrix, "max_wrong_source_leakage_db"));
 
   const auto min_written_snr = std::min(run.written_left_snr, run.written_right_snr);
   const auto min_consumed_snr = std::min(run.consumed_left_snr, run.consumed_right_snr);
@@ -272,7 +301,12 @@ const DirectRun* latest_attribution_run(const std::vector<DirectRun>& runs) {
     if (!run.has_required_artifacts) {
       continue;
     }
-    if (selected == nullptr || run.dir.string() > selected->dir.string()) {
+    if (selected == nullptr ||
+        (run.has_evidence_time && !selected->has_evidence_time) ||
+        (run.has_evidence_time && selected->has_evidence_time &&
+         run.evidence_time > selected->evidence_time) ||
+        (run.has_evidence_time == selected->has_evidence_time &&
+         run.evidence_time == selected->evidence_time && run.dir.string() > selected->dir.string())) {
       selected = &run;
     }
   }
@@ -301,10 +335,12 @@ int main(int argc, char** argv) {
   std::uint32_t internal_clean_runs = 0;
   std::uint32_t capture_failed_after_clean_runs = 0;
   std::uint32_t product_candidates = 0;
+  std::uint32_t physical_routing_pass_runs = 0;
   for (const auto& run : runs) {
     required_artifact_runs += run.has_required_artifacts ? 1U : 0U;
     internal_clean_runs += run.internal_clean ? 1U : 0U;
     capture_failed_after_clean_runs += (run.internal_clean && run.capture_failed) ? 1U : 0U;
+    physical_routing_pass_runs += run.physical_routing_pass ? 1U : 0U;
     const auto snr_floor = std::min(run.capture_left_snr, run.capture_right_snr);
     product_candidates +=
         (run.internal_clean && run.capture_quality >= kQualityGate && snr_floor >= kSnrGate) ? 1U
@@ -323,6 +359,7 @@ int main(int argc, char** argv) {
             << "  \"required_artifact_runs\": " << required_artifact_runs << ",\n"
             << "  \"internal_clean_runs\": " << internal_clean_runs << ",\n"
             << "  \"capture_failed_after_clean_runs\": " << capture_failed_after_clean_runs << ",\n"
+            << "  \"physical_routing_pass_runs\": " << physical_routing_pass_runs << ",\n"
             << "  \"product_candidate_runs\": " << product_candidates << ",\n"
             << "  \"latest_run\": ";
   if (latest != nullptr) {
@@ -362,6 +399,10 @@ int main(int argc, char** argv) {
     print_number(latest->lti_mid_coherence);
     std::cout << ", \"lti_snr_delta_db\": ";
     print_number(latest->lti_snr_delta_db);
+    std::cout << ", \"physical_routing_pass\": "
+              << (latest->physical_routing_pass ? "true" : "false");
+    std::cout << ", \"max_wrong_source_leakage_db\": ";
+    print_number(latest->max_wrong_source_leakage_db);
     std::cout << ", \"residual_classification\": \""
               << json_escape(latest->residual_classification) << "\"},\n";
   } else {
