@@ -1867,3 +1867,53 @@ Evidence:
   PASS, HAL inactive, lock absent.
 - Promotion readiness:
   `local-analysis/promotion-readiness-current.json`, FAIL, promotion forbidden.
+
+## 2026-06-17: Reject Native 24-Bit Output And Stop Byte-Format Sweeps
+
+Decision:
+- Keep the default physical output byte format as Mode 2 big-endian 24-bit
+  with `HAL_OUTPUT_START_BYTE=4` and `HAL_OUTPUT_CHECK_OFFSET=8`.
+- Reject `HAL_OUTPUT_NATIVE=1` as unsafe for this hardware path.
+- Stop spending physical windows on simple byte-order/start-byte sweeps until
+  new evidence contradicts the diagnostic capture.
+
+Reason:
+- The diagnostic HAL captured written frames, consumed frames, and packed USB
+  bytes for a failing Pair A/iRig music run. The internal path was perfect
+  against the reference: written/consumed/packed output comparisons aligned at
+  score `1.000000`, packed USB had `0` check errors, `0` panic flags, and
+  decoded at gain `0.5` with effectively zero residual.
+- The physical analog capture from the same run still failed with SNR about
+  `10.51 dB`, `40` lag jumps, and mid/high residual ratios about
+  `1.428/1.359`.
+- The native/little-endian A/B was catastrophic: quality alignment about
+  `0.0036`, SNR `-63.94 dB`, quiet noise about `-8.87 dBFS`, and more than
+  `520k` clipped capture frames.
+
+Alternatives discarded:
+- Promote native/little-endian output as a possible fix: rejected by physical
+  clipping and near-zero alignment.
+- Continue random start-byte/check-offset sweeps: rejected because the current
+  packed output bytes decode perfectly at the established big/start4/check8
+  contract and inactive output pairs remain zero.
+- Treat the diagnostic internal PASS as readiness: rejected because the iRig
+  physical run still fails product-quality thresholds.
+
+Evidence:
+- Diagnostic run:
+  `local-analysis/soundcheck/20260617-diag-pack-big-start4-irig-pairA-16s-cpp-hal`.
+- Output USB analysis:
+  `local-analysis/driver-capture-analysis/diag-pack-big-start4-output-packed-usb-auto.txt`
+  and pair A-D variants.
+- Input USB analysis:
+  `local-analysis/driver-capture-analysis/diag-pack-big-start4-input-packed-usb-pairA.txt`
+  through `pairD.txt`.
+- Native A/B rejection:
+  `local-analysis/soundcheck/20260617-native-i24-start4-irig-pairA-16s-cpp-hal`.
+- Final cleanup:
+  `local-analysis/runtime-isolation/final-after-disable-native-reject.json`,
+  PASS, HAL inactive and lock absent.
+
+Next decision pressure:
+- The next candidate must investigate device/USB scheduling or physical route
+  behavior after packed output bytes, not superficial HAL byte-format changes.

@@ -149,6 +149,33 @@ Branch: `driverkit/cpp-redesign`
   `opena8dj-control stream-stats` and `stream-stats-during.tsv`. This is
   observability only; CPU/readiness claims must account for instrumentation
   overhead.
+- 2026-06-17 transfer-ledger physical diagnostics narrowed the current
+  blocker. The default `a51ee29` music run still failed
+  (`quality_alignment_score=0.964608`, SNR `10.48 dB`, lag jumps `36`) with no
+  fallback allocations, no active underruns, and no queue/complete deltas
+  explaining the failure. The diagnostic build then captured written,
+  consumed, and packed output bytes for another failing run; those internal
+  paths were perfect against the reference, and packed output USB decoded as
+  Mode 2 `big/start4/check8` with `0` check errors, `0` panic flags, Pair A
+  gain `0.5`, and no B/C/D leakage. The physical iRig capture still failed
+  (`quality_alignment_score=0.963726`, SNR `10.51 dB`, lag jumps `40`).
+- `HAL_OUTPUT_NATIVE=1` was physically rejected and must not be used as a
+  candidate/default: quality alignment `0.003598`, SNR `-63.94 dB`, quiet noise
+  `-8.87 dBFS`, and `520014` clipped capture frames. The active native HAL was
+  parked under lock at
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260617T035921Z-cpp-native-reject`
+  after CoreAudio respawned the process.
+- Current clean runtime state after the native rejection cleanup:
+  `local-analysis/runtime-isolation/final-after-disable-native-reject.json`,
+  result `PASS`, HAL inactive, lock absent, no OpenA8DJ process. Audio stack
+  health also passed with watched audio CPU `0.0%`.
+- The current strongest technical conclusion is negative but useful: the
+  product failure is not explained by CoreAudio-to-HAL written frames, HAL
+  consumed frames, basic Pair A routing, inactive deck leakage, start byte,
+  check offset, big-endian Mode 2 packing, or USB check/panic flags in the
+  bytes produced by the driver. The next hypothesis must move after packed
+  output bytes: actual USB/device scheduling/state, hardware interpretation,
+  analog route/reference path, or physical capture-route mismatch.
 
 ## Known Baseline Inputs
 
@@ -211,6 +238,13 @@ Branch: `driverkit/cpp-redesign`
 - Physical validation must follow `docs/PHYSICAL_TEST_WINDOW_PLAN.md`, use the
   global hardware lock, and avoid default-device/sample-rate/buffer changes
   unless explicitly part of a documented window.
+- Operational debt:
+  - Post-reboot Codex auto-resume/login recovery did not work reliably and
+    remains a separate infrastructure bug to fix later.
+  - During the 2026-06-17 physical diagnostic iteration, an accidental
+    untracked file was briefly created in `/Users/fer/dev/opena8dj` and then
+    immediately removed. Follow-up checks confirmed
+    `/Users/fer/dev/opena8dj/scripts/analyze-channel-transients.py` is absent.
 
 ## 2026-06-16 Current Iteration: Lifecycle Parity Candidate
 

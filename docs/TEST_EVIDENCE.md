@@ -3311,3 +3311,151 @@ Operational note:
 - Interpretation:
   - This is an observability fix only. It makes future coalescing diagnostics
     less misleading; it is not a quality or CPU improvement claim.
+
+## 2026-06-17: Transfer-Ledger Diagnostic Physical Run And Format A/B
+
+- Candidate:
+  - Commit `a51ee29` (`Instrument aggregate USB transfer ledger`), default
+    output format `HAL_OUTPUT_NATIVE=0`, `HAL_OUTPUT_START_BYTE=4`,
+    `HAL_OUTPUT_CHECK_OFFSET=8`.
+- Preflight:
+  - Hardware lock acquired/released for device enumeration.
+  - `iRig Stream` visible as CoreAudio `2 in / 2 out`, `48000`.
+  - `Audio 8 DJ` visible on USB as VID/PID `0x17cc:0x1978`, serial
+    `SN-HKM6Q6EDKP`.
+  - Evidence:
+    `local-analysis/hardware-preflight/20260616T234124-ledger-preflight`
+    and
+    `local-analysis/hardware-preflight/20260616T234140-ledger-device-enum`.
+- Default physical soundcheck:
+  - Evidence:
+    `local-analysis/soundcheck/20260617-transfer-ledger-a51ee29-irig-pairA-16s-cpp-hal`.
+  - Result: `FAIL`.
+  - `quality_alignment_score=0.964608`.
+  - `analog_snr_db=10.48`.
+  - `lag_jumps_gt_2_frames=36`.
+  - `mid_band_residual_ratio=1.420201`.
+  - `high_band_residual_ratio=1.364979`.
+  - `quiet_mid_band_noise_dbfs=-35.88`.
+  - `capture_clipped_frames=0`.
+  - Stream-stats summary:
+    `local-analysis/stream-stats/transfer-ledger-a51ee29-summary.json`.
+  - Diagnostic flags: `stream_stats_timeouts`,
+    `transfer_ledger_overwritten`. No fallback allocations, no active
+    underruns, and no queue/complete deltas explaining the failure.
+- Diagnostic HAL capture:
+  - Build flags:
+    `HAL_DIAGNOSTIC=1 HAL_OUTPUT_AMPLITUDE_STATS=1 HAL_OUTPUT_NATIVE=0
+    HAL_OUTPUT_START_BYTE=4 HAL_OUTPUT_CHECK_OFFSET=8
+    HAL_UNROLLED_OUTPUT_PACK=0`.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-diag-pack-big-start4-irig-pairA-16s-cpp-hal`.
+  - Physical result: `FAIL`.
+  - `quality_alignment_score=0.963726`.
+  - `analog_snr_db=10.51`.
+  - `lag_jumps_gt_2_frames=40`.
+  - `mid_band_residual_ratio=1.428404`.
+  - `high_band_residual_ratio=1.359313`.
+  - Diagnostic files copied into the run directory:
+    `opena8dj-output-written-f32.raw`,
+    `opena8dj-output-consumed-f32.raw`,
+    `opena8dj-output-packed-usb.raw`,
+    `opena8dj-input-packed-usb.raw`,
+    `opena8dj-output-events.tsv`.
+  - Driver-capture analysis:
+    `local-analysis/driver-capture-analysis/diag-pack-big-start4-output-packed-usb-auto.txt`.
+  - Output USB control result:
+    `usb_check_offset=8`, `usb_start_byte=4`, `usb_byte_order=big`,
+    `usb_check_errors=0`, `usb_panic_flags=0`,
+    `usb_alignment_score=1.000000`, left/right gain `0.50000000`,
+    left/right SNR `999.00 dB`.
+  - Written/consumed/packed path result from the same diagnostic run:
+    written, consumed, written-vs-consumed, and packed USB comparisons were
+    perfect against the reference over the analyzed window.
+- Input USB analysis:
+  - Evidence:
+    `local-analysis/driver-capture-analysis/diag-pack-big-start4-input-packed-usb-pairA.txt`
+    through `pairD.txt`.
+  - Input packet checks are valid: `usb_check_errors=0`,
+    `usb_panic_flags=0`, `usb_decoded_frames=600000`.
+  - Input gains against the played reference are tiny for all pairs
+    (`~ -0.00017` to `-0.00058`) with negative SNR around `-39` to `-44 dB`.
+  - Interpretation: the input USB capture is not a useful music loopback
+    reference for the current iRig/mixer path.
+- Output no-leakage analysis:
+  - Evidence:
+    `local-analysis/driver-capture-analysis/diag-pack-big-start4-output-packed-usb-pairA.txt`
+    through `pairD.txt`.
+  - Pair A is perfect at gain `0.5`.
+  - Pairs B/C/D decode as zero for the Pair A run, so the basic output routing
+    matrix did not leak into inactive decks in the packed USB bytes.
+- Native format A/B:
+  - Build flags:
+    `HAL_OUTPUT_NATIVE=1 HAL_DIAGNOSTIC=0 HAL_OUTPUT_AMPLITUDE_STATS=0
+    HAL_OUTPUT_START_BYTE=4 HAL_OUTPUT_CHECK_OFFSET=8
+    HAL_UNROLLED_OUTPUT_PACK=0`.
+  - Evidence:
+    `local-analysis/soundcheck/20260617-native-i24-start4-irig-pairA-16s-cpp-hal`.
+  - Result: catastrophic `FAIL`.
+  - `quality_alignment_score=0.003598`.
+  - `analog_snr_db=-63.94`.
+  - `quiet_mid_band_noise_dbfs=-8.87`.
+  - `capture_clipped_frames=520014`.
+  - Interpretation: native/little-endian 24-bit output is physically rejected
+    and must not be used as a candidate/default.
+- Cleanup:
+  - The native HAL process respawned after normal recovery and user-level
+    `kill` was not permitted.
+  - Under the hardware lock, the active HAL bundle was moved to
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver.disabled-20260617T035921Z-cpp-native-reject`
+    and the respawn stopped.
+  - Final isolation:
+    `local-analysis/runtime-isolation/final-after-disable-native-reject.json`,
+    `PASS`, HAL inactive, lock absent, no OpenA8DJ HAL process.
+  - Final audio stack health: `PASS`, watched audio CPU `0.0%`.
+- Operational note:
+  - During this iteration an accidental untracked file was briefly created in
+    the read-only mainline path and immediately removed:
+    `/Users/fer/dev/opena8dj/scripts/analyze-channel-transients.py`.
+  - Follow-up checks confirmed that file is absent and clean in mainline.
+- Interpretation:
+  - The current failure is not explained by CoreAudio-to-HAL written frames,
+    HAL consumed frames, basic Pair A routing, inactive deck leakage,
+    start-byte/check-offset, big-endian Mode 2 packing, or USB check/panic
+    flags in the bytes produced by the driver.
+  - The remaining high-priority fault space is after the packed output bytes:
+    actual USB/device scheduling or state, hardware interpretation, analog
+    route/reference path, or a physical capture-route mismatch.
+  - Promotion/readiness remains `FAIL`.
+
+## 2026-06-17: Transfer-Ledger Evidence Documentation Verification
+
+- Change:
+  - Updated `ARCHITECT_CONTEXT.md`, `AGENT_HANDOFFS.md`,
+    `DECISION_LOG.md`, `SUCCESS_METRICS.md`, `TEST_EVIDENCE.md`, and
+    `local-analysis/usb-physical-investigation-summary.json` with the
+    transfer-ledger diagnostic conclusions.
+- Commands:
+  - `git diff --check`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-transfer-ledger-doc-update.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Result:
+  - Diff whitespace check PASS.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ HAL
+    process.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`, evidence schema
+    PASS with `22` required files and `0` missing.
+  - Release benchmark after the documentation update:
+    `pack_mib_s=1628.44`, `decode_into_mib_s=587.742`,
+    `route_frames_s=9.78303e+08`, `route_advanced_frames_s=4.99521e+08`.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+- Current promotion blockers:
+  - `physical_music_quality`: latest native run is catastrophic and the
+    diagnostic/default transfer-ledger runs also fail strict music thresholds.
+  - `runtime_cpu_beats_mainline`: latest OpenA8DJ driver p95 about `37.4%`,
+    above the mainline reference `6.5%`.
+  - `latest_physical_investigation`: still `FAIL_NOT_READY`.
+  - `traktor_timecode_physical`: no locked physical Traktor/timecode-vinyl
+    evidence yet.

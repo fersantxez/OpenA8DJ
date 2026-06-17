@@ -181,6 +181,39 @@ C++ evidence set:
 | evidence schema | `PASS` | `local-analysis/cpp-offline/evidence-schema.json` |
 | runtime isolation quiescence | `PASS` | `local-analysis/runtime-isolation/current.json` |
 
+## Current Physical Readiness Status
+
+As of 2026-06-17, physical readiness remains `FAIL_NOT_READY`.
+
+The latest transfer-ledger diagnostic run narrows the fault space but does not
+improve product quality:
+
+| Metric | Result |
+|---|---:|
+| default transfer-ledger music quality alignment | `0.964608` |
+| default transfer-ledger analog SNR | `10.48 dB` |
+| default transfer-ledger lag jumps > 2 frames | `36` |
+| diagnostic music quality alignment | `0.963726` |
+| diagnostic analog SNR | `10.51 dB` |
+| diagnostic lag jumps > 2 frames | `40` |
+| diagnostic packed output USB alignment | `1.000000` |
+| diagnostic packed output USB check errors | `0` |
+| diagnostic packed output USB panic flags | `0` |
+| diagnostic packed output inactive deck leakage | `B/C/D zero` |
+| native-output music quality alignment | `0.003598` |
+| native-output analog SNR | `-63.94 dB` |
+| native-output clipped capture frames | `520014` |
+
+Interpretation:
+
+- Offline C++ gates currently pass.
+- The HAL written, consumed, and packed output bytes can be perfect while the
+  analog/iRig music capture still fails.
+- `HAL_OUTPUT_NATIVE=1` is rejected and must not be used as a candidate.
+- No claim that C++ is better than mainline is allowed until physical music
+  quality, runtime CPU, physical timecode/Traktor, and latest investigation
+  gates all pass with reproducible evidence.
+
 Current Release benchmark values:
 
 | Metric | Current value | PASS floor |

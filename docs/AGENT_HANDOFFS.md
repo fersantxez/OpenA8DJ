@@ -21,6 +21,9 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Lorentz | Read-only HAL/USB CPU audit for cadence-preserving optimizations. | findings integrated in this document |
 | Linnaeus | Read-only analysis of existing physical music failure evidence. | findings integrated in this document |
 | Lagrange | Read-only promotion/readiness gap audit. | findings integrated in this document |
+| Pauli | Read-only HAL/USB transfer-ledger instrumentation audit. | findings integrated in this document |
+| Pasteur | Read-only byte-format and diagnostic-capture analysis. | findings integrated in this document |
+| Euler | Read-only physical evidence triage after diagnostic capture. | findings integrated in this document |
 
 ## Findings Integrated
 
@@ -694,3 +697,60 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - The ledger is diagnostic instrumentation. It improves observability for the
     next physical run, but any final low-CPU claim must be repeated or
     controlled with instrumentation overhead accounted for.
+
+### Pasteur
+
+- Mission: read-only byte-format and diagnostic-capture analysis after the
+  aggregate transfer-ledger run.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Found no strong evidence supporting a simple byte-order, start-byte,
+    check-offset, or deck-mapping hypothesis.
+  - Recommended a diagnostic HAL capture with big-endian output,
+    `start_byte=4`, `check_offset=8`, unrolled pack disabled, and amplitude
+    stats enabled.
+  - Recommended analyzing `/tmp/opena8dj-output-packed-usb.raw` with
+    `scripts/analyze-driver-capture.py` before any further physical format
+    sweep.
+- Integrated action:
+  - Ran the diagnostic HAL capture and copied diagnostic files into
+    `local-analysis/soundcheck/20260617-diag-pack-big-start4-irig-pairA-16s-cpp-hal`.
+  - Confirmed output written, consumed, and packed USB bytes are perfect
+    against the reference while the iRig analog capture still fails.
+- Risk:
+  - The byte-format layer is not the current dominant blocker. Future work
+    should avoid random format changes unless backed by new evidence.
+
+### Euler
+
+- Mission: read-only physical evidence triage and next-test recommendation
+  after diagnostic output bytes looked internally correct.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: completed.
+- Result:
+  - Recommended one controlled A/B with `HAL_OUTPUT_NATIVE=1` only if the
+    diagnostic capture did not already prove a byte-order answer.
+  - Recommended abandoning simple byte-order pursuit if native output did not
+    materially improve physical quality.
+- Integrated action:
+  - Ran the native-output A/B under the hardware lock.
+  - Native output was catastrophically rejected:
+    `quality_alignment_score=0.003598`, SNR `-63.94 dB`,
+    `520014` clipped capture frames.
+  - The active native HAL had to be parked under lock because CoreAudio
+    respawned the process after a direct kill.
+- Risk:
+  - Native output is unsafe for this hardware route. It should not be loaded
+    again except as a deliberately isolated forensic test with explicit
+    clipping/noise safeguards.
