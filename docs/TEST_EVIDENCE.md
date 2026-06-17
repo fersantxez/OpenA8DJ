@@ -184,6 +184,53 @@
   - Any future physical candidate must show both fallback allocation counters
     stay at `0` before it can make a low-CPU or real-time-path claim.
 
+## 2026-06-17: Transfer-Pool Offline Model Gate
+
+- Change:
+  - Added `opena8djcpp_transfer_pool_model`, a pure C++ offline model for
+    capture/playback transfer-pool occupancy and fallback-allocation behavior.
+  - Wired the model into CMake, CTest, `scripts/run-cpp-offline-gates`, and
+    `scripts/evaluate-promotion-readiness.py`.
+  - The promotion evaluator now requires the model to prove healthy no-fallback
+    queueing and explicitly reject capture/playback pool leak scenarios.
+- Reason:
+  - The physical CPU and music-quality failures cannot be explained by existing
+    underrun, late-write, or timeline counters.
+  - Transfer-pool fallback allocations are a concrete no-allocation policy
+    violation. The model gives the offline suite a structural guard before the
+    next locked physical run.
+- Commands:
+  - `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline --target opena8djcpp_transfer_pool_model && ./build/cpp-offline/opena8djcpp_transfer_pool_model`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-transfer-pool-model.json`
+- Result:
+  - Standalone transfer-pool model PASS: `6` rows, `0` failures.
+  - Healthy scenarios have `0` capture and playback fallback allocations.
+  - Rejected-by-design scenarios:
+    `capture_pool_leak_rejected`, `playback_pool_leak_rejected`.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS with `22` required files and `0` missing.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+  - Hardware touched: no.
+  - CoreAudio touched: no.
+  - USB touched: no.
+- Latest Release benchmark:
+  - `pack_mib_s=1656.23`.
+  - `decode_into_mib_s=588.188`.
+  - `route_frames_s=9.14455e+08`.
+  - `route_advanced_frames_s=5.07130e+08`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/transfer-pool-model.json`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/promotion-readiness-current.json`.
+  - `local-analysis/runtime-isolation/final-after-transfer-pool-model.json`.
+- Readiness note:
+  - This improves objective analysis coverage only. It does not prove physical
+    sound quality, low runtime CPU, or Traktor/timecode vinyl readiness.
+
 ## 2026-06-17: Playback Burst Cadence Model Gate
 
 - Change:

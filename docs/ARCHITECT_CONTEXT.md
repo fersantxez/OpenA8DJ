@@ -28,7 +28,7 @@ Branch: `driverkit/cpp-redesign`
   `total_check_errors=0`, `total_panic_flags=0`.
 - The Mode 2 decode benchmark now distinguishes the allocating developer
   wrapper from the preallocated real-time path. Current preallocated decode
-  evidence: `decode_into_mib_s=569.821`, `decode_into_output_overflows=0`,
+  evidence: `decode_into_mib_s=588.188`, `decode_into_output_overflows=0`,
   `decode_into_check_errors=0`, `decode_into_panic_flags=0`.
 - The offline simulated output matrix now covers A/B/C/D at 44.1/48 kHz across
   dense, transient, and wideband deterministic program material at gains `1.0`
@@ -58,7 +58,7 @@ Branch: `driverkit/cpp-redesign`
   can install/reload HAL, restart `coreaudiod`, play through Audio 8 DJ, or
   capture through an external recorder. Current evidence:
   `local-analysis/cpp-offline/hardware-lock-policy.json`, result `PASS`,
-  `4` audited scripts, `0` missing requirements.
+  `5` audited scripts, `0` missing requirements.
 - Current local toolchain check confirms no DriverKit SDK/AudioDriverKit path
   is available under the active Command Line Tools developer directory or the
   searched Xcode path, so real dext compilation remains blocked on full Xcode
@@ -137,6 +137,12 @@ Branch: `driverkit/cpp-redesign`
 - Build flag hygiene is now stricter: `hal` and `usb-play` depend on a HAL
   flags stamp so changing `HAL_*` build variables cannot silently reuse stale
   binaries for physical evidence.
+- Transfer-pool behavior now has both runtime observability and an offline C++
+  model gate. Current offline evidence:
+  `local-analysis/cpp-offline/transfer-pool-model.json`, result `PASS`, `6`
+  rows, `0` failures, with `capture_pool_leak_rejected` and
+  `playback_pool_leak_rejected` proving fallback-allocation scenarios are
+  rejected before hardware testing.
 
 ## Known Baseline Inputs
 

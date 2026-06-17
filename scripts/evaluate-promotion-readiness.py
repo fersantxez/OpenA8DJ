@@ -245,6 +245,16 @@ def evaluate(args):
              offline.get("hardware_lock_policy", {}).get("audited_scripts", 0) >= 4 and
              offline.get("hardware_lock_policy", {}).get("missing_requirements", 1) == 0,
              offline.get("hardware_lock_policy", {})),
+        gate("offline_transfer_pool_model",
+             offline.get("transfer_pool_model", {}).get("status") == "PASS" and
+             offline.get("transfer_pool_model", {}).get("rows", 0) >= 6 and
+             offline.get("transfer_pool_model", {}).get("failures", 1) == 0 and
+             "capture_pool_leak_rejected" in
+             offline.get("transfer_pool_model", {}).get("fallback_rejected_scenarios", []) and
+             "playback_pool_leak_rejected" in
+             offline.get("transfer_pool_model", {}).get("fallback_rejected_scenarios", []),
+             offline.get("transfer_pool_model", {}),
+             "transfer-pool model must prove healthy queueing and reject fallback-allocation scenarios"),
         gate("offline_throughput_beats_floor",
              as_float(bench, "pack_mib_s") >= BASELINE["offline_pack_mib_s_floor"] and
              as_float(bench, "decode_mib_s") >= BASELINE["offline_decode_mib_s_floor"] and

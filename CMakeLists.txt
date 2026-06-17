@@ -157,6 +157,9 @@ target_link_libraries(opena8djcpp_dvs_packet_input_decode
 add_executable(opena8djcpp_jitter_model
   tools/jitter_model.cpp)
 
+add_executable(opena8djcpp_transfer_pool_model
+  tools/transfer_pool_model.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -181,6 +184,7 @@ add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
 add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
+add_test(NAME opena8djcpp_transfer_pool_model COMMAND opena8djcpp_transfer_pool_model)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

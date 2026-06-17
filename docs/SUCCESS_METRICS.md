@@ -174,6 +174,7 @@ C++ evidence set:
 | DriverKit surface model | `PASS` | `local-analysis/cpp-offline/driverkit-surface-model.json` |
 | DriverKit shell contract | `PASS` | `local-analysis/cpp-offline/driverkit-shell-contract.json` |
 | jitter model | `PASS` | `local-analysis/cpp-offline/jitter-model.json` |
+| transfer-pool model | `PASS` | `local-analysis/cpp-offline/transfer-pool-model.json` |
 | static policy | `PASS` | `local-analysis/cpp-offline/static-policy.json` |
 | hardware lock policy | `PASS` | `local-analysis/cpp-offline/hardware-lock-policy.json` |
 | Release packet/routing benchmark | `PASS` | `local-analysis/cpp-offline/offline-bench-release.json` |
@@ -184,13 +185,13 @@ Current Release benchmark values:
 
 | Metric | Current value | PASS floor |
 |---|---:|---:|
-| Mode 2 pack throughput | median `1653.52 MiB/s` over `5` repeats, min `1537.65`, max `1659.23` | `100 MiB/s` |
-| Mode 2 decode preallocated throughput | median `551.331 MiB/s` over `5` repeats, min `546.759`, max `570.739` | `100 MiB/s` |
-| Mode 2 decode allocating wrapper throughput | median `559.924 MiB/s` over `5` repeats, min `516.382`, max `581.959` | informational |
-| Float32 to S24 conversion throughput | median `86,568,500 frames/s` over `5` repeats, min `85,821,000`, max `86,855,400` | `1,000,000 frames/s` |
-| identity routing throughput | median `934,836,000 frames/s` over `5` repeats, min `791,576,000`, max `975,115,000` | `1,000,000 frames/s` |
-| reversed routing throughput | median `498,886,000 frames/s` over `5` repeats, min `496,955,000`, max `518,542,000` | `1,000,000 frames/s` |
-| advanced mute/invert/cross-deck routing throughput | median `485,227,000 frames/s` over `5` repeats, min `477,965,000`, max `491,290,000` | `1,000,000 frames/s` |
+| Mode 2 pack throughput | median `1656.23 MiB/s` over `5` repeats, min `1644.96`, max `1657.32` | `100 MiB/s` |
+| Mode 2 decode preallocated throughput | median `588.188 MiB/s` over `5` repeats, min `583.229`, max `589.167` | `100 MiB/s` |
+| Mode 2 decode allocating wrapper throughput | median `569.723 MiB/s` over `5` repeats, min `524.785`, max `582.935` | informational |
+| Float32 to S24 conversion throughput | median `88,524,800 frames/s` over `5` repeats, min `88,462,500`, max `88,613,300` | `1,000,000 frames/s` |
+| identity routing throughput | median `914,455,000 frames/s` over `5` repeats, min `850,540,000`, max `938,323,000` | `1,000,000 frames/s` |
+| reversed routing throughput | median `513,840,000 frames/s` over `5` repeats, min `510,380,000`, max `530,790,000` | `1,000,000 frames/s` |
+| advanced mute/invert/cross-deck routing throughput | median `507,130,000 frames/s` over `5` repeats, min `506,476,000`, max `511,376,000` | `1,000,000 frames/s` |
 | Mode 2 check errors | `0` | `0` |
 | Mode 2 panic flags | `0` | `0` |
 | preallocated decode overflows | `0` | `0` |
@@ -204,6 +205,8 @@ Current Release benchmark values:
 | jitter regressions | `0` | `0` |
 | burst cadence rows | `3`, failures `0` | `>= 3`, failures `0` |
 | unsafe burst scenarios | `coalesce2`, `coalesce4` rejected by model | unsafe CPU-only burst wins rejected |
+| transfer-pool model rows | `6`, failures `0` | `>= 6`, failures `0` |
+| transfer-pool fallback rejected scenarios | `capture_pool_leak_rejected`, `playback_pool_leak_rejected` | both required |
 
 Functional coverage in the current C++ test binary:
 
@@ -285,6 +288,7 @@ Current status as of 2026-06-17:
 | offline protocol contract | `PASS` | VID/PID, endpoints, 8-in/8-out, Mode 2 cadence/full-frame constants |
 | offline simulated output matrix | `PASS` | `48` rows, SNR min `119.407 dB`, residual max `1.07069e-06`, leakage max `-240 dBFS` |
 | offline DriverKit shell contract | `PASS` | device model valid, no System Extension activated |
+| offline transfer-pool model | `PASS` | `6` rows, `0` failures, capture/playback fallback scenarios rejected |
 | offline throughput | `PASS` | pack/decode/routing exceed offline floors |
 | simulated output oracle | `PASS` | alignment/SNR/residual match oracle expectations |
 | physical tone beats mainline best | `PASS` | `sideband_ratio=0.000657`, clicks `0` |

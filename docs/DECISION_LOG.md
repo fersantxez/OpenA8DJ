@@ -1786,3 +1786,39 @@ Evidence:
 - Runtime isolation after the build:
   `local-analysis/runtime-isolation/post-transfer-pool-instrumentation-build.json`,
   PASS, HAL inactive, lock absent.
+
+## 2026-06-17: Add Transfer-Pool Offline Model As A Promotion Gate
+
+Decision:
+- Add a pure C++ transfer-pool model to the offline gates.
+- Require the promotion evaluator to pass `offline_transfer_pool_model` before
+  any branch-promotion claim can be made.
+- Do not count this as physical audio-quality evidence.
+
+Reason:
+- Transfer-pool fallback allocation would violate the realtime no-allocation
+  policy and could explain CPU/latency symptoms that are invisible to underrun
+  counters.
+- The model proves that healthy capture/playback queue configurations do not
+  need fallback allocation, and that explicit capture/playback leak scenarios
+  are rejected.
+- This is safer than spending another hardware run on a candidate whose pool
+  behavior is not structurally bounded offline.
+
+Alternatives discarded:
+- Leave fallback detection only to physical stream-stats: rejected because the
+  offline suite should catch impossible pool configurations before hardware.
+- Treat CTest PASS as enough: rejected because CTest alone did not express
+  fallback-allocation PASS/FAIL semantics for promotion.
+
+Evidence:
+- Standalone model: `opena8djcpp_transfer_pool_model`, PASS, `6` rows,
+  `0` failures.
+- Offline gate summary:
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+- Transfer-pool evidence:
+  `local-analysis/cpp-offline/transfer-pool-model.json`.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-current.json`, still FAIL because
+  physical music quality, runtime CPU, latest physical investigation, and
+  physical Traktor/timecode vinyl gates remain unresolved.

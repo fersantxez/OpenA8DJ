@@ -36,6 +36,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
+./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
@@ -78,6 +79,7 @@ timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
 dvs_packet = load_json("dvs-packet-input-decode.json")
 jitter = load_json("jitter-model.json")
+transfer_pool = load_json("transfer-pool-model.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -201,6 +203,17 @@ summary = {
         ),
         "regressions": sum(row.get("regressions", 0) for row in jitter.get("rows", [])),
         "evidence": "local-analysis/cpp-offline/jitter-model.json",
+    },
+    "transfer_pool_model": {
+        "status": transfer_pool.get("result"),
+        "rows": transfer_pool.get("row_count"),
+        "failures": transfer_pool.get("failures"),
+        "fallback_rejected_scenarios": [
+            row.get("scenario")
+            for row in transfer_pool.get("rows", [])
+            if row.get("expect_no_fallback") is False and row.get("result") == "PASS"
+        ],
+        "evidence": "local-analysis/cpp-offline/transfer-pool-model.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),
