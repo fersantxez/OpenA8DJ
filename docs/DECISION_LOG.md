@@ -4178,3 +4178,42 @@ Evidence:
 - Cleanup:
   `local-analysis/audio-stack-guard/force-unload-after-raw-reuse-check`
   reported HAL unloaded, no OpenA8DJ driver pids, and audio stack PASS.
+
+## 2026-06-17: Reject Fractional Time-Warp As Current C++ Quality Explanation
+
+Decision:
+- Add `scripts/analyze-fractional-time-warp.py` as an offline diagnostic gate.
+- Reject fractional delay/time-warp correction as the dominant explanation for
+  the current best C++ physical residual.
+
+Reason:
+- Arendt's read-only review identified a plausible remaining hypothesis:
+  physical captures might be failing because the analyzer only corrects integer
+  lag while the route has fractional delay, phase rotation, or windowed
+  time-warp.
+- The new analyzer applies a smoothed fractional delay curve to existing WAVs
+  and remeasures scalar and stereo-matrix SNR. On the relevant current C++
+  candidates, the improvement is only about `0.35-0.93 dB`, below the `3 dB`
+  threshold for even a partial explanation.
+- The existing LTI transfer analyzer also fails to improve current C++ captures
+  and reports very low mid/high coherence, so a static phase/EQ correction is
+  not sufficient either.
+
+Alternatives discarded:
+- Continue tuning capture/reference alignment as the main route to readiness:
+  rejected because the best C++ captures do not materially improve after
+  fractional time-warp.
+- Treat the degraded same-session A/B warp improvement as a product signal:
+  rejected because the delay scores are very low and both candidates in that
+  session are already marked fixture-degraded.
+
+Evidence:
+- `local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json`
+- `local-analysis/offline-diagnostics/20260617-lti-transfer-multi.json`
+- `local-analysis/offline-diagnostics/20260617-failure-modes-multi.json`
+
+Next implication:
+- The next candidate must attack HAL USB enqueue CPU and physical driver
+  behavior directly, or establish a healthier same-session physical reference.
+  Do not spend more hardware windows on alignment-only fixes unless new
+  evidence changes this classification.

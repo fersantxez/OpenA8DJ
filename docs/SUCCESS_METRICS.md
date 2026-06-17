@@ -1664,3 +1664,33 @@ Policy:
   because they trade Objective-C weak-reference safety for less callback
   overhead.
 - A partial CPU reduction cannot override physical quality failure.
+
+## 2026-06-17 Fractional Time-Warp Diagnostic Gate
+
+Latest evidence:
+`local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json`.
+
+Result: current best C++ residual is not explained by fractional time-warp.
+
+| run family | scalar SNR improvement | matrix SNR improvement | verdict |
+| --- | ---: | ---: | --- |
+| ISO10/q8 | `0.725 dB` | `0.705 dB` | rejected |
+| ISO8/q8 | `0.372 dB` | `0.349 dB` | rejected |
+| ISO12/q8 | `0.929 dB` | `0.914 dB` | rejected |
+| raw/reused completions | `0.727 dB` | `0.718 dB` | rejected |
+
+Threshold semantics:
+- `>= 6.0 dB` improvement: fractional time-warp can explain a large residual
+  fraction and fixture/capture alignment must be revalidated before blaming the
+  driver.
+- `>= 3.0 dB` and `< 6.0 dB`: partial factor; do not promote, but use as a
+  diagnostic.
+- `< 3.0 dB`: reject fractional time-warp as the dominant explanation.
+
+Product meaning:
+- Passing this diagnostic is not a sound-quality pass.
+- Current evidence means that alignment-only fixes cannot satisfy the
+  audiophile gate.
+- A future candidate still needs absolute physical quality PASS, same-session
+  mainline-relative PASS, CPU PASS, routing PASS, recovery PASS, and physical
+  Traktor/timecode evidence before readiness or branch promotion.

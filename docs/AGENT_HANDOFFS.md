@@ -2430,3 +2430,42 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Do not spend more hardware windows on blind cadence sweeps. Either validate
     the physical fixture in a same-session reference test or reduce product HAL
     CPU without changing the currently best quality family.
+
+## Arendt: Fractional Residual Hypothesis Scout - 2026-06-17
+
+- Mission:
+  - Read-only review of current evidence to find an actionable physical-quality
+    hypothesis beyond ISO/coalescing/cadence sweeps.
+- Warning:
+  - PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en `/Users/fer/dev/opena8dj` o
+    `/Users/fer/dev/audio8djrust`. Esos worktrees son READ ONLY. Solo puedes
+    escribir en `/Users/fer/dev/audio8djcpp`. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana.
+- Current integration status:
+  - Completed. No files changed by the subagent.
+  - Architect converted the hypothesis into an offline diagnostic script and
+    evidence run.
+- Findings:
+  - USB internal evidence is clean while iRig physical capture still fails,
+    so the remaining residual could plausibly have been fractional delay,
+    group delay, analog route/capture response, or physical device state.
+  - The fixture decorrelation evidence shows Pair A routing/leakage is broadly
+    correct, so simple channel swap/leakage is not enough to explain failure.
+  - Do not repeat ISO64, coalescing, unrolled packer, gain/polarity/L/R matrix,
+    or integer-lag-only tests as standalone fixes.
+- Architect integration:
+  - Added `scripts/analyze-fractional-time-warp.py`.
+  - Ran LTI transfer, failure-mode, and fractional time-warp diagnostics over
+    six existing C++/mainline physical captures.
+  - Current best C++ captures reject fractional time-warp as dominant: all
+    scalar/matrix SNR improvements are below `1 dB`, far below the `3 dB`
+    partial-explanation threshold.
+- Risks:
+  - The degraded same-session A/B captures still show large warp sensitivity,
+    so future same-session comparisons must include fixture-health checks
+    before product claims.
+- Next recommended action:
+  - Focus on reducing HAL USB enqueue CPU while preserving the best current
+    quality family, or run a locked same-session fixture reference when a new
+    physical window is justified.

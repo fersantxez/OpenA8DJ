@@ -615,3 +615,42 @@ Current Pair A evidence:
   harness/CoreAudio difference before attributing the delta to driver routing.
 - Current Pair A evidence does not satisfy full A/B/C/D or timecode physical
   matrix requirements.
+
+## Offline Fractional Time-Warp Diagnostic
+
+Purpose:
+
+- test whether failed physical captures are mostly an analyzer/reference
+  alignment issue rather than a driver or fixture problem;
+- prevent more hardware windows from being spent on alignment-only hypotheses
+  after existing WAVs already reject them.
+
+Command shape:
+
+```sh
+.venv/bin/python scripts/analyze-fractional-time-warp.py \
+  --json-out local-analysis/offline-diagnostics/<run-id>-fractional-time-warp.json \
+  <soundcheck-run-dir> [...]
+```
+
+Expected artifacts:
+
+- JSON result with `schema=opena8djcpp.fractional-time-warp.v1`;
+- per-run scalar and matrix SNR before/after smoothed fractional time-warp;
+- per-run delay score, delay span, and mid/high residual ratios.
+
+PASS/FAIL semantics:
+
+- This is a diagnostic PASS if it completes safely over existing evidence.
+- It never promotes a candidate by itself.
+- A run with `< 3 dB` SNR improvement rejects fractional time-warp as the
+  dominant residual explanation.
+- A run with `>= 3 dB` improvement requires a fixture/capture validation plan
+  before further product claims.
+
+Current status:
+
+- `local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json`
+  rejects fractional time-warp for the current best C++ captures.
+- Next physical work should focus on HAL CPU/transport behavior or a healthier
+  same-session fixture reference, not another alignment-only probe.

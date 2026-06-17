@@ -6638,3 +6638,92 @@ Operational note:
   - The experiment is safely represented as a blocked default. Offline PASS
     does not change physical readiness; raw completions remain rejected by
     physical evidence.
+
+## 2026-06-17 Fractional Time-Warp Residual Diagnostic
+
+- Purpose:
+  - Test Arendt's hypothesis that the persistent physical residual could be
+    mostly a fractional delay, phase, or time-warp mismatch between the digital
+    reference and the iRig physical capture.
+  - This is an offline-only diagnostic over existing WAV/JSON evidence.
+- Change:
+  - Added `scripts/analyze-fractional-time-warp.py`.
+  - The analyzer estimates per-window fractional delay, applies a smoothed
+    time-warp to the reference, then measures scalar and stereo-matrix SNR
+    improvement plus mid/high residual ratios.
+- Commands:
+  - `.venv/bin/python -m py_compile scripts/analyze-fractional-time-warp.py`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py --json-out local-analysis/offline-diagnostics/20260617-lti-transfer-multi.json local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py --json-out local-analysis/offline-diagnostics/20260617-failure-modes-multi.json local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck`
+  - `.venv/bin/python scripts/analyze-fractional-time-warp.py --json-out local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json local-analysis/soundcheck/20260617-cpp-iso10q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-cpp-iso8q8-dense-ch12-irig-pairA-12s local-analysis/soundcheck/20260617-iso12q8-irig-pairA-12s-cpp-hal local-analysis/soundcheck/20260617-raw-reuse-completions-irig-pairA-20s/soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck`
+- Safety:
+  - Offline existing evidence only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+  - Post-check audio stack guard reported HAL unloaded, no OpenA8DJ driver pids,
+    and audio stack PASS before this diagnostic.
+- LTI transfer result:
+  - Best current C++ captures have very low mid/high coherence and LTI transfer
+    modeling does not improve SNR:
+    - ISO10/q8: minimum LTI SNR delta `-0.776 dB`, minimum mid coherence
+      `0.112`.
+    - ISO8/q8: minimum LTI SNR delta `-0.625 dB`, minimum mid coherence
+      `0.132`.
+    - ISO12/q8: minimum LTI SNR delta `-0.654 dB`, minimum mid coherence
+      `0.075`.
+    - Raw/reused completions: minimum LTI SNR delta `-1.533 dB`, minimum mid
+      coherence `0.112`.
+- Fractional time-warp result:
+  - Current best C++ captures reject fractional time-warp as the dominant
+    residual explanation:
+    - ISO10/q8: scalar/matrix improvement `0.725/0.705 dB`.
+    - ISO8/q8: scalar/matrix improvement `0.372/0.349 dB`.
+    - ISO12/q8: scalar/matrix improvement `0.929/0.914 dB`.
+    - Raw/reused completions: scalar/matrix improvement `0.727/0.718 dB`.
+  - All four are below the `3.0 dB` partial-explanation threshold.
+  - Mid-band residual ratios do not improve enough and often get slightly
+    worse after warp, so this is not a hidden audiophile-quality correction.
+  - The degraded same-session A/B captures show partial/large warp
+    improvements, but with very low delay scores (`0.329` for C++ and `0.285`
+    for mainline), consistent with fixture/session degradation rather than a
+    product-quality pass.
+- Evidence:
+  - `local-analysis/offline-diagnostics/20260617-lti-transfer-multi.json`
+  - `local-analysis/offline-diagnostics/20260617-failure-modes-multi.json`
+  - `local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json`
+- Interpretation:
+  - Fractional delay, phase-aware LTI transfer, static L/R matrix, and simple
+    memoryless nonlinearity are all insufficient explanations for the current
+    best C++ residual.
+  - The next useful work is not post-capture correction. It must reduce HAL USB
+    enqueue CPU and/or produce a healthier same-session physical reference
+    before any audiophile claim.
+
+## 2026-06-17 Offline Gates After Fractional Time-Warp Diagnostic
+
+- Purpose:
+  - Verify that the new offline analyzer and documentation updates preserve the
+    C++ offline build/test/static-policy surface.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `17/17` passed.
+  - Release CTest: `18/18` passed.
+  - Static policy: PASS, `rejected_default_checks=23`,
+    `default_policy_failures=0`.
+  - Stream-stats contract: PASS, HAL/control field count `196`, mismatches `0`.
+  - Release bench: PASS.
+  - USB touched: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/after-fractional-timewarp-offline`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/audio-stack-guard/after-fractional-timewarp-offline`
+- Interpretation:
+  - Offline implementation/documentation hygiene remains intact.
+  - This does not change product readiness: physical quality, CPU, same-session
+    mainline comparison, full routing, and physical timecode gates still block
+    readiness and branch promotion.

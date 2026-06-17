@@ -1482,3 +1482,26 @@ Next technical target:
     readiness `FAIL`.
   - Post-run state was cleaned up: HAL unloaded, no OpenA8DJ driver PID, audio
     stack guard PASS.
+- Fractional time-warp residual diagnostic:
+  - Added `scripts/analyze-fractional-time-warp.py` after Arendt's residual
+    hypothesis.
+  - Current best C++ captures reject fractional delay/time-warp as the dominant
+    residual explanation:
+    - ISO10/q8 scalar/matrix SNR improvement `0.725/0.705 dB`.
+    - ISO8/q8 scalar/matrix SNR improvement `0.372/0.349 dB`.
+    - ISO12/q8 scalar/matrix SNR improvement `0.929/0.914 dB`.
+    - Raw/reused completions scalar/matrix SNR improvement `0.727/0.718 dB`.
+  - The threshold for a partial explanation is `3.0 dB`; all current best C++
+    runs are below it. LTI transfer modeling also fails to improve them and
+    shows very low mid/high coherence.
+  - Same-session degraded A/B captures do improve under warp, but with low
+    delay scores and existing fixture-degraded classification. This is not a
+    readiness signal.
+  - Evidence:
+    `local-analysis/offline-diagnostics/20260617-fractional-time-warp-multi.json`,
+    `local-analysis/offline-diagnostics/20260617-lti-transfer-multi.json`, and
+    `local-analysis/offline-diagnostics/20260617-failure-modes-multi.json`.
+  - Updated implication:
+    alignment/capture post-correction is not the product path. The blocking
+    work remains HAL USB enqueue CPU, physical route validation, and a same-
+    session reference that is healthy enough to support audiophile claims.
