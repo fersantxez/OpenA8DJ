@@ -148,6 +148,13 @@ target_link_libraries(opena8djcpp_driverkit_prepared_transport_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_prepared_transport_packet_contract
+  tools/prepared_transport_packet_contract.cpp)
+
+target_link_libraries(opena8djcpp_prepared_transport_packet_contract
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_dvs_signal_smoke
   tools/dvs_signal_smoke.cpp)
 
@@ -196,6 +203,7 @@ add_test(NAME opena8djcpp_realtime_audit COMMAND opena8djcpp_realtime_audit)
 add_test(NAME opena8djcpp_driverkit_surface_model COMMAND opena8djcpp_driverkit_surface_model)
 add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit_shell_contract)
 add_test(NAME opena8djcpp_driverkit_prepared_transport_contract COMMAND opena8djcpp_driverkit_prepared_transport_contract)
+add_test(NAME opena8djcpp_prepared_transport_packet_contract COMMAND opena8djcpp_prepared_transport_packet_contract)
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
 add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)

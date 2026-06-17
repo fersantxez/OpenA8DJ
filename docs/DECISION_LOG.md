@@ -4333,3 +4333,39 @@ Next implication:
   batches to `PreparedTransportBackend`, then replace the model-only backend
   with a real DriverKit/USB adapter when the toolchain and hardware window are
   ready.
+
+## 2026-06-17: Add Prepared Transport Packet/Ring Contract
+
+Decision:
+- Extend `PreparedTransportBackend` with batch HAL read/write and backend
+  completion APIs.
+- Add `tools/prepared_transport_packet_contract.cpp` and wire it into CTest
+  plus `scripts/run-cpp-offline-gates`.
+
+Reason:
+- The prepared backend had reusable rings and counters, but the product path
+  also needs proof that the backend can carry real Audio 8 DJ Mode2 packet
+  frames without leaving the offline safety boundary.
+- The new gate uses `Mode2OutputPacker`, `decode_mode2_usb_bytes_into`, and the
+  core backend together. It validates default `start_byte=4`, transfer size
+  `352`, capture decode into the backend ring, playback extraction from the
+  backend ring, and repacking/decoding of playback bytes.
+
+Alternatives discarded:
+- Keep packet validation separate from transport validation: rejected because a
+  future DriverKit adapter must satisfy both contracts together.
+- Use physical hardware to validate this step: rejected because the same packet
+  and ring invariants are provable offline first.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-transport-packet-contract.json`
+- Current result:
+  `capture_decoded_frames=131`, `playback_decoded_frames=131`,
+  `capture_check_errors=0`, `playback_check_errors=0`,
+  `capture_prefix_mismatches=0`, `playback_prefix_mismatches=0`,
+  `hal_steady_requeues=0`, `fallback_allocations=0`, and `product_safe=true`.
+
+Next implication:
+- The backend now has offline proof for Mode2 packet/ring movement. The next
+  missing layer is routing/timecode-profile batch policy over this backend, then
+  a real DriverKit/USB adapter when environment and lock window allow.

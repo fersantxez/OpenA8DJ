@@ -5,6 +5,7 @@
 #include "opena8djcpp/mode2_packet.hpp"
 
 #include <cstdint>
+#include <span>
 
 namespace opena8djcpp {
 
@@ -37,6 +38,8 @@ struct PreparedTransportCounters {
   std::uint64_t timestamp_regressions = 0;
   std::uint64_t channel_identity_failures = 0;
   std::uint64_t timecode_profile_failures = 0;
+  std::uint64_t backend_capture_frames = 0;
+  std::uint64_t backend_playback_frames = 0;
   std::uint64_t hal_capture_reads = 0;
   std::uint64_t hal_playback_writes = 0;
   double max_completion_gap_ratio = 0.0;
@@ -63,8 +66,14 @@ class PreparedTransportBackend {
   [[nodiscard]] bool backend_complete_period(const S24Frame& capture_frame,
                                              std::uint64_t sample_timestamp,
                                              const PreparedTransportStepOptions& options = {});
+  [[nodiscard]] bool backend_complete_period(std::span<const S24Frame> capture_frames,
+                                             std::span<S24Frame> playback_frames,
+                                             std::uint64_t sample_timestamp,
+                                             const PreparedTransportStepOptions& options = {});
   [[nodiscard]] bool hal_write_playback(const S24Frame& frame);
+  [[nodiscard]] std::uint32_t hal_write_playback(std::span<const S24Frame> frames);
   [[nodiscard]] bool hal_read_capture(S24Frame& frame);
+  [[nodiscard]] std::uint32_t hal_read_capture(std::span<S24Frame> frames);
 
   [[nodiscard]] const PreparedTransportConfig& config() const {
     return config_;

@@ -444,3 +444,16 @@ Offline gate:
 
 This is still weaker than physical readiness. It is the contract a real
 DriverKit/USB backend must satisfy before another hardware window is justified.
+
+## Packet Batch Boundary
+
+The prepared transport backend now accepts and emits bounded `S24Frame` spans:
+
+- HAL playback writes can publish a batch into the playback ring.
+- Backend completion can publish a decoded capture batch and pop a playback
+  batch for packet packing.
+- HAL capture reads can consume a batch from the capture ring.
+
+`opena8djcpp_prepared_transport_packet_contract` proves this path with Mode2
+pack/decode bytes outside the hot path. A real backend must keep the same span
+API allocation-free after stream start.

@@ -1542,3 +1542,15 @@ Next technical target:
   - Still missing:
     packet batch integration, real USB/DriverKit adapter, physical CPU/quality
     evidence, and same-session mainline comparison.
+- Prepared transport packet/ring contract:
+  - Added `opena8djcpp_prepared_transport_packet_contract`.
+  - It uses real Mode2 packet pack/decode logic with `PreparedTransportBackend`
+    batch APIs: capture USB bytes decode into the backend capture ring,
+    playback frames come out of the backend playback ring, then playback bytes
+    are packed and decoded again.
+  - Current offline evidence reports `131` capture frames and `131` playback
+    frames decoded with `0` check errors, `0` prefix mismatches, `0` HAL steady
+    requeues, and `0` fallback allocations.
+  - Still missing:
+    routing/timecode-profile batch policy over the backend, real USB adapter,
+    and physical proof against mainline.

@@ -71,3 +71,18 @@ Non-responsibilities:
 - it does not prove physical sound quality.
 
 The current DriverKit prepared transport gate uses this core type directly.
+
+## Packet/Ring Integration
+
+`opena8djcpp_prepared_transport_packet_contract` validates the first packet
+integration layer on top of `PreparedTransportBackend`:
+
+- Mode2 capture bytes are produced with `Mode2OutputPacker`;
+- capture bytes are decoded with `decode_mode2_usb_bytes_into`;
+- decoded capture frames are published into the prepared backend capture ring;
+- playback frames are read from the prepared backend playback ring;
+- playback frames are packed back to Mode2 bytes and decoded again for parity;
+- default `start_byte=4` and `352`-byte transfers are part of the contract.
+
+This remains an offline model. The future DriverKit/USB adapter must preserve
+the same invariants when the bytes come from hardware.

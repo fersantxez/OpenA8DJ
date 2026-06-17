@@ -549,6 +549,34 @@ void test_prepared_transport_backend_contract() {
   assert(!bad_transport.started());
 }
 
+void test_prepared_transport_batch_contract() {
+  PreparedTransportBackend transport;
+  assert(transport.start(PreparedTransportConfig{}));
+
+  std::array<S24Frame, 8> playback{};
+  std::array<S24Frame, 8> capture{};
+  for (std::uint32_t index = 0; index < playback.size(); ++index) {
+    playback[index] = synthetic_s24_frame(index);
+    capture[index] = synthetic_s24_frame(index + 100U);
+  }
+
+  assert(transport.hal_write_playback(playback) == playback.size());
+  std::array<S24Frame, 8> backend_playback{};
+  assert(transport.backend_complete_period(capture, backend_playback, 8));
+  assert(backend_playback == playback);
+
+  std::array<S24Frame, 8> hal_capture{};
+  assert(transport.hal_read_capture(hal_capture) == hal_capture.size());
+  assert(hal_capture == capture);
+
+  const auto counters = transport.counters();
+  assert(counters.backend_capture_frames == capture.size());
+  assert(counters.backend_playback_frames == playback.size());
+  assert(counters.hal_capture_reads == capture.size());
+  assert(counters.hal_playback_writes == playback.size());
+  assert(transport.safety().product_safe);
+}
+
 }  // namespace
 
 int main() {
@@ -569,6 +597,7 @@ int main() {
   test_spsc_frame_ring_contract();
   test_input_profile_decode_contract();
   test_prepared_transport_backend_contract();
+  test_prepared_transport_batch_contract();
 
   std::cout << "opena8djcpp_core_contract PASS\n";
   return 0;

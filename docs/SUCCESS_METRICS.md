@@ -1764,3 +1764,20 @@ Implementation status:
 - Product readiness remains blocked until packet/routing batches are integrated
   into the backend and physical same-session quality/CPU evidence beats
   mainline.
+
+## 2026-06-17 Prepared Transport Packet/Ring Gate
+
+Required for packet integration:
+- `opena8djcpp_prepared_transport_packet_contract` must PASS.
+- Capture and playback Mode2 decode check errors must be `0`.
+- Capture and playback panic flags must be `0`.
+- Capture and playback prefix mismatches must be `0`.
+- HAL steady-state requeues must be `0`.
+- Fallback allocations must be `0`.
+- Capture/playback ring overruns and underruns must be `0`.
+- Timestamp regressions and channel identity failures must be `0`.
+
+Current status:
+- PASS offline with default `start_byte=4`, transfer bytes `352`, `12`
+  transfers, `131` capture decoded frames, and `131` playback decoded frames.
+- This is still not physical readiness and not a better-than-mainline claim.

@@ -34,6 +34,17 @@ bool PreparedTransportBackend::backend_complete_period(
     const S24Frame& capture_frame,
     std::uint64_t sample_timestamp,
     const PreparedTransportStepOptions& options) {
+  S24Frame playback_frame{};
+  return backend_complete_period(std::span<const S24Frame>(&capture_frame, 1),
+                                 std::span<S24Frame>(&playback_frame, 1), sample_timestamp,
+                                 options);
+}
+
+bool PreparedTransportBackend::backend_complete_period(
+    std::span<const S24Frame> capture_frames,
+    std::span<S24Frame> playback_frames,
+    std::uint64_t sample_timestamp,
+    const PreparedTransportStepOptions& options) {
   if (!started_) {
     return false;
   }
@@ -53,13 +64,19 @@ bool PreparedTransportBackend::backend_complete_period(
   }
   record_timestamp(sample_timestamp);
 
-  if (!capture_ring_.push(capture_frame)) {
-    counters_.capture_ring_overruns += 1;
+  const auto captured = capture_ring_.push_many(capture_frames);
+  counters_.backend_capture_frames += captured;
+  if (captured != capture_frames.size()) {
+    counters_.capture_ring_overruns += capture_frames.size() - captured;
   }
 
-  S24Frame playback_frame{};
-  if (!playback_ring_.pop(playback_frame)) {
-    counters_.playback_ring_underruns += 1;
+  const auto popped = playback_ring_.pop_many(playback_frames);
+  counters_.backend_playback_frames += popped;
+  if (popped != playback_frames.size()) {
+    counters_.playback_ring_underruns += playback_frames.size() - popped;
+    for (std::size_t index = popped; index < playback_frames.size(); ++index) {
+      playback_frames[index] = {};
+    }
   }
 
   return true;
@@ -77,6 +94,18 @@ bool PreparedTransportBackend::hal_write_playback(const S24Frame& frame) {
   return true;
 }
 
+std::uint32_t PreparedTransportBackend::hal_write_playback(std::span<const S24Frame> frames) {
+  if (!started_) {
+    return 0;
+  }
+  const auto pushed = playback_ring_.push_many(frames);
+  counters_.hal_playback_writes += pushed;
+  if (pushed != frames.size()) {
+    counters_.playback_ring_overruns += frames.size() - pushed;
+  }
+  return static_cast<std::uint32_t>(pushed);
+}
+
 bool PreparedTransportBackend::hal_read_capture(S24Frame& frame) {
   if (!started_) {
     return false;
@@ -87,6 +116,18 @@ bool PreparedTransportBackend::hal_read_capture(S24Frame& frame) {
   }
   counters_.hal_capture_reads += 1;
   return true;
+}
+
+std::uint32_t PreparedTransportBackend::hal_read_capture(std::span<S24Frame> frames) {
+  if (!started_) {
+    return 0;
+  }
+  const auto popped = capture_ring_.pop_many(frames);
+  counters_.hal_capture_reads += popped;
+  if (popped != frames.size()) {
+    counters_.capture_ring_underruns += frames.size() - popped;
+  }
+  return static_cast<std::uint32_t>(popped);
 }
 
 PreparedTransportSafety PreparedTransportBackend::safety() const {

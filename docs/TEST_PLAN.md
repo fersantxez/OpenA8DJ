@@ -737,3 +737,37 @@ PASS/FAIL semantics:
   tool-local simulation is no longer sufficient.
 - PASS does not mean a dext exists, installs, runs, or beats mainline.
 - FAIL blocks any physical prepared-transport candidate.
+
+## Offline Prepared Transport Packet/Ring Contract
+
+Purpose:
+
+- verify that real Mode2 packet packing/decoding can move through
+  `PreparedTransportBackend` batch rings without check errors, fallback
+  allocations, HAL direct requeues, or channel/timestamp regressions.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_prepared_transport_packet_contract
+./build/cpp-offline/opena8djcpp_prepared_transport_packet_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/prepared-transport-packet-contract.json`;
+- `prepared_transport_packet_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means packet pack/decode and prepared transport rings agree offline.
+- PASS does not mean hardware, DriverKit, or physical sound quality is ready.
+- FAIL blocks the prepared transport path before physical testing.

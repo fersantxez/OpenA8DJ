@@ -6928,3 +6928,72 @@ Operational note:
     model into reusable core code.
   - Readiness remains blocked by packet-batch integration, real DriverKit/USB
     adapter work, and physical same-session proof against mainline.
+
+## 2026-06-17 Prepared Transport Packet/Ring Contract
+
+- Purpose:
+  - Validate real Mode2 packet packing/decoding through
+    `PreparedTransportBackend` batch rings.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_core_tests opena8djcpp_prepared_transport_packet_contract opena8djcpp_driverkit_prepared_transport_contract`
+  - `./build/cpp-offline/opena8djcpp_core_tests`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_packet_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_prepared_transport_contract`
+- Result:
+  - PASS.
+  - Schema: `opena8djcpp.prepared-transport-packet-contract.v1`.
+  - Default start byte: `4`.
+  - Transfer bytes: `352`.
+  - Transfers: `12`.
+  - Capture decoded frames: `131`.
+  - Playback decoded frames: `131`.
+  - Capture/playback check errors: `0/0`.
+  - Capture/playback prefix mismatches: `0/0`.
+  - HAL steady requeues: `0`.
+  - Fallback allocations: `0`.
+- Safety:
+  - Offline packet/core model only.
+  - No audio devices opened, no CoreAudio/USB mutation, no driver install, no
+    defaults changed, no hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-transport-packet-contract.json`
+- Interpretation:
+  - The prepared backend now carries real Mode2 packet frames through its rings
+    offline.
+  - This is not a physical quality pass.
+
+## 2026-06-17 Offline Gates After Prepared Packet/Ring Contract
+
+- Purpose:
+  - Verify packet/ring integration, prepared transport contracts, static policy,
+    and the existing offline surface together.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `20/20` passed.
+  - Release CTest: `21/21` passed.
+  - Prepared packet/ring contract: PASS, `capture_decoded_frames=131`,
+    `playback_decoded_frames=131`, `capture_check_errors=0`,
+    `playback_check_errors=0`, `hal_steady_requeues=0`,
+    `fallback_allocations=0`, `product_safe=true`.
+  - Static policy: PASS, `audited_files=15`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-packet-prepared-transport`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/prepared-transport-packet-contract.json`
+  - `local-analysis/audio-stack-guard/final-after-packet-prepared-transport`
+- Interpretation:
+  - Offline packet/ring integration remains green.
+  - Readiness remains blocked by routing/timecode-profile batch policy over the
+    backend, a real DriverKit/USB adapter, and physical same-session proof
+    against mainline.
