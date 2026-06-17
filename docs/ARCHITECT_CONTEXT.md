@@ -1121,3 +1121,14 @@ Next technical target:
     reject `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` as a product default. The
     remaining useful path is independent route validation or a deeper
     USB/device transport state model.
+- Current-family timebase window comparison:
+  `local-analysis/timebase-window-comparison/20260617-current-family`.
+  - Compared seven recent C++ Pair A/iRig music captures offline.
+  - Local per-window lag correction improves mid-band residual by only
+    `0-2%`.
+  - Corrected mid residual medians remain around `1.41-1.48`.
+  - Window lag jumps persist in every run: `22-35`.
+  - Interpretation:
+    the current failure is not just slow drift or a local offset problem. The
+    next useful evidence must validate the physical route or expose a deeper
+    USB/device transport-state mechanism.

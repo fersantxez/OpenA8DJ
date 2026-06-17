@@ -4900,3 +4900,54 @@ Operational note:
   - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
   - `local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
   - `local-analysis/promotion-readiness-after-output-sample-time-follower.json`
+
+## 2026-06-17: Current-Family Timebase Window Comparison
+
+- Purpose:
+  - Compare recent current-family C++ physical captures offline to test whether
+    local per-window lag correction explains the music residual.
+  - Avoid hardware and CoreAudio entirely; this reads existing captured WAV,
+    metrics, stream stats, and CPU profiles.
+- Commands:
+  - `scripts/analyze-soundcheck-window-trace.py <run> --json-out local-analysis/timebase-window-comparison/20260617-current-family/window-trace-N.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py <runs> --json-out local-analysis/timebase-window-comparison/20260617-current-family/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py <runs> --json-out local-analysis/timebase-window-comparison/20260617-current-family/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py <runs> --json-out local-analysis/timebase-window-comparison/20260617-current-family/lti-transfer-quality.json`
+  - Local summary written to
+    `local-analysis/timebase-window-comparison/20260617-current-family/summary.json`.
+- Runs compared:
+  - `20260617-streamusage-irig-pairA-12s-cpp-hal`
+  - `20260617-payload-guard-bff59cc-irig-pairA-12s-cpp-hal`
+  - `20260617-playback-before-capture-requeue-irig-pairA-12s-cpp-hal`
+  - `20260617-reuse-isoc-completions-irig-pairA-12s-cpp-hal`
+  - `20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal`
+  - `20260617-inline-inactive-decode-bypass-irig-pairA-12s-cpp-hal`
+  - `20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal`
+- Results:
+  - Local lag correction barely improves mid-band residual:
+    - streamusage: `1.438804 -> 1.413509`, improvement `1.76%`.
+    - payload guard: `1.442537 -> 1.426639`, improvement `1.10%`.
+    - playback-before-capture: `1.440646 -> 1.433932`, improvement `0.47%`.
+    - reuse completions: `1.490127 -> 1.459980`, improvement `2.02%`.
+    - fast ISO config: `1.486150 -> 1.455102`, improvement `2.09%`.
+    - inline inactive decode bypass: `1.447841 -> 1.450915`, regression
+      `0.21%`.
+    - sample time follower: `1.493616 -> 1.478376`, improvement `1.02%`.
+  - All corrected mid residual medians remain around `1.41-1.48`, far above
+    product thresholds.
+  - Window lag jumps persist in every run: `22-35`.
+  - Corrected correlation medians remain around `0.966-0.971`, not enough to
+    recover audiophile SNR.
+- Interpretation:
+  - The current physical failure is not explained by a simple local lag or
+    drift correction. Aligning windows does not remove the residual.
+  - This supports either route/capture-chain invalidity, analog/device state,
+    or a deeper USB/device transport issue after byte payload preparation.
+  - Another shallow timing knob is unlikely to be useful without new
+    observability.
+- Evidence paths:
+  - `local-analysis/timebase-window-comparison/20260617-current-family/summary.json`
+  - `local-analysis/timebase-window-comparison/20260617-current-family/failure-modes.json`
+  - `local-analysis/timebase-window-comparison/20260617-current-family/runtime-discontinuities.json`
+  - `local-analysis/timebase-window-comparison/20260617-current-family/lti-transfer-quality.json`
+  - `local-analysis/timebase-window-comparison/20260617-current-family/window-trace-1.json`

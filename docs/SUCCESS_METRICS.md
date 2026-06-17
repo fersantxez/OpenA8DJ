@@ -1108,3 +1108,23 @@ Latest promotion evaluation:
   - Passing transport counters with failing music again means build cleanliness,
     ISO invariants, and local timeline counters are necessary but not sufficient
     for audiophile readiness.
+
+## 2026-06-17 Current-Family Window Alignment Constraint
+
+- Evidence:
+  `local-analysis/timebase-window-comparison/20260617-current-family/summary.json`.
+- Diagnostic result:
+  PASS as analysis, FAIL as readiness evidence.
+- Local lag correction does not clear the music-quality gate:
+  - best observed mid-band residual improvement is about `2.09%`;
+  - corrected mid residual medians remain `>= 1.413509`;
+  - lag jumps remain `22-35` in the compared runs.
+- Readiness implication:
+  - A future timing candidate must reduce corrected residual materially, not
+    only improve drift ppm or raw correlation.
+  - Minimum diagnostic expectation before physical promotion evidence:
+    corrected mid residual should move toward the product threshold instead of
+    staying around `1.4`.
+  - If corrected residual remains around `1.4`, the fault should be treated as
+    route/capture-chain, analog/device-state, or deeper USB transport behavior,
+    not simple sample-time alignment.

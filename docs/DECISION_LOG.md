@@ -2915,3 +2915,34 @@ Evidence:
 - `local-analysis/soundcheck/20260617-output-sample-time-follower-irig-pairA-12s-cpp-hal/failure-modes.json`
 - `local-analysis/runtime-isolation/after-output-sample-time-follower-unload.json`
 - `local-analysis/promotion-readiness-after-output-sample-time-follower.json`
+
+## 2026-06-17: Local Lag Correction Does Not Explain Current Music Residual
+
+Decision:
+- Do not spend more hardware windows on shallow sample-time or per-window lag
+  corrections unless a new model predicts a much larger residual reduction.
+- Treat independent route validation or deeper USB/device transport-state work
+  as the next required evidence.
+
+Reason:
+- Offline comparison across seven current-family C++ captures shows that local
+  per-window lag correction improves mid-band residual by only about `0-2%`.
+- Corrected mid residual medians remain around `1.41-1.48`, still far above
+  product gates.
+- Window lag jumps persist in every compared run (`22-35`), but aligning each
+  window locally still does not recover SNR or remove the residual.
+- This means the failure is not simply a slow drift or local offset problem.
+
+Alternatives discarded:
+- Keep trying `sampleTime`/lag follower variants: rejected because the
+  best-case residual improvement in existing evidence is too small.
+- Claim route is definitely bad: rejected because current C++ also has its own
+  consistent failing family; route validation is required, not assumed.
+- Claim USB/device state is definitely bad: rejected until new observability
+  links transport/device state to the residual.
+
+Evidence:
+- `local-analysis/timebase-window-comparison/20260617-current-family/summary.json`
+- `local-analysis/timebase-window-comparison/20260617-current-family/failure-modes.json`
+- `local-analysis/timebase-window-comparison/20260617-current-family/runtime-discontinuities.json`
+- `local-analysis/timebase-window-comparison/20260617-current-family/lti-transfer-quality.json`

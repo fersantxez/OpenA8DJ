@@ -1481,3 +1481,30 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Either validate the physical capture/reference route independently or
     redesign the USB/device transport state model with new observability before
     another hardware window.
+
+### Architect Current-Family Timebase Window Comparison
+
+- Status:
+  - Completed offline only using existing captures.
+  - No hardware, no CoreAudio/USB mutation, no HAL install.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Local per-window lag correction improves mid-band residual by only about
+    `0-2%` across seven current-family C++ Pair A/iRig captures.
+  - Corrected mid residual medians remain around `1.41-1.48`.
+  - Window lag jumps remain `22-35`.
+  - This rejects "simple local lag/slow drift" as a sufficient explanation.
+- Risks:
+  - Without independent route validation, further driver changes can be
+    evaluated against a potentially misleading physical capture route.
+  - Without deeper transport observability, USB/device-state hypotheses remain
+    plausible but unproven.
+- Next recommended action:
+  - Prefer known-good route validation if physically possible.
+  - Otherwise add observability or redesign around the USB/device transport
+    state that occurs after byte payload preparation.
