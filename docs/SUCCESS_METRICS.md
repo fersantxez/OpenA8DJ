@@ -1152,3 +1152,56 @@ Latest promotion evaluation:
   - C++ still needs high residual below floor, CPU below mainline, strict
     physical tone/music improvement, and physical Traktor/timecode validation
     before any branch move.
+
+## 2026-06-17 Physical Comparator And USB Hotspot Gate
+
+- Evidence:
+  `local-analysis/physical-run-compare/20260617-profile-family.json`.
+- Practical comparator thresholds:
+  - `quality_alignment_score >= 0.925`.
+  - `mid_band_residual_ratio <= 1.45`.
+  - `high_band_residual_ratio <= 1.355`.
+  - `quiet_mid_band_noise_dbfs <= -32.5`.
+  - `lag_jumps_gt_2_frames <= 45`.
+  - `capture_clipped_frames == 0`.
+  - `opena8dj_driver` CPU p95 `<= 12%`.
+  - `coreaudiod` CPU p95 `<= 8%`.
+- Current result:
+  - `0/4` compared profiling runs pass.
+  - Steady-state v5 driver p95 is `24.0%`; best short v4 is `22.2%`.
+  - Both are above the practical CPU limit and far above the mainline target.
+- New metric integrity requirement:
+  - Future physical runs must expose reliable `playbackTransfersSubmitted` and
+    `playbackTransfersCompleted` counters from the same HAL payload.
+  - A run with missing or stale submitted/completed transfer accounting is
+    diagnostic-only and cannot support a performance/readiness claim.
+- Readiness implication:
+  - The active CPU hotspot is USB transfer enqueue/IOKit/MIG overhead.
+  - A future performance candidate must show driver p95 moving materially
+    toward `<=12%` while preserving or improving practical physical quality.
+  - A packer-only optimization is insufficient unless profiling proves the
+    packer became the dominant cost.
+
+## 2026-06-17 Output-Only No-Capture ISO Candidate Requirements
+
+- Candidate:
+  - `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`.
+  - Default remains rejected/not enabled until physical evidence proves benefit.
+- Minimum physical acceptance requirements:
+  - HAL candidate safety PASS before playback.
+  - `playbackTransfersSubmitted` and `playbackTransfersCompleted` both visible
+    and paired in stream stats.
+  - Driver CPU p95 must move materially toward `<=12%`; a tiny reduction is not
+    useful.
+  - `coreaudiod` p95 must remain `<=8%` for the practical gate.
+  - `outputUnderruns=0`, `outputActiveUnderruns=0`,
+    `outputLateWriteFrames=0`, and transfer-pool fallback allocations `0`.
+  - Physical music must not regress below the practical floor:
+    quality `>=0.925`, mid residual `<=1.45`, high residual `<=1.355`,
+    lag jumps `<=45`, no clipping.
+  - It must not be used for Traktor/timecode until input/DVS activation is
+    physically validated.
+- Rejection trigger:
+  - Any recurrence of the fixed OUT failure family, negative SNR, decorrelated
+    music, missing HAL input surface, or unstable CoreAudio enumeration rejects
+    the candidate regardless of CPU.

@@ -24,6 +24,7 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Pauli | Read-only HAL/USB transfer-ledger instrumentation audit. | findings integrated in this document |
 | Pasteur | Read-only byte-format and diagnostic-capture analysis. | findings integrated in this document |
 | Euler | Read-only physical evidence triage after diagnostic capture. | findings integrated in this document |
+| Carver | Read-only steady CPU/sample audit after v5 profiling. | recommended output-only no-capture ISO experiment; integrated as opt-in only |
 
 ## Findings Integrated
 
@@ -1540,3 +1541,36 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
     prioritization.
   - Focus next on high-band residual and CPU, with route validation still
     required before any final sound-quality claim.
+
+### Carver Steady CPU Hotspot Audit
+
+- Status:
+  - Completed read-only.
+  - No hardware, no CoreAudio/USB mutation, no mainline/Rust writes.
+- Mission:
+  - Audit the exact-PID v5 steady driver sample and rank the next CPU
+    optimization with the best chance of moving driver p95 toward `<12%`.
+- Findings:
+  - The dominant sampled path is capture/playback transfer requeue through
+    `IOUSBHostPipe` and `IOConnectCallAsyncMethod`, not Mode 2 packing.
+  - `fillPlaybackBytes` is secondary in the sample, and inactive input decode
+    is not the decisive CPU path.
+  - Recommended an output-only no-capture ISO experiment for playback-only
+    operation, while preserving HAL input representation and restoring capture
+    when input/DVS activates.
+- Integrated action:
+  - Added opt-in `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`.
+  - Default remains `0`.
+  - The variant compiles and the local build was restored to the default HAL.
+- Risks:
+  - Fixed OUT pacing has already been physically rejected in the current HAL.
+    This new variant can only become useful if it lowers CPU without repeating
+    that quality failure.
+  - If the hardware effectively relies on capture completions as the playback
+    clock, this experiment may reduce CPU while degrading sound.
+- Next recommended action:
+  - Do not promote this mode by build success.
+  - If physically tested, require HAL safety PASS, reliable submitted/completed
+    counters, driver p95 moving materially toward `<=12%`, no underruns/late
+    writes/fallback allocations, and physical music not worse than the
+    practical floor.

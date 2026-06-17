@@ -4995,3 +4995,168 @@ Operational note:
     CPU, and has no physical Traktor/timecode evidence.
 - Evidence path:
   - `local-analysis/mainline-practical-floor/20260617-current-cpp-music-family/summary.json`
+
+## 2026-06-17: Native Physical Run Comparator And Steady Driver Sample
+
+- Purpose:
+  - Add a native C++ comparator for physical soundcheck runs so practical
+    quality and CPU failures can be summarized without ad hoc shell/Python
+    snippets.
+  - Capture a steady-state driver sample with the exact OpenA8DJ HAL process
+    PID, not the wrapper shell PID.
+- Changes:
+  - Added `tools/physical_run_compare.cpp`.
+  - Added `make physical-run-compare`.
+  - Added `scripts/find-opena8dj-driver-pid`.
+  - Added `playbackTransfersSubmitted` as an appended stream-stats payload
+    field backed by an atomic counter; older HAL payloads still fall back to
+    `playbackQueueAttempts`/completed transfers in `opena8dj-control`.
+- Commands:
+  - `make build/physical-run-compare`
+  - `build/physical-run-compare local-analysis/profiling/20260617-current-default-steady-sample-v5/soundcheck local-analysis/profiling/20260617-current-default-sample-soundcheck-v4/soundcheck local-analysis/profiling/20260617-current-default-sample-soundcheck-v3/soundcheck local-analysis/profiling/20260617-current-default-sample-soundcheck/soundcheck > local-analysis/physical-run-compare/20260617-profile-family.json`
+  - `python3 -m json.tool local-analysis/physical-run-compare/20260617-profile-family.json`
+  - `make -B hal build/opena8dj-control`
+- Comparator result:
+  - No compared profile-family run passes practical quality+CPU.
+  - Steady v5 run:
+    `quality_alignment_score=0.941259`, SNR floor `-11.587830 dB`,
+    mid/high residual `4.233590/3.665879`, `82` lag jumps, driver CPU p95
+    `24.0%`, `coreaudiod` p95 `5.6%`.
+  - Best short v4 run:
+    quality `0.959811`, SNR floor `10.161017 dB`, mid/high residual
+    `1.456104/1.366229`, `33` lag jumps, driver CPU p95 `22.2%`,
+    `coreaudiod` p95 `10.4%`.
+- Steady sample result:
+  - Evidence:
+    `local-analysis/profiling/20260617-current-default-steady-sample-v5/opena8dj-driver-steady.sample.txt`.
+  - Target process was correct:
+    `Core Audio Driver (OpenA8DJ.driver)`.
+  - USB queue sample hotspot:
+    `DispatchQueue_43: org.opena8dj.driver.usb`.
+  - Dominant sampled path:
+    `handleCaptureTransfer` -> `queueCaptureTransfer` /
+    `queuePlaybackWithRequests` -> `IOUSBHostPipe enqueue` ->
+    `IOConnectCallAsyncMethod` -> `mach_msg2_trap`.
+  - `fillPlaybackBytes` appears, but is secondary in this profile; the largest
+    cost is transfer enqueue/IOKit/MIG/object overhead, not pure packet packing.
+- Stream-stats observation from the same run:
+  - `captureTransfersCompleted` and `playbackTransfersCompleted` both advanced
+    by `1478` over about `24.0 s`.
+  - `captureZeroCompleteTransactions` advanced by `5372`, about `223.6/s`.
+  - `outputTimelineResets` advanced by `1`.
+  - Existing `playbackTransfersSubmitted` output was unreliable because it
+    reused a cadence-diagnostic-only field; the new appended payload field fixes
+    this for future runs.
+- Interpretation:
+  - Current C++ is still not better than mainline.
+  - The next optimization must reduce USB transfer enqueue overhead or explain
+    the timeline/route failure; packer micro-optimization alone is unlikely to
+    close the CPU gap.
+  - The submitted/completed counter fix is observability, not a sound-quality
+    fix.
+- Evidence paths:
+  - `local-analysis/physical-run-compare/20260617-profile-family.json`
+  - `local-analysis/profiling/20260617-current-default-steady-sample-v5/`
+
+## 2026-06-17: Physical Comparator Tooling Offline Verification
+
+- Change:
+  - Verified the native comparator and appended submitted-transfer counter
+    build cleanly with the HAL/control tool.
+  - Refreshed offline gates, runtime isolation, and promotion readiness after
+    documenting the profiling evidence.
+- Commands:
+  - `git diff --check`
+  - `make build/physical-run-compare`
+  - `make -B hal build/opena8dj-control`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-physical-comparator-and-submitted-counter.json`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+- Result:
+  - Diff whitespace check PASS.
+  - Native comparator build PASS.
+  - HAL/control build PASS.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS with `22` required files and `0` missing.
+  - Runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ process.
+  - Promotion readiness remains FAIL with
+    `branch_promotion_allowed=false`.
+  - Hardware touched by this verification: no.
+  - CoreAudio/USB touched by this verification: no.
+- Latest Release benchmark:
+  - `pack_mib_s=1657.37`.
+  - `decode_into_mib_s=588.333`.
+  - `route_frames_s=9.69708e+08`.
+  - `route_advanced_frames_s=5.08031e+08`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/runtime-isolation/final-after-physical-comparator-and-submitted-counter.json`.
+  - `local-analysis/promotion-readiness-current.json`.
+
+## 2026-06-17: Output-Only No-Capture ISO Experiment Build
+
+- Change:
+  - Added opt-in `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`.
+  - Default remains `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.
+  - When enabled, playback-only streaming does not queue ISO IN while input
+    decode is inactive; if input decode later activates, initial capture
+    transfers are queued again.
+- Reason:
+  - The v5 steady sample shows CPU dominated by capture/playback ISO requeue
+    and IOUSBHost/MIG overhead, not packet packing.
+  - This tests whether removing capture ISO work during playback-only use can
+    reduce driver CPU without removing the HAL input surface.
+- Commands:
+  - `make -B hal build/opena8dj-control`
+  - `make -B hal build/opena8dj-control HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`
+  - `make -B hal build/opena8dj-control`
+- Result:
+  - Default build PASS.
+  - Opt-in output-only no-capture ISO build PASS.
+  - Default build restored afterward.
+  - Hardware touched: no.
+  - CoreAudio/USB touched: no.
+- Readiness note:
+  - This is not a product improvement claim.
+  - Prior fixed OUT pacing was physically rejected, so this experiment requires
+    a locked physical run before it can be considered useful.
+
+## 2026-06-17: Final Offline Verification After Output-Only Experiment
+
+- Change:
+  - Re-ran isolation, offline gates, and promotion readiness after restoring
+    the default HAL build (`HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`).
+  - No hardware, CoreAudio, USB reset, driver install, or default-device change
+    was performed in this verification.
+- Commands:
+  - `git diff --check`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-output-only-no-capture-build.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-before-commit.json`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/final-after-commit.json`
+- Result:
+  - Diff whitespace check PASS.
+  - Runtime isolation PASS: HAL inactive, hardware lock absent, no OpenA8DJ
+    process, hardware touched false, USB touched false, CoreAudio touched
+    false.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS: `22` required files, `0` missing.
+  - Promotion readiness FAIL:
+    `branch_promotion_allowed=false`.
+  - Post-commit runtime isolation PASS with HAL inactive and hardware lock
+    absent.
+  - Failing gates:
+    `physical_music_quality`, `runtime_cpu_beats_mainline`,
+    `latest_physical_investigation`, `traktor_timecode_physical`.
+- Latest Release benchmark:
+  - `pack_mib_s=1625.11`.
+  - `decode_into_mib_s=575.878`.
+  - `route_frames_s=9.78759e+08`.
+  - `route_advanced_frames_s=4.96093e+08`.
+- Evidence paths:
+  - `local-analysis/runtime-isolation/final-after-output-only-no-capture-build.json`.
+  - `local-analysis/runtime-isolation/final-before-commit.json`.
+  - `local-analysis/runtime-isolation/final-after-commit.json`.
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/promotion-readiness-current.json`.

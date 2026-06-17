@@ -1146,3 +1146,31 @@ Next technical target:
   - Interpretation:
     track the practical floor to avoid chasing route artifacts blindly, but keep
     strict audiophile and better-than-mainline promotion gates closed.
+- Native physical-run comparator:
+  `local-analysis/physical-run-compare/20260617-profile-family.json`.
+  - Compared four current profiling runs with practical quality+CPU thresholds.
+  - Result: all runs fail. The steady v5 run fails badly
+    (`quality_alignment_score=0.941259`, SNR floor `-11.59 dB`, mid/high
+    residual `4.233590/3.665879`, `82` lag jumps, driver p95 `24.0%`).
+  - Best short v4 still fails high residual and CPU:
+    mid/high residual `1.456104/1.366229`, driver p95 `22.2%`.
+  - The exact-PID steady sample shows the active USB queue dominated by
+    capture/playback requeue into `IOUSBHostPipe` and `IOConnectCallAsyncMethod`.
+    Packet filling is secondary in that profile.
+  - Added an appended `playbackTransfersSubmitted` payload field because the
+    previous `opena8dj-control` submitted counter used a cadence-diagnostic
+    field and reported `0` in product profiling runs.
+  - Interpretation:
+    C++ is not ready. The next useful optimization has to reduce USB enqueue
+    overhead or explain the timeline/route failure; packer micro-optimizations
+    alone are not supported by the current sample.
+- Added opt-in `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1`:
+  - Default remains `0`.
+  - Goal: playback-only diagnostics can avoid keeping ISO IN active when input
+    decode/DVS is inactive, while preserving HAL input representation and
+    restarting capture if input decode becomes active.
+  - It compiles in both default and opt-in forms, and the local build was
+    restored to default afterward.
+  - It is not physically validated and must not be promoted by build success.
+  - Major risk: prior fixed OUT pacing failed physical quality badly, so this
+    mode may lower CPU while degrading sound.

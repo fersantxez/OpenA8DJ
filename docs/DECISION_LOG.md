@@ -2983,3 +2983,69 @@ Evidence:
 - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:7-12`
 - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:55-59`
 - `/Users/fer/dev/opena8dj/docs/QUALITY_RUNS_2026-06-12.md:133-139`
+
+## 2026-06-17: Treat USB Enqueue Path As Primary CPU Target
+
+Decision:
+- Use `physical-run-compare` as a practical quality+CPU comparator for current
+  physical runs.
+- Treat USB transfer enqueue/IOKit/MIG overhead as the primary measured CPU
+  target, not Mode 2 packet packing.
+- Add an explicit `playbackTransfersSubmitted` payload field so future
+  submitted/completed transfer deltas are observable without relying on the
+  cadence-diagnostic-only `playbackQueueAttempts` field.
+
+Reason:
+- The steady driver sample for
+  `20260617-current-default-steady-sample-v5` shows the active OpenA8DJ driver
+  spending most sampled USB-queue time in capture/playback requeue through
+  `IOUSBHostPipe enqueueIORequestWithData` and `IOConnectCallAsyncMethod`.
+- The same sample only shows secondary time in `fillPlaybackBytes`; optimizing
+  packet packing alone cannot plausibly move driver p95 from about `24%` to
+  the practical target `<12%`.
+- Stream stats from the run showed completed playback transfers but submitted
+  transfers reported as `0`, because the old tool mapped submitted to a field
+  that is only incremented with cadence diagnostics enabled.
+
+Alternatives discarded:
+- Keep optimizing the packer first: rejected by sample evidence.
+- Trust `playbackTransfersSubmitted=0` in previous runs: rejected because the
+  counter source was not valid for product builds.
+- Claim that v4/v5 are close enough for promotion: rejected because every
+  compared run fails practical quality+CPU.
+
+Evidence:
+- `local-analysis/physical-run-compare/20260617-profile-family.json`
+- `local-analysis/profiling/20260617-current-default-steady-sample-v5/opena8dj-driver-steady.sample.txt`
+- `local-analysis/profiling/20260617-current-default-steady-sample-v5/soundcheck/stream-stats-summary.json`
+
+## 2026-06-17: Add Output-Only No-Capture ISO As Opt-In Experiment
+
+Decision:
+- Add `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1` as an opt-in transport experiment.
+- Keep the product default at `0`.
+- Do not physically test or promote the variant until it passes normal offline
+  gates and has a bounded locked test plan.
+
+Reason:
+- The v5 steady sample shows CPU dominated by ISO transfer requeue and
+  IOUSBHost enqueue overhead. Disabling ISO IN during playback-only operation
+  is the most direct way to remove the capture half of that overhead.
+- `HAL_INPUT_IO=0` broke device enumeration and is rejected; this experiment is
+  different because it leaves HAL input streams represented and only suppresses
+  USB capture transfers while input decode is inactive.
+- When input decode becomes active, the experiment restarts initial capture
+  transfers so timecode/input paths are not permanently disabled.
+
+Alternatives discarded:
+- Make this default immediately: rejected because fixed OUT pacing was already
+  physically rejected, and this mode may repeat that quality failure.
+- Remove HAL input streams for playback-only: rejected because `HAL_INPUT_IO=0`
+  failed the HAL safety gate.
+- Ignore the CPU sample and keep tuning packet packing: rejected because the
+  sample does not support packet packing as the primary CPU blocker.
+
+Evidence:
+- Default HAL/control build PASS.
+- `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=1` HAL/control build PASS.
+- Local build restored to default `HAL_OUTPUT_ONLY_NO_CAPTURE_ISOC=0`.

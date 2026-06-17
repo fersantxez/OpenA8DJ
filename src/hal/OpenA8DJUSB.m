@@ -65,6 +65,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_INPUT_DECODE_ACTIVE_GATING 0
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
+#define OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC 0
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_NATIVE_I24
 #define OPENA8DJ_OUTPUT_NATIVE_I24 0
 #endif
@@ -552,6 +556,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t transferLedgerOutputElasticReplayFrames;
     uint64_t playbackPayloadGuardChecks;
     uint64_t playbackPayloadGuardMismatches;
+    uint64_t playbackTransfersSubmitted;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1768,6 +1773,8 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 - (BOOL)sampleStableUSBFrame:(uint64_t *)outFrame hostTime:(uint64_t *)outHostTime;
 - (void)updateUSBFrameClockWithFrame:(uint64_t)frameNumber hostTime:(uint64_t)hostTime;
 - (void)queueCaptureTransfer;
+- (void)queueInitialCaptureTransfers;
+- (BOOL)captureISOEnabled;
 - (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
                         status:(IOReturn)status
                   transactions:(IOUSBHostIsochronousTransaction *)transactions;
@@ -2004,6 +2011,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_bool _playbackUseExplicitScheduling;
     atomic_uint _playbackScheduleFailureStreak;
     atomic_uint _playbackTransfersInFlight;
+    atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
     uint64_t _lastCaptureTransactionUSBTime;
@@ -2111,6 +2119,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
+        atomic_init(&_playbackTransfersSubmittedAtomic, 0);
         atomic_init(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
         AtomicStreamStatsReset(&_atomicStreamStats);
@@ -3420,6 +3429,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
     atomic_store(&_outputFramesWrittenAtomic, 0);
+    atomic_store(&_playbackTransfersSubmittedAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
     AtomicStreamStatsReset(&_atomicStreamStats);
 #endif
@@ -3441,6 +3451,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
 
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
+    stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
@@ -4116,6 +4127,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
     atomic_store(&_playbackScheduleFailureStreak, 0);
     atomic_store(&_playbackTransfersInFlight, 0);
+    atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     _lastCaptureCompletionHostTime = 0;
     _lastPlaybackCompletionHostTime = 0;
     _lastCaptureTransactionUSBTime = 0;
@@ -4717,8 +4729,12 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 
 - (void)workerLoop
 {
-    for (uint32_t transfer = 0; transfer < kCaptureQueueDepth && atomic_load(&_streaming); transfer++) {
-        [self queueCaptureTransfer];
+    if ([self captureISOEnabled]) {
+        [self queueInitialCaptureTransfers];
+#if OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
+    } else {
+        [self fillPlaybackQueue];
+#endif
     }
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED
     USBTrace("isoc async pipeline started captureDepth=%u playback=capture-paced",
@@ -4731,9 +4747,25 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
 }
 
+- (BOOL)captureISOEnabled
+{
+#if OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
+    return atomic_load(&_inputDecodeActive);
+#else
+    return YES;
+#endif
+}
+
+- (void)queueInitialCaptureTransfers
+{
+    for (uint32_t transfer = 0; transfer < kCaptureQueueDepth && atomic_load(&_streaming); transfer++) {
+        [self queueCaptureTransfer];
+    }
+}
+
 - (void)queueCaptureTransfer
 {
-    if (!atomic_load(&_streaming) || _capturePipe == nil) {
+    if (!atomic_load(&_streaming) || _capturePipe == nil || ![self captureISOEnabled]) {
         return;
     }
 
@@ -5106,7 +5138,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
 
     [self releasePooledTransfer:transfer];
-    if (atomic_load(&_streaming)) {
+    if (atomic_load(&_streaming) && [self captureISOEnabled]) {
         [self queueCaptureTransfer];
     }
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
@@ -5242,7 +5274,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         return;
     }
 
-#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED
+#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED || OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
     uint32_t requestBytes = CalculateBytesPerPacket(&_spec, _sampleRate);
     if (requestBytes == 0) {
         return;
@@ -5260,7 +5292,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         if (inFlight >= kPlaybackQueueTarget || inFlight >= kPlaybackQueueMax) {
             return;
         }
-#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED
+#if !OPENA8DJ_PLAYBACK_CAPTURE_PACED || OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
         if (OutputTimelineAvailable(&_outputTimeline) < framesPerTransfer) {
             return;
         }
@@ -5439,6 +5471,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         (void)weakSelf;
         return NO;
     }
+    atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self appendDiagnosticPackedBytes:transfer.data.bytes length:transfer.data.length];
     uint16_t diagnosticFlags = atomic_load(&_playbackUseExplicitScheduling) ?
@@ -5616,6 +5649,10 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     if (atomic_load(&_streaming)) {
         [self fillPlaybackQueue];
     }
+#elif OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
+    if (atomic_load(&_streaming) && ![self captureISOEnabled]) {
+        [self fillPlaybackQueue];
+    }
 #endif
 }
 
@@ -5647,7 +5684,21 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 - (void)setInputDecodeActive:(BOOL)active
 {
     BOOL decodeEnabled = atomic_load(&_inputDecodeEnabled);
-    atomic_store(&_inputDecodeActive, active && decodeEnabled);
+    bool nextActive = active && decodeEnabled;
+#if OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
+    bool wasActive = atomic_exchange(&_inputDecodeActive, nextActive);
+    if (nextActive && !wasActive && atomic_load(&_streaming) && _queue != nil) {
+        __weak OpenA8DJUSBEngine *weakSelf = self;
+        dispatch_async(_queue, ^{
+            OpenA8DJUSBEngine *strongSelf = weakSelf;
+            if (strongSelf != nil && [strongSelf captureISOEnabled]) {
+                [strongSelf queueInitialCaptureTransfers];
+            }
+        });
+    }
+#else
+    atomic_store(&_inputDecodeActive, nextActive);
+#endif
 }
 
 - (void)writeOutput:(const float *)inInterleaved
