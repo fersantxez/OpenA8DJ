@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
       root / "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
+      root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/prepared-transport-pressure-gate.json",
       root / "local-analysis/cpp-offline/prepared-transport-migration-gate.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
@@ -92,6 +93,20 @@ int main(int argc, char** argv) {
                                           "\"branch_promotion_allowed\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"physical_measurement_valid_for_promotion\": false") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"promotion_hard_blockers\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "same_session_mainline_cpp_physical_ab_missing") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "traktor_timecode_vinyl_physical_gate_missing") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "runtime_cpu_superiority_over_mainline_missing") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "post_reboot_autologin_codex_resume_unfixed") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"runtime_adapter_contract\"") &&
+                            file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
+                                          "\"stable_usb_submit_reduction_ratio\": 8") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",
                                           "\"hardware_touched\": false") &&
                             file_contains(root / "local-analysis/cpp-offline/current-offline-gates.json",

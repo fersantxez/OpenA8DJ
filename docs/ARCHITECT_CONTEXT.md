@@ -2362,6 +2362,16 @@ Current implication:
     (`usb_submit_reduction_ratio=8`) with zero HAL requeues, fallback
     allocations, logical gap violations, or slot order errors. Migration PASS
     now includes `logical_iso8_usb_submit_batching_supported=PASS`.
+  - A pure C++ fake runtime adapter now wraps the prepared scheduler and
+    exposes the same runtime-facing counters. Its stable row keeps
+    `logical_audio_periods=256`, `backend_slot_completions=512`,
+    `usb_submit_calls=66`, and `usb_submit_reduction_ratio=8`; negative rows
+    reject unbatched submits, logical gaps, slot-order errors, HAL requeues,
+    and fallback allocations. The migration gate now requires this adapter via
+    `runtime_adapter_batched_submit_counters_exposed=PASS`.
+  - Current full offline evidence after this integration: Debug CTest `45/45`,
+    Release CTest `46/46`, evidence schema `required_files=46`,
+    `missing_files=0`. Promotion remains blocked.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

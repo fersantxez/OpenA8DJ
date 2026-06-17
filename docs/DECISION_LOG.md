@@ -6122,3 +6122,36 @@ Next implication:
   the same counters: logical periods, USB submit calls, backend slot
   completions, order errors, timestamp regressions, HAL requeues, and fallback
   allocations.
+
+## 2026-06-17: Require Runtime-Facing Batching Counters Before Hardware Path
+
+Decision:
+- Add a pure C++ fake runtime adapter around `PreparedSlotScheduler`.
+- Require `prepared-transport-migration-gate` to read
+  `runtime-adapter-contract.json` and pass
+  `runtime_adapter_batched_submit_counters_exposed`.
+
+Reason:
+- The scheduler contract proves the model, but the next DriverKit/USB binding
+  needs runtime-facing counters, not private scheduler-only accounting.
+- This prevents a future runtime bridge from hiding one-submit-per-logical-slot
+  behavior behind a green scheduler-only test.
+
+Evidence:
+- `opena8djcpp_runtime_adapter_contract`: PASS.
+- Stable row:
+  - `logical_audio_periods=256`;
+  - `backend_slot_completions=512`;
+  - `usb_submit_calls=66`;
+  - `usb_submit_reduction_ratio=8`.
+- Negative rows reject unbatched submits, logical gaps, slot-order errors, HAL
+  requeues, and fallback allocations.
+- Full offline gates:
+  - Debug CTest `45/45` passed.
+  - Release CTest `46/46` passed.
+  - Evidence schema `required_files=46`, `missing_files=0`.
+
+Next implication:
+- The next non-offline implementation must bind these counters to the real
+  DriverKit/USB path. Product superiority still requires lock-gated physical
+  same-session evidence against mainline.

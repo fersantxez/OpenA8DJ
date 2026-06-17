@@ -242,6 +242,7 @@ int main(int argc, char** argv) {
       read_file(base / "prepared-transport-routing-timecode-contract.json");
   const auto recovery = read_file(base / "prepared-transport-recovery-contract.json");
   const auto scheduler = read_file(base / "prepared-slot-scheduler-contract.json");
+  const auto runtime_adapter = read_file(base / "runtime-adapter-contract.json");
   const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
@@ -255,6 +256,12 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(scheduler, "max_safe_logical_audio_gap_ratio"));
   const double scheduler_usb_submit_reduction =
       number_or_nan(json_number(scheduler, "max_safe_usb_submit_reduction_ratio"));
+  const double runtime_adapter_usb_submit_reduction =
+      number_or_nan(json_number(runtime_adapter, "stable_usb_submit_reduction_ratio"));
+  const double runtime_adapter_usb_submit_calls =
+      number_or_nan(json_number(runtime_adapter, "stable_usb_submit_calls"));
+  const double runtime_adapter_logical_periods =
+      number_or_nan(json_number(runtime_adapter, "stable_logical_audio_periods"));
   const double transport_gap =
       number_or_nan(json_number(driverkit_prepared, "max_completion_gap_ratio"));
   const double fixed_to_fill =
@@ -306,6 +313,12 @@ int main(int argc, char** argv) {
   const bool usb_submit_batching_supported =
       result_pass(scheduler) && finite(scheduler_usb_submit_reduction) &&
       scheduler_usb_submit_reduction >= 8.0;
+  const bool runtime_adapter_batching_exposed =
+      result_pass(runtime_adapter) && finite(runtime_adapter_usb_submit_reduction) &&
+      runtime_adapter_usb_submit_reduction >= 8.0 &&
+      finite(runtime_adapter_usb_submit_calls) && runtime_adapter_usb_submit_calls <= 66.0 &&
+      finite(runtime_adapter_logical_periods) && runtime_adapter_logical_periods >= 256.0 &&
+      number_is_zero(runtime_adapter, "failures");
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -357,6 +370,7 @@ int main(int argc, char** argv) {
       {"no_fallback_or_ring_faults", no_fallback_or_ring_faults},
       {"timestamp_and_cadence_safe", timestamp_and_cadence_safe},
       {"logical_iso8_usb_submit_batching_supported", usb_submit_batching_supported},
+      {"runtime_adapter_batched_submit_counters_exposed", runtime_adapter_batching_exposed},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -384,6 +398,12 @@ int main(int argc, char** argv) {
                scheduler_logical_gap);
   print_number("prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio",
                scheduler_usb_submit_reduction);
+  print_number("runtime_adapter_stable_usb_submit_reduction_ratio",
+               runtime_adapter_usb_submit_reduction);
+  print_number("runtime_adapter_stable_usb_submit_calls",
+               runtime_adapter_usb_submit_calls);
+  print_number("runtime_adapter_stable_logical_audio_periods",
+               runtime_adapter_logical_periods);
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

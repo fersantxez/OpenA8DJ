@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
       root / "tools/prepared_transport_routing_timecode_contract.cpp",
       root / "tools/prepared_transport_recovery_contract.cpp",
       root / "tools/prepared_slot_scheduler_contract.cpp",
+      root / "tools/runtime_adapter_contract.cpp",
       root / "tools/prepared_transport_pressure_gate.cpp",
       root / "tools/prepared_transport_migration_gate.cpp",
       root / "tools/physical_run_compare.cpp",
@@ -124,6 +125,8 @@ int main(int argc, char** argv) {
       root / "tools/static_policy_check.cpp",
       root / "core/include/opena8djcpp/prepared_transport.hpp",
       root / "core/src/prepared_transport.cpp",
+      root / "core/include/opena8djcpp/runtime_adapter.hpp",
+      root / "core/src/runtime_adapter.cpp",
   };
   const auto join = [](const char* left, const char* right) {
     return std::string(left) + std::string(right);

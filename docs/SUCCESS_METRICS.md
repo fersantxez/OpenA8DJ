@@ -2070,6 +2070,11 @@ Prepared transport migration metric:
   `prepared_slot_scheduler_max_safe_usb_submit_reduction_ratio >= 8.0` and
   `prepared_slot_scheduler_max_safe_logical_audio_gap_ratio <= 1.0`; otherwise
   the prepared transport path is not allowed to proceed toward hardware.
+- It must also report
+  `runtime_adapter_stable_usb_submit_reduction_ratio >= 8.0`,
+  `runtime_adapter_stable_usb_submit_calls <= 66`, and
+  `runtime_adapter_stable_logical_audio_periods >= 256`; otherwise the runtime
+  bridge is only decorative and cannot proceed toward hardware.
 - The offline summary must keep `promotion_hard_blockers` visible while
   same-session mainline-vs-C++ physical A/B, valid iRig loopback route,
   Traktor/timecode vinyl, runtime CPU superiority, and post-reboot Codex resume

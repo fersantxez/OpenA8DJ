@@ -3286,3 +3286,41 @@ Risk:
     requirement is that batching must not change logical slot cadence,
     timestamps, routing, lead, capture/timecode handling, or playback refill
     timing.
+
+## 2026-06-17 Subagent: Plato Runtime Adapter Engineer
+
+- Agent:
+  - Plato (`019ed7b6-c445-7a31-82ac-c26580d0b696`).
+- Mission:
+  - Implement, if feasible, a pure offline fake runtime adapter that exposes
+    the logical ISO8 to USB submit batching contract through runtime-facing
+    counters.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Files affected:
+  - `core/include/opena8djcpp/runtime_adapter.hpp`.
+  - `core/src/runtime_adapter.cpp`.
+  - `tools/runtime_adapter_contract.cpp`.
+  - `CMakeLists.txt`.
+  - `tools/static_policy_check.cpp`.
+  - `docs/TEST_EVIDENCE.md`.
+- Findings and result:
+  - Added `FakeRuntimeAdapter` on top of `PreparedSlotScheduler`.
+  - `opena8djcpp_runtime_adapter_contract` PASS exposes
+    `logical_audio_periods=256`, `backend_slot_completions=512`,
+    `usb_submit_calls=66`, and `usb_submit_reduction_ratio=8`.
+  - Negative rows reject unbatched submits, logical gaps, slot-order errors,
+    HAL requeues, and fallback allocations.
+- Integrated action by architect:
+  - Added the runtime adapter evidence to `scripts/run-cpp-offline-gates`.
+  - Required `runtime-adapter-contract.json` in `evidence_schema_check`.
+  - Made `prepared-transport-migration-gate` require
+    `runtime_adapter_batched_submit_counters_exposed=PASS`.
+- Risk:
+  - This is still a fake runtime boundary. The next implementation must bind
+    equivalent counters to real DriverKit/USB work before any lock-gated
+    hardware candidate can claim CPU direction.

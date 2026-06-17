@@ -9319,12 +9319,98 @@ Full offline gate rerun:
   - `branch_promotion_supported=false`.
   - `product_ready=false`.
 - Full offline gate result:
-  - Debug CTest: `44/44` passed.
-  - Release CTest: `45/45` passed.
-  - Evidence schema: `required_files=45`, `missing_files=0`,
+  - Debug CTest: `45/45` passed.
+  - Release CTest: `46/46` passed.
+  - Evidence schema: `required_files=46`, `missing_files=0`,
     `summary_pass=true`, `manifest_pass=true`.
 - Interpretation:
   - The next low-CPU path now has an executable offline contract: preserve
     logical ISO8 audio cadence while reducing modeled USB submit calls by 8x.
   - This is still not a runtime HAL/DriverKit implementation and does not
     justify hardware or promotion claims by itself.
+
+## 2026-06-17 Offline Promotion Blocker Schema Hardening
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Commands:
+  - `./scripts/run-cpp-offline-gates`
+  - `cmake --build build/cpp-offline --target opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_evidence_schema_check`
+- Safety:
+  - Offline evidence/schema validation only.
+  - No HAL load, driver install, system-extension activation, audio playback,
+    capture, CoreAudio mutation, USB reset, default-device change, or hardware
+    action.
+- Result:
+  - Full offline gates PASS after adding `promotion_hard_blockers` to
+    `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `opena8djcpp_evidence_schema_check`: PASS with `required_files=46`,
+    `missing_files=0`, `summary_pass=true`, `manifest_pass=true`.
+- Required hard blockers now checked in schema:
+  - `same_session_mainline_cpp_physical_ab_missing`;
+  - `traktor_timecode_vinyl_physical_gate_missing`;
+  - `runtime_cpu_superiority_over_mainline_missing`;
+  - `post_reboot_autologin_codex_resume_unfixed`.
+- Interpretation:
+  - Offline PASS cannot be confused with branch promotion readiness. The
+    evidence schema now fails if the current offline summary omits the known
+    promotion blockers.
+
+## 2026-06-17 Offline Runtime Adapter Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a pure C++ fake runtime adapter around `PreparedSlotScheduler`.
+  - The adapter exposes runtime-facing counters for logical ISO8 period ticks,
+    USB submit calls, backend slot completions, logical gap errors, slot order
+    errors, HAL requeues, and fallback allocations.
+  - No DriverKit runtime, HAL, CoreAudio, USB, hardware, install, reset, or
+    default-device action is involved.
+- Files:
+  - `core/include/opena8djcpp/runtime_adapter.hpp`
+  - `core/src/runtime_adapter.cpp`
+  - `tools/runtime_adapter_contract.cpp`
+  - `CMakeLists.txt`
+  - `tools/static_policy_check.cpp`
+  - `docs/TEST_EVIDENCE.md`
+- Gate:
+  - `opena8djcpp_runtime_adapter_contract`.
+  - Result: PASS.
+  - Row count `6`.
+  - Safe rows `1`.
+  - Stable row `runtime_iso8_usb_batch8_stable` preserves
+    `logical_audio_periods=256` and `backend_slot_completions=512` while
+    exposing `usb_submit_calls=66` and `usb_submit_reduction_ratio=8`.
+  - Negative rows reject unbatched submits, logical gap errors, slot order
+    errors, HAL requeues, and fallback allocations.
+- Migration integration:
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS.
+  - New gate row:
+    `runtime_adapter_batched_submit_counters_exposed=PASS`.
+  - `runtime_adapter_stable_usb_submit_reduction_ratio=8.000000`.
+  - `runtime_adapter_stable_usb_submit_calls=66.000000`.
+  - `runtime_adapter_stable_logical_audio_periods=256.000000`.
+  - `branch_promotion_supported=false`.
+  - `product_ready=false`.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_runtime_adapter_contract`
+  - `./build/cpp-offline/opena8djcpp_runtime_adapter_contract | tee local-analysis/cpp-offline/runtime-adapter-contract.json`
+  - `cmake --build build/cpp-offline --target opena8djcpp_prepared_slot_scheduler_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_static_policy_check opena8djcpp_runtime_adapter_contract`
+  - `ctest --test-dir build/cpp-offline -R 'opena8djcpp_(runtime_adapter_contract|prepared_slot_scheduler_contract|prepared_transport_migration_gate|static_policy_check)' --output-on-failure`
+  - `./scripts/run-cpp-offline-gates`
+- Full offline gate result:
+  - Debug CTest: `45/45` passed.
+  - Release CTest: `46/46` passed.
+  - Evidence schema: `required_files=46`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Interpretation:
+  - The runtime adapter is only a fake/simulated runtime boundary over the core
+    scheduler. It proves that runtime-facing counters can expose the logical
+    ISO8 to USB submit batching contract offline.
+  - This is not a runtime HAL/DriverKit implementation and does not justify
+    hardware or promotion claims by itself.
