@@ -822,11 +822,13 @@ scripts/run-physical-superiority-window \
 That command writes a plan only. It does not play, record, install, unload,
 restart CoreAudio, or touch USB.
 
-Actual execution requires `--execute` and an explicit HAL candidate:
+Actual execution requires `--execute`, an explicit read-only mainline HAL
+bundle, and an explicit C++ HAL candidate:
 
 ```sh
 scripts/run-physical-superiority-window \
   --execute \
+  --mainline-candidate /absolute/path/to/mainline/OpenA8DJ.driver \
   --candidate build/OpenA8DJ.driver \
   --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
@@ -839,6 +841,19 @@ scripts/run-physical-superiority-window \
 
 This is HAL-candidate physical validation only. It is not DriverKit/dext
 activation. The runner acquires the global hardware lock, runs the known-good
-route check first, then runs HAL candidate safety, Audio 8 soundcheck, native
-C++ WAV quality analysis, promotion-readiness evaluation, and cleanup unload
-unless `--leave-loaded` is supplied.
+route check first, then installs/reloads the explicit mainline HAL candidate,
+runs a mainline Audio 8 soundcheck, unloads it, installs/reloads the explicit
+C++ HAL candidate, runs the C++ Audio 8 soundcheck, analyzes both WAV captures
+with the native C++ analyzer, compares same-session mainline vs C++ physical
+metrics, runs promotion-readiness evaluation against the C++ evidence, and
+cleans up by unloading the active candidate unless `--leave-loaded` is supplied.
+
+`--candidate-only` exists only for diagnostics. It writes a blocked
+same-session comparison result and cannot support any branch-promotion or
+readiness claim.
+
+`--skip-known-good` also exists only for diagnostics. It skips route
+revalidation, writes `known_good_rc=1`, and prevents a successful runner exit.
+The promotion evaluator must be called with the same window's
+`same-session-physical-compare.json`; evidence from separate windows is
+rejected for branch promotion.

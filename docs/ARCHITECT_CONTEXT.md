@@ -1954,21 +1954,34 @@ Current implication:
   `--execute` is present.
 - Execution order is now explicit:
   - known-good non-Audio8 route -> iRig validation;
-  - HAL candidate safety install/reload;
-  - Audio 8 DJ music soundcheck with CPU and stream evidence;
-  - native C++ WAV quality analysis;
-  - promotion-readiness evaluator;
-  - unload candidate unless explicitly left loaded.
+  - mainline HAL candidate safety install/reload;
+  - mainline Audio 8 DJ music soundcheck with CPU and stream evidence;
+  - mainline unload;
+  - C++ HAL candidate safety install/reload;
+  - C++ Audio 8 DJ music soundcheck with CPU and stream evidence;
+  - native C++ WAV quality analysis for both captures;
+  - same-session mainline/C++ physical comparison;
+  - promotion-readiness evaluator against the C++ evidence;
+  - unload active candidate unless explicitly left loaded.
 - Safety encoded:
   - global hardware lock held for the whole window;
   - explicit capture device and explicit known-good source required;
+  - explicit mainline and C++ HAL bundles required for full execution;
   - OpenA8DJ / Audio 8 refused as the known-good source;
   - no default-device changes, USB reset, reboot, Traktor launch, or arbitrary
     sample-rate changes.
 
 Current implication:
 - There is now a single auditable command shape for the next physical evidence
-  window.
+  window, and it requires same-session mainline/C++ A/B evidence for any
+  superiority claim.
+- `--candidate-only` is diagnostic-only and intentionally writes a blocked
+  same-session comparison result.
+- `--skip-known-good` is diagnostic-only and blocks a successful runner exit;
+  route health is mandatory for a promotion-quality physical window.
+- The promotion evaluator now requires the same window's
+  `same-session-physical-compare.json`, so stale or fixed-reference evidence
+  cannot support branch promotion.
 - No physical route, HAL install, playback, capture, or CoreAudio restart was
   run by adding the runner.
 - Product readiness remains blocked until the runner produces passing

@@ -8247,3 +8247,131 @@ Full offline gate rerun:
   - The next physical window now has one safe entry point and a preserved
     evidence layout.
   - No quality, CPU, timecode, or branch-promotion claim changes.
+
+## 2026-06-17 Same-Session Mainline/C++ Physical A/B Gate Tightening
+
+- Scope:
+  - Tooling and policy validation only.
+  - No physical playback, capture, CoreAudio default changes, USB reset,
+    service restart, HAL install/load, or DriverKit activation performed.
+- Changes:
+  - Extended `scripts/run-physical-superiority-window` so full execution
+    requires both `--mainline-candidate` and `--candidate`.
+  - The physical runner now sequences mainline HAL safety + soundcheck, unload,
+    C++ HAL safety + soundcheck, native C++ WAV analysis for both runs, and
+    same-session physical comparison.
+  - `--candidate-only` is explicitly diagnostic and writes a blocked
+    same-session comparison result.
+  - Updated lock-policy expectations and build/test documentation.
+- Focused commands:
+  - `bash -n scripts/run-physical-superiority-window`
+  - `scripts/run-physical-superiority-window --help`
+  - `scripts/run-physical-superiority-window --run-dir local-analysis/physical-superiority-window/dry-run-same-session-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Built-in Output"`
+  - `scripts/run-physical-superiority-window --run-dir local-analysis/physical-superiority-window/reject-audio8-same-session-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Open Audio 8 DJ"`
+  - `scripts/run-physical-superiority-window --execute --run-dir local-analysis/physical-superiority-window/execute-requires-mainline-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Built-in Output" --candidate /tmp/no-such-cpp.driver`
+  - `scripts/run-physical-superiority-window --execute --candidate-only --run-dir local-analysis/physical-superiority-window/candidate-only-missing-candidate-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Built-in Output" --candidate /tmp/no-such-cpp.driver`
+  - `cmake --build build/cpp-offline --target opena8djcpp_hardware_lock_policy_check`
+  - `./build/cpp-offline/opena8djcpp_hardware_lock_policy_check`
+- Focused result:
+  - Syntax check PASS.
+  - Help prints the new full-execution requirement for
+    `--mainline-candidate`.
+  - Dry-run exits `0`, writes `summary.txt`, and lists same-session mainline
+    and C++ work without running hardware/audio.
+  - Audio 8 known-good source rejection exits `2`.
+  - Full `--execute` without `--mainline-candidate` exits `2` before lock
+    acquisition or hardware work.
+  - `--candidate-only --execute` with a missing C++ bundle exits `2` before
+    lock acquisition or hardware work.
+  - Hardware lock policy PASS with `8` audited scripts and `0` missing
+    requirements.
+- Evidence paths:
+  - `local-analysis/physical-superiority-window/dry-run-same-session-check/summary.txt`
+  - `local-analysis/physical-superiority-window/dry-run-same-session-check/window-manifest.txt`
+- Interpretation:
+  - C++ superiority is now blocked unless the same physical window measures the
+    read-only mainline HAL candidate and the C++ HAL candidate through the same
+    iRig route.
+  - This still does not provide physical quality evidence; it makes the next
+    physical evidence window stricter.
+
+## 2026-06-17 Physical Readiness Loophole Closure
+
+- Scope:
+  - Tooling and policy validation only.
+  - No physical playback, capture, CoreAudio default changes, USB reset,
+    service restart, HAL install/load, or DriverKit activation performed.
+- Trigger:
+  - Hume reviewed the new same-session contract read-only and found three
+    readiness loopholes:
+    - `opena8djcpp_physical_run_compare` could theoretically support branch
+      promotion from fixed historical thresholds.
+    - `scripts/evaluate-promotion-readiness.py` did not consume
+      `same-session-physical-compare.json`.
+    - `--skip-known-good` skipped route validation without blocking a
+      successful runner exit.
+- Changes:
+  - `opena8djcpp_physical_run_compare` now reports
+    `branch_promotion_supported=true` only with an explicit baseline run.
+  - `scripts/evaluate-promotion-readiness.py` now requires
+    `--same-session-compare` from the same physical window as the C++
+    soundcheck.
+  - `scripts/run-physical-superiority-window` now makes `--skip-known-good`
+    write blocked route evidence and exit-block via `known_good_rc=1`.
+  - `opena8djcpp_hardware_lock_policy_check` now audits candidate-only and
+    skipped-route blocked markers.
+  - `opena8djcpp_timecode_readiness_gate` now treats promotion
+    `NOT_READY`/missing `branch_promotion_allowed=true` as physical timecode
+    blocked.
+- Focused commands:
+  - `bash -n scripts/run-physical-superiority-window`
+  - `python3 -m py_compile scripts/evaluate-promotion-readiness.py`
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_run_compare opena8djcpp_hardware_lock_policy_check`
+  - `./build/cpp-offline/opena8djcpp_physical_run_compare | tee local-analysis/cpp-offline/focused-physical-run-compare-after-same-session-hardening.json`
+  - `./build/cpp-offline/opena8djcpp_hardware_lock_policy_check`
+  - `python3 scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-same-session-hardening.json`
+  - `scripts/run-physical-superiority-window --run-dir local-analysis/physical-superiority-window/dry-run-after-loophole-hardening --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Built-in Output"`
+  - `cmake --build build/cpp-offline --target opena8djcpp_timecode_readiness_gate opena8djcpp_prepared_transport_migration_gate`
+  - `./build/cpp-offline/opena8djcpp_timecode_readiness_gate | tee local-analysis/cpp-offline/timecode-readiness-gate.json`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_migration_gate | tee local-analysis/cpp-offline/prepared-transport-migration-gate-focused-after-not-ready-fix.json`
+  - `scripts/run-cpp-offline-gates`
+- Focused result:
+  - Syntax and Python compile checks PASS.
+  - Default physical comparator remains diagnostic: `result=FAIL`,
+    `branch_promotion_supported=false`, and
+    `same_session_baseline_required_for_promotion=true`.
+  - Promotion evaluator returns `NOT_READY`,
+    `branch_promotion_allowed=false`, with failing
+    `evidence:same_session_compare` because no same-window physical compare
+    exists.
+  - Timecode readiness gate returns `PASS` for offline DVS coverage but
+    `physical_traktor_timecode_blocked=true` and
+    `product_timecode_ready=false`.
+  - Prepared transport migration gate returns `PASS` after the
+    promotion-`NOT_READY` contract fix.
+  - Dry-run physical superiority wrapper remains plan-only and does not run
+    hardware/audio.
+  - Hardware lock policy PASS with `8` audited scripts and `0` missing
+    requirements.
+- Full offline gate result:
+  - Debug CTest: `41/41` PASS.
+  - Release CTest: `42/42` PASS.
+  - `current-offline-gates.json`: `status=PASS`, `hardware_touched=false`,
+    `coreaudio_touched=false`, `usb_touched=false`.
+  - `promotion-readiness-offline-check.json`: `result=NOT_READY`,
+    `branch_promotion_allowed=false`, missing
+    `same-session-physical-compare.json`.
+  - `physical-run-product-superiority.json`: `result=FAIL`,
+    `branch_promotion_supported=false`,
+    `same_session_baseline_required_for_promotion=true`.
+- Evidence paths:
+  - `local-analysis/cpp-offline/focused-physical-run-compare-after-same-session-hardening.json`
+  - `local-analysis/promotion-readiness-after-same-session-hardening.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate-focused-after-not-ready-fix.json`
+  - `local-analysis/physical-superiority-window/dry-run-after-loophole-hardening/summary.txt`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - No current evidence supports moving C++ to `main` or moving C to Legacy.
+  - The next admissible quality/performance claim requires a locked physical
+    window with known-good route PASS, same-session mainline/C++ compare PASS,
+    promotion evaluator PASS, and physical timecode validation.

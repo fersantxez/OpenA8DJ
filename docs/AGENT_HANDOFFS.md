@@ -2891,3 +2891,50 @@ Risk:
 - Next action:
   - Use the wrapper only in an authorized physical window with a real
     non-Audio8 output routed into the same iRig capture chain.
+
+## 2026-06-17 Subagent: Hume Readiness Gate Reviewer
+
+- Agent:
+  - Hume (`019ed707-c4c3-7ef3-9b94-cc15b9156e1a`).
+- Mission:
+  - Read-only review of the same-session mainline/C++ physical comparison
+    contract.
+  - Search for readiness loopholes around `--candidate-only`,
+    `--skip-known-good`, exit codes, and documentation.
+  - No hardware, CoreAudio, USB, driver install, or service changes.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Initial integration status:
+  - Findings integrated.
+- Findings:
+  - `opena8djcpp_physical_run_compare` could report branch promotion support
+    from fixed historical thresholds instead of an explicit same-session
+    mainline run.
+  - `scripts/evaluate-promotion-readiness.py` did not consume
+    `same-session-physical-compare.json`.
+  - `--skip-known-good` was labeled diagnostic but was not exit-blocking.
+  - Hardware-lock policy audited strings but not these readiness invariants.
+- Integrated action:
+  - `opena8djcpp_physical_run_compare` now supports branch promotion only with
+    an explicit baseline run.
+  - Promotion readiness now requires a same-window same-session comparison.
+  - `--skip-known-good` now writes blocked evidence and prevents success.
+  - Hardware-lock policy now checks blocked candidate-only/skipped-route
+    markers.
+- Files affected:
+  - `tools/physical_run_compare.cpp`.
+  - `scripts/evaluate-promotion-readiness.py`.
+  - `scripts/run-physical-superiority-window`.
+  - `tools/hardware_lock_policy_check.cpp`.
+  - `docs/ARCHITECT_CONTEXT.md`.
+  - `docs/DECISION_LOG.md`.
+  - `docs/TEST_PLAN.md`.
+  - `docs/BUILD.md`.
+  - `docs/PHYSICAL_TEST_WINDOW_PLAN.md`.
+- Next action:
+  - Re-run offline gates and keep promotion blocked until real physical
+    same-session evidence exists.

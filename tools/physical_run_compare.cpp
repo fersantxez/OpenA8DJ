@@ -783,6 +783,7 @@ void print_superiority_report(const RunStats& candidate,
                               const std::optional<RunStats>& baseline_run = std::nullopt) {
   const bool candidate_evidence_present = candidate.metrics_present && candidate.cpu_present;
   const bool result = candidate_evidence_present && all_pass(gates);
+  const bool branch_promotion_supported = result && baseline_run.has_value();
   std::cout << std::fixed << std::setprecision(6);
   std::cout << "{\n";
   std::cout << "  \"schema\": \"opena8djcpp.physical-run-compare.v2\",\n";
@@ -791,7 +792,10 @@ void print_superiority_report(const RunStats& candidate,
   print_json_string(mode);
   std::cout << ",\n";
   std::cout << "  \"result\": \"" << (result ? "PASS" : "FAIL") << "\",\n";
-  std::cout << "  \"branch_promotion_supported\": " << (result ? "true" : "false") << ",\n";
+  std::cout << "  \"branch_promotion_supported\": "
+            << (branch_promotion_supported ? "true" : "false") << ",\n";
+  std::cout << "  \"same_session_baseline_required_for_promotion\": "
+            << (!baseline_run.has_value() ? "true" : "false") << ",\n";
   std::cout << "  \"candidate_evidence_present\": "
             << (candidate_evidence_present ? "true" : "false") << ",\n";
   std::cout
@@ -815,8 +819,13 @@ void print_superiority_report(const RunStats& candidate,
   }
   std::cout << "  ],\n";
   std::cout << "  \"readiness_claim\": \"";
-  std::cout << (result ? "OBJECTIVE_PRODUCT_EVIDENCE_PASSES_THIS_COMPARATOR"
-                       : "BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE");
+  if (branch_promotion_supported) {
+    std::cout << "OBJECTIVE_SAME_SESSION_PRODUCT_EVIDENCE_PASSES_THIS_COMPARATOR";
+  } else if (result) {
+    std::cout << "DIAGNOSTIC_ONLY_FIXED_REFERENCE_NOT_BRANCH_PROMOTION";
+  } else {
+    std::cout << "BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE";
+  }
   std::cout << "\"\n";
   std::cout << "}\n";
 }

@@ -78,6 +78,10 @@ DEFAULTS = {
         ],
         ROOT / "local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json",
     ),
+    "same_session_compare": latest_file(
+        "local-analysis/physical-superiority-window/**/same-session-physical-compare.json",
+        ROOT / "local-analysis/physical-superiority-window/REQUIRED-same-session-physical-compare.json",
+    ),
 }
 
 
@@ -206,6 +210,7 @@ def evaluate(args):
         "physical_marker": Path(args.physical_marker),
         "usb_integrity": Path(args.usb_integrity),
         "physical_matrix": Path(args.physical_matrix),
+        "same_session_compare": Path(args.same_session_compare),
     }
     gates = []
     for name, path in paths.items():
@@ -234,6 +239,7 @@ def evaluate(args):
     physical_marker = load_json(paths["physical_marker"])
     usb_integrity = parse_key_values(paths["usb_integrity"])
     physical_matrix = load_json(paths["physical_matrix"])
+    same_session_compare = load_json(paths["same_session_compare"])
     cpu = cpu_profile(paths["cpu"])
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
@@ -461,6 +467,18 @@ def evaluate(args):
               BASELINE["physical_matrix_expected_floor_amplitude_min"],
               "capture_clipped_frames":
               physical_matrix.get("metrics", {}).get("capture_clipped_frames")}),
+        gate("same_session_mainline_cpp_physical_compare",
+             same_session_compare.get("result") == "PASS" and
+             same_session_compare.get("branch_promotion_supported") is True and
+             same_session_compare.get("mode") == "candidate_vs_baseline_run" and
+             paths["same_session_compare"].parent == paths["music"].parent.parent,
+             {"path": str(paths["same_session_compare"]),
+              "result": same_session_compare.get("result"),
+              "branch_promotion_supported": same_session_compare.get("branch_promotion_supported"),
+              "mode": same_session_compare.get("mode"),
+              "compare_parent": str(paths["same_session_compare"].parent),
+              "product_window_parent": str(paths["music"].parent.parent)},
+             "promotion requires a same-window mainline/C++ physical comparison matching the product run"),
         gate("physical_music_quality",
              as_float(music, "quality_alignment_score") >= BASELINE["music_quality_alignment_min"] and
              music_snr >= BASELINE["music_snr_db_min"] and
@@ -533,6 +551,7 @@ def main():
     parser.add_argument("--physical-marker", default=str(DEFAULTS["physical_marker"]))
     parser.add_argument("--usb-integrity", default=str(DEFAULTS["usb_integrity"]))
     parser.add_argument("--physical-matrix", default=str(DEFAULTS["physical_matrix"]))
+    parser.add_argument("--same-session-compare", default=str(DEFAULTS["same_session_compare"]))
     parser.add_argument("--json-out")
     args = parser.parse_args()
 

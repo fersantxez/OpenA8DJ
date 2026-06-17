@@ -1233,17 +1233,24 @@ Physical superiority window runner:
 - Full execution order:
   - acquire the global hardware lock;
   - run known-good non-Audio8 route soundcheck into iRig;
-  - install/reload the explicit HAL candidate through
+  - install/reload the explicit read-only mainline HAL candidate through
     `scripts/test-hal-candidate-safety`;
-  - run Audio 8 DJ soundcheck with CPU profile and stream snapshots;
-  - run `opena8djcpp_soundcheck_wav_quality` on the captured run;
+  - run mainline Audio 8 DJ soundcheck with CPU profile and stream snapshots;
+  - unload the mainline HAL candidate;
+  - install/reload the explicit C++ HAL candidate through
+    `scripts/test-hal-candidate-safety`;
+  - run C++ Audio 8 DJ soundcheck with CPU profile and stream snapshots;
+  - run `opena8djcpp_soundcheck_wav_quality` on both captured runs;
+  - compare same-session mainline vs C++ physical metrics with
+    `opena8djcpp_physical_run_compare`;
   - run `scripts/evaluate-promotion-readiness.py` against the new metrics;
-  - unload the HAL candidate unless `--leave-loaded` is explicit.
+  - unload the active HAL candidate unless `--leave-loaded` is explicit.
 - Required physical command shape:
 
 ```sh
 scripts/run-physical-superiority-window \
   --execute \
+  --mainline-candidate /absolute/path/to/mainline/OpenA8DJ.driver \
   --candidate build/OpenA8DJ.driver \
   --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
@@ -1255,14 +1262,24 @@ scripts/run-physical-superiority-window \
 ```
 
 - PASS for this runner is still not product readiness by itself. Readiness
-  requires the promotion evaluator to allow promotion and the evidence to beat
-  mainline thresholds for quality, CPU, routing, recovery, and timecode.
+  requires the same-session C++ vs mainline comparison to pass, the promotion
+  evaluator to allow promotion, and the evidence to beat mainline thresholds
+  for quality, CPU, routing, recovery, and timecode.
+- `--candidate-only` is diagnostic only. It must produce a blocked
+  same-session comparison result and must not support readiness or promotion.
+- `--skip-known-good` is diagnostic only. It must block a successful runner
+  exit because the shared physical capture route was not revalidated.
 
 PASS/FAIL semantics:
 
-- Tool `result=PASS` means the diagnostic ran.
-- `product_readiness_allowed=false` blocks readiness and branch promotion.
-- This gate does not replace physical same-session mainline/C++ evidence.
+- `same-session-physical-compare.json result=PASS` means C++ beat the explicit
+  same-session mainline run on the comparator gates for that window.
+- `branch_promotion_supported=true` is allowed only when the comparator used an
+  explicit baseline run, not fixed historical thresholds.
+- `scripts/evaluate-promotion-readiness.py` must consume the same-session
+  compare JSON from the same physical window as the C++ soundcheck.
+- The runner exits success only when known-good route validation, same-session
+  comparison, and promotion evaluation all pass.
 
 ## Offline Timecode Readiness Gate
 

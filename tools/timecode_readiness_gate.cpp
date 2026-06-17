@@ -77,7 +77,10 @@ int main(int argc, char** argv) {
   const bool signal_pass = result_pass(signal);
   const bool dvs_packet_pass = result_pass(dvs_packet);
   const bool prepared_pass = result_pass(prepared);
-  const bool physical_blocked = promotion.find("BLOCKED_UNVALIDATED_DVS") != std::string::npos ||
+  const bool promotion_allowed =
+      promotion.find("\"branch_promotion_allowed\": true") != std::string::npos;
+  const bool physical_blocked = !promotion_allowed ||
+                                promotion.find("BLOCKED_UNVALIDATED_DVS") != std::string::npos ||
                                 promotion.find("traktor_timecode_physical") != std::string::npos;
   const bool offline_pass = matrix_pass && signal_pass && dvs_packet_pass && prepared_pass;
   const bool product_timecode_ready = offline_pass && !physical_blocked;

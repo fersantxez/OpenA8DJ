@@ -91,6 +91,7 @@ Command shape:
 ```sh
 scripts/run-physical-superiority-window \
   --execute \
+  --mainline-candidate /absolute/path/to/mainline/OpenA8DJ.driver \
   --candidate build/OpenA8DJ.driver \
   --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
@@ -112,6 +113,16 @@ scripts/analyze-soundcheck-window-trace.py \
 
 Decision criteria:
 
+- The run is blocked unless the same window captures both the read-only
+  mainline HAL candidate and the C++ HAL candidate through the same iRig route.
+- C++ must pass `same-session-physical-compare.json` against mainline before
+  any superiority or branch-promotion claim is allowed.
+- The known-good non-Audio8 route check is mandatory for a successful physical
+  superiority window. `--skip-known-good` is only a diagnostic escape hatch and
+  keeps the runner blocked.
+- The promotion evaluator must consume the same window's
+  `same-session-physical-compare.json`; fixed historical references and stale
+  physical windows are not promotion evidence.
 - If stable-window lag jumps disappear and residual improves materially after
   startup discard, the main issue is harness/startup/cadence.
 - If lag jumps persist, prioritize transport/timeline scheduling.

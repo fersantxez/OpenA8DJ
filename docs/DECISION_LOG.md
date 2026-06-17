@@ -5254,3 +5254,85 @@ Next implication:
 - The next physical window can use this runner, but no readiness or branch
   promotion claim is allowed until its route, soundcheck, CPU, native WAV, and
   promotion evaluator evidence all pass against mainline thresholds.
+
+## 2026-06-17: Require Same-Session Mainline/C++ Physical A/B
+
+Decision:
+- Tighten `scripts/run-physical-superiority-window` so full execution requires
+  both an explicit read-only mainline HAL candidate and an explicit C++ HAL
+  candidate.
+- Run mainline first, unload it, run C++, analyze both captures with the native
+  C++ WAV analyzer, and compare both runs with
+  `opena8djcpp_physical_run_compare`.
+- Keep `--candidate-only` as a diagnostic mode that always writes a blocked
+  same-session comparison result and cannot support readiness or branch
+  promotion.
+
+Reason:
+- Quality-audiophile claims must be based on a same-session measurement through
+  the same physical capture route. An isolated C++ capture cannot prove lower
+  noise, lower CPU, lower jitter, or better routing than mainline.
+- The previous dry-run runner shape could guide a candidate-only run but did
+  not force the evidence needed for a superiority claim.
+
+Evidence:
+- `bash -n scripts/run-physical-superiority-window`
+- `scripts/run-physical-superiority-window --help`
+- Dry-run plan under
+  `local-analysis/physical-superiority-window/dry-run-same-session-check/`
+- Early refusal when `--execute` omits `--mainline-candidate`.
+- Early refusal when `--candidate-only --execute` points at a missing C++
+  bundle.
+- `opena8djcpp_hardware_lock_policy_check` PASS with `8` audited scripts.
+
+Next implication:
+- The next physical window must supply `--mainline-candidate` and `--candidate`
+  unless the operator explicitly wants a diagnostic-only blocked run.
+- Promotion remains blocked unless both same-session comparison and product
+  readiness evaluation pass.
+
+## 2026-06-17: Close Physical Readiness Loopholes
+
+Decision:
+- Make `opena8djcpp_physical_run_compare` report
+  `branch_promotion_supported=true` only when an explicit baseline run was
+  supplied. Fixed historical thresholds remain diagnostic.
+- Make `scripts/evaluate-promotion-readiness.py` require a
+  `--same-session-compare` JSON whose parent window matches the C++ soundcheck
+  window.
+- Make `--skip-known-good` in `scripts/run-physical-superiority-window`
+  produce `known_good_rc=1` and block a successful runner exit.
+- Extend `opena8djcpp_hardware_lock_policy_check` to audit the blocked
+  candidate-only and skipped-route markers.
+- Treat promotion `NOT_READY` as physical timecode blocked in
+  `opena8djcpp_timecode_readiness_gate`.
+
+Reason:
+- A standalone comparator, stale promotion evidence, or skipped route check
+  could otherwise create a plausible but invalid path to a readiness claim.
+- A promotion evaluator that returns early as `NOT_READY` must not be
+  interpreted as physical Traktor/timecode evidence.
+- The promotion path must require route health, same-session mainline/C++ A/B,
+  product quality/CPU gates, and timecode gates simultaneously.
+
+Evidence:
+- `opena8djcpp_physical_run_compare` default mode now reports
+  `branch_promotion_supported=false` and
+  `same_session_baseline_required_for_promotion=true`.
+- `scripts/evaluate-promotion-readiness.py --json-out
+  local-analysis/promotion-readiness-after-same-session-hardening.json`
+  returns `NOT_READY`, `branch_promotion_allowed=false`, and fails
+  `evidence:same_session_compare` when no same-window comparison exists.
+- `scripts/run-physical-superiority-window` dry-run remains plan-only and
+  performs no hardware/audio work.
+- `scripts/run-cpp-offline-gates` PASS:
+  - Debug CTest `41/41` PASS.
+  - Release CTest `42/42` PASS.
+  - Hardware lock policy PASS with `8` audited scripts.
+- Focused `opena8djcpp_timecode_readiness_gate` after the contract fix reports
+  `physical_traktor_timecode_blocked=true` and `product_timecode_ready=false`.
+- Focused `opena8djcpp_prepared_transport_migration_gate` returns `PASS`.
+
+Next implication:
+- No script-level path can support branch promotion without a same-window
+  mainline/C++ physical compare and a successful known-good route check.

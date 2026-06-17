@@ -11,11 +11,12 @@ claim that the C++ line beats mainline. By default this is dry-run only.
 Execution sequence when --execute is present:
   1. acquire the global hardware lock for the whole window;
   2. validate a known-good non-Audio8 source through the iRig capture route;
-  3. install/reload the explicit HAL candidate through test-hal-candidate-safety;
-  4. run an Open Audio 8 DJ music soundcheck with CPU and stream evidence;
-  5. run native C++ WAV quality analysis;
-  6. run promotion-readiness evaluation against the new evidence;
-  7. unload the candidate unless --leave-loaded is present.
+  3. install/reload the explicit mainline HAL candidate and run soundcheck;
+  4. install/reload the explicit C++ HAL candidate and run soundcheck;
+  5. run native C++ WAV quality analysis for both captures;
+  6. compare same-session mainline vs C++ physical metrics;
+  7. run promotion-readiness evaluation against the C++ evidence;
+  8. unload the active candidate unless --leave-loaded is present.
 
 This script does not change default devices, sample rate of arbitrary devices,
 USB state, or reboot the system. It refuses to run physical work without
@@ -23,6 +24,7 @@ USB state, or reboot the system. It refuses to run physical work without
 
 Required for full execution:
   --execute
+  --mainline-candidate PATH
   --candidate PATH
   --known-good-output-device NAME or --known-good-output-device-uid UID
   --capture-device NAME
@@ -31,6 +33,8 @@ Required for full execution:
 Options:
   --execute                         Actually run the physical window
   --route-only                      Execute only the known-good route check
+  --candidate-only                  Diagnostic: skip same-session mainline run
+  --mainline-candidate PATH         Mainline C HAL bundle for same-session A/B
   --candidate PATH                  HAL candidate bundle for C++ run
   --known-good-output-device NAME   Explicit non-Audio8 source for route check
   --known-good-output-device-uid UID Explicit non-Audio8 source UID
@@ -73,6 +77,8 @@ reject_audio8_source() {
 root="$(repo_root)"
 execute=0
 route_only=0
+candidate_only=0
+mainline_candidate=""
 candidate=""
 known_good_output_device=""
 known_good_output_device_uid=""
@@ -94,6 +100,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --execute) execute=1; shift ;;
     --route-only) route_only=1; shift ;;
+    --candidate-only) candidate_only=1; shift ;;
+    --mainline-candidate) mainline_candidate="$2"; shift 2 ;;
     --candidate) candidate="$2"; shift 2 ;;
     --known-good-output-device) known_good_output_device="$2"; shift 2 ;;
     --known-good-output-device-uid) known_good_output_device_uid="$2"; shift 2 ;;
@@ -137,6 +145,10 @@ if [ -n "$known_good_output_device_uid" ]; then
 fi
 
 if [ "$execute" -eq 1 ] && [ "$route_only" -ne 1 ]; then
+  if [ "$candidate_only" -ne 1 ]; then
+    [ -n "$mainline_candidate" ] || die "--mainline-candidate is required for full same-session execution"
+    [ -d "$mainline_candidate" ] || die "mainline candidate bundle not found: $mainline_candidate"
+  fi
   [ -n "$candidate" ] || die "--candidate is required for full execution"
   [ -d "$candidate" ] || die "candidate bundle not found: $candidate"
 fi
@@ -156,6 +168,8 @@ manifest="$run_dir/window-manifest.txt"
   echo "commit=$(git -C "$root" rev-parse --short HEAD)"
   echo "execute=$execute"
   echo "route_only=$route_only"
+  echo "candidate_only=$candidate_only"
+  echo "mainline_candidate=${mainline_candidate:-}"
   echo "candidate=${candidate:-}"
   echo "known_good_output_device=${known_good_output_device:-}"
   echo "known_good_output_device_uid=${known_good_output_device_uid:-}"
@@ -179,10 +193,11 @@ if [ "$execute" -ne 1 ]; then
     echo "No hardware/audio action was run. Add --execute for a locked physical window."
     echo "Required physical order:"
     echo "1 known-good non-Audio8 route -> iRig"
-    echo "2 candidate HAL safety install/reload"
-    echo "3 Audio 8 DJ soundcheck with CPU/stream evidence"
-    echo "4 native C++ WAV quality analysis"
-    echo "5 promotion-readiness evaluator"
+    echo "2 mainline HAL safety install/reload and soundcheck"
+    echo "3 C++ HAL safety install/reload and soundcheck"
+    echo "4 native C++ WAV quality analysis for both runs"
+    echo "5 same-session physical comparison"
+    echo "6 promotion-readiness evaluator"
     echo "run_dir=$run_dir"
   } | tee "$run_dir/summary.txt"
   exit 0
@@ -194,7 +209,7 @@ opena8dj_acquire_hardware_lock \
   "$root" \
   "physical-superiority-window" \
   "$run_dir" \
-  "known-good route playback/capture, optional HAL install/reload, Audio 8 DJ playback/capture, CoreAudio enumeration" \
+  "known-good route playback/capture, mainline HAL install/reload, C++ HAL install/reload, Audio 8 DJ playback/capture, CoreAudio enumeration" \
   "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot,Traktor-launch"
 trap opena8dj_release_hardware_lock EXIT
 
@@ -212,10 +227,22 @@ cleanup_candidate() {
 }
 trap 'cleanup_candidate; opena8dj_release_hardware_lock' EXIT
 
+unload_active_hal() {
+  "$root/scripts/audio-stack-guard" \
+    --recover \
+    --unload-opena8dj \
+    --wait 3 \
+    --enumeration-timeout 8 \
+    --min-idle-pct 20 \
+    --run-dir "$1" \
+    > "$1.log" 2>&1 || true
+}
+
 if [ "$skip_build" -ne 1 ]; then
   make -C "$root" build/audio-wav-play build/audio-record build/opena8dj-control >/dev/null
   cmake -S "$root" -B "$root/build/cpp-release" -DCMAKE_BUILD_TYPE=Release >/dev/null
-  cmake --build "$root/build/cpp-release" --target opena8djcpp_soundcheck_wav_quality >/dev/null
+  cmake --build "$root/build/cpp-release" \
+    --target opena8djcpp_soundcheck_wav_quality opena8djcpp_physical_run_compare >/dev/null
 fi
 
 if [ "$skip_known_good" -ne 1 ]; then
@@ -235,62 +262,109 @@ if [ "$skip_known_good" -ne 1 ]; then
   fi
   "${known_good_args[@]}"
 fi
+known_good_rc=0
+if [ "$skip_known_good" -eq 1 ]; then
+  known_good_rc=1
+  printf '{"schema":"opena8djcpp.known-good-route.v1","result":"FAIL","readiness_claim":"BLOCKED_KNOWN_GOOD_ROUTE_SKIPPED"}\n' \
+    > "$run_dir/known-good-route-skipped.json"
+fi
 
 if [ "$route_only" -eq 1 ]; then
   {
-    echo "PHYSICAL_SUPERIORITY_WINDOW: ROUTE_ONLY_PASS"
+    if [ "$known_good_rc" -eq 0 ]; then
+      echo "PHYSICAL_SUPERIORITY_WINDOW: ROUTE_ONLY_PASS"
+    else
+      echo "PHYSICAL_SUPERIORITY_WINDOW: ROUTE_ONLY_BLOCKED"
+    fi
     echo "known_good_route=$run_dir/known-good-route"
+    echo "known_good_rc=$known_good_rc"
     echo "run_dir=$run_dir"
   } | tee "$run_dir/summary.txt"
-  exit 0
+  exit "$known_good_rc"
 fi
 
-"$root/scripts/test-hal-candidate-safety" \
-  --candidate "$candidate" \
-  --cycles 1 \
-  --leave-loaded \
-  --wait 8 \
-  --enumeration-timeout 8 \
-  --min-idle-pct 20 \
-  --run-dir "$run_dir/hal-candidate-safety"
+run_audio8_soundcheck() {
+  local label="$1"
+  local bundle="$2"
+  local out_dir="$3"
 
-soundcheck_args=(
-  "$root/scripts/run-soundcheck"
-  --run-dir "$run_dir/cpp-soundcheck"
-  --capture-device "$capture_device"
-  --capture-channels "$capture_channels"
-  --pair "$pair"
-  --rate "$rate"
-  --buffer "$buffer"
-  --seconds "$seconds"
-  --mode dense
-  --target-peak-db "$target_peak_db"
-  --max-lag 360000
-  --min-alignment 0.98
-  --min-snr-db 35
-  --max-clicks 0
-  --max-lag-jumps 0
-  --max-mid-band-residual-ratio 1.36
-  --max-high-band-residual-ratio 1.35
-  --max-quiet-mid-band-noise-dbfs -58
-  --stream-stats-snapshots
-  --audio-stack-recover-on-fail
-  --audio-stack-unload-on-recover
-  --skip-build
-)
-if [ -n "$music_file" ]; then
-  soundcheck_args+=(--music-file "$music_file")
+  "$root/scripts/test-hal-candidate-safety" \
+    --candidate "$bundle" \
+    --cycles 1 \
+    --leave-loaded \
+    --wait 8 \
+    --enumeration-timeout 8 \
+    --min-idle-pct 20 \
+    --run-dir "$run_dir/$label-hal-candidate-safety"
+
+  local soundcheck_args=(
+    "$root/scripts/run-soundcheck"
+    --run-dir "$out_dir"
+    --capture-device "$capture_device"
+    --capture-channels "$capture_channels"
+    --pair "$pair"
+    --rate "$rate"
+    --buffer "$buffer"
+    --seconds "$seconds"
+    --mode dense
+    --target-peak-db "$target_peak_db"
+    --max-lag 360000
+    --min-alignment 0.98
+    --min-snr-db 35
+    --max-clicks 0
+    --max-lag-jumps 0
+    --max-mid-band-residual-ratio 1.36
+    --max-high-band-residual-ratio 1.35
+    --max-quiet-mid-band-noise-dbfs -58
+    --stream-stats-snapshots
+    --audio-stack-recover-on-fail
+    --audio-stack-unload-on-recover
+    --skip-build
+  )
+  if [ -n "$music_file" ]; then
+    soundcheck_args+=(--music-file "$music_file")
+  fi
+  "${soundcheck_args[@]}"
+
+  "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$out_dir" \
+    > "$out_dir/native-quality.json" \
+    2> "$out_dir/native-quality.err"
+}
+
+if [ "$candidate_only" -ne 1 ]; then
+  run_audio8_soundcheck "mainline" "$mainline_candidate" "$run_dir/mainline-soundcheck"
+  unload_active_hal "$run_dir/post-mainline-unload-guard"
 fi
-"${soundcheck_args[@]}"
 
-"$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$run_dir/cpp-soundcheck" \
-  > "$run_dir/cpp-soundcheck/native-quality.json" \
-  2> "$run_dir/cpp-soundcheck/native-quality.err"
+run_audio8_soundcheck "cpp" "$candidate" "$run_dir/cpp-soundcheck"
+
+same_session_rc=0
+if [ "$candidate_only" -ne 1 ]; then
+  "$root/build/cpp-release/opena8djcpp_physical_run_compare" \
+    --candidate "$run_dir/cpp-soundcheck" \
+    --baseline "$run_dir/mainline-soundcheck" \
+    > "$run_dir/same-session-physical-compare.json"
+  same_session_result="$(/usr/bin/python3 - "$run_dir/same-session-physical-compare.json" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        print(json.load(handle).get("result", "FAIL"))
+except Exception:
+    print("FAIL")
+PY
+)"
+  [ "$same_session_result" = "PASS" ] || same_session_rc=1
+else
+  printf '{"schema":"opena8djcpp.physical-run-compare.v2","mode":"candidate_only","result":"FAIL","branch_promotion_supported":false,"readiness_claim":"BLOCKED_NO_SAME_SESSION_MAINLINE"}\n' \
+    > "$run_dir/same-session-physical-compare.json"
+  same_session_rc=1
+fi
 
 set +e
 "$root/scripts/evaluate-promotion-readiness.py" \
   --music "$run_dir/cpp-soundcheck/metrics.json" \
   --cpu "$run_dir/cpp-soundcheck/cpu-profile.tsv" \
+  --same-session-compare "$run_dir/same-session-physical-compare.json" \
   --json-out "$run_dir/promotion-readiness.json" \
   > "$run_dir/promotion-readiness.stdout" \
   2> "$run_dir/promotion-readiness.stderr"
@@ -300,16 +374,24 @@ set -e
 {
   echo "PHYSICAL_SUPERIORITY_WINDOW: DONE"
   echo "known_good_route=$run_dir/known-good-route"
-  echo "hal_candidate_safety=$run_dir/hal-candidate-safety"
+  echo "known_good_rc=$known_good_rc"
+  if [ "$candidate_only" -ne 1 ]; then
+    echo "mainline_hal_candidate_safety=$run_dir/mainline-hal-candidate-safety"
+    echo "mainline_soundcheck=$run_dir/mainline-soundcheck"
+    echo "mainline_native_quality=$run_dir/mainline-soundcheck/native-quality.json"
+  fi
+  echo "cpp_hal_candidate_safety=$run_dir/cpp-hal-candidate-safety"
   echo "cpp_soundcheck=$run_dir/cpp-soundcheck"
-  echo "native_quality=$run_dir/cpp-soundcheck/native-quality.json"
+  echo "cpp_native_quality=$run_dir/cpp-soundcheck/native-quality.json"
+  echo "same_session_compare=$run_dir/same-session-physical-compare.json"
+  echo "same_session_rc=$same_session_rc"
   echo "promotion_readiness=$run_dir/promotion-readiness.json"
   echo "promotion_rc=$promotion_rc"
   echo "leave_loaded=$leave_loaded"
   echo "run_dir=$run_dir"
 } | tee "$run_dir/summary.txt"
 
-if [ "$promotion_rc" -eq 0 ]; then
+if [ "$promotion_rc" -eq 0 ] && [ "$same_session_rc" -eq 0 ] && [ "$known_good_rc" -eq 0 ]; then
   exit 0
 fi
 exit 1
