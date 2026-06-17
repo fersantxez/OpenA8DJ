@@ -7880,3 +7880,32 @@ Full offline gate rerun:
   - Branch promotion supported: `false`.
   - Timecode product readiness: `false`.
   - Selected product run still fails quality and CPU gates.
+
+## 2026-06-17 Prepared Transport Pressure Gate
+
+- Scope:
+  - Offline-only pressure test of the prepared backend.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Changes:
+  - Added `opena8djcpp_prepared_transport_pressure_gate`.
+  - Wired it into CMake/CTest, `scripts/run-cpp-offline-gates`,
+    `opena8djcpp_prepared_transport_migration_gate`, static policy, and
+    evidence schema.
+- Focused commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_prepared_transport_pressure_gate`
+  - `./build/cpp-offline/opena8djcpp_prepared_transport_pressure_gate`
+- Focused result:
+  - Result: PASS.
+  - Rows: `8`.
+  - Sample rates: `44100`, `48000`.
+  - Decks: A/B/C/D.
+  - Total frames: `3,684,000`.
+  - HAL steady requeues: `0`.
+  - Fallback allocations: `0`.
+  - Capture/playback mismatches: `0`.
+  - Packet check errors, panic flags, and output overflows: `0`.
+- Interpretation:
+  - This closes the short-contract gap for prepared transport offline pressure.
+  - It remains offline-only and cannot substitute for physical A/B quality,
+    CPU, route, or Traktor/timecode-vinyl validation.

@@ -2030,3 +2030,7 @@ Prepared transport migration metric:
   product readiness and branch promotion as false until same-session physical
   A/B evidence beats mainline on quality, functionality, timecode, CPU, and
   recovery.
+- `local-analysis/cpp-offline/prepared-transport-pressure-gate.json` must PASS
+  with 44.1/48 kHz, decks A/B/C/D, zero HAL steady requeues, zero fallback
+  allocations, zero ring faults, and zero packet/check mismatches before the
+  migration gate can PASS.

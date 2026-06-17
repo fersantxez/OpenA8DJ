@@ -241,6 +241,7 @@ int main(int argc, char** argv) {
       read_file(base / "prepared-transport-routing-timecode-contract.json");
   const auto recovery = read_file(base / "prepared-transport-recovery-contract.json");
   const auto scheduler = read_file(base / "prepared-slot-scheduler-contract.json");
+  const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
   const auto quality_root = read_file(base / "quality-root-cause-analysis.json");
@@ -253,20 +254,26 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(driverkit_prepared, "max_completion_gap_ratio"));
   const double fixed_to_fill =
       number_or_nan(json_number(hot_path, "fixed_queue_to_playback_fill_ratio"));
+  const double pressure_total_frames = number_or_nan(json_number(pressure, "total_frames"));
+  const double pressure_rows = number_or_nan(json_number(pressure, "row_count"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(packet) && result_pass(routing_timecode) &&
-      result_pass(recovery) && result_pass(scheduler);
+      result_pass(recovery) && result_pass(scheduler) && result_pass(pressure) &&
+      finite(pressure_rows) && pressure_rows >= 8.0 && finite(pressure_total_frames) &&
+      pressure_total_frames >= 3684000.0;
   const bool zero_hal_requeue_in_safe_contracts =
       number_is_zero(driverkit_prepared, "minimum_hal_steady_requeues_for_safe") &&
       number_is_zero(scheduler, "minimum_hal_steady_requeues_for_safe") &&
       number_is_zero(packet, "hal_steady_requeues") &&
       number_is_zero(routing_timecode, "hal_steady_requeues") &&
-      number_is_zero(recovery, "hal_steady_requeues");
+      number_is_zero(recovery, "hal_steady_requeues") &&
+      number_is_zero(pressure, "total_hal_steady_requeues");
   const bool no_fallback_or_ring_faults =
       number_is_zero(packet, "fallback_allocations") &&
       number_is_zero(routing_timecode, "fallback_allocations") &&
       number_is_zero(recovery, "fallback_allocations") &&
+      number_is_zero(pressure, "total_fallback_allocations") &&
       number_is_zero(recovery, "capture_ring_overruns") &&
       number_is_zero(recovery, "capture_ring_underruns") &&
       number_is_zero(recovery, "playback_ring_overruns") &&
@@ -275,7 +282,8 @@ int main(int argc, char** argv) {
       number_is_zero(packet, "timestamp_regressions") &&
       number_is_zero(recovery, "timestamp_regressions") &&
       number_at_most(driverkit_prepared, "max_completion_gap_ratio", 1.25) &&
-      finite(scheduler_gap) && scheduler_gap <= 1.25;
+      finite(scheduler_gap) && scheduler_gap <= 1.25 &&
+      number_is_zero(pressure, "failures");
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -338,6 +346,8 @@ int main(int argc, char** argv) {
   print_number("driverkit_prepared_max_completion_gap_ratio", transport_gap);
   print_number("prepared_slot_scheduler_max_completion_gap_ratio", scheduler_gap);
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
+  print_number("prepared_transport_pressure_rows", pressure_rows);
+  print_number("prepared_transport_pressure_total_frames", pressure_total_frames);
   print_gate_rows(gates);
   std::cout << "  \"mode\": \"offline_migration_only\",\n"
             << "  \"next_allowed_action\": \"LOCK_GATED_PREPARED_TRANSPORT_A_B_HARDWARE_WINDOW_ONLY_AFTER_RUNTIME_BINDING\",\n"

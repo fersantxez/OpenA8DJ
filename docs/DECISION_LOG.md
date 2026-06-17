@@ -4944,3 +4944,22 @@ Next implication:
 - The next implementation direction is runtime binding for prepared transport,
   followed by a lock-gated same-session A/B hardware window against mainline.
   No branch promotion or quality claim is allowed before that evidence.
+
+## 2026-06-17: Add Prepared Transport Pressure Gate
+
+Decision:
+- Add `tools/prepared_transport_pressure_gate.cpp`.
+- Require it from `tools/prepared_transport_migration_gate.cpp`.
+
+Reason:
+- A migration gate based only on short contracts could miss long-run ring,
+  timestamp, fallback, or deck-specific failures.
+- The pressure gate covers 44.1/48 kHz and all A/B/C/D decks without touching
+  hardware.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-transport-pressure-gate.json`
+
+Next implication:
+- Prepared transport has stronger offline support as the next performance
+  candidate, but physical readiness and branch promotion remain blocked.

@@ -1793,3 +1793,25 @@ Current implication:
   direction, but only as an offline migration candidate.
 - It does not prove audiophile quality, Traktor/timecode vinyl readiness, or
   superiority over mainline.
+
+### 2026-06-17 Prepared Transport Pressure Gate
+
+- Added `opena8djcpp_prepared_transport_pressure_gate`.
+- It runs a long offline pressure model over:
+  - sample rates `44100` and `48000`;
+  - decks A/B/C/D;
+  - 10 seconds per row;
+  - `3,684,000` total S24 frames.
+- Current focused result:
+  - failures: `0`;
+  - HAL steady requeues: `0`;
+  - fallback allocations: `0`;
+  - ring overruns/underruns: `0`;
+  - capture/playback mismatches: `0`;
+  - packet check errors/panic flags/output overflows: `0`.
+
+Current implication:
+- Prepared transport migration is now backed by longer offline pressure
+  evidence at the mandatory 44.1/48 kHz rates.
+- This still does not touch hardware and still cannot prove physical sound
+  quality or CPU superiority.
