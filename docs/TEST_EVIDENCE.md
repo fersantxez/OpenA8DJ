@@ -4003,3 +4003,60 @@ Operational note:
   - `local-analysis/runtime-isolation/post-stream-usage-harness-control.json`
 - Next locked physical command shape:
   - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-channel-matrix-gate --run-physical --run-id <run-id> --pair A --rate 48000 --seconds 8 --peak 0.30 --capture-device "iRig Stream" --capture-channels 1,2 --no-output-stream-usage`
+
+## 2026-06-17: Physical Stream-Usage-Off And Mainline-Config Probes
+
+- Commands:
+  - `make -B hal build/audio-record build/audio-wav-play build/opena8dj-control`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260617-cpp-no-streamusage-prep`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-channel-matrix-gate --run-physical --run-id 20260617-cpp-no-streamusage-pairA-chmatrix --pair A --rate 48000 --seconds 8 --peak 0.30 --capture-device "iRig Stream" --capture-channels 1,2 --no-output-stream-usage`
+  - `make -B hal build/audio-record build/audio-wav-play build/opena8dj-control HAL_STREAM_USAGE=0 HAL_FAST_OUTPUT_PREFETCH_CLEAR=1 HAL_BACKGROUND_PREOPEN_ON_INIT=1 HAL_HOT_STREAM_STATS_INTERVAL=1`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260617-cpp-mainline-parity-config-prep`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-channel-matrix-gate --run-physical --run-id 20260617-cpp-mainline-parity-config-pairA-chmatrix --pair A --rate 48000 --seconds 8 --peak 0.30 --capture-device "iRig Stream" --capture-channels 1,2 --no-output-stream-usage`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -12 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s --no-output-stream-usage --cpu-profile --stream-stats-snapshots --audio-stack-recover-on-fail --audio-stack-unload-on-recover`
+  - explicit HAL unload under lock, followed by `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
+  - `make -B hal build/audio-record build/audio-wav-play build/opena8dj-control`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-default-rebuild-final.json`
+  - `git diff --check`
+- Results:
+  - USB/CoreAudio preflight saw `iRig Stream` in CoreAudio and `Audio 8 DJ`
+    in USB; Audio 8 was not in CoreAudio until the C++ HAL was installed.
+  - Default C++ with harness stream usage disabled improved Pair A max
+    wrong-source leakage from `-35.36 dB` to `-39.72 dB`, but still failed the
+    `-45 dB` threshold and remained worse than mainline `-42.58 dB`.
+  - Mainline-config C++ (`HAL_STREAM_USAGE=0`,
+    `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`,
+    `HAL_BACKGROUND_PREOPEN_ON_INIT=1`,
+    `HAL_HOT_STREAM_STATS_INTERVAL=1`) recovered the physical output level to
+    mainline-like tone amplitudes, but still failed the Pair A matrix:
+    max wrong-source leakage `-40.57 dB`, left-to-right `-40.57 dB`,
+    right-to-left `-40.09 dB`, clipped frames `0`.
+  - Mainline-config real-music soundcheck failed:
+    `quality_alignment_score=0.678827`, SNR `-0.83 dB`,
+    mid residual ratio `2.536563`, high residual ratio `1.779982`,
+    `lag_jumps_gt_2_frames=42`, clipped frames `0`.
+  - Stream stats during the failed music run showed no output underruns,
+    no active underruns, no elastic drops, no timeline resets, and no late
+    writes. The quality failure is therefore not explained by the exposed
+    underrun/reset counters.
+  - Promotion readiness remains `FAIL` with
+    `branch_promotion_allowed=false`.
+  - The local HAL/tools were rebuilt back to the Makefile defaults after the
+    experiment. Offline gates still PASS: Debug `17/17`, Release `18/18`.
+  - Latest release benchmark after default rebuild:
+    `pack_mib_s=1645.1`, `decode_into_mib_s=587.023`,
+    `route_frames_s=8.61253e+08`,
+    `route_advanced_frames_s=5.06314e+08`.
+  - Diff whitespace check PASS.
+  - Final runtime isolation PASS: HAL inactive, lock absent, no OpenA8DJ
+    process, no hardware/CoreAudio/USB mutation pending.
+- Evidence paths:
+  - `local-analysis/channel-matrix/20260617-cpp-no-streamusage-pairA-chmatrix/tone-matrix.json`
+  - `local-analysis/channel-matrix/20260617-cpp-mainline-parity-config-pairA-chmatrix/tone-matrix.json`
+  - `local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s/metrics.json`
+  - `local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s/stream-stats-after.txt`
+  - `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
+  - `local-analysis/runtime-isolation/post-default-rebuild-final.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`

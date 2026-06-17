@@ -2398,3 +2398,47 @@ Evidence:
 - Runtime isolation:
   `local-analysis/runtime-isolation/post-stream-usage-harness-control.json`,
   PASS with HAL inactive and lock absent.
+
+## 2026-06-17: Reject Stream-Usage And Mainline-Config Probes As Readiness Fixes
+
+Decision:
+- Do not claim C++ routing, physical sound quality, resource use, or branch
+  promotion readiness from the latest physical probes.
+- Do not adopt the mainline-config build as a product fix yet. It recovers
+  output level, but it does not pass the physical matrix or real-music quality
+  gates.
+- Treat `IOProcStreamUsage` as a measurement variable that must stay recorded
+  in physical evidence. It is not the sole root cause.
+
+Reason:
+- Disabling output stream usage in the playback harness improved C++ Pair A
+  max wrong-source leakage from `-35.36 dB` to `-39.72 dB`, proving that the
+  previous C++ vs mainline comparison included a harness/HAL interaction.
+- The improved result still fails the `-45 dB` threshold and remains worse
+  than the read-only mainline `0.3.135` evidence at `-42.58 dB`.
+- A C++ build aligned with several mainline defaults
+  (`HAL_STREAM_USAGE=0`, `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`,
+  `HAL_BACKGROUND_PREOPEN_ON_INIT=1`, hot stats interval `1`) recovered
+  mainline-like output amplitude, but still failed the Pair A matrix at
+  `-40.57 dB` max wrong-source leakage.
+- The same mainline-config C++ build failed real-music quality:
+  `quality_alignment_score=0.678827`, SNR `-0.83 dB`, `42` lag jumps, mid
+  residual ratio `2.536563`, high residual ratio `1.779982`, with no clipping.
+- Stream stats showed no output underruns, active underruns, elastic drops,
+  timeline resets, or late writes. The remaining failure is not explained by
+  the exposed underrun/reset counters.
+
+Alternatives discarded:
+- Promote the mainline-config C++ build because it restores level: rejected
+  because level parity is not quality parity, and both leakage and music gates
+  still fail.
+- Blame only the iRig route: rejected because mainline is still measurably
+  better than C++ on the same Pair A matrix route.
+- Ignore the stream-usage result: rejected because it changed leakage by
+  roughly `4.36 dB` and must be controlled in future A/B evidence.
+
+Evidence:
+- `local-analysis/channel-matrix/20260617-cpp-no-streamusage-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/channel-matrix/20260617-cpp-mainline-parity-config-pairA-chmatrix/tone-matrix.json`
+- `local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s/metrics.json`
+- `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`

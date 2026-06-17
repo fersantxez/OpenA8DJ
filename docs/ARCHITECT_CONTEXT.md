@@ -833,3 +833,38 @@ Next technical target:
   the read-only mainline `0.3.135` artifact likely rejects the property. The
   control does not change driver behavior or readiness; it makes the next
   measurement more precise.
+
+## 2026-06-17 Stream Usage And Level-Control Findings
+
+- Current commit anchor before this evidence: `dfa6575`.
+- Hardware state verified before testing:
+  `iRig Stream` was visible in CoreAudio as a 2-channel USB capture device, and
+  `Audio 8 DJ` was visible in USB with Native Instruments vendor/product data.
+  Audio 8 DJ was not visible in CoreAudio until the C++ HAL was installed.
+- Default C++ with playback harness stream usage disabled:
+  Pair A max wrong-source leakage improved from `-35.36 dB` to `-39.72 dB`.
+  This proves stream usage was an uncontrolled measurement factor, but the run
+  still failed the `-45 dB` threshold and remained worse than mainline
+  `-42.58 dB`.
+- A C++ build with mainline-like defaults
+  (`HAL_STREAM_USAGE=0`, `HAL_FAST_OUTPUT_PREFETCH_CLEAR=1`,
+  `HAL_BACKGROUND_PREOPEN_ON_INIT=1`, hot stats interval `1`) recovered
+  mainline-like output level in the Pair A matrix. It still failed routing:
+  max wrong-source leakage `-40.57 dB`, left-to-right `-40.57 dB`,
+  right-to-left `-40.09 dB`, no clipping.
+- The same mainline-config C++ build failed real-music quality:
+  `quality_alignment_score=0.678827`, SNR `-0.83 dB`,
+  mid residual ratio `2.536563`, high residual ratio `1.779982`,
+  `lag_jumps_gt_2_frames=42`, no clipping.
+- Stream stats for that music run showed no output underruns, active underruns,
+  elastic drops, timeline resets, or late writes. The remaining defect is not
+  explained by current underrun/reset counters or by simple output level.
+- Final state after cleanup:
+  `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
+  is PASS with HAL inactive, lock absent, and no OpenA8DJ process.
+- Conclusion:
+  C++ remains blocked from readiness, promotion, and any claim of better
+  physical quality/functionality/performance than mainline. The next technical
+  work must isolate the residual path below current counters: USB/device
+  scheduling, hidden packet/cadence interpretation, analog/capture topology, or
+  a missing physical control/state difference.

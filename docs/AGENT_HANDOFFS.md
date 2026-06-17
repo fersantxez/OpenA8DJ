@@ -955,3 +955,32 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - The next locked physical A/B must run the stream-usage-off C++ variant
     before concluding whether C++ leakage is a driver defect, a harness
     difference, or a capture-route artifact.
+
+### Architect Local Continuation After Beauvoir Pending
+
+- Status:
+  - A new explorer spawn for this audit failed because the agent thread limit
+    was reached.
+  - The architect proceeded locally under the required hardware lock.
+- Physical findings:
+  - Default C++ with harness stream usage disabled improved Pair A leakage from
+    `-35.36 dB` to `-39.72 dB`, proving stream usage mattered.
+  - The result still failed `-45 dB` and remained worse than mainline
+    `-42.58 dB`.
+  - Mainline-config C++ recovered mainline-like physical output level but still
+    failed Pair A matrix at `-40.57 dB`.
+  - Mainline-config C++ failed real-music quality:
+    `quality_alignment_score=0.678827`, SNR `-0.83 dB`, `42` lag jumps.
+  - Stream stats did not show output underruns, active underruns, elastic
+    drops, timeline resets, or late writes.
+- Files affected:
+  - Documentation only in this continuation:
+    `docs/TEST_EVIDENCE.md`, `docs/DECISION_LOG.md`,
+    `docs/ARCHITECT_CONTEXT.md`, `docs/PROMOTION_READINESS_STATUS.md`,
+    `docs/AGENT_HANDOFFS.md`.
+- Next recommended action:
+  - Do not promote.
+  - Do not chase volume alone.
+  - Isolate the remaining residual path below current counters: USB/device
+    scheduling, hidden packet/cadence interpretation, analog/capture topology,
+    or a missing physical control-state difference.

@@ -99,9 +99,9 @@ Interpretation:
   `branch_promotion_allowed=false`.
 - The promotion evaluator now selects the latest paired soundcheck metrics and
   CPU profile by default. The current selected pair is
-  `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`,
-  and the `latest_music_cpu_pair` gate passes only because both artifacts come
-  from that same physical run.
+  `local-analysis/soundcheck/20260617-cpp-mainline-parity-config-dense-ch12-irig-pairA-12s`,
+  and the `latest_music_cpu_pair` evidence gate passes only because both
+  artifacts come from that same physical run. The product gates still fail.
 
 ## Required Before Branch Promotion
 
@@ -139,3 +139,24 @@ Conclusion: C++ is not ready for hardware-readiness claims, branch promotion,
 or replacement of C mainline. The next acceptable work must produce evidence
 that improves physical leakage/quality and preserves or improves CPU versus
 mainline.
+
+## 2026-06-17 Stream-Usage And Mainline-Config Status
+
+- Default C++ Pair A matrix with harness stream usage disabled:
+  `max_wrong_source_leakage_db=-39.72`; still FAIL and still worse than
+  mainline `-42.58`.
+- Mainline-config C++ recovered physical output level but still failed Pair A
+  matrix: `max_wrong_source_leakage_db=-40.57`.
+- Mainline-config C++ real-music gate failed:
+  `quality_alignment_score=0.678827`, SNR `-0.83 dB`, `42` lag jumps,
+  mid residual ratio `2.536563`, high residual ratio `1.779982`.
+- Runtime CPU gate remains FAIL in
+  `local-analysis/promotion-readiness-current.json`:
+  `opena8dj_driver_p95=6.2%` is under the driver cap used by the evaluator,
+  but `coreaudiod_p95=4.1%` is above the selected baseline cap `1.7%`.
+- Final isolation:
+  `local-analysis/runtime-isolation/post-parity-soundcheck-unload-final.json`
+  PASS, HAL inactive, lock absent.
+
+Decision: branch promotion remains forbidden. Do not move C mainline to
+Legacy, do not move C++ to `main`, and do not claim audiophile readiness.
