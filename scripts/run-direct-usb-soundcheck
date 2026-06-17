@@ -79,6 +79,80 @@ print(min(values) if values else "missing")
 PY
 }
 
+log_key() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import re
+import sys
+path, key = sys.argv[1], sys.argv[2]
+try:
+    text = open(path, "r", encoding="utf-8", errors="replace").read()
+except FileNotFoundError:
+    print("missing")
+    raise SystemExit(0)
+pattern = re.compile(r"(?:^|[ \t])" + re.escape(key) + r"=([^ \t\r\n]+)")
+match = pattern.search(text)
+print(match.group(1) if match else "missing")
+PY
+}
+
+play_event_seconds() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import re
+import sys
+path, label = sys.argv[1], sys.argv[2]
+try:
+    lines = open(path, "r", encoding="utf-8", errors="replace")
+except FileNotFoundError:
+    print("missing")
+    raise SystemExit(0)
+pattern = re.compile(r"usb_play_event label=" + re.escape(label) + r".*seconds_since_process_start=([^ \t\r\n]+)")
+for line in lines:
+    match = pattern.search(line)
+    if match:
+        print(match.group(1))
+        break
+else:
+    print("missing")
+PY
+}
+
+play_event_nsec() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import re
+import sys
+path, label = sys.argv[1], sys.argv[2]
+try:
+    lines = open(path, "r", encoding="utf-8", errors="replace")
+except FileNotFoundError:
+    print("missing")
+    raise SystemExit(0)
+pattern = re.compile(r"usb_play_event label=" + re.escape(label) + r".*monotonic_nsec=([0-9]+)")
+for line in lines:
+    match = pattern.search(line)
+    if match:
+        print(match.group(1))
+        break
+else:
+    print("missing")
+PY
+}
+
+nsec_delta_seconds() {
+  /usr/bin/python3 - "$1" "$2" <<'PY'
+import sys
+first, second = sys.argv[1], sys.argv[2]
+try:
+    first_nsec = int(first)
+    second_nsec = int(second)
+    if first_nsec <= 0 or second_nsec <= 0:
+        print("missing")
+    else:
+        print(f"{(second_nsec - first_nsec) / 1_000_000_000.0:.6f}")
+except ValueError:
+    print("missing")
+PY
+}
+
 looks_virtual_capture() {
   local lowered
   lowered="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -332,6 +406,15 @@ mid="$(json_get "$run_dir/metrics.json" mid_band_residual_ratio)"
 high="$(json_get "$run_dir/metrics.json" high_band_residual_ratio)"
 lag_jumps="$(json_get "$run_dir/metrics.json" lag_jumps_gt_2_frames)"
 clipped="$(json_get "$run_dir/metrics.json" capture_clipped_frames)"
+first_callback_seconds="$(log_key "$run_dir/record.log" first_callback_seconds)"
+first_energy_record_seconds="$(log_key "$run_dir/record.log" first_energy_record_seconds)"
+first_energy_wall_seconds="$(log_key "$run_dir/record.log" first_energy_wall_seconds)"
+first_energy_frame="$(log_key "$run_dir/record.log" first_energy_frame)"
+first_energy_nsec="$(log_key "$run_dir/record.log" first_energy_nsec)"
+first_write_seconds="$(play_event_seconds "$run_dir/play.log" after-first-write)"
+first_write_nsec="$(play_event_nsec "$run_dir/play.log" after-first-write)"
+after_start_seconds="$(play_event_seconds "$run_dir/play.log" after-start)"
+first_energy_after_first_write_seconds="$(nsec_delta_seconds "$first_write_nsec" "$first_energy_nsec")"
 
 {
   echo "DIRECT_USB_SOUNDCHECK: $([ "$analysis_rc" -eq 0 ] && echo PASS || echo FAIL)"
@@ -348,6 +431,15 @@ clipped="$(json_get "$run_dir/metrics.json" capture_clipped_frames)"
   echo "high_band_residual_ratio=$high"
   echo "lag_jumps_gt_2_frames=$lag_jumps"
   echo "capture_clipped_frames=$clipped"
+  echo "record_first_callback_seconds=$first_callback_seconds"
+  echo "record_first_energy_frame=$first_energy_frame"
+  echo "record_first_energy_nsec=$first_energy_nsec"
+  echo "record_first_energy_record_seconds=$first_energy_record_seconds"
+  echo "record_first_energy_wall_seconds=$first_energy_wall_seconds"
+  echo "player_after_start_seconds=$after_start_seconds"
+  echo "player_after_first_write_nsec=$first_write_nsec"
+  echo "player_after_first_write_seconds=$first_write_seconds"
+  echo "first_energy_after_first_write_seconds=$first_energy_after_first_write_seconds"
   echo "run_dir=$run_dir"
 } | tee "$run_dir/summary.txt"
 

@@ -1,5 +1,56 @@
 # Decision Log
 
+## 2026-06-17: Instrument Direct USB Timeline, Keep Reset Reply Wait Default
+
+Decision:
+- Add monotonic timeline instrumentation to the direct USB player and iRig
+  recorder.
+- Add experimental build flags for `AUDIO_PARAMS` reset no-wait and settle
+  timing, but keep the default as `HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=1`.
+- Do not promote reset no-wait or reset no-wait + settle as a product
+  optimization yet.
+
+Reason:
+- Locked direct USB evidence showed first captured energy only about `0.19s`
+  after the first `OpenA8DJUSBWriteOutput` call, so the multi-second delay is
+  not the analog/DAC path after first write.
+- The large delay is before first write, inside `OpenA8DJUSBStart`, where the
+  reset/stream `AUDIO_PARAMS` command sequence can wait for replies.
+- Avoiding the reset reply wait with no settle failed startup completely.
+- Small settle values were not stable enough to promote: `250ms` once started
+  quickly but later returned to a multi-second start, and `100ms` produced no
+  captured energy.
+
+Alternatives discarded:
+- Disable `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM`: still rejected because the
+  prior HAL candidate safety run failed before playback.
+- Make no-wait reset the default after a short run: rejected because startup was
+  not stable and strict physical quality remained FAIL.
+- Treat the `0.19s` first-write-to-energy delay as the product blocker:
+  rejected because the dominant delay is before first write.
+
+Evidence:
+- `local-analysis/direct-usb-timeline-instrumentation/20260617T134242Z-pairA-6s-usbdiag-nsec`:
+  `player_after_start_seconds=4.242518`,
+  `player_after_first_write_seconds=4.242867`,
+  `record_first_energy_record_seconds=4.882604`,
+  `first_energy_after_first_write_seconds=0.191420`, strict quality FAIL.
+- `local-analysis/direct-usb-reset-no-wait/20260617T134558Z-pairA-6s-usbdiag`:
+  no-wait/no-settle `player_rc=6`, no energy above threshold.
+- `local-analysis/direct-usb-reset-no-wait/20260617T134734Z-settle500ms-pairA-2s`:
+  started with `player_after_start_seconds=2.636657`, but strict quality FAIL.
+- `local-analysis/direct-usb-reset-no-wait/20260617T134755Z-settle250ms-pairA-2s`:
+  started with `player_after_start_seconds=0.270771`, but strict quality FAIL.
+- `local-analysis/direct-usb-reset-no-wait/20260617T134841Z-settle250ms-pairA-6s-usbdiag`:
+  longer run returned to `player_after_start_seconds=4.502963`, strict quality
+  FAIL.
+- Runtime isolation after each physical run: PASS, HAL inactive, lock absent.
+
+Next implication:
+- Continue using the timeline instrumentation for diagnostics.
+- Do not claim startup optimization readiness until the reset/control sequence
+  has stable repeated evidence and does not regress physical quality.
+
 ## 2026-06-17: Separate Raw Capture/Playback Completions From Sampled Stream Stats
 
 Decision:

@@ -1,5 +1,58 @@
 # Test Evidence
 
+## 2026-06-17: Direct USB Timeline Instrumentation And Reset No-Wait Rejection
+
+- Change:
+  - `audio-record` now reports raw monotonic timestamps and first-energy
+    fields: `start_nsec`, `first_callback_nsec`, `first_energy_nsec`,
+    `first_energy_frame`, and first-energy seconds.
+  - `opena8dj-usb-play` now reports monotonic `usb_play_event` markers for
+    process start, USB start, first write, play completion, and stop.
+  - `run-direct-usb-soundcheck` copies those fields into `summary.txt` and
+    computes `first_energy_after_first_write_seconds` when both monotonic
+    timestamps are present.
+  - Added build-time experiment flags:
+    `HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY` and
+    `HAL_AUDIO_PARAMS_RESET_SETTLE_USEC`.
+- Commands:
+  - `make build/audio-record build/opena8dj-usb-play`
+  - `bash -n scripts/run-direct-usb-soundcheck`
+  - `scripts/run-cpp-offline-gates`
+  - Locked direct USB/iRig runs:
+    - `local-analysis/direct-usb-timeline-instrumentation/20260617T134039Z-pairA-6s-usbdiag`
+    - `local-analysis/direct-usb-timeline-instrumentation/20260617T134242Z-pairA-6s-usbdiag-nsec`
+    - `local-analysis/direct-usb-reset-no-wait/20260617T134558Z-pairA-6s-usbdiag`
+    - `local-analysis/direct-usb-reset-no-wait/20260617T134734Z-settle500ms-pairA-2s`
+    - `local-analysis/direct-usb-reset-no-wait/20260617T134755Z-settle250ms-pairA-2s`
+    - `local-analysis/direct-usb-reset-no-wait/20260617T134815Z-settle100ms-pairA-2s`
+    - `local-analysis/direct-usb-reset-no-wait/20260617T134841Z-settle250ms-pairA-6s-usbdiag`
+- Result:
+  - Offline gates PASS after adding timeline instrumentation:
+    Debug CTest `17/17`, Release CTest `18/18`, stream-stats contract
+    `168` fields and `0` mismatches.
+  - Default direct USB run with raw monotonic timestamps still failed strict
+    quality: alignment `0.936915`, SNR `8.82 dB`, mid/high residual
+    `1.444318/1.419246`.
+  - The same run proved the analog route emits shortly after the first write:
+    `player_after_first_write_seconds=4.242867`,
+    `record_first_energy_record_seconds=4.882604`, and
+    `first_energy_after_first_write_seconds=0.191420`.
+  - Therefore the multi-second startup delay is not between first write and
+    iRig energy. It is before first write, inside `OpenA8DJUSBStart`.
+  - `HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=0` without settle failed start:
+    `player_rc=6`, no captured energy above threshold.
+  - `settle500ms` started and reduced `player_after_start_seconds` to
+    `2.636657` in a short run, but still failed quality.
+  - `settle250ms` was not stable: one short run started in `0.270771s`, but a
+    longer diagnostics run returned to `4.502963s`.
+  - `settle100ms` produced no captured energy above threshold and is rejected.
+- Interpretation:
+  - The new instrumentation is accepted.
+  - Reset no-wait/no-settle and reset no-wait with `100ms` settle are rejected.
+  - Reset no-wait with `250ms` or `500ms` settle is not promoted because it is
+    not proven stable and does not improve physical quality.
+  - Default remains `HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=1`.
+
 ## 2026-06-17: Raw Capture And Playback Completion Counter Fix
 
 - Change:

@@ -17,9 +17,12 @@ typedef struct RecorderState {
     double sampleRate;
     UInt32 leftChannel;
     UInt32 rightChannel;
+    double energyThreshold;
     UInt64 framesWritten;
     atomic_ullong startNsec;
     atomic_ullong firstCallbackNsec;
+    atomic_ullong firstEnergyFrame;
+    atomic_ullong firstEnergyNsec;
     double squareSum;
     double peak;
     UInt64 clipped;
@@ -336,6 +339,13 @@ static OSStatus IOProc(AudioObjectID inDevice,
             state->squareSum += dl * dl + dr * dr;
             double leftAbs = fabs(dl);
             double rightAbs = fabs(dr);
+            if (leftAbs >= state->energyThreshold || rightAbs >= state->energyThreshold) {
+                uint64_t unset = UINT64_MAX;
+                uint64_t absoluteFrame = state->framesWritten + frameOffset + frame;
+                if (atomic_compare_exchange_strong(&state->firstEnergyFrame, &unset, absoluteFrame)) {
+                    atomic_store(&state->firstEnergyNsec, MonotonicNsec());
+                }
+            }
             if (leftAbs > state->peak) {
                 state->peak = leftAbs;
             }
@@ -378,7 +388,7 @@ static bool ParseChannels(const char *text, UInt32 *left, UInt32 *right)
 static void PrintUsage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s <seconds> <output.wav> [device|default] [left,right]\n"
+            "usage: %s <seconds> <output.wav> [device|default] [left,right] [energy_threshold]\n"
             "  device may be a Core Audio UID, exact name, or name substring.\n"
             "  channels are 1-based input channels and default to 1,2.\n",
             argv0);
@@ -403,6 +413,15 @@ int main(int argc, char **argv)
     if (argc > 4 && !ParseChannels(argv[4], &leftChannel, &rightChannel)) {
         fprintf(stderr, "invalid channel selection: %s\n", argv[4]);
         return 4;
+    }
+    double energyThreshold = 0.005;
+    if (argc > 5) {
+        char *end = NULL;
+        energyThreshold = strtod(argv[5], &end);
+        if (end == argv[5] || *end != 0 || energyThreshold <= 0.0 || energyThreshold > 1.0) {
+            fprintf(stderr, "invalid energy threshold: %s\n", argv[5]);
+            return 4;
+        }
     }
 
     AudioObjectID device = FindInputDevice(deviceText);
@@ -475,9 +494,12 @@ int main(int argc, char **argv)
     state.sampleRate = format.mSampleRate;
     state.leftChannel = leftChannel;
     state.rightChannel = rightChannel;
+    state.energyThreshold = energyThreshold;
     atomic_init(&state.active, true);
     atomic_init(&state.startNsec, 0);
     atomic_init(&state.firstCallbackNsec, 0);
+    atomic_init(&state.firstEnergyFrame, UINT64_MAX);
+    atomic_init(&state.firstEnergyNsec, 0);
 
     AudioDeviceIOProcID ioProcID = NULL;
     status = AudioDeviceCreateIOProcID(device, IOProc, &state, &ioProcID);
@@ -515,10 +537,18 @@ int main(int argc, char **argv)
     }
     uint64_t startNsec = atomic_load(&state.startNsec);
     uint64_t firstCallbackNsec = atomic_load(&state.firstCallbackNsec);
+    uint64_t firstEnergyFrame = atomic_load(&state.firstEnergyFrame);
+    uint64_t firstEnergyNsec = atomic_load(&state.firstEnergyNsec);
     double firstCallbackSeconds = firstCallbackNsec > startNsec ?
         (double)(firstCallbackNsec - startNsec) / 1000000000.0 :
         -1.0;
-    printf("recorded path=%s seconds=%d device=\"%s\" uid=\"%s\" rate=%.0f channels=%u,%u frames=%llu rms=%.8f peak=%.8f clipped=%llu first_callback_seconds=%.6f\n",
+    double firstEnergyRecordSeconds = firstEnergyFrame != UINT64_MAX ?
+        (double)firstEnergyFrame / state.sampleRate :
+        -1.0;
+    double firstEnergyWallSeconds = firstEnergyNsec > startNsec ?
+        (double)(firstEnergyNsec - startNsec) / 1000000000.0 :
+        -1.0;
+    printf("recorded path=%s seconds=%d device=\"%s\" uid=\"%s\" rate=%.0f channels=%u,%u frames=%llu rms=%.8f peak=%.8f clipped=%llu start_nsec=%llu first_callback_nsec=%llu first_callback_seconds=%.6f first_energy_frame=%lld first_energy_nsec=%llu first_energy_record_seconds=%.6f first_energy_wall_seconds=%.6f first_energy_threshold=%.8f\n",
            argv[2],
            seconds,
            nameBuffer,
@@ -530,7 +560,14 @@ int main(int argc, char **argv)
            rms,
            state.peak,
            state.clipped,
-           firstCallbackSeconds);
+           (unsigned long long)startNsec,
+           (unsigned long long)firstCallbackNsec,
+           firstCallbackSeconds,
+           firstEnergyFrame == UINT64_MAX ? -1ll : (long long)firstEnergyFrame,
+           (unsigned long long)firstEnergyNsec,
+           firstEnergyRecordSeconds,
+           firstEnergyWallSeconds,
+           state.energyThreshold);
 
     if (name != NULL) {
         CFRelease(name);

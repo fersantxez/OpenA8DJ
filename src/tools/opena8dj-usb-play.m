@@ -51,6 +51,20 @@ static void SleepUntilNsec(uint64_t deadline)
     }
 }
 
+static void PrintEvent(const char *label, uint64_t originNsec)
+{
+    uint64_t now = MonotonicNsec();
+    double seconds = originNsec > 0 && now >= originNsec ?
+        (double)(now - originNsec) / 1000000000.0 :
+        0.0;
+    fprintf(stderr,
+            "usb_play_event label=%s monotonic_nsec=%" PRIu64 " seconds_since_process_start=%.6f\n",
+            label,
+            now,
+            seconds);
+    fflush(stderr);
+}
+
 static int ParsePair(const char *text)
 {
     if (text == NULL || strcmp(text, "all") == 0 || strcmp(text, "ALL") == 0) {
@@ -182,6 +196,8 @@ static void PrintDiagnostics(const char *label)
 int main(int argc, char **argv)
 {
     @autoreleasepool {
+        uint64_t processStartNsec = MonotonicNsec();
+        PrintEvent("process-start", processStartNsec);
         const char *path = argc > 1 ? argv[1] : "build/test-recordings/opena8dj-reference.wav";
         int selectedPair = -1;
         uint32_t leadFrames = 0;
@@ -263,17 +279,21 @@ int main(int argc, char **argv)
                 fprintf(stderr, "OpenA8DJUSBEnsureOpen failed\n");
                 return 6;
             }
+            PrintEvent("after-ensure-open", processStartNsec);
             if (!OpenA8DJUSBApplyPlaybackProfile()) {
                 fprintf(stderr, "OpenA8DJUSBApplyPlaybackProfile failed\n");
                 return 6;
             }
+            PrintEvent("after-playback-profile", processStartNsec);
             PrintDiagnostics("after-playback-profile");
         }
+        PrintEvent("before-start", processStartNsec);
         if (!OpenA8DJUSBStart((double)sampleRate)) {
             fprintf(stderr, "OpenA8DJUSBStart failed\n");
             return 6;
         }
         uint64_t startDoneNsec = MonotonicNsec();
+        PrintEvent("after-start", processStartNsec);
         PrintDiagnostics("after-start");
 
         const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
@@ -292,6 +312,8 @@ int main(int argc, char **argv)
         float out[chunkFrames * 8];
         uint32_t frame = 0;
         uint64_t playbackStartNsec = MonotonicNsec();
+        PrintEvent("before-first-write", processStartNsec);
+        bool printedFirstWrite = false;
         while (frame < sourceFrames) {
             uint32_t todo = sourceFrames - frame;
             if (todo > chunkFrames) {
@@ -311,6 +333,10 @@ int main(int argc, char **argv)
                 }
             }
             OpenA8DJUSBWriteOutput(out, todo, 8);
+            if (!printedFirstWrite) {
+                PrintEvent("after-first-write", processStartNsec);
+                printedFirstWrite = true;
+            }
             frame += todo;
             if (frame > leadFrames) {
                 double elapsedFrames = (double)(frame - leadFrames);
@@ -321,9 +347,12 @@ int main(int argc, char **argv)
 
         PrintDiagnostics("after-play");
         uint64_t afterPlayNsec = MonotonicNsec();
+        PrintEvent("after-play", processStartNsec);
         SleepFrames(sampleRate / 2, sampleRate);
         PrintDiagnostics("before-stop");
+        PrintEvent("before-stop", processStartNsec);
         OpenA8DJUSBStop();
+        PrintEvent("after-stop", processStartNsec);
         PrintDiagnostics("after-stop");
         fprintf(stderr,
                 "usb_play completed frames=%u start_to_before_play_seconds=%.6f play_loop_seconds=%.6f\n",

@@ -26,6 +26,13 @@ Branch: `driverkit/cpp-redesign`
   `playbackTransfersCompleted=8129`. The same fixed run still failed strict
   quality, and the earlier `16x` playback/capture conclusion is rejected as a
   sampling artifact.
+- Direct USB timeline instrumentation now separates startup delay from analog
+  output delay. A locked run measured first captured iRig energy `0.191420s`
+  after the first direct USB write, while `OpenA8DJUSBStart` consumed about
+  `4.24s` before the first write. Reset no-wait experiments are not promoted:
+  no-settle failed start, `100ms` produced no captured energy, and `250ms` was
+  not stable across short versus longer runs. Default remains reply-waiting
+  reset until repeated evidence proves a safer control sequence.
 - Reboot/autologin recovery is an unresolved operational gap. After the prior
   reboot, the session did not recover without user intervention as intended;
   this must be fixed before planned unattended test windows.

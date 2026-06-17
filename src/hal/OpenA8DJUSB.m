@@ -204,6 +204,12 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #ifndef OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
 #define OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM 1
 #endif
+#ifndef OPENA8DJ_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY
+#define OPENA8DJ_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY 1
+#endif
+#ifndef OPENA8DJ_AUDIO_PARAMS_RESET_SETTLE_USEC
+#define OPENA8DJ_AUDIO_PARAMS_RESET_SETTLE_USEC 0
+#endif
 
 #ifndef OPENA8DJ_ENABLE_TRANSFER_LEDGER
 #define OPENA8DJ_ENABLE_TRANSFER_LEDGER 0
@@ -2738,13 +2744,52 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     return ok;
 }
 
+- (BOOL)sendAudioParamsNoReplyWithRateCode:(uint8_t)rateCode
+                                     depth:(uint8_t)depth
+                            bytesPerPacket:(uint16_t)bpp
+                                      name:(const char *)name
+{
+    uint8_t payload[5] = {
+        (uint8_t)rateCode,
+        depth,
+        (uint8_t)(bpp & 0xff),
+        (uint8_t)(bpp >> 8),
+        1
+    };
+    BOOL sent = [self sendCommandNoReply:kCommandAudioParams payload:payload payloadLength:sizeof(payload)];
+    pthread_mutex_lock(&_ep1Mutex);
+    if (name != NULL && strcmp(name, "reset") == 0) {
+        _lastAudioParamsResetRateCode = rateCode;
+        _lastAudioParamsResetDepth = depth;
+        _lastAudioParamsResetBytesPerPacket = bpp;
+        _lastAudioParamsResetOk = sent ? 2 : 0;
+    }
+    pthread_mutex_unlock(&_ep1Mutex);
+    USBTrace("audio params %s no-reply rateCode=0x%02x depth=%u bpp=%u sent=%d",
+             name != NULL ? name : "set",
+             rateCode,
+             depth,
+             bpp,
+             sent);
+    return sent;
+}
+
 - (void)resetAudioParamsBeforeStream
 {
 #if OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
     uint16_t bpp = CalculateBytesPerPacket(&_spec, _sampleRate);
+#if OPENA8DJ_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY
     if (![self sendAudioParamsWithRateCode:0xff depth:0 bytesPerPacket:bpp name:"reset"]) {
         USBTrace("audio params reset did not complete; continuing to stream setup");
     }
+#else
+    if (![self sendAudioParamsNoReplyWithRateCode:0xff depth:0 bytesPerPacket:bpp name:"reset"]) {
+        USBTrace("audio params reset no-reply send failed; continuing to stream setup");
+    }
+#if OPENA8DJ_AUDIO_PARAMS_RESET_SETTLE_USEC > 0
+    usleep(OPENA8DJ_AUDIO_PARAMS_RESET_SETTLE_USEC);
+#endif
+#endif
 #else
     USBTrace("audio params reset skipped before stream setup");
 #endif

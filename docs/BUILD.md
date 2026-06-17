@@ -585,6 +585,18 @@ AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" \
   --pair A --playback-profile --collect-usb-diagnostics
 ```
 
+Reset timing experiments are build flags, not validated defaults:
+
+```sh
+make HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=0 \
+     HAL_AUDIO_PARAMS_RESET_SETTLE_USEC=250000 \
+     build/opena8dj-usb-play
+```
+
+As of 2026-06-17, keep `HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=1` for candidate
+builds. No-wait/no-settle failed startup, `100ms` produced no captured energy,
+and `250ms`/`500ms` have not shown stable startup plus quality improvement.
+
 ## Migration Order
 
 1. Add CMake core/test skeleton.
