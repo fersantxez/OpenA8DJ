@@ -611,3 +611,27 @@ and `250ms`/`500ms` have not shown stable startup plus quality improvement.
 
 Do not start with installers, HAL installation, DriverKit loading, or physical
 audio validation. The reproducible foundation is the offline core first.
+
+## DriverKit Extension Scaffold
+
+`driverkit/extension/` contains a non-installing DriverKit dext scaffold:
+
+- `Info.plist.template`
+- `OpenA8DJAudioDriver.entitlements.template`
+- `OpenA8DJAudioDriver.iig`
+- `OpenA8DJAudioDevice.iig`
+- `src/OpenA8DJAudioDriver.cpp`
+- `src/OpenA8DJAudioDevice.cpp`
+
+The scaffold is intentionally excluded from the default CMake build. The
+offline contract is:
+
+```sh
+cmake --build build/cpp-offline --target opena8djcpp_driverkit_extension_scaffold_contract
+./build/cpp-offline/opena8djcpp_driverkit_extension_scaffold_contract
+```
+
+The full offline gate runs it automatically. A future real dext target must be
+opt-in, build-dir-only, and unavailable unless the DriverKit SDK and required
+entitlements are present. No install, load, unload, reload, signing, or
+SystemExtensions command may be part of the default build.

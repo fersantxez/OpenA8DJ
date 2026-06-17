@@ -46,6 +46,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/realtime-audit.json",
       root / "local-analysis/cpp-offline/driverkit-surface-model.json",
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-runtime-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",

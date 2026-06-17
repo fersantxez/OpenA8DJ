@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>OpenA8DJAudioDriver</string>
+  <key>CFBundlePackageType</key>
+  <string>DEXT</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>OSBundleUsageDescription</key>
+  <string>OpenA8DJ C++ AudioDriverKit driver extension for Native Instruments Audio 8 DJ.</string>
+  <key>IOKitPersonalities</key>
+  <dict>
+    <key>OpenA8DJAudioDriver</key>
+    <dict>
+      <key>CFBundleIdentifier</key>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+      <key>IOClass</key>
+      <string>IOUserService</string>
+      <key>IOProviderClass</key>
+      <string>IOUSBHostDevice</string>
+      <key>IOMatchCategory</key>
+      <string>org.opena8dj.Audio8DJ.DriverExtension</string>
+      <key>IOUserClass</key>
+      <string>OpenA8DJAudioDriver</string>
+      <key>IOUserServerName</key>
+      <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+      <key>idVendor</key>
+      <integer>6092</integer>
+      <key>idProduct</key>
+      <integer>6520</integer>
+      <key>OpenA8DJExpectedInterface</key>
+      <integer>0</integer>
+      <key>IOUserAudioDriverUserClientProperties</key>
+      <dict>
+        <key>IOClass</key>
+        <string>IOUserUserClient</string>
+        <key>IOUserClass</key>
+        <string>IOUserAudioDriverUserClient</string>
+      </dict>
+    </dict>
+  </dict>
+</dict>
+</plist>

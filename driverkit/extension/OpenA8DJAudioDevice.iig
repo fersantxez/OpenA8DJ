@@ -1,0 +1,19 @@
+#ifndef OPENA8DJ_AUDIO_DEVICE_IIG
+#define OPENA8DJ_AUDIO_DEVICE_IIG
+
+#include <AudioDriverKit/AudioDriverKit.h>
+
+class OpenA8DJAudioDevice : public IOUserAudioDevice
+{
+public:
+  virtual bool init() override;
+  virtual void free() override;
+  virtual kern_return_t StartIO(IOUserAudioStartStopFlags flags) final;
+  virtual kern_return_t StopIO(IOUserAudioStartStopFlags flags) final;
+  virtual kern_return_t PerformDeviceConfigurationChange(uint64_t action,
+                                                         OSObject* change_info) override;
+  virtual kern_return_t AbortDeviceConfigurationChange(uint64_t action,
+                                                       OSObject* change_info) override;
+};
+
+#endif

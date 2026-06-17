@@ -4480,3 +4480,42 @@ Next implication:
   prepared backend. Remaining blockers are real AudioDriverKit class binding,
   USBDriverKit adapter implementation, signing/entitlements, and physical
   same-session quality/CPU proof.
+
+## 2026-06-17: Add Non-Installing DriverKit Extension Scaffold
+
+Decision:
+- Add `driverkit/extension/` with non-installing templates for:
+  `Info.plist`, DriverKit entitlements, `OpenA8DJAudioDriver.iig`,
+  `OpenA8DJAudioDevice.iig`, and future DriverKit SDK binding sources.
+- Add `tools/driverkit_extension_scaffold_contract.cpp` and wire it into CTest,
+  `scripts/run-cpp-offline-gates`, evidence schema, and static policy.
+
+Reason:
+- The runtime bridge proves the offline C++ boundary, but the project also
+  needs a concrete dext shape for the future AudioDriverKit/USBDriverKit build.
+- The scaffold captures the Apple-required direction: `IOKitPersonalities`,
+  `IOUserAudioDriver`, `IOUserAudioDevice`, HAL user-client properties,
+  DriverKit audio entitlement, USB transport entitlement, and Audio 8 DJ USB
+  match IDs.
+- Keeping it out of the default build prevents accidental system-extension
+  activation or false readiness on a machine that currently lacks the DriverKit
+  SDK.
+
+Alternatives discarded:
+- Generate a hand-edited Xcode project now: rejected because CMake remains the
+  source of truth and the local DriverKit SDK is absent.
+- Compile or install the dext scaffold now: rejected because that would require
+  missing SDK/entitlements and an explicit hardware/system-extension window.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json`
+- Required result:
+  files present, Info.plist pass, entitlements pass, IIG pass, runtime binding
+  pass, safety pass, default build excludes extension, and installed/activated
+  flags false.
+
+Next implication:
+- The C++ line now has an offline-tested dext scaffold. Remaining blockers are
+  full Xcode/DriverKit SDK, real AudioDriverKit class compilation,
+  USBDriverKit endpoint adapter implementation, signing/entitlements, and
+  physical same-session quality/CPU proof against mainline.

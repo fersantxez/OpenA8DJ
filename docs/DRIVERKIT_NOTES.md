@@ -88,3 +88,36 @@ Required architecture:
 This gate does not compile a real dext and does not activate a system
 extension. It exists to prevent the future DriverKit implementation from
 smuggling the current HAL enqueue bottleneck back into the hot path.
+
+## Extension Scaffold
+
+Added on 2026-06-17:
+
+- `driverkit/extension/Info.plist.template`
+- `driverkit/extension/OpenA8DJAudioDriver.entitlements.template`
+- `driverkit/extension/OpenA8DJAudioDriver.iig`
+- `driverkit/extension/OpenA8DJAudioDevice.iig`
+- `driverkit/extension/src/OpenA8DJAudioDriver.cpp`
+- `driverkit/extension/src/OpenA8DJAudioDevice.cpp`
+
+The scaffold follows the Apple AudioDriverKit shape:
+
+- `IOKitPersonalities` identify the DriverKit service class.
+- `IOUserAudioDriver` is the dext entry point.
+- `IOUserAudioDevice` owns IO start/stop and configuration-change sequencing.
+- Stream buffers must later be represented by `IOMemoryDescriptor`/
+  `IOBufferMemoryDescriptor` and exposed to HAL through `IOUserAudioStream`.
+- DriverKit audio and USB transport entitlements are required before a real
+  build or activation.
+
+Local contract:
+
+- `opena8djcpp_driverkit_extension_scaffold_contract`.
+- The scaffold must remain excluded from the default CMake build until the
+  DriverKit SDK is present.
+- The contract must report `system_extension_activated=false` and
+  `driver_installed_or_activated=false`.
+
+This is an architectural scaffold only. It does not remove the need for full
+Xcode/DriverKit SDK, provisioning, signing, user-approved system-extension
+activation, USBDriverKit endpoint implementation, or locked physical evidence.

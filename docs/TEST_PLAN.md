@@ -877,3 +877,38 @@ PASS/FAIL semantics:
 - PASS does not mean an AudioDriverKit dext exists, installs, runs, or beats
   mainline.
 - FAIL blocks dext binding work.
+
+## Offline DriverKit Extension Scaffold Contract
+
+Purpose:
+
+- verify that the future AudioDriverKit dext scaffold exists and remains
+  non-installing/non-activating by default.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_driverkit_extension_scaffold_contract
+./build/cpp-offline/opena8djcpp_driverkit_extension_scaffold_contract
+```
+
+The full offline gate also runs it automatically:
+
+```sh
+scripts/run-cpp-offline-gates
+```
+
+Expected artifacts:
+
+- `local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json`;
+- `driverkit_extension_scaffold_contract` section in
+  `local-analysis/cpp-offline/current-offline-gates.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the scaffold has required Info.plist, entitlement, IIG, binding,
+  and safety markers, and the default build excludes extension sources.
+- PASS does not mean a signed/runnable dext exists or that the driver can be
+  installed or tested physically.
+- FAIL blocks real dext binding work.

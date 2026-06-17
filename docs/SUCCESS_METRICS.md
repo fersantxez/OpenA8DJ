@@ -1835,3 +1835,22 @@ Current status:
 - PASS offline in the focused build run at 48 kHz, `64` buffer frames, `32`
   frame batch.
 - This is not a signed/installed DriverKit driver and not physical readiness.
+
+## 2026-06-17 DriverKit Extension Scaffold Gate
+
+Required before real dext binding:
+- `opena8djcpp_driverkit_extension_scaffold_contract` must PASS.
+- `driverkit/extension/Info.plist.template` must contain `IOKitPersonalities`,
+  `IOUserAudioDriverUserClientProperties`, Audio 8 DJ match IDs, and DEXT
+  package metadata.
+- Entitlements template must include DriverKit, DriverKit Audio Family, and USB
+  transport entries for `0x17cc:0x1978`.
+- IIG files must declare the future `IOUserAudioDriver` and
+  `IOUserAudioDevice` boundaries.
+- Future binding sources must point at `AudioDriverSkeleton`.
+- Default CMake build must exclude the extension sources.
+- The gate must report no system extension activation and no driver install.
+
+Current status:
+- PASS in the focused build run.
+- This is not a runnable/signed dext and not physical readiness.

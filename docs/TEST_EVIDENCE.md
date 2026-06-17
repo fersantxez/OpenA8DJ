@@ -7205,3 +7205,75 @@ Operational note:
   - Readiness remains blocked by real AudioDriverKit class binding,
     USBDriverKit transport, signing/entitlements, and physical same-session
     quality/CPU proof against mainline.
+
+## 2026-06-17 DriverKit Extension Scaffold Contract
+
+- Purpose:
+  - Validate a non-installing AudioDriverKit dext scaffold and keep it excluded
+    from the default build.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_extension_scaffold_contract opena8djcpp_static_policy_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_extension_scaffold_contract`
+  - `./build/cpp-offline/opena8djcpp_static_policy_check`
+- Result:
+  - PASS.
+  - Scaffold files present: `true`.
+  - Info.plist: PASS.
+  - Entitlements: PASS.
+  - IIG: PASS.
+  - Runtime binding markers: PASS.
+  - Safety markers: PASS.
+  - Default build excludes extension: `true`.
+  - System extension activated: `false`.
+  - Driver installed or activated: `false`.
+  - Static policy: PASS, `audited_files=19`, forbidden hits `0`.
+- Safety:
+  - Offline text/metadata contract only.
+  - No dext compiled, signed, installed, activated, loaded, or unloaded.
+  - No audio devices opened, no CoreAudio/USB mutation, no defaults changed, no
+    hardware touched.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json`
+- Interpretation:
+  - The project now has a concrete future dext shape, but it remains a scaffold.
+  - Readiness remains blocked by real DriverKit SDK build, entitlements,
+    USBDriverKit implementation, and physical same-session quality/CPU proof.
+
+## 2026-06-17 Offline Gates After DriverKit Extension Scaffold
+
+- Purpose:
+  - Verify the complete offline surface after adding the non-installing
+    AudioDriverKit dext scaffold.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - PASS.
+  - Debug CTest: `24/24` passed.
+  - Release CTest: `25/25` passed.
+  - DriverKit extension scaffold contract: PASS.
+  - Scaffold checks:
+    files present `true`, Info.plist PASS, entitlements PASS, IIG PASS,
+    runtime binding PASS, safety PASS, default build excludes extension `true`.
+  - Evidence schema: PASS, `required_files=24`, missing `0`.
+  - Static policy: PASS, `audited_files=19`,
+    `rejected_default_checks=23`, `default_policy_failures=0`.
+  - USB touched: `false`.
+  - Hardware touched: `false`.
+  - CoreAudio touched: `false`.
+  - Driver installed or activated: `false`.
+- Safety check:
+  - `scripts/audio-stack-guard --wait 2 --enumeration-timeout 6 --min-idle-pct 20 --run-dir local-analysis/audio-stack-guard/final-after-driverkit-extension-scaffold`
+  - PASS: `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`,
+    `audio_stack_health=PASS`, `global_cpu_idle_pct=91.53`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/audio-stack-guard/final-after-driverkit-extension-scaffold`
+- Interpretation:
+  - The project now has an offline-validated dext scaffold while keeping the
+    default build and test path non-mutating.
+  - Readiness remains blocked by actual DriverKit SDK compilation,
+    entitlements/signing, USBDriverKit endpoint transport, and physical
+    same-session quality/CPU proof against mainline.

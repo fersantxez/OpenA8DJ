@@ -1585,3 +1585,12 @@ Next technical target:
     backend, and shut down without leaving an active product-safe stream.
   - This is still not a dext, not signed, not installed, and not hardware
     evidence. It is the next offline executable boundary.
+- DriverKit extension scaffold:
+  - Added `driverkit/extension/` with non-installing templates for
+    `Info.plist`, entitlements, `OpenA8DJAudioDriver.iig`,
+    `OpenA8DJAudioDevice.iig`, and future SDK binding sources.
+  - Added `opena8djcpp_driverkit_extension_scaffold_contract` to validate
+    dext metadata, AudioDriverKit class shape, USB match IDs
+    `0x17cc:0x1978`, entitlements, runtime binding intent, and default-build
+    exclusion.
+  - This is not a signed, installed, activated, or runnable dext.
