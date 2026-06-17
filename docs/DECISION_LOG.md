@@ -1086,3 +1086,41 @@ Evidence:
 - `make HAL_OUTPUT_CHECK_OFFSET=4 hal` PASS for the generic fallback.
 - `make hal` rebuilt the default artifact after fallback verification.
 - `scripts/run-cpp-offline-gates` PASS: Debug `16/16`, Release `17/17`.
+
+## 2026-06-17: Reject Unrolled HAL Output Pack As Default
+
+Decision:
+- Disable the unrolled HAL output pack path by default.
+- Keep it only as an opt-in diagnostic knob via `HAL_UNROLLED_OUTPUT_PACK=1`.
+
+Reason:
+- The locked physical run failed far worse than previous candidates:
+  `quality_alignment_score=0.131043`, SNR `-18.43 dB`,
+  `lag_jumps_gt_2_frames=47`, mid-band residual ratio `8.393129`, high-band
+  residual ratio `7.405798`.
+- Runtime CPU did not improve enough to justify keeping it: OpenA8DJ driver
+  avg/p95/max `30.959%/35.600%/35.900%`.
+- Stream stats remained clean for underruns/late writes/timeline resets and
+  capture ISO invariants passed, so this result does not support a readiness
+  claim or a simple capture-transport explanation.
+
+Alternatives discarded:
+- Keep unrolled output pack as default because offline gates passed: rejected
+  because physical quality is the governing gate.
+- Continue directly to more physical sweeps with this candidate: rejected
+  because the soundcheck is a severe regression.
+
+Evidence:
+- Safety first run failed on transient high `coreaudiod` CPU, then retry PASS:
+  `local-analysis/physical-unrolled-pack/20260616-211513/hal-candidate-safety`
+  and
+  `local-analysis/physical-unrolled-pack/20260616-211622-retry/hal-candidate-safety`.
+- Soundcheck:
+  `local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal`.
+- Stream/capture summaries:
+  `local-analysis/stream-stats/unrolled-pack-summary.json` and
+  `local-analysis/stream-stats/unrolled-pack-capture-iso-invariants.json`.
+- Cleanup:
+  `local-analysis/audio-stack-guard/20260616-force-unload-unrolled-pack-explicit`
+  and
+  `local-analysis/runtime-isolation/post-unrolled-pack-failed-unload.json`.

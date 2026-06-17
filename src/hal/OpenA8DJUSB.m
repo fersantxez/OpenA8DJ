@@ -142,6 +142,10 @@
 #define OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR 0
 #endif
 
+#ifndef OPENA8DJ_ENABLE_UNROLLED_OUTPUT_PACK
+#define OPENA8DJ_ENABLE_UNROLLED_OUTPUT_PACK 0
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS 1
 #endif
@@ -3650,7 +3654,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     OpenA8DJOutputFillStats stats = {0};
     NSUInteger i = 0;
-#if OPENA8DJ_OUTPUT_CHECK_OFFSET == 8
+#if OPENA8DJ_ENABLE_UNROLLED_OUTPUT_PACK && OPENA8DJ_OUTPUT_CHECK_OFFSET == 8
     NSUInteger group = 0;
 #define OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED() \
     do { \

@@ -2274,3 +2274,37 @@ Operational note:
 - Interpretation:
   - This is a CPU/jitter candidate only. It preserves offline layout contracts,
     but it has not proved better physical music quality or lower runtime CPU.
+
+## 2026-06-17: Unrolled HAL Output Pack Physical Rejection
+
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-unrolled-pack/20260616-211513/hal-candidate-safety`
+  - Retry after recovery:
+    `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/physical-unrolled-pack/20260616-211622-retry/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-dir "$HOME/Music" --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --run-dir local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal --stream-stats-snapshots --monitor-command-timeout 1.0 --audio-stack-enumeration-timeout 8 --audio-stack-threshold 80 --audio-stack-total-threshold 180 --audio-stack-recover-on-fail`
+  - Explicit HAL unload under lock, then `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-unrolled-pack-failed-unload.json`
+  - `scripts/analyze-stream-stats.py local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/unrolled-pack-summary.json`
+  - `scripts/analyze-capture-iso-invariants.py local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal --json-out local-analysis/stream-stats/unrolled-pack-capture-iso-invariants.json`
+- Result:
+  - First safety run FAIL due high `coreaudiod` CPU after HAL load
+    (`137.0%`); recovery PASS.
+  - Safety retry PASS and left HAL loaded.
+  - Physical soundcheck FAIL.
+  - Candidate disabled by default after rejection; artifacts rebuilt with
+    `HAL_UNROLLED_OUTPUT_PACK=0`.
+  - Post-failure unload/recovery PASS; final isolation PASS.
+- Key metrics:
+  - `quality_alignment_score=0.131043`
+  - `snr_db=-18.43`
+  - `lag_jumps_gt_2_frames=47`
+  - `mid_band_residual_ratio=8.393129`
+  - `high_band_residual_ratio=7.405798`
+  - `capture_clipped_frames=0`
+  - OpenA8DJ driver avg/p95/max CPU `30.959%/35.600%/35.900%`
+  - Stream stats: no active underruns, no late writes, no timeline resets, no
+    panic flags.
+  - Capture ISO invariants PASS.
+- Interpretation:
+  - Offline layout parity did not translate to physical improvement.
+  - The root blocker remains analog residual/lag and high driver CPU; this
+    candidate must not be promoted or left as default.

@@ -407,3 +407,10 @@ Next technical target:
   `OPENA8DJ_OUTPUT_CHECK_OFFSET=8`, with the old generic path retained for
   diagnostic offsets. Offline gates remain PASS, but this is not a readiness
   claim until locked iRig quality and CPU improve.
+- Locked iRig evidence rejected that candidate as a default. The unrolled
+  output pack path is now opt-in only (`HAL_UNROLLED_OUTPUT_PACK=1`), default
+  `0`. Evidence:
+  `local-analysis/soundcheck/20260616-unrolled-pack-irig-pairA-16s-cpp-hal`
+  failed with `quality_alignment_score=0.131043`, SNR `-18.43 dB`, and
+  `lag_jumps_gt_2_frames=47`; driver CPU p95 stayed around `35.6%`.
+  Post-failure unload and isolation passed.
