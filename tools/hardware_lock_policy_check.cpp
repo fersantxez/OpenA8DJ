@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
   const auto soundcheck = read_file(root / "scripts/run-soundcheck");
   const auto matrix = read_file(root / "scripts/run-channel-matrix-gate");
   const auto known_good = read_file(root / "scripts/run-known-good-route-soundcheck");
+  const auto superiority_window = read_file(root / "scripts/run-physical-superiority-window");
 
   const bool lib_ok = contains_all(lib,
                                    {
@@ -136,12 +137,27 @@ int main(int argc, char** argv) {
                                           missing,
                                           "scripts/run-known-good-route-soundcheck");
 
+  const bool superiority_window_ok = contains_all(superiority_window,
+                                                  {
+                                                      "hardware-lock-lib.sh",
+                                                      "opena8dj_acquire_hardware_lock",
+                                                      "physical-superiority-window",
+                                                      "known-good route playback/capture, optional HAL install/reload, Audio 8 DJ playback/capture, CoreAudio enumeration",
+                                                      "trap 'cleanup_candidate; opena8dj_release_hardware_lock' EXIT",
+                                                      "No hardware/audio action was run. Add --execute for a locked physical window.",
+                                                      "--candidate is required for full execution",
+                                                      "known-good output source must not be OpenA8DJ/Audio 8",
+                                                      "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot,Traktor-launch",
+                                                  },
+                                                  missing,
+                                                  "scripts/run-physical-superiority-window");
+
   const bool pass = lib_ok && safety_ok && direct_ok && direct_soundcheck_ok &&
-                    soundcheck_ok && matrix_ok && known_good_ok;
+                    soundcheck_ok && matrix_ok && known_good_ok && superiority_window_ok;
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.hardware-lock-policy.v1\",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-            << "  \"audited_scripts\": 7,\n"
+            << "  \"audited_scripts\": 8,\n"
             << "  \"missing_requirements\": " << missing.size() << ",\n"
             << "  \"sensitive_paths\": [\n"
             << "    \"scripts/test-hal-candidate-safety\",\n"
@@ -149,7 +165,8 @@ int main(int argc, char** argv) {
             << "    \"scripts/run-direct-usb-soundcheck\",\n"
             << "    \"scripts/run-soundcheck\",\n"
             << "    \"scripts/run-channel-matrix-gate\",\n"
-            << "    \"scripts/run-known-good-route-soundcheck\"\n"
+            << "    \"scripts/run-known-good-route-soundcheck\",\n"
+            << "    \"scripts/run-physical-superiority-window\"\n"
             << "  ],\n"
             << "  \"missing\": [";
   for (std::size_t index = 0; index < missing.size(); ++index) {

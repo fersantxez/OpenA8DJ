@@ -1226,6 +1226,38 @@ scripts/run-known-good-route-soundcheck \
 - FAIL blocks driver quality comparison until the physical route is fixed or a
   cleaner route is selected.
 
+Physical superiority window runner:
+- Script:
+  `scripts/run-physical-superiority-window`.
+- Default mode is dry-run plan only. Physical work requires `--execute`.
+- Full execution order:
+  - acquire the global hardware lock;
+  - run known-good non-Audio8 route soundcheck into iRig;
+  - install/reload the explicit HAL candidate through
+    `scripts/test-hal-candidate-safety`;
+  - run Audio 8 DJ soundcheck with CPU profile and stream snapshots;
+  - run `opena8djcpp_soundcheck_wav_quality` on the captured run;
+  - run `scripts/evaluate-promotion-readiness.py` against the new metrics;
+  - unload the HAL candidate unless `--leave-loaded` is explicit.
+- Required physical command shape:
+
+```sh
+scripts/run-physical-superiority-window \
+  --execute \
+  --candidate build/OpenA8DJ.driver \
+  --known-good-output-device "<non-Audio8 output>" \
+  --capture-device "iRig Stream" \
+  --capture-channels 1,2 \
+  --reference-wav /absolute/path/to/reference.wav \
+  --music-file /absolute/path/to/music.wav \
+  --seconds 12 \
+  --run-dir local-analysis/physical-superiority-window/<timestamp>
+```
+
+- PASS for this runner is still not product readiness by itself. Readiness
+  requires the promotion evaluator to allow promotion and the evidence to beat
+  mainline thresholds for quality, CPU, routing, recovery, and timecode.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.

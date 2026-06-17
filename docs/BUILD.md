@@ -806,3 +806,39 @@ prevents a route check from silently changing system audio state.
 
 Do not use this wrapper as a product claim. It is a route-health prerequisite
 for later Audio 8 DJ and mainline/C++ same-session comparisons.
+
+## Physical Superiority Window Runner
+
+The full physical evidence window is scripted but dry-run by default:
+
+```sh
+scripts/run-physical-superiority-window \
+  --run-dir local-analysis/physical-superiority-window/<timestamp> \
+  --capture-device "iRig Stream" \
+  --known-good-output-device "<non-Audio8 output>" \
+  --reference-wav /absolute/path/to/reference.wav
+```
+
+That command writes a plan only. It does not play, record, install, unload,
+restart CoreAudio, or touch USB.
+
+Actual execution requires `--execute` and an explicit HAL candidate:
+
+```sh
+scripts/run-physical-superiority-window \
+  --execute \
+  --candidate build/OpenA8DJ.driver \
+  --known-good-output-device "<non-Audio8 output>" \
+  --capture-device "iRig Stream" \
+  --capture-channels 1,2 \
+  --reference-wav /absolute/path/to/reference.wav \
+  --music-file /absolute/path/to/music.wav \
+  --seconds 12 \
+  --run-dir local-analysis/physical-superiority-window/<timestamp>
+```
+
+This is HAL-candidate physical validation only. It is not DriverKit/dext
+activation. The runner acquires the global hardware lock, runs the known-good
+route check first, then runs HAL candidate safety, Audio 8 soundcheck, native
+C++ WAV quality analysis, promotion-readiness evaluation, and cleanup unload
+unless `--leave-loaded` is supplied.

@@ -28,10 +28,14 @@ If the lock is occupied:
 - Duration: 45-60 minutes.
 - Plays audio: yes, only after explicit authorization.
 - Records iRig: yes, if the known analog route is available.
-- Installs/reloads driver: blocked until DriverKit SDK/signing is available and user explicitly approves.
-- Restarts CoreAudio/USB services: no for first physical window.
+- Installs/reloads driver: HAL candidate only, through
+  `scripts/test-hal-candidate-safety` and only when
+  `scripts/run-physical-superiority-window --execute` is explicitly used.
+  DriverKit/dext activation remains out of scope.
+- Restarts CoreAudio/USB services: CoreAudio restart is expected only as part
+  of HAL candidate safety/recovery; USB reset remains forbidden.
 - Changes default devices: no for first physical window.
-- Evidence directory: `/Users/fer/dev/audio8djcpp/local-analysis/physical-window/<timestamp>/`
+- Evidence directory: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/<timestamp>/`
 
 ## Entry Criteria
 
@@ -58,49 +62,52 @@ If the lock is occupied:
 
 ## Next Minimal Physical Test
 
-Status: blocked until the global hardware lock is free.
+Status: not executed.
 
 Purpose:
 
-- Separate startup/cadence failure from persistent analog/capture residual.
-- Reuse the same physical route and fixture as the current failed evidence.
+- Revalidate the physical capture route before judging the Audio 8 DJ driver.
+- Then collect candidate music quality, CPU, stream, and native WAV evidence in
+  one evidence directory.
 
 Preconditions:
 
 - Mainline OpenA8DJ LaunchAgents are disabled and no mainline QA process is
   running.
-- The OpenA8DJ HAL has been restored/reinstalled under lock if this window will
-  play or capture through `Open Audio 8 DJ`.
-- `scripts/runtime-isolation-audit --expect-hal active` passes immediately
-  before capture/playback.
+- A HAL candidate bundle exists at `build/OpenA8DJ.driver` or another explicit
+  path.
+- `scripts/runtime-isolation-audit --expect-hal inactive` passes before HAL
+  candidate safety, then `Open Audio 8 DJ` is verified after the candidate is
+  loaded by the safety gate.
 - `iRig Stream` visible in CoreAudio.
 - `Open Audio 8 DJ` visible in CoreAudio with `8 in / 8 out`.
 - Global hardware lock acquired by this C++ worktree.
 - No mainline autonomous QA process owns the lock.
+- A real non-Audio8 known-good output is physically routed into the same iRig
+  capture chain.
 
 Command shape:
 
 ```sh
-scripts/run-soundcheck \
+scripts/run-physical-superiority-window \
+  --execute \
+  --candidate build/OpenA8DJ.driver \
+  --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
   --capture-channels 1,2 \
+  --reference-wav /absolute/path/to/reference.wav \
+  --music-file /absolute/path/to/music.wav \
   --pair A \
-  --rate 48000 \
-  --buffer 512 \
-  --seconds 24 \
-  --mode dense \
-  --target-peak-db -12 \
-  --max-lag 360000 \
-  --stream-stats-snapshots \
-  --run-dir local-analysis/soundcheck/<timestamp>-irig-pairA-24s-startup-discard
+  --seconds 12 \
+  --run-dir local-analysis/physical-superiority-window/<timestamp>
 ```
 
 Additional offline analysis after capture:
 
 ```sh
 scripts/analyze-soundcheck-window-trace.py \
-  local-analysis/soundcheck/<timestamp>-irig-pairA-24s-startup-discard \
-  --json-out local-analysis/soundcheck/<timestamp>-irig-pairA-24s-startup-discard/window-trace.json
+  local-analysis/physical-superiority-window/<timestamp>/cpp-soundcheck \
+  --json-out local-analysis/physical-superiority-window/<timestamp>/cpp-soundcheck/window-trace.json
 ```
 
 Decision criteria:

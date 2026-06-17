@@ -1946,3 +1946,30 @@ Current implication:
   iRig route from the Audio 8 DJ output path.
 - This harness has not been physically executed yet. It adds measurement
   control, not product readiness.
+
+### 2026-06-17 Physical Superiority Window Runner
+
+- Added `scripts/run-physical-superiority-window`.
+- The runner is dry-run by default and refuses physical/system work unless
+  `--execute` is present.
+- Execution order is now explicit:
+  - known-good non-Audio8 route -> iRig validation;
+  - HAL candidate safety install/reload;
+  - Audio 8 DJ music soundcheck with CPU and stream evidence;
+  - native C++ WAV quality analysis;
+  - promotion-readiness evaluator;
+  - unload candidate unless explicitly left loaded.
+- Safety encoded:
+  - global hardware lock held for the whole window;
+  - explicit capture device and explicit known-good source required;
+  - OpenA8DJ / Audio 8 refused as the known-good source;
+  - no default-device changes, USB reset, reboot, Traktor launch, or arbitrary
+    sample-rate changes.
+
+Current implication:
+- There is now a single auditable command shape for the next physical evidence
+  window.
+- No physical route, HAL install, playback, capture, or CoreAudio restart was
+  run by adding the runner.
+- Product readiness remains blocked until the runner produces passing
+  same-session evidence and the result beats mainline thresholds.

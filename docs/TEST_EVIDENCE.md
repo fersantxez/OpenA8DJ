@@ -8215,3 +8215,35 @@ Full offline gate rerun:
 - Interpretation:
   - The next route isolation step is now scripted and auditable.
   - This is not physical quality evidence and does not change readiness.
+
+## 2026-06-17 Physical Superiority Window Runner
+
+- Scope:
+  - Tooling and policy validation for the next physical A/B evidence window.
+  - No physical playback, capture, CoreAudio default changes, USB reset,
+    service restart, HAL install/load, or DriverKit activation performed.
+- Changes:
+  - Added `scripts/run-physical-superiority-window`.
+  - Extended `tools/hardware_lock_policy_check.cpp` to audit the new runner.
+- Focused commands:
+  - `bash -n scripts/run-physical-superiority-window`
+  - `scripts/run-physical-superiority-window --help`
+  - `scripts/run-physical-superiority-window --run-dir local-analysis/physical-superiority-window/dry-run-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Built-in Output"`
+  - `scripts/run-physical-superiority-window --run-dir local-analysis/physical-superiority-window/reject-audio8-check --capture-device "iRig Stream" --reference-wav /tmp/nope.wav --known-good-output-device "Open Audio 8 DJ"`
+  - `cmake --build build/cpp-offline --target opena8djcpp_hardware_lock_policy_check`
+  - `./build/cpp-offline/opena8djcpp_hardware_lock_policy_check`
+- Focused result:
+  - Syntax check PASS.
+  - Help prints successfully.
+  - Dry-run exits `0`, writes `summary.txt`, and explicitly reports no
+    hardware/audio action was run.
+  - Audio 8 rejection exits `2`.
+  - Hardware lock policy PASS with `8` audited scripts and `0` missing
+    requirements.
+- Evidence paths:
+  - `local-analysis/physical-superiority-window/dry-run-check/summary.txt`
+  - `local-analysis/physical-superiority-window/dry-run-check/window-manifest.txt`
+- Interpretation:
+  - The next physical window now has one safe entry point and a preserved
+    evidence layout.
+  - No quality, CPU, timecode, or branch-promotion claim changes.

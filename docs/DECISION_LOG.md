@@ -5223,3 +5223,34 @@ Next implication:
   a real non-Audio8 output routed into the same capture path. Product readiness
   and branch promotion remain blocked until the route test and same-session
   mainline/C++ A/B pass.
+
+## 2026-06-17: Add Physical Superiority Window Runner
+
+Decision:
+- Add `scripts/run-physical-superiority-window` as the single scripted entry
+  point for the next lock-gated physical evidence window.
+- Make it dry-run by default and require `--execute` before playback, capture,
+  HAL install/reload, CoreAudio restart, or recovery cleanup can occur.
+- Require the known-good route check before candidate soundcheck unless
+  explicitly marked diagnostic-only with `--skip-known-good`.
+
+Reason:
+- The project needs comparable physical evidence, not another isolated
+  candidate tweak.
+- A single runner reduces operator error by preserving order, evidence
+  directories, lock ownership, native analyzer output, and cleanup.
+- It keeps the distinction clear: HAL candidate physical testing is currently
+  possible under lock; DriverKit/dext activation is still not part of this
+  runner.
+
+Evidence:
+- `scripts/run-physical-superiority-window --help`
+- Dry-run plan creation under
+  `local-analysis/physical-superiority-window/dry-run-check/`
+- Audio 8 rejection check for the known-good source.
+- `opena8djcpp_hardware_lock_policy_check` now audits `8` sensitive scripts.
+
+Next implication:
+- The next physical window can use this runner, but no readiness or branch
+  promotion claim is allowed until its route, soundcheck, CPU, native WAV, and
+  promotion evaluator evidence all pass against mainline thresholds.
