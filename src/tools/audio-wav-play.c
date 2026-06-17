@@ -18,6 +18,7 @@ typedef struct WavData {
 typedef struct PlayerState {
     WavData wav;
     UInt32 pairIndex;
+    int useStreamUsage;
     atomic_uint frameIndex;
     atomic_bool done;
     UInt64 callbacks;
@@ -294,7 +295,7 @@ static OSStatus IOProc(AudioObjectID inDevice,
 int main(int argc, char **argv)
 {
     if (argc < 2) {
-        fprintf(stderr, "usage: audio-wav-play <file.wav> [A|B|C|D|0-3]\n");
+        fprintf(stderr, "usage: audio-wav-play <file.wav> [A|B|C|D|0-3] [--stream-usage|--no-stream-usage]\n");
         return 2;
     }
 
@@ -305,13 +306,26 @@ int main(int argc, char **argv)
     }
 
     state.pairIndex = 0;
-    if (argc > 2) {
-        if (argv[2][0] >= 'A' && argv[2][0] <= 'D') {
-            state.pairIndex = (UInt32)(argv[2][0] - 'A');
-        } else if (argv[2][0] >= 'a' && argv[2][0] <= 'd') {
-            state.pairIndex = (UInt32)(argv[2][0] - 'a');
+    state.useStreamUsage = 1;
+    for (int arg = 2; arg < argc; arg++) {
+        const char *value = argv[arg];
+        if (strcmp(value, "--stream-usage") == 0) {
+            state.useStreamUsage = 1;
+        } else if (strcmp(value, "--no-stream-usage") == 0) {
+            state.useStreamUsage = 0;
+        } else if (value[0] >= 'A' && value[0] <= 'D') {
+            state.pairIndex = (UInt32)(value[0] - 'A');
+        } else if (value[0] >= 'a' && value[0] <= 'd') {
+            state.pairIndex = (UInt32)(value[0] - 'a');
         } else {
-            state.pairIndex = (UInt32)strtoul(argv[2], NULL, 10);
+            char *end = NULL;
+            unsigned long pair = strtoul(value, &end, 10);
+            if (end == value || *end != '\0') {
+                fprintf(stderr, "unknown argument: %s\n", value);
+                free(state.wav.samples);
+                return 2;
+            }
+            state.pairIndex = (UInt32)pair;
         }
     }
     if (state.pairIndex > 3) {
@@ -343,7 +357,9 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 6;
     }
-    ConfigureOutputStreamUsage(device, ioProcID, state.pairIndex);
+    if (state.useStreamUsage) {
+        ConfigureOutputStreamUsage(device, ioProcID, state.pairIndex);
+    }
     status = AudioDeviceStart(device, ioProcID);
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);
@@ -359,11 +375,12 @@ int main(int argc, char **argv)
     AudioDeviceStop(device, ioProcID);
     AudioDeviceDestroyIOProcID(device, ioProcID);
 
-    printf("played path=%s pair=%c frames=%u callbacks=%llu\n",
+    printf("played path=%s pair=%c frames=%u callbacks=%llu stream_usage=%s\n",
            argv[1],
            'A' + state.pairIndex,
            atomic_load(&state.frameIndex),
-           state.callbacks);
+           state.callbacks,
+           state.useStreamUsage ? "on" : "off");
     free(state.wav.samples);
     return state.callbacks > 0 ? 0 : 8;
 }

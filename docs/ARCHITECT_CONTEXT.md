@@ -827,3 +827,9 @@ Next technical target:
   and `local-analysis/channel-matrix/20260617-mainline-pairA-chmatrix`.
   This blocks any claim that C++ routing, physical functionality, or sound
   quality is better than mainline.
+- The next physical A/B must control `IOProcStreamUsage`. The C++ harness now
+  supports `--no-output-stream-usage` in both channel-matrix and soundcheck
+  scripts. This is needed because C++ exposes stream usage by default, while
+  the read-only mainline `0.3.135` artifact likely rejects the property. The
+  control does not change driver behavior or readiness; it makes the next
+  measurement more precise.

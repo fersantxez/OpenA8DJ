@@ -3953,3 +3953,53 @@ Operational note:
   - `local-analysis/cpp-offline/offline-bench-release.json`
   - `local-analysis/promotion-readiness-current.json`
   - `local-analysis/runtime-isolation/post-channel-matrix-doc-update.json`
+
+## 2026-06-17: Stream-Usage-Off Harness Control
+
+- Change:
+  - Added `audio-wav-play --no-stream-usage` and `--stream-usage`.
+  - Added `scripts/run-channel-matrix-gate --no-output-stream-usage`.
+  - Added `scripts/run-soundcheck --no-output-stream-usage`.
+  - Defaults remain unchanged: `audio-wav-play` still requests selected-pair
+    output stream usage unless explicitly disabled.
+- Reason:
+  - Recent physical C++ vs mainline matrix runs used the C++ harness.
+  - C++ HAL exposes `IOProcStreamUsage`; the read-only mainline `0.3.135`
+    artifact likely rejects it because its default build has
+    `HAL_STREAM_USAGE=0`.
+  - The next physical comparison needs a controlled C++ run with stream usage
+    disabled to separate harness/CoreAudio behavior from actual driver routing
+    or analog leakage.
+- Commands:
+  - `make -B build/audio-wav-play`
+  - `bash -n scripts/run-channel-matrix-gate`
+  - `python3 -m py_compile scripts/run-soundcheck`
+  - `./build/audio-wav-play`
+  - `./build/audio-wav-play local-analysis/channel-matrix/offline-no-stream-usage-plan-v2/fixture/reference.wav --bad-option`
+  - `scripts/run-channel-matrix-gate --run-id offline-no-stream-usage-plan-v2 --no-output-stream-usage --pair A --rate 48000 --seconds 1 --peak 0.1`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-current.json`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-stream-usage-harness-control.json`
+- Results:
+  - `audio-wav-play` builds.
+  - Invalid option handling fails before CoreAudio device lookup when given a
+    valid WAV fixture: `unknown argument: --bad-option`.
+  - Prepare-only channel matrix plan records `output_stream_usage=0` and does
+    not touch hardware.
+  - Offline gates PASS: Debug `17/17`, Release `18/18`.
+  - Evidence schema PASS: `22` required files, `0` missing.
+  - Release benchmark:
+    `pack_mib_s=1612.58`, `decode_into_mib_s=586.736`,
+    `route_frames_s=9.59212e+08`,
+    `route_advanced_frames_s=5.04042e+08`.
+  - Promotion readiness remains `FAIL` with
+    `branch_promotion_allowed=false`.
+  - Runtime isolation PASS: HAL inactive, lock absent, no hardware/CoreAudio/USB
+    mutation.
+- Evidence paths:
+  - `local-analysis/channel-matrix/offline-no-stream-usage-plan-v2/plan.txt`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/promotion-readiness-current.json`
+  - `local-analysis/runtime-isolation/post-stream-usage-harness-control.json`
+- Next locked physical command shape:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-channel-matrix-gate --run-physical --run-id <run-id> --pair A --rate 48000 --seconds 8 --peak 0.30 --capture-device "iRig Stream" --capture-channels 1,2 --no-output-stream-usage`

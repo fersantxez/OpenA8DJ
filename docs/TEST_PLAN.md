@@ -564,6 +564,17 @@ AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" \
   --capture-device "iRig Stream" --capture-channels 1,2
 ```
 
+Mainline-parity diagnostic shape for the next C++ A/B, controlling the
+`IOProcStreamUsage` harness variable:
+
+```sh
+AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" \
+  scripts/run-channel-matrix-gate --run-physical \
+  --pair A --rate 48000 --seconds 8 --peak 0.30 \
+  --capture-device "iRig Stream" --capture-channels 1,2 \
+  --no-output-stream-usage
+```
+
 Expected artifacts:
 
 - `fixture/reference.wav`
@@ -592,6 +603,15 @@ PASS semantics are intentionally strict and not yet promotion semantics:
 
 Current Pair A evidence:
 
-- `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`
-  is `PASS` through iRig Stream.
-- This does not satisfy the full A/B/C/D or timecode physical matrix.
+- Earlier `local-analysis/channel-matrix/20260617-irig-pairA-decorrelated-matrix/tone-matrix.json`
+  passed through iRig Stream, but newer same-route evidence supersedes it.
+- Current C++ product HAL:
+  `local-analysis/channel-matrix/20260617-inputdecode-default-pairA-chmatrix/tone-matrix.json`
+  is `FAIL`, with max wrong-source leakage `-35.36 dB`.
+- Current mainline `0.3.135` artifact in the same route:
+  `local-analysis/channel-matrix/20260617-mainline-pairA-chmatrix/tone-matrix.json`
+  is `FAIL`, with max wrong-source leakage `-42.58 dB`.
+- The next C++ matrix should run `--no-output-stream-usage` to control the
+  harness/CoreAudio difference before attributing the delta to driver routing.
+- Current Pair A evidence does not satisfy full A/B/C/D or timecode physical
+  matrix requirements.

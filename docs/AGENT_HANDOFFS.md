@@ -928,3 +928,30 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 - Remaining risk:
   - Without a controlled mainline/C++ or known-good output A/B on the exact
     iRig route, analog/reference contribution is not fully isolated.
+
+### Beauvoir
+
+- Mission: read-only C++ vs mainline routing/output-path audit after the latest
+  Pair A physical channel-matrix comparison showed C++ worse than mainline on
+  max wrong-source leakage.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+- Status: pending/no response at the time of this handoff update.
+- Local architect finding while agent was pending:
+  - The C++ harness requests selected-pair `IOProcStreamUsage` by default.
+  - The read-only mainline `0.3.135` artifact likely rejects that property
+    because its default HAL has `HAL_STREAM_USAGE=0`.
+  - This is an uncontrolled harness/HAL interaction in the latest physical
+    C++ vs mainline matrix comparison.
+- Integrated action:
+  - Added `audio-wav-play --no-stream-usage`.
+  - Added `scripts/run-channel-matrix-gate --no-output-stream-usage`.
+  - Added `scripts/run-soundcheck --no-output-stream-usage`.
+- Remaining risk:
+  - The next locked physical A/B must run the stream-usage-off C++ variant
+    before concluding whether C++ leakage is a driver defect, a harness
+    difference, or a capture-route artifact.

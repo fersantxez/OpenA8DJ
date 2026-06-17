@@ -2353,3 +2353,48 @@ Evidence:
 - Final isolation:
   `local-analysis/runtime-isolation/after-mainline-chmatrix-unload.json`,
   PASS with HAL inactive and lock absent.
+
+## 2026-06-17: Add Stream-Usage-Off Harness Control Before Next Physical A/B
+
+Decision:
+- Add a harness-only `--no-stream-usage` switch to `audio-wav-play`.
+- Expose it through `scripts/run-channel-matrix-gate --no-output-stream-usage`
+  and `scripts/run-soundcheck --no-output-stream-usage`.
+- Keep the default behavior unchanged. This is not a driver change and not a
+  product-readiness claim.
+
+Reason:
+- The C++ harness now asks CoreAudio to enable only the selected output stream
+  through `kAudioDevicePropertyIOProcStreamUsage`.
+- The read-only mainline `0.3.135` artifact was built with
+  `HAL_STREAM_USAGE=0`, so the same C++ harness likely gets the stream-usage
+  property rejected when testing mainline.
+- That means recent C++ vs mainline physical comparisons may include a
+  harness/HAL interaction difference: C++ gets selected-pair stream usage,
+  mainline falls back to normal all-stream output-buffer behavior.
+- The next locked physical A/B needs to control this factor before treating the
+  C++ worse leakage result as a pure driver-routing defect.
+
+Alternatives discarded:
+- Disable stream usage by default: rejected because the current C++ product
+  default intentionally exposes the property and prior evidence used that
+  path.
+- Patch mainline tooling or mainline HAL: forbidden for this C++ worktree and
+  unnecessary for a controlled harness variable.
+- Repeat the same physical matrix blindly: rejected because it would reproduce
+  an uncontrolled comparison.
+
+Evidence:
+- `make -B build/audio-wav-play`: PASS.
+- `bash -n scripts/run-channel-matrix-gate`: PASS.
+- `python3 -m py_compile scripts/run-soundcheck`: PASS.
+- Prepare-only matrix plan with stream usage disabled:
+  `local-analysis/channel-matrix/offline-no-stream-usage-plan-v2/plan.txt`,
+  `output_stream_usage=0`.
+- Offline gates:
+  `local-analysis/cpp-offline/current-offline-gates.json`, PASS.
+- Promotion readiness:
+  `local-analysis/promotion-readiness-current.json`, FAIL.
+- Runtime isolation:
+  `local-analysis/runtime-isolation/post-stream-usage-harness-control.json`,
+  PASS with HAL inactive and lock absent.

@@ -15,6 +15,7 @@ CAPTURE_CHANNELS="1,2"
 PRE_ROLL_SECONDS="1"
 POST_ROLL_SECONDS="1"
 RUN_PHYSICAL=0
+OUTPUT_STREAM_USAGE=1
 
 usage() {
   cat <<'USAGE'
@@ -33,6 +34,9 @@ Options:
   --capture-channels L,R     1-based capture channels (default: 1,2).
   --pre-roll-seconds N       Capture lead-in before playback (default: 1).
   --post-roll-seconds N      Capture tail after playback (default: 1).
+  --no-output-stream-usage   Do not ask CoreAudio to enable only the selected
+                             output stream; useful for mainline-parity
+                             diagnostics.
   --run-physical             Acquire hardware lock and run capture/playback.
   -h, --help                 Show this help.
 
@@ -53,6 +57,7 @@ while (($#)); do
     --capture-channels) CAPTURE_CHANNELS="$2"; shift 2 ;;
     --pre-roll-seconds) PRE_ROLL_SECONDS="$2"; shift 2 ;;
     --post-roll-seconds) POST_ROLL_SECONDS="$2"; shift 2 ;;
+    --no-output-stream-usage) OUTPUT_STREAM_USAGE=0; shift ;;
     --run-physical) RUN_PHYSICAL=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -110,6 +115,7 @@ seconds=$SECONDS
 peak=$PEAK
 capture_device=$CAPTURE_DEVICE
 capture_channels=$CAPTURE_CHANNELS
+output_stream_usage=$OUTPUT_STREAM_USAGE
 lock_root=$LOCK_ROOT
 
 Physical command shape:
@@ -162,7 +168,11 @@ PY
 "$ROOT/build/audio-record" "$record_seconds" "$CAPTURE" "$CAPTURE_DEVICE" "$CAPTURE_CHANNELS" > "$RUN_DIR/record.log" 2>&1 &
 record_pid=$!
 sleep "$PRE_ROLL_SECONDS"
-"$ROOT/build/audio-wav-play" "$REFERENCE" "$PAIR" > "$RUN_DIR/play.log" 2>&1 || {
+play_args=("$ROOT/build/audio-wav-play" "$REFERENCE" "$PAIR")
+if [[ "$OUTPUT_STREAM_USAGE" != 1 ]]; then
+  play_args+=("--no-stream-usage")
+fi
+"${play_args[@]}" > "$RUN_DIR/play.log" 2>&1 || {
   status=$?
   wait "$record_pid" || true
   exit "$status"

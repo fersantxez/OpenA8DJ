@@ -709,6 +709,8 @@ def main():
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-config", action="store_true")
+    parser.add_argument("--no-output-stream-usage", action="store_true",
+                        help="pass --no-stream-usage to audio-wav-play for mainline-parity diagnostics")
     parser.add_argument("--max-lag", type=int, default=1024)
     parser.add_argument("--drift-profile", action="store_true")
     parser.add_argument("--time-warp", action="store_true", default=True)
@@ -848,11 +850,14 @@ def run_soundcheck_body(root, base_dir, fixture_dir, args):
         ], cwd=str(root), stdout=record_log, stderr=subprocess.STDOUT)
         time.sleep(0.6)
         playback_start_monotonic = time.monotonic()
-        player = subprocess.Popen([
+        player_command = [
             str(root / "build" / "audio-wav-play"),
             str(reference),
             args.pair,
-        ], cwd=str(root), stdout=play_log, stderr=subprocess.STDOUT)
+        ]
+        if args.no_output_stream_usage:
+            player_command.append("--no-stream-usage")
+        player = subprocess.Popen(player_command, cwd=str(root), stdout=play_log, stderr=subprocess.STDOUT)
         monitor_playback(root, base_dir, player, args, playback_start_monotonic)
         player_rc = player.wait()
         recorder_rc = recorder.wait()
