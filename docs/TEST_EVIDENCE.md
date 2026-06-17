@@ -4727,3 +4727,67 @@ Operational note:
   - `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/lti-transfer-quality.json`
   - `local-analysis/runtime-isolation/after-fast-iso-transfer-config-unload.json`
   - `local-analysis/promotion-readiness-after-fast-iso-transfer-config.json`
+
+## 2026-06-17: Offline Route-Signature Comparison
+
+- Purpose:
+  - Compare existing mainline and C++ captures without touching hardware to
+    determine whether the current iRig/reference route can support sound
+    quality claims.
+  - Separate a shared degraded route signature from the current C++ HAL
+    timebase/residual signature.
+- Commands:
+  - `.venv/bin/python scripts/analyze-soundcheck-failure-modes.py <six existing runs> --json-out local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/failure-modes.json`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py <six existing runs> --json-out local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`
+  - `.venv/bin/python scripts/analyze-lti-transfer-quality.py <six existing runs> --json-out local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/lti-transfer-quality.json`
+  - `.venv/bin/python scripts/analyze-soundcheck-window-trace.py <run> --json-out local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/window-trace-N.json`
+  - A local Python summary over existing `metrics.json` files.
+- Runs compared:
+  - `local-analysis/mainline-baseline/20260617-mainline-0.3.135-wait45/soundcheck-irig-pairA-12s`
+  - `local-analysis/soundcheck/20260617-cpp-inputdecode-off-dense-ch12-irig-pairA-12s`
+  - `local-analysis/soundcheck/20260617-cpp-iso64q8-stopisoc-irig-pairA-12s`
+  - `local-analysis/soundcheck/20260617-streamusage-irig-pairA-12s-cpp-hal`
+  - `local-analysis/soundcheck/20260617-cadence-diagnostic-irig-pairA-12s-cpp-hal`
+  - `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal`
+- Results:
+  - Shared severely degraded route-family:
+    - mainline wait45: quality `0.680798`, SNR floor `-0.83 dB`, mid/high
+      residual `2.530031/1.775333`, `39` lag jumps.
+    - C++ inputdecode-off: quality `0.680121`, SNR floor `-0.83 dB`,
+      mid/high residual `2.527144/1.786423`, `42` lag jumps.
+    - C++ ISO64/q8 StopIO: quality `0.686712`, SNR floor `-0.84 dB`,
+      mid/high residual `2.525233/1.788470`, `35` lag jumps.
+  - Current C++ failing family:
+    - streamusage: quality `0.971648`, SNR floor `10.52 dB`, mid/high
+      residual `1.399655/1.358543`, `28` lag jumps.
+    - cadence diagnostic: quality `0.958757`, SNR floor `10.09 dB`,
+      mid/high residual `1.447622/1.366173`, `27` lag jumps.
+    - fast ISO config: quality `0.959397`, SNR floor `10.19 dB`, mid/high
+      residual `1.450623/1.368530`, `35` lag jumps.
+  - Failure classifier:
+    - The degraded route-family adds
+      `window_alignment_is_unstable_for_music` and
+      `residual_tracks_program_level`.
+    - The current C++ family remains
+      `timebase_or_alignment_instability` with static L/R, polarity, simple
+      nonlinearity, and fixed LTI/EQ rejected.
+  - LTI/coherence:
+    - Degraded route-family mid coherence is extremely low, around `0.02`.
+    - Current C++ family mid coherence is higher, about `0.09-0.15`, but LTI
+      correction still worsens SNR and does not explain the defect.
+- Interpretation:
+  - The old mainline-vs-C++ degraded captures cannot prove C++ sound quality
+    or mainline superiority in the current physical route; they only prove the
+    route/comparison was not valid enough for audiophile claims.
+  - The current C++ candidate still independently fails quality with about
+    `10 dB` SNR and persistent lag jumps, so route concerns do not make C++
+    ready.
+  - Next physical work should either validate the capture/reference route with
+    a known-good bypass or redesign the transport/timebase path; do not keep
+    spending hardware windows on one-flag CPU tweaks.
+- Evidence paths:
+  - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/metrics-summary.json`
+  - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/failure-modes.json`
+  - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`
+  - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/lti-transfer-quality.json`
+  - `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/window-trace-1.json`

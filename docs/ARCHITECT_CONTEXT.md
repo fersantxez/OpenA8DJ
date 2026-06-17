@@ -1069,3 +1069,17 @@ Next technical target:
     high-value physical step because multiple current runs share a failing
     route signature. Do not claim audiophile quality until the capture route is
     independently validated.
+- Offline route-signature comparison:
+  - Evidence:
+    `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature`.
+  - A shared severely degraded route-family exists:
+    mainline wait45, C++ inputdecode-off, and C++ ISO64/q8 StopIO all show
+    quality around `0.68`, SNR around `-0.83 dB`, mid residual around `2.53`,
+    high residual around `1.78`, and very low mid coherence around `0.02`.
+  - Current C++ probes are a different failing family:
+    quality around `0.96-0.97`, SNR around `10 dB`, residual around
+    `1.4/1.36`, and persistent lag jumps.
+  - Interpretation:
+    the degraded route-family blocks quality comparisons, but current C++ still
+    fails independently. Route validation is now a prerequisite for any
+    audiophile claim.

@@ -314,3 +314,22 @@ Latest promotion evaluation:
 Decision remains unchanged: keep `HAL_FAST_ISO_TRANSFER_CONFIG=0`, do not move
 C mainline to Legacy, do not move C++ to `main`, and do not claim audiophile
 readiness.
+
+## 2026-06-17 Route-Signature Promotion Constraint
+
+Latest offline route comparison:
+`local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature`.
+
+- Branch promotion remains forbidden:
+  `branch_promotion_allowed=false`.
+- Degraded route-family blocks sound-quality comparison claims:
+  mainline wait45, C++ inputdecode-off, and C++ ISO64/q8 StopIO all show
+  quality around `0.68`, SNR around `-0.83 dB`, mid residual around `2.53`,
+  high residual around `1.78`, and very low mid coherence around `0.02`.
+- Current C++ probes still independently fail:
+  quality around `0.96-0.97`, SNR around `10 dB`, residual around
+  `1.4/1.36`, and persistent lag jumps.
+
+Decision remains unchanged: validate the capture/reference route before any
+audiophile-quality claim, keep C mainline in place, keep C++ off `main`, and do
+not claim readiness.

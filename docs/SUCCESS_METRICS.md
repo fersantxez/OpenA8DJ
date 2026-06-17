@@ -1036,3 +1036,24 @@ Latest promotion evaluation:
   - `HAL_FAST_ISO_TRANSFER_CONFIG=1` is rejected as a product default.
   - Passing ISO invariants and preserving descriptor layout do not establish
     sound quality, timecode readiness, or low resource use.
+
+## 2026-06-17 Route-Signature Readiness Constraint
+
+- Capture/reference route validity: FAIL/BLOCKED.
+  - Evidence:
+    `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature`.
+  - Shared degraded route-family:
+    mainline wait45, C++ inputdecode-off, and C++ ISO64/q8 StopIO all measured
+    quality about `0.68`, SNR about `-0.83 dB`, mid residual about `2.53`,
+    high residual about `1.78`, and mid coherence about `0.02`.
+  - Current C++ failing family:
+    quality about `0.96-0.97`, SNR about `10 dB`, mid/high residual about
+    `1.4/1.36`, and persistent lag jumps.
+- PASS requirement before audiophile claim:
+  - A known-good physical capture/reference route must produce a clean music
+    comparison independent of the Audio 8 DJ candidate, or the candidate must
+    pass on a route whose validity is documented with equivalent evidence.
+- Readiness implication:
+  - Degraded shared-route evidence cannot prove C++ better than mainline.
+  - Current C++ evidence still fails product thresholds, so route uncertainty
+    does not permit promotion.

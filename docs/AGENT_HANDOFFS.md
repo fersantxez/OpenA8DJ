@@ -1363,3 +1363,34 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - Keep `HAL_FAST_ISO_TRANSFER_CONFIG=0`.
   - Prefer capture-route validation or a deeper transport redesign model over
     more one-flag HAL hot-path probes.
+
+### Architect Offline Route-Signature Comparison
+
+- Status:
+  - Completed offline only using existing captures.
+  - No hardware, no CoreAudio/USB mutation, no HAL install.
+- Files affected:
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/PROMOTION_READINESS_STATUS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Findings:
+  - Mainline wait45, C++ inputdecode-off, and C++ ISO64/q8 StopIO form a
+    shared degraded route-family:
+    quality about `0.68`, SNR about `-0.83 dB`, mid/high residual about
+    `2.53/1.78`, and mid coherence about `0.02`.
+  - Current C++ probes form a different failing family:
+    quality about `0.96-0.97`, SNR about `10 dB`, residual about `1.4/1.36`,
+    and persistent lag jumps.
+  - Fixed LTI/EQ and static L/R/polarity remain insufficient explanations.
+- Risks:
+  - A broken or changing physical capture/reference route can make C and C++
+    comparisons misleading.
+  - This does not make the C++ candidate ready; it only blocks claims based on
+    degraded route comparisons.
+- Next recommended action:
+  - Validate the capture/reference route with a known-good bypass if available.
+  - Otherwise, focus on a transport/timebase redesign and require the current
+    C++ family to pass strict music quality before timecode/full routing.

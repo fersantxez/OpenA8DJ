@@ -2808,3 +2808,41 @@ Evidence:
 - `local-analysis/soundcheck/20260617-fast-iso-transfer-config-irig-pairA-12s-cpp-hal/failure-modes.json`
 - `local-analysis/runtime-isolation/after-fast-iso-transfer-config-unload.json`
 - `local-analysis/promotion-readiness-after-fast-iso-transfer-config.json`
+
+## 2026-06-17: Treat Degraded Route Captures As Claim-Blocking, Not Readiness Evidence
+
+Decision:
+- Do not use the degraded mainline-vs-C++ captures with quality around `0.68`
+  and SNR around `-0.83 dB` to prove either product's sound quality.
+- Keep C++ hardware readiness blocked, because the current C++ captures still
+  fail quality even outside the severely degraded route-family.
+- Prioritize independent capture/reference route validation before any new
+  audiophile-quality claim.
+
+Reason:
+- Offline comparison found a shared degraded route-family:
+  mainline wait45, C++ inputdecode-off, and C++ ISO64/q8 StopIO all show
+  quality around `0.68`, SNR around `-0.83 dB`, mid residual around `2.53`,
+  high residual around `1.78`, and very low mid coherence around `0.02`.
+- That family also adds `window_alignment_is_unstable_for_music` and
+  `residual_tracks_program_level`, which indicates the captured/reference
+  comparison is not valid enough for audiophile claims.
+- More recent C++ product probes are in a different failing family:
+  quality around `0.96-0.97`, SNR around `10 dB`, mid/high residual around
+  `1.4/1.36`, and persistent lag jumps. This is still a product failure.
+
+Alternatives discarded:
+- Claim C++ matches mainline because both fail similarly in the degraded
+  route: rejected because a broken measurement route cannot prove quality.
+- Ignore route validation because recent C++ runs have higher alignment:
+  rejected because all physical quality claims depend on a trustworthy capture
+  path.
+- Continue one-flag CPU probes as the next priority: rejected because reused
+  completion handlers and fast ISO config both failed, and quality remains
+  blocked.
+
+Evidence:
+- `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/metrics-summary.json`
+- `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/failure-modes.json`
+- `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/lti-transfer-quality.json`
+- `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`
