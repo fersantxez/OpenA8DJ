@@ -299,6 +299,43 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
   - No further transfer-pool cursor physical tests should run until the load
     safety failure has a bounded explanation.
 
+### Descartes
+
+- Mission: compare mainline C/Obj-C and C++ USB start/control sequence
+  read-only, especially `AUDIO_PARAMS`, `READ_IO`/`WRITE_IO`, direct
+  `usb-play`, and build-flag differences.
+- Required safety warning given:
+  "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorizacion de ventana."
+- Status: completed.
+- Result:
+  - Confirmed HAL USB start/control order is nearly identical between mainline
+    and C++: open/configure/interface/alt-setting, `GET_DEVICE_INFO`,
+    `READ_IO`, optional default `WRITE_IO`, reset-style `AUDIO_PARAMS`, and
+    real stream params.
+  - Confirmed C++ always sends reset-style `AUDIO_PARAMS 0xff`, while mainline
+    exposes it behind `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM`.
+  - Confirmed `usb-play` source calls the same
+    `OpenA8DJUSBStart`/`OpenA8DJUSBWriteOutput`/`OpenA8DJUSBStop` engine in
+    both trees.
+  - Found the direct-tool build difference: mainline `usb-play` compiles
+    `OpenA8DJUSB.m` with `CFLAGS`, while C++ previously compiled direct
+    `usb-play` with `HAL_CFLAGS`.
+- Integrated action:
+  - Added `make usb-play-plain` and `make usb-play-plain-gain05` in the C++
+    worktree.
+  - Ran locked direct USB physical diagnostics with both tools; both failed
+    quality, so `HAL_CFLAGS` contamination is not the sole explanation.
+- Evidence:
+  - `local-analysis/direct-usb-soundcheck/20260616-plaincflags-minus16-music`
+  - `local-analysis/direct-usb-soundcheck/20260616-plaincflags-gain05-minus16-music`
+- Risk:
+  - The remaining blocker is deeper than a direct-tool build flag mismatch.
+    More physical sweeps should wait for transfer/cadence/device-state evidence.
+
 ## Integration Notes
 
 - No subagent may declare readiness independently.

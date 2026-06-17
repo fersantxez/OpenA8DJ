@@ -187,7 +187,7 @@ Branch: `driverkit/cpp-redesign`
   transfer-pool cursor selection are build-time parameters.
 - Defaults remain conservative after ISO64 was physically rejected:
   `ISO5`, capture queue `64`, playback queue `64`, output prefetch `256`,
-  start byte `4`, check offset `8`, gain `0.50`, output amplitude stats on.
+  start byte `4`, check offset `8`, gain `0.50`, output amplitude stats off.
 - Build and offline gates passed after the lifecycle changes:
   `make usb-play hal`, `scripts/run-cpp-offline-gates` with Debug `15/15` and
   Release `16/16`.
@@ -259,3 +259,29 @@ Next technical target:
   `quality_alignment_score=-0.048481`, `analog_snr_db=-32.06`,
   `lag_jumps_gt_2_frames=46`. Defaults are back to
   `HAL_FAST_OUTPUT_PREFETCH_CLEAR=0` and `HAL_OUTPUT_WRITE_STATS=0`.
+
+## 2026-06-16 Current Iteration: Calibrated HAL And Direct USB Diagnostics
+
+- Stale hardware-holder cleanup passed: lock absent, HAL inactive, no
+  OpenA8DJ driver process, no soundcheck/capture/playback processes, and
+  mainline supervisors disabled. Codex/node cwd handles on the read-only
+  mainline path were intentionally left alive because they are not hardware
+  holders.
+- Calibrated `-16 dB` HAL soundcheck with iRig still failed:
+  `quality_alignment_score=0.960076`, `analog_snr_db=2.71`,
+  `lag_jumps_gt_2_frames=35`, mid-band residual ratio `1.565287`,
+  high-band residual ratio `1.461400`, no capture clipping.
+- CPU is still worse than mainline: C++ driver avg/p95 `30.73%/36.70%` in the
+  calibrated HAL run, while mainline `0.3.135` documents driver p95 around
+  `6.5%`.
+- Descartes found that C++ direct `usb-play` had been built with `HAL_CFLAGS`,
+  while mainline direct `usb-play` uses plain `CFLAGS`. C++ now has explicit
+  `usb-play-plain` and `usb-play-plain-gain05` targets.
+- Direct USB plain-CFLAGS physical diagnostics both failed:
+  plain CFLAGS clipped badly and scored `quality_alignment_score=0.186400`;
+  plain CFLAGS with only `OPENA8DJ_OUTPUT_GAIN=0.50f` still scored
+  `quality_alignment_score=0.023502`.
+- Current interpretation: the blocker is not only a HAL callback problem, not
+  only `HAL_CFLAGS` contamination of direct USB tools, and not only output
+  gain. Continue below-HAL transport/cadence/device-state investigation before
+  more physical sweeps.

@@ -658,3 +658,45 @@ Evidence:
 - `local-analysis/soundcheck/20260616-fastclear-writestats-irig-pairA-16s-cpp-hal`
 - `local-analysis/audio-stack-guard/20260616-fastclear-writestats-force-unload/force-unload.log`
 - `local-analysis/runtime-isolation/post-fastclear-writestats-failed-unload.json`
+
+## 2026-06-16: Reject Calibrated Default And Direct USB Plain Variants
+
+Decision:
+- Keep C++ in `NOT_READY` status after the calibrated `-16 dB` physical run
+  and two direct USB plain-CFLAGS diagnostics.
+- Do not promote, do not claim better-than-mainline, and do not move C++ toward
+  `main` until physical quality and CPU both beat the C baseline.
+
+Reason:
+- Calibrated HAL physical run still failed:
+  `quality_alignment_score=0.960076`, `analog_snr_db=2.71`,
+  `lag_jumps_gt_2_frames=35`, `mid_band_residual_ratio=1.565287`,
+  `high_band_residual_ratio=1.461400`.
+- Runtime CPU was worse than mainline `0.3.135`: C++ driver avg/p95
+  `30.73%/36.70%`, while the C baseline documents driver p95 around `6.5%`.
+- Direct USB plain-CFLAGS did not rescue quality:
+  plain CFLAGS produced `quality_alignment_score=0.186400` with clipping, and
+  plain CFLAGS plus only `OPENA8DJ_OUTPUT_GAIN=0.50f` produced
+  `quality_alignment_score=0.023502`.
+- Active-section stream stats in the HAL run did not show simple render
+  starvation; the ring stayed near target and active underruns remained zero
+  during the fed section.
+
+Alternatives discarded:
+- Treat earlier failures as overdrive artifacts: rejected because `-16 dB`
+  still failed without clipping in the HAL path.
+- Blame only `HAL_CFLAGS` contamination in `usb-play`: rejected because the
+  plain-gain05 direct USB diagnostic still failed badly.
+- Promote based on offline gates: rejected because offline gates currently do
+  not predict physical DAC/capture quality for this transport.
+
+Evidence:
+- `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`
+- `local-analysis/direct-usb-soundcheck/20260616-plaincflags-minus16-music`
+- `local-analysis/direct-usb-soundcheck/20260616-plaincflags-gain05-minus16-music`
+- `local-analysis/runtime-isolation/post-default-minus16-failed-unload.json`
+
+Follow-up:
+- Prioritize below-HAL USB transport/cadence and device-state differences.
+- Add byte-for-byte packer dumps and/or device-observed transfer diagnostics
+  before more physical sweeps.

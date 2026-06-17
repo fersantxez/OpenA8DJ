@@ -1765,3 +1765,85 @@ Operational note:
 - Readiness note:
   - This validates the source tree with rejected HAL parity paths behind safe
     defaults. It does not prove physical audio quality.
+
+## 2026-06-16: Default C++ HAL Calibrated -16 dB Physical Rejection
+
+- Commands:
+  - `make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-calibrated-default-soundcheck.json`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --run-dir local-analysis/hal-candidate-safety/20260616-default-calibrated-minus16-cpp-lockpolicy-leave-loaded`
+  - `scripts/run-soundcheck --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 16 --mode dense --target-peak-db -16 --max-lag 360000 --stream-stats-snapshots --cpu-profile --run-dir local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`
+  - Locked forced HAL unload after failure.
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/post-default-minus16-failed-unload.json`
+- Result:
+  - Pre-audit: PASS, HAL absent, lock absent, mainline supervisors disabled.
+  - Offline gates: PASS.
+  - HAL install/enumeration safety: PASS.
+  - Physical music soundcheck at the mainline calibrated level: FAIL.
+  - Post-unload runtime isolation: PASS.
+- Evidence paths:
+  - `local-analysis/runtime-isolation/pre-calibrated-default-soundcheck.json`
+  - `local-analysis/hal-candidate-safety/20260616-default-calibrated-minus16-cpp-lockpolicy-leave-loaded`
+  - `local-analysis/soundcheck/20260616-default-minus16-irig-pairA-16s-cpp-hal`
+  - `local-analysis/audio-stack-guard/20260616-default-minus16-force-unload/force-unload.log`
+  - `local-analysis/runtime-isolation/post-default-minus16-failed-unload.json`
+- Key metrics:
+  - `quality_alignment_score=0.960076`
+  - `analog_snr_db=2.71`
+  - `lag_jumps_gt_2_frames=35`
+  - `mid_band_residual_ratio=1.565287`
+  - `high_band_residual_ratio=1.461400`
+  - `quiet_mid_band_noise_dbfs=-36.81`
+  - `capture_clipped_frames=0`
+  - CPU profile: `opena8dj_driver avg=30.73% p95=36.70% max=37.00%`,
+    `coreaudiod avg=8.57% p95=56.40% max=81.00%`.
+- Stream-stat interpretation:
+  - During the active section, the output ring stayed near target and active
+    underruns remained zero; the high underrun count appears after the writer
+    stops and the stream drains.
+  - The failure is therefore not explained by simple render starvation. It
+    remains a physical quality/cadence/transport problem.
+- Readiness note:
+  - The calibrated level improves alignment versus some prior runs but still
+    fails strict quality and CPU thresholds. This candidate is not better than
+    mainline and is not ready for promotion or listening readiness claims.
+
+## 2026-06-16: Direct USB Plain-CFLAGS Physical Rejections
+
+- Commands:
+  - `make usb-play-plain`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-direct-usb-plain-minus16.json`
+  - Direct locked capture: `build/audio-record 18 ... "iRig Stream" 1,2`
+    while running `build/opena8dj-usb-play-plain fixture/reference.wav`.
+  - `scripts/analyze-soundcheck-capture.py ... --max-seconds 16 --max-lag 360000 --time-warp --drift-profile`
+  - `make usb-play-plain-gain05`
+  - `scripts/run-cpp-offline-gates`
+  - `scripts/runtime-isolation-audit --expect-hal inactive --json-out local-analysis/runtime-isolation/pre-direct-usb-plain-gain05-minus16.json`
+  - Direct locked capture with
+    `build/opena8dj-usb-play-plain-gain05 fixture/reference.wav`.
+- Result:
+  - Both direct USB tools executed and capture completed without runtime error.
+  - No HAL was installed or active.
+  - Post-run runtime isolation: PASS in both runs.
+  - Plain CFLAGS direct USB: FAIL, severe quality failure and capture clipping.
+  - Plain CFLAGS plus only `OPENA8DJ_OUTPUT_GAIN=0.50f`: FAIL, no meaningful
+    quality recovery.
+- Evidence paths:
+  - `local-analysis/direct-usb-soundcheck/20260616-plaincflags-minus16-music`
+  - `local-analysis/direct-usb-soundcheck/20260616-plaincflags-gain05-minus16-music`
+- Key metrics:
+  - Plain CFLAGS: `quality_alignment_score=0.186400`,
+    `alignment_score=0.127546`, `lag_jumps_gt_2_frames=26`,
+    `capture_clipped_frames=8768`, `quiet_mid_band_noise_dbfs=-27.59`.
+  - Plain CFLAGS gain 0.5: `quality_alignment_score=0.023502`,
+    `alignment_score=-0.001463`, `lag_jumps_gt_2_frames=54`,
+    `capture_clipped_frames=21`, `quiet_mid_band_noise_dbfs=-34.10`.
+- Interpretation:
+  - The `plain` direct tool is not a product candidate; default source gain
+    overdrives the analog chain at the calibrated music level.
+  - Reducing only gain did not recover quality. This weakens the hypothesis that
+    direct USB failures are caused only by `HAL_CFLAGS` contamination.
+  - HAL default remains less bad than direct USB, but still fails physical
+    quality and CPU gates.
