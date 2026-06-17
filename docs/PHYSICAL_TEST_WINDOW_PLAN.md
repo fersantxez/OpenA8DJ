@@ -79,6 +79,11 @@ Preconditions:
 - `scripts/runtime-isolation-audit --expect-hal inactive` passes before HAL
   candidate safety, then `Open Audio 8 DJ` is verified after the candidate is
   loaded by the safety gate.
+- Latest stored C++ HAL safety gate is PASS:
+  `local-analysis/cpp-offline/hal-candidate-safety-gate.json`.
+  Current evidence from `20260617T205049Z-cpp-candidate-safety` shows the
+  candidate enumerated `Open Audio 8 DJ` as `8 in / 8 out`, preserved iRig, and
+  unloaded cleanly. Repeat the safety gate if the candidate hash changes.
 - `iRig Stream` visible in CoreAudio.
 - `Open Audio 8 DJ` visible in CoreAudio with `8 in / 8 out`.
 - Global hardware lock acquired by this C++ worktree.

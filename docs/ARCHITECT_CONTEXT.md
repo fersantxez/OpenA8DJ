@@ -2259,3 +2259,21 @@ Current implication:
     only in a lock-held recovery window.
   - Run same-session mainline/C++ quality and CPU comparison only after the
     route gate passes.
+
+## 2026-06-17 HAL Safety Context
+
+- A lock-gated C++ HAL safety window passed at
+  `local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety`.
+- During the loaded guard, CoreAudio enumerated:
+  - `iRig Stream`, `2 in / 2 out`, 48 kHz;
+  - `Open Audio 8 DJ`, `8 in / 8 out`, 48 kHz,
+    UID `org.opena8dj.Audio8DJ`.
+- The candidate was unloaded at the end and runtime isolation confirmed HAL
+  inactive and lock absent.
+- `opena8djcpp_hal_candidate_safety_gate` now converts this into offline
+  readiness evidence.
+- Current implication:
+  - CoreAudio enumeration is recoverable through the C++ HAL safety flow.
+  - No sound-quality, CPU, timecode, or branch-promotion claim follows from
+    this. The dominant blocker remains live route validation and same-session
+    physical A/B evidence.

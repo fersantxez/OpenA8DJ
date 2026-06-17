@@ -3073,3 +3073,40 @@ Risk:
     passive snapshot of lock, process, USB, and CoreAudio state before any
     recovery. Focus recovery on Audio 8 DJ HAL/CoreAudio registration rather
     than blind USB resets.
+
+## 2026-06-17 Subagent: Carver Audio8/iRig Current-State Inspector
+
+- Agent:
+  - Carver (`019ed759-04e4-7690-a7af-9f0d8a024d99`).
+- Mission:
+  - Read-only current-state inspection of the global lock, USB visibility,
+    CoreAudio devices, and relevant test/audio processes while the architect
+    worked on HAL safety evidence.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Lock was absent at the final read.
+  - During the architect's HAL safety run, the lock briefly existed with owner
+    PID `39562` running `scripts/test-hal-candidate-safety`; it disappeared
+    after the run completed.
+  - USB/IORegistry saw:
+    - `iRig Stream`, IK Multimedia, vendor/product `0x1963/0x0059`, serial
+      `152349`;
+    - `Audio 8 DJ`, Native Instruments, vendor/product `0x17cc/0x1978`,
+      serial `SN-HKM6Q6EDKP`.
+  - Final CoreAudio state saw iRig Stream plus built-in devices, but not
+    `Open Audio 8 DJ`, because the safety harness unloaded the HAL candidate.
+  - During the intermediate window, `Core Audio Driver (OpenA8DJ.driver)` was
+    visible; it was gone by the final read.
+  - No lingering `audio-record`, `audio-wav-play`, `soundcheck`, `ffmpeg`,
+    `sox`, VLC, Traktor, or OpenA8DJ process remained at final read.
+- Integrated action:
+  - Added `opena8djcpp_hal_candidate_safety_gate` to preserve the HAL safety
+    run as machine-readable evidence.
+- Next action:
+  - Use the HAL safety result as a precondition only. The next physical step is
+    still route validation and same-session mainline/C++ A/B under lock.

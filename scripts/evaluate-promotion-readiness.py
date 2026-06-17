@@ -84,6 +84,7 @@ DEFAULTS = {
     ),
     "capture_route_health": ROOT / "local-analysis/cpp-offline/capture-route-health-gate.json",
     "direct_usb_attribution": ROOT / "local-analysis/cpp-offline/direct-usb-path-attribution.json",
+    "hal_candidate_safety": ROOT / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
 }
 
 
@@ -223,6 +224,7 @@ def evaluate(args):
         "same_session_compare": Path(args.same_session_compare),
         "capture_route_health": Path(args.capture_route_health),
         "direct_usb_attribution": Path(args.direct_usb_attribution),
+        "hal_candidate_safety": Path(args.hal_candidate_safety),
     }
     gates = []
     for name, path in paths.items():
@@ -240,6 +242,7 @@ def evaluate(args):
     same_session_compare = load_json_or_empty(paths["same_session_compare"])
     capture_route_health = load_json_or_empty(paths["capture_route_health"])
     direct_usb_attribution = load_json_or_empty(paths["direct_usb_attribution"])
+    hal_candidate_safety = load_json_or_empty(paths["hal_candidate_safety"])
     cpu = cpu_profile(paths["cpu"])
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
@@ -336,6 +339,23 @@ def evaluate(args):
               "readiness_claim": direct_usb_attribution.get("readiness_claim"),
               "latest_run": direct_usb_attribution.get("latest_run", {})},
              "a clean written/consumed/packed USB payload followed by failed physical capture blocks promotion"),
+        gate("hal_candidate_safety_for_physical_window",
+             hal_candidate_safety.get("result") == "PASS" and
+             hal_candidate_safety.get("audio8_enumerated_8x8") is True and
+             hal_candidate_safety.get("required_device_pass") is True and
+             hal_candidate_safety.get("irig_preserved_during_guard") is True and
+             hal_candidate_safety.get("post_unload_coreaudio_clean") is True and
+             hal_candidate_safety.get("driver_installed_or_activated_now") is False,
+             {"path": str(paths["hal_candidate_safety"]),
+              "latest_run": hal_candidate_safety.get("latest_run"),
+              "audio8_enumerated_8x8": hal_candidate_safety.get("audio8_enumerated_8x8"),
+              "required_device_pass": hal_candidate_safety.get("required_device_pass"),
+              "irig_preserved_during_guard":
+              hal_candidate_safety.get("irig_preserved_during_guard"),
+              "post_unload_coreaudio_clean":
+              hal_candidate_safety.get("post_unload_coreaudio_clean"),
+              "promotion_blockers": hal_candidate_safety.get("promotion_blockers", [])},
+             "HAL install/reload must be proven safe and unload cleanly before physical promotion windows"),
         gate("offline_transfer_pool_model",
              offline.get("transfer_pool_model", {}).get("status") == "PASS" and
              offline.get("transfer_pool_model", {}).get("rows", 0) >= 6 and
@@ -575,6 +595,7 @@ def main():
     parser.add_argument("--same-session-compare", default=str(DEFAULTS["same_session_compare"]))
     parser.add_argument("--capture-route-health", default=str(DEFAULTS["capture_route_health"]))
     parser.add_argument("--direct-usb-attribution", default=str(DEFAULTS["direct_usb_attribution"]))
+    parser.add_argument("--hal-candidate-safety", default=str(DEFAULTS["hal_candidate_safety"]))
     parser.add_argument("--json-out")
     args = parser.parse_args()
 

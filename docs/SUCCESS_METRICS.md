@@ -2084,6 +2084,12 @@ Prepared transport migration metric:
   cited. Its `historical_reference_currently_valid_for_promotion` field is
   expected to remain `false`; historical evidence never replaces a current
   lock-gated known-good route PASS and same-session mainline/C++ A/B PASS.
+- `local-analysis/cpp-offline/hal-candidate-safety-gate.json` must PASS before
+  any HAL-based physical quality window can support promotion. Minimum
+  expectations: required device UID `org.opena8dj.Audio8DJ` enumerated,
+  `Open Audio 8 DJ` visible as 8 in / 8 out, iRig Stream still visible, and
+  post-unload CoreAudio clean. This is an install/reload safety precondition,
+  not evidence of sound quality.
 - `local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json` must
   PASS before prepared-transport migration can be considered supported. Minimum
   expectations: 44.1/48 kHz, at least `921,000` total frames, zero HAL steady

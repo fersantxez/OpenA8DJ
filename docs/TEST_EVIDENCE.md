@@ -8835,3 +8835,100 @@ Full offline gate rerun:
   - Product readiness still fails correctly because current route validation,
     same-session mainline/C++ A/B, CPU superiority, and physical timecode vinyl
     evidence are still missing.
+
+## 2026-06-17 C++ HAL Candidate Safety Window
+
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --wait 2 --enumeration-timeout 8 --min-idle-pct 15 --run-dir local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety`
+- Safety:
+  - Global hardware lock acquired by the C++ worktree.
+  - HAL candidate install/reload and `coreaudiod` restart were performed by the
+    safety harness.
+  - No playback, capture, default-device change, sample-rate change,
+    buffer-size change, USB reset, Traktor launch, or reboot.
+  - Candidate was unloaded at the end (`leave_loaded=0`).
+- Result:
+  - `hal_candidate_safety=PASS`.
+  - `candidate_hash=844810597df79df54cc08040fc4867cfe7f2efdac7877317085307cd761f0071`.
+  - `required_device=PASS` for `org.opena8dj.Audio8DJ`.
+  - During the loaded guard, CoreAudio listed:
+    - `iRig Stream`, `in=2 out=2 rate=48000`;
+    - `Open Audio 8 DJ`, `in=8 out=8 rate=48000`.
+  - After unload, CoreAudio listed iRig Stream plus built-in devices and no
+    `Open Audio 8 DJ`.
+  - Runtime isolation after the run passed with HAL inactive and lock absent.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety/summary.txt`.
+  - `local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety/cycle-1/guard/audio-list.txt`.
+  - `local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety/cycle-1/post-unload-guard/audio-list.txt`.
+  - `local-analysis/runtime-isolation/20260617T205113Z-after-hal-candidate-safety.json`.
+- Interpretation:
+  - The C++ HAL candidate can be installed/reloaded, enumerate Audio 8 DJ as
+    8x8, preserve iRig visibility, and unload cleanly.
+  - This is not sound-quality readiness. It only clears a precondition for the
+    next locked physical route and A/B window.
+
+## 2026-06-17 HAL Candidate Safety Gate
+
+- Commands:
+  - `./build/cpp-offline/opena8djcpp_hal_candidate_safety_gate | tee local-analysis/cpp-offline/hal-candidate-safety-gate.json`
+  - `python3 scripts/evaluate-promotion-readiness.py --json-out local-analysis/cpp-offline/promotion-readiness-offline-check.json`
+- Safety:
+  - Offline-only read of existing HAL safety evidence.
+  - No audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action.
+- Result:
+  - `opena8djcpp_hal_candidate_safety_gate`: `PASS`.
+  - `audio8_enumerated_8x8=true`.
+  - `required_device_pass=true`.
+  - `irig_preserved_during_guard=true`.
+  - `post_unload_coreaudio_clean=true`.
+  - `driver_installed_or_activated_now=false`.
+  - Promotion evaluator still returns `FAIL` and
+    `branch_promotion_allowed=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-candidate-safety-gate.json`.
+  - `local-analysis/cpp-offline/promotion-readiness-offline-check.json`.
+- Interpretation:
+  - HAL enumeration safety is now machine-readable readiness evidence.
+  - Product promotion remains blocked by capture-route validity, same-session
+    physical A/B, physical music quality, runtime CPU, latest physical
+    investigation, and Traktor/timecode vinyl evidence.
+
+## 2026-06-17 Full Offline Gates With HAL Safety Gate
+
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline gate suite reading existing HAL safety evidence.
+  - No new audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action during this
+    offline run.
+- Result:
+  - Debug CTest: `43/43` passed.
+  - Release CTest: `44/44` passed.
+  - Evidence schema: `required_files=44`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `current-offline-gates.json`:
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `product_readiness_status=FAIL`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+  - `hal_candidate_safety_gate` summary:
+    - `status=PASS`;
+    - `audio8_enumerated_8x8=true`;
+    - `required_device_pass=true`;
+    - `irig_preserved_during_guard=true`;
+    - `post_unload_coreaudio_clean=true`;
+    - `driver_installed_or_activated_now=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/cpp-offline/hal-candidate-safety-gate.json`.
+  - `local-analysis/cpp-offline/ctest-default.txt`.
+  - `local-analysis/cpp-offline/ctest-release.txt`.
+- Interpretation:
+  - HAL install/reload safety is now part of the reproducible evidence stack.
+  - Product readiness still correctly fails because route validation,
+    same-session mainline/C++ physical comparison, CPU superiority, and
+    physical Traktor/timecode evidence remain unproven.

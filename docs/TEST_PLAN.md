@@ -1226,6 +1226,32 @@ Historical route reference gate:
   Audio 8 route PASS, same-session mainline/C++ physical A/B PASS, and
   timecode vinyl physical validation.
 
+HAL candidate safety gate:
+- Physical setup command:
+  `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver`.
+- Offline evidence gate:
+  `opena8djcpp_hal_candidate_safety_gate`.
+- Purpose:
+  - prove the candidate can be installed/reloaded under lock;
+  - prove CoreAudio enumerates `Open Audio 8 DJ` as 8 input / 8 output
+    channels;
+  - prove iRig Stream remains visible during the guard;
+  - prove the candidate unloads cleanly after the safety run.
+- PASS means install/reload/enumeration safety for the latest stored HAL
+  safety window.
+- PASS does not mean:
+  - audio route is valid;
+  - sound quality is acceptable;
+  - CPU is better than mainline;
+  - Traktor/timecode vinyl is ready.
+- Current result:
+  - latest HAL safety run passed;
+  - Audio 8 DJ enumerated as 8x8 at 48 kHz while loaded;
+  - iRig remained visible;
+  - post-unload CoreAudio was clean.
+- Promotion still requires current route validation, same-session mainline/C++
+  physical A/B, runtime CPU superiority, and physical timecode evidence.
+
 Known-good route soundcheck:
 - Physical-only, lock-gated harness:
   `scripts/run-known-good-route-soundcheck`.

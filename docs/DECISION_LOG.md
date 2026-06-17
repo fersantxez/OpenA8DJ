@@ -5712,3 +5712,39 @@ Next implication:
 - The route has a valid historical reference, but current promotion remains
   blocked until a lock-gated known-good non-Audio8 route capture passes and a
   same-session mainline/C++ comparison passes on that validated route.
+
+## 2026-06-17: Promote HAL Candidate Safety Into Readiness Evidence
+
+Decision:
+- Run the C++ HAL candidate through `scripts/test-hal-candidate-safety` under
+  the global hardware lock.
+- Add `opena8djcpp_hal_candidate_safety_gate` to consume that stored evidence.
+- Make `scripts/evaluate-promotion-readiness.py` require HAL safety evidence
+  as a promotion precondition.
+
+Reason:
+- Audio 8 DJ was visible over USB but not CoreAudio when no HAL was loaded.
+- Before any physical quality window can be meaningful, the candidate must
+  prove that it can install/reload, publish the expected 8x8 CoreAudio device,
+  preserve iRig visibility, and unload cleanly.
+- This must be explicit evidence, not an operator memory.
+
+Evidence:
+- Lock-gated HAL safety run:
+  `local-analysis/hal-candidate-safety/20260617T205049Z-cpp-candidate-safety`.
+- Result:
+  - `hal_candidate_safety=PASS`;
+  - `required_device=PASS` for `org.opena8dj.Audio8DJ`;
+  - CoreAudio listed `Open Audio 8 DJ` as `in=8 out=8 rate=48000`;
+  - iRig Stream remained visible as `in=2 out=2 rate=48000`;
+  - post-unload CoreAudio returned to iRig plus built-in devices;
+  - lock was released after the run.
+- Analyzer output:
+  `local-analysis/cpp-offline/hal-candidate-safety-gate.json`.
+
+Next implication:
+- HAL/CoreAudio enumeration is no longer the immediate blocker for a controlled
+  physical window.
+- Product promotion remains blocked by route validation, Direct USB capture
+  failure after clean payload, same-session mainline/C++ A/B, CPU, and physical
+  Traktor/timecode evidence.
