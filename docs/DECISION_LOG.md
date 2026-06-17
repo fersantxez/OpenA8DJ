@@ -4963,3 +4963,25 @@ Evidence:
 Next implication:
 - Prepared transport has stronger offline support as the next performance
   candidate, but physical readiness and branch promotion remain blocked.
+
+## 2026-06-17: Strengthen DriverKit Runtime Contract
+
+Decision:
+- Upgrade `tools/driverkit_runtime_contract.cpp` to schema v2.
+- Clear stream configuration when `AudioDriverSkeleton::stop_driver()` runs.
+- Require runtime-shell pressure evidence from the prepared migration gate.
+
+Reason:
+- The DriverKit shell must not pass only a tiny happy-path batch.
+- Stop/restart behavior should not carry stale stream configuration.
+- The migration direction should require pressure through the shell boundary,
+  not only through the core backend.
+
+Evidence:
+- `local-analysis/cpp-offline/driverkit-runtime-contract.json`
+- `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+
+Next implication:
+- The next implementation step can focus on dext/USB binding design or a
+  lock-gated physical window only after deciding the exact runtime candidate.
+  No hardware readiness claim is added by this contract.

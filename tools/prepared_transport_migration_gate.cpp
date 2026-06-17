@@ -256,6 +256,8 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(hot_path, "fixed_queue_to_playback_fill_ratio"));
   const double pressure_total_frames = number_or_nan(json_number(pressure, "total_frames"));
   const double pressure_rows = number_or_nan(json_number(pressure, "row_count"));
+  const double runtime_pressure_total_frames =
+      number_or_nan(json_number(runtime, "pressure_total_frames"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(packet) && result_pass(routing_timecode) &&
@@ -301,7 +303,11 @@ int main(int argc, char** argv) {
       number_is_zero(runtime, "playback_ring_underruns") &&
       number_is_zero(runtime, "timestamp_regressions") &&
       number_is_zero(runtime, "channel_identity_failures") &&
-      json_bool(runtime, "running_product_safe").value_or(false);
+      json_bool(runtime, "running_product_safe").value_or(false) &&
+      number_is_zero(runtime, "pressure_failures") &&
+      number_is_zero(runtime, "pressure_total_hal_steady_requeues") &&
+      number_is_zero(runtime, "pressure_total_fallback_allocations") &&
+      finite(runtime_pressure_total_frames) && runtime_pressure_total_frames >= 184200.0;
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -348,6 +354,7 @@ int main(int argc, char** argv) {
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);
+  print_number("driverkit_runtime_pressure_total_frames", runtime_pressure_total_frames);
   print_gate_rows(gates);
   std::cout << "  \"mode\": \"offline_migration_only\",\n"
             << "  \"next_allowed_action\": \"LOCK_GATED_PREPARED_TRANSPORT_A_B_HARDWARE_WINDOW_ONLY_AFTER_RUNTIME_BINDING\",\n"

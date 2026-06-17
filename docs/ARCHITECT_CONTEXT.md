@@ -1815,3 +1815,19 @@ Current implication:
   evidence at the mandatory 44.1/48 kHz rates.
 - This still does not touch hardware and still cannot prove physical sound
   quality or CPU superiority.
+
+### 2026-06-17 DriverKit Runtime Contract V2
+
+- Strengthened `opena8djcpp_driverkit_runtime_contract`.
+- The DriverKit shell now clears stream configuration on driver stop, so a
+  restart cannot reuse stale stream state without reconfiguration.
+- The runtime contract now covers:
+  - invalid sample rate, buffer, and transport configs;
+  - stop/restart/reconfigure lifecycle;
+  - 44.1/48 kHz pressure through `AudioDriverSkeleton`;
+  - `184,200` total runtime-shell frames;
+  - zero HAL steady requeues and zero fallback allocations.
+
+Current implication:
+- The offline DriverKit shell is closer to a real lifecycle boundary.
+- It still is not a built/installed dext and cannot prove hardware behavior.

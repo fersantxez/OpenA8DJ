@@ -447,6 +447,14 @@ summary = {
         "timestamp_regressions": driverkit_runtime.get("timestamp_regressions"),
         "channel_identity_failures": driverkit_runtime.get("channel_identity_failures"),
         "running_product_safe": driverkit_runtime.get("running_product_safe"),
+        "pressure_failures": driverkit_runtime.get("pressure_failures"),
+        "pressure_total_frames": driverkit_runtime.get("pressure_total_frames"),
+        "pressure_total_hal_steady_requeues": driverkit_runtime.get(
+            "pressure_total_hal_steady_requeues"
+        ),
+        "pressure_total_fallback_allocations": driverkit_runtime.get(
+            "pressure_total_fallback_allocations"
+        ),
         "evidence": "local-analysis/cpp-offline/driverkit-runtime-contract.json",
     },
     "driverkit_extension_scaffold_contract": {
@@ -573,6 +581,9 @@ summary = {
         ),
         "prepared_transport_pressure_total_frames": prepared_transport_migration.get(
             "prepared_transport_pressure_total_frames"
+        ),
+        "driverkit_runtime_pressure_total_frames": prepared_transport_migration.get(
+            "driverkit_runtime_pressure_total_frames"
         ),
         "failing_gates": [
             gate.get("name")

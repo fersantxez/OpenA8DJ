@@ -7909,3 +7909,30 @@ Full offline gate rerun:
   - This closes the short-contract gap for prepared transport offline pressure.
   - It remains offline-only and cannot substitute for physical A/B quality,
     CPU, route, or Traktor/timecode-vinyl validation.
+
+## 2026-06-17 DriverKit Runtime Contract V2
+
+- Scope:
+  - Offline-only DriverKit shell lifecycle/runtime contract.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Changes:
+  - `AudioDriverSkeleton::stop_driver()` now clears stream config state.
+  - `opena8djcpp_driverkit_runtime_contract` now validates invalid rate,
+    buffer, and transport configs; restart/reconfigure behavior; and 44.1/48
+    kHz pressure through the shell.
+- Focused commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_driverkit_runtime_contract`
+  - `./build/cpp-offline/opena8djcpp_driverkit_runtime_contract`
+- Focused result:
+  - Result: PASS.
+  - Schema: `opena8djcpp.driverkit-runtime-contract.v2`.
+  - Runtime-shell pressure frames: `184,200`.
+  - Runtime-shell pressure failures: `0`.
+  - HAL steady requeues: `0`.
+  - Fallback allocations: `0`.
+  - Capture/playback mismatches: `0`.
+- Interpretation:
+  - The shell lifecycle model is stricter and better aligned with a future
+    dext binding.
+  - It remains offline-only and does not install or activate DriverKit.

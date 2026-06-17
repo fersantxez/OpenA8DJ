@@ -2034,3 +2034,7 @@ Prepared transport migration metric:
   with 44.1/48 kHz, decks A/B/C/D, zero HAL steady requeues, zero fallback
   allocations, zero ring faults, and zero packet/check mismatches before the
   migration gate can PASS.
+- `local-analysis/cpp-offline/driverkit-runtime-contract.json` must PASS with
+  schema v2 runtime-shell pressure at 44.1/48 kHz, zero HAL steady requeues,
+  zero fallback allocations, and clean stop/restart/reconfigure lifecycle
+  before the migration gate can PASS.

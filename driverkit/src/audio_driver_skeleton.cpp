@@ -18,6 +18,8 @@ bool AudioDriverSkeleton::stop_driver() {
   if (transport_.started()) {
     transport_.stop();
   }
+  stream_config_ = {};
+  stream_configured_ = false;
   state_ = AudioDriverState::Stopped;
   return true;
 }
