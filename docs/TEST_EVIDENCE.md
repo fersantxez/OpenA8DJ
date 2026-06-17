@@ -6452,3 +6452,24 @@ Operational note:
     `Legacy`.
   - The mainline-aligned default may remain as a narrower baseline, but it is
     not an evidence-backed product improvement by itself.
+
+## 2026-06-17 Transport Cadence Matrix
+
+- Command:
+  - `scripts/summarize-transport-cadence.py --json-out local-analysis/transport-cadence/current.json --csv-out local-analysis/transport-cadence/current.csv`
+  - `python3 -m py_compile scripts/summarize-transport-cadence.py scripts/analyze-stream-stats.py scripts/analyze-timebase-family.py scripts/analyze-soundcheck-window-trace.py`
+- Scope:
+  - Offline-only parse of existing artifacts. No hardware, CoreAudio, USB, HAL install, defaults, or service state touched.
+- Result:
+  - PASS, `59` physical soundcheck runs summarized.
+  - Families identified from existing stream-stats cadence artifacts:
+    - `ISO5/q64`: best quality `0.978050`, median driver CPU p95 about `36.9%`.
+    - `ISO8/q8`: best quality `0.964724`, median driver CPU p95 about `22.4%`.
+    - `ISO10/q8`: quality `0.969379`, driver CPU p95 `19.6%`.
+    - `ISO64/q8`: median quality about `0.678356`, min driver CPU p95 `6.0%`.
+- Evidence:
+  - `local-analysis/transport-cadence/current.json`
+  - `local-analysis/transport-cadence/current.csv`
+- Interpretation:
+  - Current evidence shows a transport tradeoff, not a promotable candidate.
+  - Product readiness still requires simultaneous physical music quality, low CPU, routing, recovery, and Traktor/timecode evidence.

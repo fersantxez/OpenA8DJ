@@ -1566,3 +1566,21 @@ Latest locked result:
   - The flush-timing alignment does not meet audiophile quality or performance
     gates. It cannot justify hardware readiness, Traktor/timecode claims, or
     branch promotion.
+
+## 2026-06-17 Transport Cadence Family Gate
+
+Latest offline transport matrix: `local-analysis/transport-cadence/current.json`.
+
+Current observed families:
+
+| family | best quality | CPU p95 status | readiness meaning |
+| --- | ---: | --- | --- |
+| ISO5/q64 | `0.978050` | median driver p95 about `36.9%` | quality-near, CPU fail |
+| ISO8/q8 | `0.964724` | median driver p95 about `22.4%` | quality fail, CPU fail |
+| ISO10/q8 | `0.969379` | driver p95 `19.6%` | quality fail, CPU fail |
+| ISO64/q8 | median about `0.678356` | min driver p95 `6.0%` | CPU-near, physical quality fail |
+
+Required gate update:
+- Every physical candidate report must name its effective ISO/queue family when evidence can infer it.
+- A family cannot be promoted unless it simultaneously beats the strict physical music gate and the mainline-relative CPU gate.
+- Existing evidence does not contain a family that satisfies both; branch promotion and hardware-readiness claims remain blocked.

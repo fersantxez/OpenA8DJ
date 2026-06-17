@@ -42,7 +42,8 @@ python3 scripts/mode2-cross-oracle-parity \
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 python3 -m py_compile \
   scripts/analyze-soundcheck-window-trace.py \
-  scripts/analyze-timebase-family.py
+  scripts/analyze-timebase-family.py \
+  scripts/summarize-transport-cadence.py
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json

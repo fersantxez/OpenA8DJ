@@ -4034,3 +4034,31 @@ Next implication:
 - The next candidate must address the persistent post-timeline physical
   residual/lag issue and the high per-transfer CPU cost together. More
   sample-time-only or flush-order-only work is not enough.
+## 2026-06-17: Add Transport Cadence Evidence Matrix
+
+Decision:
+- Add `scripts/summarize-transport-cadence.py` as an offline evidence tool.
+- Treat transport family (`inferred_iso_frames` plus playback queue target) as a required physical-run comparison dimension.
+- Do not compare C++ candidates against mainline or against each other without naming the effective ISO/queue family when evidence artifacts expose it.
+
+Reason:
+- Existing soundcheck rows mix materially different transport cadences. Raw quality metrics alone hid the fact that the current search space has a clear tradeoff: lower ISO cadence tends to improve physical music alignment but burns CPU, while large ISO cadence reduces CPU and can destroy physical music quality.
+- Current artifact summary from `local-analysis/transport-cadence/current.json`:
+  - `ISO5/q64`: best quality `0.978050`, median driver CPU p95 about `36.9%`, best historical quality family but not performance viable.
+  - `ISO8/q8`: best quality `0.964724`, median driver CPU p95 about `22.4%`, still fails quality and CPU.
+  - `ISO10/q8`: quality `0.969379`, driver CPU p95 `19.6%`, still fails quality and CPU.
+  - `ISO64/q8`: median quality about `0.678356`, minimum driver CPU p95 `6.0%`, CPU-near-mainline but physically rejected for music quality.
+- This makes the next useful physical probes intermediate cadence tests only if they are judged on both quality and CPU. A CPU-only win or quality-only win is not promotable.
+
+Alternatives discarded:
+- Optimize from `quality_alignment_score` alone: rejected because it would favor `ISO5/q64`, which fails CPU badly.
+- Optimize from CPU alone: rejected because it would favor `ISO64/q8`, which fails physical music quality badly.
+- Continue using latest-run-only comparisons: rejected because recent runs can be different transport families and therefore not comparable without metadata.
+
+Evidence:
+- `scripts/summarize-transport-cadence.py --json-out local-analysis/transport-cadence/current.json --csv-out local-analysis/transport-cadence/current.csv`
+- `local-analysis/transport-cadence/current.json`
+- `local-analysis/transport-cadence/current.csv`
+
+Next implication:
+- The next candidate should test a bounded intermediate cadence such as `ISO12/q8` only under lock, same fixture, same iRig route, same metrics, and must beat both prior C++ quality and mainline-relative CPU gates before any readiness claim.
