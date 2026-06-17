@@ -2231,3 +2231,31 @@ Current implication:
 - A stale or nested Direct USB artifact cannot silently weaken the blocker.
 - Product readiness remains `NOT_READY` until route health is valid and a
   same-session mainline/C++ physical A/B passes on that valid route.
+
+## 2026-06-17 Current Hardware/Route Context
+
+- Global hardware lock:
+  - absent at read-only inspection time;
+  - no owner PID to kill or clear.
+- Device visibility:
+  - iRig Stream is visible over USB and CoreAudio as 2-in/2-out at 48 kHz.
+  - Audio 8 DJ is visible over USB/IORegistry but is not visible as a
+    CoreAudio device.
+- Historical route reference:
+  - The read-only mainline route proof
+    `vlc-long-route-proof-20260612-163849` passes sanity guardrails:
+    48 kHz, about 50 seconds, 46 active seconds, zero clipped frames, and
+    healthy music-level RMS/peak values.
+  - This proves the old route evidence exists and is usable as a regression
+    anchor.
+- Current route status:
+  - `current_measurement_valid_for_promotion=false`.
+  - Direct USB internal payload remains clean, but current iRig capture still
+    fails after that clean payload.
+  - iRig idle capture is clean enough to avoid blaming idle noise alone.
+- Open gap:
+  - Revalidate the live physical route with a known-good non-Audio8 source.
+  - Restore or intentionally install/register the Audio 8 DJ CoreAudio path
+    only in a lock-held recovery window.
+  - Run same-session mainline/C++ quality and CPU comparison only after the
+    route gate passes.

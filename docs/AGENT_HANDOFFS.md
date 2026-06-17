@@ -3036,3 +3036,40 @@ Risk:
     `product_readiness_status=FAIL/NOT_READY` plus
     `branch_promotion_allowed=false` until a validated physical route and
     same-session mainline/C++ comparison exist.
+
+## 2026-06-17 Subagent: Tesla iRig/Lock Recovery Analyst
+
+- Agent:
+  - Tesla (`019ed752-8782-7340-a711-954932a4026f`).
+- Mission:
+  - Read-only inspection of hardware lock, obvious stale test processes, USB
+    visibility, and CoreAudio visibility for iRig Stream and Audio 8 DJ.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Global hardware lock directory is absent; no owner PID exists.
+  - No obvious persistent test process was found for `audio-record`,
+    `soundcheck`, `ffmpeg`, `sox`, `afplay`, `vlc`, `traktor`, or OpenA8DJ
+    tooling beyond normal `coreaudiod`.
+  - USB/IORegistry sees:
+    - `iRig Stream`, IK Multimedia, serial `152349`;
+    - `Audio 8 DJ`, Native Instruments, `idVendor=6092`,
+      `idProduct=6520`, serial `SN-HKM6Q6EDKP`.
+  - CoreAudio sees `iRig Stream` as 2-in/2-out at 48 kHz.
+  - CoreAudio does not currently expose `Audio 8 DJ`, `Open Audio 8 DJ`, or
+    `OpenA8DJ`.
+  - `system_profiler SPUSBDataType` returned empty USB output while `ioreg`
+    saw both devices; use `ioreg` as the current USB visibility source.
+- Risk:
+  - Audio 8 DJ USB presence does not mean the HAL/CoreAudio path is alive.
+  - iRig is available for capture, but a promotion-quality route still needs a
+    known-good non-Audio8 route validation under lock.
+- Next action:
+  - At the start of any physical window, acquire the global lock and record a
+    passive snapshot of lock, process, USB, and CoreAudio state before any
+    recovery. Focus recovery on Audio 8 DJ HAL/CoreAudio registration rather
+    than blind USB resets.

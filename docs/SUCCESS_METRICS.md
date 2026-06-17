@@ -2079,6 +2079,11 @@ Prepared transport migration metric:
   used to claim better sound quality, timecode-vinyl readiness, or branch
   promotion. A PASS result alone is diagnostic execution, not promotion
   validity.
+- `local-analysis/cpp-offline/historical-route-reference-gate.json` must be
+  present and PASS as a regression anchor when historical route evidence is
+  cited. Its `historical_reference_currently_valid_for_promotion` field is
+  expected to remain `false`; historical evidence never replaces a current
+  lock-gated known-good route PASS and same-session mainline/C++ A/B PASS.
 - `local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json` must
   PASS before prepared-transport migration can be considered supported. Minimum
   expectations: 44.1/48 kHz, at least `921,000` total frames, zero HAL steady

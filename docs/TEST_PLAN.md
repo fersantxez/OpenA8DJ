@@ -1206,6 +1206,26 @@ iRig idle capture gate:
   the same mixer/REC OUT -> iRig route. If that passes, test Audio 8 Pair A
   directly into iRig to isolate the DAC/analog output from the mixer route.
 
+Historical route reference gate:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It reads the historical mainline route proof from the read-only mainline
+  worktree and current C++ route-health evidence.
+- It must not touch hardware, CoreAudio, USB, drivers, defaults, or services.
+- PASS means the historical iRig route proof is present and sane enough to use
+  as a regression anchor.
+- PASS does not mean:
+  - current route is valid;
+  - Audio 8 DJ output quality is validated;
+  - C++ is better than mainline;
+  - Traktor/timecode vinyl is ready.
+- Current result: the old VLC/iRig proof passes sanity guardrails, but
+  `historical_reference_currently_valid_for_promotion=false` because current
+  route-health evidence still reports invalid measurement and Direct USB
+  capture failure after clean internal payload.
+- Promotion still requires current known-good non-Audio8 route PASS, current
+  Audio 8 route PASS, same-session mainline/C++ physical A/B PASS, and
+  timecode vinyl physical validation.
+
 Known-good route soundcheck:
 - Physical-only, lock-gated harness:
   `scripts/run-known-good-route-soundcheck`.

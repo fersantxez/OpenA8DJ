@@ -5675,3 +5675,40 @@ Next implication:
   satisfied, unless route-health explicitly reports
   `measurement_valid_for_promotion=true` and the Direct USB failure-after-clean
   blocker is absent.
+
+## 2026-06-17: Add Historical iRig Route Reference Gate
+
+Decision:
+- Add `opena8djcpp_historical_route_reference_gate` as an offline C++ analyzer.
+- The gate reads the read-only mainline route proof at
+  `/Users/fer/dev/opena8dj/local-analysis/irig-stream-capture/vlc-long-route-proof-20260612-163849/`
+  and current C++ route-health artifacts.
+- It records historical route sanity separately from current promotion
+  validity.
+
+Reason:
+- The project has strong evidence that the mixer/REC OUT -> iRig route worked
+  in the past, but historical proof cannot substitute for current same-session
+  promotion evidence.
+- The analyzer prevents two opposite false claims:
+  - "the route was never proven";
+  - "the route once worked, therefore current C++ quality is ready".
+
+Evidence:
+- Historical reference:
+  - `rate=48000`;
+  - `duration_sec=49.994667`;
+  - `active_seconds_count=46`;
+  - `clipped_frames=0`;
+  - RMS `-23.161776/-24.327619 dBFS`;
+  - peaks `-12.005225/-11.446036 dBFS`.
+- Current route state:
+  - `current_measurement_valid_for_promotion=false`;
+  - `current_direct_usb_internal_clean=true`;
+  - `current_direct_usb_capture_failed_after_clean_payload=true`;
+  - `current_irig_idle_gate_pass=true`.
+
+Next implication:
+- The route has a valid historical reference, but current promotion remains
+  blocked until a lock-gated known-good non-Audio8 route capture passes and a
+  same-session mainline/C++ comparison passes on that validated route.

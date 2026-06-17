@@ -64,6 +64,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_direct_usb_path_attribution | tee "$EVIDENCE_DIR/direct-usb-path-attribution.json"
 ./build/cpp-release/opena8djcpp_capture_route_health_gate | tee "$EVIDENCE_DIR/capture-route-health-gate.json"
 ./build/cpp-release/opena8djcpp_irig_idle_capture_gate | tee "$EVIDENCE_DIR/irig-idle-capture-gate.json"
+./build/cpp-release/opena8djcpp_historical_route_reference_gate | tee "$EVIDENCE_DIR/historical-route-reference-gate.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -139,6 +140,7 @@ physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
 direct_usb_path_attribution = load_json("direct-usb-path-attribution.json")
 irig_idle_capture_gate = load_json("irig-idle-capture-gate.json")
+historical_route_reference_gate = load_json("historical-route-reference-gate.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -510,6 +512,29 @@ summary = {
         "latest_run": irig_idle_capture_gate.get("latest_run"),
         "readiness_claim": irig_idle_capture_gate.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/irig-idle-capture-gate.json",
+    },
+    "historical_route_reference_gate": {
+        "status": historical_route_reference_gate.get("result"),
+        "historical_reference_pass": historical_route_reference_gate.get(
+            "historical_reference_pass"
+        ),
+        "current_measurement_valid_for_promotion": historical_route_reference_gate.get(
+            "current_measurement_valid_for_promotion"
+        ),
+        "current_direct_usb_capture_failed_after_clean_payload": historical_route_reference_gate.get(
+            "current_direct_usb_capture_failed_after_clean_payload"
+        ),
+        "current_route_revalidation_required": historical_route_reference_gate.get(
+            "current_route_revalidation_required"
+        ),
+        "historical_reference_currently_valid_for_promotion": historical_route_reference_gate.get(
+            "historical_reference_currently_valid_for_promotion"
+        ),
+        "regression_state": historical_route_reference_gate.get("regression_state"),
+        "promotion_blockers": historical_route_reference_gate.get("promotion_blockers"),
+        "next_required_action": historical_route_reference_gate.get("next_required_action"),
+        "readiness_claim": historical_route_reference_gate.get("readiness_claim"),
+        "evidence": "local-analysis/cpp-offline/historical-route-reference-gate.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

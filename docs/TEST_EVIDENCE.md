@@ -8763,3 +8763,75 @@ Full offline gate rerun:
   - A clean internal Direct USB payload followed by failed physical capture is
     now a first-class promotion failure, not incidental context.
   - No superiority claim over mainline C is supported.
+
+## 2026-06-17 Historical iRig Route Reference Gate
+
+- Command:
+  - `./build/cpp-offline/opena8djcpp_historical_route_reference_gate | tee local-analysis/cpp-offline/historical-route-reference-gate.json`
+- Safety:
+  - Offline-only read of existing evidence.
+  - Mainline evidence was read from `/Users/fer/dev/opena8dj` without edits.
+  - No audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action.
+- Result:
+  - `result=PASS` as analyzer/reference sanity.
+  - `historical_reference_pass=true`.
+  - `historical_rate=48000`.
+  - `historical_duration_sec=49.994667`.
+  - `historical_active_seconds_count=46`.
+  - `historical_clipped_frames=0`.
+  - `historical_overall_rms_dbfs_ch1=-23.161776`.
+  - `historical_overall_rms_dbfs_ch2=-24.327619`.
+  - `historical_overall_peak_dbfs_ch1=-12.005225`.
+  - `historical_overall_peak_dbfs_ch2=-11.446036`.
+  - `current_measurement_valid_for_promotion=false`.
+  - `current_direct_usb_internal_clean=true`.
+  - `current_direct_usb_capture_failed_after_clean_payload=true`.
+  - `current_irig_idle_gate_pass=true`.
+  - `historical_reference_currently_valid_for_promotion=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/historical-route-reference-gate.json`.
+  - Read-only historical source:
+    `/Users/fer/dev/opena8dj/local-analysis/irig-stream-capture/vlc-long-route-proof-20260612-163849/capture-summary.json`.
+- Interpretation:
+  - The old route proof is real enough to use as a regression/reference
+    anchor.
+  - It does not authorize current promotion. The next valid physical step is
+    still a lock-gated known-good non-Audio8 route capture, followed by
+    same-session mainline/C++ comparison on that validated route.
+
+## 2026-06-17 Full Offline Gates With Historical Route Reference
+
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Safety:
+  - Offline-only gate suite.
+  - No audio device open, USB action, CoreAudio mutation, HAL/DriverKit
+    install/load, default-device change, or hardware action.
+- Result:
+  - Debug CTest: `42/42` passed.
+  - Release CTest: `43/43` passed.
+  - Evidence schema: `required_files=43`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - `current-offline-gates.json`:
+    - `status=PASS`;
+    - `diagnostic_status=PASS`;
+    - `product_readiness_status=FAIL`;
+    - `branch_promotion_allowed=false`;
+    - `physical_measurement_valid_for_promotion=false`.
+  - Historical route reference summary:
+    - `historical_reference_pass=true`;
+    - `historical_reference_currently_valid_for_promotion=false`;
+    - `current_direct_usb_capture_failed_after_clean_payload=true`;
+    - `current_route_revalidation_required=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `local-analysis/cpp-offline/historical-route-reference-gate.json`.
+  - `local-analysis/cpp-offline/ctest-default.txt`.
+  - `local-analysis/cpp-offline/ctest-release.txt`.
+- Interpretation:
+  - The offline stack is healthy and now preserves the old good iRig route as
+    a regression anchor.
+  - Product readiness still fails correctly because current route validation,
+    same-session mainline/C++ A/B, CPU superiority, and physical timecode vinyl
+    evidence are still missing.
