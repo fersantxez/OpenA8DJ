@@ -1474,3 +1474,9 @@ Next technical target:
   - This is a candidate timing change, not readiness evidence. It needs a
     locked same-route physical music/CPU A/B before any quality or performance
     claim.
+  - Locked Pair A/iRig evidence at commit `a3dd76a` rejected it as a standalone
+    fix: quality `0.962241`, SNR `10.29 dB`, `23` lag jumps, corrected mid
+    residual median `1.413201`, driver CPU p95 about `22.4%`, and promotion
+    readiness `FAIL`.
+  - Post-run state was cleaned up: HAL unloaded, no OpenA8DJ driver PID, audio
+    stack guard PASS.

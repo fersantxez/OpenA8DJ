@@ -1551,3 +1551,18 @@ Latest promotion evaluation:
     correction versus the prior C++ default.
   - Same-day comparison must show C++ CPU p95 no worse than mainline C.
   - Traktor/timecode remains unproven until a separate physical DVS gate passes.
+
+Latest locked result:
+
+- Evidence:
+  - `local-analysis/soundcheck/20260617-output-flush-mainline-irig-pairA-12s-cpp-hal`.
+  - `local-analysis/promotion-readiness-after-output-flush-mainline.json`.
+- Result:
+  - FAIL, `branch_promotion_allowed=false`.
+  - Quality `0.962241`, SNR `10.29 dB`, `23` lag jumps.
+  - Corrected mid residual median `1.413201`.
+  - Driver CPU p95 about `22.4%`.
+- Meaning:
+  - The flush-timing alignment does not meet audiophile quality or performance
+    gates. It cannot justify hardware readiness, Traktor/timecode claims, or
+    branch promotion.

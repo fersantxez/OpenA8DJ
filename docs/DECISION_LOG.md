@@ -3993,3 +3993,44 @@ Next implication:
   against the previous C++ baseline and mainline. Required wins: fewer lag
   jumps, lower residual after local correction, strict music thresholds, and
   CPU no worse than mainline.
+
+## 2026-06-17: Reject Output Flush Alignment As Standalone Fix
+
+Decision:
+- Do not treat `HAL_FLUSH_OUTPUT_IN_WRITE_MIX=0` as a quality or performance
+  fix.
+- Keep promotion forbidden.
+- Keep the mainline-aligned default as a cleaner timing baseline, but require
+  a new hypothesis for the remaining quality and CPU failures.
+
+Reason:
+- Locked Pair A/iRig physical evidence still fails strict music quality:
+  quality `0.962241`, SNR `10.29 dB`, `23` lag jumps, mid/high residual
+  `1.407975/1.362266`, quiet mid `-35.17 dBFS`.
+- Window trace still shows discontinuous/local timing behavior:
+  local lag range `-22..5` frames and corrected mid residual median `1.413201`.
+- CPU remains far above mainline target:
+  OpenA8DJ driver p95 about `22.4%`; `coreaudiod` p95 includes high startup
+  samples and the run still fails the CPU gate.
+- Post-run cleanup succeeded with the HAL unloaded and audio stack healthy.
+
+Alternatives discarded:
+- Claim partial win from fewer lag jumps: rejected because strict quality, SNR,
+  residual, and CPU still fail.
+- Promote to a hardware-ready candidate: rejected because promotion readiness
+  remains `FAIL` and physical timecode/Traktor is unproven.
+- Immediately move C++ to `main`: rejected; C++ has not objectively beaten
+  mainline.
+
+Evidence:
+- `local-analysis/physical-product/20260617-output-flush-mainline/hal-candidate-safety`
+- `local-analysis/soundcheck/20260617-output-flush-mainline-irig-pairA-12s-cpp-hal`
+- `local-analysis/soundcheck/20260617-output-flush-mainline-irig-pairA-12s-cpp-hal/window-trace.json`
+- `local-analysis/soundcheck/20260617-output-flush-mainline-irig-pairA-12s-cpp-hal/stream-stats-summary.json`
+- `local-analysis/promotion-readiness-after-output-flush-mainline.json`
+- `local-analysis/audio-stack-guard/after-output-flush-mainline-force-unload`
+
+Next implication:
+- The next candidate must address the persistent post-timeline physical
+  residual/lag issue and the high per-transfer CPU cost together. More
+  sample-time-only or flush-order-only work is not enough.
