@@ -2140,3 +2140,43 @@ Current implication:
 - The C++ core has stronger offline DVS/timecode evidence, but no Traktor or
   vinyl readiness claim is allowed until the physical route is valid and real
   Traktor/timecode scope evidence exists.
+
+## 2026-06-17 Post-4118eab Physical Route State
+
+- After commit `4118eab`, CoreAudio listed `iRig Stream` as a `2 in / 2 out`
+  device at 48 kHz.
+- Raw USB registry showed:
+  - `iRig Stream` from IK Multimedia at 12 Mbps;
+  - `Audio 8 DJ` from Native Instruments, vendor/product `17cc:1978`, at
+    480 Mbps.
+- A lock-gated Direct USB run was executed:
+  - run:
+    `local-analysis/direct-usb-soundcheck/20260617T201948Z-post4118eab-irig-route`;
+  - output: Audio 8 DJ Pair A via direct USB player;
+  - capture: `iRig Stream` channels `1,2`;
+  - no HAL install/load, default-device change, CoreAudio restart, USB reset,
+    or reboot.
+- The external capture failed:
+  - `quality_alignment_score=0.699393`;
+  - `snr_db_min=-1.877419`;
+  - residual ratios `1.908435` / `1.782892`;
+  - no clipping and no lag jumps in the top-level metric.
+- The same run's internal diagnostics were perfect:
+  - written, consumed, and packed USB alignment `1.000000`;
+  - USB check errors `0`;
+  - USB panic flags `0`.
+- Refreshed attribution:
+  - `opena8djcpp_direct_usb_path_attribution` now sees `9` direct USB runs,
+    with `5` internally clean runs whose external capture still failed.
+  - Latest attribution:
+    `post_usb_device_analog_or_capture_route_dominant`.
+  - `opena8djcpp_capture_route_health_gate` still reports
+    `measurement_valid_for_promotion=false`.
+
+Current implication:
+- The system can currently see both Audio 8 DJ and iRig, and can run a locked
+  physical diagnostic, but the capture path is not valid for promotion.
+- Further C++ packet-format work is low-priority unless new evidence breaks
+  the current internal USB cleanliness result.
+- The decisive next physical requirement remains a validated route/capture
+  path followed by same-session mainline/C++ comparison.

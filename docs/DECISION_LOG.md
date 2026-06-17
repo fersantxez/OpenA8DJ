@@ -5574,3 +5574,44 @@ Next implication:
 - Timecode functionality is better specified offline, but still cannot be
   claimed complete until a lock-gated physical Traktor/timecode run exists on
   a validated capture route.
+
+## 2026-06-17: Keep Route Validity As The Primary Physical Blocker
+
+Decision:
+- Do not treat the post-`4118eab` Direct USB physical failure as a C++ packet
+  packer failure.
+- Keep branch promotion and audiophile readiness blocked on capture-route
+  validation and same-session mainline/C++ comparison.
+
+Reason:
+- The latest lock-gated Direct USB run failed external iRig quality, but the
+  same run's written, consumed, and packed USB diagnostics were bit-aligned to
+  the reference with no check errors or panic flags.
+- The refreshed direct USB attribution gate classifies the latest failure as
+  `post_usb_device_analog_or_capture_route_dominant`.
+
+Evidence:
+- Run:
+  `local-analysis/direct-usb-soundcheck/20260617T201948Z-post4118eab-irig-route`.
+- External capture:
+  - `quality_alignment_score=0.699393`;
+  - `snr_db_min=-1.877419`;
+  - `mid_band_residual_ratio=1.908435`;
+  - `high_band_residual_ratio=1.782892`.
+- Internal USB:
+  - written alignment `1.000000`;
+  - consumed alignment `1.000000`;
+  - packed USB alignment `1.000000`;
+  - USB check errors `0`;
+  - USB panic flags `0`.
+- Gate refresh:
+  - `opena8djcpp_direct_usb_path_attribution`: latest attribution
+    `post_usb_device_analog_or_capture_route_dominant`.
+  - `opena8djcpp_capture_route_health_gate`:
+    `measurement_valid_for_promotion=false`.
+
+Next implication:
+- The next improvement must either validate/fix the external capture route or
+  produce a same-session physical comparison on a known-valid route.
+- No claim of better sound quality, full functionality, timecode vinyl
+  readiness, CPU superiority, or branch promotion is allowed from this result.

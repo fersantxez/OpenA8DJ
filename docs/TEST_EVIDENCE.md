@@ -8638,3 +8638,54 @@ Full offline gate rerun:
 - Interpretation:
   - This improves machine-checkable DVS/timecode functionality evidence.
   - It does not authorize a Traktor/timecode-vinyl readiness claim.
+
+## 2026-06-17 Post-4118eab Direct USB / iRig Route Check
+
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --run-dir local-analysis/direct-usb-soundcheck/20260617T201948Z-post4118eab-irig-route --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --seconds 12 --postroll-seconds 2 --lead-frames 8192 --playback-profile --collect-usb-diagnostics`
+- Safety:
+  - Hardware lock acquired by the wrapper and released after the run.
+  - Audio 8 DJ direct USB playback and iRig capture were used.
+  - No HAL install/load, DriverKit install/load, default-device change,
+    CoreAudio restart, USB reset, or system reboot.
+- Result:
+  - `DIRECT_USB_SOUNDCHECK: FAIL`.
+  - External iRig capture:
+    - `quality_alignment_score=0.699393`;
+    - `snr_db_min=-1.877419`;
+    - `mid_band_residual_ratio=1.908435`;
+    - `high_band_residual_ratio=1.782892`;
+    - `lag_jumps_gt_2_frames=0`;
+    - `capture_clipped_frames=0`.
+  - Internal diagnostics:
+    - written alignment score `1.000000`;
+    - consumed alignment score `1.000000`;
+    - packed USB alignment score `1.000000`;
+    - USB check errors `0`;
+    - USB panic flags `0`;
+    - written/consumed lag windows had min/max lag `0`.
+  - Failure-mode classifier:
+    - `timebase_or_alignment_instability`;
+    - `window_alignment_is_unstable_for_music`;
+    - `static_lr_mix_or_polarity_not_sufficient`;
+    - `simple_memoryless_nonlinearity_not_sufficient`;
+    - estimated drift `-295.512 ppm`.
+- Follow-up analyzers:
+  - `opena8djcpp_direct_usb_path_attribution`: `PASS` as diagnostic,
+    latest run attribution
+    `post_usb_device_analog_or_capture_route_dominant`.
+  - `opena8djcpp_physical_capture_forensics`: `PASS` as analyzer health,
+    `strict_quality_candidates=0`.
+  - `opena8djcpp_capture_route_health_gate`: `measurement_valid_for_promotion=false`.
+- Evidence:
+  - `local-analysis/direct-usb-soundcheck/20260617T201948Z-post4118eab-irig-route`.
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`.
+  - `local-analysis/cpp-offline/physical-capture-forensics.json`.
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`.
+- Interpretation:
+  - The latest physical run again proves clean internal USB payload and failing
+    external capture.
+  - The current dominant blocker is still the post-USB analog/capture route or
+    physical timebase behavior, not C++ packet packing.
+  - This evidence does not support audiophile readiness, Traktor readiness, or
+    branch promotion.
