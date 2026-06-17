@@ -257,6 +257,9 @@ target_link_libraries(opena8djcpp_channel_leakage_tone_contract
 add_executable(opena8djcpp_physical_run_compare
   tools/physical_run_compare.cpp)
 
+add_executable(opena8djcpp_physical_evidence_frontier
+  tools/physical_evidence_frontier.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -305,6 +308,7 @@ add_test(NAME opena8djcpp_capture_route_health_gate COMMAND opena8djcpp_capture_
 add_test(NAME opena8djcpp_soundcheck_wav_quality COMMAND opena8djcpp_soundcheck_wav_quality)
 add_test(NAME opena8djcpp_channel_leakage_tone_contract COMMAND opena8djcpp_channel_leakage_tone_contract)
 add_test(NAME opena8djcpp_physical_run_compare COMMAND opena8djcpp_physical_run_compare)
+add_test(NAME opena8djcpp_physical_evidence_frontier COMMAND opena8djcpp_physical_evidence_frontier)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

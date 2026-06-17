@@ -5030,3 +5030,24 @@ Next implication:
 - Offline evidence now supports the prepared hot-path implementation direction.
   It does not prove lower physical CPU until a lock-gated A/B run compares the
   runtime candidate against mainline on the same route.
+
+## 2026-06-17: Add Physical Evidence Frontier Scan
+
+Decision:
+- Add `tools/physical_evidence_frontier.cpp` and wire it into CMake, CTest,
+  offline gates, and evidence schema.
+- Use the scanner to aggregate all existing soundcheck runs rather than relying
+  only on hand-selected physical-run summaries.
+
+Reason:
+- The project needs a broad view of the stored physical evidence before
+  deciding whether a candidate is plausibly better.
+- A single selected run can hide whether the problem is candidate-specific,
+  route-wide, or shared across families.
+
+Evidence:
+- `local-analysis/cpp-offline/physical-evidence-frontier.json`
+
+Next implication:
+- No existing physical run supports promotion. The next physical window must
+  first prove capture-route health, then run same-session mainline/C++ A/B.

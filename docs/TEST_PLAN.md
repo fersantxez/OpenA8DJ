@@ -1148,6 +1148,13 @@ Prepared DriverKit hot path gate:
 - This gate supports a migration candidate only; physical CPU superiority still
   requires lock-gated A/B evidence.
 
+Physical evidence frontier:
+- Run as part of `scripts/run-cpp-offline-gates`.
+- It scans existing soundcheck evidence only.
+- It must not touch hardware, CoreAudio, USB, drivers, defaults, or services.
+- It reports whether any stored physical run is already a product candidate
+  under the strict quality and CPU gates.
+
 PASS/FAIL semantics:
 
 - Tool `result=PASS` means the diagnostic ran.

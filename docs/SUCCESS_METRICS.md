@@ -2049,3 +2049,7 @@ Prepared transport migration metric:
   requeues, zero fallback allocations, zero ring/timestamp/channel faults,
   max `4` ring index publications per iso8 period, and at least `8x` reduction
   versus scalar per-frame publication.
+- `local-analysis/cpp-offline/physical-evidence-frontier.json` must report at
+  least one product-candidate run before any existing physical evidence can be
+  used as a promotion argument. Current expected state is diagnostic PASS with
+  `product_candidate_runs=0`, which explicitly blocks readiness claims.

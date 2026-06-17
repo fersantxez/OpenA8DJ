@@ -7984,3 +7984,26 @@ Full offline gate rerun:
   - This is an objective offline improvement in the prepared hot-path model.
   - It does not prove physical CPU, jitter, timecode, or sound-quality
     superiority against mainline.
+
+## 2026-06-17 Physical Evidence Frontier
+
+- Scope:
+  - Offline-only scan of existing soundcheck evidence.
+  - No hardware, CoreAudio, USB, driver install, defaults, service restart, or
+    physical audio touched.
+- Focused command:
+  - `./build/cpp-release/opena8djcpp_physical_evidence_frontier`
+- Focused result:
+  - Result: PASS as diagnostic.
+  - Soundcheck runs scanned: `61`.
+  - Families inferred: `12`.
+  - Quality-passing runs: `0`.
+  - Strict CPU-passing runs: `0`.
+  - Product-candidate runs: `0`.
+  - Best quality run:
+    `local-analysis/soundcheck/20260616-capture-detail-irig-pairA-8s-cpp-hal`
+    with alignment `0.978050`, SNR floor `9.845114 dB`, driver p95 `36.7%`.
+- Interpretation:
+  - Existing physical evidence does not contain a promotion candidate.
+  - The next useful physical evidence must be a lock-gated capture-route
+    revalidation and same-session A/B against mainline.

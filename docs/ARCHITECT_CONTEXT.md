@@ -1872,3 +1872,25 @@ Current implication:
   architecture.
 - It is still not a physical CPU win until the runtime candidate is tested
   under lock against mainline.
+
+### 2026-06-17 Physical Evidence Frontier
+
+- Added `opena8djcpp_physical_evidence_frontier`.
+- The tool scans existing `local-analysis/soundcheck/**/metrics.json` and
+  matching `cpu-profile.tsv` evidence.
+- Current scan:
+  - `61` physical/soundcheck runs;
+  - `12` inferred families;
+  - `0` quality-passing runs;
+  - `0` strict CPU-passing runs;
+  - `0` product-candidate runs.
+- Best existing quality run:
+  - `local-analysis/soundcheck/20260616-capture-detail-irig-pairA-8s-cpp-hal`;
+  - quality alignment `0.978050`;
+  - SNR floor `9.845114 dB`;
+  - driver p95 `36.7%`.
+
+Current implication:
+- Existing physical evidence contains no run that can prove C++ superiority.
+- The next useful physical step remains capture-route revalidation plus a
+  same-session A/B, not branch promotion.
