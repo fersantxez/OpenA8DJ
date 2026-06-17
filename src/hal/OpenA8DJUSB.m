@@ -146,6 +146,10 @@
 #define OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS 1
 #endif
 
+#ifndef OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
+#define OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM 1
+#endif
+
 static const uint16_t kVendorID = 0x17cc;
 static const uint16_t kProductID = 0x1978;
 static const uint8_t kEndpointControlOut = 0x01;
@@ -2044,10 +2048,14 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (void)resetAudioParamsBeforeStream
 {
+#if OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
     uint16_t bpp = CalculateBytesPerPacket(&_spec, _sampleRate);
     if (![self sendAudioParamsWithRateCode:0xff depth:0 bytesPerPacket:bpp name:"reset"]) {
         USBTrace("audio params reset did not complete; continuing to stream setup");
     }
+#else
+    USBTrace("audio params reset skipped before stream setup");
+#endif
 }
 
 - (BOOL)setAudioParams

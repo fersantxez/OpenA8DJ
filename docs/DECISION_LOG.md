@@ -1,5 +1,29 @@
 # Decision Log
 
+## 2026-06-17: Keep Audio-Params Reset Enabled But Testable
+
+Decision:
+- Add `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM`, defaulting to `1`, and make the
+  HAL reset `AUDIO_PARAMS` with rate code `0xff` only when that flag is enabled.
+
+Reason:
+- Mainline exposed this as a physical-test knob. C++ was always performing the
+  reset, which made one-factor parity tests harder.
+- The default remains enabled to preserve current behavior until a locked
+  physical test proves that skipping the reset is better.
+
+Alternatives discarded:
+- Disable the reset by default: rejected because prior physical history does
+  not prove that this improves quality or startup reliability.
+- Leave the behavior hard-coded: rejected because it blocks controlled
+  mainline-parity experiments.
+
+Evidence:
+- `make usb-play hal`
+- `scripts/run-cpp-offline-gates`: Debug `16/16` PASS, Release `17/17` PASS.
+- Release bench after the change: `pack_mib_s=1657.06`,
+  `decode_mib_s=585.852`, `route_frames_s=9.46081e+08`.
+
 ## 2026-06-16: Make The Hardware Lock Mandatory In Physical Scripts
 
 Decision:

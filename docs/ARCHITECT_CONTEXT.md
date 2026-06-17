@@ -116,6 +116,13 @@ Branch: `driverkit/cpp-redesign`
   `2.1%` median mid-band residual improvement after per-window lag correction.
   Timing/cadence is real, but the music-quality failure is not explained by
   timebase alone.
+- 2026-06-17 operational cleanup found no live OpenA8DJ/HAL/direct USB/capture
+  or app playback process to kill; the hardware lock was acquired for the audit
+  and released afterward. Evidence:
+  `local-analysis/runtime-isolation/kill-open-holders-20260617T002910Z`.
+- C++ now exposes `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM`, default `1`, matching
+  current behavior while allowing a future locked one-factor test with the
+  reset skipped. This is testability infrastructure only, not a quality fix.
 
 ## Known Baseline Inputs
 

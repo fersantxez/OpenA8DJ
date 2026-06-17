@@ -1871,3 +1871,44 @@ Operational note:
   - This makes a simple byte-layout mismatch less likely as the physical
     blocker. Continue investigating transfer cadence, device state, and
     hardware-observed USB behavior.
+
+## 2026-06-17: Runtime Open-Holder Cleanup
+
+- Commands:
+  - Acquired `$HOME/.opena8dj/hardware-gate.lock`.
+  - Enumerated process and open-file candidates with `ps` and `lsof`.
+  - Terminated only matching OpenA8DJ/audio/capture/playback app candidates if
+    present.
+- Result:
+  - PASS.
+  - `killed_count=0`.
+  - No remaining OpenA8DJ HAL, direct USB playback, capture, soundcheck,
+    ffmpeg/sox/afplay, Traktor, VLC, or Spotify process candidates.
+  - Lock was released after the audit.
+- Evidence path:
+  - `local-analysis/runtime-isolation/kill-open-holders-20260617T002910Z`
+- Interpretation:
+  - The mainline should not be blocking the hardware through a live test
+    process at this point. If the device remains unavailable, the next
+    investigation should target CoreAudio/USB/device state rather than a stuck
+    OpenA8DJ test process.
+
+## 2026-06-17: HAL Audio-Params Reset Flag Port
+
+- Commands:
+  - `make usb-play hal`
+  - `scripts/run-cpp-offline-gates`
+  - `git diff --check`
+- Result:
+  - PASS.
+  - Debug offline gates: PASS, `16/16`.
+  - Release offline gates: PASS, `17/17`.
+  - `HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM` defaults to `1`, preserving current
+    behavior.
+- Key metrics:
+  - `pack_mib_s=1657.06`
+  - `decode_mib_s=585.852`
+  - `route_frames_s=9.46081e+08`
+- Interpretation:
+  - The reset behavior is now a controlled physical-test variable. No physical
+    quality claim follows from this offline-only change.
