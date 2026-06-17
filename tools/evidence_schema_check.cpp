@@ -98,6 +98,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/historical-route-reference-gate.json",
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
+      root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",

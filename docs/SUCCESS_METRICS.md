@@ -2166,6 +2166,10 @@ Prepared transport migration metric:
   promotion hard blockers present, prepared transport and DriverKit USB request
   counters present, physical-window readiness still limited to route
   revalidation, and manifest `scope=offline_only`.
+- The structured evidence parser must leave
+  `local-analysis/cpp-offline/evidence-json-contract.json` with PASS, and the
+  evidence schema must require it. Parser correctness is part of readiness
+  evidence integrity.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.

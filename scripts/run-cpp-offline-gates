@@ -99,6 +99,7 @@ if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; the
 fi
 ./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee "$EVIDENCE_DIR/prepared-transport-migration-gate.json"
 ./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee "$EVIDENCE_DIR/physical-window-readiness-gate.json"
+./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json

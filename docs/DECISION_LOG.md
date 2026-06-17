@@ -6520,3 +6520,28 @@ Alternatives discarded:
 Next implication:
 - Any future field that gates hardware windows, product readiness, branch
   promotion, or no-touch safety should be added to structured schema checks.
+
+## 2026-06-17: Evidence Parser Contract Must Leave an Artifact
+
+Decision:
+- `scripts/run-cpp-offline-gates` now writes
+  `local-analysis/cpp-offline/evidence-json-contract.json`.
+- `opena8djcpp_evidence_schema_check` requires that artifact.
+
+Reason:
+- The evidence parser protects readiness gates. Its own contract should be
+  visible in the evidence bundle instead of existing only inside CTest output.
+
+Evidence:
+- Focused schema check: PASS with `required_files=53`, `missing_files=0`.
+- Full offline gates: Debug CTest `52/52`, Release CTest `53/53`, evidence
+  schema `required_files=53`, `missing_files=0`.
+
+Alternatives discarded:
+- Keep the parser contract only as a CTest entry: rejected because the project
+  relies on explicit evidence files for later physical-window and promotion
+  decisions.
+
+Next implication:
+- New critical offline contracts should leave machine-readable evidence files
+  when they materially affect readiness decisions.

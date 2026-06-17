@@ -9922,3 +9922,36 @@ Full offline gate rerun:
   - This is still diagnostic evidence only. Product A/B, branch promotion,
     audiophile quality superiority, runtime CPU superiority, and physical
     Traktor/timecode vinyl remain blocked.
+
+## 2026-06-17 Evidence JSON Contract Artifact
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `local-analysis/cpp-offline/evidence-json-contract.json` to the full
+    offline evidence set.
+  - `opena8djcpp_evidence_schema_check` now requires this artifact.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_evidence_json_contract opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_evidence_json_contract | tee local-analysis/cpp-offline/evidence-json-contract.json`
+  - `./build/cpp-release/opena8djcpp_evidence_schema_check`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused schema check after adding the artifact: PASS,
+    `required_files=53`, `missing_files=0`.
+  - Full offline Debug CTest: `52/52` passed.
+  - Full offline Release CTest: `53/53` passed.
+  - Full evidence schema: `required_files=53`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/evidence-json-contract.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The structured evidence parser is now represented as a first-class offline
+    artifact, not only as an implicit CTest line.
+  - Product readiness and branch promotion remain blocked.
