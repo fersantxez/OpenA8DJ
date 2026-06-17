@@ -3908,3 +3908,48 @@ Next implication:
 - Any future candidate that wants to promote a rejected knob must change both
   the evidence and this policy deliberately, with a new reason and fresh
   physical proof.
+
+## 2026-06-17: Separate Fixed Latency From Timebase Instability Offline
+
+Decision:
+- Add `scripts/analyze-timebase-family.py` to aggregate existing per-window
+  soundcheck traces into drift, lag-jump, local-lag-correction, and residual
+  classifications.
+- Use this as an analysis gate before changing more transport or CPU knobs.
+- Do not reinterpret this as readiness or branch-promotion evidence.
+
+Reason:
+- Current C++ physical failures repeatedly show strong quality loss with clean
+  packet/stream counters. The missing distinction was whether the loss is fixed
+  latency, linear drift, discontinuous lag, or residual after time correction.
+- Current-family C++ traces show all `7` runs have lag jumps and residual after
+  lag correction, while maximum linear drift is only about `40 ppm`. The
+  classifier reports `analysis_result=PASS` but `stability_result=FAIL`.
+- The same-day C++ A/B run had a large fixed lag around `-265..-285` frames;
+  local lag correction improves median mid-band residual from about `3.05` to
+  `0.89`. That explains why raw alignment alone can look worse than the
+  locally corrected waveform.
+- The same-day mainline A/B run is still worse by this diagnostic: drift around
+  `-129 ppm`, `41` lag jumps, and corrected mid residual about `5.63`. The A/B
+  family also reports `stability_result=FAIL`, so it is diagnosis evidence, not
+  readiness evidence.
+
+Alternatives discarded:
+- Treat raw quality alignment as the only diagnosis: rejected because fixed
+  latency can dominate raw correlation.
+- Treat local lag correction as readiness: rejected because current-family C++
+  still has lag jumps/residual after correction, CPU failure, and no physical
+  timecode proof.
+- Install numerical packages for this pass: unnecessary; the existing pure
+  Python window-trace data is enough for the classification.
+
+Evidence:
+- `local-analysis/timebase-window-comparison/20260617-current-family/timebase-family.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-window-trace.json`
+- `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-window-trace.json`
+
+Next implication:
+- The next product change should target stable latency/timebase behavior, not
+  just faster USB enqueue code. A candidate must reduce lag jumps and residual
+  after local correction while also lowering CPU.

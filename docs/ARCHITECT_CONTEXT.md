@@ -1441,3 +1441,25 @@ Next technical target:
   - Purpose:
     prevent accidental reintroduction of physically rejected paths before they
     burn another hardware window. Passing this gate is not readiness.
+- Timebase family analysis:
+  - Added `scripts/analyze-timebase-family.py` as an offline-only aggregator
+    over existing `analyze-soundcheck-window-trace.py` JSON outputs.
+  - Current C++ family evidence:
+    `local-analysis/timebase-window-comparison/20260617-current-family/timebase-family.json`.
+    Across `7` current-family C++ traces, all runs have lag jumps and residual
+    after local lag correction. Maximum linear drift is only about `40 ppm`, so
+    linear drift alone does not explain the failure; the stronger blocker is
+    discontinuous/local alignment plus remaining mid-band residual. The
+    classifier now reports `analysis_result=PASS`, `stability_result=FAIL`.
+  - Same-day A/B evidence:
+    `local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`.
+    The C++ A/B run has a large mostly fixed lag around `-265..-285` frames;
+    correcting local lag improves median mid-band residual from about `3.05` to
+    `0.89`. The mainline A/B run remains worse after local correction, with
+    drift around `-129 ppm`, `41` lag jumps, and corrected mid residual about
+    `5.63`. The A/B family is still `stability_result=FAIL`.
+  - Interpretation:
+    raw alignment metrics can underrate a candidate when fixed latency is wrong,
+    but C++ still cannot be promoted because current-family physical runs still
+    show lag jumps, residual after local correction, high CPU, and no physical
+    timecode/Traktor proof.

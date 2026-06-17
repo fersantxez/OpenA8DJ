@@ -6335,3 +6335,46 @@ Operational note:
 - Evidence paths:
   - `local-analysis/cpp-offline/static-policy.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
+
+## 2026-06-17: Offline Timebase Family Classification
+
+- Purpose:
+  - Classify existing physical soundcheck failures as fixed latency, linear
+    drift, local lag jumps, or residual after local lag correction.
+  - Avoid changing transport/CPU knobs without knowing which failure mode they
+    can plausibly improve.
+- Commands:
+  - `python3 -m py_compile scripts/analyze-timebase-family.py`
+  - `scripts/analyze-timebase-family.py local-analysis/timebase-window-comparison/20260617-current-family/window-trace-*.json --json-out local-analysis/timebase-window-comparison/20260617-current-family/timebase-family.json`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-soundcheck --json-out local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-window-trace.json`
+  - `scripts/analyze-soundcheck-window-trace.py local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-soundcheck --json-out local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-window-trace.json`
+  - `scripts/analyze-timebase-family.py local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-window-trace.json local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-window-trace.json --json-out local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`
+- Current-family C++ result:
+  - `analysis_result=PASS`, `stability_result=FAIL`, `result=FAIL`.
+  - `trace_count=7`.
+  - `runs_with_lag_jumps=7`.
+  - `runs_with_residual_after_lag_correction=7`.
+  - `max_lag_jump_count_gt_2_frames=35`.
+  - `max_lag_abs_p95=24` frames.
+  - `max_abs_drift_ppm=40.21`.
+  - Median local-lag correction improves mid-band residual by only about
+    `1.10%`, so fixed/linear lag correction is not enough for the current
+    family.
+- Same-day A/B result:
+  - `analysis_result=PASS`, `stability_result=FAIL`, `result=FAIL`.
+  - C++ A/B:
+    fixed/local lag roughly `-265..-285` frames, `7` lag jumps,
+    corrected mid residual median about `0.89`.
+  - Mainline A/B:
+    drift about `-128.93 ppm`, `41` lag jumps, corrected mid residual median
+    about `5.63`.
+- Interpretation:
+  - Fixed latency can make raw quality metrics pessimistic.
+  - C++ still fails readiness because current-family evidence shows lag jumps
+    and residual after local correction, and product CPU still does not beat
+    mainline.
+- Evidence paths:
+  - `local-analysis/timebase-window-comparison/20260617-current-family/timebase-family.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/cpp-window-trace.json`
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/mainline-window-trace.json`

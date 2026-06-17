@@ -40,6 +40,9 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
+python3 -m py_compile \
+  scripts/analyze-soundcheck-window-trace.py \
+  scripts/analyze-timebase-family.py
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json

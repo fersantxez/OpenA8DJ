@@ -1515,3 +1515,24 @@ Latest promotion evaluation:
 - Readiness implication:
   - This protects evidence quality and hardware windows. It does not prove
     audiophile sound quality, timecode readiness, or CPU superiority.
+
+## 2026-06-17 Timebase Family Status
+
+- Evidence:
+  - `local-analysis/timebase-window-comparison/20260617-current-family/timebase-family.json`.
+  - `local-analysis/mainline-ab/20260617-sameday-ab-085735/timebase-ab.json`.
+- Current-family diagnostic:
+  - `analysis_result=PASS`, `stability_result=FAIL`, `result=FAIL`.
+  - `7/7` C++ traces have lag jumps.
+  - `7/7` C++ traces have residual after local lag correction.
+  - Maximum drift is about `40 ppm`, so linear drift alone is not the product
+    blocker.
+- Same-day A/B diagnostic:
+  - `analysis_result=PASS`, `stability_result=FAIL`, `result=FAIL`.
+  - C++ shows a large fixed/local lag that can be corrected offline, but still
+    fails product CPU and current-family stability.
+  - Mainline shows worse drift/jump/residual behavior in that A/B trace, but C++
+    still cannot be promoted until absolute quality and CPU gates pass.
+- Required next metric:
+  - A new candidate must reduce lag jumps and residual after local correction,
+    not merely improve raw correlation or hide latency with offline alignment.
