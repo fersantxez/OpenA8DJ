@@ -437,6 +437,7 @@ analysis scripts such as:
 ```sh
 .venv/bin/python scripts/analyze-lti-transfer-quality.py --help
 .venv/bin/python scripts/analyze-soundcheck-failure-modes.py --help
+.venv/bin/python scripts/analyze-runtime-discontinuities.py --help
 ```
 
 Do not install these packages globally as part of the build. They are analysis

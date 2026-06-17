@@ -524,3 +524,12 @@ Next technical target:
   `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`. HAL
   inactive, lock absent, and no OpenA8DJ/mainline holder processes were
   detected.
+- Added `scripts/analyze-runtime-discontinuities.py` to correlate existing
+  soundcheck WAV windows against CPU and stream-stats telemetry without
+  touching hardware. Evidence:
+  `local-analysis/runtime-discontinuities/recent-music-runs.json`.
+  The diagnostic found no strong CPU or stream-counter correlation with
+  residual/lag/SNR in four recent Pair A/iRig music runs, while window lag
+  jumps and ~10 dB scalar SNR persist. This weakens blind CPU-tuning as the
+  next quality path and raises priority for controlled reference-route,
+  physical path, output format/phase, or uncounted runtime-discontinuity tests.

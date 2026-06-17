@@ -2805,3 +2805,31 @@ Operational note:
 - Interpretation:
   - Sparse cycle clear is rejected. It did not improve quality, worsened CPU,
     and should not remain as a latent hot-path option.
+
+## 2026-06-17: Runtime Discontinuity Correlation Diagnostic
+
+- Commands:
+  - `.venv/bin/python -m py_compile scripts/analyze-runtime-discontinuities.py`
+  - `.venv/bin/python scripts/analyze-runtime-discontinuities.py --json-out local-analysis/runtime-discontinuities/recent-music-runs.json local-analysis/soundcheck/20260616-default-after-unrolled-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260617-hotstats-interval16-a1c8b50-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260617-stats-off-a1c8b50-irig-pairA-16s-cpp-hal local-analysis/soundcheck/20260617-sparse-cycle-clear-a1c8b50-irig-pairA-16s-cpp-hal`
+- Result:
+  - Offline diagnostic PASS. It read existing WAV/JSON/TSV evidence only and
+    did not touch hardware, CoreAudio, USB, HAL install state, or system
+    services.
+- Key metrics:
+  - No run produced a strong CPU or stream-delta correlation at the configured
+    `abs(r) >= 0.70` threshold after offset search from `-5s` to `+5s`.
+  - Window lag jumps are still present in every tested run:
+    - default-after-unrolled: `p95=26.70` frames, max `42`
+    - hotstats-interval16: `p95=24.70` frames, max `53`
+    - stats-off: `p95=28.10` frames, max `52`
+    - sparse-cycle-clear: `p95=30.35` frames, max `46`
+  - Median scalar SNR stays around `10.0-10.46 dB`.
+  - Capture clipping remains absent in all tested rows.
+- Evidence paths:
+  - `scripts/analyze-runtime-discontinuities.py`
+  - `local-analysis/runtime-discontinuities/recent-music-runs.json`
+- Interpretation:
+  - The current visible runtime counters do not explain the physical music
+    residual. The next decisive work should isolate reference-route mismatch,
+    physical path behavior, output format/phase semantics, or runtime
+    discontinuities that are not currently counted.

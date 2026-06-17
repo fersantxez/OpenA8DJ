@@ -1501,3 +1501,36 @@ Evidence:
   `local-analysis/promotion-readiness-after-sparse-cycle-clear.json`.
 - Final isolation:
   `local-analysis/runtime-isolation/final-after-sparse-cycle-clear.json`.
+
+## 2026-06-17: Add Runtime Discontinuity Correlation Diagnostic
+
+Decision:
+- Add `scripts/analyze-runtime-discontinuities.py` as an offline diagnostic
+  over existing soundcheck evidence.
+- Do not treat CPU spikes, visible stream counter deltas, or observable
+  underrun/replay counters as the primary music-quality root cause unless a
+  future run shows stronger correlation.
+
+Reason:
+- Across four recent Pair A/iRig music runs, windowed lag jumps remain present
+  (`p95` about `24.7-30.35` frames), but the diagnostic found no strong
+  correlation (`abs(r) >= 0.70`) between residual/lag/SNR windows and CPU or
+  stream-stat delta columns after searching temporal offsets from `-5s` to
+  `+5s`.
+- The same runs still have no capture clipping and still sit around scalar
+  SNR `10 dB`, so the blocker is not cleared. The evidence now points more
+  strongly at reference-route mismatch, physical path behavior, format/phase
+  semantics, or runtime behavior not represented by the existing counters.
+
+Alternatives discarded:
+- Keep tuning CPU flags blindly: rejected because several low-risk and
+  medium-risk CPU experiments did not move quality and the new diagnostic does
+  not show a strong CPU/residual relationship.
+- Declare runtime/timeline innocent: rejected. The diagnostic only proves that
+  current CPU/stream counters do not explain the music residual; a runtime
+  discontinuity not exposed by those counters remains possible.
+
+Evidence:
+- Script: `scripts/analyze-runtime-discontinuities.py`.
+- Result JSON:
+  `local-analysis/runtime-discontinuities/recent-music-runs.json`.
