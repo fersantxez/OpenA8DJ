@@ -8,13 +8,15 @@ the C++ line beats mainline C.
 ## Decision
 
 - Use the HAL bundle / PKG path for the first human-test candidate.
-- 12:48 EDT status: commit `1b09b12` is the current measured RC base. The full
-  offline gate has fresh post-commit evidence: Debug CTest `83/83`, Release
-  CTest `84/84`, evidence schema PASS with `93` files, and provenance freshness
-  PASS. `iRig Stream` and `Open Audio 8 DJ` are visible in CoreAudio, and Audio
-  8 exposes `8 in / 8 out` at `48 kHz`. Audio stack health is PASS at idle.
-  This is enough for a controlled diagnostic RC package, not for a product
-  quality, CPU superiority, or Timecode Vinyl readiness claim.
+- 12:48 EDT status: code-bearing commit `1b09b12` is the measured RC code base.
+  Documentation-only commits may advance `HEAD`; the current gate summary is
+  the authority for the exact evidence commit. The full offline gate had fresh
+  post-commit evidence: Debug CTest `83/83`, Release CTest `84/84`, evidence
+  schema PASS with `93` files, and provenance freshness PASS. `iRig Stream`
+  and `Open Audio 8 DJ` are visible in CoreAudio, and Audio 8 exposes `8 in /
+  8 out` at `48 kHz`. Audio stack health is PASS at idle. This is enough for a
+  controlled diagnostic RC package, not for a product quality, CPU superiority,
+  or Timecode Vinyl readiness claim.
 - 12:48 EDT closure policy: stop expanding scope. The only allowed path to a
   stronger label before 15:00 EDT is route validation, same-session mainline vs
   C++ A/B, CPU/submit-cadence comparison, and a bounded Traktor/timecode smoke,
@@ -82,7 +84,9 @@ The candidate identity for the human-test window must include:
 ## Frozen Candidate Identity - 12:48 EDT
 
 - Branch: `driverkit/cpp-redesign`.
-- Commit: `1b09b12`.
+- Code-bearing candidate commit: `1b09b12`.
+- Evidence commit: use `local-analysis/cpp-offline/current-offline-gates.json`
+  from the final gate run.
 - HAL executable:
   - `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
   - SHA-256 must be recorded from the final `make dist` run used for the

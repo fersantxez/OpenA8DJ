@@ -24,16 +24,18 @@ Branch: `driverkit/cpp-redesign`
   physical A/B are not ready. The planner records required evidence for Traktor
   scope, Deck A/B input isolation, 44.1/48 kHz coverage, absolute/relative
   behavior, and CPU samples, but it does not certify Timecode Vinyl readiness.
-- 12:48 EDT update: commit `1b09b12` has fresh post-commit offline evidence.
+- 12:48 EDT update: code-bearing candidate commit `1b09b12` had fresh
+  post-commit offline evidence before this planning-document update.
   `scripts/run-cpp-offline-gates` passed Debug CTest `83/83`, Release CTest
   `84/84`, evidence schema with `93` required files, and provenance freshness
-  with `head_commit=1b09b12` and `working_tree_clean_for_claim=true`. Live
-  read-only inventory sees `iRig Stream` and `Open Audio 8 DJ` as CoreAudio
-  devices, with Audio 8 exposing `8 in / 8 out` at `48 kHz`. Audio stack
-  health is currently PASS with watched CPU around `0.4%` total and
-  `opena8dj_driver=0.0%` idle. Product readiness remains FAIL because same
-  session route validation, mainline/C++ physical A/B, CPU superiority, and
-  Timecode Vinyl physical evidence are still missing.
+  with a clean worktree. The evidence summary is the authority for the exact
+  current `HEAD` after documentation commits. Live read-only inventory sees
+  `iRig Stream` and `Open Audio 8 DJ` as CoreAudio devices, with Audio 8
+  exposing `8 in / 8 out` at `48 kHz`. Audio stack health is currently PASS
+  with watched CPU around `0.4%` total and `opena8dj_driver=0.0%` idle.
+  Product readiness remains FAIL because same session route validation,
+  mainline/C++ physical A/B, CPU superiority, and Timecode Vinyl physical
+  evidence are still missing.
 - Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
   remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus

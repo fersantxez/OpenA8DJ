@@ -64,7 +64,10 @@ Hard deadline:
 
 Current truth at 12:48 EDT:
 - C++ worktree is `/Users/fer/dev/audio8djcpp` on
-  `driverkit/cpp-redesign`, commit `1b09b12`.
+  `driverkit/cpp-redesign`. The latest code-bearing candidate commit is
+  `1b09b12`; documentation-only commits may advance `HEAD`, so
+  `local-analysis/cpp-offline/current-offline-gates.json` is the authority for
+  the exact evidence commit.
 - `build/OpenA8DJ-0.3.25.pkg` and `build/OpenA8DJ-0.3.25.dmg` exist.
 - Offline gates have passed post-commit: Debug CTest `83/83`, Release CTest
   `84/84`, evidence schema PASS with `93` required files, and provenance
