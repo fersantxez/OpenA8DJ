@@ -3243,3 +3243,11 @@ Current implication:
   product audio listening, CPU superiority, Timecode Vinyl certification, and
   Legacy/main promotion remain blocked until the route and same-session
   physical evidence pass.
+- External readiness audit update: `scripts/audit-objective-external-readiness.py`
+  now separates C++ candidate evidence from external prerequisites. Current
+  expected status is `BLOCKED`: C++ is clean, Rust is clean, but mainline has
+  pre-existing dirty state, DriverKit is blocked by missing full Xcode/SDK and
+  insufficient disk (`applications_free_gib` about `3.8` vs `80.0` required),
+  and the wired non-Audio8 known-good route remains absent. This prevents
+  promotion or DriverKit build attempts from being inferred from the diagnostic
+  RC packet.

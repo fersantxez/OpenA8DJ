@@ -14411,3 +14411,35 @@ Readiness impact:
 - It keeps the RC useful for diagnostic package review while blocking product
   claims until route validation, same-session A/B, CPU, DriverKit, and Timecode
   evidence exist.
+
+## 2026-06-18 - Objective External Readiness Audit
+
+Commit context:
+- Local changes after `cef6dfa`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Existing evidence, git status, and toolchain/disk state only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, Xcode install, or external worktree
+  mutation.
+
+Commands:
+- `python3 -m py_compile scripts/audit-objective-external-readiness.py scripts/test-audit-objective-external-readiness.py`
+- `python3 scripts/test-audit-objective-external-readiness.py`
+- `python3 scripts/audit-objective-external-readiness.py --json-out local-analysis/cpp-offline/objective-external-readiness.json`
+
+Expected result:
+- External readiness fixture: PASS.
+- Current external readiness: `BLOCKED`.
+- Promotion allowed: `false`.
+- DriverKit install/build attempt allowed now: `false`.
+- Route revalidation allowed now: `false`.
+
+Readiness impact:
+- The final objective now has a separate external blocker list:
+  dirty mainline reference, no full Xcode/DriverKit SDK, insufficient free disk,
+  missing known-good route, missing same-session A/B, and missing physical
+  Timecode window.
+- This makes it explicit that the diagnostic RC packet is useful but still not
+  enough for product or branch-promotion claims.

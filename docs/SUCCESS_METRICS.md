@@ -38,6 +38,18 @@ Current DriverKit blocker:
   is about `7 GiB`. Until that changes, the human-test path is the HAL
   candidate, not a real AudioDriverKit dext.
 
+External readiness blocker:
+
+- `scripts/audit-objective-external-readiness.py` must report
+  `external_readiness_status=READY` before any product human-audio,
+  mainline-superiority, Timecode Vinyl physical-readiness, or Legacy/main branch
+  promotion claim. A `BLOCKED` result is still a successful audit, but it means
+  the RC can only be diagnostic.
+- Current expected blockers are dirty mainline reference state, missing full
+  Xcode/DriverKit SDK, insufficient disk for Xcode, no wired non-Audio8
+  known-good route into iRig, no same-session mainline/C++ A/B, no physical
+  Timecode Vinyl window, and no final objective proof.
+
 This document defines the offline success gates for the C++/DriverKit redesign.
 It is intentionally comparable with the current mainline C/OpenA8DJ reference
 and the Rust oracle contract, while keeping physical hardware, Core Audio,

@@ -167,6 +167,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/human-test-rc-packet.json",
       root / "local-analysis/cpp-offline/human-test-rc-packet.md",
       root / "local-analysis/cpp-offline/human-test-rc-packet-test.txt",
+      root / "local-analysis/cpp-offline/objective-external-readiness.json",
+      root / "local-analysis/cpp-offline/objective-external-readiness-test.txt",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",
@@ -314,6 +316,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "final_objective_readiness").value_or("");
   const auto human_test_rc_packet =
       opena8djcpp::evidence_json::json_object(summary, "human_test_rc_packet").value_or("");
+  const auto objective_external_readiness =
+      opena8djcpp::evidence_json::json_object(summary, "objective_external_readiness")
+          .value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is_last(summary, "diagnostic_status", "PASS") &&
@@ -389,6 +394,19 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "human_test_rc_packet_objective_achieved", false) &&
       string_array_has(summary, "human_test_rc_packet_next_commands",
                        "read_only_route_watcher") &&
+      string_field_is(summary, "objective_external_readiness_status", "BLOCKED") &&
+      bool_field_is(summary, "objective_external_ready", false) &&
+      bool_field_is(summary, "objective_external_promotion_allowed", false) &&
+      bool_field_is(summary,
+                    "objective_external_driverkit_install_or_build_attempt_allowed_now",
+                    false) &&
+      bool_field_is(summary, "objective_external_route_revalidation_allowed_now", false) &&
+      string_array_has(summary, "objective_external_next_required_actions",
+                       "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION") &&
+      string_array_has(summary, "objective_external_next_required_actions",
+                       "INSTALL_SELECT_FULL_XCODE_WITH_DRIVERKIT_SDK") &&
+      string_array_has(summary, "objective_external_next_required_actions",
+                       "PREPARE_CLEAN_MAINLINE_REFERENCE_BEFORE_PROMOTION") &&
       string_field_is(summary, "route_contamination_status", "PASS") &&
       string_field_is(summary, "route_contamination_classification",
                       "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
@@ -1261,6 +1279,29 @@ int main(int argc, char** argv) {
       string_array_has(human_test_rc_packet, "next_commands", "read_only_route_watcher") &&
       string_field_is(human_test_rc_packet, "evidence",
                       "local-analysis/cpp-offline/human-test-rc-packet.json") &&
+      object_present(summary, "objective_external_readiness") &&
+      string_field_is(objective_external_readiness, "status", "PASS") &&
+      string_field_is(objective_external_readiness, "schema",
+                      "opena8djcpp.objective-external-readiness.v1") &&
+      string_field_is(objective_external_readiness, "external_readiness_status", "BLOCKED") &&
+      bool_field_is(objective_external_readiness, "objective_ready", false) &&
+      bool_field_is(objective_external_readiness, "promotion_allowed", false) &&
+      bool_field_is(objective_external_readiness, "product_human_audio_allowed", false) &&
+      bool_field_is(objective_external_readiness,
+                    "driverkit_install_or_build_attempt_allowed_now", false) &&
+      bool_field_is(objective_external_readiness, "route_revalidation_allowed_now", false) &&
+      string_array_has(objective_external_readiness, "blockers",
+                       "mainline worktree is dirty; use a clean reference before Legacy/main promotion") &&
+      string_array_has(objective_external_readiness, "blockers",
+                       "full Xcode/DriverKit SDK install is not feasible now; free disk and select full Xcode") &&
+      string_array_has(objective_external_readiness, "blockers",
+                       "wired non-Audio8 known-good route is not ready") &&
+      string_array_has(objective_external_readiness, "next_required_actions",
+                       "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION") &&
+      string_array_has(objective_external_readiness, "next_required_actions",
+                       "INSTALL_SELECT_FULL_XCODE_WITH_DRIVERKIT_SDK") &&
+      string_array_has(objective_external_readiness, "next_required_actions",
+                       "PREPARE_CLEAN_MAINLINE_REFERENCE_BEFORE_PROMOTION") &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

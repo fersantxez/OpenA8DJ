@@ -1942,3 +1942,40 @@ PASS/FAIL semantics:
 - Packet PASS means the decision packet was built from current evidence.
 - It is not product readiness and does not allow human product listening unless
   the embedded route, A/B, CPU, and Timecode gates allow it.
+
+## Objective External Readiness Audit
+
+Purpose:
+
+- distinguish candidate-internal evidence from prerequisites outside the C++
+  worktree;
+- keep mainline reference cleanliness, Rust oracle cleanliness, DriverKit/Xcode
+  feasibility, disk space, route readiness, same-session A/B, and Timecode
+  readiness visible in one fail-closed audit;
+- prevent promotion or DriverKit build attempts when the external state is not
+  ready.
+
+Command shape:
+
+```sh
+scripts/audit-objective-external-readiness.py \
+  --json-out local-analysis/cpp-offline/objective-external-readiness.json
+
+scripts/test-audit-objective-external-readiness.py
+```
+
+Expected current result:
+
+- `external_readiness_status=BLOCKED`;
+- `objective_ready=false`;
+- `promotion_allowed=false`;
+- `driverkit_install_or_build_attempt_allowed_now=false`;
+- `route_revalidation_allowed_now=false`;
+- blockers include dirty mainline reference, infeasible Xcode/DriverKit install
+  due to disk/toolchain state, and missing wired non-Audio8 known-good route.
+
+PASS/FAIL semantics:
+
+- Audit PASS means the external prerequisites were measured and classified.
+- It is not product readiness. It intentionally blocks Legacy/main promotion
+  until external dependencies are clean and physical evidence exists.

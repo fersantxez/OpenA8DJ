@@ -5089,3 +5089,43 @@ Next action:
 - Regenerate the full offline bundle and commit if the schema requires the
   packet successfully. Then use the packet's watcher command until a valid
   route appears.
+
+## 2026-06-18 Architect Continuation: Objective External Readiness Audit
+
+Subagent:
+- Existing subagent audit results were reused; a new spawn attempt was rejected
+  because the agent thread limit was already reached.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Add a fail-closed audit that separates candidate-internal evidence from
+  external prerequisites for human product testing and branch promotion.
+
+Findings:
+- Existing subagents agreed that the current deliverable can be an installable
+  diagnostic RC, but not a product-quality RC or mainline-superior candidate.
+- External blockers remain decisive: dirty mainline reference, missing full
+  Xcode/DriverKit SDK, insufficient disk for Xcode, missing wired non-Audio8
+  known-good route, no same-session mainline/C++ A/B, no physical Timecode
+  window, and no final objective proof.
+
+Integrated action:
+- Added `scripts/audit-objective-external-readiness.py` and a fixture test.
+- Integrated external readiness fields into `scripts/run-cpp-offline-gates` and
+  `opena8djcpp_evidence_schema_check`.
+
+Risks:
+- A six-hour stabilization target can produce a useful RC only if the label is
+  honest. Calling the current diagnostic package a product or Timecode Vinyl
+  RC would exceed the evidence.
+
+Next action:
+- Regenerate the full offline bundle and use
+  `objective_external_readiness_status` as a hard blocker for promotion and
+  product human audio. If a wired known-good route becomes available, run only
+  the lock-gated route validation first.

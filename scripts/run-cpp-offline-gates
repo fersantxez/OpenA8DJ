@@ -273,6 +273,8 @@ python3 -m py_compile \
   scripts/test-final-objective-readiness.py \
   scripts/build-human-test-rc-packet.py \
   scripts/test-build-human-test-rc-packet.py \
+  scripts/audit-objective-external-readiness.py \
+  scripts/test-audit-objective-external-readiness.py \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
@@ -285,6 +287,7 @@ python3 scripts/test-plan-timecode-physical-window.py | tee "$EVIDENCE_DIR/timec
 python3 scripts/test-route-contamination-analysis.py | tee "$EVIDENCE_DIR/route-contamination-analysis-test.txt"
 python3 scripts/test-final-objective-readiness.py | tee "$EVIDENCE_DIR/final-objective-readiness-test.txt"
 python3 scripts/test-build-human-test-rc-packet.py | tee "$EVIDENCE_DIR/human-test-rc-packet-test.txt"
+python3 scripts/test-audit-objective-external-readiness.py | tee "$EVIDENCE_DIR/objective-external-readiness-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -3106,6 +3109,9 @@ python3 scripts/build-human-test-rc-packet.py \
   --json-out "$EVIDENCE_DIR/human-test-rc-packet.json" \
   --markdown-out "$EVIDENCE_DIR/human-test-rc-packet.md" \
   >/dev/null
+python3 scripts/audit-objective-external-readiness.py \
+  --json-out "$EVIDENCE_DIR/objective-external-readiness.json" \
+  >/dev/null
 python3 - <<'PY'
 import json
 from pathlib import Path
@@ -3116,6 +3122,7 @@ summary_path = evidence / "current-offline-gates.json"
 summary = json.loads(summary_path.read_text(encoding="utf-8"))
 final_objective = json.loads((evidence / "final-objective-readiness.json").read_text(encoding="utf-8"))
 packet = json.loads((evidence / "human-test-rc-packet.json").read_text(encoding="utf-8"))
+external = json.loads((evidence / "objective-external-readiness.json").read_text(encoding="utf-8"))
 
 summary["final_objective_status"] = final_objective.get("objective_status")
 summary["final_objective_achieved"] = final_objective.get("objective_achieved")
@@ -3135,6 +3142,18 @@ summary["human_test_rc_packet_objective_achieved"] = (
 summary["human_test_rc_packet_next_commands"] = [
     command.get("name") for command in packet.get("next_commands", [])
 ]
+summary["objective_external_readiness_status"] = external.get("external_readiness_status")
+summary["objective_external_ready"] = external.get("objective_ready")
+summary["objective_external_promotion_allowed"] = external.get("promotion_allowed")
+summary["objective_external_driverkit_install_or_build_attempt_allowed_now"] = external.get(
+    "driverkit_install_or_build_attempt_allowed_now"
+)
+summary["objective_external_route_revalidation_allowed_now"] = external.get(
+    "route_revalidation_allowed_now"
+)
+summary["objective_external_next_required_actions"] = external.get(
+    "next_required_actions", []
+)
 summary["final_objective_readiness"] = {
     "status": final_objective.get("result"),
     "schema": final_objective.get("schema"),
@@ -3179,6 +3198,21 @@ summary["human_test_rc_packet"] = {
     "next_commands": [command.get("name") for command in packet.get("next_commands", [])],
     "evidence": "local-analysis/cpp-offline/human-test-rc-packet.json",
     "markdown": "local-analysis/cpp-offline/human-test-rc-packet.md",
+}
+summary["objective_external_readiness"] = {
+    "status": external.get("result"),
+    "schema": external.get("schema"),
+    "external_readiness_status": external.get("external_readiness_status"),
+    "objective_ready": external.get("objective_ready"),
+    "promotion_allowed": external.get("promotion_allowed"),
+    "product_human_audio_allowed": external.get("product_human_audio_allowed"),
+    "driverkit_install_or_build_attempt_allowed_now": external.get(
+        "driverkit_install_or_build_attempt_allowed_now"
+    ),
+    "route_revalidation_allowed_now": external.get("route_revalidation_allowed_now"),
+    "blockers": external.get("blockers", []),
+    "next_required_actions": external.get("next_required_actions", []),
+    "evidence": "local-analysis/cpp-offline/objective-external-readiness.json",
 }
 summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
