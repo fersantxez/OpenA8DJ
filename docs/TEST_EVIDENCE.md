@@ -12537,3 +12537,35 @@ Full offline gate after commit:
   - Physical product A/B readiness: `false`.
 - Current required next action:
   `PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION`.
+
+## 2026-06-18 - Route Inventory Self-Held Lock Fix
+
+- Commit context: `b425ab9` plus uncommitted route-inventory lock-state fix.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Hardware lock acquired only for non-destructive inventory.
+  - No playback.
+  - No recording.
+  - No driver install/load/unload.
+  - No default-device, sample-rate, or buffer change.
+  - No CoreAudio/USB service restart and no USB reset.
+- Command:
+  - `scripts/physical-route-inventory --json-out local-analysis/cpp-offline/physical-route-inventory-20260618T105953Z-route-inventory-lockfix.json`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/physical-route-inventory-20260618T105953Z-route-inventory-lockfix.json`.
+- Result:
+  - Inventory `result=PASS`.
+  - `lock.held_by_current_context=true`.
+  - `lock.available_for_current_window=true`.
+  - `decision.promotion_route_ready=false`.
+  - `decision.non_audio8_non_builtin_known_good_outputs=[]`.
+  - Remaining blockers:
+    `audio8dj_not_visible_as_coreaudio_device`,
+    `active_opena8dj_hal_not_installed`,
+    `non_audio8_non_builtin_known_good_output_not_visible`,
+    `latest_same_device_irig_diagnostic_failed`.
+- Interpretation:
+  - The lock state is no longer a false blocker when Codex correctly holds the
+    lock for inventory.
+  - The physical route remains blocked for promotion and product A/B.

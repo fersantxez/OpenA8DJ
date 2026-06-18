@@ -8642,3 +8642,23 @@ Next implication:
   make the current C++ candidate ready, does not validate the iRig route, and
   does not prove quality, CPU/resource, Timecode Vinyl, or branch-promotion
   superiority.
+
+## 2026-06-18 - Distinguish Self-Held Hardware Lock In Route Inventory
+
+- Decision: `scripts/physical-route-inventory` now reports
+  `available_for_current_window` and `held_by_current_context` separately from
+  `available_for_new_window`.
+- Reason: the safest way to enumerate CoreAudio/USB during hardware work is to
+  hold the global lock, but the inventory previously classified the self-held
+  lock as `hardware_lock_not_available`. That created a false blocker while
+  preserving the real route blockers.
+- Evidence:
+  - Lock-gated, non-destructive inventory:
+    `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/physical-route-inventory-20260618T105953Z-route-inventory-lockfix.json`.
+  - Result: PASS; `held_by_current_context=true`;
+    `available_for_current_window=true`; no playback, recording, install,
+    unload, default change, USB reset, or service restart.
+- Readiness impact: no readiness improvement. The current inventory still
+  blocks promotion because no wired non-Audio8/non-built-in known-good output is
+  visible, Audio 8 DJ is not CoreAudio-visible without an active HAL, and the
+  latest same-device iRig diagnostic failed.

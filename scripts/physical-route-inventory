@@ -150,6 +150,8 @@ def lock_inventory() -> dict[str, Any]:
         "present": lock_root.exists(),
         "owner_file_present": owner.is_file(),
         "available_for_new_window": not lock_root.exists(),
+        "available_for_current_window": not lock_root.exists(),
+        "held_by_current_context": False,
     }
     if owner.is_file():
         text = owner.read_text(encoding="utf-8", errors="replace").strip()
@@ -161,9 +163,16 @@ def lock_inventory() -> dict[str, Any]:
             try:
                 os.kill(pid, 0)
                 result["owner_alive"] = True
+                held_by_current_context = (
+                    os.environ.get("OPENA8DJ_HARDWARE_LOCK_HELD") == "1"
+                    and pid in (os.getpid(), os.getppid())
+                )
+                result["held_by_current_context"] = held_by_current_context
+                result["available_for_current_window"] = held_by_current_context
             except OSError:
                 result["owner_alive"] = False
                 result["available_for_new_window"] = True
+                result["available_for_current_window"] = True
     return result
 
 
@@ -314,7 +323,7 @@ def classify(
         blockers.append("active_opena8dj_hal_not_installed")
     if not external_known_good_outputs:
         blockers.append("non_audio8_non_builtin_known_good_output_not_visible")
-    if not lock.get("available_for_new_window"):
+    if not lock.get("available_for_current_window"):
         blockers.append("hardware_lock_not_available")
     latest_same_device_failed = (
         latest_route.get("present") is True
