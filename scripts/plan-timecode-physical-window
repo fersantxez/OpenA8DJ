@@ -121,12 +121,23 @@ def main() -> int:
     parser.add_argument("--decks", default="A,B")
     parser.add_argument("--profile", default="timecode-vinyl")
     parser.add_argument("--duration-seconds", default="120")
+    parser.add_argument(
+        "--audio-list-fixture",
+        default="",
+        help="Read pre-recorded build/audio-list output for deterministic tests.",
+    )
     args = parser.parse_args()
 
     timecode_gate = load_json(resolve_path(args.timecode_gate) or Path())
     rc_status = load_json(resolve_path(args.rc_status) or Path())
     physical_plan = load_json(resolve_path(args.physical_window_plan) or Path())
-    audio_rc, audio_stdout, audio_stderr = run_text([str(ROOT / "build/audio-list")])
+    audio_fixture = resolve_path(args.audio_list_fixture)
+    if audio_fixture and audio_fixture.exists():
+        audio_rc = 0
+        audio_stdout = audio_fixture.read_text(encoding="utf-8")
+        audio_stderr = ""
+    else:
+        audio_rc, audio_stdout, audio_stderr = run_text([str(ROOT / "build/audio-list")])
     devices = parse_audio_list(audio_stdout)
     audio8 = audio8_devices(devices)
     selected_audio8 = audio8[0] if len(audio8) == 1 else {}

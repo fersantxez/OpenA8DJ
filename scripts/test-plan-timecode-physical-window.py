@@ -18,6 +18,7 @@ def run_case(tmp: Path, ready: bool) -> dict:
     timecode = tmp / "timecode.json"
     rc = tmp / "rc.json"
     physical = tmp / "physical.json"
+    audio_list = tmp / "audio-list.txt"
     write_json(
         timecode,
         {
@@ -37,6 +38,12 @@ def run_case(tmp: Path, ready: bool) -> dict:
             "full_ab_ready": ready,
         },
     )
+    audio_list.write_text(
+        "device id=100 Open Audio 8 DJ uid=org.opena8dj.test in=8 out=8 rate=48000\n"
+        if ready
+        else "device id=200 Built-in Output uid=AppleHDA in=0 out=2 rate=48000\n",
+        encoding="utf-8",
+    )
     output = tmp / ("ready.json" if ready else "blocked.json")
     completed = subprocess.run(
         [
@@ -47,6 +54,8 @@ def run_case(tmp: Path, ready: bool) -> dict:
             str(rc),
             "--physical-window-plan",
             str(physical),
+            "--audio-list-fixture",
+            str(audio_list),
             "--json-out",
             str(output),
         ],
