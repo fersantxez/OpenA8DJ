@@ -18,6 +18,7 @@
   - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260618T004250Z-cpp-hal-irig-pairA-fixture-6s-driver-sample --music-file local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 6 --mode start --target-peak-db -16 --max-lag 360000 --stream-stats-snapshots --sample-driver-process --sample-driver-delay 2 --sample-driver-seconds 4 --audio-stack-threshold 70 --audio-stack-total-threshold 160 --audio-stack-min-idle-pct 10 --skip-build`
   - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" ./build/audio-record 12 local-analysis/irig-capture-isolation/20260618T004203Z-irig-idle-after-cpp-hal-fail/captured.wav "iRig Stream" 1,2 0.0003`
   - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 2 --enumeration-timeout 8 --min-idle-pct 10 --run-dir local-analysis/audio-stack-guard/20260618T004407Z-unload-after-failed-cpp-physical/guard`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --wait 2 --enumeration-timeout 8 --min-idle-pct 10 --run-dir local-analysis/hal-candidate-safety/20260618T004647Z-cpp-candidate-load-unload-after-fail`
 - Results:
   - HAL safety: PASS. `Open Audio 8 DJ` appeared as `8 in / 8 out`; `iRig
     Stream` remained visible.
@@ -37,6 +38,9 @@
     peak `-41.031139 dBFS`, `idle_capture_unhealthy=false`.
   - Final guard unloaded the candidate: `opena8dj_state=unloaded`,
     `opena8dj_driver_pids=none`, audio stack health PASS, iRig still visible.
+  - Canonical follow-up HAL safety window also passed with `leave_loaded=0`;
+    post-unload CoreAudio enumeration showed only `iRig Stream`,
+    `MacBook Air Microphone`, and `MacBook Air Speakers`.
 - Evidence:
   - `local-analysis/hal-candidate-safety/20260618T003723Z-cpp-candidate-leave-loaded`
   - `local-analysis/soundcheck/20260618T003816Z-cpp-hal-irig-pairA-12s`
@@ -44,6 +48,7 @@
   - `local-analysis/soundcheck/20260618T004250Z-cpp-hal-irig-pairA-fixture-6s-driver-sample`
   - `local-analysis/irig-capture-isolation/20260618T004203Z-irig-idle-after-cpp-hal-fail`
   - `local-analysis/audio-stack-guard/20260618T004407Z-unload-after-failed-cpp-physical`
+  - `local-analysis/hal-candidate-safety/20260618T004647Z-cpp-candidate-load-unload-after-fail`
 - Interpretation:
   - This is negative product evidence. The current C++ HAL candidate is not
     better than mainline on quality or CPU.
