@@ -1170,6 +1170,10 @@ int main(int argc, char** argv) {
       bool_field_is(physical_submit_comparison_contract, "analyzer_outputs_submit_rates", true) &&
       bool_field_is(physical_submit_comparison_contract, "soundcheck_records_submit_counters",
                     true) &&
+      bool_field_is(physical_submit_comparison_contract,
+                    "physical_window_generates_stream_summary", true) &&
+      bool_field_is(physical_submit_comparison_contract,
+                    "physical_window_generates_transfer_ledger_analysis", true) &&
       bool_field_is(physical_submit_comparison_contract, "compare_reads_submit_rates", true) &&
       bool_field_is(physical_submit_comparison_contract, "compare_has_legacy_fallback", true) &&
       bool_field_is(physical_submit_comparison_contract,

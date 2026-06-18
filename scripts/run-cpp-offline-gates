@@ -1964,6 +1964,12 @@ summary = {
         "soundcheck_records_submit_counters": physical_submit_comparison_contract.get(
             "soundcheck_records_submit_counters"
         ),
+        "physical_window_generates_stream_summary": physical_submit_comparison_contract.get(
+            "physical_window_generates_stream_summary"
+        ),
+        "physical_window_generates_transfer_ledger_analysis": physical_submit_comparison_contract.get(
+            "physical_window_generates_transfer_ledger_analysis"
+        ),
         "compare_reads_submit_rates": physical_submit_comparison_contract.get(
             "compare_reads_submit_rates"
         ),

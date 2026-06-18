@@ -3306,3 +3306,10 @@ Current implication:
   restore with `--wait 8` failed on a transient `coreaudiod` spike
   (`138.8%`). Retrying with `--wait 20` passed and left Open Audio 8 DJ visible
   as `8 in / 8 out` with installed hash `23a2d5...`.
+- Physical-evidence attribution update: same-session A/B windows now generate
+  `stream-stats-summary.json` and `transfer-ledger-analysis.json` inside each
+  soundcheck directory before running `opena8djcpp_physical_run_compare`.
+  Without this, the runner collected `stream-stats-during.tsv` but the
+  comparator reported `stream_summary_present=false` and lost submit/transfer
+  rate gates. Offline gates now require this wiring through
+  `opena8djcpp_physical_submit_comparison_contract`.

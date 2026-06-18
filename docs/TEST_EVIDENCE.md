@@ -14758,3 +14758,51 @@ Follow-up correction:
   - Future restore commands after physical windows should allow longer
     post-load settling, currently `--wait 20`, before treating a transient
     `coreaudiod` spike as a candidate failure.
+
+## 2026-06-18 - Physical Window Stream Summary Contract
+
+- Commit: working tree after `9a3e2d0`.
+- Safety:
+  - Offline tooling/evidence change only.
+  - No hardware lock required; no audio playback/capture, CoreAudio mutation,
+    USB access, HAL install/reload, service restart, or default-device change.
+- Problem:
+  - `scripts/run-physical-superiority-window` passed
+    `--stream-stats-snapshots`, so soundcheck folders contained
+    `stream-stats-during.tsv`.
+  - `tools/physical_run_compare.cpp` reads only
+    `stream-stats-summary.json`, so latest A/B comparisons reported
+    `stream_summary_present=false` and had null submit/transfer-rate gates.
+- Integrated action:
+  - `scripts/run-physical-superiority-window` now runs
+    `scripts/analyze-stream-stats.py` for each soundcheck directory and writes
+    `stream-stats-summary.json`.
+  - The same runner now runs `scripts/analyze-transfer-ledger.py` when
+    `transfer-ledger-after.tsv` exists and writes `transfer-ledger-analysis.json`.
+  - `opena8djcpp_physical_submit_comparison_contract` now requires both
+    analyzer calls to be wired into the physical window.
+  - `current-offline-gates.json` and `opena8djcpp_evidence_schema_check` now
+    carry and require:
+    `physical_window_generates_stream_summary=true` and
+    `physical_window_generates_transfer_ledger_analysis=true`.
+- Verification:
+  - `bash -n scripts/run-physical-superiority-window scripts/run-cpp-offline-gates`
+  - `python3 -m py_compile scripts/analyze-stream-stats.py scripts/analyze-transfer-ledger.py`
+  - `cmake --build build/cpp-release --target opena8djcpp_physical_submit_comparison_contract opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_physical_submit_comparison_contract`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Contract result: `PASS`.
+  - Debug CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Reprocessing the rejected USB-clock A/B with stream summaries changed the
+    comparator evidence from `stream_summary_present=false` to
+    `stream_summary_present=true` for both mainline and C++ candidate.
+  - The rejected USB-clock conclusion did not change:
+    `BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+- Readiness impact:
+  - Future same-session physical A/B windows will include submit/transfer-rate
+    evidence in the comparator result by default.
+  - This improves attribution for CPU/performance claims. It does not make the
+    current candidate product-ready and does not unblock Timecode Vinyl or
+    branch promotion.

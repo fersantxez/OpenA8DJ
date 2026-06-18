@@ -9678,3 +9678,32 @@ Next implication:
 - Readiness impact: narrows the next work. The timing problem remains open, but
   USB-clock-anchor as currently built is not the path to product readiness or
   branch promotion.
+
+## 2026-06-18 - Require Stream Summary Generation In Physical A/B Windows
+
+- Decision: make the physical A/B runner generate
+  `stream-stats-summary.json` and `transfer-ledger-analysis.json` for each
+  soundcheck before invoking the same-session comparator.
+- Reason: `run-soundcheck --stream-stats-snapshots` already writes
+  `stream-stats-during.tsv`, but `physical_run_compare.cpp` consumes only the
+  summarized JSON. Without the summary, same-session comparisons lose
+  submit/transfer-rate evidence and cannot support CPU/resource claims.
+- Evidence:
+  - Reprocessing
+    `local-analysis/physical-evidence-window/20260618T184221Z-usb-clock-source-reference-ab-codesign-fixed`
+    with `scripts/analyze-stream-stats.py` made
+    `stream_summary_present=true` for both mainline and C++.
+  - `opena8djcpp_physical_submit_comparison_contract` reports
+    `physical_window_generates_stream_summary=true` and
+    `physical_window_generates_transfer_ledger_analysis=true`.
+  - `scripts/run-cpp-offline-gates` passed Debug `83/83` and Release `84/84`
+    tests with the new schema fields.
+- Alternatives rejected:
+  - Teach `physical_run_compare.cpp` to parse raw TSV directly: rejected for
+    now because the summary analyzer already centralizes flags, rates, runtime
+    geometry, and submit reduction ratios.
+  - Leave summary generation as a manual post-step: rejected because physical
+    windows are short and evidence must be complete before any readiness claim.
+- Readiness impact: improves future CPU/performance evidence attribution. It
+  does not change the USB-clock rejection and does not unblock product
+  readiness or branch promotion by itself.

@@ -450,10 +450,40 @@ run_audio8_soundcheck() {
   local native_rc=0
   local audiophile_cpp_rc=0
   local audiophile_python_rc=0
+  local stream_stats_summary_rc=125
+  local transfer_ledger_analysis_rc=125
   set +e
   "${soundcheck_args[@]}"
   soundcheck_rc=$?
   set -e
+
+  if [ -f "$out_dir/stream-stats-during.tsv" ]; then
+    set +e
+    python3 "$root/scripts/analyze-stream-stats.py" "$out_dir" \
+      --json-out "$out_dir/stream-stats-summary.json" \
+      > "$out_dir/stream-stats-summary.stdout" \
+      2> "$out_dir/stream-stats-summary.err"
+    stream_stats_summary_rc=$?
+    set -e
+  else
+    {
+      echo "stream stats summary skipped: missing stream-stats-during.tsv"
+    } > "$out_dir/stream-stats-summary.err"
+  fi
+
+  if [ -f "$out_dir/transfer-ledger-after.tsv" ]; then
+    set +e
+    python3 "$root/scripts/analyze-transfer-ledger.py" "$out_dir/transfer-ledger-after.tsv" \
+      --json-out "$out_dir/transfer-ledger-analysis.json" \
+      > "$out_dir/transfer-ledger-analysis.stdout" \
+      2> "$out_dir/transfer-ledger-analysis.err"
+    transfer_ledger_analysis_rc=$?
+    set -e
+  else
+    {
+      echo "transfer ledger analysis skipped: missing transfer-ledger-after.tsv"
+    } > "$out_dir/transfer-ledger-analysis.err"
+  fi
 
   if [ -f "$out_dir/captured.wav" ] && [ -f "$out_dir/fixture/reference.wav" ]; then
     set +e
@@ -511,6 +541,8 @@ run_audio8_soundcheck() {
     echo "native_rc=$native_rc"
     echo "audiophile_cpp_rc=$audiophile_cpp_rc"
     echo "audiophile_python_rc=$audiophile_python_rc"
+    echo "stream_stats_summary_rc=$stream_stats_summary_rc"
+    echo "transfer_ledger_analysis_rc=$transfer_ledger_analysis_rc"
     echo "out_dir=$out_dir"
   } > "$out_dir/window-soundcheck-status.txt"
 

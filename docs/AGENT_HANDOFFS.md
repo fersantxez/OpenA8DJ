@@ -5338,3 +5338,41 @@ Next action:
 - If continuing optimization, prefer prepared-lite only if CPU/resource
   pressure is the bottleneck; otherwise return to measured timing/root-cause
   analysis before creating another timing candidate.
+
+## 2026-06-18 Architect Continuation: Physical Stream Summary Wiring
+
+Subagent:
+- Physical Evidence Wiring Auditor.
+
+Required warning:
+- The subagent received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Explain why latest same-session comparisons had
+  `stream_summary_present=false` despite `stream-stats-during.tsv` existing.
+
+Findings:
+- `run-soundcheck` produced `stream-stats-during.tsv` and
+  `transfer-ledger-after.tsv`.
+- `physical_run_compare.cpp` reads `stream-stats-summary.json`, not the raw TSV.
+- `run-physical-superiority-window` ran the comparator without generating that
+  summary JSON.
+
+Integrated action:
+- `run-physical-superiority-window` now generates `stream-stats-summary.json`
+  and `transfer-ledger-analysis.json` after each soundcheck.
+- `opena8djcpp_physical_submit_comparison_contract`,
+  `run-cpp-offline-gates`, and `evidence_schema_check` now require this wiring.
+
+Risks:
+- This is attribution/tooling, not an audio fix.
+- The next physical A/B can now compare transport/submit cadence correctly, but
+  quality, CPU superiority, Timecode Vinyl, and branch promotion remain blocked.
+
+Next action:
+- Use the updated physical window runner for the next candidate; do not accept
+  CPU/performance claims from windows missing `stream-stats-summary.json`.

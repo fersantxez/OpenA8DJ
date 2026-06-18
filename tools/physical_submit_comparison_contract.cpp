@@ -49,17 +49,23 @@ int main(int argc, char** argv) {
   const auto root = repo_root(argv);
   const auto compare_source = read_file(root / "tools/physical_run_compare.cpp");
   const auto stream_stats_analyzer = read_file(root / "scripts/analyze-stream-stats.py");
+  const auto transfer_ledger_analyzer = read_file(root / "scripts/analyze-transfer-ledger.py");
   const auto run_soundcheck = read_file(root / "scripts/run-soundcheck");
+  const auto physical_window = read_file(root / "scripts/run-physical-superiority-window");
   const auto promotion_evaluator = read_file(root / "scripts/evaluate-promotion-readiness.py");
 
   std::vector<std::string> failures;
   const bool compare_source_present = !compare_source.empty();
   const bool stream_stats_analyzer_present = !stream_stats_analyzer.empty();
+  const bool transfer_ledger_analyzer_present = !transfer_ledger_analyzer.empty();
   const bool run_soundcheck_present = !run_soundcheck.empty();
+  const bool physical_window_present = !physical_window.empty();
   const bool promotion_evaluator_present = !promotion_evaluator.empty();
   if (!compare_source_present) failures.push_back("physical_run_compare_missing");
   if (!stream_stats_analyzer_present) failures.push_back("stream_stats_analyzer_missing");
+  if (!transfer_ledger_analyzer_present) failures.push_back("transfer_ledger_analyzer_missing");
   if (!run_soundcheck_present) failures.push_back("run_soundcheck_missing");
+  if (!physical_window_present) failures.push_back("physical_window_runner_missing");
   if (!promotion_evaluator_present) failures.push_back("promotion_evaluator_missing");
 
   const bool analyzer_outputs_submit_rates =
@@ -82,6 +88,22 @@ int main(int argc, char** argv) {
       contains(run_soundcheck, "\"playbackTransfersSubmitted\",");
   if (!soundcheck_records_submit_counters) {
     failures.push_back("soundcheck_submit_counter_columns_missing");
+  }
+
+  const bool physical_window_generates_stream_summary =
+      contains(physical_window, "scripts/analyze-stream-stats.py") &&
+      contains(physical_window, "--json-out \"$out_dir/stream-stats-summary.json\"") &&
+      contains(physical_window, "stream_stats_summary_rc=");
+  if (!physical_window_generates_stream_summary) {
+    failures.push_back("physical_window_stream_summary_generation_missing");
+  }
+
+  const bool physical_window_generates_transfer_ledger_analysis =
+      contains(physical_window, "scripts/analyze-transfer-ledger.py") &&
+      contains(physical_window, "--json-out \"$out_dir/transfer-ledger-analysis.json\"") &&
+      contains(physical_window, "transfer_ledger_analysis_rc=");
+  if (!physical_window_generates_transfer_ledger_analysis) {
+    failures.push_back("physical_window_transfer_ledger_analysis_missing");
   }
 
   const bool compare_reads_submit_rates =
@@ -137,6 +159,10 @@ int main(int argc, char** argv) {
       << (analyzer_outputs_submit_rates ? "true" : "false") << ",\n"
       << "  \"soundcheck_records_submit_counters\": "
       << (soundcheck_records_submit_counters ? "true" : "false") << ",\n"
+      << "  \"physical_window_generates_stream_summary\": "
+      << (physical_window_generates_stream_summary ? "true" : "false") << ",\n"
+      << "  \"physical_window_generates_transfer_ledger_analysis\": "
+      << (physical_window_generates_transfer_ledger_analysis ? "true" : "false") << ",\n"
       << "  \"compare_reads_submit_rates\": "
       << (compare_reads_submit_rates ? "true" : "false") << ",\n"
       << "  \"compare_has_legacy_fallback\": "
