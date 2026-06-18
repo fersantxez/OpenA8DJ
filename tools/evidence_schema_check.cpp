@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/historical-route-reference-gate.json",
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
+      root / "local-analysis/cpp-offline/physical-route-inventory.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/product-quality-claim-gate.json",
@@ -225,6 +226,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto physical_route_inventory =
+      opena8djcpp::evidence_json::json_object(summary, "physical_route_inventory").value_or("");
   const auto hal_transport_runtime_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
   const auto hal_logical_capture_batching_contract =
@@ -585,6 +588,26 @@ int main(int argc, char** argv) {
       string_field_is(
           physical_window_readiness_gate, "blocked_claim",
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
+      object_present(summary, "physical_route_inventory") &&
+      string_field_is(physical_route_inventory, "status", "PASS") &&
+      string_field_is(physical_route_inventory, "schema",
+                      "opena8djcpp.physical-route-inventory.v1") &&
+      bool_field_present(physical_route_inventory, "irig_capture_visible") &&
+      bool_field_present(physical_route_inventory, "irig_output_visible") &&
+      bool_field_present(physical_route_inventory, "audio8_usb_visible") &&
+      bool_field_present(physical_route_inventory, "audio8_coreaudio_visible") &&
+      bool_field_present(physical_route_inventory, "active_hal_installed") &&
+      bool_field_present(physical_route_inventory, "promotion_route_ready") &&
+      bool_field_present(physical_route_inventory,
+                         "same_device_irig_diagnostic_possible") &&
+      bool_field_present(physical_route_inventory,
+                         "candidate_hal_window_possible_after_lock") &&
+      bool_field_is(physical_route_inventory, "product_promotion_measurement_possible_now",
+                    false) &&
+      bool_field_is(physical_route_inventory, "hardware_touched", false) &&
+      bool_field_is(physical_route_inventory, "audio_played", false) &&
+      bool_field_is(physical_route_inventory, "audio_recorded", false) &&
+      bool_field_is(physical_route_inventory, "driver_installed_or_activated", false) &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
       bool_field_is(product_quality_claim_gate, "quality_claim_allowed", false) &&

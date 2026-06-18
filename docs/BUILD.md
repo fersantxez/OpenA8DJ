@@ -925,6 +925,38 @@ rejected for branch promotion.
 Preflight PASS means the requested devices and files are visible. It does not
 prove the physical route; the known-good route capture must still pass.
 
+## Physical Route Inventory
+
+Before choosing a lock-gated hardware action, run the read-only route
+inventory:
+
+```sh
+scripts/physical-route-inventory \
+  --json-out local-analysis/cpp-offline/physical-route-inventory.json
+```
+
+The tool lists CoreAudio devices, checks Audio 8 DJ and iRig USB visibility,
+checks whether `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` is active, records
+parked HAL candidates under `/Library/Audio/Plug-Ins/HAL.disabled`, and reports
+the hardware-lock state. It does not play, record, install/reload drivers,
+restart services, reset USB, change defaults, or change sample rate.
+
+`scripts/run-cpp-offline-gates` now runs this inventory and includes a compact
+`physical_route_inventory` object in `current-offline-gates.json`.
+
+Interpretation:
+
+- `promotion_route_ready=true` means a non-Audio8, non-built-in output is
+  visible for the known-good route prerequisite. It still does not prove the
+  cable route; the lock-gated route capture must pass.
+- `same_device_irig_diagnostic_possible=true` means iRig can be used for a
+  diagnostic self-loop style check only. This cannot produce product,
+  audiophile-quality, CPU/resource, timecode, or branch-promotion evidence.
+- `candidate_hal_window_possible_after_lock=true` means Audio 8 DJ USB and
+  iRig capture are visible enough to consider a locked HAL candidate window,
+  but promotion remains blocked until the same-session route and mainline/C++
+  comparison pass.
+
 ## Privileged Driver Sampling During Soundcheck
 
 For CPU attribution diagnostics, `scripts/run-soundcheck` can sample the active

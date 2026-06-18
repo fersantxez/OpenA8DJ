@@ -7851,3 +7851,49 @@ Next implication:
 - Next hardware action remains route-only revalidation first. Only after that
   can the prepared-runtime candidate be compared against mainline with submit
   counters, CPU p95, jitter, and dual audiophile WAV analyzers.
+
+## 2026-06-18: Add Read-Only Physical Route Inventory Gate
+
+Decision:
+- Added `scripts/physical-route-inventory` as a read-only environment
+  classifier for physical evidence windows.
+- The offline gate runner now writes
+  `local-analysis/cpp-offline/physical-route-inventory.json` and the evidence
+  schema requires it in `current-offline-gates.json`.
+- The inventory distinguishes iRig capture visibility, Audio 8 DJ USB
+  visibility, Audio 8 DJ CoreAudio visibility, active HAL installation, valid
+  non-Audio8 known-good output availability, and same-device iRig diagnostic
+  availability.
+
+Reason:
+- Sound-quality and CPU/resource claims are only meaningful if the physical
+  route can support the claim. The current machine can show iRig and Audio 8 DJ
+  on USB while still lacking an active Audio 8 DJ CoreAudio device and lacking
+  a non-Audio8 wired known-good output for promotion evidence.
+- Capturing this as JSON prevents a diagnostic route from being mistaken for a
+  promotable mainline-vs-C++ comparison.
+
+Evidence:
+- Focused inventory: PASS.
+- Current decision:
+  `LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY`.
+- Current blockers:
+  `audio8dj_not_visible_as_coreaudio_device`,
+  `active_opena8dj_hal_not_installed`, and
+  `non_audio8_non_builtin_known_good_output_not_visible`.
+- No playback, capture, driver install/reload, USB reset, CoreAudio restart,
+  default-device change, sample-rate change, or buffer-size change was
+  performed.
+
+Alternatives discarded:
+- Run a physical A/B immediately: rejected because the visible route cannot
+  produce promotable evidence yet.
+- Treat iRig same-device loopback as route proof: rejected. It can diagnose
+  whether iRig itself is alive, but it does not prove the external capture route
+  needed to judge Audio 8 DJ output quality.
+
+Next implication:
+- Use the inventory before any lock-gated hardware window.
+- If only the same-device iRig diagnostic is available, it may be run as a
+  diagnostic under lock, but the result must remain blocked for product,
+  quality, CPU/resource, timecode, and branch-promotion claims.

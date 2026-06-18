@@ -147,6 +147,7 @@ if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; the
 fi
 ./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee "$EVIDENCE_DIR/prepared-transport-migration-gate.json"
 ./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee "$EVIDENCE_DIR/physical-window-readiness-gate.json"
+python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
 ./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
 ./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee "$EVIDENCE_DIR/diagnostic-pass-semantics-gate.json"
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
@@ -229,6 +230,7 @@ irig_idle_capture_gate = load_json("irig-idle-capture-gate.json")
 historical_route_reference_gate = load_json("historical-route-reference-gate.json")
 hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
+physical_route_inventory = load_json("physical-route-inventory.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
@@ -984,6 +986,48 @@ summary = {
         ),
         "blocked_claim": physical_window_readiness_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/physical-window-readiness-gate.json",
+    },
+    "physical_route_inventory": {
+        "status": physical_route_inventory.get("result"),
+        "schema": physical_route_inventory.get("schema"),
+        "irig_capture_visible": physical_route_inventory.get("decision", {}).get(
+            "irig_capture_visible"
+        ),
+        "irig_output_visible": physical_route_inventory.get("decision", {}).get(
+            "irig_output_visible"
+        ),
+        "audio8_usb_visible": physical_route_inventory.get("decision", {}).get(
+            "audio8_usb_visible"
+        ),
+        "audio8_coreaudio_visible": physical_route_inventory.get("decision", {}).get(
+            "audio8_coreaudio_visible"
+        ),
+        "active_hal_installed": physical_route_inventory.get("decision", {}).get(
+            "active_hal_installed"
+        ),
+        "promotion_route_ready": physical_route_inventory.get("decision", {}).get(
+            "promotion_route_ready"
+        ),
+        "same_device_irig_diagnostic_possible": physical_route_inventory.get(
+            "decision", {}
+        ).get("same_device_irig_diagnostic_possible"),
+        "candidate_hal_window_possible_after_lock": physical_route_inventory.get(
+            "decision", {}
+        ).get("candidate_hal_window_possible_after_lock"),
+        "product_promotion_measurement_possible_now": physical_route_inventory.get(
+            "decision", {}
+        ).get("product_promotion_measurement_possible_now"),
+        "next_lock_gated_action": physical_route_inventory.get("decision", {}).get(
+            "next_lock_gated_action"
+        ),
+        "blockers": physical_route_inventory.get("decision", {}).get("blockers"),
+        "hardware_touched": physical_route_inventory.get("hardware_touched"),
+        "audio_played": physical_route_inventory.get("audio_played"),
+        "audio_recorded": physical_route_inventory.get("audio_recorded"),
+        "driver_installed_or_activated": physical_route_inventory.get(
+            "driver_installed_or_activated"
+        ),
+        "evidence": "local-analysis/cpp-offline/physical-route-inventory.json",
     },
     "diagnostic_pass_semantics_gate": {
         "status": diagnostic_pass_semantics_gate.get("result"),

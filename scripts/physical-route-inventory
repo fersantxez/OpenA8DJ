@@ -1,0 +1,325 @@
+#!/usr/bin/env python3
+"""Read-only inventory for the next physical OpenA8DJ evidence window.
+
+This tool does not acquire the hardware lock, play audio, record audio, reset
+USB, restart CoreAudio, install/uninstall HAL bundles, or change defaults. It
+only records what macOS currently exposes and classifies which physical window
+is objectively possible.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+AUDIO8_USB_VENDOR_DECIMAL = 6092
+AUDIO8_USB_PRODUCT_DECIMAL = 6520
+ACTIVE_HAL = Path("/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver")
+DISABLED_HAL_ROOT = Path("/Library/Audio/Plug-Ins/HAL.disabled")
+
+
+def run_text(argv: list[str], timeout: int = 10) -> tuple[int, str, str]:
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+        return completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired as exc:
+        return 124, exc.stdout or "", exc.stderr or "timeout"
+
+
+def parse_audio_list(text: str) -> list[dict[str, Any]]:
+    pattern = re.compile(
+        r"^\s*\d+\s+id=(?P<id>\d+)\s+(?P<name>.*?)\s+uid=(?P<uid>.*?)\s+"
+        r"in=(?P<inputs>\d+)\s+out=(?P<outputs>\d+)\s+rate=(?P<rate>[0-9.]+)"
+    )
+    devices: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        devices.append(
+            {
+                "id": int(match.group("id")),
+                "name": match.group("name").strip(),
+                "uid": match.group("uid").strip(),
+                "inputs": int(match.group("inputs")),
+                "outputs": int(match.group("outputs")),
+                "rate": float(match.group("rate")),
+            }
+        )
+    return devices
+
+
+def audio8ish(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "opena8dj",
+            "open audio 8",
+            "audio 8 dj",
+            "org.opena8dj.audio8dj",
+        )
+    )
+
+
+def irigish(value: str) -> bool:
+    lowered = value.lower()
+    return "irig" in lowered or "ik multimedia" in lowered
+
+
+def built_in_or_acoustic(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "builtinspeakerdevice",
+            "built-in output",
+            "built in output",
+            "macbook air speakers",
+            "macbook speakers",
+            "internal speakers",
+        )
+    )
+
+
+def usb_inventory() -> dict[str, Any]:
+    rc, stdout, stderr = run_text(["ioreg", "-p", "IOUSB", "-l", "-w0"], timeout=10)
+    text = stdout + "\n" + stderr
+    audio8_present = (
+        "Audio 8 DJ" in text
+        and f'"idVendor" = {AUDIO8_USB_VENDOR_DECIMAL}' in text
+        and f'"idProduct" = {AUDIO8_USB_PRODUCT_DECIMAL}' in text
+    )
+    irig_present = "iRig Stream" in text or "IK Multimedia" in text
+    return {
+        "command": "ioreg -p IOUSB -l -w0",
+        "return_code": rc,
+        "audio8_usb_visible": audio8_present,
+        "audio8_name_match": "Audio 8 DJ" in text,
+        "irig_usb_visible": irig_present,
+        "irig_name_match": "iRig Stream" in text,
+    }
+
+
+def hal_inventory() -> dict[str, Any]:
+    disabled_candidates: list[str] = []
+    if DISABLED_HAL_ROOT.is_dir():
+        disabled_candidates = sorted(
+            str(path) for path in DISABLED_HAL_ROOT.glob("OpenA8DJ.driver*")
+        )
+    return {
+        "active_hal_path": str(ACTIVE_HAL),
+        "active_hal_installed": ACTIVE_HAL.is_dir(),
+        "active_hal_executable": str(ACTIVE_HAL / "Contents/MacOS/OpenA8DJHAL"),
+        "active_hal_executable_exists": (
+            ACTIVE_HAL / "Contents/MacOS/OpenA8DJHAL"
+        ).is_file(),
+        "disabled_hal_root": str(DISABLED_HAL_ROOT),
+        "disabled_hal_candidates": disabled_candidates[:16],
+        "disabled_hal_candidate_count": len(disabled_candidates),
+    }
+
+
+def lock_inventory() -> dict[str, Any]:
+    lock_root = Path(
+        os.environ.get(
+            "AUDIO_GATE_LOCK_ROOT",
+            str(Path.home() / ".opena8dj/hardware-gate.lock"),
+        )
+    )
+    owner = lock_root / "owner"
+    result: dict[str, Any] = {
+        "path": str(lock_root),
+        "present": lock_root.exists(),
+        "owner_file_present": owner.is_file(),
+        "available_for_new_window": not lock_root.exists(),
+    }
+    if owner.is_file():
+        text = owner.read_text(encoding="utf-8", errors="replace").strip()
+        result["owner"] = text
+        pid_match = re.search(r"(?:pid|PID)=?(\d+)|^(\d+)$", text)
+        if pid_match:
+            pid = int(pid_match.group(1) or pid_match.group(2))
+            result["pid"] = pid
+            try:
+                os.kill(pid, 0)
+                result["owner_alive"] = True
+            except OSError:
+                result["owner_alive"] = False
+                result["available_for_new_window"] = True
+    return result
+
+
+def load_offline_summary() -> dict[str, Any]:
+    path = ROOT / "local-analysis/cpp-offline/current-offline-gates.json"
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(parsed, dict):
+            return parsed
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def device_identity(device: dict[str, Any]) -> str:
+    return str(device.get("name", "")) + " " + str(device.get("uid", ""))
+
+
+def classify(
+    devices: list[dict[str, Any]],
+    usb: dict[str, Any],
+    hal: dict[str, Any],
+    lock: dict[str, Any],
+) -> dict[str, Any]:
+    irig_inputs = [
+        device
+        for device in devices
+        if irigish(device_identity(device)) and device.get("inputs", 0) >= 2
+    ]
+    irig_outputs = [
+        device
+        for device in devices
+        if irigish(device_identity(device)) and device.get("outputs", 0) >= 2
+    ]
+    audio8_coreaudio = [
+        device for device in devices if audio8ish(device_identity(device))
+    ]
+    external_known_good_outputs = [
+        device
+        for device in devices
+        if device.get("outputs", 0) >= 2
+        and not audio8ish(device_identity(device))
+        and not irigish(device_identity(device))
+        and not built_in_or_acoustic(device_identity(device))
+    ]
+    acoustic_outputs = [
+        device
+        for device in devices
+        if device.get("outputs", 0) >= 2
+        and built_in_or_acoustic(device_identity(device))
+    ]
+    promotion_route_ready = bool(irig_inputs and external_known_good_outputs)
+    same_device_irig_diagnostic_possible = bool(irig_inputs and irig_outputs)
+    candidate_hal_window_possible_after_lock = bool(usb.get("audio8_usb_visible") and irig_inputs)
+    if promotion_route_ready:
+        next_action = "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION"
+    elif same_device_irig_diagnostic_possible:
+        next_action = "LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY"
+    elif acoustic_outputs and irig_inputs:
+        next_action = "LOCK_GATED_BUILT_IN_ACOUSTIC_DIAGNOSTIC_ONLY"
+    else:
+        next_action = "NO_VALID_CAPTURE_ROUTE_VISIBLE"
+    blockers: list[str] = []
+    if not irig_inputs:
+        blockers.append("irig_capture_not_visible_as_coreaudio_input")
+    if not usb.get("audio8_usb_visible"):
+        blockers.append("audio8dj_not_visible_on_usb")
+    if not audio8_coreaudio:
+        blockers.append("audio8dj_not_visible_as_coreaudio_device")
+    if not hal.get("active_hal_installed"):
+        blockers.append("active_opena8dj_hal_not_installed")
+    if not external_known_good_outputs:
+        blockers.append("non_audio8_non_builtin_known_good_output_not_visible")
+    if not lock.get("available_for_new_window"):
+        blockers.append("hardware_lock_not_available")
+    return {
+        "irig_capture_visible": bool(irig_inputs),
+        "irig_output_visible": bool(irig_outputs),
+        "audio8_usb_visible": bool(usb.get("audio8_usb_visible")),
+        "audio8_coreaudio_visible": bool(audio8_coreaudio),
+        "active_hal_installed": bool(hal.get("active_hal_installed")),
+        "non_audio8_non_builtin_known_good_outputs": external_known_good_outputs,
+        "built_in_or_acoustic_outputs": acoustic_outputs,
+        "promotion_route_ready": promotion_route_ready,
+        "same_device_irig_diagnostic_possible": same_device_irig_diagnostic_possible,
+        "candidate_hal_window_possible_after_lock": candidate_hal_window_possible_after_lock,
+        "product_promotion_measurement_possible_now": False,
+        "next_lock_gated_action": next_action,
+        "blockers": blockers,
+        "policy": (
+            "Inventory PASS means the read-only scan completed. It is not a "
+            "sound-quality, CPU, routing, timecode, or branch-promotion claim."
+        ),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--json-out", type=Path)
+    args = parser.parse_args()
+
+    rc, audio_stdout, audio_stderr = run_text([str(ROOT / "build/audio-list")], timeout=10)
+    devices = parse_audio_list(audio_stdout)
+    usb = usb_inventory()
+    hal = hal_inventory()
+    lock = lock_inventory()
+    offline = load_offline_summary()
+    decision = classify(devices, usb, hal, lock)
+    report = {
+        "schema": "opena8djcpp.physical-route-inventory.v1",
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "worktree": str(ROOT),
+        "result": "PASS" if rc == 0 and usb.get("return_code") == 0 else "FAIL",
+        "commands": {
+            "audio_list": {
+                "command": "build/audio-list",
+                "return_code": rc,
+                "stderr": audio_stderr.strip(),
+            },
+            "usb": {
+                "command": usb.get("command"),
+                "return_code": usb.get("return_code"),
+            },
+        },
+        "coreaudio_devices": devices,
+        "usb": usb,
+        "hal": hal,
+        "lock": lock,
+        "offline_candidate": {
+            "summary_present": bool(offline),
+            "base_commit": offline.get("base_commit", ""),
+            "offline_status": offline.get("status", ""),
+            "diagnostic_status": offline.get("diagnostic_status", ""),
+            "prepared_runtime_candidate_status": offline.get(
+                "hal_prepared_runtime_candidate", {}
+            ).get("status", "")
+            if isinstance(offline.get("hal_prepared_runtime_candidate"), dict)
+            else "",
+            "branch_promotion_allowed": offline.get("branch_promotion_allowed", False),
+        },
+        "decision": decision,
+        "hardware_touched": False,
+        "audio_played": False,
+        "audio_recorded": False,
+        "coreaudio_configuration_changed": False,
+        "usb_reset_or_configuration_changed": False,
+        "driver_installed_or_activated": False,
+    }
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        output = args.json_out if args.json_out.is_absolute() else ROOT / args.json_out
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+    sys.stdout.write(text)
+    return 0 if report["result"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

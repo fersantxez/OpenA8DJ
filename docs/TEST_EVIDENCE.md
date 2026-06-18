@@ -11554,3 +11554,56 @@ Full offline gate after commit:
   - This is still not a product claim. Same-session route revalidation,
     mainline/C++ physical A/B, CPU/resource counters, quality analyzers,
     routing isolation, and Timecode Vinyl physical evidence remain required.
+
+## 2026-06-18 Physical Route Inventory Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a read-only physical route inventory to the offline evidence bundle.
+  - The inventory checks CoreAudio device enumeration, Audio 8 DJ/iRig USB
+    visibility, active/parked HAL state, and hardware-lock availability.
+  - No lock acquisition, playback, capture, driver install/reload, USB reset,
+    CoreAudio restart, default-device change, sample-rate change, or
+    buffer-size change was performed.
+- Focused commands:
+  - `python3 -m py_compile scripts/physical-route-inventory`
+  - `scripts/physical-route-inventory --json-out local-analysis/cpp-offline/physical-route-inventory.json`
+- Focused result:
+  - Inventory: PASS.
+  - iRig Stream visible as CoreAudio `2 in / 2 out` at 48 kHz.
+  - Audio 8 DJ visible on USB.
+  - Audio 8 DJ not visible as CoreAudio audio device.
+  - Active `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`: absent.
+  - Parked HAL candidates under `HAL.disabled`: 203.
+  - Promotion route ready: false.
+  - Same-device iRig diagnostic possible: true.
+  - Next action classified as `LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY`.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-route-inventory.json`
+- Full offline gate before commit:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Debug CTest: `75/75` PASS.
+  - Release CTest: `76/76` PASS.
+  - Evidence schema: PASS, `required_files=82`, `missing_files=0`.
+  - Product readiness: FAIL.
+  - Branch promotion allowed: `false`.
+  - Provenance: FAIL before commit only, because the current edits were not
+    committed yet.
+- Full offline gate after commit:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Commit: recorded in
+    `local-analysis/cpp-offline/current-offline-gates.json` as
+    `base_commit` and in `evidence_provenance_freshness_gate.head_commit`.
+  - Debug CTest: `75/75` PASS.
+  - Release CTest: `76/76` PASS.
+  - Evidence schema: PASS, `required_files=82`, `missing_files=0`.
+  - Provenance: PASS with `claimable_current_candidate=true`.
+  - Product readiness: FAIL.
+  - Branch promotion allowed: `false`.
+- Interpretation:
+  - The current machine can diagnose iRig liveness under lock.
+  - It cannot produce promotable Audio 8 DJ quality/performance evidence until
+    a valid known-good non-Audio8 route and a same-session mainline/C++ window
+    exist.
