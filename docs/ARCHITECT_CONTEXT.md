@@ -2841,4 +2841,13 @@ Current implication:
   completion outliers and zero underruns. This means the present hardware
   route/timebase is degraded relative to earlier best evidence; product
   comparison is blocked until route/timebase isolation passes.
+- Current route isolation result: iRig idle capture is clean enough at rest
+  (`max_rms_dbfs=-64.4305`, `max_peak_dbfs=-42.0430`), and direct USB internal
+  diagnostics are perfect through written/consumed/packed USB evidence
+  (`alignment_score=1.000000`, SNR `999`, zero USB check errors). However the
+  same direct USB signal captured through the current analog iRig route still
+  fails product/audiophile thresholds (`quality_alignment_score=0.931575`,
+  SNR floor `5.43 dB`, corrected audiophile SNR about `5.6/5.9 dB`, delay p95
+  `12.6` frames). This blocks further superiority claims and makes additional
+  HAL optimization probes unsafe as evidence until the route/timebase is stable.
 - Post-commit diagnostic A/B on `98ef928`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928` used real music and same-session mainline/C++ HAL runs. C++ improved relative music metrics over the dirty mainline bundle in that run (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`), but still failed product thresholds and used `--skip-known-good` because no separate wired non-Audio8 output was available for same-window iRig route validation. CPU was also worse for C++ (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`). Treat this as diagnostic learning only, not superiority evidence.

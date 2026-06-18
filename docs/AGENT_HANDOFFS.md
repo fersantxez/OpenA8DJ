@@ -4180,3 +4180,44 @@ Risk:
 Next action:
 - Commit and rerun freshness gates, then run a short lock-gated diagnostic only
   if the lock is available.
+
+## 2026-06-18 Maxwell: Physical Route Forensics
+
+Subagent:
+- `019eda08-00f3-7113-935a-94c25a322761` (`Maxwell`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Determine whether the current catastrophic physical results are explained by
+  C++ output corruption, the capture route, timebase instability,
+  channel/polarity, clipping, or a known-good route gap.
+
+Findings:
+- The capture-batch failure is not useful as a CPU win and is dominated by bad
+  physical quality evidence.
+- Simple L/R swap, polarity, clipping, static matrix, and simple nonlinearity
+  explanations do not rescue the current captures.
+- Current route evidence points to route/timebase instability, not a clean proof
+  of digital output corruption.
+- No separate wired non-Audio8 known-good output is currently available for a
+  promotion-valid same-window route check.
+
+Integrated action:
+- Ran iRig idle and direct USB route isolation under lock.
+- Confirmed iRig idle is quiet enough at rest and direct USB internal written,
+  consumed, written-vs-consumed, and decoded USB payloads are perfect.
+- Documented that the analog iRig capture of the direct USB signal still fails
+  strict audiophile/product thresholds and blocks further claims.
+
+Risks:
+- The current physical route can produce misleading optimization results:
+  digital USB can be clean while analog capture metrics fail badly.
+- Timecode Vinyl and branch-promotion claims remain blocked because they require
+  stable same-window physical evidence.
+
+Next action:
+- Revalidate the physical route/timebase before any more HAL performance
+  probes. Prefer a separate wired non-Audio8 known-good output into the iRig, or
+  a controlled route-only Audio 8 DJ diagnostic with explicit claim blockers.

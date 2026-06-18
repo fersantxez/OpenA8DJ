@@ -1,5 +1,50 @@
 # Test Evidence
 
+## 2026-06-18: Current iRig Route Isolation And Direct USB Control
+
+- Scope:
+  - Ran a lock-gated iRig idle capture on the current physical route.
+  - Ran a lock-gated direct USB Pair A soundcheck with HAL unloaded, capturing
+    Audio 8 DJ analog output through `iRig Stream`.
+  - Ran additional offline WAV analysis on the saved direct USB capture using
+    the local `.venv` Python/SciPy stack.
+  - No driver install, driver load, CoreAudio restart, USB reset, default-device
+    change, or HAL candidate playback was performed in this step.
+- Commands:
+  - `./build/audio-record 12 local-analysis/irig-capture-isolation/20260618T092436Z-irig-idle-current-route/captured.wav "iRig Stream" 1,2`
+  - `scripts/run-direct-usb-soundcheck --skip-build --capture-device "iRig Stream" --capture-channels 1,2 --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --seconds 12 --mode dense --target-peak-db -16 --collect-usb-diagnostics --run-dir local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s`
+  - `.venv/bin/python scripts/analyze-audiophile-wav.py --reference local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s/fixture/reference.wav --capture local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s/captured.wav --seconds 12 --max-lag-seconds 6 --label direct-usb-current-route-irig-maxlag6 --json-out local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s/audiophile-wav-analysis-maxlag6.json`
+- Result:
+  - iRig idle capture: PASS. Max RMS `-64.4305 dBFS`, max peak
+    `-42.0430 dBFS`, `idle_capture_unhealthy=false`.
+  - Direct USB product gate: FAIL. `quality_alignment_score=0.931575`,
+    SNR floor `5.43 dB`, mid-band residual ratio `1.546533`,
+    high-band residual ratio `1.451566`, quiet mid-band noise
+    `-29.09 dBFS`, no clipping, and `lag_jumps_gt_2_frames=0` in the
+    legacy soundcheck metric.
+  - Direct USB internal diagnostics: PASS/perfect for the digital path.
+    Written, consumed, written-vs-consumed, and decoded USB payloads all scored
+    alignment `1.000000`, SNR `999`, zero click outliers, zero USB check
+    errors, and zero USB panic flags.
+  - Corrected audiophile WAV analysis with a 6-second lag window: FAIL.
+    Alignment lag was about `4.927 s`; left/right SNR was `5.60/5.92 dB`,
+    active mid-band coherence was `0.726/0.676`, delay p95 was `12.6`
+    frames, stereo leakage was not evaluable from the music reference, and
+    `product_claim_allowed=false`.
+- Evidence:
+  - `local-analysis/irig-capture-isolation/20260618T092436Z-irig-idle-current-route`
+  - `local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s`
+- Interpretation:
+  - The iRig is present and idle noise is not the blocker by itself.
+  - The direct USB generation/packing/consumption path is objectively clean.
+  - The current physical analog capture route still fails audiophile/product
+    thresholds badly under signal. It cannot be used for branch promotion,
+    CPU/resource superiority, Timecode Vinyl readiness, or claims that the C++
+    line is better than mainline.
+  - Further HAL optimization probes are blocked until route/timebase evidence
+    is made stable or a separate wired known-good output into the iRig is
+    available for same-window validation.
+
 ## 2026-06-18: HAL Prepared Runtime Binding Contract
 
 - Scope:

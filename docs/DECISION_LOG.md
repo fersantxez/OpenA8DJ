@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2026-06-18 - Fail Closed On Current iRig Route Despite Clean Direct USB Internals
+
+Decision:
+- Block further HAL optimization, CPU-superiority, branch-promotion, and
+  Timecode Vinyl readiness claims until the current physical route/timebase is
+  revalidated.
+
+Reason:
+- Current route isolation split the problem cleanly. The iRig idle capture is
+  quiet enough at rest, and direct USB internal diagnostics are perfect:
+  `written`, `consumed`, `written_consumed`, and decoded USB alignment all
+  score `1.000000`, SNR `999`, with zero USB check errors.
+- The analog iRig capture of that same direct USB signal still fails product
+  and audiophile metrics: soundcheck SNR floor `5.43 dB`, corrected
+  audiophile WAV SNR about `5.6/5.9 dB`, active mid-band coherence below
+  `0.9`, and delay p95 `12.6` frames.
+
+Evidence:
+- `/Users/fer/dev/audio8djcpp/local-analysis/irig-capture-isolation/20260618T092436Z-irig-idle-current-route`
+- `/Users/fer/dev/audio8djcpp/local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s`
+
+Alternatives discarded:
+- Treating direct USB as a product pass: rejected because internal digital
+  cleanliness does not prove analog route quality or HAL timing quality.
+- Continuing random HAL performance probes: rejected because degraded
+  measurement can make CPU wins and quality regressions indistinguishable.
+- Declaring iRig broken: rejected because idle capture is clean and the device
+  is visible/capturing; the failing condition is signal-bearing route
+  quality/timebase.
+
+Next implication:
+- No C++ candidate is ready for hardware/product claims, no code should be
+  promoted over mainline, and the next physical step must be route/timebase
+  validation before any optimization benchmark.
+
 ## 2026-06-18: Bind Prepared Runtime Physical Windows to Offline Artifact Hash
 
 Decision:
