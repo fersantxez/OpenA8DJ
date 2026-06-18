@@ -2518,3 +2518,9 @@ Current implication:
     exposes the capture physical-transfer flag, defaults remain legacy-safe,
     capture pool/queue/timing use the physical size, and capture-paced playback
     does not truncate larger capture completions.
+  - Lock-gated HAL safety evidence now exists for the opt-in capture-batched
+    candidate. Run
+    `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety`
+    loaded the candidate, enumerated `Open Audio 8 DJ` as 8 in / 8 out,
+    preserved `iRig Stream`, then unloaded the HAL and left CoreAudio clean.
+    This is install/reload safety only, not audio quality or CPU superiority.

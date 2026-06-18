@@ -10400,3 +10400,49 @@ Full offline gate rerun:
   - It is not proof of better sound, lower CPU, Traktor/timecode readiness, or
     branch-promotion readiness. Those remain blocked until same-window physical
     metrics beat mainline.
+
+## 2026-06-18 Capture ISO64 HAL Candidate Safety Load
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Rebuilt the HAL candidate with:
+    `HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8
+    HAL_PLAYBACK_ISO_FRAMES=8`.
+  - Ran one lock-gated HAL install/reload/enumeration/unload cycle.
+  - This touched HAL installation/reload and restarted CoreAudio under the
+    global hardware lock.
+  - It did not play audio, record audio, change default devices, change sample
+    rate or buffer size, reset USB, install a DriverKit dext/System Extension,
+    reboot, or leave the HAL loaded.
+- Commands:
+  - `make -B hal HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --run-dir local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety`
+  - `./build/audio-list`
+- Results:
+  - `hal_candidate_safety=PASS`.
+  - During load, CoreAudio enumerated:
+    `Open Audio 8 DJ uid=org.opena8dj.Audio8DJ in=8 out=8 rate=48000`.
+  - `required_device=PASS`.
+  - `iRig Stream` remained visible with `in=2 out=2 rate=48000`.
+  - Guard while loaded: `audio_stack_health=PASS`,
+    `global_cpu_idle_pct=93.71`, `opena8dj_driver.cpu_pct=0.0`.
+  - Post-unload guard: `opena8dj_state=unloaded`,
+    `opena8dj_driver.pids=none`, `audio_stack_health=PASS`,
+    `global_cpu_idle_pct=83.74`.
+  - Final live `audio-list` after unload showed only `iRig Stream`,
+    `MacBook Air Microphone`, and `MacBook Air Speakers`; the C++ HAL was not
+    left active.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety`
+  - `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety/summary.txt`
+  - `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety/cycle-1/guard/audio-list.txt`
+  - `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety/cycle-1/post-unload-guard/summary.txt`
+- Interpretation:
+  - The opt-in capture-batched HAL candidate can be installed, enumerate as
+    8x8, preserve the iRig, and unload cleanly.
+  - This is still not an audiophile-quality, routing, timecode, or performance
+    proof. The current physical-window preflight still blocks promotion because
+    no wired non-Audio8 known-good output source is visible; only `MacBook Air
+    Speakers` is available and that acoustic path is rejected for promotion.
