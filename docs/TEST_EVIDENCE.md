@@ -15610,3 +15610,39 @@ Follow-up correction:
   - The stable gate now requires the hot-path physical conclusion to be present
     and labeled diagnostic-only.
   - A post-commit gate rerun is required before any clean stable-load claim.
+
+## 2026-06-18 - Post-Commit Hot-Path Stable Load Freshness Gate
+
+- Scope:
+  - Reran the full offline gate suite after commit `45dd277`.
+  - Did not install, unload, reload, play audio, record audio, change CoreAudio,
+    change USB, change defaults, or touch hardware.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+  - `local-analysis/cpp-offline/hot-path-timing-analysis.json`
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+- Result:
+  - Debug CTest: `86/86` PASS.
+  - Release CTest: `87/87` PASS.
+  - Evidence schema: PASS with `required_files=109`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Freshness: PASS with `head_commit=45dd277`,
+    `summary_base_commit=45dd277`, `summary_matches_head=true`, and
+    `working_tree_clean_for_claim=true`.
+  - Offline summary: `status=PASS`, `diagnostic_status=PASS`,
+    `product_readiness_status=FAIL`, `final_objective_status=NOT_READY`,
+    `branch_promotion_allowed=false`.
+  - Hot-path attribution remains
+    `fixed_queue_requeue_enqueue_dominant`,
+    `fixed_queue_to_playback_fill_ratio=18.463729`,
+    `capture_zero_complete_per_capture_transfer=3.635914`, and
+    `capture_transaction_errors_per_capture_transfer=3.635914`.
+- Interpretation:
+  - This is the current stable diagnostic load closure.
+  - Human/product readiness is still blocked. The next allowed window is
+    lock-gated source-reference/mainline/C++ physical A/B plus CPU comparison,
+    followed by Timecode Vinyl physical validation.
