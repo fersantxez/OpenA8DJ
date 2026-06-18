@@ -11110,3 +11110,20 @@ Full offline gate rerun:
   - The guard is active and correctly blocks C++ LTI claim use.
   - The C++ analyzer needs closer Welch/CSD or reconstruction parity before it
     can replace Python/SciPy for claim-critical LTI evidence.
+
+Full offline gate after commit:
+- Commit:
+  - `ee3f3c174d5a87b08441c9d7060aaaac9ae455d2`
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Debug/offline CTest: `67/67 PASS`
+  - Release CTest: `68/68 PASS`
+  - Evidence schema: `required_files=71`, `missing_files=0`
+  - Freshness/provenance: `PASS`
+  - `working_tree_clean_for_claim=true`
+  - `claimable_current_candidate=true`
+- Product interpretation:
+  - This is current offline evidence for the committed C++ candidate only.
+  - It does not authorize audio-quality, CPU/resource, Traktor/timecode vinyl,
+    hardware-readiness, branch-promotion, or mainline-replacement claims.

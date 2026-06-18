@@ -2654,3 +2654,19 @@ Current implication:
     Python/SciPy oracle, physical-window wiring, comparator requirements, and
     product-claim blocker all remain present. This does not prove sound quality;
     it prevents missing analyzer evidence from being treated as good enough.
+  - Current committed candidate `ee3f3c174d5a87b08441c9d7060aaaac9ae455d2`
+    adds `opena8djcpp_lti_transfer_quality_parity_gate`. The full offline gate
+    passes on a clean worktree with Debug/offline CTest `67/67`, Release CTest
+    `68/68`, evidence schema `required_files=71` and `missing_files=0`, and
+    provenance freshness `PASS`.
+  - The new LTI parity guard currently reports `lti_parity_pass=false` and
+    `cpp_lti_claim_allowed=false`. This is intentional fail-closed behavior:
+    the native C++ LTI self-test is useful diagnostically, but it is not
+    numerically equivalent to the Python/SciPy oracle on saved physical
+    evidence. Product claims must continue to use the Python/SciPy LTI oracle
+    until C++ parity passes.
+  - A short-lived experiment attempted to move the C++ analyzer closer to the
+    SciPy Welch/CSD reconstruction path. It was not kept because the full-length
+    FFT/IFFT approach was too slow for a mandatory gate and regressed the
+    existing self-test. The stable tree keeps the guard and explicitly records
+    the parity blocker instead of lowering thresholds.

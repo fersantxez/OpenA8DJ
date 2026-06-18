@@ -3790,3 +3790,51 @@ Risk:
 - Next recommended action:
   - Add a schema-compatible C++ `lti_transfer_quality` tool and a parity gate
     against the existing Python output on saved evidence.
+
+## 2026-06-18 Architect Integration: Existing Subagent Queue After ee3f3c1
+
+- Architect status:
+  - New spawn attempt for a dedicated LTI parity analyst failed because the
+    thread had reached the subagent limit.
+  - Existing completed subagents were queried and their results were integrated
+    instead of duplicating work.
+- Safety:
+  - No subagent was authorized to touch hardware/audio/CoreAudio/USB.
+  - Mainline `/Users/fer/dev/opena8dj` and Rust
+    `/Users/fer/dev/audio8djrust` remain read-only learning sources.
+- Ampere (`019ed86e-57d9-7c13-ae5d-1f1dc33c809c`):
+  - Finding: the closest runtime path is `AudioDriverSkeleton` plus
+    `PreparedTransportBackend`, `PreparedUsbSubmitPlanner`, and
+    `PreparedUsbRequestPool`; the extension source still needs real DriverKit
+    SDK/runtime binding and USBDriverKit completion behavior before hardware
+    readiness.
+  - Next action: compile-only DriverKit SDK binding gate, then fake async
+    USBDriverKit request interface with cancellation/restart races.
+- Banach (`019ed889-50ec-71b0-aafc-0fc936e5ac36`):
+  - Finding: the top remaining claim-critical Python/SciPy dependencies are
+    LTI transfer quality, fractional time-warp, and runtime discontinuity
+    correlation.
+  - Integrated action: `opena8djcpp_lti_transfer_quality_parity_gate` now
+    prevents C++ LTI from replacing Python/SciPy until numerical parity passes.
+- Pascal (`019ed798-3e9c-7f41-8f84-a94f82051179`):
+  - Finding: prepared transport must become real HAL/DriverKit submit cadence
+    reduction, not accounting-only.
+  - Next action: add a bridge/wrapper around real capture/playback submit paths
+    only when it exposes actual submit-attempt/queued counters and fails closed
+    if enqueue pressure is not reduced.
+- Pasteur (`019ed7de-a957-7f62-84f6-d130065e7f22`):
+  - Finding: request shutdown/cancel/restart lifecycle remains a key offline
+    blocker.
+  - Next action: require late-completion-after-stop and restart-after-cancel
+    behavior in the request lifecycle gate before any new physical candidate.
+- Singer (`019ed86e-28f5-7413-9911-961ed7d7a48f`):
+  - Finding: HAL runtime still directly calls `enqueueIORequestWithData` in the
+    audio path; current counters can attribute submit cadence, but not claim
+    reduction yet.
+  - Next action: introduce default-off wrappers before changing cadence.
+- Raman (`019ed827-dc26-7693-a8a3-60ddb566472a`):
+  - Finding: the next physical command should be route-only known-good
+    non-Audio8 output to iRig capture, producing evidence under
+    `local-analysis/physical-superiority-window/...`.
+  - Next action: only after explicit lock-gated window, run route
+    revalidation; do not run mainline-vs-C++ A/B until route passes.
