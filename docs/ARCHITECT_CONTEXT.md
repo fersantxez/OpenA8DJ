@@ -36,6 +36,17 @@ Branch: `driverkit/cpp-redesign`
   Product readiness remains FAIL because same session route validation,
   mainline/C++ physical A/B, CPU superiority, and Timecode Vinyl physical
   evidence are still missing.
+- 12:59 EDT physical diagnostic update: a lock-gated Direct USB Pair A run
+  under `local-analysis/direct-usb-soundcheck/20260618T1658Z-direct-usb-diag-rc94e7817-irig-pairA-8s`
+  proves the internal USB payload path is clean (`usb_alignment_score=1.0`,
+  USB SNR `999 dB`, `usb_check_errors=0`, `usb_panic_flags=0`) while the
+  physical iRig capture still fails (`quality_alignment_score=0.836459`, SNR
+  floor `-10.776581 dB`, zero clipping, zero native lag jumps). The adjacent
+  iRig idle capture has RMS `0.00065060`, peak `0.01190186`, and energy from
+  frame `0`. Current attribution is downstream of clean USB payload: physical
+  analog/capture route, mixer monitoring, gain staging, or iRig-side capture
+  state. Do not spend the remaining window on product A/B or Timecode Vinyl
+  certification until the route is validated.
 - Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
   remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus

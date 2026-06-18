@@ -38,7 +38,9 @@
 
 - Scope:
   - Regenerated the local distribution package with `make dist` after the RC
-    closure plan was committed.
+    closure plan was committed. The offline gate also runs `make dist`, so the
+    authoritative PKG/DMG hashes are the hashes read from
+    `build/OpenA8DJ-0.3.25-checksums.txt` after the final gate run.
   - This wrote only local build/package artifacts under
     `/Users/fer/dev/audio8djcpp/build`; it did not install, load, unload,
     activate DriverKit, restart CoreAudio, reset USB, change defaults, play, or
@@ -46,16 +48,48 @@
 - Result:
   - HAL executable SHA-256:
     `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
-  - PKG SHA-256:
-    `801319d9ea5b019153dd55ce879430c07652f241998772faa2a2a715a31c5a2a`
-  - DMG SHA-256:
-    `647c03c4315609b2957e137ea8a0138a7fe26fd2825a70bf6596522a1caffcd6`
   - Checksum file:
     `build/OpenA8DJ-0.3.25-checksums.txt`
 - Interpretation:
   - These artifacts are suitable for a lock-gated diagnostic install window if
     the hardware preflight allows it. They still do not prove product quality,
     CPU/resource superiority, or Timecode Vinyl physical readiness.
+
+## 2026-06-18: Lock-Gated Direct USB Route Recheck
+
+- Scope:
+  - Ran a lock-gated Direct USB Pair A diagnostic from Audio 8 DJ output into
+    `iRig Stream` capture at `48 kHz`, `8` seconds, target `-16 dB`, with USB
+    diagnostics enabled.
+  - Ran a lock-gated iRig idle capture immediately afterward.
+  - No driver install/load/unload, DriverKit activation, default-device change,
+    CoreAudio restart, USB reset, or service restart was performed.
+- Evidence:
+  - Direct USB diagnostic:
+    `local-analysis/direct-usb-soundcheck/20260618T1658Z-direct-usb-diag-rc94e7817-irig-pairA-8s`
+  - Earlier non-diagnostic false start:
+    `local-analysis/direct-usb-soundcheck/20260618T1655Z-direct-usb-rc94e7817-irig-pairA-8s`
+  - iRig idle capture:
+    `local-analysis/irig-capture-isolation/20260618T1656Z-irig-idle-after-direct-usb-94e7817`
+- Result:
+  - USB internal path is clean: USB alignment `1.000000`, USB SNR `999 dB`,
+    `usb_check_errors=0`, `usb_panic_flags=0`.
+  - Physical iRig capture still fails: quality alignment `0.836459`, SNR floor
+    `-10.776581 dB`, mid-band residual ratio `5.074354`, high-band residual
+    ratio `3.880426`, zero clipping, zero native lag jumps.
+  - Time-warp analysis does not explain the failure:
+    `fractional_time_warp_rejected`, scalar improvement `1.861610 dB`, matrix
+    improvement `1.868690 dB`.
+  - C++/Python audiophile path remains failed: audiophile alignment `0.321666`,
+    audiophile SNR floor `-8.985880 dB`, delay p95 `16169.8` frames.
+  - iRig idle capture is not silent: RMS `0.00065060`, peak `0.01190186`,
+    energy from frame `0`, no clipping.
+- Interpretation:
+  - This is strong evidence that the current failure is downstream of the
+    clean USB payload boundary: analog/capture route, mixer monitoring, gain
+    staging, or iRig-side capture state. It blocks product quality,
+    same-session A/B, Timecode Vinyl physical readiness, CPU/resource
+    superiority, and branch promotion.
 
 ## 2026-06-18: Human-Test Milestone And Low-Risk Offline Hardening
 
