@@ -80,7 +80,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", default="build/OpenA8DJ-prepared-runtime.driver")
     parser.add_argument("--json-out", default="")
+    parser.add_argument("--slots-per-submit", type=int, default=8)
+    parser.add_argument("--logical-iso-frames", type=int, default=8)
+    parser.add_argument("--playback-base-iso-frames", type=int, default=8)
+    parser.add_argument("--capture-queue", type=int, default=8)
+    parser.add_argument("--playback-queue", type=int, default=8)
     args = parser.parse_args()
+    if args.slots_per_submit < 2:
+        raise ValueError("--slots-per-submit must be at least 2")
+    if args.logical_iso_frames <= 0 or args.playback_base_iso_frames <= 0:
+        raise ValueError("ISO frame counts must be positive")
+    capture_iso_frames = args.logical_iso_frames * args.slots_per_submit
+    playback_coalesce_transfers = capture_iso_frames // args.playback_base_iso_frames
+    if playback_coalesce_transfers * args.playback_base_iso_frames != capture_iso_frames:
+        raise ValueError("--playback-base-iso-frames must divide logical_iso_frames * slots_per_submit")
 
     candidate = resolve_path(args.candidate)
     require_inside_root(candidate, "--candidate")
@@ -90,7 +103,21 @@ def main() -> int:
     if json_out is not None:
         require_inside_root(json_out, "--json-out")
 
-    prepared_rc, prepared_stdout, prepared_stderr = run(["make", "-B", "hal-prepared-runtime"])
+    prepared_rc, prepared_stdout, prepared_stderr = run(
+        [
+            "make",
+            "-B",
+            "hal",
+            "HAL_PREPARED_USB_SUBMIT_RUNTIME=1",
+            f"HAL_PREPARED_USB_SLOTS_PER_SUBMIT={args.slots_per_submit}",
+            f"HAL_ISO_FRAMES={args.logical_iso_frames}",
+            f"HAL_CAPTURE_ISO_FRAMES={capture_iso_frames}",
+            f"HAL_PLAYBACK_ISO_FRAMES={args.playback_base_iso_frames}",
+            f"HAL_PLAYBACK_COALESCE_TRANSFERS={playback_coalesce_transfers}",
+            f"HAL_CAPTURE_QUEUE={args.capture_queue}",
+            f"HAL_PLAYBACK_QUEUE={args.playback_queue}",
+        ]
+    )
     copied = False
     if prepared_rc == 0 and DEFAULT_HAL_BIN.is_file():
         if candidate.exists():
@@ -147,12 +174,12 @@ def main() -> int:
         "result": "PASS" if passed else "FAIL",
         "candidate": str(candidate),
         "prepared_runtime_enabled": True,
-        "prepared_runtime_slots_per_submit": 8,
-        "logical_iso_frames": 8,
-        "capture_iso_frames": 64,
-        "playback_base_iso_frames": 8,
-        "playback_coalesce_transfers": 8,
-        "expected_submit_reduction_ratio": 8,
+        "prepared_runtime_slots_per_submit": args.slots_per_submit,
+        "logical_iso_frames": args.logical_iso_frames,
+        "capture_iso_frames": capture_iso_frames,
+        "playback_base_iso_frames": args.playback_base_iso_frames,
+        "playback_coalesce_transfers": playback_coalesce_transfers,
+        "expected_submit_reduction_ratio": args.slots_per_submit,
         "physical_evidence_present": False,
         "product_claim_allowed": False,
         "prepared_candidate": prepared_metrics,

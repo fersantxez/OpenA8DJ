@@ -802,7 +802,7 @@ NativeMetrics analyze(const std::filesystem::path& run_dir,
   const std::size_t cap_rough_start = first_signal_index(capture.frames);
   const auto rate = reference.sample_rate;
   const auto fit_frames = std::min({reference.frames.size() - ref_start,
-                                    static_cast<std::size_t>(rate / 10U),
+                                    static_cast<std::size_t>(rate),
                                     capture.frames.size()});
   if (fit_frames < rate / 20U) {
     throw std::runtime_error("not_enough_audio_for_alignment");
@@ -965,6 +965,15 @@ void print_json_number(double value) {
 
 int main(int argc, char** argv) {
   try {
+    if (argc >= 2 && std::string(argv[1]) == "--health-check") {
+      std::cout << "{\n"
+                << "  \"schema\": \"opena8djcpp.soundcheck-wav-quality.v1\",\n"
+                << "  \"result\": \"PASS\",\n"
+                << "  \"mode\": \"analyzer_health_check\",\n"
+                << "  \"meaning\": \"analyzer executable is available; no WAV evidence was judged\"\n"
+                << "}\n";
+      return 0;
+    }
     const auto root = repo_root(argv);
     std::filesystem::path run_dir;
     if (argc >= 2) {
@@ -1016,7 +1025,7 @@ int main(int argc, char** argv) {
     std::cout << "{\n";
     std::cout << "  \"schema\": \"opena8djcpp.soundcheck-wav-quality.v1\",\n";
     std::cout << "  \"safety\": \"offline_existing_wav_evidence_only_no_audio_coreaudio_usb_or_hardware_touch\",\n";
-    std::cout << "  \"result\": \"PASS\",\n";
+    std::cout << "  \"result\": \"" << (comparison_failures == 0U ? "PASS" : "FAIL") << "\",\n";
     std::cout << "  \"run_dir\": ";
     print_json_string(run_dir.string());
     std::cout << ",\n";
@@ -1067,7 +1076,7 @@ int main(int argc, char** argv) {
               << native.residual_attribution.source_lr_correlation << "\n";
     std::cout << "  },\n";
     std::cout << "  \"parity\": {\n";
-    std::cout << "    \"result\": \"" << (comparison_failures == 0U ? "PASS" : "WARN") << "\",\n";
+    std::cout << "    \"result\": \"" << (comparison_failures == 0U ? "PASS" : "FAIL") << "\",\n";
     std::cout << "    \"comparison_count\": " << comparisons.size() << ",\n";
     std::cout << "    \"failures\": " << comparison_failures << ",\n";
     std::cout << "    \"tolerance_policy\": \"first-slice native analyzer; broad tolerance until algorithms are fully unified\"\n";
@@ -1077,7 +1086,7 @@ int main(int argc, char** argv) {
       const auto& comparison = comparisons[index];
       std::cout << "    {\"name\": ";
       print_json_string(comparison.name);
-      std::cout << ", \"result\": \"" << (comparison.pass ? "PASS" : "WARN")
+      std::cout << ", \"result\": \"" << (comparison.pass ? "PASS" : "FAIL")
                 << "\", \"native\": ";
       print_json_number(comparison.native);
       std::cout << ", \"recorded\": ";
@@ -1088,7 +1097,7 @@ int main(int argc, char** argv) {
     std::cout << "  ],\n";
     std::cout << "  \"readiness_claim\": \"ANALYZER_ONLY_NOT_PRODUCT_READINESS\"\n";
     std::cout << "}\n";
-    return 0;
+    return comparison_failures == 0U ? 0 : 1;
   } catch (const std::exception& error) {
     std::cout << "{\n"
               << "  \"schema\": \"opena8djcpp.soundcheck-wav-quality.v1\",\n"

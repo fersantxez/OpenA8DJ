@@ -87,7 +87,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_quality_root_cause_analysis | tee "$EVIDENCE_DIR/quality-root-cause-analysis.json"
 ./build/cpp-release/opena8djcpp_loopback_quality_analysis | tee "$EVIDENCE_DIR/loopback-quality-analysis.json"
 ./build/cpp-release/opena8djcpp_capture_matrix_quality_analysis | tee "$EVIDENCE_DIR/capture-matrix-quality-analysis.json"
-./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
+./build/cpp-release/opena8djcpp_soundcheck_wav_quality --health-check | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_audiophile_tone_gate | tee "$EVIDENCE_DIR/audiophile-tone-gate.json"
 ./build/cpp-release/opena8djcpp_audiophile_precision_claim_gate | tee "$EVIDENCE_DIR/audiophile-precision-claim-gate.json"

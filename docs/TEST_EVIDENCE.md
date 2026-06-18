@@ -11894,3 +11894,50 @@ Full offline gate after commit:
   - `./scripts/run-cpp-offline-gates` after this instrumentation passed Debug
     `77/77` and Release `78/78`, with product claims still blocked; provenance
     was blocked only because these edits were not yet committed.
+## 2026-06-18 - Physical HAL Output Surface Investigation
+
+- Commit under test: `d84b85f` plus local candidates, worktree `/Users/fer/dev/audio8djcpp`, branch `driverkit/cpp-redesign`.
+- Safety: all physical runs used the global hardware lock. No mainline or Rust files were edited. No default devices were changed.
+- Recovery/blocker evidence: `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/20260618T075827Z-kill-pioneer-fwupdatemanagerd-audio8-usb`.
+  - Finding: Pioneer `FwUpdateManagerd` held Audio 8 DJ USB user clients and prevented HAL USB open.
+  - Result: process killed under lock; later HAL starts could open USB.
+- Prepared runtime trace before blocker removal: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T075441Z-prepared-candidate-trace-start-d84b85f`.
+  - Result: fail; `AudioDeviceStart failed: 2003329396`, USB open failed.
+- Prepared runtime after blocker removal: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T075857Z-prepared-candidate-trace-after-fwupdate-kill-d84b85f`.
+  - Result: fail; `quality_alignment_score=-0.051974`, `analog_snr_db=-37.72`, `lag_jumps_gt_2_frames=29`, no clipping.
+- Prepared runtime slots2: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T080928Z-prepared-slots2-trace-after-fwupdate-kill`.
+  - Result: fail; `quality_alignment_score=-0.029898`, `analog_snr_db=-28.43`, `lag_jumps_gt_2_frames=10`, no clipping.
+- Direct USB control: `/Users/fer/dev/audio8djcpp/local-analysis/direct-usb-soundcheck/20260618T080559Z-direct-usb-after-fwupdate-kill-pairA-8s`.
+  - Result: diagnostic fail against strict thresholds but route/control is alive; `quality_alignment_score=0.958587`, `snr_db_min=9.775`, `lag_jumps_gt_2_frames=0`, no clipping.
+- Default HAL no-trace: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T081331Z-default-hal-notrace-after-fwupdate-kill`.
+  - Result: fail; `quality_alignment_score=0.326384`, `analog_snr_db=-17.28`, `lag_jumps_gt_2_frames=29`, no clipping.
+- `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082010Z-ignore-sampletime-after-fwupdate-kill`.
+  - Result: fail/worse; `quality_alignment_score=-0.065227`, `analog_snr_db=-37.29`, `lag_jumps_gt_2_frames=21`, no clipping.
+- `HAL_FLUSH_OUTPUT_IN_WRITE_MIX=1`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082130Z-flush-write-mix-after-fwupdate-kill`.
+  - Result: fail/worse; `quality_alignment_score=-0.040334`, `analog_snr_db=-31.42`, `lag_jumps_gt_2_frames=25`, no clipping.
+- `HAL_OUTPUT_STREAMS=1 HAL_STREAM_USAGE=0`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082250Z-outputstreams1-after-fwupdate-kill`.
+  - Result: best current HAL evidence but still fail; `quality_alignment_score=0.975550`, `analog_snr_db=10.70`, `lag_jumps_gt_2_frames=25`, `click_outliers=15`, no clipping.
+  - Decision from evidence: make one 8-channel output stream the HAL default and continue reducing timing noise/clicks before any readiness claim.
+- Same-session diagnostic against existing dirty-mainline bundle: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082712Z-same-session-mainline-existing-vs-cpp-outputstreams1`.
+  - Result: fail/no promotion. The existing mainline bundle scored `quality_alignment_score=-0.034410`; the C++ candidate scored `quality_alignment_score=0.146341` in legacy metrics, but audiophile analyzers showed C++ alignment near `0.965` with about `10.5 dB` SNR. This run was diagnostic only because known-good route validation was skipped and the mainline worktree is dirty/read-only.
+- Analyzer discrepancy found:
+  - Runs such as `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T083022Z-default-outputstreams1-streamusage0` and `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T083340Z-default-outputstreams1-after-direct-usb-control` show legacy `metrics.json` quality near `0.04-0.17` while native/audiophile analyzers show alignment near `0.965`.
+  - Product claims remain blocked. Until the analyzer discrepancy is resolved, decisions must be fail-closed and prefer dual C++/Python audiophile agreement plus native WAV reanalysis over the legacy console score.
+- Analyzer correction:
+  - `scripts/run-physical-superiority-window` now uses `--max-lag 48000` instead of `360000`.
+  - `scripts/analyze-soundcheck-capture.py` and `tools/soundcheck_wav_quality.cpp` now use a 1-second alignment fit instead of 0.1 seconds.
+  - `tools/soundcheck_wav_quality.cpp` now fails closed when native-vs-recorded metrics disagree; CTest uses `--health-check` so binary health is separate from evidence judgment.
+- Fresh bounded-lag/fixed-analyzer HAL run: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T084406Z-default-outputstreams1-fixed-analyzers`.
+  - Result: fail, now for coherent reasons. `quality_alignment_score=0.974196`, `analog_snr_db=10.75`, `lag_jumps_gt_2_frames=19`, `click_outliers=4`, no clipping. Native parity passed; Python/C++ audiophile analyzers both failed with alignment near `0.965` and SNR near `10.6 dB`.
+  - Readiness impact: measurement ambiguity is reduced, but product quality remains blocked by SNR, delay/jitter, residual ratios, and clicks.
+- `HAL_OUTPUT_SAMPLE_TIME_FOLLOWER=1` on the one-stream/no-stream-usage profile: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T083729Z-outputstreams1-follower`.
+  - Result: no improvement. Audiophile Python alignment `0.965622`, SNR about `10.44/10.72 dB`, delay p95 `5.3` frames, still fail.
+- Offline gates after prepared-builder configurability change:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Result: tests passed, but provenance gate blocked claims because the worktree had uncommitted changes. This was expected and prevents false readiness claims.
+- Offline gates after analyzer fail-closed semantics fix:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Result: script exited `0`; Debug CTest passed `77/77`, Release CTest passed `78/78`, and diagnostic PASS semantics gate passed.
+  - The soundcheck WAV analyzer now separates executable health check from WAV evidence judgment. WAV parity disagreements return `FAIL`; health-check mode returns `PASS` only as analyzer availability, not product readiness.
+  - Provenance freshness still reported `result=FAIL` before commit because the worktree contained this local patch set. This blocks current-candidate claims until the patch is committed and the gate is rerun on the new HEAD.
+  - Product quality remains blocked by current physical evidence: no archived run meets the audiophile SNR, click, lag-jump, route-validity, same-session mainline/C++ comparison, CPU, or timecode-vinyl promotion requirements.

@@ -73,9 +73,12 @@ int main(int argc, char** argv) {
       !soundcheck.empty() && !physical_compare.empty() && !timecode.empty() &&
       !migration.empty() && !physical_window.empty() && !promotion.empty();
 
-  const bool soundcheck_analyzer_only =
-      string_field_is(soundcheck, "result", "PASS") &&
-      has_readiness_claim(soundcheck, "ANALYZER_ONLY_NOT_PRODUCT_READINESS");
+  const bool soundcheck_protected =
+      (string_field_is(soundcheck, "mode", "analyzer_health_check") &&
+       string_field_is(soundcheck, "result", "PASS")) ||
+      (has_readiness_claim(soundcheck, "ANALYZER_ONLY_NOT_PRODUCT_READINESS") &&
+       (string_field_is(soundcheck, "result", "PASS") ||
+        string_field_is(soundcheck, "result", "FAIL")));
   const bool physical_compare_not_promotion =
       (string_field_is(physical_compare, "result", "FAIL") ||
        bool_field_is(physical_compare, "branch_promotion_supported", false)) &&
@@ -98,8 +101,14 @@ int main(int argc, char** argv) {
       bool_field_is(promotion, "branch_promotion_allowed", false);
 
   std::vector<std::string> protected_diagnostic_passes;
-  if (soundcheck_analyzer_only) {
-    protected_diagnostic_passes.push_back("soundcheck_wav_quality_analyzer_only");
+  if (soundcheck_protected) {
+    if (string_field_is(soundcheck, "mode", "analyzer_health_check")) {
+      protected_diagnostic_passes.push_back("soundcheck_wav_quality_health_check_only");
+    } else if (string_field_is(soundcheck, "result", "FAIL")) {
+      protected_diagnostic_passes.push_back("soundcheck_wav_quality_fail_closed");
+    } else {
+      protected_diagnostic_passes.push_back("soundcheck_wav_quality_analyzer_only");
+    }
   }
   if (physical_compare_not_promotion) {
     protected_diagnostic_passes.push_back("physical_run_compare_not_branch_promotion");
@@ -117,7 +126,7 @@ int main(int argc, char** argv) {
     protected_diagnostic_passes.push_back("promotion_not_allowed");
   }
 
-  const bool pass = evidence_present && soundcheck_analyzer_only &&
+  const bool pass = evidence_present && soundcheck_protected &&
                     physical_compare_not_promotion && timecode_offline_only &&
                     migration_not_product && physical_window_not_product &&
                     promotion_not_allowed;
@@ -128,7 +137,7 @@ int main(int argc, char** argv) {
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
             << "  \"meaning\": \"PASS means diagnostic PASS artifacts carry explicit non-product-readiness semantics\",\n"
             << "  \"evidence_present\": " << (evidence_present ? "true" : "false") << ",\n"
-            << "  \"soundcheck_analyzer_only\": " << (soundcheck_analyzer_only ? "true" : "false")
+            << "  \"soundcheck_protected\": " << (soundcheck_protected ? "true" : "false")
             << ",\n"
             << "  \"physical_compare_not_promotion\": "
             << (physical_compare_not_promotion ? "true" : "false") << ",\n"

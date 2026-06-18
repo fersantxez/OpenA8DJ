@@ -710,7 +710,7 @@ def compare_pair(ref,
     got_rough_start = first_signal_index(got)
     fit_frames = min(len(ref) - ref_start,
                      int(max_seconds * rate) if max_seconds > 0 else len(ref),
-                     int(rate * 0.1))
+                     int(rate * 1.0))
     if fit_frames < rate // 20:
         raise SystemExit("reference audio is too short for alignment")
     got_total_frames = len(got)

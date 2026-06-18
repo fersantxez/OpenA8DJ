@@ -8170,3 +8170,33 @@ Next implication:
 - Commit and rerun freshness gates, then run one short lock-gated prepared
   candidate diagnostic. Its first purpose is attribution of the playback
   rejection cause, not audio-quality or branch-promotion evidence.
+## 2026-06-18 - HAL Default Output Surface Moves To One 8-Channel Stream
+
+- Decision: default HAL builds now expose one 8-channel output stream instead of four 2-channel output streams and disable output stream usage (`HAL_OUTPUT_STREAMS ?= 1`, `HAL_STREAM_USAGE ?= 0`).
+- Reason: lock-gated same-machine physical evidence after killing the Pioneer firmware updater USB blocker showed the four-stream HAL path corrupts output timing/layout materially. The default no-trace HAL scored `quality_alignment_score=0.326384` with `lag_jumps_gt_2_frames=29`, while the one-stream candidate scored `quality_alignment_score=0.975550` with the same Audio 8 DJ -> iRig route and no capture clipping.
+- Alternatives rejected for the current default:
+  - `HAL_IGNORE_OUTPUT_SAMPLE_TIME=1`: physical run scored `quality_alignment_score=-0.065227`, worse than default.
+  - `HAL_FLUSH_OUTPUT_IN_WRITE_MIX=1`: physical run scored `quality_alignment_score=-0.040334`, worse than default.
+  - prepared runtime as default: rejected for product quality until physical quality passes; prepared 8-slot and 2-slot runs failed badly even when submit counters worked.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T081331Z-default-hal-notrace-after-fwupdate-kill`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082010Z-ignore-sampletime-after-fwupdate-kill`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082130Z-flush-write-mix-after-fwupdate-kill`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T082250Z-outputstreams1-after-fwupdate-kill`
+- Readiness impact: this is a strong quality improvement but not product readiness. The one-stream candidate still fails strict gates: `analog_snr_db=10.70`, `lag_jumps_gt_2_frames=25`, `click_outliers=15`, and audiophile analyzers fail.
+
+## 2026-06-18 - Post-Reboot Autologin/Codex Recovery Still Broken
+
+- Decision: keep reboot recovery as an explicit operational blocker, not part of the audio-quality candidate.
+- Reason: the system did not recover Codex automatically after reboot earlier in this work session even though the user needed no-human-login continuation. This must be fixed before planned reboot-dependent hardware windows.
+- Readiness impact: no driver readiness or branch-promotion claim may depend on unattended reboot recovery until there is fresh evidence that login/Codex resume works.
+
+## 2026-06-18 - WAV Analyzer Disagreements Fail Closed
+
+- Decision: native soundcheck WAV analysis now returns `FAIL` when native-vs-recorded metric parity disagrees, and CTest uses explicit `--health-check` mode so executable availability is not confused with evidence quality.
+- Reason: the old analyzer could emit a diagnostic `PASS` while hiding disagreement between the native C++ analyzer and recorded metrics. That is unacceptable for audiophile readiness because it can turn ambiguous captures into false confidence.
+- Alternatives rejected:
+  - Keep broad `WARN` parity semantics: rejected because downstream gates could treat the artifact as softer than it is.
+  - Keep CTest judging archived WAV evidence by default: rejected because stale physical evidence can fail for correct reasons and should not make binary health checks flaky.
+- Evidence: `./scripts/run-cpp-offline-gates` passed after the gate update, while product quality and branch promotion remained blocked.
+- Readiness impact: analyzer health can pass independently, but WAV evidence must pass dual analyzer/parity requirements before any quality claim.
