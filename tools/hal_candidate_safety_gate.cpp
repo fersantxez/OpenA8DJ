@@ -89,18 +89,24 @@ void print_string_array(const char* name, const std::vector<std::string>& values
   std::cout << "],\n";
 }
 
-std::optional<SafetyRun> latest_run(const std::filesystem::path& root) {
-  const auto runs_root = root / "local-analysis/hal-candidate-safety";
+void scan_runs_root(const std::filesystem::path& runs_root, std::optional<SafetyRun>& latest) {
   if (!std::filesystem::is_directory(runs_root)) {
-    return std::nullopt;
+    return;
   }
-  std::optional<SafetyRun> latest;
   for (const auto& entry : std::filesystem::directory_iterator(runs_root)) {
     if (!entry.is_directory()) {
       continue;
     }
     const auto summary = entry.path() / "summary.txt";
     if (!std::filesystem::is_regular_file(summary)) {
+      continue;
+    }
+    const auto manifest = entry.path() / "manifest.txt";
+    const std::string summary_text = read_file(summary);
+    const std::string manifest_text = read_file(manifest);
+    const bool safety_like_run = contains(summary_text, "hal_candidate_safety=") ||
+                                 contains(manifest_text, "required_device_uid=");
+    if (!safety_like_run) {
       continue;
     }
     std::error_code error;
@@ -116,6 +122,12 @@ std::optional<SafetyRun> latest_run(const std::filesystem::path& root) {
       latest = run;
     }
   }
+}
+
+std::optional<SafetyRun> latest_run(const std::filesystem::path& root) {
+  std::optional<SafetyRun> latest;
+  scan_runs_root(root / "local-analysis/hal-candidate-safety", latest);
+  scan_runs_root(root / "local-analysis/human-test-candidate", latest);
   return latest;
 }
 

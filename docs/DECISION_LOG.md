@@ -9445,3 +9445,34 @@ Next implication:
   lock-gated action is fresh HAL safety smoke before diagnostic install; the
   next product action remains known-good route validation followed by
   same-session mainline/C++ A/B, CPU, and Timecode Vinyl evidence.
+
+## 2026-06-18 - Fresh HAL Safety Smoke Passed After Longer Settle Window
+
+- Decision: consume HAL safety evidence from `local-analysis/human-test-candidate`
+  as well as `local-analysis/hal-candidate-safety`, and use the latest safety
+  run as the RC gate input.
+- Reason: the current RC smoke was run from the human-test window path. If the
+  offline gate only scanned the old safety directory, it would keep reporting a
+  stale safety failure after a newer, cleaner safety pass.
+- Evidence:
+  - First smoke:
+    `local-analysis/human-test-candidate/20260618T154741Z-fresh-hal-safety-smoke`
+    failed because `coreaudiod` sampled at `106.4%` and total watched audio
+    stack CPU at `136.2%`. It still enumerated `Open Audio 8 DJ` as 8x8 and
+    preserved iRig; recovery unloaded the HAL and restored audio-stack health.
+  - Second smoke:
+    `local-analysis/human-test-candidate/20260618T154903Z-fresh-hal-safety-smoke-wait15`
+    passed with `audio_stack_health=PASS`, `core_audio_enumeration=PASS`,
+    `Open Audio 8 DJ` as 8 in / 8 out, iRig visible, watched audio-stack CPU
+    `0.0%`, post-unload guard PASS, and no active HAL left loaded.
+  - Updated `opena8djcpp_hal_candidate_safety_gate` now reports
+    `safety_window_status=PASS` for the second run.
+- Alternatives rejected:
+  - Ignore the first failure: rejected because the CPU spike is a real safety
+    signal and explains why short-settle install smoke is not enough.
+  - Keep the stale safety failure in the RC gate: rejected because current
+    evidence must reflect the latest lock-gated run.
+- Readiness impact: diagnostic install is now allowed under lock from a safety
+  perspective. Product human listening, Timecode Vinyl physical readiness, CPU
+  superiority, and branch promotion remain blocked by route and comparison
+  evidence.

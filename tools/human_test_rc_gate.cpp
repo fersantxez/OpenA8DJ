@@ -180,6 +180,8 @@ int main(int argc, char** argv) {
       prepared_window_ready_for_controlled_experiment;
   const bool diagnostic_install_smoke_allowed_after_lock =
       diagnostic_rc_artifacts_ready && safety_smoke_required;
+  const bool diagnostic_install_allowed_after_lock =
+      diagnostic_rc_artifacts_ready && !safety_smoke_required;
   const bool route_revalidation_allowed_after_lock =
       diagnostic_rc_artifacts_ready && route_ready && !safety_smoke_required;
   const bool product_human_test_allowed =
@@ -251,6 +253,7 @@ int main(int argc, char** argv) {
   print_bool("diagnostic_rc_artifacts_ready", diagnostic_rc_artifacts_ready);
   print_bool("diagnostic_install_smoke_allowed_after_lock",
              diagnostic_install_smoke_allowed_after_lock);
+  print_bool("diagnostic_install_allowed_after_lock", diagnostic_install_allowed_after_lock);
   print_bool("fresh_hal_safety_smoke_required", safety_smoke_required);
   print_bool("route_revalidation_allowed_after_lock", route_revalidation_allowed_after_lock);
   print_bool("route_revalidation_ready", route_ready);
@@ -266,11 +269,15 @@ int main(int argc, char** argv) {
                "same_session_mainline_cpp_physical_ab",
                "runtime_cpu_submit_counter_comparison",
                "traktor_timecode_vinyl_physical_gate"});
-  print_string("next_required_action",
-               safety_smoke_required
-                   ? "LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL"
-                   : "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION",
-               false);
+  std::string next_required_action =
+      "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION";
+  if (safety_smoke_required) {
+    next_required_action = "LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL";
+  } else if (!route_ready) {
+    next_required_action =
+        "PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION";
+  }
+  print_string("next_required_action", next_required_action, false);
   std::cout << "}\n";
   return pass ? 0 : 1;
 }

@@ -247,9 +247,10 @@ diagnostic candidate plus a blocked decision packet, not a listening approval.
 11:45 EDT update: `opena8djcpp_human_test_rc_gate` is now the RC decision
 artifact. Current focused status is a diagnostic RC only:
 `diagnostic_rc_artifacts_ready=true`,
-`diagnostic_install_smoke_allowed_after_lock=true`, and
-`fresh_hal_safety_smoke_required=true`. Product human listening remains
-blocked with `route_revalidation_ready=false`,
+`diagnostic_install_allowed_after_lock=true`, and
+`fresh_hal_safety_smoke_required=false` after the wait15 HAL safety smoke
+passed. Product human listening remains blocked with
+`route_revalidation_ready=false`,
 `product_human_test_allowed=false`,
 `timecode_vinyl_human_test_allowed=false`,
 `cpu_superiority_claim_allowed=false`, and

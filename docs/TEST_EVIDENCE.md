@@ -13753,3 +13753,55 @@ Full offline gate after commit:
     fresh lock-gated HAL safety smoke.
   - Product human listening, Timecode Vinyl physical readiness, CPU/resource
     superiority, and branch promotion remain blocked.
+
+## 2026-06-18 - Fresh HAL Safety Smoke
+
+- Commit context: physical evidence after `ad43a8c`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Global hardware lock acquired by `scripts/test-hal-candidate-safety`.
+  - HAL bundle installed/reloaded for one safety cycle and unloaded afterward.
+  - No audio playback, recording, default-device change, sample-rate change,
+    buffer change, USB reset, Traktor/VLC/Spotify automation, or reboot.
+  - iRig visibility was checked and preserved.
+- First command:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --wait 3 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T154741Z-fresh-hal-safety-smoke`
+- First result:
+  - FAIL.
+  - `Open Audio 8 DJ` enumerated as `8 in / 8 out`.
+  - iRig Stream visible as `2 in / 2 out`.
+  - Failure reason: `coreaudiod=106.4%`, total watched audio stack `136.2%`.
+  - Recovery unloaded OpenA8DJ and returned audio-stack health to PASS.
+- Second command:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --wait 15 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T154903Z-fresh-hal-safety-smoke-wait15`
+- Second result:
+  - PASS.
+  - `Open Audio 8 DJ` enumerated as `8 in / 8 out`.
+  - iRig Stream visible as `2 in / 2 out`.
+  - `audio_stack_health=PASS`.
+  - `core_audio_enumeration=PASS`.
+  - `process.coreaudiod.cpu_pct=0.0`.
+  - `process.opena8dj_driver.cpu_pct=0.0`.
+  - Post-unload guard PASS with active HAL absent.
+  - Hardware lock released.
+- Source/build changes after the run:
+  - `tools/hal_candidate_safety_gate.cpp` now scans
+    `local-analysis/human-test-candidate` for safety runs as well as the
+    historical `local-analysis/hal-candidate-safety` path.
+  - `tools/human_test_rc_gate.cpp` now exposes
+    `diagnostic_install_allowed_after_lock`.
+- Focused verification:
+  - `opena8djcpp_hal_candidate_safety_gate`: PASS,
+    `safety_window_status=PASS`, latest run is the wait15 smoke.
+  - `opena8djcpp_human_test_rc_gate`: PASS,
+    `diagnostic_install_allowed_after_lock=true`,
+    `fresh_hal_safety_smoke_required=false`,
+    `route_revalidation_ready=false`,
+    `product_human_test_allowed=false`.
+- Readiness impact:
+  - Safety now permits a lock-gated diagnostic install/smoke path.
+  - Product listening and superiority remain blocked by missing validated
+    known-good route, failed Audio8 route matrix, missing same-session
+    mainline/C++ A/B, missing CPU superiority, and missing physical
+    Timecode Vinyl evidence.

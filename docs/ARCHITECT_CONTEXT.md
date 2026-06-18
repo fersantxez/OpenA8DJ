@@ -3111,12 +3111,13 @@ Current implication:
   physical validation.
 - Human-test RC gate update: `opena8djcpp_human_test_rc_gate` now classifies
   the 15:00 EDT candidate state explicitly. Current focused output says
-  `diagnostic_rc_artifacts_ready=true` and
-  `diagnostic_install_smoke_allowed_after_lock=true`, but also
-  `fresh_hal_safety_smoke_required=true`, `route_revalidation_ready=false`,
-  `product_human_test_allowed=false`,
+  `diagnostic_rc_artifacts_ready=true`,
+  `diagnostic_install_allowed_after_lock=true`, and
+  `fresh_hal_safety_smoke_required=false`, but also
+  `route_revalidation_ready=false`, `product_human_test_allowed=false`,
   `timecode_vinyl_human_test_allowed=false`,
   `cpu_superiority_claim_allowed=false`, and `branch_promotion_allowed=false`.
-  The next required action before any diagnostic install is a lock-gated fresh
-  HAL safety smoke; product listening still requires route validation and
+  A lock-gated HAL safety smoke passed after a longer settle window, enumerated
+  `Open Audio 8 DJ` as 8x8, preserved iRig, showed zero watched audio-stack CPU,
+  and unloaded cleanly. Product listening still requires route validation and
   same-session mainline/C++ comparison.

@@ -2633,6 +2633,9 @@ summary = {
         "diagnostic_install_smoke_allowed_after_lock": human_test_rc_gate.get(
             "diagnostic_install_smoke_allowed_after_lock"
         ),
+        "diagnostic_install_allowed_after_lock": human_test_rc_gate.get(
+            "diagnostic_install_allowed_after_lock"
+        ),
         "fresh_hal_safety_smoke_required": human_test_rc_gate.get(
             "fresh_hal_safety_smoke_required"
         ),

@@ -1032,6 +1032,7 @@ int main(int argc, char** argv) {
       bool_field_is(human_test_rc_gate, "capture_visible", true) &&
       bool_field_present(human_test_rc_gate, "diagnostic_rc_artifacts_ready") &&
       bool_field_present(human_test_rc_gate, "diagnostic_install_smoke_allowed_after_lock") &&
+      bool_field_present(human_test_rc_gate, "diagnostic_install_allowed_after_lock") &&
       bool_field_present(human_test_rc_gate, "fresh_hal_safety_smoke_required") &&
       bool_field_present(human_test_rc_gate, "route_revalidation_allowed_after_lock") &&
       bool_field_present(human_test_rc_gate, "route_revalidation_ready") &&
