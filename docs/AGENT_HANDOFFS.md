@@ -3748,3 +3748,45 @@ Risk:
 - Next recommended action:
   - Implement real prepared submit runtime or DriverKit USB transport binding,
     then run a lock-gated same-session physical CPU/quality comparison.
+
+## 2026-06-18 Subagent: Banach Analysis Dependency Audit
+
+- Agent:
+  - Banach (`019ed889-50ec-71b0-aafc-0fc936e5ac36`)
+- Mission:
+  - Audit which physical/audiophile analysis scripts still depend on Python or
+    external tools, which already have C++ equivalents, and which C++
+    conversions would most improve reproducibility and precision.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Status:
+  - Completed read-only. No files, hardware, audio, CoreAudio, or USB were
+    touched by the subagent.
+- Findings:
+  - The C++ tree now has strong native coverage for WAV analysis,
+    soundcheck-quality analysis, physical forensics, direct-USB attribution,
+    and the audiophile precision claim guard.
+  - The biggest remaining Python/SciPy dependencies that affect future
+    superiority evidence are:
+    - `scripts/analyze-lti-transfer-quality.py`;
+    - `scripts/analyze-fractional-time-warp.py`;
+    - `scripts/analyze-runtime-discontinuities.py`.
+  - `opena8djcpp_audiophile_precision_claim_gate` currently consumes the JSON
+    artifacts from those Python analyses, so schema-compatible C++ replacements
+    can reduce dependency risk without changing the claim contract.
+- Integrated action:
+  - Added `opena8djcpp_audiophile_analysis_stack_contract` to lock the current
+    dual-analyzer WAV stack as fail-closed while Python remains an oracle.
+  - Recorded the next migration order: LTI transfer quality first, fractional
+    time-warp second, runtime discontinuity/residual correlation third.
+- Risks:
+  - Migrating SciPy spectral analysis to C++ must preserve numeric behavior
+    closely enough that old evidence remains interpretable. Until parity tests
+    exist, Python should stay as a cross-check rather than be removed.
+- Next recommended action:
+  - Add a schema-compatible C++ `lti_transfer_quality` tool and a parity gate
+    against the existing Python output on saved evidence.
