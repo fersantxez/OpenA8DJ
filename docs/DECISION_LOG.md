@@ -7771,3 +7771,43 @@ Next implication:
 - After commit, rerun full offline gates so provenance is clean.
 - Next physical action is route-only revalidation under the global lock, not a
   product A/B.
+
+## 2026-06-18: Bind HAL Prepared Runtime Through Explicit Submit Dispatch
+
+Decision:
+- Added default-off submit dispatch wrappers in the HAL runtime:
+  `submitCaptureTransfer`, `enqueuePreparedCaptureSubmitWithTransfer`,
+  `submitPlaybackTransfer`, and `enqueuePreparedPlaybackSubmitWithTransfer`.
+- The normal HAL path remains the fallback. The prepared helpers are only
+  selected when `OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME` is enabled and
+  `kPreparedRuntimeGeometrySupported` is true.
+- Strengthened the binding, migration, runtime, summary, and schema gates to
+  require `prepared_runtime_dispatch_path_present=true`.
+
+Reason:
+- The separated candidate artifact was reproducible, but the HAL queue methods
+  still mixed queue policy and physical IOUSBHost submit. A dedicated dispatch
+  point makes the opt-in runtime path auditable and gives physical evidence a
+  clear place to attribute submit cadence.
+
+Evidence:
+- `make -B hal`: PASS.
+- `make hal-prepared-runtime-candidate`: PASS.
+- Focused release gates PASS:
+  - `opena8djcpp_hal_prepared_runtime_binding_contract`.
+  - `opena8djcpp_prepared_transport_migration_gate`.
+  - `opena8djcpp_hal_transport_runtime_gate` as a blocking guard.
+
+Alternatives discarded:
+- Convert `OpenA8DJUSB.m` to Objective-C++ and bind the C++
+  `PreparedUsbRequestPool` directly in this pass: rejected for now because it
+  expands build/signing/runtime risk before the current geometry-based prepared
+  candidate has physical submit-counter evidence.
+- Treat this dispatch as CPU superiority: rejected. Lower CPU and no audio
+  regression still require lock-gated same-session physical metrics.
+
+Next implication:
+- Run full offline gates after commit so provenance is fresh.
+- Next hardware action remains route-only revalidation first. Only after that
+  can the prepared-runtime candidate be compared against mainline with submit
+  counters, CPU p95, jitter, and dual audiophile WAV analyzers.

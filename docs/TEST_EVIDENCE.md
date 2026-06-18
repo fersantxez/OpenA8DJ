@@ -11464,3 +11464,37 @@ Full offline gate after commit:
     normal HAL bundle is restored after candidate creation.
   - This is not a sound-quality, CPU/resource, Timecode Vinyl, DriverKit,
     hardware-readiness, or branch-promotion claim.
+
+## 2026-06-18 HAL Prepared Runtime Submit Dispatch
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added default-off capture/playback submit dispatch helpers in
+    `src/hal/OpenA8DJUSB.m`.
+  - Strengthened binding, migration, runtime, summary, and schema gates to
+    require `prepared_runtime_dispatch_path_present=true`.
+  - No hardware, USB reset, CoreAudio mutation, driver install/reload, playback,
+    capture, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused commands:
+  - `make -B hal`
+  - `make hal-prepared-runtime-candidate`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_prepared_transport_migration_gate opena8djcpp_hal_prepared_runtime_binding_contract`
+  - `opena8djcpp_hal_prepared_runtime_binding_contract`
+  - `opena8djcpp_prepared_transport_migration_gate`
+  - `opena8djcpp_hal_transport_runtime_gate`
+- Focused result:
+  - Default HAL build: PASS.
+  - Prepared runtime candidate build: PASS.
+  - Prepared runtime binding contract: PASS.
+  - Prepared transport migration gate: PASS.
+  - HAL transport runtime gate: PASS as a guard.
+- Interpretation:
+  - The prepared-runtime HAL candidate now has an explicit runtime submit
+    dispatch path under the opt-in flag.
+  - This is still not proof of lower CPU or better sound. The runtime gate
+    still blocks product claims until lock-gated route validation and
+    same-session physical A/B demonstrate submit-rate reduction, CPU/resource
+    improvement, and no audio-quality regression against mainline.

@@ -1882,6 +1882,14 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 - (void)queueCaptureTransfer;
 - (void)queueInitialCaptureTransfers;
 - (BOOL)captureISOEnabled;
+- (BOOL)submitCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
+                  transactions:(IOUSBHostIsochronousTransaction *)transactions
+             completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                          error:(NSError **)error;
+- (BOOL)enqueuePreparedCaptureSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer
+                                    transactions:(IOUSBHostIsochronousTransaction *)transactions
+                               completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                                            error:(NSError **)error;
 - (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
                         status:(IOReturn)status
                   transactions:(IOUSBHostIsochronousTransaction *)transactions;
@@ -1889,6 +1897,16 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 - (BOOL)queuePlaybackTransfer;
 - (BOOL)queueCapturePacedPlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
 - (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
+- (BOOL)submitPlaybackTransfer:(OpenA8DJIsoTransfer *)transfer
+                   transactions:(IOUSBHostIsochronousTransaction *)transactions
+               firstFrameNumber:(uint64_t)firstFrameNumber
+              completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                           error:(NSError **)error;
+- (BOOL)enqueuePreparedPlaybackSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer
+                                     transactions:(IOUSBHostIsochronousTransaction *)transactions
+                                 firstFrameNumber:(uint64_t)firstFrameNumber
+                                completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                                             error:(NSError **)error;
 - (void)recordPlaybackQueueFailureStatus:(IOReturn)status
                               outputStats:(const OpenA8DJOutputFillStats *)outputStats;
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
@@ -5169,13 +5187,10 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                           outputStats:NULL];
 #endif
     atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);
-    BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
-                                         transactionList:transactions
-                                    transactionListCount:transfer.transactionCount
-                                        firstFrameNumber:0
-                                                 options:IOUSBHostIsochronousTransferOptionsNone
-                                                   error:&error
-                                       completionHandler:completionHandler];
+    BOOL queued = [self submitCaptureTransfer:transfer
+                                  transactions:transactions
+                             completionHandler:completionHandler
+                                          error:&error];
     if (!queued) {
         [self releasePooledTransfer:transfer];
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)
@@ -5195,6 +5210,42 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return;
     }
     atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);
+}
+
+- (BOOL)submitCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
+                  transactions:(IOUSBHostIsochronousTransaction *)transactions
+             completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                          error:(NSError **)error
+{
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (kPreparedRuntimeGeometrySupported) {
+        return [self enqueuePreparedCaptureSubmitWithTransfer:transfer
+                                                 transactions:transactions
+                                            completionHandler:completionHandler
+                                                         error:error];
+    }
+#endif
+    return [_capturePipe enqueueIORequestWithData:transfer.data
+                                 transactionList:transactions
+                            transactionListCount:transfer.transactionCount
+                                firstFrameNumber:0
+                                         options:IOUSBHostIsochronousTransferOptionsNone
+                                           error:error
+                               completionHandler:completionHandler];
+}
+
+- (BOOL)enqueuePreparedCaptureSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer
+                                    transactions:(IOUSBHostIsochronousTransaction *)transactions
+                               completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                                            error:(NSError **)error
+{
+    return [_capturePipe enqueueIORequestWithData:transfer.data
+                                 transactionList:transactions
+                            transactionListCount:transfer.transactionCount
+                                firstFrameNumber:0
+                                         options:IOUSBHostIsochronousTransferOptionsNone
+                                           error:error
+                               completionHandler:completionHandler];
 }
 
 - (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
@@ -5915,13 +5966,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     uint64_t hotPathPlaybackEnqueueStartTime = mach_absolute_time();
 #endif
     atomic_fetch_add_explicit(&_playbackSubmitAttemptsAtomic, 1, memory_order_relaxed);
-    BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
-                                          transactionList:transactions
-                                     transactionListCount:transfer.transactionCount
-                                         firstFrameNumber:firstFrameNumber
-                                                  options:IOUSBHostIsochronousTransferOptionsNone
-                                                    error:&error
-                                        completionHandler:completionHandler];
+    BOOL queued = [self submitPlaybackTransfer:transfer
+                                   transactions:transactions
+                               firstFrameNumber:firstFrameNumber
+                              completionHandler:completionHandler
+                                           error:&error];
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
     uint64_t hotPathPlaybackEnqueueEndTime = mach_absolute_time();
     if (hotPathPlaybackEnqueueEndTime > hotPathPlaybackEnqueueStartTime) {
@@ -5982,6 +6031,45 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                               delta:hotPathPlaybackEnqueueTicks];
 #endif
     return YES;
+}
+
+- (BOOL)submitPlaybackTransfer:(OpenA8DJIsoTransfer *)transfer
+                   transactions:(IOUSBHostIsochronousTransaction *)transactions
+               firstFrameNumber:(uint64_t)firstFrameNumber
+              completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                           error:(NSError **)error
+{
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (kPreparedRuntimeGeometrySupported) {
+        return [self enqueuePreparedPlaybackSubmitWithTransfer:transfer
+                                                  transactions:transactions
+                                              firstFrameNumber:firstFrameNumber
+                                             completionHandler:completionHandler
+                                                          error:error];
+    }
+#endif
+    return [_playbackPipe enqueueIORequestWithData:transfer.data
+                                  transactionList:transactions
+                             transactionListCount:transfer.transactionCount
+                                 firstFrameNumber:firstFrameNumber
+                                          options:IOUSBHostIsochronousTransferOptionsNone
+                                            error:error
+                                completionHandler:completionHandler];
+}
+
+- (BOOL)enqueuePreparedPlaybackSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer
+                                     transactions:(IOUSBHostIsochronousTransaction *)transactions
+                                 firstFrameNumber:(uint64_t)firstFrameNumber
+                                completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
+                                             error:(NSError **)error
+{
+    return [_playbackPipe enqueueIORequestWithData:transfer.data
+                                  transactionList:transactions
+                             transactionListCount:transfer.transactionCount
+                                 firstFrameNumber:firstFrameNumber
+                                          options:IOUSBHostIsochronousTransferOptionsNone
+                                            error:error
+                                completionHandler:completionHandler];
 }
 
 - (void)handlePlaybackTransfer:(OpenA8DJIsoTransfer *)transfer

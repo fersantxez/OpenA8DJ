@@ -135,6 +135,8 @@ int main(int argc, char** argv) {
       number_or(prepared_runtime_binding, "expected_submit_reduction_ratio", 0.0) >= 8.0 &&
       bool_field_is(prepared_runtime_binding, "physical_evidence_present", false) &&
       bool_field_is(prepared_runtime_binding, "product_claim_allowed", false);
+  const bool hal_prepared_runtime_dispatch_path_present =
+      bool_field_is(prepared_runtime_binding, "prepared_runtime_dispatch_path_present", true);
   const bool hal_prepared_runtime_physical_evidence_present = false;
   const bool hal_has_logical_physical_capture_split =
       contains(hal_source, "OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
@@ -200,11 +202,11 @@ int main(int argc, char** argv) {
       contains(hal_source,
                "return;\n    }\n    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
       appears_before(hal_source,
-                     "BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data",
+                     "BOOL queued = [self submitCaptureTransfer:transfer",
                      "atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);");
   const bool playback_submit_counter_success_only =
       appears_before(hal_source,
-                     "BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data",
+                     "BOOL queued = [self submitPlaybackTransfer:transfer",
                      "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
       appears_before(hal_source,
                      "return NO;\n    }\n    atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);",
@@ -255,8 +257,10 @@ int main(int argc, char** argv) {
     blockers.push_back("runtime_submit_observability_missing");
   }
   if (runtime_reduction_missing) {
-    blockers.push_back("hal_runtime_still_direct_usb_enqueue");
     blockers.push_back("hal_prepared_runtime_not_physically_validated");
+    if (!hal_prepared_runtime_dispatch_path_present) {
+      blockers.push_back("hal_runtime_still_direct_usb_enqueue_without_prepared_dispatch");
+    }
   }
   if (!hal_has_runtime_prepared_submit_guard) {
     blockers.push_back("hal_prepared_runtime_source_guard_missing");
@@ -299,6 +303,8 @@ int main(int argc, char** argv) {
       << (hal_prepared_runtime_source_contract_pass ? "true" : "false") << ",\n"
       << "  \"hal_prepared_runtime_binding_contract_pass\": "
       << (hal_prepared_runtime_binding_contract_pass ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_runtime_dispatch_path_present\": "
+      << (hal_prepared_runtime_dispatch_path_present ? "true" : "false") << ",\n"
       << "  \"hal_prepared_runtime_expected_submit_reduction_ratio\": "
       << number_or(prepared_runtime_binding, "expected_submit_reduction_ratio", -1.0) << ",\n"
       << "  \"hal_prepared_runtime_default_off\": "
@@ -347,7 +353,7 @@ int main(int argc, char** argv) {
   print_string_array("runtime_claim_blockers", blockers);
   std::cout
       << "  \"next_required_action\": "
-         "\"COMPILE_OPT_IN_HAL_PREPARED_RUNTIME_THEN_LOCK_GATED_ROUTE_REVALIDATION_BEFORE_PHYSICAL_AB\",\n"
+         "\"LOCK_GATED_ROUTE_REVALIDATION_THEN_PREPARED_RUNTIME_SUBMIT_COUNTER_AB_BEFORE_PRODUCT_AB\",\n"
       << "  \"blocked_claim\": "
          "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_PREPARED_RUNTIME_HAS_LOCK_GATED_SAME_SESSION_PHYSICAL_EVIDENCE\"\n"
       << "}\n";

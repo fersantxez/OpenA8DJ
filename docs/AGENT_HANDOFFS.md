@@ -4011,3 +4011,34 @@ Risk:
     wired known-good non-Audio8 output into it yet.
   - Next action: acquire the global hardware lock for route-only revalidation
     after a valid wired output route is available. Product A/B remains blocked.
+
+## 2026-06-18 Faraday: HAL Prepared Runtime Dispatch
+
+- Safety:
+  - Faraday (`019ed93a-7431-7ad0-a4be-3d34046045c3`) was given the required
+    isolation warning and performed read-only inspection only.
+  - Mainline and Rust remained read-only. No hardware/audio/CoreAudio/USB
+    mutation was performed.
+- Mission:
+  - Identify the smallest safe slice to move HAL prepared runtime from build
+    artifact toward a real runtime submit path.
+- Finding:
+  - The safest slice is an opt-in HAL submit adapter around
+    `queueCaptureTransfer` and `queuePlaybackWithRequests`, preserving submit
+    attempts, success-only submitted counters, in-flight playback accounting,
+    completion-owned recycling, and physical transaction timestamps.
+  - A direct `PreparedUsbRequestPool` C++ binding would require a larger
+    Objective-C++ bridge and should wait until the current prepared geometry
+    has physical submit-counter evidence.
+- Integrated action:
+  - Added default-off prepared submit dispatch helpers in `OpenA8DJUSB.m`.
+  - Updated source/migration/runtime/schema gates so
+    `prepared_runtime_dispatch_path_present=true` is required.
+- Risk:
+  - Offline gates cannot prove IOUSBHost accepts the prepared cadence, nor that
+    64-transaction submits avoid timing faults, short transfers, or sound
+    degradation.
+- Next action:
+  - Commit and rerun full offline gates.
+  - Then route-only revalidation under lock before any prepared-runtime
+    physical comparison.

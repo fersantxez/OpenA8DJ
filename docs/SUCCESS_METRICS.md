@@ -2473,3 +2473,7 @@ Current implementation:
   - no regressions in routing, 8-in/8-out representation, or timecode/DVS
     offline gates;
   - no CoreAudio/USB recovery debt after the run.
+- `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json` must
+  include `prepared_runtime_dispatch_path_present=true`. This proves the HAL
+  candidate has an explicit opt-in submit dispatch path. It does not prove CPU
+  superiority; physical submit counters must show the reduction on hardware.

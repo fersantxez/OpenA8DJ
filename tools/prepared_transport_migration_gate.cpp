@@ -448,6 +448,8 @@ int main(int argc, char** argv) {
           .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "playback_pool_uses_prepared_geometry")
           .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "prepared_runtime_dispatch_path_present")
+          .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "transfer_pool_lifetime_completion_owned")
           .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "capture_enqueue_uses_prepared_geometry")

@@ -1186,3 +1186,16 @@ change defaults, play audio, or record audio. Passing this build only proves
 that the candidate artifact is reproducible and bundle-complete. It does not
 prove lower CPU, audiophile quality, Timecode Vinyl behavior, or branch
 promotion readiness.
+
+The prepared-runtime HAL candidate uses an explicit default-off submit dispatch
+path under `OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME`. Build and verify the
+source contract with:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_binding_contract
+./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract
+```
+
+The contract must report `prepared_runtime_dispatch_path_present=true`.
+Physical CPU/resource claims still require the global hardware lock and
+same-session comparison against mainline.

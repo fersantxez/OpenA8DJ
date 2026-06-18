@@ -101,6 +101,32 @@ int main(int argc, char** argv) {
       function_body(hal_source,
                     "- (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests "
                     "count:(NSUInteger)count\n{");
+  const auto submit_capture =
+      function_body(hal_source,
+                    "- (BOOL)submitCaptureTransfer:(OpenA8DJIsoTransfer *)transfer\n"
+                    "                  transactions:(IOUSB" "HostIsochronousTransaction *)transactions\n"
+                    "             completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler\n"
+                    "                          error:(NSError **)error\n{");
+  const auto prepared_capture =
+      function_body(hal_source,
+                    "- (BOOL)enqueuePreparedCaptureSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer\n"
+                    "                                    transactions:(IOUSB" "HostIsochronousTransaction *)transactions\n"
+                    "                               completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler\n"
+                    "                                            error:(NSError **)error\n{");
+  const auto submit_playback =
+      function_body(hal_source,
+                    "- (BOOL)submitPlaybackTransfer:(OpenA8DJIsoTransfer *)transfer\n"
+                    "                   transactions:(IOUSB" "HostIsochronousTransaction *)transactions\n"
+                    "               firstFrameNumber:(uint64_t)firstFrameNumber\n"
+                    "              completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler\n"
+                    "                           error:(NSError **)error\n{");
+  const auto prepared_playback =
+      function_body(hal_source,
+                    "- (BOOL)enqueuePreparedPlaybackSubmitWithTransfer:(OpenA8DJIsoTransfer *)transfer\n"
+                    "                                     transactions:(IOUSB" "HostIsochronousTransaction *)transactions\n"
+                    "                                 firstFrameNumber:(uint64_t)firstFrameNumber\n"
+                    "                                completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler\n"
+                    "                                             error:(NSError **)error\n{");
   const auto capture_completion =
       function_body(hal_source,
                     "- (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer\n"
@@ -138,6 +164,17 @@ int main(int argc, char** argv) {
       contains(hal_source, "CreateIsoTransferWithCapacity(kPlaybackIsoFramesPerTransfer,") &&
       contains(hal_source,
                "(NSUInteger)kPlaybackIsoFramesPerTransfer * kIsoBytesPerFrame");
+  const bool prepared_runtime_dispatch_path_present =
+      contains(capture_queue, "[self submitCaptureTransfer:transfer") &&
+      contains(playback_with_requests, "[self submitPlaybackTransfer:transfer") &&
+      contains(submit_capture, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
+      contains(submit_capture, "if (kPreparedRuntimeGeometrySupported)") &&
+      contains(submit_capture, "enqueuePreparedCaptureSubmitWithTransfer:transfer") &&
+      contains(submit_playback, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
+      contains(submit_playback, "if (kPreparedRuntimeGeometrySupported)") &&
+      contains(submit_playback, "enqueuePreparedPlaybackSubmitWithTransfer:transfer") &&
+      contains(prepared_capture, "[_capturePipe enqueueIORequestWithData:transfer.data") &&
+      contains(prepared_playback, "[_playbackPipe enqueueIORequestWithData:transfer.data");
   const bool transfer_pool_lifetime_completion_owned =
       count_occurrences(hal_source, "captureCompletionHandler =") >= 1 &&
       count_occurrences(hal_source, "playbackCompletionHandler =") >= 1 &&
@@ -150,14 +187,17 @@ int main(int argc, char** argv) {
       contains(capture_queue, "uint32_t requests[kCaptureIsoFramesPerTransfer];") &&
       contains(capture_queue, "frame < kCaptureIsoFramesPerTransfer") &&
       contains(capture_queue, "count:kCaptureIsoFramesPerTransfer") &&
-      contains(capture_queue, "transactionListCount:transfer.transactionCount") &&
-      contains(capture_queue, "firstFrameNumber:0");
+      contains(capture_queue, "[self submitCaptureTransfer:transfer") &&
+      contains(prepared_capture, "transactionListCount:transfer.transactionCount") &&
+      contains(prepared_capture, "firstFrameNumber:0");
   const bool playback_enqueue_uses_prepared_geometry =
       contains(playback_queue, "uint32_t requests[kPlaybackIsoFramesPerTransfer];") &&
       contains(playback_queue, "frame < kPlaybackIsoFramesPerTransfer") &&
       contains(playback_queue, "count:kPlaybackIsoFramesPerTransfer") &&
       contains(playback_with_requests, "count:count") &&
-      contains(playback_with_requests, "transactionListCount:transfer.transactionCount");
+      contains(playback_with_requests, "[self submitPlaybackTransfer:transfer") &&
+      contains(prepared_playback, "transactionListCount:transfer.transactionCount") &&
+      contains(prepared_playback, "firstFrameNumber:firstFrameNumber");
   const bool capture_paced_playback_batches_to_prepared_geometry =
       contains(capture_paced_playback, "while (offset + kPlaybackIsoFramesPerTransfer <= count)") &&
       contains(capture_paced_playback,
@@ -170,14 +210,14 @@ int main(int argc, char** argv) {
   const bool capture_submit_counter_success_only =
       appears_before(capture_queue,
                      "atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);",
-                     "BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data") &&
+                     "BOOL queued = [self submitCaptureTransfer:transfer") &&
       appears_before(capture_queue,
                      "if (!queued) {",
                      "atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);");
   const bool playback_submit_counter_success_only =
       appears_before(playback_with_requests,
                      "atomic_fetch_add_explicit(&_playbackSubmitAttemptsAtomic, 1, memory_order_relaxed);",
-                     "BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data") &&
+                     "BOOL queued = [self submitPlaybackTransfer:transfer") &&
       appears_before(playback_with_requests,
                      "if (!queued) {",
                      "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);");
@@ -228,6 +268,9 @@ int main(int argc, char** argv) {
   if (!compile_time_geometry_guard_present) blockers.push_back("compile_time_geometry_guard_missing");
   if (!capture_pool_uses_prepared_geometry) blockers.push_back("capture_pool_not_prepared_geometry");
   if (!playback_pool_uses_prepared_geometry) blockers.push_back("playback_pool_not_prepared_geometry");
+  if (!prepared_runtime_dispatch_path_present) {
+    blockers.push_back("prepared_runtime_dispatch_path_missing");
+  }
   if (!transfer_pool_lifetime_completion_owned) {
     blockers.push_back("transfer_lifetime_not_completion_owned");
   }
@@ -262,6 +305,7 @@ int main(int argc, char** argv) {
   print_bool("compile_time_geometry_guard_present", compile_time_geometry_guard_present);
   print_bool("capture_pool_uses_prepared_geometry", capture_pool_uses_prepared_geometry);
   print_bool("playback_pool_uses_prepared_geometry", playback_pool_uses_prepared_geometry);
+  print_bool("prepared_runtime_dispatch_path_present", prepared_runtime_dispatch_path_present);
   print_bool("transfer_pool_lifetime_completion_owned", transfer_pool_lifetime_completion_owned);
   print_bool("capture_enqueue_uses_prepared_geometry", capture_enqueue_uses_prepared_geometry);
   print_bool("playback_enqueue_uses_prepared_geometry", playback_enqueue_uses_prepared_geometry);

@@ -2746,3 +2746,12 @@ Current implication:
     promotion, driver installation, device defaults changes, CoreAudio restarts,
     USB resets, playback, or recording until a lock-gated route-only
     revalidation passes first.
+  - Current in-progress candidate after `022346a` adds a default-off HAL
+    prepared-runtime submit dispatch. `queueCaptureTransfer` and
+    `queuePlaybackWithRequests` now route physical enqueue through
+    `submitCaptureTransfer` / `submitPlaybackTransfer`; under
+    `OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME` those wrappers take explicit
+    prepared capture/playback helpers while preserving IOUSBHost lifetime,
+    completion handlers, first-frame scheduling, and success-only submit
+    counters. Focused offline gates pass. Physical CPU/resource and
+    audio-quality claims remain blocked.

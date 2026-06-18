@@ -1015,6 +1015,9 @@ summary = {
         "hal_prepared_runtime_binding_contract_pass": hal_transport_runtime_gate.get(
             "hal_prepared_runtime_binding_contract_pass"
         ),
+        "hal_prepared_runtime_dispatch_path_present": hal_transport_runtime_gate.get(
+            "hal_prepared_runtime_dispatch_path_present"
+        ),
         "hal_prepared_runtime_expected_submit_reduction_ratio": hal_transport_runtime_gate.get(
             "hal_prepared_runtime_expected_submit_reduction_ratio"
         ),
@@ -1675,6 +1678,9 @@ summary = {
         ),
         "playback_pool_uses_prepared_geometry": hal_prepared_runtime_binding_contract.get(
             "playback_pool_uses_prepared_geometry"
+        ),
+        "prepared_runtime_dispatch_path_present": hal_prepared_runtime_binding_contract.get(
+            "prepared_runtime_dispatch_path_present"
         ),
         "transfer_pool_lifetime_completion_owned": hal_prepared_runtime_binding_contract.get(
             "transfer_pool_lifetime_completion_owned"

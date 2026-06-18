@@ -324,6 +324,8 @@ int main(int argc, char** argv) {
       bool_field_is(hal_prepared_runtime_binding_contract,
                     "playback_pool_uses_prepared_geometry", true) &&
       bool_field_is(hal_prepared_runtime_binding_contract,
+                    "prepared_runtime_dispatch_path_present", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
                     "transfer_pool_lifetime_completion_owned", true) &&
       bool_field_is(hal_prepared_runtime_binding_contract,
                     "capture_enqueue_uses_prepared_geometry", true) &&
@@ -595,6 +597,8 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_source_contract_pass",
                     true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_binding_contract_pass",
+                    true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_dispatch_path_present",
                     true) &&
       number_field_is(hal_transport_runtime_gate,
                       "hal_prepared_runtime_expected_submit_reduction_ratio", 8.0) &&
