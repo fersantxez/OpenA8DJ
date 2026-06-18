@@ -1738,14 +1738,13 @@ Rejected-candidate regression guard:
   this evidence before any capture cadence above ISO8 can support a
   CPU/resource or product-readiness claim.
 
-## ISO8 Input Decode Batch Publication
+## Rejected ISO8 Input Decode Batch Publication
 
 Purpose:
 
-- reduce input/capture CPU without changing USB cadence, packet layout,
-  playback timing, channel routing, or observable diagnostics;
-- preserve Timecode Vinyl safety by keeping decoded frame order and A/B/C/D
-  routing unchanged.
+- preserve the negative physical result from the ISO8 input-decode batch
+  experiment;
+- prove the default HAL is not carrying this rejected timing change forward.
 
 Command shape:
 
@@ -1757,15 +1756,17 @@ cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batchin
 
 Required contract fields:
 
-- `input_decode_batch_capacity_present=true`;
-- `input_decode_batches_before_ring_write=true`;
-- `input_decode_preserves_overflow_fallback=true`;
-- `input_decode_preserves_per_frame_diagnostic=true`;
-- `input_decode_ring_write_reduction_model=ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME`.
+- `input_decode_batch_physical_status=REJECTED`;
+- `input_decode_batch_active_in_default_hal=false`;
+- `input_decode_batch_product_candidate_allowed=false`;
+- `input_decode_batch_rejected_quality_alignment_score=0.112023`;
+- `input_decode_batch_rejected_driver_cpu_p95_pct=18.8`;
+- `input_decode_ring_write_reduction_model=REJECTED_PHYSICAL_CANDIDATE_NOT_ACTIVE_IN_DEFAULT_HAL`.
 
 PASS/FAIL semantics:
 
-- PASS means the source and evidence summary preserve the intended ISO8
-  hot-path optimization.
-- PASS does not mean CPU/resource superiority. That requires physical
-  same-session mainline/C++ evidence on the validated iRig route.
+- PASS means the rejected batch publication path is not active in the default
+  HAL and its failure remains visible in evidence.
+- PASS does not mean CPU/resource superiority. It means this specific
+  optimization avenue is closed unless future evidence disproves the current
+  physical failure.

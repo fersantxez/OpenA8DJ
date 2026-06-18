@@ -298,8 +298,6 @@ enum {
     kPreparedRuntimeGeometrySupported =
         kPreparedRuntimeEnabled && kPreparedRuntimeCaptureGeometry && kPreparedRuntimePlaybackGeometry,
     kIsoBytesPerFrame = 512,
-    kInputDecodeBatchFrames =
-        (kIsoBytesPerFrame / (kStreams * kBytesPerSampleUSB * kChannelsPerStream)) + 2,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
@@ -4831,9 +4829,6 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 - (BOOL)appendInputByte:(uint8_t)byte
                  stream:(uint32_t)stream
              inputStats:(OpenA8DJInputStatsPayload *)inputStats
-           routedFrames:(float *)routedFrames
-    routedFrameCapacity:(uint32_t)routedFrameCapacity
-       routedFrameCount:(uint32_t *)routedFrameCount
 {
     if (stream >= kStreams) {
         return NO;
@@ -4877,16 +4872,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             routedInput[destination * 2] = _pendingInput[source * 2];
             routedInput[destination * 2 + 1] = _pendingInput[source * 2 + 1];
         }
-        if (routedFrames != NULL &&
-            routedFrameCount != NULL &&
-            *routedFrameCount < routedFrameCapacity) {
-            memcpy(&routedFrames[(size_t)(*routedFrameCount) * kChannels],
-                   routedInput,
-                   sizeof(routedInput));
-            *routedFrameCount += 1;
-        } else {
-            RingWrite(&_inputRing, routedInput, 1);
-        }
+        RingWrite(&_inputRing, routedInput, 1);
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
         [self appendDiagnosticFrames:&_diagnosticInputBuffer counter:&_diagnosticInputFrames frames:routedInput count:1];
 #endif
@@ -4906,8 +4892,6 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     uint64_t outputPanicFlags = 0;
     OpenA8DJInputStatsPayload inputStatsDelta;
     memset(&inputStatsDelta, 0, sizeof(inputStatsDelta));
-    float routedInputBatch[(size_t)kInputDecodeBatchFrames * kChannels];
-    uint32_t routedInputBatchFrames = 0;
 #if OPENA8DJ_ENABLE_INPUT_DECODE && !OPENA8DJ_ENABLE_INPUT_CHECKS
     if (!atomic_load(&_inputDecodeActive)) {
         const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
@@ -4964,19 +4948,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             continue;
         }
         uint32_t stream = groupOffset % kStreams;
-        if ([self appendInputByte:bytes[offset]
-                           stream:stream
-                       inputStats:&inputStatsDelta
-                    routedFrames:routedInputBatch
-             routedFrameCapacity:kInputDecodeBatchFrames
-                routedFrameCount:&routedInputBatchFrames]) {
+        if ([self appendInputByte:bytes[offset] stream:stream inputStats:&inputStatsDelta]) {
             decodedFrames++;
         }
     }
 #endif
-    if (routedInputBatchFrames > 0) {
-        RingWrite(&_inputRing, routedInputBatch, routedInputBatchFrames);
-    }
     [self mergeInputStats:&inputStatsDelta];
     if (inputCheckErrors > 0) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, inputCheckErrors)

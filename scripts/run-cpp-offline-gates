@@ -1495,6 +1495,30 @@ summary = {
         "input_decode_ring_write_reduction_model": hal_logical_capture_batching_contract.get(
             "input_decode_ring_write_reduction_model"
         ),
+        "input_decode_batch_physical_status": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_physical_status"
+        ),
+        "input_decode_batch_rejected_quality_alignment_score": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_rejected_quality_alignment_score"
+        ),
+        "input_decode_batch_rejected_analog_snr_db": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_rejected_analog_snr_db"
+        ),
+        "input_decode_batch_rejected_lag_jumps_gt_2_frames": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_rejected_lag_jumps_gt_2_frames"
+        ),
+        "input_decode_batch_rejected_driver_cpu_p95_pct": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_rejected_driver_cpu_p95_pct"
+        ),
+        "input_decode_batch_product_candidate_allowed": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_product_candidate_allowed"
+        ),
+        "input_decode_batch_active_in_default_hal": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_active_in_default_hal"
+        ),
+        "input_decode_batch_rejection_evidence": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_rejection_evidence"
+        ),
         "makefile_exposes_capture_batch_v2_diagnostic": hal_logical_capture_batching_contract.get(
             "makefile_exposes_capture_batch_v2_diagnostic"
         ),

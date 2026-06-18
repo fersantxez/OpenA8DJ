@@ -38,8 +38,12 @@ Risks:
 - Fixed transfer slots can introduce stale completion/lifecycle bugs.
 
 Recommended next action:
-- Start with ISO8-preserving ring/bulk decode work and require offline
-  routing/timecode/packet parity before any physical diagnostic.
+- The ISO8-preserving input decode batch was implemented, passed offline gates,
+  then failed physical iRig quality (`quality_alignment_score=0.112023`,
+  `analog_snr_db=-20.50`, `lag_jumps_gt_2_frames=45`) without a meaningful CPU
+  win. Do not continue this line as a product candidate.
+- Next CPU work should move to fixed transfer lifecycle, packer efficiency, or
+  stats publication while preserving the proven per-frame input ring timing.
 
 ## 2026-06-18 - Existing Subagent Results Integrated
 

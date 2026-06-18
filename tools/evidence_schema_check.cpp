@@ -871,16 +871,32 @@ int main(int argc, char** argv) {
       bool_field_is(hal_logical_capture_batching_contract, "playback_logical_batcher_still_chunks",
                     true) &&
       bool_field_is(hal_logical_capture_batching_contract,
-                    "input_decode_batch_capacity_present", true) &&
+                    "input_decode_batch_capacity_present", false) &&
       bool_field_is(hal_logical_capture_batching_contract,
-                    "input_decode_batches_before_ring_write", true) &&
+                    "input_decode_batches_before_ring_write", false) &&
       bool_field_is(hal_logical_capture_batching_contract,
                     "input_decode_preserves_overflow_fallback", true) &&
       bool_field_is(hal_logical_capture_batching_contract,
                     "input_decode_preserves_per_frame_diagnostic", true) &&
       string_field_is(hal_logical_capture_batching_contract,
                       "input_decode_ring_write_reduction_model",
-                      "ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME") &&
+                      "REJECTED_PHYSICAL_CANDIDATE_NOT_ACTIVE_IN_DEFAULT_HAL") &&
+      string_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_batch_physical_status", "REJECTED") &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_batch_rejected_quality_alignment_score", 0.112023) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_batch_rejected_analog_snr_db", -20.50) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_batch_rejected_lag_jumps_gt_2_frames", 45.0) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_batch_rejected_driver_cpu_p95_pct", 18.8) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_batch_product_candidate_allowed", false) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_batch_active_in_default_hal", false) &&
+      string_field_present(hal_logical_capture_batching_contract,
+                           "input_decode_batch_rejection_evidence") &&
       bool_field_is(hal_logical_capture_batching_contract,
                     "makefile_exposes_capture_batch_v2_diagnostic", true) &&
       number_field_is(hal_logical_capture_batching_contract,

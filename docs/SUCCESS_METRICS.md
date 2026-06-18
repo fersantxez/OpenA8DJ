@@ -2592,6 +2592,10 @@ Current implementation:
   - CPU/resource p95 is less than or equal to mainline;
   - timecode/DVS offline gates still pass and physical Traktor/timecode remains
     unblocked.
+- Input ring publication timing is also physically sensitive. The ISO8 input
+  decode batch candidate is rejected after `quality_alignment_score=0.112023`,
+  `analog_snr_db=-20.50`, `lag_jumps_gt_2_frames=45`, and no CPU win sufficient
+  to approach mainline. It must remain inactive in the default HAL.
 
 ## Promotion Window Contract
 

@@ -3010,3 +3010,8 @@ Current implication:
   transactions plus `2505` playback completion delta outliers. Treat capture
   batching above ISO8 as rejected for product candidates; CPU work must improve
   the ISO8 path instead of changing the USB cadence.
+- Input decode batch rejection: commit `34e829e` batched decoded input frames
+  before ring publication while preserving ISO8 geometry, but physical iRig
+  quality collapsed (`quality_alignment_score=0.112023`, `analog_snr_db=-20.50`,
+  `lag_jumps_gt_2_frames=45`) and driver CPU still sampled near `18.8%`.
+  The default HAL has been returned to per-frame input ring publication.

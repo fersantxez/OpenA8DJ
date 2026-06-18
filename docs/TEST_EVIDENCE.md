@@ -13258,3 +13258,47 @@ Full offline gate after commit:
     path. It is not a CPU superiority claim until same-session physical A/B
     proves it beats mainline without quality, routing, or Timecode Vinyl
     regression.
+
+## 2026-06-18 - ISO8 Input Decode Batch Physical Rejection
+
+- Commit context: after `34e829e`, before rejection commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Hardware lock was used for candidate load/playback/capture.
+  - No mainline or Rust files were changed.
+  - Final cleanup force-unloaded OpenA8DJ and confirmed CoreAudio/iRig health.
+- Candidate:
+  - `build/OpenA8DJ-input-batch.driver`.
+  - SHA256:
+    `96bcac75c727d5eeac82664a490c883589ddfa3c05ce1720af0f286656f56b27`.
+  - Source change under test: batch decoded input frames before `_inputRing`
+    publication while preserving ISO8 USB geometry.
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ-input-batch.driver --cycles 1 --leave-loaded --wait 10 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/input-batch-20260618T134511Z/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -24 --capture-device "iRig Stream" --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/hardware-recovery/input-batch-20260618T134511Z/soundcheck-irig-pairA-minus24`
+  - `python3 scripts/analyze-stream-stats.py local-analysis/hardware-recovery/input-batch-20260618T134511Z/soundcheck-irig-pairA-minus24/stream-stats-during.tsv`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 8 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/input-batch-20260618T134511Z/final-clean-unload-guard`
+- Result:
+  - Safety load: PASS.
+  - Soundcheck: FAIL.
+  - `quality_alignment_score=0.112023`.
+  - `analog_snr_db=-20.50`.
+  - `lag_jumps_gt_2_frames=45`.
+  - `click_outliers=0`.
+  - `capture_clipped_frames=0`.
+  - Runtime geometry stayed ISO8:
+    `captureIsoFramesPerTransfer=8`,
+    `playbackIsoFramesPerTransfer=8`,
+    `playbackCoalesceTransfers=1`.
+  - Playback completion outliers were `0`, but quality was still unusable.
+  - Driver CPU sampled near `18.8%` p95, which does not approach mainline.
+  - Final cleanup: PASS; OpenA8DJ unloaded and iRig Stream still visible.
+- Interpretation:
+  - Input decode batching is physically rejected for the default HAL.
+  - The failure suggests this path perturbs timing or scheduling enough to
+    destroy analog quality despite clean playback underrun/outlier counters.
+  - The source has been reverted to per-frame input ring publication, and the
+    offline contract now preserves this rejection.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/input-batch-20260618T134511Z`.

@@ -145,19 +145,6 @@ int main(int argc, char** argv) {
   if (!makefile_exposes_capture_batch_v2_diagnostic) {
     failures.push_back("capture_batch_v2_diagnostic_target_missing");
   }
-  if (!input_decode_batch_capacity_present) {
-    failures.push_back("input_decode_batch_capacity_missing");
-  }
-  if (!input_decode_batches_before_ring_write) {
-    failures.push_back("input_decode_batch_ring_write_missing");
-  }
-  if (!input_decode_preserves_overflow_fallback) {
-    failures.push_back("input_decode_overflow_fallback_missing");
-  }
-  if (!input_decode_preserves_per_frame_diagnostic) {
-    failures.push_back("input_decode_diagnostic_frames_not_preserved");
-  }
-
   const bool pass = failures.empty();
 
   std::cout
@@ -191,7 +178,17 @@ int main(int argc, char** argv) {
       << (input_decode_preserves_overflow_fallback ? "true" : "false") << ",\n"
       << "  \"input_decode_preserves_per_frame_diagnostic\": "
       << (input_decode_preserves_per_frame_diagnostic ? "true" : "false") << ",\n"
-      << "  \"input_decode_ring_write_reduction_model\": \"ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME\",\n";
+      << "  \"input_decode_ring_write_reduction_model\": \"REJECTED_PHYSICAL_CANDIDATE_NOT_ACTIVE_IN_DEFAULT_HAL\",\n"
+      << "  \"input_decode_batch_physical_status\": \"REJECTED\",\n"
+      << "  \"input_decode_batch_rejected_quality_alignment_score\": 0.112023,\n"
+      << "  \"input_decode_batch_rejected_analog_snr_db\": -20.50,\n"
+      << "  \"input_decode_batch_rejected_lag_jumps_gt_2_frames\": 45,\n"
+      << "  \"input_decode_batch_rejected_driver_cpu_p95_pct\": 18.8,\n"
+      << "  \"input_decode_batch_product_candidate_allowed\": false,\n"
+      << "  \"input_decode_batch_active_in_default_hal\": "
+      << (input_decode_batches_before_ring_write ? "true" : "false") << ",\n"
+      << "  \"input_decode_batch_rejection_evidence\": "
+         "\"local-analysis/hardware-recovery/input-batch-20260618T134511Z\",\n";
   std::cout
       << "  \"makefile_exposes_capture_batch_diagnostic\": "
       << (makefile_exposes_capture_batch_diagnostic ? "true" : "false") << ",\n";

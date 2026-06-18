@@ -9132,3 +9132,36 @@ Next implication:
 - Readiness impact: this is an ISO8-preserving CPU candidate only. It does not
   prove product quality, CPU superiority, Timecode Vinyl readiness, or branch
   promotion until measured.
+
+## 2026-06-18 - Reject Input Decode Batch Publication After Physical Failure
+
+- Decision: remove input decode batch publication from the default HAL and
+  classify it as physically rejected.
+- Reason: the candidate preserved ISO8 capture/playback geometry and compiled
+  cleanly, but the lock-gated iRig soundcheck failed badly and did not improve
+  the CPU/resource gap. A CPU-oriented change that destroys quality cannot be
+  carried forward.
+- Evidence:
+  - Commit tested: `34e829e`.
+  - Candidate hash:
+    `96bcac75c727d5eeac82664a490c883589ddfa3c05ce1720af0f286656f56b27`.
+  - Evidence root:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/input-batch-20260618T134511Z`.
+  - Safety load: PASS.
+  - Soundcheck failed: `quality_alignment_score=0.112023`,
+    `analog_snr_db=-20.50`, `lag_jumps_gt_2_frames=45`,
+    `click_outliers=0`, no clipping.
+  - CPU did not solve the main gap: `opena8dj_driver` sampled near
+    `18.8%` p95 during the run.
+  - Runtime geometry remained ISO8: `captureIsoFramesPerTransfer=8`,
+    `playbackIsoFramesPerTransfer=8`, `playbackCoalesceTransfers=1`.
+  - Final cleanup unloaded the HAL and restored CoreAudio/iRig health.
+- Alternatives rejected:
+  - Keep as default because offline gates passed: rejected because physical
+    sound quality is the gate that matters here.
+  - Keep as opt-in CPU candidate: rejected until a deeper root-cause explains
+    why the timing shifted so catastrophically.
+- Readiness impact: no product, CPU/resource, Timecode Vinyl, or
+  branch-promotion claim is allowed from input decode batching. Future CPU work
+  should focus on fixed transfer lifecycle, packer efficiency, or stats
+  publication without changing input ring publication timing.
