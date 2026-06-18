@@ -57,7 +57,8 @@ bool AudioDriverSkeleton::start_stream() {
   if (!transport_.start(stream_config_.transport)) {
     return false;
   }
-  if (!start_usb_submit_binding()) {
+  if (persistent_usb_transport_enabled() ? !start_persistent_usb_transport_binding()
+                                         : !start_usb_submit_binding()) {
     transport_.stop();
     return false;
   }
@@ -71,9 +72,11 @@ bool AudioDriverSkeleton::stop_stream() {
     return false;
   }
   finish_usb_submit_binding();
-  (void)cancel_usb_requests();
-  usb_submit_planner_.stop();
-  usb_request_pool_.stop();
+  if (!persistent_usb_transport_enabled()) {
+    (void)cancel_usb_requests();
+    usb_submit_planner_.stop();
+    usb_request_pool_.stop();
+  }
   transport_.stop();
   return true;
 }
@@ -131,10 +134,22 @@ bool AudioDriverSkeleton::complete_backend_period(std::span<const S24Frame> capt
                                                   std::uint64_t sample_timestamp) {
   const bool transport_ok =
       transport_.backend_complete_period(capture_frames, playback_frames, sample_timestamp);
-  return transport_ok && queue_usb_slots_for_period(capture_frames, playback_frames);
+  if (!transport_ok) {
+    return false;
+  }
+  return persistent_usb_transport_enabled()
+             ? complete_persistent_usb_transport_period(capture_frames, playback_frames)
+             : queue_usb_slots_for_period(capture_frames, playback_frames);
 }
 
 void AudioDriverSkeleton::finish_usb_submit_binding() {
+  if (persistent_usb_transport_enabled()) {
+    if (persistent_usb_transport_.started()) {
+      (void)persistent_usb_transport_.drain();
+      persistent_usb_transport_.stop();
+    }
+    return;
+  }
   usb_submit_planner_.finish();
   if (!drain_new_usb_submit_descriptors()) {
     runtime_counters_.usb_request_drain_failures += 1;
@@ -169,6 +184,10 @@ const PreparedUsbRequestPoolCounters& AudioDriverSkeleton::usb_request_counters(
   return usb_request_pool_.counters();
 }
 
+PersistentUsbTransportCounters AudioDriverSkeleton::persistent_usb_transport_counters() const {
+  return persistent_usb_transport_.counters();
+}
+
 std::span<const UsbSubmitDescriptor> AudioDriverSkeleton::usb_submit_descriptors() const {
   return usb_submit_planner_.descriptors();
 }
@@ -189,6 +208,10 @@ PreparedUsbRequestPoolSafety AudioDriverSkeleton::usb_request_safety() const {
   return usb_request_pool_.safety();
 }
 
+PersistentUsbTransportSafety AudioDriverSkeleton::persistent_usb_transport_safety() const {
+  return persistent_usb_transport_.safety();
+}
+
 bool AudioDriverSkeleton::validate_stream_config(const AudioStreamConfig& config) const {
   const bool sample_rate_valid =
       config.sample_rate == device_model_.sample_rates[0] ||
@@ -206,7 +229,15 @@ bool AudioDriverSkeleton::validate_stream_config(const AudioStreamConfig& config
          config.usb_request_slots > 0 &&
          config.usb_request_slots <= kPreparedUsbRequestMaxSlots &&
          config.usb_request_completion_depth > 0 &&
-         config.usb_request_completion_depth <= config.usb_request_slots;
+         config.usb_request_completion_depth <= config.usb_request_slots &&
+         config.usb_capture_bytes_per_slot > 0 &&
+         (!config.use_persistent_usb_transport ||
+          (config.persistent_capture_queue_depth > 0 &&
+           config.persistent_playback_queue_depth > 0 &&
+           config.persistent_capture_queue_depth + config.persistent_playback_queue_depth <=
+               config.usb_request_slots &&
+           config.persistent_capture_queue_depth + config.persistent_playback_queue_depth <=
+               kPreparedUsbRequestMaxSlots));
 }
 
 bool AudioDriverSkeleton::validate_io_memory_layout(
@@ -235,6 +266,10 @@ bool AudioDriverSkeleton::validate_io_memory_layout(
   return input_channels == kInputChannels && output_channels == kOutputChannels;
 }
 
+bool AudioDriverSkeleton::persistent_usb_transport_enabled() const {
+  return stream_config_.use_persistent_usb_transport;
+}
+
 bool AudioDriverSkeleton::start_usb_submit_binding() {
   next_capture_usb_sequence_ = 0;
   next_playback_usb_sequence_ = 0;
@@ -258,6 +293,27 @@ bool AudioDriverSkeleton::start_usb_submit_binding() {
     finish_usb_submit_binding();
     usb_submit_planner_.stop();
     usb_request_pool_.stop();
+    return false;
+  }
+  return true;
+}
+
+bool AudioDriverSkeleton::start_persistent_usb_transport_binding() {
+  if (!persistent_usb_transport_.start(PersistentUsbTransportConfig{
+          .request_pool = PreparedUsbRequestPoolConfig{
+              .request_slots = stream_config_.usb_request_slots,
+          },
+          .slots_per_submit = stream_config_.usb_slots_per_submit,
+          .frames_per_slot = stream_config_.transport.iso_frames,
+          .capture_bytes_per_slot = stream_config_.usb_capture_bytes_per_slot,
+          .playback_bytes_per_slot = stream_config_.usb_bytes_per_slot,
+          .capture_queue_depth = stream_config_.persistent_capture_queue_depth,
+          .playback_queue_depth = stream_config_.persistent_playback_queue_depth,
+      })) {
+    return false;
+  }
+  if (!persistent_usb_transport_.prime()) {
+    persistent_usb_transport_.stop();
     return false;
   }
   return true;
@@ -292,6 +348,23 @@ bool AudioDriverSkeleton::queue_usb_slots_for_period(std::span<const S24Frame> c
     }
   }
   return true;
+}
+
+bool AudioDriverSkeleton::complete_persistent_usb_transport_period(
+    std::span<const S24Frame> capture_frames,
+    std::span<const S24Frame> playback_frames) {
+  if (!persistent_usb_transport_.started() || stream_config_.transport.iso_frames == 0 ||
+      capture_frames.size() != playback_frames.size()) {
+    return false;
+  }
+  const auto expected_frames =
+      static_cast<std::size_t>(stream_config_.usb_slots_per_submit) *
+      static_cast<std::size_t>(stream_config_.transport.iso_frames);
+  if (capture_frames.size() != expected_frames) {
+    return false;
+  }
+  return persistent_usb_transport_.complete_next(UsbSlotDirection::Capture) &&
+         persistent_usb_transport_.complete_next(UsbSlotDirection::Playback);
 }
 
 bool AudioDriverSkeleton::queue_usb_slot(UsbSlotDirection direction) {

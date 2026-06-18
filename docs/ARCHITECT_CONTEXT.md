@@ -3560,3 +3560,17 @@ Current implication:
   certification, runtime CPU superiority, and branch promotion remain blocked
   until this model is bound to a HAL/DriverKit candidate and beats mainline in a
   lock-gated same-session source-reference A/B.
+- 18:12 EDT stable-load closure update: bound the persistent USB request-window
+  model into the DriverKit skeleton behind `use_persistent_usb_transport=false`
+  by default. The new opt-in DriverKit contract runs 128 periods of 64 frames,
+  keeps 8 live requests steady, reuses persistent slots for all 256 steady
+  submit cycles, and records zero frame mismatches, sequence gaps, timestamp
+  gaps, slot identity mismatches, depth drift, and fallback allocations. Full
+  offline gates regenerated with no hardware/CoreAudio/USB/system mutation:
+  debug CTest `88/88` PASS, Release CTest `89/89` PASS, evidence schema
+  `114/114` required files present, and `current-offline-gates.status=PASS`.
+  This closes a more stable offline load, but does not change readiness:
+  `final_objective_status=NOT_READY`, `human_test_product_allowed=false`, and
+  `branch_promotion_allowed=false`. Next required action remains a lock-gated
+  same-session source-reference mainline-vs-C++ A/B before any human product,
+  audiophile, CPU, Timecode Vinyl, or branch promotion claim.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "opena8djcpp/driverkit_model.hpp"
+#include "opena8djcpp/persistent_usb_transport.hpp"
 #include "opena8djcpp/prepared_transport.hpp"
 #include "opena8djcpp/usb_request_pool.hpp"
 #include "opena8djcpp/usb_submit_plan.hpp"
@@ -28,6 +29,10 @@ struct AudioStreamConfig {
   std::uint32_t usb_request_slots = 8;
   std::uint32_t usb_request_completion_depth = 4;
   bool usb_retain_submit_descriptors = false;
+  bool use_persistent_usb_transport = false;
+  std::uint32_t usb_capture_bytes_per_slot = 512 * 8;
+  std::uint32_t persistent_capture_queue_depth = 4;
+  std::uint32_t persistent_playback_queue_depth = 4;
 };
 
 struct AudioIOMemoryDescriptorModel {
@@ -86,20 +91,27 @@ class AudioDriverSkeleton {
   [[nodiscard]] const DriverKitRuntimeCounters& runtime_counters() const;
   [[nodiscard]] const PreparedUsbSubmitPlannerCounters& usb_submit_counters() const;
   [[nodiscard]] const PreparedUsbRequestPoolCounters& usb_request_counters() const;
+  [[nodiscard]] PersistentUsbTransportCounters persistent_usb_transport_counters() const;
   [[nodiscard]] std::span<const UsbSubmitDescriptor> usb_submit_descriptors() const;
   [[nodiscard]] ZeroTimestampModel zero_timestamp() const;
   [[nodiscard]] PreparedTransportSafety transport_safety() const;
   [[nodiscard]] PreparedUsbSubmitPlannerSafety usb_submit_safety() const;
   [[nodiscard]] PreparedUsbRequestPoolSafety usb_request_safety() const;
+  [[nodiscard]] PersistentUsbTransportSafety persistent_usb_transport_safety() const;
 
  private:
   [[nodiscard]] bool validate_stream_config(const AudioStreamConfig& config) const;
   [[nodiscard]] bool validate_io_memory_layout(
       const std::array<AudioIOMemoryDescriptorModel, 5>& layout) const;
+  [[nodiscard]] bool persistent_usb_transport_enabled() const;
   [[nodiscard]] bool start_usb_submit_binding();
+  [[nodiscard]] bool start_persistent_usb_transport_binding();
   [[nodiscard]] bool queue_initial_usb_slots();
   [[nodiscard]] bool queue_usb_slots_for_period(std::span<const S24Frame> capture_frames,
                                                 std::span<const S24Frame> playback_frames);
+  [[nodiscard]] bool complete_persistent_usb_transport_period(
+      std::span<const S24Frame> capture_frames,
+      std::span<const S24Frame> playback_frames);
   [[nodiscard]] bool queue_usb_slot(UsbSlotDirection direction);
   [[nodiscard]] bool drain_new_usb_submit_descriptors();
   [[nodiscard]] bool submit_usb_descriptor(const UsbSubmitDescriptor& descriptor);
@@ -113,6 +125,7 @@ class AudioDriverSkeleton {
   PreparedTransportBackend transport_{};
   PreparedUsbSubmitPlanner usb_submit_planner_{};
   PreparedUsbRequestPool usb_request_pool_{};
+  PersistentUsbTransport persistent_usb_transport_{};
   std::array<PreparedUsbRequestHandle, kPreparedUsbRequestMaxSlots> inflight_usb_requests_{};
   DriverKitRuntimeCounters runtime_counters_{};
   ZeroTimestampModel zero_timestamp_{};

@@ -15760,3 +15760,48 @@ Follow-up correction:
     prepared-lite rejection.
   - It does not prove physical quality, CPU superiority, Timecode Vinyl, or
     readiness to promote. A post-commit freshness rerun is required.
+
+## 2026-06-18 - DriverKit Persistent USB Stable-Load Gate Pre-Commit
+
+- Scope:
+  - Bound the persistent USB transport model into the DriverKit skeleton behind
+    an opt-in configuration flag.
+  - Added a dedicated DriverKit persistent USB transport contract and wired it
+    into CMake, CTest, `scripts/run-cpp-offline-gates`, and the evidence schema.
+  - Did not install, unload, reload, play audio, record audio, change
+    CoreAudio, change USB, change defaults, or touch hardware.
+- Commands:
+  - `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline --target opena8djcpp_driverkit_persistent_usb_transport_contract opena8djcpp_driverkit_usb_submit_binding_contract opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_driverkit_persistent_usb_transport_contract`
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-persistent-usb-transport-contract.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+- Result:
+  - Focused DriverKit persistent contract: PASS.
+  - Debug CTest: `88/88` PASS.
+  - Release CTest: `89/89` PASS.
+  - Evidence schema: PASS with `required_files=114`, `missing_files=0`,
+    `summary_pass=true`.
+  - Offline summary: `status=PASS`, `final_objective_status=NOT_READY`,
+    `human_test_product_allowed=false`, `branch_promotion_allowed=false`.
+  - DriverKit persistent contract values:
+    `periods=128`, `frames_per_period=64`,
+    `steady_live_requests_before_stop=8`, `max_live_requests=8`,
+    `max_capture_live_requests=4`, `max_playback_live_requests=4`,
+    `max_capture_lead_frames=256`, `max_playback_lead_frames=256`,
+    `persistent_slot_reuses=256`, `slot_identity_mismatches=0`,
+    `sequence_gap_errors=0`, `timestamp_gap_errors=0`,
+    `depth_drift_errors=0`, `fallback_allocations=0`,
+    `transport_frame_mismatches=0`, and `capture_read_mismatches=0`.
+  - Provenance freshness before commit: FAIL as expected because the worktree
+    contains the DriverKit persistent binding changes.
+- Interpretation:
+  - This closes the 15:10 stable-load request as an offline-cleaner load, not
+    as product readiness.
+  - Post-commit freshness must be rerun before the evidence can be treated as
+    attributable to the new HEAD.

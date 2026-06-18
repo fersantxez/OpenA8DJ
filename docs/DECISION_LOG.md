@@ -10319,3 +10319,40 @@ Next implication:
   not allow any claim of better audio quality, Timecode Vinyl readiness, lower
   CPU, human product test, or branch promotion until HAL/DriverKit binding and
   lock-gated same-session physical A/B pass.
+
+## 2026-06-18 - Bind Persistent USB Window Into DriverKit Skeleton As Opt-In Stable Load
+
+- Decision: connect `PersistentUsbTransport` to `AudioDriverSkeleton` behind an
+  explicit opt-in flag, leaving the existing DriverKit prepared-submit path as
+  the default.
+- Reason: at 15:10 EDT the priority shifted to closing a stable load. The
+  safest useful closure is not another physical experiment; it is making the
+  strongest offline transport model executable through the DriverKit skeleton
+  while preserving existing passing contracts and blocking product claims.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-persistent-usb-transport-contract.json`.
+  - Focused contract: `status=PASS`, `periods=128`,
+    `frames_per_period=64`, `steady_live_requests_before_stop=8`,
+    `max_live_requests=8`, `max_capture_lead_frames=256`,
+    `max_playback_lead_frames=256`, `persistent_slot_reuses=256`,
+    `slot_identity_mismatches=0`, `sequence_gap_errors=0`,
+    `timestamp_gap_errors=0`, and `fallback_allocations=0`.
+  - Full offline gates: debug CTest `88/88` PASS, Release CTest `89/89`
+    PASS, evidence schema `required_files=114`, `missing_files=0`,
+    `summary_pass=true`.
+  - Summary still blocks product claims:
+    `final_objective_status=NOT_READY`,
+    `human_test_product_allowed=false`,
+    `branch_promotion_allowed=false`.
+- Alternatives rejected:
+  - Make persistent transport default immediately: rejected because it has no
+    HAL physical A/B, CPU, or Timecode Vinyl evidence yet.
+  - Continue tuning physically rejected HAL variants: rejected because the
+    current stable need is closure and evidence freshness, not churn.
+  - Claim human-test readiness from offline gates: rejected because offline
+    stability does not prove sound quality, Traktor/timecode behavior, or CPU
+    superiority over mainline.
+- Readiness impact: improves the offline candidate architecture and gives the
+  next physical window a cleaner transport path to test. It still does not
+  authorize product human testing, branch promotion, or any claim of beating
+  mainline.
