@@ -630,6 +630,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathPlaybackCompletionTicksSum;
     uint64_t hotPathPlaybackCompletionTicksSamples;
     uint64_t captureTransfersSubmitted;
+    uint64_t captureSubmitAttempts;
+    uint64_t playbackSubmitAttempts;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -2093,6 +2095,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_bool _playbackUseExplicitScheduling;
     atomic_uint _playbackScheduleFailureStreak;
     atomic_uint _playbackTransfersInFlight;
+    atomic_uint_fast64_t _captureSubmitAttemptsAtomic;
+    atomic_uint_fast64_t _playbackSubmitAttemptsAtomic;
     atomic_uint_fast64_t _captureTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersCompletedAtomic;
@@ -2204,6 +2208,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
+        atomic_init(&_captureSubmitAttemptsAtomic, 0);
+        atomic_init(&_playbackSubmitAttemptsAtomic, 0);
         atomic_init(&_captureTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersCompletedAtomic, 0);
@@ -3697,6 +3703,8 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
     atomic_store(&_outputFramesWrittenAtomic, 0);
+    atomic_store(&_captureSubmitAttemptsAtomic, 0);
+    atomic_store(&_playbackSubmitAttemptsAtomic, 0);
     atomic_store(&_captureTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
@@ -3722,6 +3730,8 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
 
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
+    stats.captureSubmitAttempts = atomic_load(&_captureSubmitAttemptsAtomic);
+    stats.playbackSubmitAttempts = atomic_load(&_playbackSubmitAttemptsAtomic);
     stats.captureTransfersSubmitted = atomic_load(&_captureTransfersSubmittedAtomic);
     stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);
     stats.playbackTransfersCompletedRaw = atomic_load(&_playbackTransfersCompletedAtomic);
@@ -4422,6 +4432,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
     atomic_store(&_playbackScheduleFailureStreak, 0);
     atomic_store(&_playbackTransfersInFlight, 0);
+    atomic_store(&_playbackSubmitAttemptsAtomic, 0);
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
     atomic_store(&_captureTransfersCompletedAtomic, 0);
@@ -5127,6 +5138,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                    shortTransactions:0
                           outputStats:NULL];
 #endif
+    atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);
     BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
                                          transactionList:transactions
                                     transactionListCount:transfer.transactionCount
@@ -5150,6 +5162,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                 [weakSelf queueCaptureTransfer];
             });
         }
+        return;
     }
     atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);
 }
@@ -5871,6 +5884,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
     uint64_t hotPathPlaybackEnqueueStartTime = mach_absolute_time();
 #endif
+    atomic_fetch_add_explicit(&_playbackSubmitAttemptsAtomic, 1, memory_order_relaxed);
     BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
                                           transactionList:transactions
                                      transactionListCount:transfer.transactionCount

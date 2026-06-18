@@ -90,6 +90,16 @@ Branch: `driverkit/cpp-redesign`
 - Same-session physical comparison now has a source-level contract requiring
   capture/playback submit cadence to participate in mainline-vs-C++ comparison
   before runtime CPU/resource superiority can be claimed.
+- Capture submit observability now counts successful IOUSBHost capture enqueues
+  only. This matches playback submit semantics and prevents failed queue attempts
+  from inflating the future CPU/resource comparison denominator. Explicit
+  capture/playback submit-attempt counters are now available to detect rejected
+  queue work separately from accepted submit work.
+- Subagent runtime review points the next real performance implementation at
+  `AudioDriverSkeleton` + `PreparedTransportBackend` +
+  `PreparedUsbSubmitPlanner` + `PreparedUsbRequestPool`. The HAL remains useful
+  for controlled physical measurement, but more HAL flags without real enqueue
+  reduction are not enough for a CPU/resource superiority claim.
 - 2026-06-17 hot-path timing is now opt-in (`HAL_HOT_PATH_TIMING=1`) and off
   by default. A locked iRig run showed physical quality still FAILs
   (`quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps) and

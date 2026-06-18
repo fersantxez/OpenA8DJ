@@ -6959,3 +6959,39 @@ Next implication:
   candidate against mainline in the same session, but promotion remains blocked
   until route revalidation, music/tone capture, CPU sampling, routing matrix,
   and Traktor/timecode vinyl evidence all pass from one physical bundle.
+
+## 2026-06-18: Separate USB Submit Attempts From Accepted Submits
+
+Decision:
+- `captureTransfersSubmitted` and `playbackTransfersSubmitted` now mean accepted
+  IOUSBHost isochronous submit work.
+- Added `captureSubmitAttempts` and `playbackSubmitAttempts` as appended
+  stream-stats fields.
+- Extended soundcheck TSV, stream-stats analysis, runtime gates, and physical
+  comparison contracts so attempts, accepted submits, and submit failures remain
+  observable.
+
+Reason:
+- Capture previously incremented `captureTransfersSubmitted` even when
+  `enqueueIORequestWithData` failed, while playback incremented submitted only
+  on success.
+- Same-session CPU/resource comparison now depends on submit cadence. Ambiguous
+  counters would let failed queue attempts distort the measurement.
+
+Evidence:
+- Focused stream-stats contract: PASS with `field_count=205`,
+  `control_field_count=205`, `mismatch_count=0`, and
+  `last_field=playbackSubmitAttempts`.
+- Focused HAL transport runtime gate: PASS with success-only submit counters
+  and runtime submit observability.
+- Focused physical submit comparison contract: PASS.
+
+Alternatives discarded:
+- Keep only the success-only semantic change: rejected because attempts are
+  useful diagnostics when a physical run has queue rejection.
+- Count attempts as submitted: rejected because accepted USB work is the metric
+  needed for performance comparison.
+
+Next implication:
+- Future physical A/B runs can report both accepted submit cadence and failed
+  enqueue attempts before any CPU/resource superiority claim.

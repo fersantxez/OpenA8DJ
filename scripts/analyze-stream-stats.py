@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 COUNTERS = [
+    "captureSubmitAttempts",
     "captureTransfersSubmitted",
     "captureTransfersCompleted",
     "captureTransfersSampled",
@@ -24,6 +25,7 @@ COUNTERS = [
     "captureOtherByteCountTransactions",
     "captureShortTransfers",
     "filteredCaptureTransactions",
+    "playbackSubmitAttempts",
     "playbackTransfersSubmitted",
     "playbackTransfersCompleted",
     "playbackTransfersSampled",
@@ -219,7 +221,13 @@ def analyze(path):
     else:
         write_read_delta = math.nan
 
+    capture_submit_attempt_delta = counters["captureSubmitAttempts"]["delta"]
     capture_submit_delta = counters["captureTransfersSubmitted"]["delta"]
+    capture_submit_failure_delta = (
+        capture_submit_attempt_delta - capture_submit_delta
+        if math.isfinite(capture_submit_attempt_delta) and math.isfinite(capture_submit_delta)
+        else math.nan
+    )
     capture_tx_delta = counters["captureTransfersCompleted"]["delta"]
     capture_sampled_delta = counters["captureTransfersSampled"]["delta"]
     capture_ratio_delta = capture_sampled_delta if capture_sampled_delta > 0 else capture_tx_delta
@@ -236,6 +244,13 @@ def analyze(path):
         if math.isfinite(capture_errors_delta) and capture_tx_delta > 0 else math.nan
     )
 
+    playback_submit_attempt_delta = counters["playbackSubmitAttempts"]["delta"]
+    playback_submit_delta = counters["playbackTransfersSubmitted"]["delta"]
+    playback_submit_failure_delta = (
+        playback_submit_attempt_delta - playback_submit_delta
+        if math.isfinite(playback_submit_attempt_delta) and math.isfinite(playback_submit_delta)
+        else math.nan
+    )
     playback_completed_delta = counters["playbackTransfersCompleted"]["delta"]
     transfer_balance_delta = (
         playback_completed_delta - capture_tx_delta
@@ -316,6 +331,14 @@ def analyze(path):
         flags.append("playback_payload_guard_mismatches")
     if counters["playbackScheduleErrors"]["delta"] > 0:
         flags.append("playback_schedule_errors")
+    if math.isfinite(capture_submit_failure_delta) and capture_submit_failure_delta > 0:
+        flags.append("capture_submit_failures")
+    if math.isfinite(playback_submit_failure_delta) and playback_submit_failure_delta > 0:
+        flags.append("playback_submit_failures")
+    if math.isfinite(capture_submit_failure_delta) and capture_submit_failure_delta < 0:
+        flags.append("capture_submit_attempts_less_than_submitted")
+    if math.isfinite(playback_submit_failure_delta) and playback_submit_failure_delta < 0:
+        flags.append("playback_submit_attempts_less_than_submitted")
     if ok_rows and not math.isfinite(logical_iso):
         flags.append("runtime_geometry_missing_or_unstable")
 
@@ -332,10 +355,14 @@ def analyze(path):
         "output_write_stats_observable": written_observable,
         "output_write_minus_read_frames_last": write_read_delta,
         "output_read_frames_per_second": counters["outputFramesRead"]["per_second"],
+        "capture_submit_attempts_per_second": counters["captureSubmitAttempts"]["per_second"],
         "capture_transfers_per_second": counters["captureTransfersCompleted"]["per_second"],
         "capture_transfers_submitted_per_second": counters["captureTransfersSubmitted"]["per_second"],
+        "capture_submit_failures": capture_submit_failure_delta,
         "capture_transfers_sampled_per_second": counters["captureTransfersSampled"]["per_second"],
+        "playback_submit_attempts_per_second": counters["playbackSubmitAttempts"]["per_second"],
         "playback_transfers_submitted_per_second": counters["playbackTransfersSubmitted"]["per_second"],
+        "playback_submit_failures": playback_submit_failure_delta,
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_transfers_sampled_per_second": counters["playbackTransfersSampled"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,

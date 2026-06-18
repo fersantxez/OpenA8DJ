@@ -704,6 +704,12 @@ summary = {
         "analyzer_summarizes_submit_counters": hal_transport_runtime_gate.get(
             "analyzer_summarizes_submit_counters"
         ),
+        "capture_submit_counter_success_only": hal_transport_runtime_gate.get(
+            "capture_submit_counter_success_only"
+        ),
+        "playback_submit_counter_success_only": hal_transport_runtime_gate.get(
+            "playback_submit_counter_success_only"
+        ),
         "runtime_submit_observability_present": hal_transport_runtime_gate.get(
             "runtime_submit_observability_present"
         ),

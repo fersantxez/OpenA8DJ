@@ -274,6 +274,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathPlaybackCompletionTicksSum;
     uint64_t hotPathPlaybackCompletionTicksSamples;
     uint64_t captureTransfersSubmitted;
+    uint64_t captureSubmitAttempts;
+    uint64_t playbackSubmitAttempts;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1317,6 +1319,11 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
         stats->playbackScheduleOutOfWindow +
         stats->playbackScheduleFallbacks;
     printf("streaming=%u\n", stats->streaming);
+    printf("captureSubmitAttempts=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, captureSubmitAttempts) ?
+                                stats->captureSubmitAttempts :
+                                (STREAM_STATS_HAS_FIELD(payloadLength, captureTransfersSubmitted) ?
+                                 stats->captureTransfersSubmitted : stats->captureTransfers)));
     printf("captureTransfersSubmitted=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, captureTransfersSubmitted) ?
                                 stats->captureTransfersSubmitted : stats->captureTransfers));
@@ -1331,6 +1338,13 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("captureOtherByteCountTransactions=%llu\n", (unsigned long long)stats->captureOtherByteCountTransactions);
     printf("captureShortTransfers=%llu\n", (unsigned long long)stats->captureShortTransfers);
     printf("filteredCaptureTransactions=%llu\n", (unsigned long long)stats->filteredCaptureTransactions);
+    printf("playbackSubmitAttempts=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackSubmitAttempts) ?
+                                stats->playbackSubmitAttempts :
+                                (STREAM_STATS_HAS_FIELD(payloadLength, playbackTransfersSubmitted) ?
+                                 stats->playbackTransfersSubmitted :
+                                 (STREAM_STATS_HAS_FIELD(payloadLength, playbackQueueAttempts) ?
+                                  stats->playbackQueueAttempts : stats->playbackTransfers))));
     printf("playbackTransfersSubmitted=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransfersSubmitted) ?
                                 stats->playbackTransfersSubmitted :

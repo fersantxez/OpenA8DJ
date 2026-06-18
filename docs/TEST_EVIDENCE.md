@@ -10587,3 +10587,54 @@ Full offline gate rerun:
     submit cadence evidence, not just process CPU samples.
   - This still does not make the candidate ready for hardware promotion; it
     hardens the promotion gate for when valid route evidence exists.
+
+## 2026-06-18 HAL Submit Counter Success Semantics
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Fixed capture submit accounting so `captureTransfersSubmitted` increments
+    only after `IOUSBHostPipe enqueueIORequestWithData` accepts the capture
+    request.
+  - Added explicit `captureSubmitAttempts` and `playbackSubmitAttempts`
+    counters so future evidence can separate attempted queue work from accepted
+    USB submit work.
+  - Playback already used success-only `playbackTransfersSubmitted`; its
+    attempt counter now makes the same distinction observable.
+  - Extended `opena8djcpp_hal_transport_runtime_gate` and evidence schema so
+    both capture and playback submit counters must be success-only before
+    runtime submit observability can pass.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py scripts/check-stream-stats-contract.py`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `git diff --check`
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_physical_submit_comparison_contract opena8djcpp_physical_run_compare opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate`
+  - `./build/cpp-release/opena8djcpp_physical_submit_comparison_contract`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_hal_transport_runtime_gate|opena8djcpp_physical_submit_comparison_contract|opena8djcpp_physical_run_compare' --output-on-failure`
+  - `make hal`
+- Focused results before commit:
+  - Stream-stats contract: PASS with `field_count=205`,
+    `control_field_count=205`, `mismatch_count=0`,
+    `last_field=playbackSubmitAttempts`.
+  - HAL transport runtime gate: PASS with
+    `capture_submit_counter_success_only=true`,
+    `playback_submit_counter_success_only=true`, and
+    `runtime_submit_observability_present=true`.
+  - Physical submit comparison contract: PASS with submit attempt/failure fields
+    required through the analyzer, soundcheck TSV, and physical comparator.
+  - Focused CTest: PASS for `opena8djcpp_physical_run_compare`,
+    `opena8djcpp_physical_submit_comparison_contract`, and
+    `opena8djcpp_hal_transport_runtime_gate`.
+  - Local HAL/control build: PASS. The driver bundle was compiled but not
+    installed, loaded, activated, or used against hardware.
+- Interpretation:
+  - Future same-session physical CPU/resource comparisons now use submit
+    counters that represent accepted USB work, not failed queue attempts.
+  - This improves measurement truth only. It does not prove lower CPU, better
+    sound quality, timecode readiness, or branch-promotion readiness.

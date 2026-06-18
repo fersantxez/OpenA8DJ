@@ -63,8 +63,12 @@ int main(int argc, char** argv) {
   if (!promotion_evaluator_present) failures.push_back("promotion_evaluator_missing");
 
   const bool analyzer_outputs_submit_rates =
+      contains(stream_stats_analyzer, "\"capture_submit_attempts_per_second\"") &&
       contains(stream_stats_analyzer, "\"capture_transfers_submitted_per_second\"") &&
+      contains(stream_stats_analyzer, "\"capture_submit_failures\"") &&
+      contains(stream_stats_analyzer, "\"playback_submit_attempts_per_second\"") &&
       contains(stream_stats_analyzer, "\"playback_transfers_submitted_per_second\"") &&
+      contains(stream_stats_analyzer, "\"playback_submit_failures\"") &&
       contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") &&
       contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"") &&
       contains(stream_stats_analyzer, "\"capture_submit_rate_ratio_to_expected\"") &&
@@ -72,15 +76,21 @@ int main(int argc, char** argv) {
   if (!analyzer_outputs_submit_rates) failures.push_back("analyzer_submit_rates_missing");
 
   const bool soundcheck_records_submit_counters =
+      contains(run_soundcheck, "\"captureSubmitAttempts\",") &&
       contains(run_soundcheck, "\"captureTransfersSubmitted\",") &&
+      contains(run_soundcheck, "\"playbackSubmitAttempts\",") &&
       contains(run_soundcheck, "\"playbackTransfersSubmitted\",");
   if (!soundcheck_records_submit_counters) {
     failures.push_back("soundcheck_submit_counter_columns_missing");
   }
 
   const bool compare_reads_submit_rates =
+      contains(compare_source, "capture_submit_attempts_per_second") &&
+      contains(compare_source, "playback_submit_attempts_per_second") &&
       contains(compare_source, "capture_submit_calls_per_second") &&
       contains(compare_source, "playback_submit_calls_per_second") &&
+      contains(compare_source, "capture_submit_failures") &&
+      contains(compare_source, "playback_submit_failures") &&
       contains(compare_source, "capture_transfers_submitted_per_second") &&
       contains(compare_source, "playback_transfers_submitted_per_second");
   if (!compare_reads_submit_rates) failures.push_back("physical_compare_submit_reads_missing");
@@ -98,8 +108,12 @@ int main(int argc, char** argv) {
   }
 
   const bool compare_prints_submit_rates =
+      contains(compare_source, "\"capture_submit_attempts_per_second\"") &&
+      contains(compare_source, "\"playback_submit_attempts_per_second\"") &&
       contains(compare_source, "\"capture_submit_calls_per_second\"") &&
       contains(compare_source, "\"playback_submit_calls_per_second\"") &&
+      contains(compare_source, "\"capture_submit_failures\"") &&
+      contains(compare_source, "\"playback_submit_failures\"") &&
       contains(compare_source, "\"capture_submit_rate_ratio_to_expected\"") &&
       contains(compare_source, "\"playback_submit_rate_ratio_to_expected\"");
   if (!compare_prints_submit_rates) failures.push_back("physical_compare_submit_output_missing");

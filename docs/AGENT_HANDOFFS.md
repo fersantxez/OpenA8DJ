@@ -3610,3 +3610,44 @@ Risk:
     C++ submit rates, hot-path enqueue/requeue ticks, CPU p95, quality WAV
     metrics, routing, and then Traktor/timecode vinyl evidence once the route
     is valid.
+
+## 2026-06-18 Subagents: Singer HAL Runtime Map and Ampere DriverKit Path
+
+- Agents:
+  - Singer (`019ed86e-28f5-7413-9911-961ed7d7a48f`)
+  - Ampere (`019ed86e-57d9-7c13-ae5d-1f1dc33c809c`)
+- Mission:
+  - Singer: map the current HAL/USB runtime enqueue path and identify the
+    minimum safe measurement or cadence-reduction change.
+  - Ampere: rank prepared-transport and DriverKit components by readiness for
+    real runtime integration.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - The current HAL runtime still uses direct `IOUSBHostPipe
+    enqueueIORequestWithData` for capture and playback. The bulk/control path
+    has another enqueue call, but it is not the isochronous audio hot path.
+  - Capture `captureTransfersSubmitted` previously counted queue attempts even
+    when IOUSBHost rejected the request, while playback counted only accepted
+    submits. This could corrupt future resource-comparison evidence.
+  - The closest path to real low-CPU runtime is `AudioDriverSkeleton` plus
+    `PreparedTransportBackend`, `PreparedUsbSubmitPlanner`, and
+    `PreparedUsbRequestPool`. The `FakeRuntimeAdapter` is useful as a contract
+    witness, not as final runtime.
+  - DriverKit product integration remains blocked by real `StartIO`/`StopIO`,
+    stream memory, timestamp, configuration-change, USBDriverKit pipe, and
+    completion-race binding gaps.
+- Integrated action:
+  - Capture submit accounting was changed to success-only and explicit
+    capture/playback submit-attempt counters were added for future evidence.
+  - Runtime and physical-comparison contracts now require attempts, accepted
+    submits, and submit-failure observability through the evidence chain.
+- Next action:
+  - Add a compile/static DriverKit binding gate that fails while
+    `OpenA8DJAudioDevice` remains pass-through/stub, then add a fake
+    USBDriverKit async request interface with late-callback/cancel/restart race
+    coverage before any prepared transport hardware window.

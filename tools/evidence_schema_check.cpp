@@ -238,6 +238,8 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "control_exposes_submit_counters", true) &&
       bool_field_is(hal_transport_runtime_gate, "soundcheck_tsv_captures_submit_counters", true) &&
       bool_field_is(hal_transport_runtime_gate, "analyzer_summarizes_submit_counters", true) &&
+      bool_field_is(hal_transport_runtime_gate, "capture_submit_counter_success_only", true) &&
+      bool_field_is(hal_transport_runtime_gate, "playback_submit_counter_success_only", true) &&
       bool_field_is(hal_transport_runtime_gate, "runtime_submit_observability_present", true) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       object_present(summary, "hal_logical_capture_batching_contract") &&

@@ -59,8 +59,12 @@ struct RunStats {
   bool captured_wav_present = false;
   double capture_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_submit_attempts_per_second = std::numeric_limits<double>::quiet_NaN();
+  double playback_submit_attempts_per_second = std::numeric_limits<double>::quiet_NaN();
   double capture_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_submit_failures = std::numeric_limits<double>::quiet_NaN();
+  double playback_submit_failures = std::numeric_limits<double>::quiet_NaN();
   double capture_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
   double capture_submit_reduction_ratio_vs_logical = std::numeric_limits<double>::quiet_NaN();
@@ -401,16 +405,30 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
       number_or_nan(json_number(stream_summary, "capture_transfers_per_second"));
   run.playback_transfers_per_second =
       number_or_nan(json_number(stream_summary, "playback_transfers_completed_per_second"));
+  run.capture_submit_attempts_per_second =
+      number_or_nan(json_number(stream_summary, "capture_submit_attempts_per_second"));
   run.capture_submit_calls_per_second =
       number_or_nan(json_number(stream_summary, "capture_transfers_submitted_per_second"));
   if (!std::isfinite(run.capture_submit_calls_per_second)) {
     run.capture_submit_calls_per_second = run.capture_transfers_per_second;
   }
+  if (!std::isfinite(run.capture_submit_attempts_per_second)) {
+    run.capture_submit_attempts_per_second = run.capture_submit_calls_per_second;
+  }
+  run.playback_submit_attempts_per_second =
+      number_or_nan(json_number(stream_summary, "playback_submit_attempts_per_second"));
   run.playback_submit_calls_per_second =
       number_or_nan(json_number(stream_summary, "playback_transfers_submitted_per_second"));
   if (!std::isfinite(run.playback_submit_calls_per_second)) {
     run.playback_submit_calls_per_second = run.playback_transfers_per_second;
   }
+  if (!std::isfinite(run.playback_submit_attempts_per_second)) {
+    run.playback_submit_attempts_per_second = run.playback_submit_calls_per_second;
+  }
+  run.capture_submit_failures =
+      number_or_nan(json_number(stream_summary, "capture_submit_failures"));
+  run.playback_submit_failures =
+      number_or_nan(json_number(stream_summary, "playback_submit_failures"));
   run.capture_transfers_sampled_per_second =
       number_or_nan(json_number(stream_summary, "capture_transfers_sampled_per_second"));
   run.playback_transfers_sampled_per_second =
@@ -666,11 +684,23 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"playback_transfers_sampled_per_second\": ";
   print_json_number(run.playback_transfers_sampled_per_second);
   std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_attempts_per_second\": ";
+  print_json_number(run.capture_submit_attempts_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_submit_attempts_per_second\": ";
+  print_json_number(run.playback_submit_attempts_per_second);
+  std::cout << ",\n";
   std::cout << indent << "  \"capture_submit_calls_per_second\": ";
   print_json_number(run.capture_submit_calls_per_second);
   std::cout << ",\n";
   std::cout << indent << "  \"playback_submit_calls_per_second\": ";
   print_json_number(run.playback_submit_calls_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_failures\": ";
+  print_json_number(run.capture_submit_failures);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_submit_failures\": ";
+  print_json_number(run.playback_submit_failures);
   std::cout << ",\n";
   std::cout << indent << "  \"capture_submit_reduction_ratio_vs_logical\": ";
   print_json_number(run.capture_submit_reduction_ratio_vs_logical);

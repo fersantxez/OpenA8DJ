@@ -33,6 +33,13 @@ bool contains(std::string_view text, std::string_view needle) {
   return text.find(needle) != std::string_view::npos;
 }
 
+bool appears_before(std::string_view text, std::string_view first, std::string_view second) {
+  const auto first_pos = text.find(first);
+  const auto second_pos = text.find(second);
+  return first_pos != std::string_view::npos && second_pos != std::string_view::npos &&
+         first_pos < second_pos;
+}
+
 bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
   return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
 }
@@ -102,6 +109,14 @@ int main(int argc, char** argv) {
       contains(hal_source, "ExpectedIsoTransferTicksForFrames(kCaptureIsoFramesPerTransfer)");
   const bool hal_has_capture_submit_counter =
       contains(hal_source, "uint64_t captureTransfersSubmitted;") &&
+      contains(hal_source, "uint64_t captureSubmitAttempts;") &&
+      contains(hal_source, "atomic_uint_fast64_t _captureSubmitAttemptsAtomic;") &&
+      contains(hal_source, "atomic_init(&_captureSubmitAttemptsAtomic, 0);") &&
+      contains(hal_source, "atomic_store(&_captureSubmitAttemptsAtomic, 0);") &&
+      contains(hal_source,
+               "stats.captureSubmitAttempts = atomic_load(&_captureSubmitAttemptsAtomic);") &&
+      contains(hal_source,
+               "atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);") &&
       contains(hal_source, "atomic_uint_fast64_t _captureTransfersSubmittedAtomic;") &&
       contains(hal_source, "atomic_init(&_captureTransfersSubmittedAtomic, 0);") &&
       contains(hal_source, "atomic_store(&_captureTransfersSubmittedAtomic, 0);") &&
@@ -111,27 +126,59 @@ int main(int argc, char** argv) {
                "atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);");
   const bool hal_has_playback_submit_counter =
       contains(hal_source, "uint64_t playbackTransfersSubmitted;") &&
+      contains(hal_source, "uint64_t playbackSubmitAttempts;") &&
+      contains(hal_source, "atomic_uint_fast64_t _playbackSubmitAttemptsAtomic;") &&
+      contains(hal_source, "atomic_init(&_playbackSubmitAttemptsAtomic, 0);") &&
+      contains(hal_source, "atomic_store(&_playbackSubmitAttemptsAtomic, 0);") &&
+      contains(hal_source,
+               "stats.playbackSubmitAttempts = atomic_load(&_playbackSubmitAttemptsAtomic);") &&
+      contains(hal_source,
+               "atomic_fetch_add_explicit(&_playbackSubmitAttemptsAtomic, 1, memory_order_relaxed);") &&
       contains(hal_source, "atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;") &&
       contains(hal_source,
                "stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);") &&
       contains(hal_source,
                "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);");
   const bool control_exposes_submit_counters =
+      contains(control_source, "captureSubmitAttempts=%llu") &&
       contains(control_source, "captureTransfersSubmitted=%llu") &&
+      contains(control_source, "playbackSubmitAttempts=%llu") &&
       contains(control_source, "playbackTransfersSubmitted=%llu");
   const bool soundcheck_tsv_captures_submit_counters =
+      contains(run_soundcheck, "\"captureSubmitAttempts\",") &&
       contains(run_soundcheck, "\"captureTransfersSubmitted\",") &&
+      contains(run_soundcheck, "\"playbackSubmitAttempts\",") &&
       contains(run_soundcheck, "\"playbackTransfersSubmitted\",");
   const bool analyzer_summarizes_submit_counters =
+      contains(stream_stats_analyzer, "\"captureSubmitAttempts\",") &&
       contains(stream_stats_analyzer, "\"captureTransfersSubmitted\",") &&
+      contains(stream_stats_analyzer, "\"playbackSubmitAttempts\",") &&
       contains(stream_stats_analyzer, "\"playbackTransfersSubmitted\",") &&
+      contains(stream_stats_analyzer, "\"capture_submit_attempts_per_second\"") &&
       contains(stream_stats_analyzer, "\"capture_transfers_submitted_per_second\"") &&
+      contains(stream_stats_analyzer, "\"capture_submit_failures\"") &&
+      contains(stream_stats_analyzer, "\"playback_submit_attempts_per_second\"") &&
+      contains(stream_stats_analyzer, "\"playback_submit_failures\"") &&
       contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") &&
       contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"");
+  const bool capture_submit_counter_success_only =
+      contains(hal_source,
+               "return;\n    }\n    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
+      appears_before(hal_source,
+                     "BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data",
+                     "atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);");
+  const bool playback_submit_counter_success_only =
+      appears_before(hal_source,
+                     "BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data",
+                     "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
+      appears_before(hal_source,
+                     "return NO;\n    }\n    atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);",
+                     "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);");
   const bool runtime_submit_observability_present =
       hal_has_capture_submit_counter && hal_has_playback_submit_counter &&
       control_exposes_submit_counters && soundcheck_tsv_captures_submit_counters &&
-      analyzer_summarizes_submit_counters;
+      analyzer_summarizes_submit_counters && capture_submit_counter_success_only &&
+      playback_submit_counter_success_only;
 
   const bool offline_prepared_model_supported =
       string_field_is(migration, "result", "PASS") &&
@@ -212,6 +259,10 @@ int main(int argc, char** argv) {
       << (soundcheck_tsv_captures_submit_counters ? "true" : "false") << ",\n"
       << "  \"analyzer_summarizes_submit_counters\": "
       << (analyzer_summarizes_submit_counters ? "true" : "false") << ",\n"
+      << "  \"capture_submit_counter_success_only\": "
+      << (capture_submit_counter_success_only ? "true" : "false") << ",\n"
+      << "  \"playback_submit_counter_success_only\": "
+      << (playback_submit_counter_success_only ? "true" : "false") << ",\n"
       << "  \"runtime_submit_observability_present\": "
       << (runtime_submit_observability_present ? "true" : "false") << ",\n"
       << "  \"runtime_reduction_missing\": " << (runtime_reduction_missing ? "true" : "false")
