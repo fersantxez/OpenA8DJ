@@ -12508,3 +12508,32 @@ Full offline gate after commit:
   - This improves measurement reliability only. It does not clear current
     physical route, SNR/delay, CPU/resource, Traktor/timecode, or branch
     promotion blockers.
+
+## 2026-06-18 - Wide-Lag Alignment Guard Post-Commit Freshness
+
+- Commit under test: `8d1b9ea`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Command: `./scripts/run-cpp-offline-gates`.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/current-offline-gates.json`.
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/ctest-default.txt`.
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/ctest-release.txt`.
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`.
+- Results:
+  - Overall offline status: PASS.
+  - Debug/default CTest: `78` passed, `0` failed.
+  - Release CTest: `79` passed, `0` failed.
+  - Evidence freshness: PASS; `head_commit=8d1b9ea`,
+    `summary_base_commit=8d1b9ea`, `working_tree_clean_for_claim=true`.
+  - Product readiness status: FAIL.
+  - Product quality claim allowed: `false`.
+  - Branch promotion supported: `false`.
+  - Physical product A/B readiness: `false`.
+- Current required next action:
+  `PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION`.
