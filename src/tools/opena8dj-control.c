@@ -257,6 +257,10 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathCaptureRequeueTicksMax;
     uint64_t hotPathCaptureRequeueTicksSum;
     uint64_t hotPathCaptureRequeueTicksSamples;
+    uint64_t hotPathCaptureEnqueueTicksMin;
+    uint64_t hotPathCaptureEnqueueTicksMax;
+    uint64_t hotPathCaptureEnqueueTicksSum;
+    uint64_t hotPathCaptureEnqueueTicksSamples;
     uint64_t hotPathPlaybackQueueTicksMin;
     uint64_t hotPathPlaybackQueueTicksMax;
     uint64_t hotPathPlaybackQueueTicksSum;
@@ -1279,6 +1283,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
         PRINT_HOT_PATH_TIMING(stats, "capture-handler", hotPathCaptureHandler);
         PRINT_HOT_PATH_TIMING(stats, "capture-decode", hotPathCaptureDecode);
         PRINT_HOT_PATH_TIMING(stats, "capture-requeue", hotPathCaptureRequeue);
+        if (STREAM_STATS_HAS_FIELD(payloadLength, hotPathCaptureEnqueueTicksSamples)) {
+            PRINT_HOT_PATH_TIMING(stats, "capture-enqueue", hotPathCaptureEnqueue);
+        }
         PRINT_HOT_PATH_TIMING(stats, "playback-queue", hotPathPlaybackQueue);
         PRINT_HOT_PATH_TIMING(stats, "playback-fill", hotPathPlaybackFill);
         PRINT_HOT_PATH_TIMING(stats, "playback-enqueue", hotPathPlaybackEnqueue);
@@ -1588,6 +1595,12 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
         printf("hotPathCaptureRequeueTicksMax=%llu\n", (unsigned long long)stats->hotPathCaptureRequeueTicksMax);
         printf("hotPathCaptureRequeueTicksSum=%llu\n", (unsigned long long)stats->hotPathCaptureRequeueTicksSum);
         printf("hotPathCaptureRequeueTicksSamples=%llu\n", (unsigned long long)stats->hotPathCaptureRequeueTicksSamples);
+        if (STREAM_STATS_HAS_FIELD(payloadLength, hotPathCaptureEnqueueTicksSamples)) {
+            printf("hotPathCaptureEnqueueTicksMin=%llu\n", (unsigned long long)stats->hotPathCaptureEnqueueTicksMin);
+            printf("hotPathCaptureEnqueueTicksMax=%llu\n", (unsigned long long)stats->hotPathCaptureEnqueueTicksMax);
+            printf("hotPathCaptureEnqueueTicksSum=%llu\n", (unsigned long long)stats->hotPathCaptureEnqueueTicksSum);
+            printf("hotPathCaptureEnqueueTicksSamples=%llu\n", (unsigned long long)stats->hotPathCaptureEnqueueTicksSamples);
+        }
         printf("hotPathPlaybackQueueTicksMin=%llu\n", (unsigned long long)stats->hotPathPlaybackQueueTicksMin);
         printf("hotPathPlaybackQueueTicksMax=%llu\n", (unsigned long long)stats->hotPathPlaybackQueueTicksMax);
         printf("hotPathPlaybackQueueTicksSum=%llu\n", (unsigned long long)stats->hotPathPlaybackQueueTicksSum);

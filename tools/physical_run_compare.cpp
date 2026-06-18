@@ -410,6 +410,7 @@ std::optional<double> max_present(std::optional<double> lhs, std::optional<doubl
 bool stream_summary_has_hot_path_timing(const std::string& json) {
   const char* keys[] = {
       "hotPathCaptureDecodeTicksSamples",
+      "hotPathCaptureEnqueueTicksSamples",
       "hotPathCaptureHandlerTicksSamples",
       "hotPathCaptureRequeueTicksSamples",
       "hotPathPlaybackCompletionTicksSamples",

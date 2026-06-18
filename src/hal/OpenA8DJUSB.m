@@ -669,6 +669,10 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathCaptureRequeueTicksMax;
     uint64_t hotPathCaptureRequeueTicksSum;
     uint64_t hotPathCaptureRequeueTicksSamples;
+    uint64_t hotPathCaptureEnqueueTicksMin;
+    uint64_t hotPathCaptureEnqueueTicksMax;
+    uint64_t hotPathCaptureEnqueueTicksSum;
+    uint64_t hotPathCaptureEnqueueTicksSamples;
     uint64_t hotPathPlaybackQueueTicksMin;
     uint64_t hotPathPlaybackQueueTicksMax;
     uint64_t hotPathPlaybackQueueTicksSum;
@@ -5391,10 +5395,23 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                           outputStats:NULL];
 #endif
     atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathCaptureEnqueueStartTime = mach_absolute_time();
+#endif
     BOOL queued = [self submitCaptureTransfer:transfer
                                   transactions:transactions
                              completionHandler:completionHandler
                                           error:&error];
+#if OPENA8DJ_ENABLE_HOT_PATH_TIMING
+    uint64_t hotPathCaptureEnqueueEndTime = mach_absolute_time();
+    if (hotPathCaptureEnqueueEndTime > hotPathCaptureEnqueueStartTime) {
+        [self addHotPathTimingMinOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureEnqueueTicksMin)
+                              maxOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureEnqueueTicksMax)
+                              sumOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureEnqueueTicksSum)
+                          samplesOffset:offsetof(OpenA8DJStreamStatsPayload, hotPathCaptureEnqueueTicksSamples)
+                                  delta:hotPathCaptureEnqueueEndTime - hotPathCaptureEnqueueStartTime];
+    }
+#endif
     if (!queued) {
         [self releasePooledTransfer:transfer];
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)

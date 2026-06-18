@@ -5419,3 +5419,84 @@ Next action:
 - Implement `HAL_PLAYBACK_LEAD_SCHEDULER` or equivalent default-off HAL binding
   around capture-paced playback refill, then run lock-gated source-reference
   A/B before any CPU or quality claim.
+
+## 2026-06-18 Explorer: DriverKit Prepared Transport Gap
+
+Subagent:
+- Chandrasekhar.
+
+Required warning:
+- The subagent received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Inspect DriverKit/prepared transport and identify what exists, what is
+  missing for an executable DriverKit candidate, and the lowest-risk next
+  transport change.
+
+Findings:
+- Prepared USB submit planner, request pool, async runtime, and DriverKit
+  skeleton contracts already model 8:1 submit reduction offline.
+- The real DriverKit extension is still scaffold: no real `IOUserAudioDevice`
+  stream binding, no `IOMemoryDescriptor`/timestamp implementation, and no
+  USBDriverKit endpoint/request binding.
+- The existing gap gate still blocks real DriverKit runtime readiness.
+
+Integrated action:
+- Updated transport direction so physical CPU work no longer points at
+  repeating the rejected playback-scheduler HAL candidate.
+- Kept DriverKit/USB runtime as the strategic path for reducing true
+  IOUSBHost enqueue overhead, after an offline adapter/probe closes the
+  endpoint binding gap.
+
+Risks:
+- DriverKit remains non-executable as a physical candidate until the SDK build
+  and USBDriverKit endpoint binding exist.
+
+Next action:
+- Implement an offline DriverKit USB submit backend/adapter that maps one
+  prepared descriptor to one async USB request with completion-owned lifecycle,
+  then run a build-only DriverKit SDK probe before any DriverKit install or
+  activation.
+
+## 2026-06-18 Explorer: HAL USB Enqueue Hot Path
+
+Subagent:
+- Helmholtz.
+
+Required warning:
+- The subagent received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Inspect current HAL/USB runtime and identify a low-risk default-off patch
+  that improves performance evidence without repeating rejected knobs.
+
+Findings:
+- Hot path is `handleCaptureTransfer` -> `queueCaptureTransfer` ->
+  `submitCaptureTransfer` -> `IOUSBHostPipe enqueueIORequestWithData`, with
+  playback enqueue as the secondary path.
+- Existing rejected knobs should not be repeated without a new implementation:
+  stats-off, playback coalescing alone, output-only/no-capture, reused/raw
+  completion handlers, input decode batching, and capture batching.
+- Current hot-path timing measured playback enqueue but only broad capture
+  requeue, not capture enqueue itself.
+
+Integrated action:
+- Added default-off `hotPathCaptureEnqueue*` observability through HAL IPC,
+  control output, soundcheck TSV, stream-stats analyzer, physical comparator
+  detection, and the transport runtime gate.
+
+Risks:
+- This improves attribution only. It does not reduce CPU by itself and does
+  not justify installing the rebuilt HAL.
+
+Next action:
+- Use the new fields in a dedicated hot-timing diagnostic window only after a
+  new transport candidate or explicit diagnostic window is justified.

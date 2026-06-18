@@ -92,6 +92,18 @@ int main(int argc, char** argv) {
       read_file(evidence / "playback-scheduler-runtime-contract.json");
   const auto hal_playback_scheduler_candidate =
       read_file(evidence / "hal-playback-scheduler-candidate.json");
+  const auto playback_scheduler_physical_compare =
+      read_file(root / "local-analysis/physical-evidence-window/"
+                       "20260618T2002Z-playback-scheduler-source-reference-ab-8s/"
+                       "same-session-physical-compare.recomputed.json");
+  const auto default_postclose_physical_compare =
+      read_file(root / "local-analysis/physical-evidence-window/"
+                       "20260618T2020Z-default-source-reference-ab-8s-postclose/"
+                       "same-session-physical-compare.json");
+  const auto postclose_driver_sample =
+      read_file(root / "local-analysis/cpu-sample/"
+                       "20260618T2024Z-default-cpp-postclose-driver-sample/"
+                       "driver-sample/analysis.json");
 
   const bool evidence_present = !hal_source.empty() && !control_source.empty() &&
                                 !run_soundcheck.empty() && !stream_stats_analyzer.empty() &&
@@ -100,7 +112,10 @@ int main(int argc, char** argv) {
                                 !hal_safety.empty() && !prepared_runtime_source.empty() &&
                                 !prepared_runtime_binding.empty() &&
                                 !playback_scheduler_runtime.empty() &&
-                                !hal_playback_scheduler_candidate.empty();
+                                !hal_playback_scheduler_candidate.empty() &&
+                                !playback_scheduler_physical_compare.empty() &&
+                                !default_postclose_physical_compare.empty() &&
+                                !postclose_driver_sample.empty();
 
   const bool hal_has_direct_usb_enqueue =
       contains(hal_source, "enqueueIORequestWithData:transfer.data") &&
@@ -236,6 +251,15 @@ int main(int argc, char** argv) {
       contains(stream_stats_analyzer, "\"preparedRuntimeSubmitFailures\",") &&
       contains(stream_stats_analyzer, "\"preparedPlaybackRejectTransactionCount\",") &&
       contains(stream_stats_analyzer, "\"prepared_runtime\"");
+  const bool usb_enqueue_timing_observability_present =
+      contains(hal_source, "hotPathCaptureEnqueueTicksMin") &&
+      contains(hal_source, "hotPathCaptureEnqueueStartTime") &&
+      contains(hal_source, "submitCaptureTransfer:transfer") &&
+      contains(control_source, "hotPathCaptureEnqueueTicksSamples") &&
+      contains(control_source, "\"capture-enqueue\"") &&
+      contains(run_soundcheck, "\"hotPathCaptureEnqueueTicksSamples\"") &&
+      contains(stream_stats_analyzer, "\"hotPathCaptureEnqueueTicksSamples\"") &&
+      contains(stream_stats_analyzer, "\"capture_enqueue\"");
   const bool capture_submit_counter_success_only =
       contains(hal_source,
                "return;\n    }\n    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
@@ -254,7 +278,7 @@ int main(int argc, char** argv) {
       control_exposes_submit_counters && soundcheck_tsv_captures_submit_counters &&
       analyzer_summarizes_submit_counters && capture_submit_counter_success_only &&
       playback_submit_counter_success_only &&
-      prepared_runtime_rejection_observability_present;
+      prepared_runtime_rejection_observability_present && usb_enqueue_timing_observability_present;
 
   const bool offline_prepared_model_supported =
       string_field_is(migration, "result", "PASS") &&
@@ -292,6 +316,26 @@ int main(int argc, char** argv) {
       bool_field_is(hal_playback_scheduler_candidate, "default_hal_restored", true) &&
       bool_field_is(hal_playback_scheduler_candidate, "physical_evidence_present", false) &&
       bool_field_is(hal_playback_scheduler_candidate, "product_claim_allowed", false);
+  const bool playback_scheduler_physically_rejected =
+      string_field_is(playback_scheduler_physical_compare, "result", "FAIL") &&
+      string_field_is(playback_scheduler_physical_compare, "readiness_claim",
+                      "BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE") &&
+      contains(playback_scheduler_physical_compare, "\"playback_submit_reduction_ratio_vs_base\": 8") &&
+      contains(playback_scheduler_physical_compare, "\"quality_alignment_score\": 0.396583") &&
+      contains(playback_scheduler_physical_compare, "\"driver_cpu_p95\": 14.3") &&
+      contains(playback_scheduler_physical_compare, "\"coreaudiod_cpu_p95\": 22.3");
+  const bool default_postclose_physically_rejected_for_product =
+      string_field_is(default_postclose_physical_compare, "result", "FAIL") &&
+      string_field_is(default_postclose_physical_compare, "readiness_claim",
+                      "BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE") &&
+      contains(default_postclose_physical_compare, "\"quality_alignment_score\": 0.843286") &&
+      contains(default_postclose_physical_compare, "\"driver_cpu_p95\": 19.4") &&
+      contains(default_postclose_physical_compare, "\"coreaudiod_cpu_p95\": 14.5");
+  const bool postclose_cpu_sample_points_to_usbhost_enqueue =
+      contains(postclose_driver_sample,
+               "\"dominant_interpretation\": \"usbhost_async_enqueue_from_capture_and_playback_paths\"") &&
+      contains(postclose_driver_sample, "\"usbhost_enqueue\": 918") &&
+      contains(postclose_driver_sample, "\"queue_capture\": 873");
 
   const bool current_quality_blocked =
       string_field_is(product_quality, "result", "PASS") &&
@@ -322,6 +366,8 @@ int main(int argc, char** argv) {
       runtime_reduction_missing && offline_prepared_model_supported &&
       hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
       playback_scheduler_runtime_contract_pass && hal_playback_scheduler_candidate_pass &&
+      playback_scheduler_physically_rejected && default_postclose_physically_rejected_for_product &&
+      postclose_cpu_sample_points_to_usbhost_enqueue &&
       current_quality_blocked && physical_ab_blocked && hal_safety_blocks_claims &&
       stable_default_load_preserved &&
       observability_defaults_preserved && prepared_runtime_not_next_default;
@@ -332,6 +378,9 @@ int main(int argc, char** argv) {
   }
   if (!runtime_submit_observability_present) {
     blockers.push_back("runtime_submit_observability_missing");
+  }
+  if (!usb_enqueue_timing_observability_present) {
+    blockers.push_back("usb_enqueue_timing_observability_missing");
   }
   if (!stable_default_load_preserved) {
     blockers.push_back("stable_default_load_not_preserved");
@@ -365,6 +414,21 @@ int main(int argc, char** argv) {
   }
   if (!hal_playback_scheduler_candidate_pass) {
     blockers.push_back("hal_playback_scheduler_candidate_missing_or_failing");
+  }
+  if (playback_scheduler_physically_rejected) {
+    blockers.push_back("playback_scheduler_physically_rejected");
+  } else {
+    blockers.push_back("playback_scheduler_physical_rejection_missing");
+  }
+  if (default_postclose_physically_rejected_for_product) {
+    blockers.push_back("default_postclose_physically_rejected_for_product");
+  } else {
+    blockers.push_back("default_postclose_rejection_missing");
+  }
+  if (postclose_cpu_sample_points_to_usbhost_enqueue) {
+    blockers.push_back("postclose_cpu_sample_points_to_usbhost_enqueue");
+  } else {
+    blockers.push_back("postclose_cpu_sample_missing_or_not_usbhost_enqueue");
   }
   if (current_quality_blocked) {
     blockers.push_back("physical_quality_claim_blocked");
@@ -434,6 +498,8 @@ int main(int argc, char** argv) {
       << (playback_submit_counter_success_only ? "true" : "false") << ",\n"
       << "  \"runtime_submit_observability_present\": "
       << (runtime_submit_observability_present ? "true" : "false") << ",\n"
+      << "  \"usb_enqueue_timing_observability_present\": "
+      << (usb_enqueue_timing_observability_present ? "true" : "false") << ",\n"
       << "  \"runtime_reduction_missing\": " << (runtime_reduction_missing ? "true" : "false")
       << ",\n"
       << "  \"prepared_runtime_not_next_default\": "
@@ -463,6 +529,12 @@ int main(int argc, char** argv) {
       << "  \"hal_playback_scheduler_candidate_playback_coalesce_transfers\": "
       << number_or(hal_playback_scheduler_candidate, "playback_coalesce_transfers", -1.0)
       << ",\n"
+      << "  \"playback_scheduler_physically_rejected\": "
+      << (playback_scheduler_physically_rejected ? "true" : "false") << ",\n"
+      << "  \"default_postclose_physically_rejected_for_product\": "
+      << (default_postclose_physically_rejected_for_product ? "true" : "false") << ",\n"
+      << "  \"postclose_cpu_sample_points_to_usbhost_enqueue\": "
+      << (postclose_cpu_sample_points_to_usbhost_enqueue ? "true" : "false") << ",\n"
       << "  \"current_quality_blocked\": " << (current_quality_blocked ? "true" : "false")
       << ",\n"
       << "  \"physical_ab_blocked\": " << (physical_ab_blocked ? "true" : "false") << ",\n"
@@ -473,11 +545,11 @@ int main(int argc, char** argv) {
   print_string_array("runtime_claim_blockers", blockers);
   std::cout
       << "  \"next_cpu_direction\": "
-         "\"LOCK_GATED_PLAYBACK_SCHEDULER_CANDIDATE_SOURCE_REFERENCE_AB_PRESERVE_CAPTURE_ISO8\",\n"
+         "\"DESIGN_NEW_TRANSPORT_REDUCING_IOUSBHOST_ENQUEUE_OR_DRIVERKIT_USB_RUNTIME\",\n"
       << "  \"next_required_action\": "
-         "\"KEEP_DEFAULT_STABLE_LOAD_AND_RUN_PLAYBACK_SCHEDULER_CANDIDATE_LOCK_GATED_SOURCE_REFERENCE_AB\",\n"
+         "\"KEEP_DEFAULT_STABLE_LOAD_DO_NOT_REPEAT_REJECTED_PLAYBACK_SCHEDULER_IMPLEMENT_NEW_TRANSPORT_CANDIDATE_OFFLINE_FIRST\",\n"
       << "  \"blocked_claim\": "
-         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB\"\n"
+         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_A_NEW_TRANSPORT_CANDIDATE_BEATS_MAINLINE_IN_LOCK_GATED_SAME_SESSION_AB\"\n"
       << "}\n";
 
   return pass ? 0 : 1;

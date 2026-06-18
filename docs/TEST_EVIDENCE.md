@@ -15254,3 +15254,104 @@ Follow-up correction:
   - It is suitable for controlled diagnostic review only. Product listening,
     Timecode Vinyl certification, mainline superiority, CPU superiority, and
     branch promotion remain blocked by the latest physical evidence.
+
+## 2026-06-18 - USB Enqueue Timing And Rejected Scheduler Direction
+
+- Scope:
+  - Updated offline transport gating so it incorporates post-close physical
+    evidence: default C++ is rejected for product claims, and the
+    playback-scheduler candidate is physically rejected despite reducing
+    playback submit cadence.
+  - Added default-off hot-path timing observability for capture USB enqueue:
+    `hotPathCaptureEnqueueTicksMin/Max/Sum/Samples`.
+  - Propagated the new fields through `opena8dj-control`, soundcheck TSV
+    snapshots, stream-stats analysis, and physical-run hot-path timing
+    detection.
+  - Built local artifacts only. No install, unload/reload, playback, recording,
+    CoreAudio restart, USB reset, default-device change, mainline write, or
+    Rust write occurred.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_evidence_schema_check opena8djcpp_physical_run_compare -j`
+  - `make hal`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `./build/cpp-release/opena8djcpp_evidence_schema_check | tee local-analysis/cpp-offline/evidence-schema-check-after-usb-enqueue-timing.json`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(hal_transport_runtime_gate|physical_run_compare)' --output-on-failure`
+  - `shasum -a 256 /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+- Result:
+  - Build: PASS.
+  - `opena8djcpp_hal_transport_runtime_gate`: PASS.
+  - `opena8djcpp_evidence_schema_check`: PASS.
+  - Focused CTest: `2/2` PASS.
+  - Transport gate now reports:
+    - `playback_scheduler_physically_rejected=true`;
+    - `default_postclose_physically_rejected_for_product=true`;
+    - `postclose_cpu_sample_points_to_usbhost_enqueue=true`;
+    - `usb_enqueue_timing_observability_present=true`.
+  - Next CPU direction is now:
+    `DESIGN_NEW_TRANSPORT_REDUCING_IOUSBHOST_ENQUEUE_OR_DRIVERKIT_USB_RUNTIME`.
+  - Installed stable HAL hash remains
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Rebuilt local `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL` hash is
+    `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`.
+- Interpretation:
+  - The installed stable load was not changed.
+  - The rebuilt artifact is an offline candidate with better enqueue
+    observability only; it is not a product candidate, not a superiority claim,
+    and not a reason to run another physical A/B by itself.
+  - A future physical diagnostic window can now quantify capture enqueue timing
+    separately from capture requeue timing if `HAL_HOT_PATH_TIMING=1` is used.
+
+## 2026-06-18 - 16:34 Offline Close After USB Enqueue Timing
+
+- Scope:
+  - Ran the full offline gate suite after adding capture USB enqueue timing
+    observability and after preserving the installed stable HAL.
+  - No install, unload/reload, playback, recording, CoreAudio restart, USB
+    reset, default-device change, mainline write, or Rust write occurred.
+- Commands:
+  - `scripts/run-cpp-offline-gates`
+  - `jq '{result,head_commit,summary_base_commit,manifest_base_commit,working_tree_clean_for_claim,claimable_current_candidate,blocked_claim}' local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+  - `jq '{result,bundle_ready,package_present,hal_bundle_path,pkg_path,dmg_path,diagnostic_hal_installed_now,product_human_test_allowed,timecode_vinyl_human_test_allowed,next_required_action,blockers}' local-analysis/cpp-offline/human-test-rc-gate.json`
+  - `find /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver build/OpenA8DJ.driver -maxdepth 4 -type f -print0 | xargs -0 shasum -a 256`
+- Result:
+  - Debug/offline CTest: PASS.
+  - Release CTest: `86/86` PASS.
+  - Protocol/routing/timecode/offline performance contracts: PASS.
+  - `opena8djcpp_hal_transport_runtime_gate`: PASS with
+    `usb_enqueue_timing_observability_present=true`,
+    `playback_scheduler_physically_rejected=true`,
+    `default_postclose_physically_rejected_for_product=true`, and
+    `postclose_cpu_sample_points_to_usbhost_enqueue=true`.
+  - `opena8djcpp_human_test_rc_gate`: PASS as diagnostic classification only:
+    bundle/package/DMG exist, but `product_human_test_allowed=false` and
+    `timecode_vinyl_human_test_allowed=false`.
+  - `opena8djcpp_product_quality_claim_gate`: PASS as a blocker:
+    `quality_claim_allowed=false` and `branch_promotion_allowed=false`.
+  - `opena8djcpp_physical_window_readiness_gate`: PASS for planning only:
+    `ready_for_source_reference_ab_window=true`,
+    `ready_for_product_physical_ab=false`, and
+    `ready_for_branch_promotion=false`.
+  - `opena8djcpp_evidence_provenance_freshness_gate`: FAIL because the
+    current evidence was generated while the worktree contained the new
+    uncommitted USB enqueue timing changes. This blocks any current-candidate
+    claim until the changes are committed and the offline gate is rerun.
+  - Installed stable HAL remains unchanged:
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+    hash `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Rebuilt local HAL candidate:
+    `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+    hash `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`.
+  - Package artifacts exist:
+    `build/OpenA8DJ-0.3.25.pkg`
+    hash `be0d6ad20ae6fbc64fff948ee43a454cd90729bb1d71adc6d115938d15edc084`;
+    `build/OpenA8DJ-0.3.25.dmg`
+    hash `325c5934486d5495a58141965a2abe8bbfd7e1830d83ad8b4675c71b94559582`.
+- Interpretation:
+  - The stable load to leave running is still the previously installed HAL,
+    not the rebuilt local artifact.
+  - The rebuilt local artifact is a diagnostic candidate with better timing
+    observability. It must not be treated as product-ready, human-test-ready,
+    Timecode Vinyl-ready, CPU-superior, or branch-promotion-ready.
+  - Next safe closure step is to commit the observability and gate updates,
+    rerun offline gates on a clean worktree, then decide whether a lock-gated
+    fresh HAL safety smoke is worth spending before any diagnostic install.

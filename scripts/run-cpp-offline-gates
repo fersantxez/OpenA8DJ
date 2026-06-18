@@ -1889,6 +1889,9 @@ summary = {
         "runtime_submit_observability_present": hal_transport_runtime_gate.get(
             "runtime_submit_observability_present"
         ),
+        "usb_enqueue_timing_observability_present": hal_transport_runtime_gate.get(
+            "usb_enqueue_timing_observability_present"
+        ),
         "stable_default_load_preserved": hal_transport_runtime_gate.get(
             "stable_default_load_preserved"
         ),
@@ -1927,6 +1930,15 @@ summary = {
         ),
         "hal_playback_scheduler_candidate_playback_coalesce_transfers": hal_transport_runtime_gate.get(
             "hal_playback_scheduler_candidate_playback_coalesce_transfers"
+        ),
+        "playback_scheduler_physically_rejected": hal_transport_runtime_gate.get(
+            "playback_scheduler_physically_rejected"
+        ),
+        "default_postclose_physically_rejected_for_product": hal_transport_runtime_gate.get(
+            "default_postclose_physically_rejected_for_product"
+        ),
+        "postclose_cpu_sample_points_to_usbhost_enqueue": hal_transport_runtime_gate.get(
+            "postclose_cpu_sample_points_to_usbhost_enqueue"
         ),
         "product_claim_blocked": hal_transport_runtime_gate.get("product_claim_blocked"),
         "next_cpu_direction": hal_transport_runtime_gate.get("next_cpu_direction"),

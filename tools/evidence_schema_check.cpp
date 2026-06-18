@@ -1142,6 +1142,8 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "capture_submit_counter_success_only", true) &&
       bool_field_is(hal_transport_runtime_gate, "playback_submit_counter_success_only", true) &&
       bool_field_is(hal_transport_runtime_gate, "runtime_submit_observability_present", true) &&
+      bool_field_is(hal_transport_runtime_gate, "usb_enqueue_timing_observability_present",
+                    true) &&
       bool_field_is(hal_transport_runtime_gate, "stable_default_load_preserved", true) &&
       bool_field_is(hal_transport_runtime_gate,
                     "rejected_transport_variants_default_off", true) &&
@@ -1162,16 +1164,22 @@ int main(int argc, char** argv) {
                       "hal_playback_scheduler_candidate_prepared_submit_frames", 64.0) &&
       number_field_is(hal_transport_runtime_gate,
                       "hal_playback_scheduler_candidate_playback_coalesce_transfers", 8.0) &&
+      bool_field_is(hal_transport_runtime_gate, "playback_scheduler_physically_rejected",
+                    true) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "default_postclose_physically_rejected_for_product", true) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "postclose_cpu_sample_points_to_usbhost_enqueue", true) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       string_field_is(
           hal_transport_runtime_gate, "next_cpu_direction",
-          "LOCK_GATED_PLAYBACK_SCHEDULER_CANDIDATE_SOURCE_REFERENCE_AB_PRESERVE_CAPTURE_ISO8") &&
+          "DESIGN_NEW_TRANSPORT_REDUCING_IOUSBHOST_ENQUEUE_OR_DRIVERKIT_USB_RUNTIME") &&
       string_field_is(
           hal_transport_runtime_gate, "next_required_action",
-          "KEEP_DEFAULT_STABLE_LOAD_AND_RUN_PLAYBACK_SCHEDULER_CANDIDATE_LOCK_GATED_SOURCE_REFERENCE_AB") &&
+          "KEEP_DEFAULT_STABLE_LOAD_DO_NOT_REPEAT_REJECTED_PLAYBACK_SCHEDULER_IMPLEMENT_NEW_TRANSPORT_CANDIDATE_OFFLINE_FIRST") &&
       string_field_is(
           hal_transport_runtime_gate, "blocked_claim",
-          "NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB") &&
+          "NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_A_NEW_TRANSPORT_CANDIDATE_BEATS_MAINLINE_IN_LOCK_GATED_SAME_SESSION_AB") &&
       object_present(summary, "hal_logical_capture_batching_contract") &&
       bool_field_is(hal_logical_capture_batching_contract, "build_exposes_capture_iso", true) &&
       bool_field_is(hal_logical_capture_batching_contract,

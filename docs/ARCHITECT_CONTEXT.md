@@ -3424,3 +3424,32 @@ Current implication:
   window. This closes the operational load, not the product goal: product
   listening, Timecode Vinyl certification, CPU superiority, mainline
   superiority, and branch promotion remain blocked.
+- 16:42 EDT transport direction correction: two read-only subagents confirmed
+  the same CPU picture from different angles. The HAL hot path is capture
+  completion -> `queueCaptureTransfer` -> `submitCaptureTransfer` ->
+  `IOUSBHostPipe enqueueIORequestWithData`, with playback enqueue secondary.
+  DriverKit has strong offline prepared-submit/request-pool models, but the
+  real extension is still scaffold and does not bind USBDriverKit endpoints or
+  real AudioDriverKit streams. The transport runtime gate now treats both the
+  default post-close candidate and playback-scheduler candidate as physically
+  rejected for product claims and no longer recommends repeating the
+  playback-scheduler window. It now points to a new transport candidate that
+  reduces true IOUSBHost enqueue overhead or a real DriverKit/USB runtime.
+- 16:45 EDT USB enqueue timing observability: the HAL/control/evidence path now
+  exposes `hotPathCaptureEnqueue*` timing fields, default-off behind
+  `HAL_HOT_PATH_TIMING`, to separate capture enqueue cost from the broader
+  capture requeue handler. `build/OpenA8DJ.driver` was rebuilt locally and now
+  differs from the installed stable HAL; nothing was installed or reloaded.
+- 16:50 EDT stable-load close status: full offline gates after the USB enqueue
+  timing patch pass for functionality/contracts, including Release `86/86`.
+  The provenance freshness gate intentionally fails because the evidence was
+  produced with the new observability changes still uncommitted
+  (`working_tree_clean_for_claim=false`). The installed stable HAL remains the
+  earlier diagnostic RC hash
+  `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`; the
+  rebuilt local HAL candidate hash is
+  `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`. Do not
+  install or reload it as a product candidate. The only justifiable next
+  physical step is a lock-gated fresh HAL safety smoke if we decide to install
+  the diagnostic observability candidate, followed by source-reference A/B,
+  CPU comparison, and Timecode Vinyl gates.

@@ -10003,3 +10003,87 @@ Next implication:
     propose an impossible command.
 - Readiness impact: operational stability improves; product readiness and
   superiority claims remain blocked.
+
+## 2026-06-18 - Stop Recommending Rejected Playback Scheduler
+
+- Decision: `opena8djcpp_hal_transport_runtime_gate` now treats the
+  playback-scheduler physical A/B as rejected evidence and no longer points the
+  next CPU action at repeating that candidate.
+- Reason: the playback-scheduler candidate already reduced playback submit
+  cadence, but physical quality and CPU/resource gates still failed. Repeating
+  the same window would burn hardware time without a new technical hypothesis.
+- Evidence:
+  - Playback-scheduler A/B:
+    `local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s`.
+  - Result: `FAIL`,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Candidate metrics included playback submit reduction `8.0`, but
+    `quality_alignment_score=0.396583`, driver CPU p95 `14.3`, and coreaudiod
+    p95 `22.3`.
+  - Default post-close candidate also remains rejected for product claims:
+    driver CPU p95 `19.4`, coreaudiod p95 `14.5`, and absolute audiophile
+    gates failing.
+- Alternatives rejected:
+  - Repeat playback-scheduler A/B: rejected because the same candidate has
+    already failed the decisive physical window.
+  - Promote default C++ despite better relative quality: rejected because CPU
+    and absolute quality gates fail.
+- Readiness impact: next CPU work must be a new transport candidate or real
+  DriverKit/USB runtime work, not another low-impact HAL flag.
+
+## 2026-06-18 - Add Capture USB Enqueue Timing Observability
+
+- Decision: add `hotPathCaptureEnqueue*` timing fields through HAL IPC,
+  `opena8dj-control`, soundcheck TSV capture, stream-stats analysis, and the
+  transport runtime gate.
+- Reason: the driver process sample attributes CPU to IOUSBHost async enqueue,
+  but the existing hot-path timing separated playback enqueue while capture
+  only exposed broader requeue time. This made the dominant capture submit
+  cost too coarse to quantify in the next diagnostic window.
+- Evidence:
+  - `make hal` builds the updated HAL/control artifacts.
+  - `opena8djcpp_hal_transport_runtime_gate` PASS with
+    `usb_enqueue_timing_observability_present=true`.
+  - `opena8djcpp_evidence_schema_check` PASS.
+- Alternatives rejected:
+  - Enable another transport knob immediately: rejected because the already
+    tested HAL knobs are physically rejected and no new performance hypothesis
+    is proven yet.
+  - Rely only on process `sample`: rejected because `sample` gives stack
+    attribution but not per-window stream-counter timing that can be compared
+    across candidates.
+- Readiness impact: observability improves. This is not a product improvement,
+  not a CPU superiority claim, and not a reason to install the rebuilt HAL.
+
+## 2026-06-18 - Close Stable Load Without Replacing Installed HAL
+
+- Decision: the stable load for the 15:10 EDT closure remains the previously
+  installed diagnostic HAL, while the newly rebuilt HAL with capture enqueue
+  timing is held as an offline diagnostic candidate only.
+- Reason: the new artifact changes observability and needs at least a
+  lock-gated fresh HAL safety smoke before installation. The full offline suite
+  passes functional/contracts gates, but the provenance freshness gate fails
+  until the observability changes are committed and gates are rerun from a
+  clean worktree.
+- Evidence:
+  - Release CTest: `86/86` PASS.
+  - `opena8djcpp_hal_transport_runtime_gate`: PASS with
+    `usb_enqueue_timing_observability_present=true`.
+  - `opena8djcpp_product_quality_claim_gate`: PASS as a blocker with
+    `quality_claim_allowed=false`.
+  - `opena8djcpp_human_test_rc_gate`: PASS as diagnostic classification with
+    `product_human_test_allowed=false`.
+  - `opena8djcpp_evidence_provenance_freshness_gate`: FAIL with
+    `working_tree_clean_for_claim=false`.
+  - Installed HAL hash:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Rebuilt local HAL candidate hash:
+    `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`.
+- Alternatives rejected:
+  - Install/reload the new local artifact immediately: rejected because it has
+    no fresh lock-gated safety smoke and does not change product blockers.
+  - Call the current package a human/product baseline: rejected because quality,
+    CPU, Timecode Vinyl, and branch-promotion gates remain blocked.
+- Readiness impact: operationally stable diagnostic load is preserved; the
+  next action is clean-commit plus offline rerun, then optional lock-gated
+  safety smoke for the observability candidate.
