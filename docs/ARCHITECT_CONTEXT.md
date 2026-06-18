@@ -2922,3 +2922,6 @@ Current implication:
   improves measurement safety only; current product readiness remains blocked
   by route validity, strict SNR/delay thresholds, CPU/resource evidence,
   physical Traktor/timecode evidence, and same-session mainline/C++ comparison.
+- Evidence-summary hardening update: `current-offline-gates.json` now exposes
+  top-level product decision fields so a diagnostic offline PASS cannot be
+  confused with a quality, hardware, or branch-promotion claim.

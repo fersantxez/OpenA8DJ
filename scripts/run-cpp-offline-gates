@@ -373,6 +373,17 @@ summary = {
     "diagnostic_status": "PASS",
     "product_readiness_status": promotion_evaluator.get("result", "NOT_READY"),
     "branch_promotion_allowed": promotion_evaluator.get("branch_promotion_allowed", False),
+    "quality_claim_allowed": product_quality_claim_gate.get("quality_claim_allowed", False),
+    "ready_for_product_physical_ab": physical_window_readiness_gate.get(
+        "ready_for_product_physical_ab", False
+    ),
+    "ready_for_branch_promotion": physical_window_readiness_gate.get(
+        "ready_for_branch_promotion", False
+    ),
+    "next_required_action": physical_window_readiness_gate.get("next_required_action"),
+    "product_quality_claim_blockers": product_quality_claim_gate.get(
+        "quality_claim_blockers", []
+    ),
     "physical_measurement_valid_for_promotion": capture_route_health.get(
         "measurement_valid_for_promotion"
     ),

@@ -12569,3 +12569,24 @@ Full offline gate after commit:
   - The lock state is no longer a false blocker when Codex correctly holds the
     lock for inventory.
   - The physical route remains blocked for promotion and product A/B.
+
+## 2026-06-18 - Offline Summary Product-Claim Fields
+
+- Commit context: `889cbbb` plus uncommitted offline-summary hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline evidence/reporting change only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Change:
+  - `scripts/run-cpp-offline-gates` now copies the product decision fields from
+    nested gates into top-level `current-offline-gates.json`:
+    `quality_claim_allowed`, `ready_for_product_physical_ab`,
+    `ready_for_branch_promotion`, `next_required_action`, and
+    `product_quality_claim_blockers`.
+- Expected interpretation:
+  - Offline `status=PASS` remains diagnostic only.
+  - Product readiness must remain blocked unless the top-level claim fields and
+    promotion evaluator both allow it.

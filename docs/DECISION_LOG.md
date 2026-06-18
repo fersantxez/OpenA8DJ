@@ -8662,3 +8662,21 @@ Next implication:
   blocks promotion because no wired non-Audio8/non-built-in known-good output is
   visible, Audio 8 DJ is not CoreAudio-visible without an active HAL, and the
   latest same-device iRig diagnostic failed.
+
+## 2026-06-18 - Promote Claim Blockers To Offline Summary Top Level
+
+- Decision: `scripts/run-cpp-offline-gates` now writes top-level
+  `quality_claim_allowed`, `ready_for_product_physical_ab`,
+  `ready_for_branch_promotion`, `next_required_action`, and
+  `product_quality_claim_blockers` into `current-offline-gates.json`.
+- Reason: the offline suite can legitimately report diagnostic `status=PASS`
+  while the product remains blocked. The primary summary must make that
+  impossible to misread without drilling into nested gate objects.
+- Alternatives rejected:
+  - Leave the fields nested only: rejected because it increases operator error
+    risk during long physical/debug sessions.
+  - Convert offline diagnostic PASS into FAIL: rejected because offline
+    contracts are passing; product readiness is a separate evidence gate.
+- Readiness impact: measurement/reporting safety only. This does not validate
+  the route, prove CPU/resource superiority, clear Timecode Vinyl, or authorize
+  branch promotion.
