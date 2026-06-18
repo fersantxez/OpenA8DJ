@@ -1480,8 +1480,26 @@ summary = {
         "playback_logical_batcher_still_chunks": hal_logical_capture_batching_contract.get(
             "playback_logical_batcher_still_chunks"
         ),
+        "makefile_exposes_capture_batch_v2_diagnostic": hal_logical_capture_batching_contract.get(
+            "makefile_exposes_capture_batch_v2_diagnostic"
+        ),
+        "capture_batch_v2_capture_iso_frames": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_capture_iso_frames"
+        ),
+        "capture_batch_v2_playback_iso_frames": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_playback_iso_frames"
+        ),
+        "capture_batch_v2_playback_coalesce_transfers": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_playback_coalesce_transfers"
+        ),
+        "capture_batch_v2_preserves_one_stream_output_surface": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_preserves_one_stream_output_surface"
+        ),
         "candidate_build_flags": hal_logical_capture_batching_contract.get(
             "candidate_build_flags"
+        ),
+        "candidate_v2_build_flags": hal_logical_capture_batching_contract.get(
+            "candidate_v2_build_flags"
         ),
         "blocked_claim": hal_logical_capture_batching_contract.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
