@@ -10446,3 +10446,50 @@ Full offline gate rerun:
     proof. The current physical-window preflight still blocks promotion because
     no wired non-Audio8 known-good output source is visible; only `MacBook Air
     Speakers` is available and that acoustic path is rejected for promotion.
+
+## 2026-06-18 HAL Runtime Geometry Observability
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added runtime geometry fields to `OpenA8DJStreamStatsPayload` in the HAL
+    and `opena8dj-control`.
+  - Added `opena8djcpp_hal_runtime_geometry_observability_contract` and wired
+    it into CMake, CTest, the offline runner, static policy, and evidence
+    schema.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release -DOPENA8DJ_BUILD_HAL=OFF -DOPENA8DJ_BUILD_HARDWARE_TOOLS=OFF`
+  - `cmake -S . -B build/cpp-debug -DCMAKE_BUILD_TYPE=Debug -DOPENA8DJ_BUILD_HAL=OFF -DOPENA8DJ_BUILD_HARDWARE_TOOLS=OFF`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_runtime_geometry_observability_contract opena8djcpp_static_policy_check opena8djcpp_evidence_schema_check`
+  - `make -B hal HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8`
+  - `./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `ctest --test-dir build/cpp-release -R opena8djcpp_hal_runtime_geometry_observability_contract --output-on-failure`
+  - `./scripts/run-cpp-offline-gates`
+- Results before commit:
+  - Stream-stats contract: PASS with `field_count=202`,
+    `control_field_count=202`, `mismatch_count=0`.
+  - HAL runtime geometry observability contract: PASS.
+  - Static policy: PASS with `audited_files=44`, `forbidden_hits=0`.
+  - Focused CTest: PASS.
+  - HAL ISO64 capture candidate rebuild: PASS.
+  - Full offline runner functional gates: Debug CTest `58/58`, Release CTest
+    `59/59`.
+  - Full offline runner correctly exited non-zero on provenance because the
+    worktree was dirty before commit:
+    `working_tree_clean_for_claim=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json`
+  - `local-analysis/cpp-offline/static-policy.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - Future physical HAL evidence can now prove which ISO/capture/playback queue
+    geometry was active during the run.
+  - This still does not prove better sound quality, lower CPU, routing
+    superiority, or Traktor/timecode vinyl readiness. Those remain blocked by
+    missing route revalidation and same-session physical A/B evidence.

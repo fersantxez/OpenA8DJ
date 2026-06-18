@@ -218,6 +218,7 @@ C++ evidence set:
 | transfer-pool model | `PASS` | `local-analysis/cpp-offline/transfer-pool-model.json` |
 | static policy | `PASS` | `local-analysis/cpp-offline/static-policy.json` |
 | hardware lock policy | `PASS` | `local-analysis/cpp-offline/hardware-lock-policy.json` |
+| HAL runtime geometry observability | `PASS` | `local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json` |
 | Release packet/routing benchmark | `PASS` | `local-analysis/cpp-offline/offline-bench-release.json` |
 | evidence schema | `PASS` | `local-analysis/cpp-offline/evidence-schema.json` |
 | runtime isolation quiescence | `PASS` | `local-analysis/runtime-isolation/current.json` |

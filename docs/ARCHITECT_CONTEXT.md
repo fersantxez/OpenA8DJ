@@ -70,9 +70,16 @@ Branch: `driverkit/cpp-redesign`
   distinguish Audio 8 analog output from mixer/REC OUT under signal.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
-  `OpenA8DJStreamStatsPayload` field list (`196` fields, `0` mismatches in the
+  `OpenA8DJStreamStatsPayload` field list (`202` fields, `0` mismatches in the
   latest run). This removes stale-tool/payload-drift as an avoidable
   explanation before hardware runs.
+- HAL runtime geometry is now observable through stream stats. Physical runs
+  can attribute the active logical ISO size, capture ISO size, playback base
+  ISO size, playback effective ISO size, playback coalesce count, capture queue
+  depth, and playback queue target from the same stats payload used by
+  `opena8dj-control`. The
+  `opena8djcpp_hal_runtime_geometry_observability_contract` blocks physical
+  quality/performance claims if this attribution surface drifts.
 - 2026-06-17 hot-path timing is now opt-in (`HAL_HOT_PATH_TIMING=1`) and off
   by default. A locked iRig run showed physical quality still FAILs
   (`quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps) and
@@ -2518,6 +2525,12 @@ Current implication:
     exposes the capture physical-transfer flag, defaults remain legacy-safe,
     capture pool/queue/timing use the physical size, and capture-paced playback
     does not truncate larger capture completions.
+  - `opena8djcpp_hal_runtime_geometry_observability_contract` guards that HAL
+    and `opena8dj-control` expose the active runtime geometry in stream stats:
+    `logicalIsoFramesPerTransfer`, `captureIsoFramesPerTransfer`,
+    `playbackBaseIsoFramesPerTransfer`, `playbackIsoFramesPerTransfer`,
+    `playbackCoalesceTransfers`, `captureQueueDepth`, and
+    `playbackQueueTarget`.
   - Lock-gated HAL safety evidence now exists for the opt-in capture-batched
     candidate. Run
     `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety`

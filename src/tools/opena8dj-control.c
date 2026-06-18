@@ -79,6 +79,12 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint32_t outputTargetLatencyFrames;
     uint32_t outputByteInFrame;
     uint32_t playbackLeadFrames;
+    uint32_t logicalIsoFramesPerTransfer;
+    uint32_t captureIsoFramesPerTransfer;
+    uint32_t playbackBaseIsoFramesPerTransfer;
+    uint32_t playbackIsoFramesPerTransfer;
+    uint32_t playbackCoalesceTransfers;
+    uint32_t captureQueueDepth;
     uint32_t playbackQueueTarget;
     uint32_t playbackTransfersInFlight;
     double sampleRate;
@@ -1072,6 +1078,15 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            stats->outputTargetLatencyFrames);
     printf("  output-byte-position:   %u\n", stats->outputByteInFrame);
     printf("  playback-lead:          %u frames\n", stats->playbackLeadFrames);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, captureQueueDepth)) {
+        printf("  transport-geometry:     logical-iso=%u capture-iso=%u playback-base-iso=%u playback-iso=%u coalesce=%u capture-queue=%u\n",
+               stats->logicalIsoFramesPerTransfer,
+               stats->captureIsoFramesPerTransfer,
+               stats->playbackBaseIsoFramesPerTransfer,
+               stats->playbackIsoFramesPerTransfer,
+               stats->playbackCoalesceTransfers,
+               stats->captureQueueDepth);
+    }
     printf("  playback-queue:         in-flight=%u / target %u next-frame=%llu\n",
            stats->playbackTransfersInFlight,
            stats->playbackQueueTarget,
@@ -1389,6 +1404,15 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                (unsigned long long)stats->playbackQueueFailureExplicit);
     }
     printf("playbackReschedules=%llu\n", (unsigned long long)stats->playbackReschedules);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, captureQueueDepth)) {
+        printf("logicalIsoFramesPerTransfer=%u\n", stats->logicalIsoFramesPerTransfer);
+        printf("captureIsoFramesPerTransfer=%u\n", stats->captureIsoFramesPerTransfer);
+        printf("playbackBaseIsoFramesPerTransfer=%u\n", stats->playbackBaseIsoFramesPerTransfer);
+        printf("playbackIsoFramesPerTransfer=%u\n", stats->playbackIsoFramesPerTransfer);
+        printf("playbackCoalesceTransfers=%u\n", stats->playbackCoalesceTransfers);
+        printf("captureQueueDepth=%u\n", stats->captureQueueDepth);
+        printf("playbackQueueTarget=%u\n", stats->playbackQueueTarget);
+    }
     printf("outputRingFrames=%u\n", stats->outputRingFrames);
     printf("outputFramesWritten=%llu\n", (unsigned long long)stats->outputFramesWritten);
     printf("outputFramesRead=%llu\n", (unsigned long long)stats->outputFramesRead);

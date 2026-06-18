@@ -102,6 +102,14 @@ fresh. `build/opena8dj-control` therefore depends on `src/hal/OpenA8DJUSB.m`,
 and `scripts/run-cpp-offline-gates` runs
 `scripts/check-stream-stats-contract.py` to compare the duplicated
 `OpenA8DJStreamStatsPayload` field sequence in HAL and control source.
+The stream stats payload also exposes active HAL runtime geometry so physical
+evidence can be attributed to the exact candidate configuration:
+`logicalIsoFramesPerTransfer`, `captureIsoFramesPerTransfer`,
+`playbackBaseIsoFramesPerTransfer`, `playbackIsoFramesPerTransfer`,
+`playbackCoalesceTransfers`, `captureQueueDepth`, and `playbackQueueTarget`.
+`opena8djcpp_hal_runtime_geometry_observability_contract` guards that HAL
+populates those fields and `opena8dj-control` prints them in both human and
+machine-readable output.
 
 ## Build Options
 

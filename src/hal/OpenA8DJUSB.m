@@ -435,6 +435,12 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint32_t outputTargetLatencyFrames;
     uint32_t outputByteInFrame;
     uint32_t playbackLeadFrames;
+    uint32_t logicalIsoFramesPerTransfer;
+    uint32_t captureIsoFramesPerTransfer;
+    uint32_t playbackBaseIsoFramesPerTransfer;
+    uint32_t playbackIsoFramesPerTransfer;
+    uint32_t playbackCoalesceTransfers;
+    uint32_t captureQueueDepth;
     uint32_t playbackQueueTarget;
     uint32_t playbackTransfersInFlight;
     double sampleRate;
@@ -3720,6 +3726,12 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
     stats.outputByteInFrame = _outputByteInFrame;
     stats.playbackLeadFrames = kPlaybackScheduleLeadFrames;
+    stats.logicalIsoFramesPerTransfer = kIsoFramesPerTransfer;
+    stats.captureIsoFramesPerTransfer = kCaptureIsoFramesPerTransfer;
+    stats.playbackBaseIsoFramesPerTransfer = kPlaybackBaseIsoFramesPerTransfer;
+    stats.playbackIsoFramesPerTransfer = kPlaybackIsoFramesPerTransfer;
+    stats.playbackCoalesceTransfers = kPlaybackCoalesceTransfers;
+    stats.captureQueueDepth = kCaptureQueueDepth;
     stats.playbackQueueTarget = kPlaybackQueueTarget;
     stats.playbackTransfersInFlight = atomic_load(&_playbackTransfersInFlight);
     stats.sampleRate = _sampleRate;

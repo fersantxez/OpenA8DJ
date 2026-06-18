@@ -108,6 +108,7 @@ fi
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
 ./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee "$EVIDENCE_DIR/hal-transport-runtime-gate.json"
 ./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract | tee "$EVIDENCE_DIR/hal-logical-capture-batching-contract.json"
+./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract | tee "$EVIDENCE_DIR/hal-runtime-geometry-observability-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -175,6 +176,7 @@ diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json"
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
 hal_logical_capture_batching_contract = load_json("hal-logical-capture-batching-contract.json")
+hal_runtime_geometry_observability_contract = load_json("hal-runtime-geometry-observability-contract.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -718,6 +720,29 @@ summary = {
         ),
         "blocked_claim": hal_logical_capture_batching_contract.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
+    },
+    "hal_runtime_geometry_observability_contract": {
+        "status": hal_runtime_geometry_observability_contract.get("result"),
+        "build_exposes_capture_iso": hal_runtime_geometry_observability_contract.get(
+            "build_exposes_capture_iso"
+        ),
+        "hal_payload_exposes_runtime_geometry": hal_runtime_geometry_observability_contract.get(
+            "hal_payload_exposes_runtime_geometry"
+        ),
+        "control_payload_exposes_runtime_geometry": hal_runtime_geometry_observability_contract.get(
+            "control_payload_exposes_runtime_geometry"
+        ),
+        "snapshot_populates_runtime_geometry": hal_runtime_geometry_observability_contract.get(
+            "snapshot_populates_runtime_geometry"
+        ),
+        "control_prints_runtime_geometry": hal_runtime_geometry_observability_contract.get(
+            "control_prints_runtime_geometry"
+        ),
+        "runtime_geometry_fields": hal_runtime_geometry_observability_contract.get(
+            "runtime_geometry_fields"
+        ),
+        "blocked_claim": hal_runtime_geometry_observability_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

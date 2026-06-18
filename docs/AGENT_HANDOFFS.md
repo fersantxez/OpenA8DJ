@@ -3548,3 +3548,34 @@ Risk:
 - Risk:
   - A real non-Audio8 wired output is still required before a promotion-valid
     known-good route or same-session mainline/C++ A/B can be run.
+
+## 2026-06-18 Subagent: Halley Evidence Gap Auditor
+
+- Agent:
+  - Halley (`019ed858-5396-7f30-a769-346cd65321cf`)
+- Mission:
+  - Read-only audit of remaining objective gaps before claiming audiophile
+    quality, functionality, timecode vinyl readiness, or performance
+    superiority over mainline.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Offline gates are broad, but product readiness still fails correctly.
+  - Current route evidence is not valid for promotion because the shared capture
+    path is unhealthy, direct USB payload evidence is internally clean while
+    physical capture fails after the payload, and no current wired non-Audio8
+    known-good source is visible.
+  - Same-session mainline/C++ A/B, sustained CPU superiority, and physical
+    Traktor/timecode vinyl evidence remain missing.
+  - The ISO64 capture HAL safety load proves install/enumeration/unload safety
+    only; it does not prove quality, routing, timecode, or CPU superiority.
+- Integrated action:
+  - Added HAL runtime geometry observability so the next physical evidence can
+    attribute active ISO and queue settings to the exact candidate under test.
+- Next action:
+  - Run only a lock-gated known-good wired non-Audio8 route revalidation first.
+    Do not run product A/B or promotion gates until that route passes.
