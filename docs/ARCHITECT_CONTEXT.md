@@ -3090,3 +3090,10 @@ Current implication:
   This blocks product human listening and further HAL tuning against the iRig
   route until the route is validated with a known non-Audio8 wired source or a
   new matrix shows useful correlated signal.
+- Known-good route selector update: `scripts/known-good-route-selector` now
+  converts read-only CoreAudio inventory into either an exact lock-gated
+  `run-known-good-route-soundcheck` command using device UIDs, or an explicit
+  blocker. Current live classification is iRig capture visible, Audio 8 DJ
+  visible, but `valid_known_good_output_count=0`, so the next action remains
+  provisioning a wired non-Audio8/non-built-in output before more driver
+  tuning or product listening.

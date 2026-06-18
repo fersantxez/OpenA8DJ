@@ -9353,3 +9353,37 @@ Next implication:
 - Readiness impact: installable diagnostic candidate can still be packaged,
   but product-quality human testing, mainline superiority, Timecode Vinyl
   physical readiness, and branch promotion remain blocked.
+
+## 2026-06-18 - Known-Good Route Selector Must Produce UID-Based Command Or Block
+
+- Decision: add a read-only route selector that classifies current CoreAudio
+  devices and emits an exact lock-gated known-good route command only when a
+  real non-Audio8, non-iRig, non-built-in output and iRig capture are both
+  visible.
+- Reason: the current blocker is not just "run another test"; it is the absence
+  of a promotion-valid known-good source into the iRig route. The next physical
+  window must avoid ambiguous names, same-device iRig diagnostics, built-in
+  acoustic output, Audio 8 as its own known-good source, and virtual/pre-device
+  capture.
+- Evidence:
+  - `scripts/known-good-route-selector --json-out
+    local-analysis/cpp-offline/known-good-route-selector.json`: PASS as
+    inventory classification.
+  - Current live result:
+    `route_revalidation_ready=false`,
+    `valid_known_good_output_count=0`,
+    `irig_capture_count=1`,
+    blocker `non_audio8_non_builtin_known_good_output_not_visible`.
+  - `scripts/test-known-good-route-selector.py`: PASS for both no-route and
+    ready-route fixtures; the ready fixture requires `--output-device-uid` and
+    `--capture-device-uid`.
+- Alternatives rejected:
+  - Use built-in speakers as known-good source: rejected because acoustic room
+    capture cannot validate the wired iRig route.
+  - Use iRig output into iRig input as promotion evidence: rejected because it
+    is same-device diagnostic only.
+  - Use name-only selectors in the final command: rejected because ambiguous
+    CoreAudio names can pick the wrong source.
+- Readiness impact: improves speed and safety of the next physical window.
+  It does not validate the route, improve audio quality, prove CPU/resource
+  superiority, or unblock branch promotion.

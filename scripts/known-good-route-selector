@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""Suggest the next known-good route validation command.
+
+This is a read-only planner. It may enumerate CoreAudio devices through
+build/audio-list, or read a saved audio-list fixture, but it does not acquire
+the hardware lock, play audio, record audio, install/load drivers, restart
+CoreAudio, reset USB, change default devices, or touch external worktrees.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def run_audio_list(timeout: int) -> tuple[int, str, str]:
+    try:
+        completed = subprocess.run(
+            [str(ROOT / "build/audio-list")],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+        return completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired as exc:
+        return 124, exc.stdout or "", exc.stderr or "timeout"
+
+
+def parse_audio_list(text: str) -> list[dict[str, Any]]:
+    pattern = re.compile(
+        r"^\s*\d+\s+id=(?P<id>\d+)\s+(?P<name>.*?)\s+uid=(?P<uid>.*?)\s+"
+        r"in=(?P<inputs>\d+)\s+out=(?P<outputs>\d+)\s+rate=(?P<rate>[0-9.]+)"
+    )
+    devices: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        match = pattern.match(line)
+        if not match:
+            continue
+        devices.append(
+            {
+                "id": int(match.group("id")),
+                "name": match.group("name").strip(),
+                "uid": match.group("uid").strip(),
+                "inputs": int(match.group("inputs")),
+                "outputs": int(match.group("outputs")),
+                "rate": float(match.group("rate")),
+            }
+        )
+    return devices
+
+
+def identity(device: dict[str, Any]) -> str:
+    return f"{device.get('name', '')} {device.get('uid', '')}"
+
+
+def audio8ish(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "opena8dj",
+            "open audio 8",
+            "audio 8 dj",
+            "org.opena8dj.audio8dj",
+            "org.opena8dj.audio8",
+        )
+    )
+
+
+def irigish(value: str) -> bool:
+    lowered = value.lower()
+    return "irig" in lowered or "ik multimedia" in lowered
+
+
+def built_in_or_acoustic(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "builtinspeakerdevice",
+            "built-in output",
+            "built in output",
+            "macbook air speakers",
+            "macbook speakers",
+            "internal speakers",
+        )
+    )
+
+
+def find_default_reference() -> str:
+    candidates = [
+        ROOT
+        / "local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav",
+        ROOT / "local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav",
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return str(ROOT / "REQUIRED-reference.wav")
+
+
+def command_shell_hint(argv: list[str]) -> str:
+    def quote(value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9_./:=+-]+", value):
+            return value
+        return "'" + value.replace("'", "'\"'\"'") + "'"
+
+    return " ".join(quote(arg) for arg in argv)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--audio-list-file", default="")
+    parser.add_argument("--reference-wav", default="")
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--timeout", type=int, default=8)
+    args = parser.parse_args()
+
+    if args.audio_list_file:
+        audio_list_path = Path(args.audio_list_file)
+        audio_rc = 0
+        audio_stdout = audio_list_path.read_text(encoding="utf-8", errors="replace")
+        audio_stderr = ""
+        audio_source = str(audio_list_path)
+    else:
+        audio_rc, audio_stdout, audio_stderr = run_audio_list(args.timeout)
+        audio_source = "build/audio-list"
+
+    devices = parse_audio_list(audio_stdout)
+    irig_captures = [
+        device
+        for device in devices
+        if device.get("inputs", 0) >= 2 and irigish(identity(device))
+    ]
+    valid_outputs = [
+        device
+        for device in devices
+        if device.get("outputs", 0) >= 2
+        and not audio8ish(identity(device))
+        and not irigish(identity(device))
+        and not built_in_or_acoustic(identity(device))
+    ]
+    rejected_outputs = [
+        {
+            "device": device,
+            "reason": (
+                "audio8"
+                if audio8ish(identity(device))
+                else "irig_same_device"
+                if irigish(identity(device))
+                else "built_in_or_acoustic"
+                if built_in_or_acoustic(identity(device))
+                else "insufficient_outputs"
+            ),
+        }
+        for device in devices
+        if device.get("outputs", 0) < 2
+        or audio8ish(identity(device))
+        or irigish(identity(device))
+        or built_in_or_acoustic(identity(device))
+    ]
+
+    reference = args.reference_wav or find_default_reference()
+    route_ready = bool(valid_outputs and irig_captures)
+    selected_output = valid_outputs[0] if valid_outputs else None
+    selected_capture = irig_captures[0] if irig_captures else None
+    command_argv: list[str] = []
+    if route_ready and selected_output and selected_capture:
+        command_argv = [
+            "scripts/run-known-good-route-soundcheck",
+            "--skip-build",
+            "--output-device-uid",
+            str(selected_output["uid"]),
+            "--capture-device",
+            str(selected_capture["name"]),
+            "--capture-device-uid",
+            str(selected_capture["uid"]),
+            "--capture-channels",
+            "1,2",
+            "--reference-wav",
+            reference,
+            "--seconds",
+            "8",
+            "--run-dir",
+            "local-analysis/known-good-route/<timestamp>-known-good-irig",
+        ]
+
+    blockers: list[str] = []
+    if audio_rc != 0 or not devices:
+        blockers.append("coreaudio_device_inventory_unavailable")
+    if not irig_captures:
+        blockers.append("irig_capture_not_visible")
+    if not valid_outputs:
+        blockers.append("non_audio8_non_builtin_known_good_output_not_visible")
+
+    report: dict[str, Any] = {
+        "schema": "opena8djcpp.known-good-route-selector.v1",
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "safety": "read_only_coreaudio_inventory_no_audio_playback_recording_driver_usb_defaults_or_lock",
+        "result": "PASS" if audio_rc == 0 and devices else "FAIL",
+        "meaning": "PASS means route candidates were classified; it is not route validation or product readiness",
+        "audio_source": audio_source,
+        "audio_list_return_code": audio_rc,
+        "audio_list_stderr": audio_stderr.strip(),
+        "route_revalidation_ready": route_ready,
+        "product_claim_allowed": False,
+        "branch_promotion_allowed": False,
+        "selected_known_good_output": selected_output or {},
+        "selected_irig_capture": selected_capture or {},
+        "valid_known_good_output_count": len(valid_outputs),
+        "irig_capture_count": len(irig_captures),
+        "valid_known_good_outputs": valid_outputs,
+        "irig_captures": irig_captures,
+        "rejected_outputs": rejected_outputs,
+        "blockers": blockers,
+        "reference_wav": reference,
+        "lock_required_before_command": True,
+        "command_argv": command_argv,
+        "command_shell_hint": command_shell_hint(command_argv) if command_argv else "",
+        "next_action": (
+            "ACQUIRE_LOCK_AND_RUN_KNOWN_GOOD_ROUTE_COMMAND"
+            if route_ready
+            else "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION"
+        ),
+    }
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        output = Path(args.json_out)
+        if not output.is_absolute():
+            output = ROOT / output
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0 if report["result"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

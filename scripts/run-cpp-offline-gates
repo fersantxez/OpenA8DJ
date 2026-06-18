@@ -221,6 +221,7 @@ fi
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
+python3 scripts/known-good-route-selector --json-out "$EVIDENCE_DIR/known-good-route-selector.json" >/dev/null
 ./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
 ./build/cpp-release/opena8djcpp_physical_route_matrix_contract | tee "$EVIDENCE_DIR/physical-route-matrix-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -232,11 +233,14 @@ python3 -m py_compile \
   scripts/analyze-timebase-family.py \
   scripts/evaluate-promotion-readiness.py \
   scripts/test-promotion-window-contract.py \
+  scripts/test-known-good-route-selector.py \
   scripts/validate-known-good-route-request.py \
+  scripts/known-good-route-selector \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
   scripts/analyze-audiophile-wav.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
+python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-good-route-selector-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -355,6 +359,7 @@ historical_route_reference_gate = load_json("historical-route-reference-gate.jso
 hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 physical_route_inventory = load_json("physical-route-inventory.json")
+known_good_route_selector = load_json("known-good-route-selector.json")
 capture_readiness_contract = load_json("capture-readiness-contract.json")
 physical_route_matrix_contract = load_json("physical-route-matrix-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
@@ -474,6 +479,10 @@ summary = {
     "physical_route_matrix_all_pairs_no_useful_correlated_capture": physical_route_matrix_contract.get(
         "all_pairs_no_useful_correlated_capture"
     ),
+    "known_good_route_selector_ready": known_good_route_selector.get(
+        "route_revalidation_ready"
+    ),
+    "known_good_route_selector_next_action": known_good_route_selector.get("next_action"),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -1326,6 +1335,33 @@ summary = {
             "driver_installed_or_activated"
         ),
         "evidence": "local-analysis/cpp-offline/physical-route-inventory.json",
+    },
+    "known_good_route_selector": {
+        "status": known_good_route_selector.get("result"),
+        "schema": known_good_route_selector.get("schema"),
+        "route_revalidation_ready": known_good_route_selector.get(
+            "route_revalidation_ready"
+        ),
+        "valid_known_good_output_count": known_good_route_selector.get(
+            "valid_known_good_output_count"
+        ),
+        "irig_capture_count": known_good_route_selector.get("irig_capture_count"),
+        "selected_known_good_output": known_good_route_selector.get(
+            "selected_known_good_output"
+        ),
+        "selected_irig_capture": known_good_route_selector.get("selected_irig_capture"),
+        "blockers": known_good_route_selector.get("blockers"),
+        "next_action": known_good_route_selector.get("next_action"),
+        "command_argv": known_good_route_selector.get("command_argv"),
+        "command_shell_hint": known_good_route_selector.get("command_shell_hint"),
+        "lock_required_before_command": known_good_route_selector.get(
+            "lock_required_before_command"
+        ),
+        "product_claim_allowed": known_good_route_selector.get("product_claim_allowed"),
+        "branch_promotion_allowed": known_good_route_selector.get(
+            "branch_promotion_allowed"
+        ),
+        "evidence": "local-analysis/cpp-offline/known-good-route-selector.json",
     },
     "capture_readiness_contract": {
         "status": capture_readiness_contract.get("result"),

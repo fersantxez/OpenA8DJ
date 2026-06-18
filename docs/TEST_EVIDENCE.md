@@ -13638,3 +13638,37 @@ Full offline gate after commit:
     non-Audio8 wired source validates iRig capture, or a new A/B/C/D matrix
     shows useful correlated Audio 8 signal.
   - Does not block packaging an installable diagnostic candidate.
+
+## 2026-06-18 - Known-Good Route Selector Added
+
+- Commit context: local changes after `4cdc8c2`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Read-only CoreAudio inventory and offline fixtures only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Source/build changes:
+  - Added `scripts/known-good-route-selector`.
+  - Added `scripts/test-known-good-route-selector.py`.
+  - Added selector execution, py-compile, fixture test, and summary fields to
+    `scripts/run-cpp-offline-gates`.
+- Commands:
+  - `scripts/known-good-route-selector --json-out local-analysis/cpp-offline/known-good-route-selector.json`
+  - `python3 scripts/test-known-good-route-selector.py`
+- Results:
+  - Selector live inventory: PASS as classification.
+  - `route_revalidation_ready=false`.
+  - `valid_known_good_output_count=0`.
+  - `irig_capture_count=1`.
+  - Blocker: `non_audio8_non_builtin_known_good_output_not_visible`.
+  - Test: `known_good_route_selector_tests=PASS`.
+- Readiness impact:
+  - The next lock-gated physical action is now mechanically defined as soon as
+    a valid wired non-Audio8 output appears.
+  - Current product-quality, Timecode Vinyl physical, CPU/resource superiority,
+    and branch-promotion claims remain blocked.
