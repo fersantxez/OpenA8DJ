@@ -10493,3 +10493,57 @@ Full offline gate rerun:
   - This still does not prove better sound quality, lower CPU, routing
     superiority, or Traktor/timecode vinyl readiness. Those remain blocked by
     missing route revalidation and same-session physical A/B evidence.
+
+## 2026-06-18 HAL Runtime Submit Observability
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added an atomic `captureTransfersSubmitted` counter to the HAL to mirror
+    the existing playback submit counter.
+  - Kept the new field at the end of `OpenA8DJStreamStatsPayload` so newer
+    control tools can safely detect older payloads by length.
+  - Added capture/playback submit columns to `run-soundcheck` stream-stats TSV
+    snapshots.
+  - Extended `scripts/analyze-stream-stats.py` to summarize runtime geometry,
+    submit rates, expected submit cadence, and capture/playback submit-rate
+    ratios.
+  - Extended `opena8djcpp_hal_transport_runtime_gate` so offline evidence fails
+    if submit observability is missing anywhere in the HAL -> control ->
+    soundcheck -> analyzer chain.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `python3 -m py_compile scripts/run-soundcheck scripts/analyze-stream-stats.py`
+  - `python3 scripts/check-stream-stats-contract.py`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_hal_runtime_geometry_observability_contract opena8djcpp_evidence_schema_check`
+  - `make -B hal HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate`
+  - `./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_hal_transport_runtime_gate|opena8djcpp_hal_runtime_geometry_observability_contract' --output-on-failure`
+- Results before commit:
+  - Stream-stats contract: PASS with `field_count=203`,
+    `control_field_count=203`, `mismatch_count=0`,
+    `last_field=captureTransfersSubmitted`.
+  - HAL ISO64 capture candidate rebuild: PASS.
+  - HAL transport runtime gate: PASS, with
+    `runtime_submit_observability_present=true`,
+    `hal_has_capture_submit_counter=true`,
+    `hal_has_playback_submit_counter=true`,
+    `soundcheck_tsv_captures_submit_counters=true`, and
+    `analyzer_summarizes_submit_counters=true`.
+  - HAL runtime geometry observability contract: PASS, with
+    `soundcheck_tsv_captures_runtime_geometry=true` and
+    `analyzer_summarizes_runtime_geometry=true`.
+  - Focused CTest: PASS for both runtime/geometry gates.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json`
+- Interpretation:
+  - The next physical A/B can measure submit cadence directly instead of
+    inferring it from build flags or offline models.
+  - CPU superiority remains unproven. The current HAL still performs direct USB
+    enqueue work and still requires same-session physical CPU and quality
+    evidence against mainline.

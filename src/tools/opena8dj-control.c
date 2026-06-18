@@ -273,6 +273,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathPlaybackCompletionTicksMax;
     uint64_t hotPathPlaybackCompletionTicksSum;
     uint64_t hotPathPlaybackCompletionTicksSamples;
+    uint64_t captureTransfersSubmitted;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1316,6 +1317,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
         stats->playbackScheduleOutOfWindow +
         stats->playbackScheduleFallbacks;
     printf("streaming=%u\n", stats->streaming);
+    printf("captureTransfersSubmitted=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, captureTransfersSubmitted) ?
+                                stats->captureTransfersSubmitted : stats->captureTransfers));
     printf("captureTransfersCompleted=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, captureTransfersCompletedRaw) ?
                                 stats->captureTransfersCompletedRaw : stats->captureTransfers));

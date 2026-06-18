@@ -70,7 +70,7 @@ Branch: `driverkit/cpp-redesign`
   distinguish Audio 8 analog output from mixer/REC OUT under signal.
 - Stream-stats observability is now harder to drift: `make hal` rebuilds
   `build/opena8dj-control`, and the offline gate compares the HAL/control
-  `OpenA8DJStreamStatsPayload` field list (`202` fields, `0` mismatches in the
+  `OpenA8DJStreamStatsPayload` field list (`203` fields, `0` mismatches in the
   latest run). This removes stale-tool/payload-drift as an avoidable
   explanation before hardware runs.
 - HAL runtime geometry is now observable through stream stats. Physical runs
@@ -80,6 +80,13 @@ Branch: `driverkit/cpp-redesign`
   `opena8dj-control`. The
   `opena8djcpp_hal_runtime_geometry_observability_contract` blocks physical
   quality/performance claims if this attribution surface drifts.
+- Runtime submit observability is now symmetric enough for physical CPU
+  comparisons: playback and capture submit counters are exposed through stream
+  stats, `run-soundcheck` records them into `stream-stats-during.tsv`, and
+  `scripts/analyze-stream-stats.py` summarizes submit rates plus expected
+  capture/playback submit ratios from the active runtime geometry. This still
+  does not prove CPU superiority; it makes the next lock-gated A/B capable of
+  measuring it.
 - 2026-06-17 hot-path timing is now opt-in (`HAL_HOT_PATH_TIMING=1`) and off
   by default. A locked iRig run showed physical quality still FAILs
   (`quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps) and
@@ -2531,6 +2538,10 @@ Current implication:
     `playbackBaseIsoFramesPerTransfer`, `playbackIsoFramesPerTransfer`,
     `playbackCoalesceTransfers`, `captureQueueDepth`, and
     `playbackQueueTarget`.
+  - `opena8djcpp_hal_transport_runtime_gate` now also requires runtime submit
+    observability: capture/playback submit counters must exist in HAL, be
+    printed by `opena8dj-control`, be captured by `run-soundcheck`, and be
+    summarized by `scripts/analyze-stream-stats.py`.
   - Lock-gated HAL safety evidence now exists for the opt-in capture-batched
     candidate. Run
     `local-analysis/hal-candidate-safety/20260618T012357Z-capture-iso64-safety`

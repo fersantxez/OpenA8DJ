@@ -14,6 +14,7 @@ from pathlib import Path
 
 
 COUNTERS = [
+    "captureTransfersSubmitted",
     "captureTransfersCompleted",
     "captureTransfersSampled",
     "captureTransactionErrors",
@@ -84,6 +85,13 @@ COUNTERS = [
 
 
 GAUGES = [
+    "logicalIsoFramesPerTransfer",
+    "captureIsoFramesPerTransfer",
+    "playbackBaseIsoFramesPerTransfer",
+    "playbackIsoFramesPerTransfer",
+    "playbackCoalesceTransfers",
+    "captureQueueDepth",
+    "playbackQueueTarget",
     "outputRingFrames",
     "transferLedgerCapacity",
     "transferLedgerPlaybackFirstFrameMin",
@@ -157,6 +165,17 @@ def average_timing(counters, prefix):
     return math.nan
 
 
+def stable_gauge_value(rows, key):
+    values = finite(parse_float(row.get(key)) for row in rows)
+    if not values:
+        return math.nan
+    first = values[0]
+    for value in values[1:]:
+        if value != first:
+            return math.nan
+    return first
+
+
 def load_rows(path):
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         return list(csv.DictReader(handle, delimiter="\t"))
@@ -200,6 +219,7 @@ def analyze(path):
     else:
         write_read_delta = math.nan
 
+    capture_submit_delta = counters["captureTransfersSubmitted"]["delta"]
     capture_tx_delta = counters["captureTransfersCompleted"]["delta"]
     capture_sampled_delta = counters["captureTransfersSampled"]["delta"]
     capture_ratio_delta = capture_sampled_delta if capture_sampled_delta > 0 else capture_tx_delta
@@ -220,6 +240,49 @@ def analyze(path):
     transfer_balance_delta = (
         playback_completed_delta - capture_tx_delta
         if math.isfinite(playback_completed_delta) and math.isfinite(capture_tx_delta) else math.nan
+    )
+    logical_iso = stable_gauge_value(ok_rows, "logicalIsoFramesPerTransfer")
+    capture_iso = stable_gauge_value(ok_rows, "captureIsoFramesPerTransfer")
+    playback_base_iso = stable_gauge_value(ok_rows, "playbackBaseIsoFramesPerTransfer")
+    playback_iso = stable_gauge_value(ok_rows, "playbackIsoFramesPerTransfer")
+    playback_coalesce = stable_gauge_value(ok_rows, "playbackCoalesceTransfers")
+    capture_queue_depth = stable_gauge_value(ok_rows, "captureQueueDepth")
+    playback_queue_target = stable_gauge_value(ok_rows, "playbackQueueTarget")
+    capture_submit_reduction_ratio = (
+        capture_iso / logical_iso
+        if math.isfinite(capture_iso) and math.isfinite(logical_iso) and logical_iso > 0 else math.nan
+    )
+    playback_submit_reduction_ratio = (
+        playback_iso / playback_base_iso
+        if math.isfinite(playback_iso) and math.isfinite(playback_base_iso) and playback_base_iso > 0 else math.nan
+    )
+    capture_submits_per_output_frame = (
+        capture_submit_delta / read_delta
+        if math.isfinite(capture_submit_delta) and math.isfinite(read_delta) and read_delta > 0 else math.nan
+    )
+    playback_submits_per_output_frame = (
+        playback_completed_delta / read_delta
+        if math.isfinite(playback_completed_delta) and math.isfinite(read_delta) and read_delta > 0 else math.nan
+    )
+    expected_capture_transfers_per_output_frame = (
+        1.0 / capture_iso
+        if math.isfinite(capture_iso) and capture_iso > 0 else math.nan
+    )
+    expected_playback_transfers_per_output_frame = (
+        1.0 / playback_iso
+        if math.isfinite(playback_iso) and playback_iso > 0 else math.nan
+    )
+    capture_submit_rate_ratio = (
+        capture_submits_per_output_frame / expected_capture_transfers_per_output_frame
+        if (math.isfinite(capture_submits_per_output_frame) and
+            math.isfinite(expected_capture_transfers_per_output_frame) and
+            expected_capture_transfers_per_output_frame > 0) else math.nan
+    )
+    playback_submit_rate_ratio = (
+        playback_submits_per_output_frame / expected_playback_transfers_per_output_frame
+        if (math.isfinite(playback_submits_per_output_frame) and
+            math.isfinite(expected_playback_transfers_per_output_frame) and
+            expected_playback_transfers_per_output_frame > 0) else math.nan
     )
 
     flags = []
@@ -253,6 +316,8 @@ def analyze(path):
         flags.append("playback_payload_guard_mismatches")
     if counters["playbackScheduleErrors"]["delta"] > 0:
         flags.append("playback_schedule_errors")
+    if ok_rows and not math.isfinite(logical_iso):
+        flags.append("runtime_geometry_missing_or_unstable")
 
     return {
         "schema": "opena8djcpp.stream-stats-summary.v1",
@@ -268,10 +333,28 @@ def analyze(path):
         "output_write_minus_read_frames_last": write_read_delta,
         "output_read_frames_per_second": counters["outputFramesRead"]["per_second"],
         "capture_transfers_per_second": counters["captureTransfersCompleted"]["per_second"],
+        "capture_transfers_submitted_per_second": counters["captureTransfersSubmitted"]["per_second"],
         "capture_transfers_sampled_per_second": counters["captureTransfersSampled"]["per_second"],
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_transfers_sampled_per_second": counters["playbackTransfersSampled"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,
+        "runtime_geometry": {
+            "logical_iso_frames_per_transfer": logical_iso,
+            "capture_iso_frames_per_transfer": capture_iso,
+            "playback_base_iso_frames_per_transfer": playback_base_iso,
+            "playback_iso_frames_per_transfer": playback_iso,
+            "playback_coalesce_transfers": playback_coalesce,
+            "capture_queue_depth": capture_queue_depth,
+            "playback_queue_target": playback_queue_target,
+            "capture_submit_reduction_ratio_vs_logical": capture_submit_reduction_ratio,
+            "playback_submit_reduction_ratio_vs_base": playback_submit_reduction_ratio,
+            "capture_submits_per_output_frame": capture_submits_per_output_frame,
+            "playback_submits_per_output_frame": playback_submits_per_output_frame,
+            "expected_capture_transfers_per_output_frame": expected_capture_transfers_per_output_frame,
+            "expected_playback_transfers_per_output_frame": expected_playback_transfers_per_output_frame,
+            "capture_submit_rate_ratio_to_expected": capture_submit_rate_ratio,
+            "playback_submit_rate_ratio_to_expected": playback_submit_rate_ratio,
+        },
         "capture_transfer_pool_fallback_allocations_per_second":
             counters["captureTransferPoolFallbackAllocations"]["per_second"],
         "playback_transfer_pool_fallback_allocations_per_second":

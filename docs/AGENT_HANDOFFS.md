@@ -3579,3 +3579,34 @@ Risk:
 - Next action:
   - Run only a lock-gated known-good wired non-Audio8 route revalidation first.
     Do not run product A/B or promotion gates until that route passes.
+
+## 2026-06-18 Subagent: Nietzsche Runtime Submit Audit
+
+- Agent:
+  - Nietzsche (`019ed85f-785e-7961-b611-514d0b5c562c`)
+- Mission:
+  - Read-only audit of the lowest-risk next step for objective runtime
+    performance evidence against mainline.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - Capture and playback both still use direct `IOUSBHost` enqueue calls in the
+    HAL hot path.
+  - Playback already had a submitted-transfer counter; capture lacked the
+    symmetric counter needed to compare submit cadence against mainline.
+  - Changing runtime USB cadence before stronger measurement is higher risk
+    because it may alter completion cadence, first-frame scheduling, in-flight
+    depth, lag stability, or timecode behavior.
+- Integrated action:
+  - Added capture submit observability and wired capture/playback submit rates
+    through stream stats, `run-soundcheck`, the stream-stats analyzer, and the
+    HAL transport runtime gate.
+- Next action:
+  - Use the next lock-gated physical window to capture same-session mainline vs
+    C++ submit rates, hot-path enqueue/requeue ticks, CPU p95, quality WAV
+    metrics, routing, and then Traktor/timecode vinyl evidence once the route
+    is valid.

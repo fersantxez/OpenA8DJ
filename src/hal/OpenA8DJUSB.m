@@ -629,6 +629,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t hotPathPlaybackCompletionTicksMax;
     uint64_t hotPathPlaybackCompletionTicksSum;
     uint64_t hotPathPlaybackCompletionTicksSamples;
+    uint64_t captureTransfersSubmitted;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -2092,6 +2093,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_bool _playbackUseExplicitScheduling;
     atomic_uint _playbackScheduleFailureStreak;
     atomic_uint _playbackTransfersInFlight;
+    atomic_uint_fast64_t _captureTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersCompletedAtomic;
     atomic_uint_fast64_t _captureTransfersCompletedAtomic;
@@ -2202,6 +2204,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
+        atomic_init(&_captureTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersCompletedAtomic, 0);
         atomic_init(&_captureTransfersCompletedAtomic, 0);
@@ -3694,6 +3697,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
     atomic_store(&_outputFramesWrittenAtomic, 0);
+    atomic_store(&_captureTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
     atomic_store(&_captureTransfersCompletedAtomic, 0);
@@ -3718,6 +3722,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
 
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
+    stats.captureTransfersSubmitted = atomic_load(&_captureTransfersSubmittedAtomic);
     stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);
     stats.playbackTransfersCompletedRaw = atomic_load(&_playbackTransfersCompletedAtomic);
     stats.captureTransfersCompletedRaw = atomic_load(&_captureTransfersCompletedAtomic);
@@ -5146,6 +5151,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             });
         }
     }
+    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);
 }
 
 - (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer

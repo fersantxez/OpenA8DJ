@@ -110,6 +110,10 @@ evidence can be attributed to the exact candidate configuration:
 `opena8djcpp_hal_runtime_geometry_observability_contract` guards that HAL
 populates those fields and `opena8dj-control` prints them in both human and
 machine-readable output.
+Runtime submit counters are also part of the physical evidence path:
+`captureTransfersSubmitted` and `playbackTransfersSubmitted` must flow from the
+HAL payload through `opena8dj-control`, `run-soundcheck` TSV snapshots, and
+`scripts/analyze-stream-stats.py`.
 
 ## Build Options
 

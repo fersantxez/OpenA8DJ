@@ -69,13 +69,18 @@ int main(int argc, char** argv) {
   const auto evidence = root / "local-analysis/cpp-offline";
 
   const auto hal_source = read_file(root / "src/hal/OpenA8DJUSB.m");
+  const auto control_source = read_file(root / "src/tools/opena8dj-control.c");
+  const auto run_soundcheck = read_file(root / "scripts/run-soundcheck");
+  const auto stream_stats_analyzer = read_file(root / "scripts/analyze-stream-stats.py");
   const auto makefile = read_file(root / "Makefile");
   const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
   const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
   const auto hal_safety = read_file(evidence / "hal-candidate-safety-gate.json");
 
-  const bool evidence_present = !hal_source.empty() && !makefile.empty() && !migration.empty() &&
+  const bool evidence_present = !hal_source.empty() && !control_source.empty() &&
+                                !run_soundcheck.empty() && !stream_stats_analyzer.empty() &&
+                                !makefile.empty() && !migration.empty() &&
                                 !product_quality.empty() && !physical_window.empty() &&
                                 !hal_safety.empty();
 
@@ -95,6 +100,38 @@ int main(int argc, char** argv) {
                "kCaptureIsoFramesPerTransfer = OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(hal_source, "ExpectedIsoTransferTicksForFrames(kCaptureIsoFramesPerTransfer)");
+  const bool hal_has_capture_submit_counter =
+      contains(hal_source, "uint64_t captureTransfersSubmitted;") &&
+      contains(hal_source, "atomic_uint_fast64_t _captureTransfersSubmittedAtomic;") &&
+      contains(hal_source, "atomic_init(&_captureTransfersSubmittedAtomic, 0);") &&
+      contains(hal_source, "atomic_store(&_captureTransfersSubmittedAtomic, 0);") &&
+      contains(hal_source,
+               "stats.captureTransfersSubmitted = atomic_load(&_captureTransfersSubmittedAtomic);") &&
+      contains(hal_source,
+               "atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);");
+  const bool hal_has_playback_submit_counter =
+      contains(hal_source, "uint64_t playbackTransfersSubmitted;") &&
+      contains(hal_source, "atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;") &&
+      contains(hal_source,
+               "stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);") &&
+      contains(hal_source,
+               "atomic_fetch_add_explicit(&_playbackTransfersSubmittedAtomic, 1, memory_order_relaxed);");
+  const bool control_exposes_submit_counters =
+      contains(control_source, "captureTransfersSubmitted=%llu") &&
+      contains(control_source, "playbackTransfersSubmitted=%llu");
+  const bool soundcheck_tsv_captures_submit_counters =
+      contains(run_soundcheck, "\"captureTransfersSubmitted\",") &&
+      contains(run_soundcheck, "\"playbackTransfersSubmitted\",");
+  const bool analyzer_summarizes_submit_counters =
+      contains(stream_stats_analyzer, "\"captureTransfersSubmitted\",") &&
+      contains(stream_stats_analyzer, "\"playbackTransfersSubmitted\",") &&
+      contains(stream_stats_analyzer, "\"capture_transfers_submitted_per_second\"") &&
+      contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") &&
+      contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"");
+  const bool runtime_submit_observability_present =
+      hal_has_capture_submit_counter && hal_has_playback_submit_counter &&
+      control_exposes_submit_counters && soundcheck_tsv_captures_submit_counters &&
+      analyzer_summarizes_submit_counters;
 
   const bool offline_prepared_model_supported =
       string_field_is(migration, "result", "PASS") &&
@@ -128,6 +165,9 @@ int main(int argc, char** argv) {
   if (!evidence_present) {
     blockers.push_back("required_runtime_evidence_missing");
   }
+  if (!runtime_submit_observability_present) {
+    blockers.push_back("runtime_submit_observability_missing");
+  }
   if (runtime_reduction_missing) {
     blockers.push_back("hal_runtime_still_direct_usb_enqueue");
     blockers.push_back("hal_runtime_prepared_submit_not_integrated");
@@ -145,7 +185,7 @@ int main(int argc, char** argv) {
     blockers.push_back("hal_load_evidence_is_safety_only");
   }
 
-  const bool pass = evidence_present && product_claim_blocked;
+  const bool pass = evidence_present && runtime_submit_observability_present && product_claim_blocked;
 
   std::cout
       << "{\n"
@@ -162,6 +202,18 @@ int main(int argc, char** argv) {
       << (hal_has_no_runtime_prepared_submit ? "true" : "false") << ",\n"
       << "  \"hal_has_logical_physical_capture_split\": "
       << (hal_has_logical_physical_capture_split ? "true" : "false") << ",\n"
+      << "  \"hal_has_capture_submit_counter\": "
+      << (hal_has_capture_submit_counter ? "true" : "false") << ",\n"
+      << "  \"hal_has_playback_submit_counter\": "
+      << (hal_has_playback_submit_counter ? "true" : "false") << ",\n"
+      << "  \"control_exposes_submit_counters\": "
+      << (control_exposes_submit_counters ? "true" : "false") << ",\n"
+      << "  \"soundcheck_tsv_captures_submit_counters\": "
+      << (soundcheck_tsv_captures_submit_counters ? "true" : "false") << ",\n"
+      << "  \"analyzer_summarizes_submit_counters\": "
+      << (analyzer_summarizes_submit_counters ? "true" : "false") << ",\n"
+      << "  \"runtime_submit_observability_present\": "
+      << (runtime_submit_observability_present ? "true" : "false") << ",\n"
       << "  \"runtime_reduction_missing\": " << (runtime_reduction_missing ? "true" : "false")
       << ",\n"
       << "  \"offline_prepared_model_supported\": "

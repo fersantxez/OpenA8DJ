@@ -687,6 +687,24 @@ summary = {
         "hal_has_logical_physical_capture_split": hal_transport_runtime_gate.get(
             "hal_has_logical_physical_capture_split"
         ),
+        "hal_has_capture_submit_counter": hal_transport_runtime_gate.get(
+            "hal_has_capture_submit_counter"
+        ),
+        "hal_has_playback_submit_counter": hal_transport_runtime_gate.get(
+            "hal_has_playback_submit_counter"
+        ),
+        "control_exposes_submit_counters": hal_transport_runtime_gate.get(
+            "control_exposes_submit_counters"
+        ),
+        "soundcheck_tsv_captures_submit_counters": hal_transport_runtime_gate.get(
+            "soundcheck_tsv_captures_submit_counters"
+        ),
+        "analyzer_summarizes_submit_counters": hal_transport_runtime_gate.get(
+            "analyzer_summarizes_submit_counters"
+        ),
+        "runtime_submit_observability_present": hal_transport_runtime_gate.get(
+            "runtime_submit_observability_present"
+        ),
         "offline_usb_submit_reduction_ratio": hal_transport_runtime_gate.get(
             "offline_usb_submit_reduction_ratio"
         ),

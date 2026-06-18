@@ -229,6 +229,12 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "hal_has_direct_usb_enqueue", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_no_runtime_prepared_submit", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_logical_physical_capture_split", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_capture_submit_counter", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_playback_submit_counter", true) &&
+      bool_field_is(hal_transport_runtime_gate, "control_exposes_submit_counters", true) &&
+      bool_field_is(hal_transport_runtime_gate, "soundcheck_tsv_captures_submit_counters", true) &&
+      bool_field_is(hal_transport_runtime_gate, "analyzer_summarizes_submit_counters", true) &&
+      bool_field_is(hal_transport_runtime_gate, "runtime_submit_observability_present", true) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       object_present(summary, "hal_logical_capture_batching_contract") &&
       bool_field_is(hal_logical_capture_batching_contract, "build_exposes_capture_iso", true) &&

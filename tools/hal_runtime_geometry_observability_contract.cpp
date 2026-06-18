@@ -49,10 +49,14 @@ int main(int argc, char** argv) {
   const auto root = repo_root(argv);
   const auto hal_source = read_file(root / "src/hal/OpenA8DJUSB.m");
   const auto control_source = read_file(root / "src/tools/opena8dj-control.c");
+  const auto run_soundcheck = read_file(root / "scripts/run-soundcheck");
+  const auto stream_stats_analyzer = read_file(root / "scripts/analyze-stream-stats.py");
   const auto makefile = read_file(root / "Makefile");
 
   const bool hal_source_present = !hal_source.empty();
   const bool control_source_present = !control_source.empty();
+  const bool run_soundcheck_present = !run_soundcheck.empty();
+  const bool stream_stats_analyzer_present = !stream_stats_analyzer.empty();
   const bool makefile_present = !makefile.empty();
   const bool build_exposes_capture_iso =
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
@@ -72,10 +76,14 @@ int main(int argc, char** argv) {
   bool control_payload_exposes_runtime_geometry = true;
   bool snapshot_populates_runtime_geometry = true;
   bool control_prints_runtime_geometry = true;
+  bool soundcheck_tsv_captures_runtime_geometry = true;
+  bool analyzer_summarizes_runtime_geometry = true;
   std::vector<std::string> failures;
 
   if (!hal_source_present) failures.push_back("hal_source_missing");
   if (!control_source_present) failures.push_back("control_source_missing");
+  if (!run_soundcheck_present) failures.push_back("run_soundcheck_missing");
+  if (!stream_stats_analyzer_present) failures.push_back("stream_stats_analyzer_missing");
   if (!makefile_present) failures.push_back("makefile_missing");
   if (!build_exposes_capture_iso) failures.push_back("build_capture_iso_flag_missing");
 
@@ -91,6 +99,14 @@ int main(int argc, char** argv) {
     if (!contains(control_source, std::string("stats->") + std::string(field))) {
       control_prints_runtime_geometry = false;
       failures.push_back(std::string("control_output_missing_") + std::string(field));
+    }
+    if (!contains(run_soundcheck, std::string("\"") + std::string(field) + "\",")) {
+      soundcheck_tsv_captures_runtime_geometry = false;
+      failures.push_back(std::string("soundcheck_tsv_missing_") + std::string(field));
+    }
+    if (!contains(stream_stats_analyzer, std::string("\"") + std::string(field) + "\",")) {
+      analyzer_summarizes_runtime_geometry = false;
+      failures.push_back(std::string("analyzer_missing_") + std::string(field));
     }
   }
 
@@ -121,6 +137,14 @@ int main(int argc, char** argv) {
     control_prints_runtime_geometry = false;
     failures.push_back("control_runtime_geometry_text_missing");
   }
+  if (!contains(stream_stats_analyzer, "\"runtime_geometry\"") ||
+      !contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") ||
+      !contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"") ||
+      !contains(stream_stats_analyzer, "\"capture_submit_rate_ratio_to_expected\"") ||
+      !contains(stream_stats_analyzer, "\"playback_submit_rate_ratio_to_expected\"")) {
+    analyzer_summarizes_runtime_geometry = false;
+    failures.push_back("analyzer_runtime_geometry_summary_missing");
+  }
 
   const bool pass = failures.empty();
 
@@ -132,6 +156,9 @@ int main(int argc, char** argv) {
       << "  \"meaning\": \"PASS means future HAL physical evidence can attribute active ISO geometry and queue settings from stream stats\",\n"
       << "  \"hal_source_present\": " << (hal_source_present ? "true" : "false") << ",\n"
       << "  \"control_source_present\": " << (control_source_present ? "true" : "false") << ",\n"
+      << "  \"run_soundcheck_present\": " << (run_soundcheck_present ? "true" : "false") << ",\n"
+      << "  \"stream_stats_analyzer_present\": "
+      << (stream_stats_analyzer_present ? "true" : "false") << ",\n"
       << "  \"makefile_present\": " << (makefile_present ? "true" : "false") << ",\n"
       << "  \"build_exposes_capture_iso\": " << (build_exposes_capture_iso ? "true" : "false")
       << ",\n"
@@ -143,6 +170,11 @@ int main(int argc, char** argv) {
       << (snapshot_populates_runtime_geometry ? "true" : "false") << ",\n"
       << "  \"control_prints_runtime_geometry\": "
       << (control_prints_runtime_geometry ? "true" : "false") << ",\n";
+  std::cout
+      << "  \"soundcheck_tsv_captures_runtime_geometry\": "
+      << (soundcheck_tsv_captures_runtime_geometry ? "true" : "false") << ",\n"
+      << "  \"analyzer_summarizes_runtime_geometry\": "
+      << (analyzer_summarizes_runtime_geometry ? "true" : "false") << ",\n";
   print_string_array("runtime_geometry_fields",
                      {"logicalIsoFramesPerTransfer",
                       "captureIsoFramesPerTransfer",
