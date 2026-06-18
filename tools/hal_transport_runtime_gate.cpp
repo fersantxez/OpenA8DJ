@@ -204,9 +204,12 @@ int main(int argc, char** argv) {
       contains(hal_source, "OpenA8DJPreparedRuntimeBridgeSnapshotCounters") &&
       contains(control_source, "preparedRuntimeSubmitFailures=%llu") &&
       contains(control_source, "preparedRuntimeDescriptorMismatches=%llu") &&
+      contains(control_source, "preparedPlaybackRejectTransactionCount=%llu") &&
       contains(run_soundcheck, "\"preparedRuntimeSubmitFailures\"") &&
       contains(run_soundcheck, "\"preparedRuntimeDescriptorMismatches\"") &&
+      contains(run_soundcheck, "\"preparedPlaybackRejectTransactionCount\"") &&
       contains(stream_stats_analyzer, "\"preparedRuntimeSubmitFailures\",") &&
+      contains(stream_stats_analyzer, "\"preparedPlaybackRejectTransactionCount\",") &&
       contains(stream_stats_analyzer, "\"prepared_runtime\"");
   const bool capture_submit_counter_success_only =
       contains(hal_source,

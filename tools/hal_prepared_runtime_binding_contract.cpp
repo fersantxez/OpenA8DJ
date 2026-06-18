@@ -300,11 +300,15 @@ int main(int argc, char** argv) {
       contains(control_source, "prepared-runtime:") &&
       contains(control_source, "preparedRuntimeSubmitFailures=%llu") &&
       contains(control_source, "preparedRuntimeDescriptorMismatches=%llu") &&
+      contains(control_source, "preparedPlaybackRejectTransactionCount=%llu") &&
       contains(run_soundcheck, "\"preparedRuntimeSubmitFailures\"") &&
       contains(run_soundcheck, "\"preparedRuntimeDescriptorMismatches\"") &&
+      contains(run_soundcheck, "\"preparedPlaybackRejectTransactionCount\"") &&
       contains(stream_stats_analyzer, "\"preparedRuntimeSubmitFailures\"") &&
+      contains(stream_stats_analyzer, "\"preparedPlaybackRejectTransactionCount\"") &&
       contains(stream_stats_analyzer, "\"prepared_runtime\"") &&
-      contains(stream_stats_analyzer, "prepared_runtime_descriptor_mismatches");
+      contains(stream_stats_analyzer, "prepared_runtime_descriptor_mismatches") &&
+      contains(stream_stats_analyzer, "prepared_playback_reject_transaction_count");
 
   constexpr std::uint32_t kLogicalIsoFrames = 8;
   constexpr std::uint32_t kPreparedSlotsPerSubmit = 8;

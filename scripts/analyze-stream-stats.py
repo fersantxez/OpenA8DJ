@@ -40,6 +40,11 @@ COUNTERS = [
     "preparedRuntimeFallbackAllocations",
     "preparedRuntimeSubmittedFrames",
     "preparedRuntimeSubmittedBytes",
+    "preparedPlaybackRejectBridgeNull",
+    "preparedPlaybackRejectTransactionCount",
+    "preparedPlaybackRejectModulo",
+    "preparedPlaybackRejectTransactionCountSum",
+    "preparedPlaybackRejectDataBytesSum",
     "captureTransferPoolFallbackAllocations",
     "playbackTransferPoolFallbackAllocations",
     "transferLedgerEntriesWritten",
@@ -333,6 +338,12 @@ def analyze(path):
         flags.append("prepared_runtime_descriptor_mismatches")
     if counters["preparedRuntimeFallbackAllocations"]["delta"] > 0:
         flags.append("prepared_runtime_fallback_allocations")
+    if counters["preparedPlaybackRejectBridgeNull"]["delta"] > 0:
+        flags.append("prepared_playback_reject_bridge_null")
+    if counters["preparedPlaybackRejectTransactionCount"]["delta"] > 0:
+        flags.append("prepared_playback_reject_transaction_count")
+    if counters["preparedPlaybackRejectModulo"]["delta"] > 0:
+        flags.append("prepared_playback_reject_modulo")
     if counters["captureTransferPoolFallbackAllocations"]["delta"] > 0:
         flags.append("capture_transfer_pool_fallback_allocations")
     if counters["playbackTransferPoolFallbackAllocations"]["delta"] > 0:
@@ -395,6 +406,14 @@ def analyze(path):
             "fallback_allocations_delta": counters["preparedRuntimeFallbackAllocations"]["delta"],
             "submitted_frames_delta": counters["preparedRuntimeSubmittedFrames"]["delta"],
             "submitted_bytes_delta": counters["preparedRuntimeSubmittedBytes"]["delta"],
+            "playback_reject_bridge_null_delta": counters["preparedPlaybackRejectBridgeNull"]["delta"],
+            "playback_reject_transaction_count_delta":
+                counters["preparedPlaybackRejectTransactionCount"]["delta"],
+            "playback_reject_modulo_delta": counters["preparedPlaybackRejectModulo"]["delta"],
+            "playback_reject_transaction_count_sum_delta":
+                counters["preparedPlaybackRejectTransactionCountSum"]["delta"],
+            "playback_reject_data_bytes_sum_delta":
+                counters["preparedPlaybackRejectDataBytesSum"]["delta"],
         },
         "runtime_geometry": {
             "logical_iso_frames_per_transfer": logical_iso,

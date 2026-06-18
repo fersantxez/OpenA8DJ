@@ -298,6 +298,11 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t preparedRuntimeSubmittedBytes;
     uint64_t preparedRuntimeCompletedBytes;
     uint64_t preparedRuntimeCancelledBytes;
+    uint64_t preparedPlaybackRejectBridgeNull;
+    uint64_t preparedPlaybackRejectTransactionCount;
+    uint64_t preparedPlaybackRejectModulo;
+    uint64_t preparedPlaybackRejectTransactionCountSum;
+    uint64_t preparedPlaybackRejectDataBytesSum;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1179,6 +1184,14 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                (unsigned long long)stats->preparedRuntimeCompletedBytes,
                (unsigned long long)stats->preparedRuntimeCancelledBytes);
     }
+    if (STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum)) {
+        printf("  prepared-playback-reject: bridge-null=%llu tx-count=%llu modulo=%llu tx-count-sum=%llu data-bytes-sum=%llu\n",
+               (unsigned long long)stats->preparedPlaybackRejectBridgeNull,
+               (unsigned long long)stats->preparedPlaybackRejectTransactionCount,
+               (unsigned long long)stats->preparedPlaybackRejectModulo,
+               (unsigned long long)stats->preparedPlaybackRejectTransactionCountSum,
+               (unsigned long long)stats->preparedPlaybackRejectDataBytesSum);
+    }
     if (STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations)) {
         printf("  transfer-pool:          capture-fallback-alloc=%llu playback-fallback-alloc=%llu\n",
                (unsigned long long)stats->captureTransferPoolFallbackAllocations,
@@ -1438,6 +1451,21 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("preparedRuntimeSubmittedBytes=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
                                 stats->preparedRuntimeSubmittedBytes : 0));
+    printf("preparedPlaybackRejectBridgeNull=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum) ?
+                                stats->preparedPlaybackRejectBridgeNull : 0));
+    printf("preparedPlaybackRejectTransactionCount=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum) ?
+                                stats->preparedPlaybackRejectTransactionCount : 0));
+    printf("preparedPlaybackRejectModulo=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum) ?
+                                stats->preparedPlaybackRejectModulo : 0));
+    printf("preparedPlaybackRejectTransactionCountSum=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum) ?
+                                stats->preparedPlaybackRejectTransactionCountSum : 0));
+    printf("preparedPlaybackRejectDataBytesSum=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedPlaybackRejectDataBytesSum) ?
+                                stats->preparedPlaybackRejectDataBytesSum : 0));
     printf("captureTransferPoolFallbackAllocations=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?
                                 stats->captureTransferPoolFallbackAllocations : 0));

@@ -688,6 +688,11 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t preparedRuntimeSubmittedBytes;
     uint64_t preparedRuntimeCompletedBytes;
     uint64_t preparedRuntimeCancelledBytes;
+    uint64_t preparedPlaybackRejectBridgeNull;
+    uint64_t preparedPlaybackRejectTransactionCount;
+    uint64_t preparedPlaybackRejectModulo;
+    uint64_t preparedPlaybackRejectTransactionCountSum;
+    uint64_t preparedPlaybackRejectDataBytesSum;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -6203,9 +6208,34 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                              error:(NSError **)error
 {
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
-    if (_preparedRuntimeBridge == NULL ||
-        transfer.transactionCount != kPlaybackIsoFramesPerTransfer ||
-        (transfer.transactionCount % kIsoFramesPerTransfer) != 0) {
+    if (_preparedRuntimeBridge == NULL) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectBridgeNull)
+                              value:1];
+        return NO;
+    }
+    if (transfer.transactionCount != kPlaybackIsoFramesPerTransfer) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectTransactionCount)
+                              value:1];
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectTransactionCountSum)
+                              value:(uint64_t)transfer.transactionCount];
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectDataBytesSum)
+                              value:(uint64_t)transfer.data.length];
+        return NO;
+    }
+    if ((transfer.transactionCount % kIsoFramesPerTransfer) != 0) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectModulo)
+                              value:1];
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectTransactionCountSum)
+                              value:(uint64_t)transfer.transactionCount];
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload,
+                                             preparedPlaybackRejectDataBytesSum)
+                              value:(uint64_t)transfer.data.length];
         return NO;
     }
     uint64_t firstSequence = firstFrameNumber / (uint64_t)kIsoFramesPerTransfer;
