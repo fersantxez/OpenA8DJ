@@ -212,6 +212,8 @@ def build_full_command(
         command.extend(["--music-file", str(resolve_path(args.music_file))])
     if args.prepared_runtime_candidate:
         command.append("--prepared-runtime-candidate")
+    if args.prepared_lite_candidate:
+        command.append("--prepared-lite-candidate")
     return command
 
 
@@ -233,6 +235,7 @@ def main() -> int:
     parser.add_argument("--watch-timeout-seconds", type=float, default=0.0)
     parser.add_argument("--watch-interval-seconds", type=float, default=2.0)
     parser.add_argument("--prepared-runtime-candidate", action="store_true")
+    parser.add_argument("--prepared-lite-candidate", action="store_true")
     args = parser.parse_args()
 
     if args.watcher_json:

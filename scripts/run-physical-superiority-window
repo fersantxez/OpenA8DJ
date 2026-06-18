@@ -40,6 +40,9 @@ Options:
   --prepared-runtime-candidate      Candidate is the prepared-runtime HAL
                                     bundle and must match offline prepared
                                     runtime evidence before physical execution
+  --prepared-lite-candidate         Candidate is the prepared-lite HAL bundle
+                                    and must match offline prepared-lite
+                                    evidence before physical execution
   --known-good-output-device NAME   Explicit non-Audio8 source for route check
   --known-good-output-device-uid UID Explicit non-Audio8 source UID
   --capture-device NAME             Capture device, normally "iRig Stream"
@@ -96,6 +99,7 @@ candidate_only=0
 mainline_candidate=""
 candidate=""
 prepared_runtime_candidate=0
+prepared_lite_candidate=0
 known_good_output_device=""
 known_good_output_device_uid=""
 capture_device=""
@@ -123,6 +127,7 @@ while [ "$#" -gt 0 ]; do
     --mainline-candidate) mainline_candidate="$2"; shift 2 ;;
     --candidate) candidate="$2"; shift 2 ;;
     --prepared-runtime-candidate) prepared_runtime_candidate=1; shift ;;
+    --prepared-lite-candidate) prepared_lite_candidate=1; shift ;;
     --known-good-output-device) known_good_output_device="$2"; shift 2 ;;
     --known-good-output-device-uid) known_good_output_device_uid="$2"; shift 2 ;;
     --capture-device) capture_device="$2"; shift 2 ;;
@@ -200,6 +205,7 @@ manifest="$run_dir/window-manifest.txt"
   echo "mainline_candidate=${mainline_candidate:-}"
   echo "candidate=${candidate:-}"
   echo "prepared_runtime_candidate=$prepared_runtime_candidate"
+  echo "prepared_lite_candidate=$prepared_lite_candidate"
   echo "known_good_output_device=${known_good_output_device:-}"
   echo "known_good_output_device_uid=${known_good_output_device_uid:-}"
   echo "capture_device=$capture_device"
@@ -261,6 +267,9 @@ if [ "$candidate_only" -eq 1 ]; then
 fi
 if [ "$prepared_runtime_candidate" -eq 1 ]; then
   preflight_args+=(--prepared-runtime-candidate)
+fi
+if [ "$prepared_lite_candidate" -eq 1 ]; then
+  preflight_args+=(--prepared-lite-candidate)
 fi
 if [ "$skip_known_good" -eq 1 ]; then
   preflight_args+=(--skip-known-good)
