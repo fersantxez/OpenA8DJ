@@ -8,6 +8,10 @@ the C++ line beats mainline C.
 ## Decision
 
 - Use the HAL bundle / PKG path for the first human-test candidate.
+- 10:27 EDT status: installable packaging is ready, but product human-test
+  readiness is blocked by physical quality evidence. Do not start human
+  listening from the current candidates except as an explicitly diagnostic,
+  non-product check.
 - Do not attempt a real DriverKit/dext candidate today unless the host gains
   full Xcode, DriverKit SDK, `iig`, sufficient disk space, and usable
   entitlements/provisioning.
@@ -92,7 +96,7 @@ scripts/run-soundcheck \
   --buffer 512 \
   --seconds 12 \
   --mode dense \
-  --target-peak-db -24 \
+  --target-peak-db -16 \
   --capture-device "iRig Stream" \
   --capture-channels 1,2 \
   --stream-stats-snapshots \
@@ -102,10 +106,39 @@ scripts/run-soundcheck \
 Human listening can start only after:
 
 - safety load enumerates `Open Audio 8 DJ` as 8 inputs / 8 outputs;
+- physical music quality is not in the current failed class;
 - no immediate pops/click storms are seen in the smoke run;
 - CPU is not obviously runaway;
 - iRig remains visible;
 - rollback command is ready.
+
+## 10:27 EDT Physical Triage Result
+
+Evidence root:
+
+- `local-analysis/human-test/human-test-20260618T141037Z`
+
+Current result:
+
+- Default C++ ISO8 package path builds and loads safely but fails physical music
+  quality at `-16 dB`: `quality_alignment_score=0.417270`,
+  `analog_snr_db=-8.55`, `lag_jumps_gt_2_frames=38`.
+- ISO5 is the best tested C++ physical variant, but still fails:
+  `quality_alignment_score=0.901762`, `analog_snr_db=4.82`,
+  `lag_jumps_gt_2_frames=36`, with driver CPU roughly `26-29%` late in the
+  run.
+- Mainline `0.3.135` also fails in the same session on the current route:
+  `quality_alignment_score=0.068735`, `analog_snr_db=-37.96`,
+  `lag_jumps_gt_2_frames=43`.
+- Pair A channel matrix confirms signal is present but route/product quality is
+  not valid: `max_wrong_source_leakage_db=-41.97` against the `-45 dB`
+  threshold plus large residual.
+
+Decision:
+
+- No product human-test candidate is approved yet.
+- The next milestone is route/capture validation plus transport-continuity
+  repair, not branch promotion or mainline replacement.
 
 ## Rollback
 

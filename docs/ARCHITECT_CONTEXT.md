@@ -25,6 +25,36 @@ Branch: `driverkit/cpp-redesign`
 - Audiophile analyzer hardening just landed: the C++ WAV analyzer now emits
   residual burst, residual-signal correlation, and residual peak/RMS metrics to
   catch texture/transient/modulated residuals that broad SNR/alignment can hide.
+- 10:27 EDT update: a HAL installable candidate is buildable/packageable, but
+  the first human-test readiness gate is still blocked by physical quality.
+  Offline gates passed at commit `97d6dcc` (Debug CTest `80/80`, Release CTest
+  `81/81`, evidence schema PASS, freshness PASS). The default package was
+  restored and rebuilt after physical probes. Current artifacts are
+  `build/OpenA8DJ-0.3.25.pkg`, `build/OpenA8DJ-0.3.25.dmg`, and
+  `build/OpenA8DJ.driver`.
+- Same-session physical route evidence in
+  `local-analysis/human-test/human-test-20260618T141037Z`:
+  - iRig Stream is visible/unambiguous, Audio 8 DJ is USB-visible, and HAL
+    load/enumeration safety passes.
+  - C++ default ISO8 at `-16 dB`: FAIL,
+    `quality_alignment_score=0.417270`, `analog_snr_db=-8.55`,
+    `lag_jumps_gt_2_frames=38`, no clipping.
+  - C++ ISO5 quality profile at `-16 dB`: best tested C++ physical result but
+    still FAIL, `quality_alignment_score=0.901762`, `analog_snr_db=4.82`,
+    `lag_jumps_gt_2_frames=36`, no clipping, driver CPU rising to roughly
+    `26-29%` late in the run.
+  - C++ ISO5 quality profile at `-12 dB`: safety rejected before playback due
+    CoreAudio/mediaremoted CPU; cleanup recovered the system.
+  - Read-only mainline `0.3.135` artifact at `-16 dB`: FAIL,
+    `quality_alignment_score=0.068735`, `analog_snr_db=-37.96`,
+    `lag_jumps_gt_2_frames=43`, no clipping.
+  - Channel matrix Pair A confirms output is present but route/product quality
+    is not valid: `max_wrong_source_leakage_db=-41.97` against a `-45 dB`
+    threshold and large physical residual.
+- Honest readiness status: do not declare a human-test-ready, audiophile, CPU,
+  Timecode Vinyl, or mainline-superiority candidate yet. ISO5 is the best
+  current diagnostic fallback, not a final product path. The next work must
+  separate current route/capture validity from HAL transport continuity.
 
 ## Current State
 

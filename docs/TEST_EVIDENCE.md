@@ -13383,3 +13383,68 @@ Full offline gate after commit:
   - The installable HAL package path is now viable for the 15:00 NY human-test
     milestone, pending post-commit offline gates, package hash capture, and
     lock-gated install/smoke/soundcheck.
+
+## 2026-06-18 - First Human-Test Physical Triage Window
+
+- Commit context: `97d6dcc` plus rebuilt local HAL variants for physical
+  triage.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Evidence root:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test/human-test-20260618T141037Z`.
+- Safety:
+  - Hardware lock was used for HAL load/reload, Audio 8 DJ playback, iRig
+    capture, CPU profiling, and cleanup.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` were not
+    edited.
+  - No default device, global sample-rate, global buffer, Traktor, VLC, Spotify,
+    or USB reset action was performed.
+  - Each physical run ended with OpenA8DJ unloaded and audio stack health PASS.
+- Preflight:
+  - iRig Stream was visible and unambiguous in CoreAudio.
+  - Audio 8 DJ was visible on USB.
+  - OpenA8DJ was absent from CoreAudio before candidate load.
+  - Full promotion preflight remained blocked because no same-window
+    non-Audio8 known-good wired output/reference was supplied.
+- Package/build artifacts after restoring the default HAL:
+  - `build/OpenA8DJ-0.3.25.pkg`:
+    `83e567531f790694f5719e09b6587204e6b9add57c2dd3866052d6d4b96af14a`.
+  - `build/OpenA8DJ-0.3.25.dmg`:
+    `020bb5f32f02ae05d150e8f3d585315e4b7e48652dde0893946e3c3ee12ca8cc`.
+  - `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+- Tested candidates and results:
+  - Default C++ ISO8, `-24 dB`: HAL safety PASS, soundcheck FAIL,
+    `quality_alignment_score=0.199108`, `analog_snr_db=-15.95`,
+    `lag_jumps_gt_2_frames=42`, `capture_clipped_frames=0`.
+  - Default C++ ISO8, `-16 dB`: HAL safety PASS, soundcheck FAIL,
+    `quality_alignment_score=0.417270`, `analog_snr_db=-8.55`,
+    `lag_jumps_gt_2_frames=38`, `capture_clipped_frames=0`.
+  - C++ ISO8 inputdecode-off, `-24 dB`: HAL safety PASS, soundcheck FAIL,
+    `quality_alignment_score=0.102622`, `analog_snr_db=-18.81`,
+    `lag_jumps_gt_2_frames=44`, `capture_clipped_frames=0`.
+  - C++ ISO64/inputdecode-off, `-24 dB`: HAL safety PASS, soundcheck FAIL,
+    `quality_alignment_score=0.076315`, `analog_snr_db=-25.82`,
+    `lag_jumps_gt_2_frames=44`, `capture_clipped_frames=0`.
+  - C++ ISO5 quality profile, `-16 dB`: HAL safety PASS, best C++ soundcheck of
+    this window but still FAIL, `quality_alignment_score=0.901762`,
+    `analog_snr_db=4.82`, `lag_jumps_gt_2_frames=36`,
+    `capture_clipped_frames=0`; driver CPU rose to roughly `26-29%` late in
+    the run.
+  - C++ ISO5 quality profile, `-12 dB`: HAL safety FAIL before playback because
+    CoreAudio/mediaremoted exceeded safety thresholds; cleanup recovered the
+    system.
+  - Read-only mainline `0.3.135` artifact, `-16 dB`: HAL safety PASS,
+    soundcheck FAIL, `quality_alignment_score=0.068735`,
+    `analog_snr_db=-37.96`, `lag_jumps_gt_2_frames=43`,
+    `capture_clipped_frames=0`.
+  - Default C++ Pair A channel matrix: FAIL, expected tones present but
+    `max_wrong_source_leakage_db=-41.97` versus `-45 dB` threshold and large
+    physical residual.
+- Interpretation:
+  - No tested candidate is ready for human listening as a product candidate.
+  - The current route is not valid for branch promotion or superiority claims.
+  - ISO5 is the best diagnostic fallback for audible continuity work, but it
+    fails quality gates and consumes too much CPU for the final direction.
+  - Mainline failing in the same session means the current route/capture state
+    must be separated from candidate quality before any honest C++ vs C claim.
