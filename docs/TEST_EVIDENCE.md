@@ -13941,3 +13941,62 @@ Full offline gate after commit:
   - Product readiness remains blocked by missing known-good route,
     same-session mainline/C++ physical A/B, CPU superiority, and physical
     Timecode Vinyl gates.
+
+## 2026-06-18 - Known-Good Route Watcher Focused Checks
+
+- Commit context: local changes after `d1a202d`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Read-only CoreAudio inventory checks only.
+  - No hardware lock acquired.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Commands:
+  - `python3 -m py_compile scripts/watch-known-good-route scripts/test-watch-known-good-route.py`
+  - `python3 scripts/test-watch-known-good-route.py`
+  - `python3 scripts/watch-known-good-route --timeout-seconds 0 --json-out local-analysis/cpp-offline/watch-known-good-route.json`
+- Result:
+  - Py compile: PASS.
+  - Fixture self-test: PASS.
+  - Live watcher: `result=PASS`, `status=BLOCKED`,
+    `route_revalidation_ready=false`, `selector_return_code=0`,
+    `irig_capture_count=1`, `valid_known_good_output_count=0`.
+  - Live blocker:
+    `non_audio8_non_builtin_known_good_output_not_visible`.
+- Readiness impact:
+  - iRig capture and Audio 8 DJ are visible, but the known-good route needed
+    for product-grade capture revalidation is still missing.
+  - Product human listening, Timecode Vinyl physical readiness, CPU/resource
+    superiority, and branch promotion remain blocked.
+
+## 2026-06-18 - Full Offline Gates With Known-Good Route Watcher
+
+- Commit context: local changes after `d1a202d`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build/package/evidence regeneration plus read-only CoreAudio
+    inventory classification.
+  - No hardware lock acquired by the offline script.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Debug/default CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS, `required_files=89`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Offline summary: `status=PASS`, `diagnostic_status=PASS`.
+  - Watcher summary: `watch_known_good_route_status=BLOCKED`,
+    `watch_known_good_route_ready=false`,
+    `watch_known_good_route_next_action=PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`.
+  - Provenance freshness: FAIL only because the worktree had uncommitted
+    watcher/docs/schema changes during this pre-commit run.
+- Readiness impact:
+  - The RC remains installable only as a diagnostic HAL candidate.
+  - Product human listening, Timecode Vinyl physical readiness,
+    CPU/resource superiority, and branch promotion remain blocked.

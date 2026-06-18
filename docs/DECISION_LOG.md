@@ -9558,3 +9558,28 @@ Next implication:
 - Readiness impact: strengthens diagnostic RC identity. It does not unblock
   product listening, Timecode Vinyl physical readiness, CPU superiority, or
   branch promotion.
+
+## 2026-06-18 - Add Read-Only Known-Good Route Watcher
+
+- Decision: add `scripts/watch-known-good-route` and require its JSON/test
+  evidence in the offline evidence schema.
+- Reason: the six-hour human-test window needs a fast, repeatable way to know
+  when the iRig capture plus a valid external non-Audio8 output route are
+  actually present, without playing audio, recording, changing defaults,
+  resetting USB, or touching driver state.
+- Evidence:
+  - Focused self-test passed with both blocked and ready fixtures.
+  - Live read-only run produced `result=PASS`, `status=BLOCKED`,
+    `irig_capture_count=1`, `valid_known_good_output_count=0`, and
+    `selector_return_code=0`.
+  - Hardware lock was free, but no lock was acquired because the watcher is
+    inventory-only.
+- Alternatives rejected:
+  - Rely on ad hoc `audio-list` inspection during the human window: rejected
+    because it is easy to miss UID changes and route blockers under time
+    pressure.
+  - Treat route watcher READY as product readiness: rejected because it only
+    authorizes the next lock-gated known-good route validation command.
+- Readiness impact: improves the path to a controlled human test. It does not
+  unblock product-quality listening, Timecode Vinyl physical readiness, CPU
+  superiority, or branch promotion until physical evidence exists.

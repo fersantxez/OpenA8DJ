@@ -226,6 +226,17 @@ python3 scripts/check-hal-bundle-complete \
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
 python3 scripts/known-good-route-selector --json-out "$EVIDENCE_DIR/known-good-route-selector.json" >/dev/null
+set +e
+python3 scripts/watch-known-good-route \
+  --timeout-seconds 0 \
+  --json-out "$EVIDENCE_DIR/watch-known-good-route.json" \
+  >/dev/null
+WATCH_KNOWN_GOOD_ROUTE_RC=$?
+set -e
+if [[ "$WATCH_KNOWN_GOOD_ROUTE_RC" -ne 0 && "$WATCH_KNOWN_GOOD_ROUTE_RC" -ne 2 ]]; then
+  exit "$WATCH_KNOWN_GOOD_ROUTE_RC"
+fi
+printf '%s\n' "$WATCH_KNOWN_GOOD_ROUTE_RC" > "$EVIDENCE_DIR/watch-known-good-route.rc"
 ./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
 ./build/cpp-release/opena8djcpp_physical_route_matrix_contract | tee "$EVIDENCE_DIR/physical-route-matrix-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -238,13 +249,16 @@ python3 -m py_compile \
   scripts/evaluate-promotion-readiness.py \
   scripts/test-promotion-window-contract.py \
   scripts/test-known-good-route-selector.py \
+  scripts/test-watch-known-good-route.py \
   scripts/validate-known-good-route-request.py \
   scripts/known-good-route-selector \
+  scripts/watch-known-good-route \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
   scripts/analyze-audiophile-wav.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
 python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-good-route-selector-test.txt"
+python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-good-route-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -365,6 +379,7 @@ hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 physical_route_inventory = load_json("physical-route-inventory.json")
 known_good_route_selector = load_json("known-good-route-selector.json")
+watch_known_good_route = load_json("watch-known-good-route.json")
 capture_readiness_contract = load_json("capture-readiness-contract.json")
 physical_route_matrix_contract = load_json("physical-route-matrix-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
@@ -489,6 +504,9 @@ summary = {
         "route_revalidation_ready"
     ),
     "known_good_route_selector_next_action": known_good_route_selector.get("next_action"),
+    "watch_known_good_route_status": watch_known_good_route.get("status"),
+    "watch_known_good_route_ready": watch_known_good_route.get("route_revalidation_ready"),
+    "watch_known_good_route_next_action": watch_known_good_route.get("next_action"),
     "human_test_rc_status": human_test_rc_gate.get("result"),
     "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
         "diagnostic_rc_artifacts_ready"
@@ -1379,6 +1397,33 @@ summary = {
             "branch_promotion_allowed"
         ),
         "evidence": "local-analysis/cpp-offline/known-good-route-selector.json",
+    },
+    "watch_known_good_route": {
+        "status": watch_known_good_route.get("result"),
+        "schema": watch_known_good_route.get("schema"),
+        "watch_status": watch_known_good_route.get("status"),
+        "route_revalidation_ready": watch_known_good_route.get("route_revalidation_ready"),
+        "attempt_count": watch_known_good_route.get("attempt_count"),
+        "selector_return_code": watch_known_good_route.get("selector_return_code"),
+        "valid_known_good_output_count": watch_known_good_route.get(
+            "last_selector", {}
+        ).get("valid_known_good_output_count"),
+        "irig_capture_count": watch_known_good_route.get("last_selector", {}).get(
+            "irig_capture_count"
+        ),
+        "blockers": watch_known_good_route.get("last_selector", {}).get("blockers"),
+        "next_action": watch_known_good_route.get("next_action"),
+        "command_argv": watch_known_good_route.get("command_argv"),
+        "command_shell_hint": watch_known_good_route.get("command_shell_hint"),
+        "lock_required_before_command": watch_known_good_route.get(
+            "lock_required_before_command"
+        ),
+        "product_claim_allowed": watch_known_good_route.get("product_claim_allowed"),
+        "branch_promotion_allowed": watch_known_good_route.get(
+            "branch_promotion_allowed"
+        ),
+        "meaning": watch_known_good_route.get("meaning"),
+        "evidence": "local-analysis/cpp-offline/watch-known-good-route.json",
     },
     "capture_readiness_contract": {
         "status": capture_readiness_contract.get("result"),

@@ -1299,3 +1299,21 @@ contract `opena8djcpp_prepared_runtime_physical_window_contract` keeps this
 runner/preflight wiring in the offline gate set. Passing this check only proves
 artifact identity for the physical window; it still does not prove lower CPU,
 better sound, Timecode Vinyl behavior, or branch promotion.
+
+## Known-Good Route Watcher
+
+Use the read-only watcher when waiting for the external known-good route before
+a physical window:
+
+```sh
+scripts/watch-known-good-route \
+  --timeout-seconds 60 \
+  --interval-seconds 2 \
+  --json-out local-analysis/cpp-offline/watch-known-good-route-live.json
+```
+
+Exit `0` means the JSON contains the exact lock-gated validation command to
+run next. Exit `2` means the watcher ran correctly but the route is still
+blocked. It never acquires the hardware lock, plays audio, records audio,
+changes defaults, restarts services, resets USB, installs/unloads drivers, or
+touches worktrees outside `/Users/fer/dev/audio8djcpp`.

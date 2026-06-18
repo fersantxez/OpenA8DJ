@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Poll for a known-good non-Audio8 output route into iRig.
+
+This is a read-only preflight helper. It does not acquire the hardware lock,
+play audio, record audio, install/load drivers, restart CoreAudio, reset USB,
+change defaults, or mutate external worktrees. It repeatedly runs
+known-good-route-selector and exits as soon as a valid non-Audio8/non-built-in
+output plus iRig capture are visible.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def run_selector(args: argparse.Namespace, output: Path) -> tuple[int, dict[str, Any], str, str]:
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/known-good-route-selector"),
+        "--json-out",
+        str(output),
+        "--timeout",
+        str(args.selector_timeout),
+    ]
+    if args.audio_list_file:
+        command.extend(["--audio-list-file", args.audio_list_file])
+    if args.reference_wav:
+        command.extend(["--reference-wav", args.reference_wav])
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    try:
+        report = json.loads(output.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        report = {}
+    return completed.returncode, report, completed.stdout, completed.stderr
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--audio-list-file", default="")
+    parser.add_argument("--reference-wav", default="")
+    parser.add_argument("--timeout-seconds", type=float, default=0.0)
+    parser.add_argument("--interval-seconds", type=float, default=2.0)
+    parser.add_argument("--selector-timeout", type=int, default=8)
+    args = parser.parse_args()
+
+    timeout_seconds = max(0.0, args.timeout_seconds)
+    interval_seconds = max(0.1, args.interval_seconds)
+    deadline = time.monotonic() + timeout_seconds
+    attempts: list[dict[str, Any]] = []
+    final_selector: dict[str, Any] = {}
+    final_rc = 1
+    selector_stdout = ""
+    selector_stderr = ""
+
+    with TemporaryDirectory(prefix="opena8dj-route-watch-") as temp_dir:
+        selector_json = Path(temp_dir) / "known-good-route-selector.json"
+        while True:
+            final_rc, final_selector, selector_stdout, selector_stderr = run_selector(
+                args, selector_json
+            )
+            route_ready = bool(final_selector.get("route_revalidation_ready"))
+            attempts.append(
+                {
+                    "index": len(attempts) + 1,
+                    "timestamp_utc": utc_now(),
+                    "selector_return_code": final_rc,
+                    "route_revalidation_ready": route_ready,
+                    "valid_known_good_output_count": final_selector.get(
+                        "valid_known_good_output_count", 0
+                    ),
+                    "irig_capture_count": final_selector.get("irig_capture_count", 0),
+                    "blockers": final_selector.get("blockers", []),
+                }
+            )
+            if route_ready or final_rc not in (0,):
+                break
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(min(interval_seconds, max(0.0, deadline - time.monotonic())))
+
+    route_ready = bool(final_selector.get("route_revalidation_ready"))
+    selector_failed = final_rc != 0
+    status = "READY" if route_ready else "BLOCKED"
+    result = "PASS" if not selector_failed else "FAIL"
+    report: dict[str, Any] = {
+        "schema": "opena8djcpp.watch-known-good-route.v1",
+        "timestamp_utc": utc_now(),
+        "safety": "read_only_coreaudio_inventory_poll_no_audio_playback_recording_driver_usb_defaults_or_lock",
+        "result": result,
+        "status": status,
+        "meaning": "READY means the next lock-gated route validation command can be run; it is not route validation or product readiness",
+        "attempt_count": len(attempts),
+        "timeout_seconds": timeout_seconds,
+        "interval_seconds": interval_seconds,
+        "route_revalidation_ready": route_ready,
+        "product_claim_allowed": False,
+        "branch_promotion_allowed": False,
+        "lock_required_before_command": True,
+        "selector_return_code": final_rc,
+        "selector_stdout_tail": selector_stdout[-2000:],
+        "selector_stderr_tail": selector_stderr[-2000:],
+        "last_selector": final_selector,
+        "attempts": attempts,
+        "command_argv": final_selector.get("command_argv", []),
+        "command_shell_hint": final_selector.get("command_shell_hint", ""),
+        "next_action": (
+            "ACQUIRE_LOCK_AND_RUN_KNOWN_GOOD_ROUTE_COMMAND"
+            if route_ready
+            else "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION"
+        ),
+    }
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        output = Path(args.json_out)
+        if not output.is_absolute():
+            output = ROOT / output
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
+    print(text, end="")
+    if selector_failed:
+        return 1
+    return 0 if route_ready else 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

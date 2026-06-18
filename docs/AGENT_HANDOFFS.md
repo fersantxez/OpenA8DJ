@@ -4784,3 +4784,100 @@ Risks:
 Next action:
 - Use the hardware lock only for route validation with a known non-Audio8 wired
   source, or keep the 15:00 candidate explicitly diagnostic-only.
+
+## 2026-06-18 Kierkegaard: Remaining 15:00 EDT Stabilization Plan
+
+Subagent:
+- `019edb27-8f80-7071-86f0-6949e21a6e29` (`Kierkegaard`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Produce a 15:00 EDT stabilization plan from the current C++ worktree state.
+
+Findings:
+- The only defensible target is a frozen installable HAL/PKG diagnostic RC, not
+  a DriverKit/dext or product-readiness candidate.
+- Current gates classify `product_human_test_allowed=false`,
+  `route_revalidation_ready=false`, `timecode_vinyl_human_test_allowed=false`,
+  `cpu_superiority_claim_allowed=false`, and `branch_promotion_allowed=false`.
+- The next critical step is not more transport tuning; it is a lock-gated
+  known-good route validation after a wired non-Audio8 output appears.
+
+Integrated action:
+- Kept the watcher/readiness work fail-closed and diagnostic-only.
+- Preserved the product claim blockers in the offline evidence schema.
+
+Risks:
+- A human listen before route validation would mix driver behavior, cable path,
+  iRig capture, and physical routing into one non-attributable signal.
+
+Next action:
+- Freeze and verify the diagnostic RC, then only move to physical validation
+  if the known-good route watcher reports READY.
+
+## 2026-06-18 Bernoulli: Metrics Gap Audit Refresh
+
+Subagent:
+- `019edb43-5f35-7610-a38a-9a61ce0dcfc9` (`Bernoulli`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Audit what metrics can and cannot support a claim that C++ is better than
+  mainline in sound quality, Timecode Vinyl, CPU, and stability.
+
+Findings:
+- Offline/model metrics are strong, including simulated routing, timecode
+  profiles, DVS smoke, and clean direct USB internals.
+- Physical/product metrics remain failing or missing: same-session route
+  validation, C++/mainline A/B, CPU superiority, physical Timecode Vinyl,
+  and current known-good non-Audio8 route validation.
+- Current same-device route metrics cannot support product claims because the
+  route/capture evidence is classified diagnostic-only.
+
+Integrated action:
+- Kept watcher PASS semantics diagnostic: a blocked route watcher can pass as
+  a classifier but cannot unlock product listening.
+
+Risks:
+- Any claim of superiority before same-window physical A/B would be an
+  evidence error even if the offline gate is green.
+
+Next action:
+- Re-run offline gates post-commit, then use only lock-gated route validation
+  to generate the next physical evidence.
+
+## 2026-06-18 Mill: Installable RC and Rollback Review
+
+Subagent:
+- `019edb50-7899-7f42-87a2-7f4bada77505` (`Mill`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Review whether the current C++ candidate is installable end-to-end and what
+  rollback/observability gaps remain.
+
+Findings:
+- The HAL/PKG/DMG path is installable for a private diagnostic RC, but it is
+  not a dext/DriverKit product candidate.
+- Rollback can uninstall the diagnostic candidate and restart CoreAudio under
+  authorization, but it does not automatically restore a previous mainline HAL.
+- The active diagnostic HAL hash is a useful identity anchor, but it does not
+  prove route quality, CPU superiority, or Timecode Vinyl behavior.
+
+Integrated action:
+- Added the known-good route watcher to shorten and de-risk the next physical
+  window before any human product listen is considered.
+
+Risks:
+- Installing or uninstalling still touches CoreAudio and must remain under the
+  hardware/audio lock and an explicit window.
+
+Next action:
+- Keep the RC diagnostic-only until a validated known-good route and rollback
+  plan exist for the exact same physical window.

@@ -3146,3 +3146,11 @@ Current implication:
   comparison is against the signed distribution candidate, not a transient
   CMake-built executable. This prevents a stale installed HAL from being
   accepted as the current RC after local build churn.
+- Known-good route watcher update: `scripts/watch-known-good-route` now wraps
+  the read-only selector in a polling helper that writes a stable JSON report
+  and either emits the exact lock-gated route-validation command or preserves
+  the blocker. Focused live run at 12:17 EDT saw iRig Stream capture visible
+  and Open Audio 8 DJ visible, but no valid non-Audio8/non-built-in wired
+  output (`route_revalidation_ready=false`,
+  `next_action=PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`).
+  This is a human-window accelerator, not product readiness.
