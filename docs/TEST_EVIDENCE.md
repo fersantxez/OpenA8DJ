@@ -12919,3 +12919,33 @@ Full offline gate after commit:
   - This does not make the dext runnable or product-ready. It makes the current
     blocker measurable and preserves a safe path to compile-only validation
     once full Xcode with DriverKit SDK is available.
+
+## 2026-06-18 - Same-Device iRig Diagnostic Promotion Guard
+
+- Commit context: after `469376c`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline script/contract checks only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `python3 scripts/test-promotion-window-contract.py`
+  - `cmake --build build/cpp-release --target opena8djcpp_hardware_lock_policy_check opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_hardware_lock_policy_check`
+  - `bash -n scripts/run-physical-superiority-window scripts/run-known-good-route-soundcheck`
+  - `python3 -m py_compile scripts/physical-window-preflight scripts/evaluate-promotion-readiness.py scripts/test-promotion-window-contract.py`
+  - `git diff --check`
+- Result:
+  - Promotion-window contract: PASS.
+  - Hardware-lock policy check: PASS.
+  - Script syntax/compile checks: PASS.
+  - Diff whitespace check: PASS.
+- Interpretation:
+  - `scripts/run-physical-superiority-window` can now run a controlled
+    `--allow-same-device-loopback-diagnostic` path when the next required
+    action is iRig route recovery.
+  - `evaluate-promotion-readiness.py` rejects that window for promotion through
+    `physical_window_not_diagnostic`, even if route files and analyzers pass.
+  - This advances recovery diagnostics without weakening the product-quality,
+    CPU/resource, Timecode Vinyl, or branch-promotion bar.

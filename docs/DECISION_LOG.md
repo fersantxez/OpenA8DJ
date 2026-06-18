@@ -1,5 +1,36 @@
 # Decision Log
 
+## 2026-06-18 - Treat Same-Device iRig Loopback As Diagnostic Only
+
+Decision:
+- `scripts/run-physical-superiority-window` now exposes
+  `--allow-same-device-loopback-diagnostic`.
+- The flag is recorded in `window-manifest.txt`, forwarded to
+  `physical-window-preflight`, and forwarded to
+  `run-known-good-route-soundcheck`.
+- `physical-window-preflight` records
+  `known_good_output_same_as_capture`.
+- `evaluate-promotion-readiness.py` rejects any same-device loopback window
+  through `physical_window_not_diagnostic`.
+
+Reason:
+- The current route blocker can require a lock-gated same-device iRig diagnostic
+  to prove whether iRig can capture correlated signal at all. That diagnostic
+  is useful for recovery, but it is not a known-good non-Audio8 wired route and
+  cannot prove Audio 8 DJ product quality or promotion readiness.
+
+Evidence:
+- `scripts/test-promotion-window-contract.py`: PASS for a same-device diagnostic
+  fixture where route files exist but `physical_window_not_diagnostic` fails.
+- `opena8djcpp_hardware_lock_policy_check`: PASS after requiring the new flag
+  in lock-gated scripts.
+
+Next implication:
+- A same-device iRig run may be used only to debug capture-route recovery. The
+  promotion path still requires a separate wired non-Audio8 known-good source,
+  then same-session mainline vs C++ A/B, CPU/jitter/resource comparison, and
+  Timecode Vinyl physical evidence.
+
 ## 2026-06-18 - Add Default-Off DriverKit SDK Build Probe
 
 Decision:

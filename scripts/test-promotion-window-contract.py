@@ -24,7 +24,12 @@ def write_text(path: Path, text: str) -> Path:
     return path
 
 
-def run_evaluator(window: Path, include_known_good: bool, diagnostic: bool) -> dict:
+def run_evaluator(
+    window: Path,
+    include_known_good: bool,
+    built_in_diagnostic: bool,
+    same_device_diagnostic: bool = False,
+) -> dict:
     cpp = window / "cpp-soundcheck"
     known_good = window / "known-good-route"
     write_json(
@@ -82,7 +87,8 @@ def run_evaluator(window: Path, include_known_good: bool, diagnostic: bool) -> d
                 "route_only=0",
                 "candidate_only=0",
                 "skip_known_good=0",
-                f"allow_built_in_output_acoustic_diagnostic={1 if diagnostic else 0}",
+                f"allow_same_device_loopback_diagnostic={1 if same_device_diagnostic else 0}",
+                f"allow_built_in_output_acoustic_diagnostic={1 if built_in_diagnostic else 0}",
                 "",
             ]
         ),
@@ -95,8 +101,10 @@ def run_evaluator(window: Path, include_known_good: bool, diagnostic: bool) -> d
             "route_only": False,
             "candidate_only": False,
             "skip_known_good": False,
-            "allow_built_in_output_acoustic_diagnostic": diagnostic,
-            "known_good_output_builtin_or_acoustic": diagnostic,
+            "allow_same_device_loopback_diagnostic": same_device_diagnostic,
+            "allow_built_in_output_acoustic_diagnostic": built_in_diagnostic,
+            "known_good_output_same_as_capture": same_device_diagnostic,
+            "known_good_output_builtin_or_acoustic": built_in_diagnostic,
         },
     )
 
@@ -222,7 +230,7 @@ def run_ambiguous_known_good_request_fixture(root: Path) -> dict:
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="opena8djcpp-promotion-contract-") as temp:
         root = Path(temp)
-        missing = run_evaluator(root / "missing-known-good", include_known_good=False, diagnostic=False)
+        missing = run_evaluator(root / "missing-known-good", include_known_good=False, built_in_diagnostic=False)
         if gate(missing, "same_window_known_good_route_revalidated")["result"] != "FAIL":
             raise AssertionError("missing known-good route did not fail")
         if "known_good_route" not in missing["evidence_selection"]["physical_promotion_bundle"]["required_artifacts"]:
@@ -230,13 +238,24 @@ def main() -> int:
         if gate(missing, "same_window_known_good_audiophile_analyzers")["result"] != "FAIL":
             raise AssertionError("missing known-good audiophile analyzers did not fail")
 
-        diagnostic = run_evaluator(root / "diagnostic-known-good", include_known_good=True, diagnostic=True)
+        diagnostic = run_evaluator(root / "diagnostic-known-good", include_known_good=True, built_in_diagnostic=True)
         if gate(diagnostic, "same_window_known_good_route_revalidated")["result"] != "PASS":
             raise AssertionError("diagnostic fixture should still have same-window route file")
         if gate(diagnostic, "same_window_known_good_audiophile_analyzers")["result"] != "PASS":
             raise AssertionError("diagnostic fixture should include same-window audiophile analyzer files")
         if gate(diagnostic, "physical_window_not_diagnostic")["result"] != "FAIL":
             raise AssertionError("diagnostic physical window did not fail")
+
+        same_device = run_evaluator(
+            root / "same-device-diagnostic-known-good",
+            include_known_good=True,
+            built_in_diagnostic=False,
+            same_device_diagnostic=True,
+        )
+        if gate(same_device, "same_window_known_good_route_revalidated")["result"] != "PASS":
+            raise AssertionError("same-device diagnostic fixture should still have same-window route file")
+        if gate(same_device, "physical_window_not_diagnostic")["result"] != "FAIL":
+            raise AssertionError("same-device diagnostic physical window did not fail")
 
         known_good = run_known_good_request_fixture(root / "known-good-request")
         if gate(known_good, "output_not_audio8")["result"] != "FAIL":

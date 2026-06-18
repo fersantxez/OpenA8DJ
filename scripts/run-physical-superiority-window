@@ -54,6 +54,10 @@ Options:
   --run-dir DIR                     Evidence directory
   --skip-build                      Reuse existing built tools
   --skip-known-good                 Skip route validation; diagnostic only
+  --allow-same-device-loopback-diagnostic
+                                    Allow output and capture device to be the
+                                    same device; diagnostic only, never
+                                    promotion evidence
   --allow-built-in-output-acoustic-diagnostic
                                     Allow built-in speaker/acoustic route;
                                     diagnostic only, never promotion evidence
@@ -102,6 +106,7 @@ target_peak_db="-16"
 run_dir=""
 skip_build=0
 skip_known_good=0
+allow_same_device_loopback_diagnostic=0
 allow_built_in_output_acoustic_diagnostic=0
 leave_loaded=0
 
@@ -127,6 +132,7 @@ while [ "$#" -gt 0 ]; do
     --run-dir) run_dir="$2"; shift 2 ;;
     --skip-build) skip_build=1; shift ;;
     --skip-known-good) skip_known_good=1; shift ;;
+    --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
     --allow-built-in-output-acoustic-diagnostic) allow_built_in_output_acoustic_diagnostic=1; shift ;;
     --leave-loaded) leave_loaded=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -195,6 +201,7 @@ manifest="$run_dir/window-manifest.txt"
   echo "buffer=$buffer"
   echo "target_peak_db=$target_peak_db"
   echo "skip_known_good=$skip_known_good"
+  echo "allow_same_device_loopback_diagnostic=$allow_same_device_loopback_diagnostic"
   echo "allow_built_in_output_acoustic_diagnostic=$allow_built_in_output_acoustic_diagnostic"
   echo "leave_loaded=$leave_loaded"
   echo "run_dir=$run_dir"
@@ -244,6 +251,9 @@ if [ "$skip_known_good" -eq 1 ]; then
 fi
 if [ "$allow_built_in_output_acoustic_diagnostic" -eq 1 ]; then
   preflight_args+=(--allow-built-in-output-acoustic-diagnostic)
+fi
+if [ "$allow_same_device_loopback_diagnostic" -eq 1 ]; then
+  preflight_args+=(--allow-same-device-loopback-diagnostic)
 fi
 if [ -n "$known_good_output_device_uid" ]; then
   preflight_args+=(--known-good-output-device-uid "$known_good_output_device_uid")
@@ -324,6 +334,9 @@ if [ "$skip_known_good" -ne 1 ]; then
   fi
   if [ "$allow_built_in_output_acoustic_diagnostic" -eq 1 ]; then
     known_good_args+=(--allow-built-in-output-acoustic-diagnostic)
+  fi
+  if [ "$allow_same_device_loopback_diagnostic" -eq 1 ]; then
+    known_good_args+=(--allow-same-device-loopback-diagnostic)
   fi
   "${known_good_args[@]}"
 fi

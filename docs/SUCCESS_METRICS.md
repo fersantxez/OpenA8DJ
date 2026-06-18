@@ -98,6 +98,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   comparison. Historical route-only passes, built-in/acoustic output, and
   `--skip-known-good` diagnostic windows do not validate the capture route for
   promotion.
+- Same-device iRig loopback diagnostics do not validate the capture route for
+  promotion. If `allow_same_device_loopback_diagnostic=true` or
+  `known_good_output_same_as_capture=true`, `physical_window_not_diagnostic`
+  must fail and `branch_promotion_allowed` must remain `false`.
 - `opena8djcpp_hal_prepared_submit_adapter_contract` must pass before any
   default-off runtime prepared-submit candidate is allowed. Required values:
   `logical_slots=528`, `usb_submit_calls=66`, `total_bytes=185856`,

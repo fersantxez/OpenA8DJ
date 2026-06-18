@@ -343,13 +343,16 @@ def evaluate(args):
         window_manifest.get("route_only") == "0" and
         window_manifest.get("candidate_only") == "0" and
         window_manifest.get("skip_known_good") == "0" and
+        window_manifest.get("allow_same_device_loopback_diagnostic") == "0" and
         window_manifest.get("allow_built_in_output_acoustic_diagnostic") == "0" and
         window_preflight.get("result") == "PASS" and
         window_preflight.get("ready_to_execute_physical_window") is True and
         window_preflight.get("route_only") is False and
         window_preflight.get("candidate_only") is False and
         window_preflight.get("skip_known_good") is False and
+        window_preflight.get("allow_same_device_loopback_diagnostic") is False and
         window_preflight.get("allow_built_in_output_acoustic_diagnostic") is False and
+        window_preflight.get("known_good_output_same_as_capture") is False and
         window_preflight.get("known_good_output_builtin_or_acoustic") is False
     )
 
@@ -398,6 +401,8 @@ def evaluate(args):
                   "route_only": window_manifest.get("route_only"),
                   "candidate_only": window_manifest.get("candidate_only"),
                   "skip_known_good": window_manifest.get("skip_known_good"),
+                  "allow_same_device_loopback_diagnostic":
+                  window_manifest.get("allow_same_device_loopback_diagnostic"),
                   "allow_built_in_output_acoustic_diagnostic":
                   window_manifest.get("allow_built_in_output_acoustic_diagnostic"),
               },
@@ -408,12 +413,16 @@ def evaluate(args):
                   "route_only": window_preflight.get("route_only"),
                   "candidate_only": window_preflight.get("candidate_only"),
                   "skip_known_good": window_preflight.get("skip_known_good"),
+                  "allow_same_device_loopback_diagnostic":
+                  window_preflight.get("allow_same_device_loopback_diagnostic"),
                   "allow_built_in_output_acoustic_diagnostic":
                   window_preflight.get("allow_built_in_output_acoustic_diagnostic"),
+                  "known_good_output_same_as_capture":
+                  window_preflight.get("known_good_output_same_as_capture"),
                   "known_good_output_builtin_or_acoustic":
                   window_preflight.get("known_good_output_builtin_or_acoustic"),
               }},
-             "diagnostic, route-only, candidate-only, skipped-route, or built-in/acoustic windows cannot support promotion"),
+             "diagnostic, route-only, candidate-only, skipped-route, same-device loopback, or built-in/acoustic windows cannot support promotion"),
         gate("offline_all_gates",
              offline.get("status") == "PASS" and not offline.get("hardware_touched", True),
              {"status": offline.get("status"),

@@ -404,6 +404,7 @@ def main() -> int:
         "prepared_runtime_candidate_report": prepared_runtime_report,
         "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic,
         "allow_built_in_output_acoustic_diagnostic": args.allow_built_in_output_acoustic_diagnostic,
+        "known_good_output_same_as_capture": same_known_good_capture_device,
         "known_good_output_builtin_or_acoustic": built_in_known_good_output,
         "known_good_output_match_count": len(known_good_matches),
         "capture_device_match_count": len(capture_matches),

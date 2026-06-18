@@ -34,6 +34,13 @@ Branch: `driverkit/cpp-redesign`
   free space is below the full-Xcode threshold. The probe records
   `driver_installed_or_activated=false`, `system_extension_activated=false`,
   `coreaudio_touched=false`, `usb_touched=false`, and `hardware_touched=false`.
+- 2026-06-18 physical-window diagnostic hardening status: the main physical
+  window runner now exposes `--allow-same-device-loopback-diagnostic`, forwards
+  it to preflight and known-good route checks, and records it in the window
+  manifest. Promotion evaluation fails any same-device loopback window through
+  `physical_window_not_diagnostic`, even if the route files and analyzers pass.
+  This supports the current `LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY`
+  recovery path without weakening branch-promotion rules.
 - 2026-06-18 post-commit Direct USB route status: the lock-gated
   `20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s` run again proves
   the internal USB payload path is clean (`written/consumed/packed`
