@@ -14868,3 +14868,42 @@ Follow-up correction:
     functionality/stability because it removes hot diagnostic work without
     changing default audio geometry. It is not yet a quality, CPU, Timecode, or
     promotion candidate.
+
+## 2026-06-18 - Stable Load Closure After Lite Rejection
+
+- Scope:
+  - Ran a short lock-gated source-reference A/B for
+    `build/OpenA8DJ-human-test-lite.driver` against mainline C.
+  - Restored the default diagnostic C++ HAL afterward and left it loaded.
+- Evidence:
+  - Lite A/B:
+    `/Users/fer/dev/audio8djcpp/local-analysis/physical-evidence-window/20260618T190658Z-human-lite-source-reference-ab`
+  - Default restore:
+    `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T191036Z-restore-default-after-lite-rejected`
+- Result:
+  - Lite window result: `FAIL`,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Lite candidate: `quality_alignment_score=0.879671`,
+    `snr_floor_db=-5.885049`,
+    `mid_band_residual_ratio=4.727078`,
+    `high_band_residual_ratio=2.647887`,
+    `lag_jumps_gt_2_frames=32`,
+    `driver_cpu_p95=17.1`,
+    `coreaudiod_cpu_p95=23.9`.
+  - The mainline leg in the same window was abnormally poor
+    (`quality_alignment_score=-0.004218`, SNR `-41.829163 dB`), so this window
+    is not valid for a superiority claim. It is valid for rejecting the lite
+    candidate as the immediate stable baseline because the candidate still
+    failed strict quality and CPU gates.
+  - Default restore result: `hal_candidate_safety=PASS`, `restore_rc=0`.
+  - Installed HAL hash matches `build/OpenA8DJ.driver`:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Final read-only inventory: iRig Stream visible as `2 in / 2 out` at
+    `48 kHz`; Open Audio 8 DJ visible as `8 in / 8 out` at `48 kHz`.
+  - Final audio-stack health: PASS; `coreaudiod=0.0%`,
+    `opena8dj_driver=0.0%`; hardware lock free.
+- Interpretation:
+  - The stable load for the immediate human baseline is the default diagnostic
+    C++ HAL, not the lite candidate.
+  - This remains a diagnostic baseline, not proof of audiophile superiority,
+    CPU superiority, Timecode Vinyl readiness, or branch-promotion readiness.

@@ -92,6 +92,16 @@ Branch: `driverkit/cpp-redesign`
   branch promotion. The next lock-gated action is a short safety/install smoke
   plus source-reference soundcheck, then immediate restore to the default
   diagnostic HAL if the lite candidate regresses.
+- 15:11 EDT stable-load closure: the low-telemetry lite candidate was tested
+  in a short lock-gated source-reference A/B and rejected as the active human
+  baseline. It loaded and enumerated, but still failed quality gates and showed
+  worse CPU than the earlier default C++ window (`driver_cpu_p95=17.1`,
+  `coreaudiod_cpu_p95=23.9`). The machine was restored to the default
+  diagnostic HAL, safety passed, Audio 8 DJ is visible as `8 in / 8 out` at
+  `48 kHz`, iRig Stream is visible as `2 in / 2 out`, the hardware lock is
+  free, and `opena8dj_driver`/`coreaudiod` are idle at `0.0%`. Active installed
+  HAL hash:
+  `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
 - 13:13 EDT continuation update: `scripts/human-test-rc-status` now consumes
   the route-contamination and Timecode physical-window gates directly. The live
   RC status is no longer a generic route block; it is
