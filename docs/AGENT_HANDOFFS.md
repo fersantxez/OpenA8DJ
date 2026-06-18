@@ -3473,3 +3473,40 @@ Risk:
   - Historical physical artifacts still may not carry per-artifact commit IDs.
     The next physical promotion bundle should stamp candidate commit/build ID
     into every generated artifact.
+
+## 2026-06-17 Subagent: Cicero Physical Promotion Window Audit
+
+- Agent:
+  - Cicero (`019ed819-733b-7230-bc2e-177a1a0eae1e`)
+- Mission:
+  - Read-only audit of `scripts/run-physical-superiority-window`,
+    `scripts/physical-window-preflight`,
+    `scripts/run-known-good-route-soundcheck`, and
+    `scripts/evaluate-promotion-readiness.py`.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - The promotion evaluator did not require `known-good-route` evidence in the
+    same physical window as music/CPU/tone/latency/matrix/same-session
+    artifacts.
+  - A built-in/acoustic diagnostic known-good route could be too easy to
+    confuse with promotion evidence if not explicitly checked.
+  - Preflight rejected Audio 8 by argument text but not by the resolved
+    CoreAudio device identity.
+- Integrated action:
+  - Added `same_window_known_good_route_revalidated` and
+    `physical_window_not_diagnostic` gates to promotion evaluation.
+  - Added `known_good_route` to the required physical promotion bundle.
+  - Added `scripts/test-promotion-window-contract.py`, an offline synthetic
+    regression test for missing route evidence and diagnostic-window rejection.
+  - Hardened `physical-window-preflight` to reject resolved known-good devices
+    that are actually OpenA8DJ/Audio 8.
+- Risk:
+  - This closes a false-positive promotion path. It does not provide the
+    missing physical evidence; the next real step remains a locked known-good
+    wired non-Audio8 route revalidation followed by same-session mainline/C++
+    physical A/B.

@@ -86,8 +86,10 @@ python3 -m py_compile \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
   scripts/evaluate-promotion-readiness.py \
+  scripts/test-promotion-window-contract.py \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py
+python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -192,6 +194,7 @@ hal_bundle_complete = load_json("hal-bundle-complete.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
+promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
 
 summary = {
     "date": subprocess.check_output(["date", "+%F"], text=True).strip(),
@@ -210,6 +213,8 @@ summary = {
     "physical_measurement_blockers": capture_route_health.get("promotion_blockers", []),
     "promotion_hard_blockers": [
         "single_physical_promotion_evidence_bundle_missing",
+        "same_window_known_good_route_revalidation_missing",
+        "diagnostic_physical_window_not_promotable",
         "same_session_mainline_cpp_physical_ab_missing",
         "valid_irig_loopback_route_not_currently_proven_for_promotion",
         "traktor_timecode_vinyl_physical_gate_missing",
@@ -1162,6 +1167,16 @@ summary = {
             if gate.get("result") != "PASS"
         ],
         "evidence": "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
+    },
+    "promotion_window_contract": {
+        "status": "PASS" if "promotion_window_contract=PASS" in promotion_window_contract else "FAIL",
+        "same_window_known_good_route_required": "known_good_route" in json.dumps(
+            promotion_evaluator.get("evidence_selection", {}).get("physical_promotion_bundle", {})
+        ),
+        "diagnostic_window_blocked": "physical_window_not_diagnostic" in json.dumps(
+            promotion_evaluator.get("gates", [])
+        ),
+        "evidence": "local-analysis/cpp-offline/promotion-window-contract.txt",
     },
     "not_ready": [
         "mainline_runtime_byte_parity_requires physical capture/export evidence",

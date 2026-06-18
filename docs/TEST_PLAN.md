@@ -113,6 +113,16 @@ Current NOT_READY coverage:
 - real AudioDriverKit dext stream mapping under DriverKit SDK;
 - physical A/B/C/D I/O, Traktor, iRig capture, and listening.
 
+Physical promotion bundle rule:
+
+- A future physical promotion window must produce one coherent bundle under
+  `local-analysis/physical-superiority-window/<id>`.
+- That bundle must include same-window `known-good-route/metrics.json` from an
+  explicit wired non-Audio8 output source into the iRig capture route.
+- Built-in/acoustic output, historical route-only evidence, candidate-only
+  runs, and skipped known-good checks are diagnostic only and must not satisfy
+  branch promotion.
+
 ## Baseline Inputs
 
 Use these references for comparisons:

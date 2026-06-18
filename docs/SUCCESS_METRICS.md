@@ -64,6 +64,11 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   diagnostic guardrails: max RMS `-66.94 dBFS`, max peak `-41.65 dBFS`, max
   first-difference RMS `-68.87 dBFS`. This does not satisfy product quality; it
   only permits the next route-isolation test with a known-good source.
+- A known-good non-Audio8 wired route check must be part of the same
+  lock-gated physical promotion bundle as the C++ candidate and mainline
+  comparison. Historical route-only passes, built-in/acoustic output, and
+  `--skip-known-good` diagnostic windows do not validate the capture route for
+  promotion.
 
 ### Mainline C Reference
 

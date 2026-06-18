@@ -1,5 +1,38 @@
 # Decision Log
 
+## 2026-06-17: Require Same-Window Known-Good Route Evidence For Promotion
+
+Decision:
+- `scripts/evaluate-promotion-readiness.py` now treats
+  `known-good-route/metrics.json` as a required artifact in the same
+  `local-analysis/physical-superiority-window/<id>` bundle as the C++ music,
+  CPU, tone, latency, USB, matrix, and same-session comparison evidence.
+- The offline summary now includes
+  `same_window_known_good_route_revalidation_missing` as a hard promotion
+  blocker.
+
+Reason:
+- Current Core Audio enumeration only exposes iRig Stream and built-in
+  speakers as non-Audio8 devices. Built-in/acoustic output is diagnostic only
+  and cannot validate the wired mixer/REC OUT -> iRig capture route.
+- Historical route evidence and skipped known-good runs are useful forensic
+  inputs, but they must not be enough to support an audiophile quality or
+  branch-promotion claim.
+
+Alternatives discarded:
+- Trusting a prior route-only pass: rejected because the physical route can
+  drift between sessions.
+- Allowing candidate-only windows to satisfy bundle completeness: rejected
+  because they cannot prove the capture route or same-session mainline
+  comparison.
+
+Evidence:
+- `./build/audio-list` showed iRig Stream, MacBook Air Microphone, and
+  MacBook Air Speakers only.
+- `scripts/evaluate-promotion-readiness.py` now reports
+  `same_window_known_good_route_revalidated` as a failing gate until current
+  same-window evidence exists.
+
 ## 2026-06-17: Add C++ Physical Capture Forensics Before Further Hardware Claims
 
 Decision:

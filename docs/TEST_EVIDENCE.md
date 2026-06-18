@@ -1,5 +1,47 @@
 # Test Evidence
 
+## 2026-06-17: Same-Window Known-Good Route Promotion Contract
+
+- Scope:
+  - Hardened branch-promotion evidence so a physical promotion bundle must
+    include same-window `known-good-route/metrics.json`.
+  - Added `physical_window_not_diagnostic` so route-only, candidate-only,
+    `--skip-known-good`, and built-in/acoustic diagnostic windows cannot
+    support promotion.
+  - Hardened preflight to reject a known-good output that resolves to
+    OpenA8DJ/Audio 8 even if the user supplied an ambiguous device substring.
+- Commands:
+  - `python3 -m py_compile scripts/evaluate-promotion-readiness.py scripts/physical-window-preflight scripts/test-promotion-window-contract.py`
+  - `python3 scripts/test-promotion-window-contract.py`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Synthetic promotion contract: PASS.
+  - Pre-commit full offline run stopped at provenance freshness because the
+    worktree was intentionally dirty; this is the expected guard behavior.
+  - Post-commit full offline run passed.
+  - Debug CTest: `54/54` passed.
+  - Release CTest: `55/55` passed.
+  - Evidence schema: PASS with `required_files=57`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Provenance gate: PASS with `summary_matches_head=true`,
+    `working_tree_clean_for_claim=true`, and
+    `claimable_current_candidate=true`.
+  - Promotion evaluator now fails these additional blockers:
+    `same_window_known_good_route_revalidated` and
+    `physical_window_not_diagnostic`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, buffer-size
+    change, playback, capture, or Traktor action was performed.
+- Evidence:
+  - `local-analysis/cpp-offline/promotion-window-contract.txt`
+  - `local-analysis/cpp-offline/promotion-readiness-offline-check.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - Future physical promotion evidence must be a single coherent window. A
+    historical route-only pass or skipped/diagnostic known-good route cannot be
+    used to claim better sound quality, lower CPU, full routing, timecode
+    readiness, or branch promotion.
+
 ## 2026-06-17: C++ Physical Capture Forensics Over Archived iRig WAVs
 
 - Change:

@@ -79,6 +79,10 @@ DEFAULTS = {
         ],
         ROOT / "local-analysis/direct-usb-soundcheck/20260617-decorrelated-no-continuous-reset-alt0-pairA-12s-usbdiag/tone-matrix.json",
     ),
+    "known_good_route": latest_file(
+        "local-analysis/physical-superiority-window/**/known-good-route/metrics.json",
+        ROOT / "local-analysis/physical-superiority-window/REQUIRED-known-good-route-metrics.json",
+    ),
     "same_session_compare": latest_file(
         "local-analysis/physical-superiority-window/**/same-session-physical-compare.json",
         ROOT / "local-analysis/physical-superiority-window/REQUIRED-same-session-physical-compare.json",
@@ -150,6 +154,13 @@ def parse_key_values(path):
             key, value = stripped.split("=", 1)
             values[key.strip()] = value.strip()
     return values
+
+
+def window_file(paths, name):
+    root = promotion_window_root(paths["music"])
+    if root is None:
+        return ROOT / "local-analysis/physical-superiority-window" / f"REQUIRED-{name}"
+    return root / name
 
 
 def as_float(mapping, key, default=math.nan):
@@ -242,6 +253,7 @@ def promotion_bundle(paths):
         "physical_marker": paths["physical_marker"],
         "usb_integrity": paths["usb_integrity"],
         "physical_matrix": paths["physical_matrix"],
+        "known_good_route": paths["known_good_route"],
         "same_session_compare": paths["same_session_compare"],
     }
     roots = {name: promotion_window_root(path) for name, path in required.items()}
@@ -273,6 +285,7 @@ def evaluate(args):
         "physical_marker": Path(args.physical_marker),
         "usb_integrity": Path(args.usb_integrity),
         "physical_matrix": Path(args.physical_matrix),
+        "known_good_route": Path(args.known_good_route),
         "same_session_compare": Path(args.same_session_compare),
         "capture_route_health": Path(args.capture_route_health),
         "direct_usb_attribution": Path(args.direct_usb_attribution),
@@ -291,6 +304,7 @@ def evaluate(args):
     physical_marker = load_json_or_empty(paths["physical_marker"])
     usb_integrity = parse_key_values(paths["usb_integrity"])
     physical_matrix = load_json_or_empty(paths["physical_matrix"])
+    known_good_route = load_json_or_empty(paths["known_good_route"])
     same_session_compare = load_json_or_empty(paths["same_session_compare"])
     capture_route_health = load_json_or_empty(paths["capture_route_health"])
     direct_usb_attribution = load_json_or_empty(paths["direct_usb_attribution"])
@@ -306,6 +320,24 @@ def evaluate(args):
     bench_path = ROOT / "local-analysis/cpp-offline/offline-bench-release.json"
     bench = load_json(bench_path) if bench_path.is_file() else {}
     bundle = promotion_bundle(paths)
+    window_manifest_path = window_file(paths, "window-manifest.txt")
+    window_preflight_path = window_file(paths, "physical-window-preflight.json")
+    window_manifest = parse_key_values(window_manifest_path)
+    window_preflight = load_json_or_empty(window_preflight_path)
+    window_not_diagnostic = (
+        window_manifest.get("execute") == "1" and
+        window_manifest.get("route_only") == "0" and
+        window_manifest.get("candidate_only") == "0" and
+        window_manifest.get("skip_known_good") == "0" and
+        window_manifest.get("allow_built_in_output_acoustic_diagnostic") == "0" and
+        window_preflight.get("result") == "PASS" and
+        window_preflight.get("ready_to_execute_physical_window") is True and
+        window_preflight.get("route_only") is False and
+        window_preflight.get("candidate_only") is False and
+        window_preflight.get("skip_known_good") is False and
+        window_preflight.get("allow_built_in_output_acoustic_diagnostic") is False and
+        window_preflight.get("known_good_output_builtin_or_acoustic") is False
+    )
 
     gates.extend([
         gate("latest_music_cpu_pair",
@@ -317,6 +349,45 @@ def evaluate(args):
              bundle["same_window"],
              bundle,
              "promotion evidence must come from one lock-gated physical window with the same route, candidate, baseline, and run context"),
+        gate("same_window_known_good_route_revalidated",
+             known_good_route.get("result") == "PASS" and
+             paths["known_good_route"].parent.name == "known-good-route" and
+             promotion_window_root(paths["known_good_route"]) == promotion_window_root(paths["music"]),
+             {"path": str(paths["known_good_route"]),
+              "result": known_good_route.get("result"),
+              "quality_alignment_score": known_good_route.get("quality_alignment_score"),
+              "snr_db_min": min(as_float(known_good_route, "left_snr_db"),
+                                as_float(known_good_route, "right_snr_db")),
+              "lag_jumps_gt_2_frames": known_good_route.get("lag_jumps_gt_2_frames"),
+              "click_outliers": known_good_route.get("click_outliers"),
+              "known_good_window": str(promotion_window_root(paths["known_good_route"])),
+              "product_window": str(promotion_window_root(paths["music"]))},
+             "the iRig capture route must be revalidated with a non-Audio8 wired source in the same physical promotion window"),
+        gate("physical_window_not_diagnostic",
+             window_not_diagnostic,
+             {"manifest": evidence_metadata(window_manifest_path),
+              "preflight": evidence_metadata(window_preflight_path),
+              "manifest_flags": {
+                  "execute": window_manifest.get("execute"),
+                  "route_only": window_manifest.get("route_only"),
+                  "candidate_only": window_manifest.get("candidate_only"),
+                  "skip_known_good": window_manifest.get("skip_known_good"),
+                  "allow_built_in_output_acoustic_diagnostic":
+                  window_manifest.get("allow_built_in_output_acoustic_diagnostic"),
+              },
+              "preflight_flags": {
+                  "result": window_preflight.get("result"),
+                  "ready_to_execute_physical_window":
+                  window_preflight.get("ready_to_execute_physical_window"),
+                  "route_only": window_preflight.get("route_only"),
+                  "candidate_only": window_preflight.get("candidate_only"),
+                  "skip_known_good": window_preflight.get("skip_known_good"),
+                  "allow_built_in_output_acoustic_diagnostic":
+                  window_preflight.get("allow_built_in_output_acoustic_diagnostic"),
+                  "known_good_output_builtin_or_acoustic":
+                  window_preflight.get("known_good_output_builtin_or_acoustic"),
+              }},
+             "diagnostic, route-only, candidate-only, skipped-route, or built-in/acoustic windows cannot support promotion"),
         gate("offline_all_gates",
              offline.get("status") == "PASS" and not offline.get("hardware_touched", True),
              {"status": offline.get("status"),
@@ -642,6 +713,9 @@ def evaluate(args):
             "product_run": str(paths["music"].parent)
             if paths["music"].parent == paths["cpu"].parent else None,
             "physical_promotion_bundle": bundle,
+            "window_manifest": evidence_metadata(window_manifest_path),
+            "window_preflight": evidence_metadata(window_preflight_path),
+            "known_good_route": evidence_metadata(paths["known_good_route"]),
             "music": evidence_metadata(paths["music"]),
             "cpu": evidence_metadata(paths["cpu"]),
         },
@@ -661,6 +735,7 @@ def main():
     parser.add_argument("--physical-marker", default=str(DEFAULTS["physical_marker"]))
     parser.add_argument("--usb-integrity", default=str(DEFAULTS["usb_integrity"]))
     parser.add_argument("--physical-matrix", default=str(DEFAULTS["physical_matrix"]))
+    parser.add_argument("--known-good-route", default=str(DEFAULTS["known_good_route"]))
     parser.add_argument("--same-session-compare", default=str(DEFAULTS["same_session_compare"]))
     parser.add_argument("--capture-route-health", default=str(DEFAULTS["capture_route_health"]))
     parser.add_argument("--direct-usb-attribution", default=str(DEFAULTS["direct_usb_attribution"]))

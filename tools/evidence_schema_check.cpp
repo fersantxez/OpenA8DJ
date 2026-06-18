@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
+      root / "local-analysis/cpp-offline/promotion-window-contract.txt",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",
@@ -135,6 +136,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto promotion_window_contract =
+      opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is(summary, "diagnostic_status", "PASS") &&
@@ -142,6 +145,10 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
       string_array_has(summary, "promotion_hard_blockers",
                        "single_physical_promotion_evidence_bundle_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "same_window_known_good_route_revalidation_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
+                       "diagnostic_physical_window_not_promotable") &&
       string_array_has(summary, "promotion_hard_blockers",
                        "same_session_mainline_cpp_physical_ab_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
@@ -181,6 +188,10 @@ int main(int argc, char** argv) {
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
+      object_present(summary, "promotion_window_contract") &&
+      string_field_is(promotion_window_contract, "status", "PASS") &&
+      bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&
+      bool_field_is(promotion_window_contract, "diagnostic_window_blocked", true) &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

@@ -225,6 +225,7 @@ def main() -> int:
         )
     )
     built_in_known_good_output = requires_known_good and built_in_or_acoustic_output(known_good_identity)
+    resolved_known_good_audio8 = requires_known_good and audio8ish(known_good_identity)
 
     gates = [
         gate("audio_list_available", audio_rc == 0 and bool(devices), {"return_code": audio_rc, "device_count": len(devices)}, audio_stderr.strip()),
@@ -236,7 +237,7 @@ def main() -> int:
         gate("reference_wav_exists", not requires_known_good or (reference_wav is not None and reference_wav.is_file()), {"path": str(reference_wav) if reference_wav else ""}, "known-good route reference WAV is required"),
         gate("music_file_exists_if_supplied", music_file is None or music_file.is_file(), {"path": str(music_file) if music_file else ""}, "music fixture must exist when supplied"),
         gate("known_good_output_specified", not requires_known_good or bool(args.known_good_output_device or args.known_good_output_device_uid), {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid}, "explicit non-Audio8 output source is required"),
-        gate("known_good_output_not_audio8", not audio8ish(args.known_good_output_device + " " + args.known_good_output_device_uid), {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid}, "known-good source must not be OpenA8DJ/Audio 8"),
+        gate("known_good_output_not_audio8", not resolved_known_good_audio8, {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid, "resolved": known_good or {}}, "known-good source must not be OpenA8DJ/Audio 8"),
         gate("known_good_output_visible", not requires_known_good or (known_good is not None and int(known_good.get("outputs", 0)) >= 2), {"device": known_good or {}}, "known-good source must be a visible CoreAudio output with at least two channels"),
         gate("known_good_output_not_capture_device", not same_known_good_capture_device or args.allow_same_device_loopback_diagnostic, {"capture": capture or {}, "known_good": known_good or {}, "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic}, "known-good source must not be the same CoreAudio device as the capture device unless explicitly diagnostic"),
         gate("known_good_output_not_builtin_acoustic", not built_in_known_good_output or args.allow_built_in_output_acoustic_diagnostic, {"device": known_good or {}, "allow_built_in_output_acoustic_diagnostic": args.allow_built_in_output_acoustic_diagnostic}, "built-in speakers/acoustic paths cannot validate the wired iRig route"),

@@ -169,6 +169,11 @@ Branch: `driverkit/cpp-redesign`
   `branch_promotion_allowed=false`. C++ must not be moved to `main`, and C
   must not be moved to `Legacy`, until the gate returns PASS and the user
   authorizes the branch operation.
+- 2026-06-17 promotion evidence is now stricter: a same-window
+  non-Audio8 known-good route revalidation is mandatory in the physical
+  promotion bundle. A route-only historical PASS or a `--skip-known-good`
+  candidate run cannot satisfy branch promotion, even if later music/CPU
+  artifacts are present.
 - 2026-06-16 locked physical USB investigation recovered the audio stack after
   a stuck Spotify process, installed the HAL candidate safely, and confirmed
   `iRig Stream` plus `Open Audio 8 DJ` visibility. The HAL music soundcheck
