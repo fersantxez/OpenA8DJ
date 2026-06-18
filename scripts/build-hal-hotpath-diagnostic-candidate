@@ -1,0 +1,211 @@
+#!/usr/bin/env python3
+"""Build a separate opt-in HAL candidate with hot-path timing enabled.
+
+This script is build-only. It writes only under the C++ worktree, copies the
+diagnostic bundle to a separate path, then rebuilds the normal HAL bundle so
+build/OpenA8DJ.driver remains the conservative default candidate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+BLOCKED_CLAIM = (
+    "NO_AUDIOPHILE_TIMING_OR_CPU_CLAIM_FROM_HOTPATH_DIAGNOSTIC_BUILD_WITHOUT_"
+    "LOCK_GATED_PHYSICAL_EVIDENCE"
+)
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def reject_inside_bundle(path: Path, bundle: Path, label: str) -> None:
+    try:
+        path.relative_to(bundle)
+    except ValueError:
+        return
+    raise ValueError(f"{label} must not be written inside the candidate bundle: {path}")
+
+
+def run(argv: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        argv,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    info = path / "Contents/Info.plist"
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    return {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+    }
+
+
+def write_json(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ-hotpath-diagnostic.driver")
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--hot-stream-stats-interval", type=int, default=1)
+    args = parser.parse_args()
+
+    if args.hot_stream_stats_interval < 1:
+        raise ValueError("--hot-stream-stats-interval must be >= 1")
+
+    candidate = resolve_path(args.candidate)
+    require_inside_root(candidate, "--candidate")
+    if candidate == ROOT or candidate == DEFAULT_HAL:
+        raise ValueError("--candidate must be separate from the worktree and default HAL")
+    json_out = resolve_path(args.json_out) if args.json_out else None
+    if json_out is not None:
+        require_inside_root(json_out, "--json-out")
+        reject_inside_bundle(json_out, candidate, "--json-out")
+
+    build_rc, build_stdout, build_stderr = run(
+        [
+            "make",
+            "-B",
+            "hal",
+            "HAL_HOT_PATH_TIMING=1",
+            f"HAL_HOT_STREAM_STATS_INTERVAL={args.hot_stream_stats_interval}",
+            "HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1",
+            "HAL_TRANSFER_LEDGER=0",
+            "HAL_PLAYBACK_PAYLOAD_GUARD=0",
+            "HAL_CADENCE_DIAGNOSTIC=0",
+        ]
+    )
+
+    copied = False
+    if build_rc == 0 and DEFAULT_HAL_BIN.is_file():
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+        copied = True
+
+    diagnostic_metrics = bundle_metrics(candidate)
+
+    restore_rc, restore_stdout, restore_stderr = run(["make", "-B", "hal"])
+    default_metrics = bundle_metrics(DEFAULT_HAL)
+
+    diagnostic_hash = str(diagnostic_metrics.get("executable_sha256", ""))
+    default_hash = str(default_metrics.get("executable_sha256", ""))
+    gates = [
+        {
+            "name": "hotpath_diagnostic_build",
+            "result": "PASS" if build_rc == 0 else "FAIL",
+            "return_code": build_rc,
+        },
+        {
+            "name": "hotpath_diagnostic_candidate_copied",
+            "result": "PASS" if copied else "FAIL",
+        },
+        {
+            "name": "hotpath_diagnostic_candidate_complete",
+            "result": "PASS"
+            if diagnostic_metrics["bundle_exists"]
+            and diagnostic_metrics["info_plist_exists"]
+            and diagnostic_metrics["executable_exists"]
+            and int(diagnostic_metrics["executable_bytes"]) > 0
+            else "FAIL",
+        },
+        {
+            "name": "default_hal_restored",
+            "result": "PASS"
+            if restore_rc == 0
+            and default_metrics["bundle_exists"]
+            and default_metrics["info_plist_exists"]
+            and default_metrics["executable_exists"]
+            and int(default_metrics["executable_bytes"]) > 0
+            else "FAIL",
+            "return_code": restore_rc,
+        },
+        {
+            "name": "hotpath_diagnostic_hash_differs_from_default",
+            "result": "PASS"
+            if diagnostic_hash and default_hash and diagnostic_hash != default_hash
+            else "FAIL",
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.hal-hotpath-diagnostic-candidate.v1",
+        "safety": "offline_local_build_only_no_install_load_coreaudio_usb_hardware_or_default_device_touch",
+        "result": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "hot_path_timing_enabled": True,
+        "hot_stream_stats_interval": args.hot_stream_stats_interval,
+        "stream_stats_atomic_accumulators_enabled": True,
+        "transfer_ledger_enabled": False,
+        "playback_payload_guard_enabled": False,
+        "cadence_diagnostic_enabled": False,
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "candidate_metrics": diagnostic_metrics,
+        "default_hal_after_restore": default_metrics,
+        "default_hal_restored": restore_rc == 0 and default_metrics["executable_exists"],
+        "candidate_hash_differs_from_default": bool(
+            diagnostic_hash and default_hash and diagnostic_hash != default_hash
+        ),
+        "gates": gates,
+        "blocked_claim": BLOCKED_CLAIM,
+    }
+    if build_rc != 0:
+        report["build_stderr"] = build_stderr[-4000:]
+        report["build_stdout"] = build_stdout[-4000:]
+    if restore_rc != 0:
+        report["restore_build_stderr"] = restore_stderr[-4000:]
+        report["restore_build_stdout"] = restore_stdout[-4000:]
+
+    text = json.dumps(report, indent=2, sort_keys=True)
+    print(text)
+    if json_out is not None:
+        write_json(json_out, report)
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

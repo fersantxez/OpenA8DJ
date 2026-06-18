@@ -3487,3 +3487,16 @@ Current implication:
   (`driver_cpu_p95=14.7%` vs `4.8%`, `coreaudiod_cpu_p95=21.6%` vs `3.7%`).
   This is diagnostic evidence only. Product/human readiness, CPU superiority,
   branch promotion, and Timecode Vinyl remain blocked.
+- 17:01 EDT stable-load closure direction: the default C++ HAL remains the
+  stable diagnostic load candidate, while a separate opt-in hot-path timing
+  bundle now exists for the next CPU attribution window:
+  `build/OpenA8DJ-hotpath-diagnostic.driver`. The build script restores
+  `build/OpenA8DJ.driver` immediately after copying the diagnostic bundle, and
+  the offline gates/schema now require the diagnostic bundle to declare
+  `product_claim_allowed=false` and no physical evidence. Read-only subagents
+  reached complementary conclusions: CPU is likely dominated by per-completion
+  HAL/USB work rather than raw submit count, and the latest physical quality
+  failure still points strongly at post-USB route/capture contamination despite
+  clean direct USB payload evidence. The next stable action is offline gate
+  regeneration and, only if we choose a new physical window, a lock-gated
+  diagnostic run that measures hot-path timing before any product claim.

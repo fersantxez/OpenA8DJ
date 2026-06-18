@@ -10154,3 +10154,35 @@ Next implication:
 - Readiness impact: C++ remains blocked for product/human readiness and branch
   promotion. Next work must reduce runtime CPU and stabilize physical output
   quality before another promotion attempt.
+
+## 2026-06-18 - Add Separate Hot-Path Diagnostic Candidate For Stable Closure
+
+- Decision: add `scripts/build-hal-hotpath-diagnostic-candidate` and
+  `make hal-hotpath-diagnostic-candidate`, and make the offline evidence bundle
+  require `hal-hotpath-diagnostic-candidate.json` plus bundle-completeness
+  evidence.
+- Reason: the 17:00 stable-load goal needs the next CPU measurement ready
+  without contaminating the default diagnostic RC. The latest same-session A/B
+  shows fewer C++ capture submits than mainline but worse CPU, so the next
+  question is per-completion cost attribution, not another blind timing knob.
+- Evidence:
+  - Local build-only run produced
+    `build/OpenA8DJ-hotpath-diagnostic.driver`.
+  - The candidate enables `HAL_HOT_PATH_TIMING=1`,
+    `HAL_HOT_STREAM_STATS_INTERVAL=1`, and
+    `HAL_STREAM_STATS_ATOMIC_ACCUMULATORS=1`.
+  - It disables transfer ledger, playback payload guard, and cadence
+    diagnostics so the timing window focuses on hot-path CPU attribution.
+  - The script rebuilt and restored `build/OpenA8DJ.driver`; candidate and
+    default hashes differ.
+  - The report states `physical_evidence_present=false` and
+    `product_claim_allowed=false`.
+- Alternatives rejected:
+  - Replace the stable default HAL with the hot-path diagnostic build:
+    rejected because instrumentation is not a product improvement and atomic
+    stream stats have already been physically rejected as a default.
+  - Treat lower submit count as CPU proof: rejected because the physical A/B
+    measured higher driver and coreaudiod CPU for C++.
+- Readiness impact: this improves the next diagnostic window, not product
+  readiness. Quality, CPU superiority, Timecode Vinyl physical validation, and
+  branch promotion remain blocked.

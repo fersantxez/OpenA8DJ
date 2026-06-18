@@ -180,7 +180,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist FORCE
+.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -247,6 +247,11 @@ hal-hotpath-diagnostic:
 		HAL_TRANSFER_LEDGER=0 \
 		HAL_PLAYBACK_PAYLOAD_GUARD=0 \
 		HAL_CADENCE_DIAGNOSTIC=0
+
+hal-hotpath-diagnostic-candidate:
+	python3 scripts/build-hal-hotpath-diagnostic-candidate \
+		--candidate build/OpenA8DJ-hotpath-diagnostic.driver \
+		--json-out build/hal-candidates/hotpath-diagnostic-candidate.json
 
 hal-capture-batch-diagnostic:
 	$(MAKE) -B hal \

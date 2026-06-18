@@ -26,6 +26,13 @@ python3 scripts/build-hal-prepared-runtime-candidate \
 python3 scripts/check-hal-bundle-complete \
   --candidate build/OpenA8DJ-playback-scheduler.driver \
   --json-out "$EVIDENCE_DIR/hal-playback-scheduler-bundle-complete.json"
+python3 scripts/build-hal-hotpath-diagnostic-candidate \
+  --candidate build/OpenA8DJ-hotpath-diagnostic.driver \
+  --json-out "$EVIDENCE_DIR/hal-hotpath-diagnostic-candidate.json" \
+  >/dev/null
+python3 scripts/check-hal-bundle-complete \
+  --candidate build/OpenA8DJ-hotpath-diagnostic.driver \
+  --json-out "$EVIDENCE_DIR/hal-hotpath-diagnostic-bundle-complete.json"
 ./build/cpp-offline/opena8djcpp_usb_submit_plan_contract > "$EVIDENCE_DIR/usb-submit-plan-contract.json"
 ./build/cpp-offline/opena8djcpp_usb_submit_payload_contract > "$EVIDENCE_DIR/usb-submit-payload-contract.json"
 ./build/cpp-offline/opena8djcpp_prepared_usb_runtime_submit_contract > "$EVIDENCE_DIR/prepared-usb-runtime-submit-contract.json"
@@ -264,6 +271,7 @@ python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats
 python3 -m py_compile \
   scripts/check-hal-bundle-complete \
   scripts/build-hal-prepared-runtime-candidate \
+  scripts/build-hal-hotpath-diagnostic-candidate \
   scripts/physical-window-preflight \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
@@ -472,6 +480,10 @@ hal_prepared_runtime_bundle_complete = load_json("hal-prepared-runtime-bundle-co
 hal_playback_scheduler_candidate = load_json("hal-playback-scheduler-candidate.json")
 hal_playback_scheduler_bundle_complete = load_json(
     "hal-playback-scheduler-bundle-complete.json"
+)
+hal_hotpath_diagnostic_candidate = load_json("hal-hotpath-diagnostic-candidate.json")
+hal_hotpath_diagnostic_bundle_complete = load_json(
+    "hal-hotpath-diagnostic-bundle-complete.json"
 )
 stream_stats_contract = load_json("stream-stats-contract.json")
 prepared_runtime_physical_window_contract = load_json(
@@ -3109,6 +3121,47 @@ summary = {
         "status": hal_playback_scheduler_bundle_complete.get("result"),
         "candidate": hal_playback_scheduler_bundle_complete.get("candidate"),
         "evidence": "local-analysis/cpp-offline/hal-playback-scheduler-bundle-complete.json",
+    },
+    "hal_hotpath_diagnostic_candidate": {
+        "status": hal_hotpath_diagnostic_candidate.get("result"),
+        "candidate": hal_hotpath_diagnostic_candidate.get("candidate"),
+        "hot_path_timing_enabled": hal_hotpath_diagnostic_candidate.get(
+            "hot_path_timing_enabled"
+        ),
+        "hot_stream_stats_interval": hal_hotpath_diagnostic_candidate.get(
+            "hot_stream_stats_interval"
+        ),
+        "stream_stats_atomic_accumulators_enabled": hal_hotpath_diagnostic_candidate.get(
+            "stream_stats_atomic_accumulators_enabled"
+        ),
+        "transfer_ledger_enabled": hal_hotpath_diagnostic_candidate.get(
+            "transfer_ledger_enabled"
+        ),
+        "playback_payload_guard_enabled": hal_hotpath_diagnostic_candidate.get(
+            "playback_payload_guard_enabled"
+        ),
+        "cadence_diagnostic_enabled": hal_hotpath_diagnostic_candidate.get(
+            "cadence_diagnostic_enabled"
+        ),
+        "default_hal_restored": hal_hotpath_diagnostic_candidate.get(
+            "default_hal_restored"
+        ),
+        "candidate_hash_differs_from_default": hal_hotpath_diagnostic_candidate.get(
+            "candidate_hash_differs_from_default"
+        ),
+        "physical_evidence_present": hal_hotpath_diagnostic_candidate.get(
+            "physical_evidence_present"
+        ),
+        "product_claim_allowed": hal_hotpath_diagnostic_candidate.get(
+            "product_claim_allowed"
+        ),
+        "blocked_claim": hal_hotpath_diagnostic_candidate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-hotpath-diagnostic-candidate.json",
+    },
+    "hal_hotpath_diagnostic_bundle_complete": {
+        "status": hal_hotpath_diagnostic_bundle_complete.get("result"),
+        "candidate": hal_hotpath_diagnostic_bundle_complete.get("candidate"),
+        "evidence": "local-analysis/cpp-offline/hal-hotpath-diagnostic-bundle-complete.json",
     },
     "stream_stats_contract": {
         "status": stream_stats_contract.get("result"),

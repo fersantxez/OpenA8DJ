@@ -78,6 +78,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-candidate.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-bundle-complete.json",
+      root / "local-analysis/cpp-offline/hal-hotpath-diagnostic-candidate.json",
+      root / "local-analysis/cpp-offline/hal-hotpath-diagnostic-bundle-complete.json",
       root / "local-analysis/cpp-offline/packet-matrix.json",
       root / "local-analysis/cpp-offline/protocol-contract.json",
       root / "local-analysis/cpp-offline/simulated-output-matrix.json",
@@ -217,6 +219,13 @@ int main(int argc, char** argv) {
   const auto hal_playback_scheduler_bundle_complete =
       opena8djcpp::evidence_json::json_object(summary,
                                               "hal_playback_scheduler_bundle_complete")
+          .value_or("");
+  const auto hal_hotpath_diagnostic_candidate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_hotpath_diagnostic_candidate")
+          .value_or("");
+  const auto hal_hotpath_diagnostic_bundle_complete =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "hal_hotpath_diagnostic_bundle_complete")
           .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
@@ -559,6 +568,27 @@ int main(int argc, char** argv) {
       bool_field_is(hal_playback_scheduler_candidate, "product_claim_allowed", false) &&
       object_present(summary, "hal_playback_scheduler_bundle_complete") &&
       string_field_is(hal_playback_scheduler_bundle_complete, "status", "PASS") &&
+      object_present(summary, "hal_hotpath_diagnostic_candidate") &&
+      string_field_is(hal_hotpath_diagnostic_candidate, "status", "PASS") &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "hot_path_timing_enabled", true) &&
+      number_field_is(hal_hotpath_diagnostic_candidate, "hot_stream_stats_interval", 1.0) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate,
+                    "stream_stats_atomic_accumulators_enabled",
+                    true) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "transfer_ledger_enabled", false) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "playback_payload_guard_enabled", false) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "cadence_diagnostic_enabled", false) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "default_hal_restored", true) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate,
+                    "candidate_hash_differs_from_default",
+                    true) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_hotpath_diagnostic_candidate, "product_claim_allowed", false) &&
+      string_field_is(hal_hotpath_diagnostic_candidate,
+                      "blocked_claim",
+                      "NO_AUDIOPHILE_TIMING_OR_CPU_CLAIM_FROM_HOTPATH_DIAGNOSTIC_BUILD_WITHOUT_LOCK_GATED_PHYSICAL_EVIDENCE") &&
+      object_present(summary, "hal_hotpath_diagnostic_bundle_complete") &&
+      string_field_is(hal_hotpath_diagnostic_bundle_complete, "status", "PASS") &&
       object_present(summary, "runtime_adapter_contract") &&
       number_field_is(runtime_adapter_contract, "stable_usb_submit_reduction_ratio", 8.0) &&
       object_present(summary, "usb_submit_plan_contract") &&

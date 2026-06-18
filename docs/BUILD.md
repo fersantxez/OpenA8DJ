@@ -1389,6 +1389,25 @@ for a product claim until a lock-gated same-session physical A/B proves sound
 quality, CPU/resource behavior, routing, and Timecode Vinyl behavior against
 mainline.
 
+Hot-path timing diagnostic candidate:
+
+```sh
+make hal-hotpath-diagnostic-candidate
+```
+
+This writes `build/OpenA8DJ-hotpath-diagnostic.driver` and
+`build/hal-candidates/hotpath-diagnostic-candidate.json`. It enables
+`HAL_HOT_PATH_TIMING=1`, samples hot stream stats every completion, and uses
+atomic stream-stat accumulators only to attribute CPU in a controlled
+diagnostic window. It then rebuilds `build/OpenA8DJ.driver` so the default HAL
+stays conservative.
+
+This candidate is diagnostic-only. It is meant to answer where the current CPU
+cost lives in the capture/playback completion path. It is not the stable
+product candidate, not a route-quality fix, and not valid evidence that C++
+beats mainline unless a separate lock-gated same-session physical window proves
+quality, CPU, routing, and Timecode Vinyl behavior.
+
 Candidate evidence JSON must stay outside the `.driver` bundle. Writing extra
 files into the bundle root breaks the seal and can make the lock-gated safety
 installer fail codesign with `unsealed contents present in the bundle root`.

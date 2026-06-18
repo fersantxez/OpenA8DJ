@@ -15479,3 +15479,40 @@ Follow-up correction:
     submit cadence, but still failed absolute quality gates and regressed CPU.
   - This evidence blocks, rather than supports, a product/human readiness claim.
   - Timecode Vinyl remains physically unvalidated.
+
+## 2026-06-18 - Stable Load Hot-Path Diagnostic Candidate Offline Gates
+
+- Scope:
+  - Added and ran a build-only hot-path timing diagnostic candidate.
+  - Regenerated the full offline gate bundle.
+  - Did not install, unload, reload, play audio, record audio, change CoreAudio,
+    change USB, or touch hardware.
+- Commands:
+  - `python3 -m py_compile scripts/build-hal-hotpath-diagnostic-candidate`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `make hal-hotpath-diagnostic-candidate`
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `build/hal-candidates/hotpath-diagnostic-candidate.json`
+  - `local-analysis/cpp-offline/hal-hotpath-diagnostic-candidate.json`
+  - `local-analysis/cpp-offline/hal-hotpath-diagnostic-bundle-complete.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+- Result:
+  - Hot-path diagnostic candidate build: PASS.
+  - Candidate bundle: `build/OpenA8DJ-hotpath-diagnostic.driver`.
+  - Default HAL restored after diagnostic build: PASS.
+  - Candidate hash differs from default HAL: PASS.
+  - Debug CTest: `86/86` PASS.
+  - Release CTest: `87/87` PASS.
+  - Evidence schema: PASS with `required_files=109`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Offline summary: `status=PASS`, `diagnostic_status=PASS`.
+  - Provenance freshness before commit: FAIL as expected because the worktree
+    is dirty while this change is uncommitted.
+- Interpretation:
+  - The stable default HAL remains conservative.
+  - The hot-path timing bundle is ready only for a future lock-gated diagnostic
+    CPU attribution window.
+  - It is not product readiness, not mainline superiority, and not Timecode
+    Vinyl physical validation.

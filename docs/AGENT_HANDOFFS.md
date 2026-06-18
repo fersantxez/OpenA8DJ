@@ -5500,3 +5500,51 @@ Risks:
 Next action:
 - Use the new fields in a dedicated hot-timing diagnostic window only after a
   new transport candidate or explicit diagnostic window is justified.
+
+## 2026-06-18 Dewey: CPU Completion-Cost Review
+
+- Mission:
+  - Read-only analysis of why C++ CPU remains high even though capture submits
+    are lower than mainline.
+  - Warning given: PROHIBIDO tocar, editar, formatear, generar archivos,
+    limpiar, resetear, instalar o mutar cualquier cosa en
+    `/Users/fer/dev/opena8dj` o `/Users/fer/dev/audio8djrust`; solo escribir en
+    `/Users/fer/dev/audio8djcpp`; no tocar hardware/audio/CoreAudio/USB sin
+    lock global y ventana autorizada.
+- Findings:
+  - Lower submit count does not prove lower CPU because the C++ completion path
+    still does decode, validation, capture requeue, playback queue/fill, stream
+    stats, timeline access, and Objective-C/IOUSBHost enqueue work.
+  - Current physical CPU attribution is too coarse when hot-path timing samples
+    are absent.
+  - Do not repeat already rejected knobs: USB-clock/zero timestamp, large
+    capture batching, playback coalescing as a CPU shortcut, atomic stream
+    stats as default, or reused completions as readiness evidence.
+- Files affected by architect after handoff:
+  - `scripts/build-hal-hotpath-diagnostic-candidate`
+  - `scripts/run-cpp-offline-gates`
+  - `tools/evidence_schema_check.cpp`
+  - `Makefile`
+  - docs describing the diagnostic-only candidate.
+- Next action recommended:
+  - Use the hot-path diagnostic bundle only in a lock-gated diagnostic window to
+    collect nonzero timing attribution before choosing another CPU candidate.
+
+## 2026-06-18 Hubble: Physical Quality/Capture Review
+
+- Mission:
+  - Read-only analysis of the latest physical quality/capture failure.
+  - Same safety warning as above.
+- Findings:
+  - The latest physical quality failure points more strongly at post-USB
+    route/capture contamination than at payload digital corruption.
+  - Direct USB evidence remains clean while physical capture fails; the route
+    gate classifies the current shared route as unhealthy.
+  - CPU/scheduling remains a blocker, but the latest evidence does not prove it
+    is the primary cause of the observed physical residual/noise.
+- Files affected:
+  - None by the subagent.
+- Next action recommended:
+  - Revalidate the physical route under lock before using any human/product
+    listening result for promotion. Treat current route-based audio quality
+    measurements as diagnostic unless the route is revalidated.
