@@ -2835,4 +2835,10 @@ Current implication:
   `playbackCompletionDeltaOutliers=1514`. The HAL was force-unloaded and
   CoreAudio recovered. Do not use capture batching as a readiness or CPU-win
   argument.
+- Current route warning: a fresh rebuilt default one-stream HAL control also
+  failed on the same iRig route (`quality_alignment_score=0.842366`,
+  `analog_snr_db=-6.57`, `lag_jumps_gt_2_frames=37`) even with zero playback
+  completion outliers and zero underruns. This means the present hardware
+  route/timebase is degraded relative to earlier best evidence; product
+  comparison is blocked until route/timebase isolation passes.
 - Post-commit diagnostic A/B on `98ef928`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928` used real music and same-session mainline/C++ HAL runs. C++ improved relative music metrics over the dirty mainline bundle in that run (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`), but still failed product thresholds and used `--skip-known-good` because no separate wired non-Audio8 output was available for same-window iRig route validation. CPU was also worse for C++ (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`). Treat this as diagnostic learning only, not superiority evidence.

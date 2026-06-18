@@ -8270,3 +8270,30 @@ Next implication:
     same-window quality evidence remains stable.
 - Readiness impact: no CPU/resource, audiophile quality, timecode, or branch
   promotion claim may cite capture batching as positive evidence.
+
+## 2026-06-18 - Treat Current Route As Degraded After Default Control
+
+- Decision: block further product/performance comparisons until the physical
+  route/timebase is revalidated.
+- Reason: after rejecting capture batching, the rebuilt default one-stream HAL
+  also failed the same iRig route with `quality_alignment_score=0.842366`,
+  `analog_snr_db=-6.57`, and `lag_jumps_gt_2_frames=37`. That is materially
+  worse than the earlier best one-stream evidence and cannot be explained by
+  the capture-batch change.
+- Evidence:
+  - Default safety PASS:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hal-candidate-safety/20260618T092052Z-default-control-d3b6b28`
+  - Default control soundcheck:
+    `/Users/fer/dev/audio8djcpp/local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`
+  - Default control cleanup:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/20260618T092215Z-force-unload-default-control-d3b6b28`
+  - Offline failure-mode comparison:
+    `/Users/fer/dev/audio8djcpp/local-analysis/offline-diagnostics/20260618T0922-default-vs-capture-batch-failure-modes.json`
+- Technical interpretation: the default control had no playback completion
+  outlier storm and no output underruns, but still failed badly. The failure
+  mode analyzer rejected simple L/R swap, polarity, static matrix, and simple
+  nonlinearity explanations. This points back to route/timebase instability or
+  a capture-path state problem.
+- Readiness impact: do not run branch-promotion A/B, timecode-vinyl claim, or
+  CPU-superiority claim against the current route. The next physical window
+  must be route/timebase isolation, not optimization.

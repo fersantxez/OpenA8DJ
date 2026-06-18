@@ -12051,3 +12051,45 @@ Full offline gate after commit:
     and failed analog quality despite zero output underrun counters.
   - This candidate is rejected for product, performance, and branch-promotion
     purposes. It must not be used as evidence that C++ is better than mainline.
+
+## 2026-06-18 - Fresh Default Control Also Fails Current Route
+
+- Commit context: `d3b6b28` after documenting capture-batch rejection.
+- Safety:
+  - Rebuilt default HAL locally.
+  - Lock-gated candidate safety and iRig capture.
+  - Force-unloaded the HAL after the run and verified `opena8dj_state=unloaded`.
+- Default build:
+  - Command: `make -B hal`.
+  - Geometry: `HAL_OUTPUT_STREAMS=1`, `HAL_STREAM_USAGE=0`,
+    `HAL_CAPTURE_ISO_FRAMES=8`, `HAL_PLAYBACK_ISO_FRAMES=8`,
+    `HAL_PLAYBACK_CAPTURE_PACED=1`.
+- Safety/load:
+  - Command: `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 10 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hal-candidate-safety/20260618T092052Z-default-control-d3b6b28`
+  - Result: `hal_candidate_safety=PASS`.
+- Physical soundcheck:
+  - Command: `scripts/run-soundcheck --skip-build --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`
+  - Evidence: `/Users/fer/dev/audio8djcpp/local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`.
+  - Result: `FAIL`.
+  - Metrics: `quality_alignment_score=0.842366`, `analog_snr_db=-6.57`,
+    `lag_jumps_gt_2_frames=37`, `capture_clipped_frames=0`.
+  - Stream stats: default geometry was active; `playbackCompletionDeltaOutliers=0`,
+    `outputUnderruns=0`, `outputActiveUnderruns=0`.
+  - Offline failure-mode analysis:
+    `/Users/fer/dev/audio8djcpp/local-analysis/offline-diagnostics/20260618T0922-default-vs-capture-batch-failure-modes.json`.
+    Classification: `timebase_or_alignment_instability`,
+    `window_alignment_is_unstable_for_music`, `static_lr_mix_or_polarity_not_sufficient`,
+    and `simple_memoryless_nonlinearity_not_sufficient`.
+- Cleanup:
+  - Command: `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 8 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/20260618T092215Z-force-unload-default-control-d3b6b28`
+  - Result: `audio_stack_guard=PASS`, `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`.
+- Interpretation:
+  - Capture-batch remains rejected, but the fresh default control proves the
+    current physical measurement route/timebase is degraded relative to the
+    earlier best one-stream evidence. Today's route cannot support promotion
+    or a fair CPU/audio-quality comparison.
+  - The next hardware action should not be another optimization probe. It
+    should be a route/timebase isolation window that preserves iRig: idle iRig
+    capture, direct USB diagnostic on the same pair, and default HAL diagnostic
+    with dense stream stats/ledger, all unloaded afterward.
