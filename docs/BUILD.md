@@ -1088,6 +1088,20 @@ numerically close enough to the Python/SciPy oracle for the saved evidence
 covered by the parity gate. It is still not a CPU/resource superiority claim;
 real runtime submit reduction and same-session physical A/B remain required.
 
+The HAL prepared-submit adapter contract is:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_hal_prepared_submit_adapter_contract
+./build/cpp-release/opena8djcpp_hal_prepared_submit_adapter_contract
+```
+
+It models the current HAL logical ISO8 geometry through
+`PreparedUsbSubmitPlanner` and `PreparedUsbRequestPool`, expecting `528`
+logical slots to become `66` prepared USB submits with no partial submits,
+fallback allocations, payload mismatches, or request lifecycle leaks. Passing
+this guard is a prerequisite for a default-off runtime binding experiment, not
+a product, CPU, hardware, or DriverKit readiness claim.
+
 `scripts/run-cpp-offline-gates` runs CTest before generating all final JSON
 evidence, so it excludes `opena8djcpp_evidence_schema_check` from those early
 CTest sweeps and runs the schema check explicitly at the end after all evidence

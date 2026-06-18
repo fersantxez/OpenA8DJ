@@ -3877,3 +3877,43 @@ Risk:
     physical A/B must prove both resource use and audio quality.
   - Next action: integrate prepared submit into runtime as a compile-only,
     no-hardware slice before requesting any lock-gated physical comparison.
+
+## 2026-06-18 Architect Integration: HAL Prepared-Submit Adapter
+
+- Safety:
+  - Subagents were given the required warning:
+    `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+  - Mainline and Rust remained read-only.
+  - No hardware, audio, CoreAudio, USB runtime, driver install/reload, default
+    device change, playback, capture, sample-rate change, or buffer-size change
+    was performed.
+- Wegener (`019ed90e-0cee-7231-a4a9-038fba701235`):
+  - Mission: inspect the runtime/prepared-submit blocker.
+  - Finding: HAL still calls `enqueueIORequestWithData` directly for capture
+    and playback, while the prepared path exists only in offline/core and
+    DriverKit shell models.
+  - Recommendation: add a HAL prepared-submit adapter contract before changing
+    the live queue path.
+  - Integrated action: added
+    `opena8djcpp_hal_prepared_submit_adapter_contract`, integrated it into
+    CMake/CTest, the offline runner, schema check, static policy, and
+    `prepared_transport_migration_gate`.
+  - Risk: real runtime binding can still break buffer lifetime, first-frame
+    scheduling, completion timing, or physical quality.
+- Lagrange (`019ed90e-286e-72d0-b9a7-8dadda476a82`):
+  - Mission: summarize objective gaps for audiophile quality, functionality,
+    Timecode Vinyl, and low resource use.
+  - Finding: offline gates are healthy, but product claims remain blocked by
+    invalid current capture route evidence, missing same-session physical A/B,
+    missing physical Traktor/timecode vinyl validation, DriverKit SDK absence,
+    and worse current physical CPU than mainline.
+  - Integrated action: kept the new adapter contract as an offline bridge only;
+    no readiness claim was made.
+  - Next action: after this contract is committed and full offline gates are
+    fresh, bind the adapter default-off to real HAL or DriverKit USB submit
+    paths, then request a route-revalidation-only lock window before product
+    A/B.

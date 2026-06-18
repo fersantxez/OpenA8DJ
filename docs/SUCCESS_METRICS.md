@@ -69,6 +69,14 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   comparison. Historical route-only passes, built-in/acoustic output, and
   `--skip-known-good` diagnostic windows do not validate the capture route for
   promotion.
+- `opena8djcpp_hal_prepared_submit_adapter_contract` must pass before any
+  default-off runtime prepared-submit candidate is allowed. Required values:
+  `logical_slots=528`, `usb_submit_calls=66`, `total_bytes=185856`,
+  `total_frames=5808`, `max_live_requests<=4`, `partial_submit_calls=0`,
+  `fallback_allocations=0`, `planner_safe=true`, `request_pool_safe=true`,
+  `hal_geometry_preserved=true`, and `payload_equivalent=true`. This is an
+  offline migration prerequisite only; it does not prove lower CPU, audio
+  quality, Timecode Vinyl readiness, hardware readiness, or branch promotion.
 
 ### Mainline C Reference
 

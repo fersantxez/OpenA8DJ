@@ -91,6 +91,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
+      root / "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
       root / "local-analysis/cpp-offline/prepared-transport-pressure-gate.json",
       root / "local-analysis/cpp-offline/prepared-transport-migration-gate.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
@@ -151,6 +152,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "usb_submit_plan_contract").value_or("");
   const auto usb_submit_payload_contract =
       opena8djcpp::evidence_json::json_object(summary, "usb_submit_payload_contract").value_or("");
+  const auto hal_prepared_submit_adapter_contract =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_submit_adapter_contract")
+          .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
           .value_or("");
@@ -250,6 +254,22 @@ int main(int argc, char** argv) {
       object_present(summary, "usb_submit_payload_contract") &&
       number_field_is(usb_submit_payload_contract, "descriptors", 66.0) &&
       number_field_is(usb_submit_payload_contract, "total_frames", 5808.0) &&
+      object_present(summary, "hal_prepared_submit_adapter_contract") &&
+      number_field_is(hal_prepared_submit_adapter_contract, "logical_slots", 528.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "capture_logical_slots", 264.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "playback_logical_slots", 264.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "usb_submit_calls", 66.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "partial_submit_calls", 0.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "total_bytes", 185856.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "total_frames", 5808.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "request_submit_calls", 66.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "request_completion_calls", 66.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "request_recycle_calls", 66.0) &&
+      number_field_is(hal_prepared_submit_adapter_contract, "fallback_allocations", 0.0) &&
+      bool_field_is(hal_prepared_submit_adapter_contract, "planner_safe", true) &&
+      bool_field_is(hal_prepared_submit_adapter_contract, "request_pool_safe", true) &&
+      bool_field_is(hal_prepared_submit_adapter_contract, "hal_geometry_preserved", true) &&
+      bool_field_is(hal_prepared_submit_adapter_contract, "payload_equivalent", true) &&
       object_present(summary, "driverkit_usb_submit_binding_contract") &&
       number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&

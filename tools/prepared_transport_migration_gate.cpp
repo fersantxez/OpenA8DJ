@@ -251,6 +251,8 @@ int main(int argc, char** argv) {
   const auto runtime_adapter = read_file(base / "runtime-adapter-contract.json");
   const auto usb_submit_plan = read_file(base / "usb-submit-plan-contract.json");
   const auto usb_submit_payload = read_file(base / "usb-submit-payload-contract.json");
+  const auto hal_prepared_submit_adapter =
+      read_file(base / "hal-prepared-submit-adapter-contract.json");
   const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
@@ -284,6 +286,16 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(usb_submit_payload, "total_bytes"));
   const double usb_payload_total_frames =
       number_or_nan(json_number(usb_submit_payload, "total_frames"));
+  const double hal_adapter_logical_slots =
+      number_or_nan(json_number(hal_prepared_submit_adapter, "logical_slots"));
+  const double hal_adapter_submit_calls =
+      number_or_nan(json_number(hal_prepared_submit_adapter, "usb_submit_calls"));
+  const double hal_adapter_total_bytes =
+      number_or_nan(json_number(hal_prepared_submit_adapter, "total_bytes"));
+  const double hal_adapter_total_frames =
+      number_or_nan(json_number(hal_prepared_submit_adapter, "total_frames"));
+  const double hal_adapter_max_live =
+      number_or_nan(json_number(hal_prepared_submit_adapter, "max_live_requests"));
   const double transport_gap =
       number_or_nan(json_number(driverkit_prepared, "max_completion_gap_ratio"));
   const double fixed_to_fill =
@@ -386,6 +398,28 @@ int main(int argc, char** argv) {
       number_is_zero(usb_submit_payload, "descriptor_frame_mismatches") &&
       number_is_zero(usb_submit_payload, "direction_order_errors") &&
       number_is_zero(usb_submit_payload, "timestamp_mismatches");
+  const bool hal_prepared_submit_adapter_safe =
+      result_pass(hal_prepared_submit_adapter) &&
+      json_bool(hal_prepared_submit_adapter, "planner_safe").value_or(false) &&
+      json_bool(hal_prepared_submit_adapter, "request_pool_safe").value_or(false) &&
+      json_bool(hal_prepared_submit_adapter, "hal_geometry_preserved").value_or(false) &&
+      json_bool(hal_prepared_submit_adapter, "payload_equivalent").value_or(false) &&
+      finite(hal_adapter_logical_slots) && hal_adapter_logical_slots == 528.0 &&
+      finite(hal_adapter_submit_calls) && hal_adapter_submit_calls == 66.0 &&
+      finite(hal_adapter_total_bytes) && hal_adapter_total_bytes == 185856.0 &&
+      finite(hal_adapter_total_frames) && hal_adapter_total_frames == 5808.0 &&
+      finite(hal_adapter_max_live) && hal_adapter_max_live <= 4.0 &&
+      number_is_zero(hal_prepared_submit_adapter, "partial_submit_calls") &&
+      number_is_zero(hal_prepared_submit_adapter, "fallback_allocations") &&
+      number_is_zero(hal_prepared_submit_adapter, "check_errors") &&
+      number_is_zero(hal_prepared_submit_adapter, "panic_flags") &&
+      number_is_zero(hal_prepared_submit_adapter, "output_overflows") &&
+      number_is_zero(hal_prepared_submit_adapter, "prefix_mismatches") &&
+      number_is_zero(hal_prepared_submit_adapter, "descriptor_byte_mismatches") &&
+      number_is_zero(hal_prepared_submit_adapter, "descriptor_frame_mismatches") &&
+      number_is_zero(hal_prepared_submit_adapter, "direction_order_errors") &&
+      number_is_zero(hal_prepared_submit_adapter, "timestamp_mismatches") &&
+      number_is_zero(hal_prepared_submit_adapter, "sequence_mismatches");
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -490,6 +524,7 @@ int main(int argc, char** argv) {
       {"runtime_adapter_batched_submit_counters_exposed", runtime_adapter_batching_exposed},
       {"usb_submit_descriptor_plan_safe", usb_submit_plan_safe},
       {"usb_submit_payload_plan_safe", usb_submit_payload_safe},
+      {"hal_prepared_submit_adapter_safe", hal_prepared_submit_adapter_safe},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -533,6 +568,11 @@ int main(int argc, char** argv) {
   print_number("usb_submit_payload_descriptors", usb_payload_descriptors);
   print_number("usb_submit_payload_total_bytes", usb_payload_total_bytes);
   print_number("usb_submit_payload_total_frames", usb_payload_total_frames);
+  print_number("hal_prepared_submit_adapter_logical_slots", hal_adapter_logical_slots);
+  print_number("hal_prepared_submit_adapter_usb_submit_calls", hal_adapter_submit_calls);
+  print_number("hal_prepared_submit_adapter_total_bytes", hal_adapter_total_bytes);
+  print_number("hal_prepared_submit_adapter_total_frames", hal_adapter_total_frames);
+  print_number("hal_prepared_submit_adapter_max_live_requests", hal_adapter_max_live);
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

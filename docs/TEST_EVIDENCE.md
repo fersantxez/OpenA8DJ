@@ -11264,3 +11264,54 @@ Full offline gate after commit:
     Product quality, real runtime CPU/resource superiority, Traktor/timecode
     vinyl readiness, and branch promotion remain blocked until their physical
     gates pass.
+
+## 2026-06-18 HAL Prepared-Submit Adapter Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_hal_prepared_submit_adapter_contract`.
+  - The contract models current HAL geometry into `PreparedUsbSubmitPlanner`
+    and `PreparedUsbRequestPool` without touching HAL install state, CoreAudio,
+    USB, audio devices, playback, capture, defaults, sample rate, or buffer
+    size.
+  - Integrated the contract into CMake/CTest, `scripts/run-cpp-offline-gates`,
+    `opena8djcpp_prepared_transport_migration_gate`,
+    `opena8djcpp_static_policy_check`, and `opena8djcpp_evidence_schema_check`.
+- Focused commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_submit_adapter_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_submit_adapter_contract`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(hal_prepared_submit_adapter_contract|static_policy_check)' --output-on-failure`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_migration_gate`
+- Focused result:
+  - HAL prepared-submit adapter contract: `PASS`.
+  - Release focused CTest: `2/2 PASS`.
+  - Migration gate includes `hal_prepared_submit_adapter_safe=PASS`.
+- Key metrics:
+  - `logical_slots=528`.
+  - `capture_logical_slots=264`.
+  - `playback_logical_slots=264`.
+  - `usb_submit_calls=66`.
+  - `partial_submit_calls=0`.
+  - `capture_descriptors=33`.
+  - `playback_descriptors=33`.
+  - `total_bytes=185856`.
+  - `total_frames=5808`.
+  - `request_submit_calls=66`.
+  - `request_completion_calls=66`.
+  - `request_recycle_calls=66`.
+  - `max_live_requests=4`.
+  - `fallback_allocations=0`.
+  - `payload_equivalent=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+- Interpretation:
+  - This closes an offline bridge gap between HAL geometry and prepared USB
+    submit descriptors.
+  - It does not prove lower CPU, better sound, Timecode Vinyl readiness, real
+    DriverKit readiness, hardware readiness, or branch promotion. Those remain
+    blocked until the adapter is bound to real HAL/DriverKit USB and wins
+    lock-gated same-session physical A/B after route revalidation.

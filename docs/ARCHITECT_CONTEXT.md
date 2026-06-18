@@ -9,6 +9,15 @@ Branch: `driverkit/cpp-redesign`
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.
 - `/Users/fer/dev/opena8dj` is the C/Objective-C mainline and is read-only for this effort.
 - `/Users/fer/dev/audio8djrust` is the Rust experiment and is read-only for this effort.
+- 2026-06-18 prepared-submit integration status: C++ now has an offline
+  `opena8djcpp_hal_prepared_submit_adapter_contract` that models the current
+  HAL geometry into `PreparedUsbSubmitPlanner` plus `PreparedUsbRequestPool`.
+  The focused contract passes with `528` logical slots, `66` USB submits,
+  `185856` bytes, `5808` frames, max live requests `4`, no partial submits, no
+  fallback allocations, and payload equivalence. This closes one offline bridge
+  gap but does not change the live HAL runtime yet; `hal_transport_runtime_gate`
+  must continue blocking CPU/product claims until the adapter is bound to real
+  HAL or DriverKit USB and same-session physical A/B passes.
 - 2026-06-17 status: C++ is not ready for branch promotion or physical
   readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
   improvement over mainline. ISO8/current-cadence builds remain high CPU and

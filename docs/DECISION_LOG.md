@@ -1,5 +1,46 @@
 # Decision Log
 
+## 2026-06-18: Add HAL Prepared-Submit Adapter Contract Before Runtime Mutation
+
+Decision:
+- Add an offline `opena8djcpp_hal_prepared_submit_adapter_contract` before
+  changing the live HAL `enqueueIORequestWithData` path.
+- Require this contract inside `opena8djcpp_prepared_transport_migration_gate`.
+- Keep CPU/resource and product-quality claims blocked until the adapter is
+  bound to real HAL or DriverKit USB and then wins a same-session physical A/B.
+
+Reason:
+- Current performance evidence is blocked because HAL still submits USB
+  directly from capture/playback paths.
+- Existing prepared-submit models prove batching in abstract DriverKit/core
+  contracts, but the next risk is preserving HAL geometry, request lifecycle,
+  timestamps, and payload bytes when bridging toward the real runtime.
+- A small offline adapter contract gives objective pass/fail evidence before
+  touching hardware, CoreAudio, USB, or driver install state.
+
+Evidence:
+- Focused run:
+  `opena8djcpp_hal_prepared_submit_adapter_contract` PASS.
+- Key metrics:
+  `logical_slots=528`, `usb_submit_calls=66`, `total_bytes=185856`,
+  `total_frames=5808`, `max_live_requests=4`,
+  `partial_submit_calls=0`, `fallback_allocations=0`,
+  `payload_equivalent=true`.
+- Migration gate now includes `hal_prepared_submit_adapter_safe=PASS`.
+
+Alternatives discarded:
+- Editing the live HAL queue path first: rejected because it risks changing
+  buffer lifetime, first-frame scheduling, and completion behavior before the
+  bridge is proven offline.
+- Treating existing DriverKit submit contracts as enough: rejected because they
+  did not explicitly represent the HAL geometry boundary that is blocking the
+  real CPU claim.
+
+Next implication:
+- The next implementation step is a default-off runtime binding of this
+  adapter to real HAL or DriverKit USB submit paths, followed by a lock-gated
+  physical A/B only after the route is revalidated.
+
 ## 2026-06-17/18: Reject Current C++ HAL Physical Candidate Again
 
 Decision:
