@@ -1,5 +1,39 @@
 # Test Evidence
 
+## 2026-06-18: Full Offline Gates After Guarded HAL Prepared Runtime Profile
+
+- Scope:
+  - Full offline build/test/evidence generation from the C++ worktree.
+  - No hardware, CoreAudio runtime, USB reset, driver install, driver load,
+    playback, capture, default-device change, sample-rate change, or buffer
+    change.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Overall summary: `PASS`.
+  - Debug CTest: `73/73` passed.
+  - Release CTest: `74/74` passed.
+  - Evidence schema: `77` required files, `0` missing.
+  - Provenance: evidence matched current HEAD and clean worktree.
+  - Safety flags: `hardware_touched=false`, `coreaudio_touched=false`,
+    `usb_touched=false`.
+  - Product readiness remains `FAIL`, branch promotion remains blocked, and
+    physical measurement is not valid for promotion.
+  - New prepared-runtime source contract passed, but
+    `hal_transport_runtime_gate` still reports
+    `runtime_reduction_missing=true` and
+    `hal_prepared_runtime_physical_evidence_present=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json`
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+- Interpretation:
+  - The C++ line is objectively healthier offline and now has a controlled
+    opt-in HAL prepared runtime profile, but it still has not proven better
+    sound quality, Timecode Vinyl behavior, or lower CPU/resource use than
+    mainline.
+
 ## 2026-06-18: HAL Prepared Runtime Source Contract And Opt-In Build
 
 - Scope:
