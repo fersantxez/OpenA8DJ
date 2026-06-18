@@ -4112,3 +4112,71 @@ Risks:
 Next action:
 - Commit this bridge, rerun full offline gates from the clean HEAD, then request
   only a lock-gated route/safety window before any product A/B.
+
+## 2026-06-18 Schrodinger: HAL Physical Timing Split
+
+Subagent:
+- `019ed9f8-7802-7cd0-b905-5eaa84551eb1` (`Schrodinger`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Explain why direct USB can show zero lag jumps while HAL physical capture
+  still shows lag jumps and low SNR.
+
+Findings:
+- The current failure should be split into two issues:
+  - HAL/CoreAudio/USB timing mismatch and capture-paced playback can introduce
+    lag instability.
+  - The physical/iRig route still has low SNR/residual even when direct USB
+    payloads are internally clean.
+- Existing HAL stream stats show the USB clock anchor remains invalid/fallback
+  in recent runs; direct USB does not prove the HAL timebase is sound.
+
+Integrated action:
+- Used the finding to avoid a blind quality claim and to keep the next physical
+  window diagnostic-only.
+
+Risk:
+- A physical run may still fail because the route/SNR problem is independent of
+  HAL submit cadence.
+
+Next action:
+- For the next lock-gated diagnostic, record direct USB and HAL evidence with
+  dense stream stats and compare written/consumed/packed/captured paths.
+
+## 2026-06-18 Bohr: HAL CPU Enqueue Reduction Options
+
+Subagent:
+- `019ed9f8-58e6-7711-9740-eeb62e7da36c` (`Bohr`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Identify lower-risk ways to reduce HAL CPU without repeating rejected
+  physical experiments.
+
+Findings:
+- The main CPU hotspot is IOUSBHost async enqueue cadence, not packing.
+- Lowest-risk next option: batch capture transfers while preserving playback
+  ISO8 cadence. This should reduce capture submits without repeating the
+  playback coalescing failure.
+- Do not repeat global ISO64, playback coalescing, raw/reused completion-only
+  probes, stats-off, output-only no-capture, ignore-sample-time, flush-write, or
+  prepared runtime as default.
+
+Integrated action:
+- Implemented opt-in `hal-capture-batch-diagnostic`.
+- Updated `queueCapturePacedPlaybackWithRequests` so large capture completions
+  are split into logical playback ISO8 submits when playback coalescing is off.
+- Strengthened `opena8djcpp_hal_logical_capture_batching_contract`.
+
+Risk:
+- Capture batching could still affect DVS/timecode input granularity or HAL
+  capture timing. It needs physical metrics before any claim.
+
+Next action:
+- Commit and rerun freshness gates, then run a short lock-gated diagnostic only
+  if the lock is available.

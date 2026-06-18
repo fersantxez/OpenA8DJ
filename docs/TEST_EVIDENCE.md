@@ -11956,3 +11956,54 @@ Full offline gate after commit:
   - C++ result: `quality_alignment_score=0.932726`, `snr_floor_db=5.004064`, `lag_jumps_gt_2_frames=24`, `driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`, no clipping.
   - Same-session comparison: `same-session-physical-compare.json` reported `result=FAIL`, `branch_promotion_supported=false`. C++ improved alignment/SNR/residual ratios over this mainline run, but failed quiet-noise, CPU/resource, submit-rate observability, and both C++/Python audiophile WAV pass requirements.
   - Promotion readiness: `promotion-readiness.json` reported `result=FAIL`; blockers included skipped same-window known-good route, unvalidated capture route, physical music quality below thresholds, runtime CPU above threshold, same-session compare failure, and no physical Traktor/timecode-vinyl evidence.
+
+## 2026-06-18 - Capture-Batch Diagnostic Candidate Offline Evidence
+
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety: offline build/source/CTest only; no hardware, no CoreAudio device
+  changes, no USB reset, no driver install/load, no default device change. The
+  mainline and Rust worktrees remained read-only.
+- Rationale:
+  - Driver CPU remains blocked by IOUSBHost async enqueue cadence.
+  - Prior playback coalescing and global ISO64 reduced submit cadence at the
+    cost of severe physical quality regressions.
+  - The new candidate isolates capture batching while preserving playback ISO8
+    cadence.
+- Source/build changes:
+  - `src/hal/OpenA8DJUSB.m`: `queueCapturePacedPlaybackWithRequests` no longer
+    forwards a large capture batch as one playback submit when
+    `kPlaybackCoalesceTransfers <= 1`; it always chunks to
+    `kPlaybackIsoFramesPerTransfer`.
+  - `Makefile`: added `hal-capture-batch-diagnostic` with
+    `HAL_CAPTURE_ISO_FRAMES=64`, `HAL_PLAYBACK_ISO_FRAMES=8`,
+    `HAL_PLAYBACK_COALESCE_TRANSFERS=1`, and prepared runtime disabled.
+  - `tools/hal_logical_capture_batching_contract.cpp`: now fails if the old
+    direct-return behavior reappears and requires the diagnostic target.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_hal_runtime_geometry_observability_contract`
+  - `make hal-capture-batch-diagnostic`
+  - `./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract`
+  - `./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_hal_logical_capture_batching_contract|opena8djcpp_hal_runtime_geometry_observability_contract' --output-on-failure`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused build: PASS.
+  - `make hal-capture-batch-diagnostic`: PASS.
+  - `opena8djcpp_hal_logical_capture_batching_contract`: PASS with
+    `makefile_exposes_capture_batch_diagnostic=true` and
+    `playback_logical_batcher_still_chunks=true`.
+  - `opena8djcpp_hal_runtime_geometry_observability_contract`: PASS.
+  - Focused CTest: `2/2` PASS.
+  - Full offline gates: script exited `0`; Debug CTest `77/77` PASS, Release
+    CTest `78/78` PASS. The freshness gate reported `result=FAIL` only because
+    this patch set was not yet committed, correctly blocking current-candidate
+    claims.
+- Readiness impact:
+  - No product quality, CPU/resource, Traktor/timecode, or branch-promotion
+    claim is allowed from this evidence.
+  - The next physical action, if taken, must be lock-gated and diagnostic:
+    install/load only the capture-batch candidate, run a short iRig Pair A
+    capture, require active runtime geometry in stream stats, verify capture
+    submit rate reduction, verify playback submit cadence did not coalesce, and
+    unload/clean up afterward.

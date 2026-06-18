@@ -8207,3 +8207,34 @@ Next implication:
 - Reason: the window intentionally used `--skip-known-good` because current CoreAudio inventory exposed no separate wired non-Audio8 output device for same-window iRig route validation. That violates the promotion requirement even though the A/B itself was useful.
 - Evidence summary: C++ beat the same-session dirty mainline bundle on several relative music metrics (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`) but still failed absolute quality (`0.98` alignment and `35 dB` SNR required), lag-jump (`24`), quiet-noise, dual audiophile analyzer pass, and CPU/resource gates (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`).
 - Readiness impact: keep C++ as the active development candidate, but no branch promotion, no hardware readiness claim, and no timecode-vinyl claim until a validated same-window route plus physical Traktor/timecode and CPU/resource gates pass.
+
+## 2026-06-18 - Add Opt-In Capture Batch Diagnostic Without Playback Coalescing
+
+- Decision: add an opt-in `hal-capture-batch-diagnostic` build profile and
+  change capture-paced playback batching so large capture completions are
+  split back into logical playback ISO8 submits when
+  `HAL_PLAYBACK_COALESCE_TRANSFERS=1`.
+- Reason: the current CPU profile is dominated by IOUSBHost async enqueue
+  cadence. Prior global ISO64 and playback-coalescing experiments reduced
+  submit pressure but destroyed physical quality. The safer next variable is
+  capture-only batching: reduce capture submit cadence while preserving the
+  known less-bad playback cadence.
+- Alternatives rejected:
+  - Global ISO64/default change: already physically rejected for quality.
+  - Playback coalescing as default: already physically rejected for cadence and
+    quality.
+  - Stats-only cleanup: insufficient; previous stats-off runs did not solve CPU
+    or quality.
+  - USB clock anchor plus explicit scheduling: rejected as a combo by physical
+    evidence; any future anchor probe must be isolated from explicit scheduling.
+- Evidence:
+  - `make hal-capture-batch-diagnostic`: PASS build-only, no install/load.
+  - `opena8djcpp_hal_logical_capture_batching_contract`: PASS.
+  - `opena8djcpp_hal_runtime_geometry_observability_contract`: PASS.
+  - `./scripts/run-cpp-offline-gates`: Debug `77/77` PASS and Release `78/78`
+    PASS; provenance intentionally failed before commit because the worktree
+    was dirty, blocking claims.
+- Readiness impact: this is not product readiness and not a CPU/resource claim.
+  The next allowed hardware step is a short lock-gated diagnostic of the
+  capture-batch candidate, verifying submit-rate reduction, no qfail storm,
+  preserved iRig capture, and physical quality not worse before any broader A/B.

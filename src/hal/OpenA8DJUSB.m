@@ -5944,10 +5944,6 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return NO;
     }
 
-    if (kPlaybackCoalesceTransfers <= 1) {
-        return [self queuePlaybackWithRequests:requests count:count];
-    }
-
     while (count > 0) {
         if (_pendingPlaybackRequestCount > 0) {
             NSUInteger room = kPlaybackIsoFramesPerTransfer - _pendingPlaybackRequestCount;

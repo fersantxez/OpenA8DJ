@@ -87,7 +87,17 @@ int main(int argc, char** argv) {
                "[self queuePlaybackWithRequests:_pendingPlaybackRequests\n"
                "                                                    count:kPlaybackIsoFramesPerTransfer]") &&
       !contains(hal_source,
+                "if (kPlaybackCoalesceTransfers <= 1) {\n"
+                "        return [self queuePlaybackWithRequests:requests count:count];\n"
+                "    }") &&
+      !contains(hal_source,
                 "_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer");
+  const bool makefile_exposes_capture_batch_diagnostic =
+      contains(makefile, "hal-capture-batch-diagnostic:") &&
+      contains(makefile, "HAL_CAPTURE_ISO_FRAMES=64") &&
+      contains(makefile, "HAL_PLAYBACK_ISO_FRAMES=8") &&
+      contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS=1") &&
+      contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME=0");
 
   std::vector<std::string> failures;
   if (!source_present) failures.push_back("hal_source_missing");
@@ -104,6 +114,9 @@ int main(int argc, char** argv) {
   }
   if (!playback_logical_batcher_still_chunks) {
     failures.push_back("playback_logical_chunker_missing");
+  }
+  if (!makefile_exposes_capture_batch_diagnostic) {
+    failures.push_back("capture_batch_diagnostic_target_missing");
   }
 
   const bool pass = failures.empty();
@@ -130,6 +143,9 @@ int main(int argc, char** argv) {
       << (capture_paced_playback_accepts_full_batch ? "true" : "false") << ",\n"
       << "  \"playback_logical_batcher_still_chunks\": "
       << (playback_logical_batcher_still_chunks ? "true" : "false") << ",\n";
+  std::cout
+      << "  \"makefile_exposes_capture_batch_diagnostic\": "
+      << (makefile_exposes_capture_batch_diagnostic ? "true" : "false") << ",\n";
   print_string_array("failures", failures);
   std::cout
       << ",\n"

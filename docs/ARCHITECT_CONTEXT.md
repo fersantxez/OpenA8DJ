@@ -9,6 +9,13 @@ Branch: `driverkit/cpp-redesign`
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.
 - `/Users/fer/dev/opena8dj` is the C/Objective-C mainline and is read-only for this effort.
 - `/Users/fer/dev/audio8djrust` is the Rust experiment and is read-only for this effort.
+- 2026-06-18 capture-batch diagnostic status: C++ now has an opt-in HAL build
+  profile, `make hal-capture-batch-diagnostic`, that keeps logical playback at
+  ISO8 while batching capture at `HAL_CAPTURE_ISO_FRAMES=64`. The default HAL
+  remains ISO8. Focused contracts and full offline gates pass, but no
+  CPU/resource or sound-quality claim is allowed until a lock-gated physical
+  diagnostic proves capture submit reduction, no playback coalescing regression,
+  preserved iRig capture, and no quality regression.
 - 2026-06-18 prepared-submit integration status: C++ now has an offline
   `opena8djcpp_hal_prepared_submit_adapter_contract` that models the current
   HAL geometry into `PreparedUsbSubmitPlanner` plus `PreparedUsbRequestPool`.
