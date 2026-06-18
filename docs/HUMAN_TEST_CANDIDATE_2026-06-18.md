@@ -407,3 +407,46 @@ Next candidate requirements before another human load:
   structural packet checks.
 - Prove HAL input stream delivery to the CoreAudio client path used by Traktor
   and preserve A/B/C/D deck mapping.
+
+## 19:00 EDT Current Human Diagnostic Candidate
+
+Decision: `OUTPUT1_START2_DIAGNOSTIC_RETEST_ACTIVE`.
+
+Human feedback on the prior recovery load:
+
+- Traktor Timecode Vinyl/Scratch Control is now excellent: syncs and responds.
+- VLC produced no audible output.
+- ChatGPT dictation via MacBook microphone produced only a pulse and strange
+  noise.
+
+Candidate currently loaded:
+
+- `build/OpenA8DJ-traktor-recovery-output1-start2.driver`
+- Installed hash:
+  `8ce0163f66c6dd5a6c3d163c3270e5fef9fb1333f70e8694b7bd7aedf4cbb6a5`
+- Evidence:
+  `local-analysis/human-feedback/20260618T2259Z-vlc-output1-start2-load`
+
+What changed:
+
+- Kept the known-good Traktor input shape: one 8-channel input stream.
+- Switched output to one 8-channel output stream so ordinary CoreAudio clients
+  have one clear output buffer.
+- Kept `timecode-vinyl`, strict idle silence, touched-output flush, and
+  `output-start-byte=2`.
+
+Current objective evidence:
+
+- Safety load PASS.
+- Audio 8 DJ visible as `8 in / 8 out`.
+- iRig Stream and MacBook microphone visible.
+- Timecode profile applied.
+- Client I/O probe PASS: `outputPeak=0.01500000`, `outputFrames=48128`.
+- Runtime output counters: no underruns, no active underruns, no panic flags.
+- Final guard PASS with `coreaudiod=0.0%` and `opena8dj_driver=0.0%`.
+
+Retest order:
+
+1. VLC playback on Audio 8.
+2. Traktor Scratch Control remains locked/responsive.
+3. ChatGPT dictation with MacBook microphone no longer produces pulse/noise.

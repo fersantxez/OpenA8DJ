@@ -87,6 +87,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidate", default="build/OpenA8DJ-traktor-recovery.driver")
     parser.add_argument("--json-out", default="build/hal-candidates/traktor-recovery-candidate.json")
+    parser.add_argument("--output-streams", choices=("1", "4"), default="4")
     parser.add_argument("--stream-usage", choices=("0", "1"), default="0")
     parser.add_argument("--flush-touched-output", choices=("0", "1"), default="1")
     parser.add_argument("--output-start-byte", choices=("2", "4"), default="4")
@@ -105,7 +106,7 @@ def main() -> int:
             "make",
             "-B",
             "hal",
-            "HAL_OUTPUT_STREAMS=4",
+            f"HAL_OUTPUT_STREAMS={args.output_streams}",
             "HAL_INPUT_STREAMS=1",
             "HAL_INPUT_IO=1",
             "HAL_INPUT_DECODE=1",
@@ -177,7 +178,7 @@ def main() -> int:
         "candidate": str(candidate),
         "input_streams": 1,
         "input_channels": 8,
-        "output_streams": 4,
+        "output_streams": int(args.output_streams),
         "output_channels": 8,
         "stream_usage_enabled": args.stream_usage == "1",
         "flush_touched_output_enabled": args.flush_touched_output == "1",

@@ -10386,3 +10386,33 @@ Next implication:
   The next candidate must explicitly prove silence handling, output packet
   correctness against audible fixtures, and input stream delivery before it is
   reloaded for another human test.
+
+## 2026-06-18 - Prefer Output1 Start2 Diagnostic Candidate After VLC Silence
+
+- Decision: load the hybrid `OpenA8DJ-traktor-recovery-output1-start2.driver`
+  for the next human retest.
+- Reason: human feedback showed a clear split: Timecode Vinyl on the
+  1x8-input recovery candidate works very well, but VLC produced no sound.
+  The `streamusage1` attempt caused a `coreaudiod` CPU spike and is unsafe.
+  A single 8-channel output stream is the most conservative way to give normal
+  CoreAudio clients one unambiguous output buffer while preserving the 1x8
+  input surface that made Traktor/timecode work.
+- Evidence:
+  - `local-analysis/human-feedback/20260618T2253Z-vlc-output-fix-streamusage1-load`
+    shows `streamusage1` rejected with `coreaudiod` around 101% CPU, followed
+    by automatic recovery PASS.
+  - `local-analysis/human-feedback/20260618T2259Z-vlc-output1-start2-load`
+    shows safety load PASS for the hybrid output candidate.
+  - `local-analysis/human-feedback/20260618T2259Z-vlc-output1-start2-load/audio-io-client-probe`
+    shows a client-side output probe PASS with `outputPeak=0.01500000`,
+    `outputFrames=48128`, and no runtime output underruns.
+- Alternatives rejected:
+  - Keep `streamusage1`: rejected because it is unsafe under the current gate.
+  - Keep four output streams as the only retest path: rejected because VLC/no
+    sound points to ordinary-client compatibility risk.
+  - Declare quality fixed from client counters: rejected because headphone
+    listening is still required and the prior candidate had severe audible
+    artifacts.
+- Readiness impact: allows a focused human diagnostic retest only. It does not
+  allow product readiness, superiority, CPU/resource superiority, or branch
+  promotion claims.

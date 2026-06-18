@@ -15887,3 +15887,48 @@ Follow-up offline verification:
   intentionally reports two global streams (`1 input + 1 output`). This is a
   smoke-tool expectation gap, not evidence against the loaded Traktor recovery
   candidate, whose own smoke/parity passed with five global streams.
+
+## 2026-06-18 - Human Retest Feedback And VLC Output Recovery Iteration
+
+- Scope:
+  - Captured human feedback on the loaded Traktor recovery candidate:
+    Timecode Vinyl/Scratch Control now syncs and feels responsive, but VLC
+    produced no audible output.
+  - Also captured a side effect report: ChatGPT dictation using the MacBook
+    microphone recorded only a pulse and strange noise.
+  - Tried the prepared `streamusage1` candidate and rejected it automatically
+    because the safety gate observed `coreaudiod` at about 101% CPU during
+    enumeration.
+  - Loaded `start2` safely, then built and loaded a hybrid
+    `output1-start2` candidate to keep the one 8-channel input stream that
+    made Traktor work while exposing one 8-channel output buffer for ordinary
+    clients such as VLC.
+- Evidence:
+  - `local-analysis/human-feedback/20260618T2253Z-vlc-output-fix-streamusage1-load`
+  - `local-analysis/human-feedback/20260618T2256Z-vlc-output-fix-start2-load`
+  - `local-analysis/human-feedback/20260618T2259Z-vlc-output1-start2-load`
+  - `build/hal-candidates/traktor-recovery-output1-start2-candidate.json`
+- Result:
+  - `streamusage1`: FAIL, recovered automatically, HAL unloaded, post-recovery
+    audio-stack guard PASS.
+  - `start2`: PASS safety load, timecode-vinyl profile applied, input stats
+    remained nonzero on A/B/C/D, final guard PASS.
+  - `output1-start2`: PASS safety load, exposes `8 in / 8 out` as one input
+    stream and one output stream, timecode-vinyl profile applied, final guard
+    PASS.
+  - Low-level CoreAudio output client probe on `output1-start2`: PASS with
+    `callbacks=94`, `outputFrames=48128`, `outputSamples=385024`, and
+    `outputPeak=0.01500000`.
+  - Runtime driver counters after the client probe: no output underruns, no
+    active underruns, no output panic flags, `coreaudiod=0.0%`, and
+    `opena8dj_driver=0.0%`.
+- Currently loaded candidate:
+  - `build/OpenA8DJ-traktor-recovery-output1-start2.driver`
+  - Installed post-codesign hash:
+    `8ce0163f66c6dd5a6c3d163c3270e5fef9fb1333f70e8694b7bd7aedf4cbb6a5`
+- Interpretation:
+  - The candidate is still diagnostic, not product-ready and not superior to
+    mainline.
+  - The human result improved materially on Timecode Vinyl input, but output
+    quality and VLC playback still require human confirmation on the currently
+    loaded `output1-start2` candidate.
