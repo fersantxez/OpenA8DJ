@@ -1824,3 +1824,49 @@ PASS/FAIL semantics:
 - PASS does not mean CPU/resource superiority. It means this specific
   optimization avenue is closed unless future evidence disproves the current
   physical failure.
+
+## Timecode Vinyl Physical Window Planner
+
+Purpose:
+
+- convert offline DVS/timecode PASS into a safe physical-window checklist;
+- keep Traktor/timecode claims blocked until a validated capture route and
+  same-session C++/mainline physical A/B are already ready;
+- require explicit evidence for Traktor scope stability, input isolation,
+  absolute/relative mode, CPU/resource behavior, and 44.1/48 kHz coverage.
+
+Command shape:
+
+```sh
+scripts/plan-timecode-physical-window \
+  --json-out local-analysis/cpp-offline/timecode-physical-window-plan.json
+
+scripts/test-plan-timecode-physical-window.py
+```
+
+Expected current result:
+
+- `status=BLOCKED`;
+- `offline_timecode_pass=true`;
+- `ready_for_lock_gated_timecode_window=false`;
+- blockers include `same_session_physical_ab_not_ready` and
+  `validated_route_and_full_ab_window_not_ready`;
+- `product_claim_allowed=false`;
+- `timecode_vinyl_certification_allowed=false`;
+- `branch_promotion_allowed=false`.
+
+Physical execution rule:
+
+- `scripts/run-timecode-physical-window` is dry-run by default.
+- `--execute` is allowed only in a coordinated hardware window with the global
+  lock and `--operator-acknowledge-manual-traktor-control`.
+- It must not change default devices, reset USB, restart CoreAudio, or
+  install/reload drivers.
+
+PASS/FAIL semantics:
+
+- Planner PASS means the current Timecode physical-window state is classified.
+- It is not Timecode Vinyl readiness.
+- Product Timecode Vinyl readiness still requires current route validation,
+  same-session mainline/C++ comparison, real Traktor scope observation, and CPU
+  evidence under lock.

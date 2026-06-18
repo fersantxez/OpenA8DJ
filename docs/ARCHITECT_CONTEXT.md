@@ -17,6 +17,13 @@ Branch: `driverkit/cpp-redesign`
   non-built-in known-good output is visible for objective route validation.
   This permits a diagnostic RC packet only; it still blocks product quality,
   CPU superiority, physical Timecode Vinyl, and branch-promotion claims.
+- Timecode physical-window planning update: `scripts/plan-timecode-physical-window`
+  and `scripts/run-timecode-physical-window` now define the fail-closed bridge
+  from offline DVS/timecode PASS to a future lock-gated Traktor/vinyl window.
+  Current status is still blocked because route validation and same-session
+  physical A/B are not ready. The planner records required evidence for Traktor
+  scope, Deck A/B input isolation, 44.1/48 kHz coverage, absolute/relative
+  behavior, and CPU samples, but it does not certify Timecode Vinyl readiness.
 - Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
   remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus

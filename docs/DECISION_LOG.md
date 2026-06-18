@@ -9613,3 +9613,34 @@ Next implication:
 - Readiness impact: improves readiness to collect decisive physical evidence.
   It does not itself validate sound quality, CPU superiority, Timecode Vinyl,
   or branch promotion.
+
+## 2026-06-18 - Plan Timecode Vinyl Physical Window Separately
+
+- Decision: add a read-only Timecode Vinyl physical-window planner plus a
+  guarded dry-run/manual runner, and require the planner in offline evidence.
+- Reason: offline DVS/timecode gates prove profile/routing/analyzer behavior,
+  but they do not prove Traktor scope stability, vinyl control, input isolation,
+  or CPU behavior. The project needs an explicit fail-closed bridge from
+  offline Timecode evidence to a lock-gated physical Traktor window.
+- Evidence:
+  - `scripts/plan-timecode-physical-window` reports current state as
+    `status=BLOCKED`, with `offline_timecode_pass=true` and blockers
+    `same_session_physical_ab_not_ready` and
+    `validated_route_and_full_ab_window_not_ready`.
+  - `scripts/test-plan-timecode-physical-window.py` covers blocked and ready
+    fixtures and keeps product/certification claims false even in the ready
+    planning case.
+  - `scripts/run-timecode-physical-window` dry-run writes a manifest and does
+    not acquire a lock or touch audio. `--execute` requires the global hardware
+    lock path and an explicit manual-Traktor-control acknowledgement.
+- Alternatives rejected:
+  - Treat `timecode-readiness-gate` as enough for physical Timecode Vinyl:
+    rejected because it explicitly says
+    `OFFLINE_DVS_ONLY_NOT_TRAKTOR_VINYL_READINESS`.
+  - Fold Timecode Vinyl into the sound-quality A/B runner without its own
+    evidence requirements: rejected because DVS needs Traktor scope,
+    input-pair isolation, absolute/relative behavior, and per-rate observation.
+- Readiness impact: improves the path to a complete physical validation set.
+  It does not unblock Timecode Vinyl certification, product quality,
+  CPU/resource superiority, or branch promotion until route validation and
+  same-session physical evidence pass.

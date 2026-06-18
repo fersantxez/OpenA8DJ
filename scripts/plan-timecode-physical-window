@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""Plan the lock-gated physical Traktor/timecode vinyl evidence window.
+
+This is a read-only planner. It does not acquire the hardware lock, open
+Traktor, play audio, record audio, install/uninstall drivers, restart CoreAudio,
+reset USB, change defaults, or mutate the mainline/Rust worktrees.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+EVIDENCE = ROOT / "local-analysis/cpp-offline"
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def resolve_path(value: str | None) -> Path | None:
+    if not value:
+        return None
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def run_text(argv: list[str], timeout: int = 10) -> tuple[int, str, str]:
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+        return completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired as exc:
+        return 124, exc.stdout or "", exc.stderr or "timeout"
+
+
+def parse_audio_list(text: str) -> list[dict[str, Any]]:
+    devices: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        if " id=" not in line or " uid=" not in line:
+            continue
+        try:
+            before_uid, after_uid = line.split(" uid=", 1)
+            device_id = int(before_uid.split("id=", 1)[1].split()[0])
+            name = before_uid.split(f"id={device_id}", 1)[1].strip()
+            uid, rest = after_uid.split(" in=", 1)
+            inputs = int(rest.split(" out=", 1)[0])
+            outputs = int(rest.split(" out=", 1)[1].split(" rate=", 1)[0])
+            rate = float(rest.split(" rate=", 1)[1])
+        except (IndexError, ValueError):
+            continue
+        devices.append(
+            {
+                "id": device_id,
+                "name": name,
+                "uid": uid.strip(),
+                "inputs": inputs,
+                "outputs": outputs,
+                "rate": rate,
+            }
+        )
+    return devices
+
+
+def audio8_devices(devices: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for device in devices:
+        identity = f"{device.get('name', '')} {device.get('uid', '')}".lower()
+        if (
+            "open audio 8" in identity
+            or "audio 8 dj" in identity
+            or "opena8dj" in identity
+        ):
+            result.append(device)
+    return result
+
+
+def command_shell_hint(argv: list[str]) -> str:
+    def quote(value: str) -> str:
+        safe = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:=+,-"
+        if value and all(ch in safe for ch in value):
+            return value
+        return "'" + value.replace("'", "'\"'\"'") + "'"
+
+    return " ".join(quote(item) for item in argv)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--run-dir", default="local-analysis/timecode-physical-window/<timestamp>")
+    parser.add_argument("--timecode-gate", default=str(EVIDENCE / "timecode-readiness-gate.json"))
+    parser.add_argument("--rc-status", default=str(EVIDENCE / "human-test-rc-status.json"))
+    parser.add_argument(
+        "--physical-window-plan",
+        default=str(EVIDENCE / "physical-evidence-window-plan.json"),
+    )
+    parser.add_argument("--sample-rates", default="44100,48000")
+    parser.add_argument("--decks", default="A,B")
+    parser.add_argument("--profile", default="timecode-vinyl")
+    parser.add_argument("--duration-seconds", default="120")
+    args = parser.parse_args()
+
+    timecode_gate = load_json(resolve_path(args.timecode_gate) or Path())
+    rc_status = load_json(resolve_path(args.rc_status) or Path())
+    physical_plan = load_json(resolve_path(args.physical_window_plan) or Path())
+    audio_rc, audio_stdout, audio_stderr = run_text([str(ROOT / "build/audio-list")])
+    devices = parse_audio_list(audio_stdout)
+    audio8 = audio8_devices(devices)
+    selected_audio8 = audio8[0] if len(audio8) == 1 else {}
+
+    sample_rates = [item.strip() for item in args.sample_rates.split(",") if item.strip()]
+    decks = [item.strip().upper() for item in args.decks.split(",") if item.strip()]
+    run_dir = args.run_dir.replace("<timestamp>", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+
+    blockers: list[str] = []
+    offline_timecode_pass = bool(timecode_gate.get("offline_timecode_pass"))
+    if not offline_timecode_pass:
+        blockers.append("offline_timecode_gates_not_passing")
+    if timecode_gate.get("product_timecode_ready") is True:
+        blockers.append("unexpected_existing_product_timecode_ready_claim")
+    if rc_status.get("status") != "LOCK_GATED_FULL_AB_READY":
+        blockers.append("same_session_physical_ab_not_ready")
+    if physical_plan.get("full_ab_ready") is not True:
+        blockers.append("validated_route_and_full_ab_window_not_ready")
+    if audio_rc != 0:
+        blockers.append("audio_inventory_failed")
+    if len(audio8) != 1:
+        blockers.append("audio8_coreaudio_not_unambiguous")
+    elif selected_audio8.get("inputs") != 8 or selected_audio8.get("outputs") != 8:
+        blockers.append("audio8_not_8x8")
+    if "44100" not in sample_rates or "48000" not in sample_rates:
+        blockers.append("sample_rates_44100_48000_required")
+    if not {"A", "B"}.issubset(set(decks)):
+        blockers.append("deck_a_b_required")
+
+    route_validated = physical_plan.get("full_ab_ready") is True
+    rc_full_ab_ready = rc_status.get("status") == "LOCK_GATED_FULL_AB_READY"
+    ready = (
+        offline_timecode_pass
+        and route_validated
+        and rc_full_ab_ready
+        and len(audio8) == 1
+        and selected_audio8.get("inputs") == 8
+        and selected_audio8.get("outputs") == 8
+        and "44100" in sample_rates
+        and "48000" in sample_rates
+        and {"A", "B"}.issubset(set(decks))
+        and not blockers
+    )
+
+    checklist = [
+        "acquire_hardware_lock_before_any_traktor_coreaudio_usb_or_driver_action",
+        "verify_audio8_visible_as_8in_8out_immediately_before_test",
+        "verify_validated_known_good_route_from_same_session",
+        "select_Open_Audio_8_DJ_in_Traktor_without_changing_system_defaults",
+        f"set_opena8dj_control_profile_{args.profile}",
+        "validate_deck_A_timecode_input_A_LR_and_deck_B_input_B_LR",
+        "capture_traktor_scope_state_absolute_relative_and_dropout_observations",
+        "record_cpu_coreaudiod_and_opena8dj_driver_before_during_after",
+        "run_same_session_mainline_cpp_timecode_comparison_before_any_claim",
+        "store_evidence_under_the_reported_run_dir",
+    ]
+    manual_command = [
+        "scripts/run-timecode-physical-window",
+        "--execute",
+        "--run-dir",
+        run_dir,
+        "--profile",
+        args.profile,
+        "--decks",
+        ",".join(decks),
+        "--sample-rates",
+        ",".join(sample_rates),
+        "--duration-seconds",
+        str(args.duration_seconds),
+    ]
+    report = {
+        "schema": "opena8djcpp.timecode-physical-window-plan.v1",
+        "timestamp_utc": utc_now(),
+        "safety": "read_only_plan_only_no_lock_traktor_audio_capture_playback_driver_coreaudio_usb_defaults_or_external_worktree_mutation",
+        "result": "PASS",
+        "status": "READY" if ready else "BLOCKED",
+        "ready_for_lock_gated_timecode_window": ready,
+        "offline_timecode_pass": offline_timecode_pass,
+        "product_timecode_ready": False,
+        "product_claim_allowed": False,
+        "branch_promotion_allowed": False,
+        "timecode_vinyl_certification_allowed": False,
+        "route_validated_for_timecode_window": route_validated,
+        "same_session_physical_ab_ready": rc_full_ab_ready,
+        "audio_inventory_return_code": audio_rc,
+        "audio_inventory_stderr": audio_stderr.strip(),
+        "selected_audio8_device": selected_audio8,
+        "sample_rates_required": [44100, 48000],
+        "sample_rates_planned": sample_rates,
+        "decks_required": ["A", "B"],
+        "decks_planned": decks,
+        "profile": args.profile,
+        "duration_seconds": args.duration_seconds,
+        "run_dir": run_dir,
+        "blockers": list(dict.fromkeys(blockers)),
+        "next_action": (
+            "ACQUIRE_LOCK_AND_RUN_TIMECODE_WINDOW"
+            if ready
+            else "VALIDATE_KNOWN_GOOD_ROUTE_AND_SAME_SESSION_AB_BEFORE_TRAKTOR_TIMECODE"
+        ),
+        "manual_checklist": checklist,
+        "future_command_argv": manual_command if ready else [],
+        "future_command_shell_hint": command_shell_hint(manual_command) if ready else "",
+        "required_evidence": [
+            "audio_inventory_before_after",
+            "hardware_lock_owner",
+            "opena8dj_control_profile_before_after",
+            "traktor_audio_device_and_deck_assignments",
+            "scope_observation_for_each_deck_and_rate",
+            "absolute_relative_mode_observation",
+            "dropout_or_scope_loss_count",
+            "cpu_profile_before_during_after",
+            "same_session_mainline_cpp_dvs_comparison",
+            "route_validation_reference_from_same_session",
+        ],
+        "meaning": (
+            "PASS means this planner ran and either emitted a lock-gated future "
+            "window or explicit blockers; it is not physical Timecode Vinyl readiness."
+        ),
+    }
+
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        output_path = resolve_path(args.json_out)
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

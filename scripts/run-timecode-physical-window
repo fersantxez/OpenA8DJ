@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+usage: scripts/run-timecode-physical-window --run-dir DIR [options]
+
+Plans or executes the lock-gated Traktor/timecode vinyl evidence window. By
+default this is dry-run only and writes no physical evidence. The current
+implementation is a guarded operator checklist/manifest runner; it does not
+automate Traktor, change default devices, change system sample rates, reset USB,
+or install/uninstall drivers.
+
+Options:
+  --execute                         Acquire the hardware lock and write a
+                                    lock-scoped manual evidence manifest
+  --operator-acknowledge-manual-traktor-control
+                                    Required with --execute; confirms a human
+                                    will perform Traktor UI/scope observation
+  --run-dir DIR                     Evidence directory
+  --profile NAME                    Expected profile, default timecode-vinyl
+  --decks LIST                      Decks to validate, default A,B
+  --sample-rates LIST               Rates to validate, default 44100,48000
+  --duration-seconds N              Per-rate/deck observation target, default 120
+  -h, --help                        Show this help
+USAGE
+}
+
+repo_root() {
+  cd "$(dirname "$0")/.." && pwd
+}
+
+die() {
+  echo "$*" >&2
+  exit 2
+}
+
+root="$(repo_root)"
+execute=0
+ack=0
+run_dir=""
+profile="timecode-vinyl"
+decks="A,B"
+sample_rates="44100,48000"
+duration_seconds="120"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --execute) execute=1; shift ;;
+    --operator-acknowledge-manual-traktor-control) ack=1; shift ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --profile) profile="$2"; shift 2 ;;
+    --decks) decks="$2"; shift 2 ;;
+    --sample-rates) sample_rates="$2"; shift 2 ;;
+    --duration-seconds) duration_seconds="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$run_dir" ] || run_dir="local-analysis/timecode-physical-window/$(date -u +%Y%m%dT%H%M%SZ)"
+case "$run_dir" in
+  /*) ;;
+  *) run_dir="$root/$run_dir" ;;
+esac
+mkdir -p "$run_dir"
+
+manifest="$run_dir/timecode-window-manifest.json"
+
+if [ "$execute" -ne 1 ]; then
+  cat > "$manifest" <<JSON
+{
+  "schema": "opena8djcpp.timecode-physical-window-manifest.v1",
+  "status": "DRY_RUN",
+  "safety": "dry_run_no_lock_no_traktor_audio_capture_playback_driver_coreaudio_usb_defaults_or_external_worktree_mutation",
+  "run_dir": "$run_dir",
+  "profile": "$profile",
+  "decks": "$decks",
+  "sample_rates": "$sample_rates",
+  "duration_seconds": "$duration_seconds",
+  "product_claim_allowed": false,
+  "branch_promotion_allowed": false
+}
+JSON
+  echo "TIMEcode physical window dry-run only. Manifest: $manifest"
+  echo "No hardware/audio action was run. Add --execute only inside an approved locked window."
+  exit 0
+fi
+
+[ "$ack" -eq 1 ] || die "--operator-acknowledge-manual-traktor-control is required with --execute"
+
+# shellcheck source=scripts/hardware-lock-lib.sh
+. "$root/scripts/hardware-lock-lib.sh"
+
+opena8dj_acquire_hardware_lock \
+  "$root" \
+  "traktor-timecode-physical-window" \
+  "$run_dir" \
+  "Traktor/manual timecode scope observation, Open Audio 8 DJ profile verification, CPU observation" \
+  "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot,driver-install,driver-uninstall,driver-reload,CoreAudio-restart,automated-Traktor-UI-without-operator"
+trap opena8dj_release_hardware_lock EXIT
+
+{
+  echo "{"
+  echo "  \"schema\": \"opena8djcpp.timecode-physical-window-manifest.v1\","
+  echo "  \"status\": \"LOCKED_MANUAL_WINDOW_STARTED\","
+  echo "  \"safety\": \"lock_gated_manual_observation_manifest_no_driver_install_reload_usb_reset_coreaudio_restart_default_device_change\","
+  echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+  echo "  \"run_dir\": \"$run_dir\","
+  echo "  \"profile\": \"$profile\","
+  echo "  \"decks\": \"$decks\","
+  echo "  \"sample_rates\": \"$sample_rates\","
+  echo "  \"duration_seconds\": \"$duration_seconds\","
+  echo "  \"required_operator_actions\": ["
+  echo "    \"select Open Audio 8 DJ in Traktor\","
+  echo "    \"verify Deck A timecode input maps to Input A L/R\","
+  echo "    \"verify Deck B timecode input maps to Input B L/R\","
+  echo "    \"record scope stability, absolute/relative behavior, and dropouts\","
+  echo "    \"record CPU observations before/during/after\""
+  echo "  ],"
+  echo "  \"product_claim_allowed\": false,"
+  echo "  \"branch_promotion_allowed\": false"
+  echo "}"
+} > "$manifest"
+
+./build/audio-list > "$run_dir/audio-list-before.txt" 2>&1 || true
+scripts/audio-stack-health --threshold 25 --total-threshold 120 --wait 1 \
+  > "$run_dir/audio-stack-health-before.txt" 2>&1 || true
+
+echo "TIMECODE_PHYSICAL_WINDOW: MANUAL_OBSERVATION_REQUIRED"
+echo "manifest=$manifest"
+echo "operator must fill manual observations before any claim"

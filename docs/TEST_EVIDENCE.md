@@ -14105,3 +14105,79 @@ Interpretation:
   product/audiophile/mainline-superiority claim.
 - Next action remains provisioning a wired non-Audio8/non-built-in output,
   then rerunning the watcher and the generated lock-gated physical command.
+
+## 2026-06-18 - Timecode Physical Window Planner Focused Checks
+
+Commit context:
+- Local changes after `670bb4f`; expected provenance failure until commit.
+
+Safety:
+- Read-only planning and dry-run manifest only.
+- No hardware lock acquired.
+- No Traktor launch/control, playback, recording, driver install/reload,
+  CoreAudio restart, USB reset, default-device change, or external worktree
+  mutation.
+
+Commands:
+- `python3 -m py_compile scripts/plan-timecode-physical-window scripts/test-plan-timecode-physical-window.py`
+- `bash -n scripts/run-timecode-physical-window`
+- `scripts/test-plan-timecode-physical-window.py`
+- `scripts/plan-timecode-physical-window --json-out local-analysis/cpp-offline/timecode-physical-window-plan.json`
+- `scripts/run-timecode-physical-window --run-dir local-analysis/timecode-physical-window/dry-run-smoke`
+
+Result:
+- Planner self-test: PASS, covering `BLOCKED` and `READY` fixtures.
+- Live planner: `result=PASS`, `status=BLOCKED`,
+  `offline_timecode_pass=true`,
+  `ready_for_lock_gated_timecode_window=false`.
+- Live blockers:
+  `same_session_physical_ab_not_ready`,
+  `validated_route_and_full_ab_window_not_ready`.
+- Selected Audio 8 device remains `Open Audio 8 DJ`, 8 inputs / 8 outputs.
+- Dry-run manifest written under
+  `local-analysis/timecode-physical-window/dry-run-smoke/`.
+
+Readiness impact:
+- Timecode Vinyl physical validation is now explicitly planned, but still
+  blocked until known-good route validation and same-session physical A/B are
+  ready.
+- No Timecode Vinyl certification, product-quality, CPU superiority, or branch
+  promotion claim is allowed from this planner.
+
+## 2026-06-18 - Full Offline Gates With Timecode Physical Window Planner
+
+Commit context:
+- Local changes after `670bb4f`; expected provenance failure until commit.
+
+Safety:
+- Offline build/package/evidence regeneration plus read-only CoreAudio
+  inventory.
+- No hardware lock acquired.
+- No Traktor launch/control, playback, recording, driver install/reload,
+  CoreAudio restart, USB reset, default-device change, or reboot.
+
+Command:
+- `./scripts/run-cpp-offline-gates`
+
+Result:
+- Debug/default CTest: `83/83` PASS.
+- Release CTest: `84/84` PASS.
+- Evidence schema: PASS, `required_files=93`, `missing_files=0`,
+  `summary_pass=true`, `manifest_pass=true`.
+- Offline summary: `status=PASS`, `diagnostic_status=PASS`,
+  `product_readiness_status=FAIL`.
+- Timecode physical window plan: `status=BLOCKED`,
+  `ready_for_lock_gated_timecode_window=false`,
+  `next_action=VALIDATE_KNOWN_GOOD_ROUTE_AND_SAME_SESSION_AB_BEFORE_TRAKTOR_TIMECODE`.
+- Timecode blockers:
+  `same_session_physical_ab_not_ready`,
+  `validated_route_and_full_ab_window_not_ready`.
+- Provenance freshness: FAIL only because the worktree had uncommitted
+  Timecode planner/docs/schema changes during this pre-commit run.
+
+Readiness impact:
+- Offline Timecode/DVS remains PASS, but physical Traktor/Timecode Vinyl
+  remains blocked.
+- Product human listening, CPU/resource superiority, and branch promotion
+  remain blocked by missing known-good route and missing same-session physical
+  evidence.

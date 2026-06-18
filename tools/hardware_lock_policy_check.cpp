@@ -51,6 +51,7 @@ int main(int argc, char** argv) {
   const auto matrix = read_file(root / "scripts/run-channel-matrix-gate");
   const auto known_good = read_file(root / "scripts/run-known-good-route-soundcheck");
   const auto superiority_window = read_file(root / "scripts/run-physical-superiority-window");
+  const auto timecode_window = read_file(root / "scripts/run-timecode-physical-window");
 
   const bool lib_ok = contains_all(lib,
                                    {
@@ -165,13 +166,28 @@ int main(int argc, char** argv) {
                                                   },
                                                   missing,
                                                   "scripts/run-physical-superiority-window");
+  const bool timecode_window_ok = contains_all(timecode_window,
+                                               {
+                                                   "hardware-lock-lib.sh",
+                                                   "opena8dj_acquire_hardware_lock",
+                                                   "traktor-timecode-physical-window",
+                                                   "operator-acknowledge-manual-traktor-control",
+                                                   "trap opena8dj_release_hardware_lock EXIT",
+                                                   "No hardware/audio action was run. Add --execute only inside an approved locked window.",
+                                                   "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot,driver-install,driver-uninstall,driver-reload,CoreAudio-restart",
+                                                   "product_claim_allowed",
+                                                   "branch_promotion_allowed",
+                                               },
+                                               missing,
+                                               "scripts/run-timecode-physical-window");
 
   const bool pass = lib_ok && safety_ok && direct_ok && direct_soundcheck_ok &&
-                    soundcheck_ok && matrix_ok && known_good_ok && superiority_window_ok;
+                    soundcheck_ok && matrix_ok && known_good_ok && superiority_window_ok &&
+                    timecode_window_ok;
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.hardware-lock-policy.v1\",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-            << "  \"audited_scripts\": 8,\n"
+            << "  \"audited_scripts\": 9,\n"
             << "  \"missing_requirements\": " << missing.size() << ",\n"
             << "  \"sensitive_paths\": [\n"
             << "    \"scripts/test-hal-candidate-safety\",\n"
@@ -180,7 +196,8 @@ int main(int argc, char** argv) {
             << "    \"scripts/run-soundcheck\",\n"
             << "    \"scripts/run-channel-matrix-gate\",\n"
             << "    \"scripts/run-known-good-route-soundcheck\",\n"
-            << "    \"scripts/run-physical-superiority-window\"\n"
+            << "    \"scripts/run-physical-superiority-window\",\n"
+            << "    \"scripts/run-timecode-physical-window\"\n"
             << "  ],\n"
             << "  \"missing\": [";
   for (std::size_t index = 0; index < missing.size(); ++index) {

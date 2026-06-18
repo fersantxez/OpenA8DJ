@@ -143,6 +143,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/watch-known-good-route-test.txt",
       root / "local-analysis/cpp-offline/physical-evidence-window-plan.json",
       root / "local-analysis/cpp-offline/physical-evidence-window-plan-test.txt",
+      root / "local-analysis/cpp-offline/timecode-physical-window-plan.json",
+      root / "local-analysis/cpp-offline/timecode-physical-window-plan-test.txt",
       root / "local-analysis/cpp-offline/capture-readiness-contract.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
@@ -266,6 +268,9 @@ int main(int argc, char** argv) {
   const auto physical_evidence_window_plan =
       opena8djcpp::evidence_json::json_object(summary, "physical_evidence_window_plan")
           .value_or("");
+  const auto timecode_physical_window_plan =
+      opena8djcpp::evidence_json::json_object(summary, "timecode_physical_window_plan")
+          .value_or("");
   const auto capture_readiness_contract =
       opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
@@ -319,6 +324,26 @@ int main(int argc, char** argv) {
       bool_field_present(summary, "physical_evidence_window_plan_route_only_ready") &&
       bool_field_present(summary, "physical_evidence_window_plan_full_ab_ready") &&
       string_field_present(summary, "physical_evidence_window_plan_next_action") &&
+      string_field_present(summary, "timecode_physical_window_plan_status") &&
+      bool_field_present(summary, "timecode_physical_window_plan_ready") &&
+      string_field_present(summary, "timecode_physical_window_plan_next_action") &&
+      object_present(summary, "timecode_physical_window_plan") &&
+      string_field_is(timecode_physical_window_plan, "schema",
+                      "opena8djcpp.timecode-physical-window-plan.v1") &&
+      bool_field_is(timecode_physical_window_plan, "offline_timecode_pass", true) &&
+      bool_field_is(timecode_physical_window_plan,
+                    "ready_for_lock_gated_timecode_window", false) &&
+      bool_field_is(timecode_physical_window_plan,
+                    "route_validated_for_timecode_window", false) &&
+      bool_field_is(timecode_physical_window_plan, "same_session_physical_ab_ready", false) &&
+      bool_field_is(timecode_physical_window_plan, "product_claim_allowed", false) &&
+      bool_field_is(timecode_physical_window_plan, "branch_promotion_allowed", false) &&
+      bool_field_is(timecode_physical_window_plan,
+                    "timecode_vinyl_certification_allowed", false) &&
+      string_array_has(timecode_physical_window_plan, "blockers",
+                       "same_session_physical_ab_not_ready") &&
+      string_array_has(timecode_physical_window_plan, "blockers",
+                       "validated_route_and_full_ab_window_not_ready") &&
       string_field_is(summary, "human_test_rc_status", "PASS") &&
       bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
       bool_field_is(summary, "human_test_product_allowed", false) &&

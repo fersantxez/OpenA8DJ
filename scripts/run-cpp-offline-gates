@@ -241,6 +241,9 @@ python3 scripts/plan-physical-evidence-window \
   --watcher-json "$EVIDENCE_DIR/watch-known-good-route.json" \
   --json-out "$EVIDENCE_DIR/physical-evidence-window-plan.json" \
   >/dev/null
+python3 scripts/plan-timecode-physical-window \
+  --json-out "$EVIDENCE_DIR/timecode-physical-window-plan.json" \
+  >/dev/null
 ./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
 ./build/cpp-release/opena8djcpp_physical_route_matrix_contract | tee "$EVIDENCE_DIR/physical-route-matrix-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -259,6 +262,8 @@ python3 -m py_compile \
   scripts/known-good-route-selector \
   scripts/watch-known-good-route \
   scripts/plan-physical-evidence-window \
+  scripts/plan-timecode-physical-window \
+  scripts/test-plan-timecode-physical-window.py \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
@@ -267,6 +272,7 @@ python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion
 python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-good-route-selector-test.txt"
 python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-good-route-test.txt"
 python3 scripts/test-plan-physical-evidence-window.py | tee "$EVIDENCE_DIR/physical-evidence-window-plan-test.txt"
+python3 scripts/test-plan-timecode-physical-window.py | tee "$EVIDENCE_DIR/timecode-physical-window-plan-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -390,6 +396,7 @@ physical_route_inventory = load_json("physical-route-inventory.json")
 known_good_route_selector = load_json("known-good-route-selector.json")
 watch_known_good_route = load_json("watch-known-good-route.json")
 physical_evidence_window_plan = load_json("physical-evidence-window-plan.json")
+timecode_physical_window_plan = load_json("timecode-physical-window-plan.json")
 capture_readiness_contract = load_json("capture-readiness-contract.json")
 physical_route_matrix_contract = load_json("physical-route-matrix-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
@@ -528,6 +535,13 @@ summary = {
     "physical_evidence_window_plan_next_action": physical_evidence_window_plan.get(
         "next_action"
     ),
+    "timecode_physical_window_plan_status": timecode_physical_window_plan.get("status"),
+    "timecode_physical_window_plan_ready": timecode_physical_window_plan.get(
+        "ready_for_lock_gated_timecode_window"
+    ),
+    "timecode_physical_window_plan_next_action": timecode_physical_window_plan.get(
+        "next_action"
+    ),
     "human_test_rc_status": human_test_rc_gate.get("result"),
     "human_test_rc_status_live": human_test_rc_status.get("status"),
     "human_test_rc_status_next_action": human_test_rc_status.get("next_action"),
@@ -624,6 +638,31 @@ summary = {
         ),
         "readiness_claim": timecode_readiness.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/timecode-readiness-gate.json",
+    },
+    "timecode_physical_window_plan": {
+        "status": timecode_physical_window_plan.get("status"),
+        "schema": timecode_physical_window_plan.get("schema"),
+        "ready_for_lock_gated_timecode_window": timecode_physical_window_plan.get(
+            "ready_for_lock_gated_timecode_window"
+        ),
+        "offline_timecode_pass": timecode_physical_window_plan.get("offline_timecode_pass"),
+        "route_validated_for_timecode_window": timecode_physical_window_plan.get(
+            "route_validated_for_timecode_window"
+        ),
+        "same_session_physical_ab_ready": timecode_physical_window_plan.get(
+            "same_session_physical_ab_ready"
+        ),
+        "product_claim_allowed": timecode_physical_window_plan.get("product_claim_allowed"),
+        "branch_promotion_allowed": timecode_physical_window_plan.get(
+            "branch_promotion_allowed"
+        ),
+        "timecode_vinyl_certification_allowed": timecode_physical_window_plan.get(
+            "timecode_vinyl_certification_allowed"
+        ),
+        "blockers": timecode_physical_window_plan.get("blockers", []),
+        "next_action": timecode_physical_window_plan.get("next_action"),
+        "required_evidence": timecode_physical_window_plan.get("required_evidence", []),
+        "evidence": "local-analysis/cpp-offline/timecode-physical-window-plan.json",
     },
     "dvs_signal_smoke": {
         "status": dvs.get("result"),
