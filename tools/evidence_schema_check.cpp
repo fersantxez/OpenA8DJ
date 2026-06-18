@@ -1363,7 +1363,33 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "coreaudio_touched", false) &&
       bool_field_is(summary, "usb_touched", false) &&
       object_present(summary, "evidence_provenance_freshness_gate");
-  const bool effective_summary_pass = summary_pass || source_reference_summary_pass;
+  const bool post_source_reference_baseline_blocked_summary_pass =
+      string_field_is(summary, "status", "PASS") &&
+      string_field_is_last(summary, "diagnostic_status", "PASS") &&
+      string_field_is(summary, "product_readiness_status", "FAIL") &&
+      bool_field_is(summary, "branch_promotion_allowed", false) &&
+      bool_field_is(summary, "quality_claim_allowed", false) &&
+      bool_field_is(summary, "source_reference_policy_ready", true) &&
+      bool_field_is(summary, "non_audio8_known_good_route_required", false) &&
+      bool_field_is(summary, "ready_for_source_reference_ab_window", true) &&
+      string_field_is(summary, "physical_evidence_window_plan_status",
+                      "SOURCE_REFERENCE_AB_READY") &&
+      string_field_is(summary, "human_test_rc_status_live", "BLOCKED") &&
+      string_field_is(summary, "human_test_rc_packet_status", "BLOCKED") &&
+      string_field_is(summary, "human_test_next_required_action",
+                      "LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL") &&
+      string_field_is(summary, "final_objective_status", "NOT_READY") &&
+      bool_field_is(summary, "final_objective_achieved", false) &&
+      string_array_has(summary, "objective_external_next_required_actions",
+                       "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG") &&
+      bool_field_is(summary, "objective_external_route_revalidation_allowed_now", true) &&
+      bool_field_is(summary, "hardware_touched", false) &&
+      bool_field_is(summary, "coreaudio_touched", false) &&
+      bool_field_is(summary, "usb_touched", false) &&
+      object_present(summary, "evidence_provenance_freshness_gate");
+  const bool effective_summary_pass =
+      summary_pass || source_reference_summary_pass ||
+      post_source_reference_baseline_blocked_summary_pass;
 
   const auto manifest = read_file(root / "docs/CANDIDATE_MANIFEST.json");
   const bool manifest_pass =
@@ -1379,6 +1405,9 @@ int main(int argc, char** argv) {
             << "  \"legacy_summary_pass\": " << (summary_pass ? "true" : "false") << ",\n"
             << "  \"source_reference_summary_pass\": "
             << (source_reference_summary_pass ? "true" : "false") << ",\n"
+            << "  \"post_source_reference_baseline_blocked_summary_pass\": "
+            << (post_source_reference_baseline_blocked_summary_pass ? "true" : "false")
+            << ",\n"
             << "  \"manifest_pass\": " << (manifest_pass ? "true" : "false") << "\n"
             << "}\n";
 
