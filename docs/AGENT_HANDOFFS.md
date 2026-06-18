@@ -4042,3 +4042,37 @@ Risk:
   - Commit and rerun full offline gates.
   - Then route-only revalidation under lock before any prepared-runtime
     physical comparison.
+## 2026-06-18 Descartes: Prepared USB Runtime Submitter
+
+Subagent:
+- `019ed968-26f9-7fc0-8820-447b4604a34b` (`Descartes`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Find the smallest offline/runtime contract that moves the prepared USB submit
+  performance path closer to a real HAL/DriverKit implementation without
+  touching hardware.
+
+Finding:
+- The missing reusable component was a core runtime submitter between
+  `PreparedUsbSubmitPlanner` and `PreparedUsbRequestPool`.
+- Existing evidence already proved `528` logical slots can become `66` USB
+  submits with `33` capture and `33` playback descriptors, but much of that was
+  encoded in `tools/hal_prepared_submit_adapter_contract.cpp` rather than a
+  core API.
+
+Integrated action:
+- Added `PreparedUsbRuntimeSubmitter` in core.
+- Added `opena8djcpp_prepared_usb_runtime_submit_contract`.
+- Updated the migration gate and evidence schema to require the new contract.
+
+Risks:
+- This is still offline model evidence only.
+- The HAL prepared-runtime path still needs binding to this core submitter and
+  lock-gated physical validation before any CPU/resource claim.
+
+Next action:
+- Bind the core submitter into the opt-in HAL prepared runtime path, preserving
+  default HAL behavior and all current claim blockers.

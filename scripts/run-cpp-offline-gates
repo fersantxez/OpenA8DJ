@@ -69,6 +69,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_runtime_adapter_contract | tee "$EVIDENCE_DIR/runtime-adapter-contract.json"
 ./build/cpp-release/opena8djcpp_usb_submit_plan_contract | tee "$EVIDENCE_DIR/usb-submit-plan-contract.json"
 ./build/cpp-release/opena8djcpp_usb_submit_payload_contract | tee "$EVIDENCE_DIR/usb-submit-payload-contract.json"
+./build/cpp-release/opena8djcpp_prepared_usb_runtime_submit_contract | tee "$EVIDENCE_DIR/prepared-usb-runtime-submit-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_submit_adapter_contract | tee "$EVIDENCE_DIR/hal-prepared-submit-adapter-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_runtime_source_contract | tee "$EVIDENCE_DIR/hal-prepared-runtime-source-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract | tee "$EVIDENCE_DIR/hal-prepared-runtime-binding-contract.json"
@@ -257,6 +258,7 @@ prepared_slot_scheduler = load_json("prepared-slot-scheduler-contract.json")
 runtime_adapter = load_json("runtime-adapter-contract.json")
 usb_submit_plan = load_json("usb-submit-plan-contract.json")
 usb_submit_payload = load_json("usb-submit-payload-contract.json")
+prepared_usb_runtime_submit = load_json("prepared-usb-runtime-submit-contract.json")
 hal_prepared_submit_adapter = load_json("hal-prepared-submit-adapter-contract.json")
 hal_prepared_runtime_source_contract = load_json("hal-prepared-runtime-source-contract.json")
 hal_prepared_runtime_binding_contract = load_json("hal-prepared-runtime-binding-contract.json")
@@ -1707,6 +1709,39 @@ summary = {
         "timestamp_mismatches": usb_submit_payload.get("timestamp_mismatches"),
         "evidence": "local-analysis/cpp-offline/usb-submit-payload-contract.json",
     },
+    "prepared_usb_runtime_submit_contract": {
+        "status": prepared_usb_runtime_submit.get("result"),
+        "schema": prepared_usb_runtime_submit.get("schema"),
+        "slots_per_submit": prepared_usb_runtime_submit.get("slots_per_submit"),
+        "logical_slots": prepared_usb_runtime_submit.get("logical_slots"),
+        "capture_logical_slots": prepared_usb_runtime_submit.get("capture_logical_slots"),
+        "playback_logical_slots": prepared_usb_runtime_submit.get("playback_logical_slots"),
+        "usb_submit_calls": prepared_usb_runtime_submit.get("usb_submit_calls"),
+        "partial_submit_calls": prepared_usb_runtime_submit.get("partial_submit_calls"),
+        "usb_submit_reduction_ratio": prepared_usb_runtime_submit.get(
+            "usb_submit_reduction_ratio"
+        ),
+        "descriptors": prepared_usb_runtime_submit.get("descriptors"),
+        "capture_descriptors": prepared_usb_runtime_submit.get("capture_descriptors"),
+        "playback_descriptors": prepared_usb_runtime_submit.get("playback_descriptors"),
+        "total_bytes": prepared_usb_runtime_submit.get("total_bytes"),
+        "total_frames": prepared_usb_runtime_submit.get("total_frames"),
+        "request_submit_calls": prepared_usb_runtime_submit.get("request_submit_calls"),
+        "request_completion_calls": prepared_usb_runtime_submit.get(
+            "request_completion_calls"
+        ),
+        "request_recycle_calls": prepared_usb_runtime_submit.get("request_recycle_calls"),
+        "max_live_requests": prepared_usb_runtime_submit.get("max_live_requests"),
+        "fallback_allocations": prepared_usb_runtime_submit.get("fallback_allocations"),
+        "submit_failures": prepared_usb_runtime_submit.get("submit_failures"),
+        "retained_descriptor_overflows": prepared_usb_runtime_submit.get(
+            "retained_descriptor_overflows"
+        ),
+        "runtime_safe": prepared_usb_runtime_submit.get("runtime_safe"),
+        "payload_equivalent": prepared_usb_runtime_submit.get("payload_equivalent"),
+        "blocked_claim": prepared_usb_runtime_submit.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json",
+    },
     "hal_prepared_submit_adapter_contract": {
         "status": hal_prepared_submit_adapter.get("result"),
         "schema": hal_prepared_submit_adapter.get("schema"),
@@ -1907,6 +1942,21 @@ summary = {
         ),
         "usb_submit_payload_total_frames": prepared_transport_migration.get(
             "usb_submit_payload_total_frames"
+        ),
+        "prepared_usb_runtime_submit_logical_slots": prepared_transport_migration.get(
+            "prepared_usb_runtime_submit_logical_slots"
+        ),
+        "prepared_usb_runtime_submit_usb_submit_calls": prepared_transport_migration.get(
+            "prepared_usb_runtime_submit_usb_submit_calls"
+        ),
+        "prepared_usb_runtime_submit_total_bytes": prepared_transport_migration.get(
+            "prepared_usb_runtime_submit_total_bytes"
+        ),
+        "prepared_usb_runtime_submit_total_frames": prepared_transport_migration.get(
+            "prepared_usb_runtime_submit_total_frames"
+        ),
+        "prepared_usb_runtime_submit_max_live_requests": prepared_transport_migration.get(
+            "prepared_usb_runtime_submit_max_live_requests"
         ),
         "hal_prepared_submit_adapter_usb_submit_calls": prepared_transport_migration.get(
             "hal_prepared_submit_adapter_usb_submit_calls"

@@ -11684,3 +11684,44 @@ Full offline gate after commit:
     blocked.
   - The HAL safety gate now records `safety_window_status=FAIL` while keeping
     the evidence consumable and fail-closed.
+
+## 2026-06-18 Prepared USB Runtime Submitter Core Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a reusable pure-C++ `PreparedUsbRuntimeSubmitter` core component.
+  - Ran the focused offline contract only; no audio, CoreAudio, USB, driver
+    install, hardware, defaults, or services were touched.
+- Command:
+  - `./build/cpp-release/opena8djcpp_prepared_usb_runtime_submit_contract`
+- Result:
+  - `result=PASS`
+  - `logical_slots=528`
+  - `capture_logical_slots=264`
+  - `playback_logical_slots=264`
+  - `usb_submit_calls=66`
+  - `partial_submit_calls=0`
+  - `descriptors=66`
+  - `capture_descriptors=33`
+  - `playback_descriptors=33`
+  - `total_bytes=185856`
+  - `total_frames=5808`
+  - `request_submit_calls=66`
+  - `request_completion_calls=66`
+  - `request_recycle_calls=66`
+  - `max_live_requests=4`
+  - `fallback_allocations=0`
+  - `submit_failures=0`
+  - `runtime_safe=true`
+  - `payload_equivalent=true`
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json`
+- Interpretation:
+  - This improves the offline performance architecture by moving prepared USB
+    submit batching into reusable core code.
+  - It does not prove physical CPU reduction, sound quality, timecode behavior,
+    or product readiness.
+  - Physical claims remain blocked until the submitter is bound to real HAL or
+    DriverKit USB and compared against mainline in the same lock-gated session.

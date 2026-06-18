@@ -122,6 +122,7 @@ int main(int argc, char** argv) {
       root / "tools/runtime_adapter_contract.cpp",
       root / "tools/usb_submit_plan_contract.cpp",
       root / "tools/usb_submit_payload_contract.cpp",
+      root / "tools/prepared_usb_runtime_submit_contract.cpp",
       root / "tools/hal_prepared_submit_adapter_contract.cpp",
       root / "tools/hal_prepared_runtime_source_contract.cpp",
       root / "tools/hal_prepared_runtime_binding_contract.cpp",
@@ -147,6 +148,8 @@ int main(int argc, char** argv) {
       root / "core/src/usb_submit_plan.cpp",
       root / "core/include/opena8djcpp/usb_request_pool.hpp",
       root / "core/src/usb_request_pool.cpp",
+      root / "core/include/opena8djcpp/prepared_usb_runtime_submit.hpp",
+      root / "core/src/prepared_usb_runtime_submit.cpp",
       root / "driverkit/include/opena8djcpp/driverkit/audio_device_runtime_binding.hpp",
       root / "driverkit/src/audio_device_runtime_binding.cpp",
   };

@@ -8005,3 +8005,50 @@ Next implication:
 - Offline gates may still pass as evidence-processing gates, but product
   readiness and branch promotion remain blocked by the latest HAL safety
   failure plus the invalid capture route.
+
+## 2026-06-18: Promote Prepared USB Runtime Submitter Into Core
+
+Decision:
+- Add `PreparedUsbRuntimeSubmitter` as a reusable pure-C++ core component.
+- Keep it offline-only for now, with a contract that proves the default
+  prepared geometry submits `528` logical slots as `66` USB submit calls,
+  `33` capture descriptors and `33` playback descriptors.
+- Keep product/performance claims blocked until this core submitter is bound to
+  real HAL or DriverKit USB and measured in a same-session physical A/B.
+
+Reason:
+- The existing prepared USB batching behavior was proven in tool contracts, but
+  not exposed as a reusable core runtime API. That made the next optimization
+  step too easy to duplicate in HAL/DriverKit code.
+- A core submitter gives HAL and DriverKit one shared, preallocated model for
+  planner-to-request-pool submission, with bounded live requests and explicit
+  fallback accounting.
+
+Evidence:
+- `tools/prepared_usb_runtime_submit_contract.cpp`
+- `local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json`
+- Contract invariants:
+  - `logical_slots=528`
+  - `usb_submit_calls=66`
+  - `partial_submit_calls=0`
+  - `total_bytes=185856`
+  - `total_frames=5808`
+  - `request_submit_calls=66`
+  - `request_completion_calls=66`
+  - `fallback_allocations=0`
+  - `submit_failures=0`
+  - `runtime_safe=true`
+  - `payload_equivalent=true`
+
+Alternatives discarded:
+- Keep the submitter only inside tool contracts: rejected because the HAL and
+  DriverKit paths need a shared runtime abstraction before physical CPU
+  reduction can be tested rigorously.
+- Bind directly into HAL in the same step: rejected because the core contract
+  should be stable and evidence-backed before touching the physical runtime
+  path again.
+
+Next implication:
+- The next implementation step is to bind this core submitter into the HAL
+  prepared-runtime opt-in path, then run only a lock-gated route/safety window
+  before any performance or quality claim.
