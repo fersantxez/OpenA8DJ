@@ -2850,4 +2850,9 @@ Current implication:
   SNR floor `5.43 dB`, corrected audiophile SNR about `5.6/5.9 dB`, delay p95
   `12.6` frames). This blocks further superiority claims and makes additional
   HAL optimization probes unsafe as evidence until the route/timebase is stable.
+- Claim-gate hardening: `direct_usb_capture_failed_after_clean_payload` is now a
+  first-class blocker in `product-quality-claim-gate` and required by
+  `evidence-schema-check`. Direct USB internals being clean is explicitly not
+  enough for audiophile quality, CPU/resource superiority, Timecode Vinyl, or
+  branch promotion while analog iRig capture fails.
 - Post-commit diagnostic A/B on `98ef928`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928` used real music and same-session mainline/C++ HAL runs. C++ improved relative music metrics over the dirty mainline bundle in that run (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`), but still failed product thresholds and used `--skip-known-good` because no separate wired non-Audio8 output was available for same-window iRig route validation. CPU was also worse for C++ (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`). Treat this as diagnostic learning only, not superiority evidence.

@@ -1108,6 +1108,9 @@ summary = {
     "product_quality_claim_gate": {
         "status": product_quality_claim_gate.get("result"),
         "quality_claim_allowed": product_quality_claim_gate.get("quality_claim_allowed"),
+        "direct_usb_capture_failed_after_clean_payload": product_quality_claim_gate.get(
+            "direct_usb_capture_failed_after_clean_payload"
+        ),
         "same_session_audiophile_wav_analyzers_pass": product_quality_claim_gate.get(
             "same_session_audiophile_wav_analyzers_pass"
         ),

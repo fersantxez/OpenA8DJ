@@ -1,5 +1,39 @@
 # Decision Log
 
+## 2026-06-18 - Make Direct USB Clean / Analog Capture Failed A Hard Claim Blocker
+
+Decision:
+- Treat `direct_usb_capture_failed_after_clean_payload` as a first-class hard
+  blocker in product-quality and evidence-schema gates.
+- Require direct USB attribution to expose audiophile WAV failure fields for
+  the latest run.
+- Allow `hal-candidate-safety-gate` to consume later hardware-recovery evidence
+  after an intentional `--leave-loaded` diagnostic window, while still marking
+  the original safety window as not a final product pass.
+
+Reason:
+- A direct USB run can prove that generated, consumed, and packed USB payloads
+  are clean, but that does not prove analog output quality. The latest direct
+  USB run has perfect internal USB evidence and still fails the captured
+  audiophile analysis badly.
+- Product claims need the causal blocker preserved. A generic
+  `capture_route_not_valid_for_promotion` blocker is too easy to overlook when
+  evaluating quality, CPU, Timecode Vinyl, or branch promotion.
+- Safety windows that intentionally leave a HAL candidate loaded must be tied
+  to explicit later recovery evidence, otherwise offline gates confuse an
+  intermediate test state with the final machine state.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s`
+- `local-analysis/hardware-recovery/20260618T092215Z-force-unload-default-control-d3b6b28`
+- `local-analysis/cpp-offline/product-quality-claim-gate.json`
+- `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+
+Next implication:
+- The next physical action remains route revalidation only. No HAL optimization
+  result can support a product claim until a validated route and same-session
+  mainline/C++ comparison pass.
+
 ## 2026-06-18 - Fail Closed On Current iRig Route Despite Clean Direct USB Internals
 
 Decision:

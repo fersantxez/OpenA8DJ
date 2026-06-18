@@ -4221,3 +4221,34 @@ Next action:
 - Revalidate the physical route/timebase before any more HAL performance
   probes. Prefer a separate wired non-Audio8 known-good output into the iRig, or
   a controlled route-only Audio 8 DJ diagnostic with explicit claim blockers.
+
+## 2026-06-18 Peirce: Claim Gate Hardening Review
+
+Subagent:
+- `019eda12-dce5-7ca2-8d9c-01f56a9c1300` (`Peirce`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Inspect, read-only, which offline gate should be reinforced so clean direct
+  USB internals plus failed analog iRig capture cannot support a product claim.
+
+Findings:
+- `capture-route-health-gate` already classifies the route symptom correctly.
+- `physical-window-readiness-gate` already blocks product A/B until route
+  revalidation.
+- The missing preservation point was `product-quality-claim-gate`: it only
+  reported the generic route blocker and did not carry
+  `direct_usb_capture_failed_after_clean_payload` as a hard causal blocker.
+
+Integrated action:
+- Added the hard blocker to `product-quality-claim-gate`.
+- Added schema requirements for direct USB audiophile fields and the hard
+  product-quality blocker.
+- Regenerated offline evidence; diagnostic gates pass and product readiness
+  remains blocked.
+
+Next action:
+- Keep physical work limited to route revalidation until the blocker is cleared
+  by fresh evidence, not by code changes alone.

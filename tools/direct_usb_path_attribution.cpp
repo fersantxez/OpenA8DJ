@@ -44,9 +44,14 @@ struct DirectRun {
   double capture_mid_ratio = std::numeric_limits<double>::quiet_NaN();
   double capture_high_ratio = std::numeric_limits<double>::quiet_NaN();
   double capture_lag_jumps = std::numeric_limits<double>::quiet_NaN();
+  double audiophile_snr_floor_db = std::numeric_limits<double>::quiet_NaN();
+  double audiophile_mid_coherence_floor = std::numeric_limits<double>::quiet_NaN();
+  double audiophile_delay_p95_frames = std::numeric_limits<double>::quiet_NaN();
+  double audiophile_alignment_score = std::numeric_limits<double>::quiet_NaN();
   double timing_explain_db = std::numeric_limits<double>::quiet_NaN();
   double routing_matrix_explain_db = std::numeric_limits<double>::quiet_NaN();
   std::string residual_classification;
+  std::string audiophile_result;
 
   double failure_drift_ppm = std::numeric_limits<double>::quiet_NaN();
   double failure_matrix_improve_db = std::numeric_limits<double>::quiet_NaN();
@@ -176,6 +181,38 @@ std::optional<std::string> json_string(const std::string& json, const std::strin
   return std::nullopt;
 }
 
+std::optional<bool> json_bool(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return std::nullopt;
+  }
+  const std::size_t colon = json.find(':', key_pos + needle.size());
+  if (colon == std::string::npos) {
+    return std::nullopt;
+  }
+  std::size_t start = colon + 1U;
+  while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+    ++start;
+  }
+  if (json.compare(start, 4U, "true") == 0) {
+    return true;
+  }
+  if (json.compare(start, 5U, "false") == 0) {
+    return false;
+  }
+  return std::nullopt;
+}
+
+std::string json_slice_from_key(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return {};
+  }
+  return json.substr(key_pos);
+}
+
 double number_or_nan(std::optional<double> value) {
   return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
@@ -221,10 +258,12 @@ DirectRun read_run(const std::filesystem::path& dir) {
   const auto failure = read_file(dir / "failure-modes.json");
   const auto lti = read_file(dir / "lti-transfer-quality.json");
   const auto tone_matrix = read_file(dir / "tone-matrix.json");
+  const auto audiophile = read_file(dir / "audiophile-wav-analysis-maxlag6.json");
   run.has_required_artifacts = !diagnostics.empty() && (!native.empty() || !metrics.empty());
   for (const auto& path : {dir / "driver-diagnostics-analysis.txt", dir / "native-wav-quality.json",
                            dir / "metrics.json", dir / "failure-modes.json",
-                           dir / "lti-transfer-quality.json", dir / "tone-matrix.json"}) {
+                           dir / "lti-transfer-quality.json", dir / "tone-matrix.json",
+                           dir / "audiophile-wav-analysis-maxlag6.json"}) {
     if (std::filesystem::is_regular_file(path)) {
       update_evidence_time(run, path);
     }
@@ -251,6 +290,20 @@ DirectRun read_run(const std::filesystem::path& dir) {
   run.capture_mid_ratio = number_or_nan(json_number(capture_json, "mid_band_residual_ratio"));
   run.capture_high_ratio = number_or_nan(json_number(capture_json, "high_band_residual_ratio"));
   run.capture_lag_jumps = number_or_nan(json_number(capture_json, "lag_jumps_gt_2_frames"));
+  run.audiophile_result = json_string(audiophile, "result").value_or("missing");
+  run.audiophile_alignment_score =
+      number_or_nan(json_number(json_slice_from_key(audiophile, "alignment"), "score"));
+  const auto left_audiophile = json_slice_from_key(audiophile, "left");
+  const auto right_audiophile = json_slice_from_key(audiophile, "right");
+  run.audiophile_snr_floor_db =
+      std::min(number_or_nan(json_number(left_audiophile, "snr_db")),
+               number_or_nan(json_number(right_audiophile, "snr_db")));
+  run.audiophile_mid_coherence_floor =
+      std::min(number_or_nan(json_number(left_audiophile, "coherence_mid_active_mean")),
+               number_or_nan(json_number(right_audiophile, "coherence_mid_active_mean")));
+  run.audiophile_delay_p95_frames =
+      number_or_nan(json_number(json_slice_from_key(audiophile, "delay_windows"),
+                                "p95_abs_frames"));
   run.timing_explain_db = number_or_nan(json_number(capture_json, "timing_explain_db"));
   run.routing_matrix_explain_db = number_or_nan(json_number(capture_json, "routing_matrix_explain_db"));
   run.residual_classification =
@@ -280,11 +333,16 @@ DirectRun read_run(const std::filesystem::path& dir) {
                        min_usb_snr >= kCleanSnrGate && run.usb_check_errors == 0.0 &&
                        run.usb_panic_flags == 0.0;
   const auto snr_floor = std::min(run.capture_left_snr, run.capture_right_snr);
+  const bool audiophile_claim_blocked =
+      !audiophile.empty() &&
+      (run.audiophile_result == "FAIL" ||
+       json_bool(audiophile, "product_claim_allowed").value_or(false) == false);
   run.capture_failed =
       finite(run.capture_quality) && finite(snr_floor) &&
       (run.capture_quality < kQualityGate || snr_floor < kSnrGate ||
        (finite(run.capture_mid_ratio) && run.capture_mid_ratio > 1.0) ||
-       (finite(run.capture_high_ratio) && run.capture_high_ratio > 1.0));
+       (finite(run.capture_high_ratio) && run.capture_high_ratio > 1.0) ||
+       audiophile_claim_blocked);
   if (run.internal_clean && run.capture_failed) {
     run.attribution = "post_usb_device_analog_or_capture_route_dominant";
   } else if (!run.internal_clean) {
@@ -377,6 +435,16 @@ int main(int argc, char** argv) {
     print_number(latest->capture_high_ratio);
     std::cout << ", \"native_lag_jumps_gt_2_frames\": ";
     print_number(latest->capture_lag_jumps);
+    std::cout << ", \"audiophile_wav_analysis_result\": \""
+              << json_escape(latest->audiophile_result) << "\"";
+    std::cout << ", \"audiophile_alignment_score\": ";
+    print_number(latest->audiophile_alignment_score);
+    std::cout << ", \"audiophile_snr_floor_db\": ";
+    print_number(latest->audiophile_snr_floor_db);
+    std::cout << ", \"audiophile_mid_coherence_floor\": ";
+    print_number(latest->audiophile_mid_coherence_floor);
+    std::cout << ", \"audiophile_delay_p95_frames\": ";
+    print_number(latest->audiophile_delay_p95_frames);
     std::cout << ", \"usb_alignment_score\": ";
     print_number(latest->usb_alignment);
     std::cout << ", \"usb_snr_floor_db\": ";

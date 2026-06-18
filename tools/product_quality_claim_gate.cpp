@@ -47,6 +47,10 @@ bool bool_field_present_and_is(std::string_view json, std::string_view key, bool
   return value.has_value() && *value == expected;
 }
 
+bool string_array_has(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
+}
+
 double number_or(std::string_view json, std::string_view key, double fallback) {
   return opena8djcpp::evidence_json::json_number(json, key).value_or(fallback);
 }
@@ -87,6 +91,10 @@ int main(int argc, char** argv) {
       string_field_is(physical_compare, "result", "PASS") &&
       bool_field_is(physical_compare, "branch_promotion_supported", true);
   const bool route_valid = bool_field_is(capture_route, "measurement_valid_for_promotion", true);
+  const bool direct_usb_failed_after_clean_payload =
+      bool_field_is(capture_route, "direct_usb_capture_failed_after_clean_payload", true) &&
+      string_array_has(capture_route, "promotion_blockers",
+                       "direct_usb_capture_failed_after_clean_payload");
   const bool tone_pass = string_field_is(tone, "result", "PASS");
   const bool tone_current_valid = bool_field_is(tone, "physical_measurement_valid_for_promotion", true);
   const bool promotion_allowed = last_string_field_is(promotion, "result", "PASS") &&
@@ -113,6 +121,9 @@ int main(int argc, char** argv) {
   if (!route_valid) {
     blockers.push_back("capture_route_not_valid_for_promotion");
   }
+  if (direct_usb_failed_after_clean_payload) {
+    blockers.push_back("direct_usb_capture_failed_after_clean_payload");
+  }
   if (!tone_pass) {
     blockers.push_back("audiophile_tone_gate_not_passed");
   }
@@ -123,7 +134,8 @@ int main(int argc, char** argv) {
     blockers.push_back("branch_promotion_not_allowed");
   }
 
-  const bool guard_pass = evidence_present && !quality_claim_allowed && blockers.size() >= 4U;
+  const bool guard_pass = evidence_present && !quality_claim_allowed &&
+                          (direct_usb_failed_after_clean_payload || blockers.size() >= 4U);
 
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.product-quality-claim-gate.v1\",\n"
@@ -141,6 +153,8 @@ int main(int argc, char** argv) {
             << (audiophile_analyzers_pass ? "true" : "false") << ",\n"
             << "  \"capture_route_valid_for_promotion\": " << (route_valid ? "true" : "false")
             << ",\n"
+            << "  \"direct_usb_capture_failed_after_clean_payload\": "
+            << (direct_usb_failed_after_clean_payload ? "true" : "false") << ",\n"
             << "  \"audiophile_tone_pass\": " << (tone_pass ? "true" : "false") << ",\n"
             << "  \"audiophile_tone_current_promotion_measurement\": "
             << (tone_current_valid ? "true" : "false") << ",\n"

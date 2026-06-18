@@ -1,5 +1,55 @@
 # Test Evidence
 
+## 2026-06-18: Route Failure Claim Gates Hardened
+
+- Scope:
+  - Hardened offline evidence gates so a clean direct USB internal path plus
+    failed analog iRig capture becomes an explicit claim blocker.
+  - Added corrected audiophile WAV metrics from the latest direct USB route
+    diagnostic into `direct-usb-path-attribution`.
+  - Made `product-quality-claim-gate` expose and require the hard blocker
+    `direct_usb_capture_failed_after_clean_payload`.
+  - Made `hal-candidate-safety-gate` consume the later hardware-recovery
+    evidence after an intentional `--leave-loaded` safety window.
+  - No hardware, CoreAudio, USB, driver load/unload, playback, capture,
+    default-device change, or service restart was performed by this gate
+    hardening.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_direct_usb_path_attribution opena8djcpp_product_quality_claim_gate opena8djcpp_evidence_schema_check`
+  - `cmake --build build/cpp-release --target opena8djcpp_irig_idle_capture_gate`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_candidate_safety_gate opena8djcpp_physical_window_readiness_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Focused gates: PASS.
+  - Full offline gates: diagnostic PASS and evidence schema PASS.
+  - Debug CTest: `77/77` PASS.
+  - Release CTest: `78/78` PASS.
+  - Provenance intentionally FAIL before commit because the worktree contained
+    the new gate changes.
+  - `direct-usb-path-attribution` latest run now points to
+    `20260618T092456Z-direct-usb-current-route-irig-pairA-12s` and records
+    `audiophile_wav_analysis_result=FAIL`, audiophile SNR floor `5.601383 dB`,
+    mid coherence floor `0.676226`, delay p95 `12.6` frames, while USB
+    alignment remains `1.000000` with USB SNR `999`.
+  - `product-quality-claim-gate` now reports
+    `direct_usb_capture_failed_after_clean_payload=true` and includes that
+    blocker in `quality_claim_blockers`.
+  - `physical-window-readiness-gate` remains route-only:
+    `ready_for_route_revalidation_window=true`,
+    `ready_for_product_physical_ab=false`, and
+    `ready_for_branch_promotion=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`
+  - `local-analysis/cpp-offline/product-quality-claim-gate.json`
+  - `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The system now fails closed on the current route regression. A clean
+    internal USB path cannot be misread as audiophile quality, CPU superiority,
+    Timecode Vinyl readiness, or branch-promotion evidence while the analog
+    iRig capture route is failing.
+
 ## 2026-06-18: Current iRig Route Isolation And Direct USB Control
 
 - Scope:

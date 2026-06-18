@@ -119,12 +119,47 @@ std::optional<SafetyRun> latest_run(const std::filesystem::path& root) {
   return latest;
 }
 
+std::optional<SafetyRun> latest_recovery_after(const std::filesystem::path& root,
+                                               std::filesystem::file_time_type after) {
+  const auto runs_root = root / "local-analysis/hardware-recovery";
+  if (!std::filesystem::is_directory(runs_root)) {
+    return std::nullopt;
+  }
+  std::optional<SafetyRun> latest;
+  for (const auto& entry : std::filesystem::directory_iterator(runs_root)) {
+    if (!entry.is_directory()) {
+      continue;
+    }
+    const auto summary = entry.path() / "summary.txt";
+    if (!std::filesystem::is_regular_file(summary)) {
+      continue;
+    }
+    std::error_code error;
+    const auto time = std::filesystem::last_write_time(summary, error);
+    if (error || time <= after) {
+      continue;
+    }
+    SafetyRun run{};
+    run.dir = entry.path();
+    run.time = time;
+    run.has_time = true;
+    if (!latest || run.time > latest->time || run.dir.string() > latest->dir.string()) {
+      latest = run;
+    }
+  }
+  return latest;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   const auto root = repo_root(argv);
   const auto latest = latest_run(root);
+  const auto external_recovery =
+      latest ? latest_recovery_after(root, latest->time) : std::optional<SafetyRun>{};
   const std::filesystem::path run_dir = latest ? latest->dir : std::filesystem::path{};
+  const std::filesystem::path recovery_dir =
+      external_recovery ? external_recovery->dir : run_dir / "recovery";
 
   const auto summary = latest ? read_file(run_dir / "summary.txt") : std::string{};
   const auto manifest = latest ? read_file(run_dir / "manifest.txt") : std::string{};
@@ -139,9 +174,9 @@ int main(int argc, char** argv) {
   const auto post_unload_summary =
       latest ? read_file(run_dir / "cycle-1/post-unload-guard/summary.txt") : std::string{};
   const auto recovery_audio_list =
-      latest ? read_file(run_dir / "recovery/audio-list.txt") : std::string{};
+      latest ? read_file(recovery_dir / "audio-list.txt") : std::string{};
   const auto recovery_summary =
-      latest ? read_file(run_dir / "recovery/summary.txt") : std::string{};
+      latest ? read_file(recovery_dir / "summary.txt") : std::string{};
   const auto unloaded_after_failure =
       latest ? read_file(run_dir / "unloaded-after-failure.txt") : std::string{};
 
@@ -186,6 +221,9 @@ int main(int argc, char** argv) {
   const auto candidate_hash = manifest_value(manifest, "candidate_hash").value_or("missing");
   const auto cycles = manifest_value(manifest, "cycles").value_or("missing");
   const bool unloaded_by_design = leave_loaded == "0";
+  const bool recovered_after_leave_loaded = external_recovery.has_value() && recovery_unloaded &&
+                                            recovery_irig_visible &&
+                                            recovery_coreaudio_enumeration_pass;
   const bool active_hal_left_loaded = !post_unload_coreaudio_clean;
   const double guard_coreaudiod_cpu_pct =
       key_number(guard_summary, "process.coreaudiod.cpu_pct");
@@ -221,8 +259,10 @@ int main(int argc, char** argv) {
   if (!irig_preserved_during_guard) {
     blockers.push_back("irig_not_visible_during_hal_guard");
   }
-  if (!unloaded_by_design) {
+  if (!unloaded_by_design && !recovered_after_leave_loaded) {
     blockers.push_back("safety_run_left_hal_loaded");
+  } else if (!unloaded_by_design && recovered_after_leave_loaded) {
+    blockers.push_back("safety_run_required_external_recovery");
   }
   if (!post_unload_coreaudio_clean) {
     blockers.push_back("post_unload_coreaudio_not_clean");
@@ -240,6 +280,7 @@ int main(int argc, char** argv) {
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
             << "  \"meaning\": \"PASS means the latest HAL safety evidence was consumed and left CoreAudio unloaded/observable; safety_window_status controls whether the candidate itself passed\",\n"
             << "  \"latest_run\": \"" << json_escape(run_dir.string()) << "\",\n"
+            << "  \"external_recovery_run\": \"" << json_escape(recovery_dir.string()) << "\",\n"
             << "  \"safety_window_status\": \"" << (safety_window_pass ? "PASS" : "FAIL")
             << "\",\n"
             << "  \"summary_pass\": " << (summary_pass ? "true" : "false") << ",\n"

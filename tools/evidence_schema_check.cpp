@@ -235,6 +235,11 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto direct_usb_path_attribution =
+      opena8djcpp::evidence_json::json_object(summary, "direct_usb_path_attribution").value_or("");
+  const auto direct_usb_latest_run =
+      opena8djcpp::evidence_json::json_object(direct_usb_path_attribution, "latest_run")
+          .value_or("");
   const auto hal_candidate_safety_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
@@ -636,6 +641,20 @@ int main(int argc, char** argv) {
       string_field_is(
           physical_window_readiness_gate, "blocked_claim",
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
+      object_present(summary, "direct_usb_path_attribution") &&
+      string_field_is(direct_usb_path_attribution, "status", "PASS") &&
+      number_field_present(direct_usb_path_attribution, "run_count") &&
+      number_field_present(direct_usb_path_attribution, "capture_failed_after_clean_runs") &&
+      object_present(direct_usb_path_attribution, "latest_run") &&
+      bool_field_is(direct_usb_latest_run, "internal_clean", true) &&
+      bool_field_is(direct_usb_latest_run, "capture_failed", true) &&
+      number_field_present(direct_usb_latest_run, "usb_alignment_score") &&
+      number_field_present(direct_usb_latest_run, "usb_snr_floor_db") &&
+      string_field_is(direct_usb_latest_run, "audiophile_wav_analysis_result", "FAIL") &&
+      number_field_present(direct_usb_latest_run, "audiophile_alignment_score") &&
+      number_field_present(direct_usb_latest_run, "audiophile_snr_floor_db") &&
+      number_field_present(direct_usb_latest_run, "audiophile_mid_coherence_floor") &&
+      number_field_present(direct_usb_latest_run, "audiophile_delay_p95_frames") &&
       object_present(summary, "physical_route_inventory") &&
       string_field_is(physical_route_inventory, "status", "PASS") &&
       string_field_is(physical_route_inventory, "schema",
@@ -672,9 +691,13 @@ int main(int argc, char** argv) {
       object_present(summary, "product_quality_claim_gate") &&
       bool_field_is(product_quality_claim_gate, "quality_claim_allowed", false) &&
       bool_field_is(product_quality_claim_gate,
+                    "direct_usb_capture_failed_after_clean_payload", true) &&
+      bool_field_is(product_quality_claim_gate,
                     "same_session_audiophile_wav_analyzers_pass", false) &&
       string_array_has(product_quality_claim_gate, "quality_claim_blockers",
                        "same_session_audiophile_wav_analyzers_missing_or_failing") &&
+      string_array_has(product_quality_claim_gate, "quality_claim_blockers",
+                       "direct_usb_capture_failed_after_clean_payload") &&
       string_field_is(
           product_quality_claim_gate, "blocked_claim",
           "NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_ANALYZERS_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS") &&

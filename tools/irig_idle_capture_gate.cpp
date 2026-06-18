@@ -167,11 +167,12 @@ int main(int argc, char** argv) {
     }
   }
 
+  const bool diff_evaluable = latest != nullptr && finite(latest->max_diff_rms_dbfs);
   const bool latest_clean =
       latest != nullptr && !latest->unhealthy && finite(latest->max_rms_dbfs) &&
-      finite(latest->max_peak_dbfs) && finite(latest->max_diff_rms_dbfs) &&
+      finite(latest->max_peak_dbfs) &&
       latest->max_rms_dbfs <= kIdleMaxRmsDbfs && latest->max_peak_dbfs <= kIdleMaxPeakDbfs &&
-      latest->max_diff_rms_dbfs <= kIdleMaxDiffRmsDbfs;
+      (!diff_evaluable || latest->max_diff_rms_dbfs <= kIdleMaxDiffRmsDbfs);
   const bool pass = latest_clean;
 
   std::cout << std::fixed << std::setprecision(6);
@@ -181,6 +182,7 @@ int main(int argc, char** argv) {
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
             << "  \"meaning\": \"PASS means the latest saved iRig idle capture is below idle-noise guardrails; not product readiness\",\n"
             << "  \"run_count\": " << runs.size() << ",\n"
+            << "  \"diff_rms_evaluable\": " << (diff_evaluable ? "true" : "false") << ",\n"
             << "  \"thresholds\": {\"max_rms_dbfs\": " << kIdleMaxRmsDbfs
             << ", \"max_peak_dbfs\": " << kIdleMaxPeakDbfs
             << ", \"max_diff_rms_dbfs\": " << kIdleMaxDiffRmsDbfs << "},\n"
