@@ -12656,7 +12656,8 @@ Full offline gate after commit:
 
 ## 2026-06-18 - Degraded Audiophile Analyzer Self-Tests
 
-- Commit context: `8906ee8` plus uncommitted degraded analyzer hardening.
+- Commit context: degraded analyzer hardening that later became commit
+  `b1fedc0`.
 - Worktree: `/Users/fer/dev/audio8djcpp`.
 - Branch: `driverkit/cpp-redesign`.
 - Safety:
@@ -12694,3 +12695,41 @@ Full offline gate after commit:
     and rejection of unrelated/noisy captures.
   - This reduces false-positive risk for future physical windows, but does not
     prove product sound quality or superiority over mainline.
+
+## 2026-06-18 - Full Offline Gates After Degraded Analyzer Hardening
+
+- Commit: `b1fedc0`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Command: `./scripts/run-cpp-offline-gates`.
+- Evidence summary: `local-analysis/cpp-offline/current-offline-gates.json`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Result:
+  - Overall offline `status=PASS`.
+  - `working_tree_dirty=false`.
+  - Debug CTest: PASS, 79/79.
+  - Release CTest: PASS, 80/80.
+  - C++ degraded audiophile self-test: PASS as rejection;
+    analyzer `result=FAIL`, `alignment.score=-0.00242805267685`, blockers for
+    alignment, SNR, coherence, delay, and leakage.
+  - Python degraded audiophile self-test: PASS as rejection;
+    analyzer `result=FAIL`, `alignment.score=0.011263478504197618`, blockers
+    for alignment, SNR, coherence, delay, and leakage.
+  - Evidence provenance freshness gate: PASS; summary base commit matched HEAD.
+- Product status:
+  - `product_readiness_status=FAIL`.
+  - `quality_claim_allowed=false`.
+  - `branch_promotion_allowed=false`.
+  - `ready_for_product_physical_ab=false`.
+  - `ready_for_branch_promotion=false`.
+  - Next required action remains:
+    `PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION`.
+- Interpretation:
+  - The candidate is stronger as an offline measurement system.
+  - It still cannot claim audiophile quality, Timecode Vinyl readiness,
+    lower CPU/resource usage, or superiority over mainline without same-session
+    lock-gated physical evidence on a validated route.
