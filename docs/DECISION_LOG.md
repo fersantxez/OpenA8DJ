@@ -7317,3 +7317,44 @@ Next implication:
 - Same-session mainline/C++ physical A/B evidence will now carry both analyzer
   outputs per leg. Product superiority remains blocked unless those analyzer
   results, route validity, CPU/submit cadence, and Traktor/timecode gates pass.
+
+## 2026-06-18: Require Audiophile Analyzer PASS In Physical Comparator
+
+Decision:
+- Updated `opena8djcpp_physical_run_compare` so promotion-capable physical A/B
+  comparison requires both analyzer outputs for candidate and baseline legs:
+  - compiled C++ `audiophile-wav-analysis-cpp.json`;
+  - Python/SciPy `audiophile-wav-analysis.json`.
+- Updated `opena8djcpp_product_quality_claim_gate` and the evidence schema so
+  the global quality-claim guard reports
+  `same_session_audiophile_wav_analyzers_pass=false` until that evidence exists
+  and passes.
+
+Reason:
+- The previous step made future physical windows generate the analyzer files,
+  but the product comparator still did not require them structurally. That left
+  room for a same-session comparison to be interpreted without the stricter
+  audiophile evidence.
+- A product-quality claim must fail closed if either analyzer is missing or
+  fails on either side of the mainline/C++ comparison.
+
+Evidence:
+- Focused comparator run on the existing 2026-06-17 mainline/C++ physical
+  bundle remains `FAIL` and now includes explicit failing gates:
+  `candidate_audiophile_cpp_wav_analysis_pass`,
+  `candidate_audiophile_python_wav_analysis_pass`,
+  `baseline_audiophile_cpp_wav_analysis_pass`, and
+  `baseline_audiophile_python_wav_analysis_pass`.
+- `opena8djcpp_product_quality_claim_gate` returns PASS as a guard with
+  `quality_claim_allowed=false`,
+  `same_session_audiophile_wav_analyzers_pass=false`, and blocker
+  `same_session_audiophile_wav_analyzers_missing_or_failing`.
+
+Alternatives discarded:
+- Leave analyzer execution as a side artifact only: rejected because artifacts
+  that do not participate in the comparator can be overlooked during promotion.
+
+Next implication:
+- Even if future route/CPU/tone metrics improve, branch promotion remains
+  blocked unless the same-session physical comparator sees both analyzer JSONs
+  passing for both mainline and C++ legs.

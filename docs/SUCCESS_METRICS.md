@@ -2323,6 +2323,15 @@ Current implementation:
     level `<= -70 dB` relative to the active diagonal.
   If stereo leakage is not evaluable because the reference is too correlated,
   the run cannot clear a no-leakage claim.
+- `opena8djcpp_physical_run_compare` must report PASS for all analyzer gates
+  before same-session physical A/B evidence can support branch promotion:
+  `candidate_audiophile_cpp_wav_analysis_pass`,
+  `candidate_audiophile_python_wav_analysis_pass`,
+  `baseline_audiophile_cpp_wav_analysis_pass`, and
+  `baseline_audiophile_python_wav_analysis_pass`.
+- `opena8djcpp_product_quality_claim_gate` must report
+  `same_session_audiophile_wav_analyzers_pass=true` before
+  `quality_claim_allowed=true` is possible.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

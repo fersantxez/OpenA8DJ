@@ -10992,3 +10992,46 @@ Full offline gate rerun:
     for stricter quality review.
   - This is source/planning evidence only; it does not validate a physical route
     or support product readiness.
+
+## 2026-06-18 Physical Comparator Requires Audiophile Analyzers
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Updated `opena8djcpp_physical_run_compare` so same-session physical
+    promotion requires both compiled C++ and Python/SciPy audiophile analyzer
+    PASS for baseline and candidate legs.
+  - Updated `opena8djcpp_product_quality_claim_gate` so
+    `quality_claim_allowed=true` is impossible until the same-session analyzer
+    requirement passes.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Commands:
+  - `cmake --build build/cpp-offline --target opena8djcpp_physical_run_compare opena8djcpp_product_quality_claim_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_physical_run_compare --candidate local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/cpp-soundcheck --baseline local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/mainline-soundcheck`
+  - `./build/cpp-offline/opena8djcpp_product_quality_claim_gate`
+- Results:
+  - Focused physical comparator: `FAIL`, `branch_promotion_supported=false`,
+    `audiophile_wav_analysis_required_before_promotion=true`.
+  - Explicit failing analyzer gates:
+    - `candidate_audiophile_cpp_wav_analysis_pass`;
+    - `candidate_audiophile_python_wav_analysis_pass`;
+    - `baseline_audiophile_cpp_wav_analysis_pass`;
+    - `baseline_audiophile_python_wav_analysis_pass`.
+  - Product quality claim gate: PASS as guard with
+    `quality_claim_allowed=false`,
+    `same_session_audiophile_wav_analyzers_pass=false`, and blocker
+    `same_session_audiophile_wav_analyzers_missing_or_failing`.
+- Evidence:
+  - Focused comparator JSON was written to `/tmp/physical_compare_check.json`
+    during this development check.
+  - Canonical regenerated evidence will be
+    `local-analysis/cpp-offline/physical-run-product-superiority.json` and
+    `local-analysis/cpp-offline/product-quality-claim-gate.json` after the full
+    offline gate rerun.
+- Interpretation:
+  - This tightens promotion semantics. Existing physical evidence remains
+    invalid for audiophile superiority and now fails for missing/failing
+    analyzer requirements as well as route/quality/CPU blockers.

@@ -2643,3 +2643,9 @@ Current implication:
     reference is not decorrelated enough for a valid stereo leakage claim. This
     strengthens the blocker: existing physical captures cannot support
     audiophile superiority or branch promotion.
+  - `opena8djcpp_physical_run_compare` now requires both compiled C++ and
+    Python/SciPy audiophile analyzer PASS for candidate and baseline legs before
+    same-session physical evidence can support branch promotion. The product
+    quality claim gate exposes this as
+    `same_session_audiophile_wav_analyzers_pass=false` until those artifacts
+    exist and pass.

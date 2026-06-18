@@ -42,6 +42,11 @@ bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
   return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
 }
 
+bool bool_field_present_and_is(std::string_view json, std::string_view key, bool expected) {
+  const auto value = opena8djcpp::evidence_json::json_bool(json, key);
+  return value.has_value() && *value == expected;
+}
+
 double number_or(std::string_view json, std::string_view key, double fallback) {
   return opena8djcpp::evidence_json::json_number(json, key).value_or(fallback);
 }
@@ -74,6 +79,10 @@ int main(int argc, char** argv) {
 
   const bool soundcheck_analyzer_only =
       string_field_is(soundcheck, "readiness_claim", "ANALYZER_ONLY_NOT_PRODUCT_READINESS");
+  const bool audiophile_analyzers_pass =
+      bool_field_present_and_is(physical_compare,
+                                "audiophile_wav_analysis_required_before_promotion",
+                                false);
   const bool real_music_superiority =
       string_field_is(physical_compare, "result", "PASS") &&
       bool_field_is(physical_compare, "branch_promotion_supported", true);
@@ -83,8 +92,9 @@ int main(int argc, char** argv) {
   const bool promotion_allowed = last_string_field_is(promotion, "result", "PASS") &&
                                  bool_field_is(promotion, "branch_promotion_allowed", true);
 
-  const bool quality_claim_allowed = evidence_present && real_music_superiority && route_valid &&
-                                     tone_pass && tone_current_valid && promotion_allowed &&
+  const bool quality_claim_allowed = evidence_present && real_music_superiority &&
+                                     audiophile_analyzers_pass && route_valid && tone_pass &&
+                                     tone_current_valid && promotion_allowed &&
                                      !soundcheck_analyzer_only;
 
   std::vector<std::string> blockers;
@@ -96,6 +106,9 @@ int main(int argc, char** argv) {
   }
   if (!real_music_superiority) {
     blockers.push_back("real_music_same_session_superiority_missing");
+  }
+  if (!audiophile_analyzers_pass) {
+    blockers.push_back("same_session_audiophile_wav_analyzers_missing_or_failing");
   }
   if (!route_valid) {
     blockers.push_back("capture_route_not_valid_for_promotion");
@@ -124,6 +137,8 @@ int main(int argc, char** argv) {
             << ",\n"
             << "  \"real_music_superiority\": " << (real_music_superiority ? "true" : "false")
             << ",\n"
+            << "  \"same_session_audiophile_wav_analyzers_pass\": "
+            << (audiophile_analyzers_pass ? "true" : "false") << ",\n"
             << "  \"capture_route_valid_for_promotion\": " << (route_valid ? "true" : "false")
             << ",\n"
             << "  \"audiophile_tone_pass\": " << (tone_pass ? "true" : "false") << ",\n"
@@ -140,7 +155,7 @@ int main(int argc, char** argv) {
   print_string_array("quality_claim_blockers", blockers);
   std::cout
       << "  \"blocked_claim\": "
-         "\"NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS\"\n"
+         "\"NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_ANALYZERS_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS\"\n"
       << "}\n";
   return guard_pass ? 0 : 1;
 }

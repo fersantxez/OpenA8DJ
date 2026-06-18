@@ -1509,8 +1509,9 @@ PASS/FAIL semantics:
 - Current expected PASS means the guard is active and
   `quality_claim_allowed=false`.
 - A future quality claim requires `quality_claim_allowed=true`, which demands
-  same-session real-music superiority, route-valid tone evidence, route
-  promotion validity, and branch-promotion allowance.
+  same-session real-music superiority, both audiophile analyzers passing on
+  mainline and C++ legs, route-valid tone evidence, route promotion validity,
+  and branch-promotion allowance.
 
 ## Evidence Provenance Freshness Gate
 

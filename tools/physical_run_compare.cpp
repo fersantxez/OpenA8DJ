@@ -49,6 +49,19 @@ struct NativeWavStats {
   double matrix_condition_number = std::numeric_limits<double>::quiet_NaN();
 };
 
+struct AudiophileWavStats {
+  bool evidence_present = false;
+  bool pass = false;
+  bool product_claim_allowed = true;
+  std::string schema;
+  std::string result;
+  double alignment_score = std::numeric_limits<double>::quiet_NaN();
+  double snr_floor_db = std::numeric_limits<double>::quiet_NaN();
+  double mid_active_coherence_floor = std::numeric_limits<double>::quiet_NaN();
+  double delay_p95_frames = std::numeric_limits<double>::quiet_NaN();
+  double worst_offdiag_db_relative = std::numeric_limits<double>::quiet_NaN();
+};
+
 struct RunStats {
   std::filesystem::path path;
   bool metrics_present = false;
@@ -84,6 +97,8 @@ struct RunStats {
   CpuStats driver_after_5s;
   CpuStats coreaudiod_after_5s;
   NativeWavStats native_wav;
+  AudiophileWavStats audiophile_cpp;
+  AudiophileWavStats audiophile_python;
 };
 
 struct FixedBaseline {
@@ -196,6 +211,69 @@ std::optional<std::string> json_string(const std::string& json, const std::strin
     value.push_back(c);
   }
   return std::nullopt;
+}
+
+std::optional<bool> json_bool(const std::string& json, const std::string& key) {
+  const std::string needle = "\"" + key + "\"";
+  const std::size_t key_pos = json.find(needle);
+  if (key_pos == std::string::npos) {
+    return std::nullopt;
+  }
+  const std::size_t colon = json.find(':', key_pos + needle.size());
+  if (colon == std::string::npos) {
+    return std::nullopt;
+  }
+  std::size_t start = colon + 1;
+  while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+    ++start;
+  }
+  if (json.compare(start, 4, "true") == 0) {
+    return true;
+  }
+  if (json.compare(start, 5, "false") == 0) {
+    return false;
+  }
+  return std::nullopt;
+}
+
+std::vector<double> json_numbers(const std::string& json, const std::string& key) {
+  std::vector<double> values;
+  const std::string needle = "\"" + key + "\"";
+  std::size_t from = 0;
+  while (from < json.size()) {
+    const std::size_t key_pos = json.find(needle, from);
+    if (key_pos == std::string::npos) {
+      break;
+    }
+    const std::size_t colon = json.find(':', key_pos + needle.size());
+    if (colon == std::string::npos) {
+      break;
+    }
+    std::size_t start = colon + 1;
+    while (start < json.size() && std::isspace(static_cast<unsigned char>(json[start]))) {
+      ++start;
+    }
+    std::size_t end = start;
+    while (end < json.size()) {
+      const char c = json[end];
+      if (!(std::isdigit(static_cast<unsigned char>(c)) || c == '-' || c == '+' || c == '.' ||
+            c == 'e' || c == 'E')) {
+        break;
+      }
+      ++end;
+    }
+    if (end > start) {
+      try {
+        const double value = std::stod(json.substr(start, end - start));
+        if (std::isfinite(value)) {
+          values.push_back(value);
+        }
+      } catch (const std::exception&) {
+      }
+    }
+    from = end + 1;
+  }
+  return values;
 }
 
 std::vector<std::string> split_tab(const std::string& line) {
@@ -389,6 +467,35 @@ NativeWavStats read_native_wav_stats(const std::filesystem::path& root,
   return stats;
 }
 
+AudiophileWavStats read_audiophile_wav_stats(const std::filesystem::path& path,
+                                             const std::string& expected_schema) {
+  AudiophileWavStats stats;
+  const auto json = read_file(path);
+  if (json.empty()) {
+    return stats;
+  }
+  stats.evidence_present = true;
+  stats.schema = json_string(json, "schema").value_or("");
+  stats.result = json_string(json, "result").value_or("FAIL");
+  stats.product_claim_allowed = json_bool(json, "product_claim_allowed").value_or(true);
+  stats.alignment_score = number_or_nan(json_number(json, "score"));
+  const auto snrs = json_numbers(json, "snr_db");
+  if (!snrs.empty()) {
+    stats.snr_floor_db = *std::min_element(snrs.begin(), snrs.end());
+  }
+  const auto mid_coherence = json_numbers(json, "coherence_mid_active_mean");
+  if (!mid_coherence.empty()) {
+    stats.mid_active_coherence_floor =
+        *std::min_element(mid_coherence.begin(), mid_coherence.end());
+  }
+  stats.delay_p95_frames = number_or_nan(json_number(json, "p95_abs_frames"));
+  stats.worst_offdiag_db_relative =
+      number_or_nan(json_number(json, "worst_offdiag_db_relative"));
+  stats.pass = stats.schema == expected_schema && stats.result == "PASS" &&
+               !stats.product_claim_allowed;
+  return stats;
+}
+
 RunStats read_run(const std::filesystem::path& path, const std::filesystem::path& root) {
   RunStats run;
   run.path = path;
@@ -460,6 +567,12 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
   run.driver_after_5s = read_cpu_column_after(cpu_path, "opena8dj_driver", 5.0);
   run.coreaudiod_after_5s = read_cpu_column_after(cpu_path, "coreaudiod", 5.0);
   run.native_wav = read_native_wav_stats(root, path);
+  run.audiophile_cpp = read_audiophile_wav_stats(
+      path / "audiophile-wav-analysis-cpp.json",
+      "opena8djcpp.audiophile-wav-analysis-cpp.v1");
+  run.audiophile_python = read_audiophile_wav_stats(
+      path / "audiophile-wav-analysis.json",
+      "opena8djcpp.audiophile-wav-analysis.v1");
   return run;
 }
 
@@ -574,6 +687,16 @@ std::vector<GateResult> fixed_baseline_gates(const RunStats& candidate,
                      candidate.native_wav.matched_candidate ? 1.0 : 0.0,
                      1.0});
   }
+  if (candidate.reference_wav_present && candidate.captured_wav_present) {
+    gates.push_back({"audiophile_cpp_wav_analysis_pass",
+                     Direction::GreaterOrEqual,
+                     candidate.audiophile_cpp.pass ? 1.0 : 0.0,
+                     1.0});
+    gates.push_back({"audiophile_python_wav_analysis_pass",
+                     Direction::GreaterOrEqual,
+                     candidate.audiophile_python.pass ? 1.0 : 0.0,
+                     1.0});
+  }
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
   }
@@ -601,6 +724,14 @@ std::vector<GateResult> run_to_run_gates(const RunStats& candidate, const RunSta
        candidate.capture_submit_calls_per_second, baseline.capture_submit_calls_per_second},
       {"playback_submit_calls_per_second", Direction::LessOrEqual,
        candidate.playback_submit_calls_per_second, baseline.playback_submit_calls_per_second},
+      {"candidate_audiophile_cpp_wav_analysis_pass", Direction::GreaterOrEqual,
+       candidate.audiophile_cpp.pass ? 1.0 : 0.0, 1.0},
+      {"candidate_audiophile_python_wav_analysis_pass", Direction::GreaterOrEqual,
+       candidate.audiophile_python.pass ? 1.0 : 0.0, 1.0},
+      {"baseline_audiophile_cpp_wav_analysis_pass", Direction::GreaterOrEqual,
+       baseline.audiophile_cpp.pass ? 1.0 : 0.0, 1.0},
+      {"baseline_audiophile_python_wav_analysis_pass", Direction::GreaterOrEqual,
+       baseline.audiophile_python.pass ? 1.0 : 0.0, 1.0},
   };
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
@@ -665,6 +796,20 @@ void print_run(const RunStats& run, const std::string& indent) {
             << (run.native_wav.evidence_present ? "true" : "false") << ",\n";
   std::cout << indent << "  \"native_wav_run_dir\": ";
   print_json_string(run.native_wav.run_dir);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_wav_analysis_present\": "
+            << (run.audiophile_cpp.evidence_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_wav_analysis_pass\": "
+            << (run.audiophile_cpp.pass ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_wav_analysis_schema\": ";
+  print_json_string(run.audiophile_cpp.schema);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_wav_analysis_present\": "
+            << (run.audiophile_python.evidence_present ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"audiophile_python_wav_analysis_pass\": "
+            << (run.audiophile_python.pass ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"audiophile_python_wav_analysis_schema\": ";
+  print_json_string(run.audiophile_python.schema);
   std::cout << ",\n";
   std::cout << indent << "  \"stream_summary_present\": "
             << (run.stream_summary_present ? "true" : "false") << ",\n";
@@ -785,6 +930,36 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"residual_source_lr_correlation\": ";
   print_json_number(run.native_wav.source_lr_correlation);
   std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_alignment_score\": ";
+  print_json_number(run.audiophile_cpp.alignment_score);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_snr_floor_db\": ";
+  print_json_number(run.audiophile_cpp.snr_floor_db);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_mid_active_coherence_floor\": ";
+  print_json_number(run.audiophile_cpp.mid_active_coherence_floor);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_delay_p95_frames\": ";
+  print_json_number(run.audiophile_cpp.delay_p95_frames);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_worst_offdiag_db_relative\": ";
+  print_json_number(run.audiophile_cpp.worst_offdiag_db_relative);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_alignment_score\": ";
+  print_json_number(run.audiophile_python.alignment_score);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_snr_floor_db\": ";
+  print_json_number(run.audiophile_python.snr_floor_db);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_mid_active_coherence_floor\": ";
+  print_json_number(run.audiophile_python.mid_active_coherence_floor);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_delay_p95_frames\": ";
+  print_json_number(run.audiophile_python.delay_p95_frames);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_worst_offdiag_db_relative\": ";
+  print_json_number(run.audiophile_python.worst_offdiag_db_relative);
+  std::cout << ",\n";
   std::cout << indent << "  \"driver_cpu_p95\": ";
   print_json_number(run.driver.p95);
   std::cout << ",\n";
@@ -876,9 +1051,14 @@ void print_superiority_report(const RunStats& candidate,
             << (candidate_evidence_present ? "true" : "false") << ",\n";
   std::cout
       << "  \"analysis_source\": "
-         "\"metrics_json_cpu_profile_tsv_and_native_wav_reanalysis_when_matching\",\n";
+         "\"metrics_json_cpu_profile_tsv_native_wav_reanalysis_and_audiophile_wav_analyzers\",\n";
   std::cout << "  \"native_wav_reanalysis_required_before_promotion\": "
             << (!candidate.native_wav.matched_candidate ? "true" : "false") << ",\n";
+  std::cout << "  \"audiophile_wav_analysis_required_before_promotion\": "
+            << (!(candidate.audiophile_cpp.pass && candidate.audiophile_python.pass)
+                    ? "true"
+                    : "false")
+            << ",\n";
   if (baseline_run) {
     std::cout << "  \"baseline\": ";
     print_run(*baseline_run, "  ");

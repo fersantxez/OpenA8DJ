@@ -189,6 +189,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
+  const auto product_quality_claim_gate =
+      opena8djcpp::evidence_json::json_object(summary, "product_quality_claim_gate").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is(summary, "diagnostic_status", "PASS") &&
@@ -363,6 +365,14 @@ int main(int argc, char** argv) {
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
+      bool_field_is(product_quality_claim_gate, "quality_claim_allowed", false) &&
+      bool_field_is(product_quality_claim_gate,
+                    "same_session_audiophile_wav_analyzers_pass", false) &&
+      string_array_has(product_quality_claim_gate, "quality_claim_blockers",
+                       "same_session_audiophile_wav_analyzers_missing_or_failing") &&
+      string_field_is(
+          product_quality_claim_gate, "blocked_claim",
+          "NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_ANALYZERS_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS") &&
       object_present(summary, "hal_transport_runtime_gate") &&
       bool_field_is(hal_transport_runtime_gate, "runtime_reduction_missing", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_direct_usb_enqueue", true) &&
