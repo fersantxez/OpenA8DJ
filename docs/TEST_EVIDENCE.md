@@ -10298,8 +10298,15 @@ Full offline gate rerun:
   - `recommended_xcode_version_for_current_host=26.5 (17F42) [Apple Silicon]`.
   - `product_driverkit_build_allowed=false`.
   - `real_driverkit_claim_blocked=true`.
+  - After committing the gate, the full offline runner passed with Debug CTest
+    `56/56`, Release CTest `57/57`, provenance
+    `summary_matches_head=true`, `working_tree_clean_for_claim=true`,
+    evidence schema `required_files=59`, `missing_files=0`,
+    `summary_pass=true`, and `manifest_pass=true`.
 - Evidence:
   - `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
 - Interpretation:
   - The DriverKit source scaffold and offline contracts are not a real dext
     candidate yet. Real DriverKit build claims remain blocked until full Xcode
