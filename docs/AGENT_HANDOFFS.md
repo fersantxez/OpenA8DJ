@@ -3430,3 +3430,20 @@ Risk:
   - Product readiness is still blocked until the route is valid and one
     same-session physical bundle proves mainline-vs-C++ quality, CPU,
     routing, and Traktor/timecode-vinyl behavior.
+
+## 2026-06-17 Product Quality Claim Guard
+
+- Subagent input:
+  - Kant's review noted that the audiophile tone gate was too narrow to prove
+    real-music quality by itself.
+- Integrated action:
+  - Added `opena8djcpp_product_quality_claim_gate`.
+  - The gate blocks quality claims unless real-music same-session superiority,
+    route-valid tone, route validity, and promotion allowance all pass.
+- Evidence:
+  - Full offline gates: Debug CTest `54/54`, Release CTest `55/55`, evidence
+    schema `required_files=55`, `missing_files=0`.
+  - Current gate state: `quality_claim_allowed=false`.
+- Risk:
+  - This is still an offline evidence guard, not proof of sound quality. It
+    prevents false claims until a valid lock-gated physical bundle exists.

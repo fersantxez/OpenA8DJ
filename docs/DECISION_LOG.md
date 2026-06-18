@@ -6609,3 +6609,33 @@ Alternatives discarded:
 Next implication:
 - New analyzer gates that can PASS before product readiness must either be
   covered by this semantics gate or expose equivalent blocked-claim fields.
+
+## 2026-06-17: Tone Evidence Alone Cannot Authorize Audiophile Quality
+
+Decision:
+- Added `opena8djcpp_product_quality_claim_gate`.
+- Added `local-analysis/cpp-offline/product-quality-claim-gate.json` to the
+  full offline evidence bundle and schema requirements.
+
+Reason:
+- A narrow saved-tone gate can pass while real-music capture, route validity,
+  CPU, and same-session promotion evidence remain blocked. The project needs a
+  machine-readable quality-claim guard that ties those facts together.
+
+Evidence:
+- Full offline gates after integration: Debug CTest `54/54`, Release CTest
+  `55/55`, evidence schema `required_files=55`, `missing_files=0`,
+  `summary_pass=true`, `manifest_pass=true`.
+- Product quality claim gate reports `quality_claim_allowed=false` with
+  blockers for analyzer-only soundcheck, missing real-music superiority,
+  invalid route, non-current tone measurement, and branch promotion not allowed.
+
+Alternatives discarded:
+- Strengthen the tone gate only: rejected because tone is necessary but not
+  sufficient for real music or Traktor/timecode claims.
+- Rely on promotion evaluator alone: rejected because quality claim semantics
+  should be explicit in the offline evidence summary.
+
+Next implication:
+- Future physical windows must make `quality_claim_allowed=true` before any
+  statement that C++ has better audiophile quality than mainline.

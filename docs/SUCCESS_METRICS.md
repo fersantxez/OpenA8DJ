@@ -2184,6 +2184,12 @@ Prepared transport migration metric:
   physical Traktor/vinyl evidence exists, migration stays `product_ready=false`,
   physical-window readiness stays route-revalidation-only, and promotion
   evaluation keeps `branch_promotion_allowed=false`.
+- Product sound-quality claims must be protected by
+  `local-analysis/cpp-offline/product-quality-claim-gate.json`. Minimum
+  expectations before `quality_claim_allowed=true`: real-music same-session
+  superiority PASS, capture route valid for promotion, audiophile tone PASS
+  from a current promotion-valid measurement, and branch promotion allowed.
+  Current expected state is PASS as a guard with `quality_claim_allowed=false`.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.

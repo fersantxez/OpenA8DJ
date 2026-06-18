@@ -1,0 +1,146 @@
+#include "evidence_json.hpp"
+
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace {
+
+std::string read_file(const std::filesystem::path& path) {
+  std::ifstream input(path);
+  if (!input) {
+    return {};
+  }
+  return std::string((std::istreambuf_iterator<char>(input)),
+                     std::istreambuf_iterator<char>());
+}
+
+std::filesystem::path repo_root(char** argv) {
+  auto root = std::filesystem::absolute(argv[0]).parent_path();
+  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
+    root = root.parent_path();
+  }
+  if (root.empty() || root.filename() != "audio8djcpp") {
+    return "/Users/fer/dev/audio8djcpp";
+  }
+  return root;
+}
+
+bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
+}
+
+bool last_string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_last(json, key).value_or("") == expected;
+}
+
+bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
+  return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
+}
+
+double number_or(std::string_view json, std::string_view key, double fallback) {
+  return opena8djcpp::evidence_json::json_number(json, key).value_or(fallback);
+}
+
+void print_string_array(const char* name, const std::vector<std::string>& values) {
+  std::cout << "  \"" << name << "\": [";
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    if (index != 0) {
+      std::cout << ", ";
+    }
+    std::cout << "\"" << values[index] << "\"";
+  }
+  std::cout << "],\n";
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  (void)argc;
+  const auto evidence = repo_root(argv) / "local-analysis/cpp-offline";
+
+  const auto soundcheck = read_file(evidence / "soundcheck-wav-quality.json");
+  const auto physical_compare = read_file(evidence / "physical-run-product-superiority.json");
+  const auto capture_route = read_file(evidence / "capture-route-health-gate.json");
+  const auto tone = read_file(evidence / "audiophile-tone-gate.json");
+  const auto promotion = read_file(evidence / "promotion-readiness-offline-check.json");
+
+  const bool evidence_present = !soundcheck.empty() && !physical_compare.empty() &&
+                                !capture_route.empty() && !tone.empty() && !promotion.empty();
+
+  const bool soundcheck_analyzer_only =
+      string_field_is(soundcheck, "readiness_claim", "ANALYZER_ONLY_NOT_PRODUCT_READINESS");
+  const bool real_music_superiority =
+      string_field_is(physical_compare, "result", "PASS") &&
+      bool_field_is(physical_compare, "branch_promotion_supported", true);
+  const bool route_valid = bool_field_is(capture_route, "measurement_valid_for_promotion", true);
+  const bool tone_pass = string_field_is(tone, "result", "PASS");
+  const bool tone_current_valid = bool_field_is(tone, "physical_measurement_valid_for_promotion", true);
+  const bool promotion_allowed = last_string_field_is(promotion, "result", "PASS") &&
+                                 bool_field_is(promotion, "branch_promotion_allowed", true);
+
+  const bool quality_claim_allowed = evidence_present && real_music_superiority && route_valid &&
+                                     tone_pass && tone_current_valid && promotion_allowed &&
+                                     !soundcheck_analyzer_only;
+
+  std::vector<std::string> blockers;
+  if (!evidence_present) {
+    blockers.push_back("required_quality_evidence_missing");
+  }
+  if (soundcheck_analyzer_only) {
+    blockers.push_back("latest_soundcheck_is_analyzer_only");
+  }
+  if (!real_music_superiority) {
+    blockers.push_back("real_music_same_session_superiority_missing");
+  }
+  if (!route_valid) {
+    blockers.push_back("capture_route_not_valid_for_promotion");
+  }
+  if (!tone_pass) {
+    blockers.push_back("audiophile_tone_gate_not_passed");
+  }
+  if (!tone_current_valid) {
+    blockers.push_back("audiophile_tone_not_current_promotion_measurement");
+  }
+  if (!promotion_allowed) {
+    blockers.push_back("branch_promotion_not_allowed");
+  }
+
+  const bool guard_pass = evidence_present && !quality_claim_allowed && blockers.size() >= 4U;
+
+  std::cout << "{\n"
+            << "  \"schema\": \"opena8djcpp.product-quality-claim-gate.v1\",\n"
+            << "  \"safety\": \"offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch\",\n"
+            << "  \"result\": \"" << (guard_pass ? "PASS" : "FAIL") << "\",\n"
+            << "  \"meaning\": \"PASS means the quality claim guard is active and product quality remains blocked\",\n"
+            << "  \"evidence_present\": " << (evidence_present ? "true" : "false") << ",\n"
+            << "  \"quality_claim_allowed\": " << (quality_claim_allowed ? "true" : "false")
+            << ",\n"
+            << "  \"soundcheck_analyzer_only\": " << (soundcheck_analyzer_only ? "true" : "false")
+            << ",\n"
+            << "  \"real_music_superiority\": " << (real_music_superiority ? "true" : "false")
+            << ",\n"
+            << "  \"capture_route_valid_for_promotion\": " << (route_valid ? "true" : "false")
+            << ",\n"
+            << "  \"audiophile_tone_pass\": " << (tone_pass ? "true" : "false") << ",\n"
+            << "  \"audiophile_tone_current_promotion_measurement\": "
+            << (tone_current_valid ? "true" : "false") << ",\n"
+            << "  \"branch_promotion_allowed\": " << (promotion_allowed ? "true" : "false")
+            << ",\n"
+            << "  \"latest_soundcheck_quality_alignment_score\": "
+            << number_or(soundcheck, "quality_alignment_score", -1.0) << ",\n"
+            << "  \"latest_soundcheck_snr_floor_db\": "
+            << std::min(number_or(soundcheck, "left_snr_db", -999.0),
+                        number_or(soundcheck, "right_snr_db", -999.0))
+            << ",\n";
+  print_string_array("quality_claim_blockers", blockers);
+  std::cout
+      << "  \"blocked_claim\": "
+         "\"NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS\"\n"
+      << "}\n";
+  return guard_pass ? 0 : 1;
+}

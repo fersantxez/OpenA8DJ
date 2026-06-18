@@ -101,6 +101,7 @@ fi
 ./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee "$EVIDENCE_DIR/physical-window-readiness-gate.json"
 ./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
 ./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee "$EVIDENCE_DIR/diagnostic-pass-semantics-gate.json"
+./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -161,6 +162,7 @@ historical_route_reference_gate = load_json("historical-route-reference-gate.jso
 hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
+product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -643,6 +645,13 @@ summary = {
         ),
         "blocked_claim": diagnostic_pass_semantics_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
+    },
+    "product_quality_claim_gate": {
+        "status": product_quality_claim_gate.get("result"),
+        "quality_claim_allowed": product_quality_claim_gate.get("quality_claim_allowed"),
+        "quality_claim_blockers": product_quality_claim_gate.get("quality_claim_blockers"),
+        "blocked_claim": product_quality_claim_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/product-quality-claim-gate.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

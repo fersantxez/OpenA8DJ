@@ -1429,3 +1429,32 @@ PASS/FAIL semantics:
   non-product-readiness semantics.
 - It must not clear product sound-quality, CPU, routing, timecode-vinyl, or
   branch-promotion blockers.
+
+## Product Quality Claim Gate
+
+Purpose:
+
+- prevent narrow tone or analyzer-only evidence from authorizing an audiophile
+  quality claim;
+- require real music, tone, route validity, same-session comparison, and
+  promotion state to agree before quality claims can open.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_product_quality_claim_gate
+./build/cpp-offline/opena8djcpp_product_quality_claim_gate
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/product-quality-claim-gate.json`.
+
+PASS/FAIL semantics:
+
+- Current expected PASS means the guard is active and
+  `quality_claim_allowed=false`.
+- A future quality claim requires `quality_claim_allowed=true`, which demands
+  same-session real-music superiority, route-valid tone evidence, route
+  promotion validity, and branch-promotion allowance.

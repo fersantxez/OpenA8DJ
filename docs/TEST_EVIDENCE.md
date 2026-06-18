@@ -10030,3 +10030,40 @@ Full offline gate rerun:
   - The candidate still cannot be claimed better than mainline until the same
     lock-gated physical bundle proves route validity, mainline-vs-C++ quality,
     CPU, routing, and Traktor/timecode vinyl behavior.
+
+## 2026-06-17 Product Quality Claim Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_product_quality_claim_gate`.
+  - The gate blocks audiophile quality claims unless real-music same-session
+    superiority, current promotion-valid tone evidence, capture-route
+    validity, and promotion allowance all agree.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - `opena8djcpp_product_quality_claim_gate`: PASS as a guard.
+  - `quality_claim_allowed=false`.
+  - Blockers:
+    `latest_soundcheck_is_analyzer_only`,
+    `real_music_same_session_superiority_missing`,
+    `capture_route_not_valid_for_promotion`,
+    `audiophile_tone_not_current_promotion_measurement`,
+    `branch_promotion_not_allowed`.
+  - Full offline Debug CTest: `54/54` passed.
+  - Full offline Release CTest: `55/55` passed.
+  - Evidence schema: PASS with `required_files=55`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/product-quality-claim-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Interpretation:
+  - Tone evidence alone can no longer be read as an audiophile quality claim.
+  - Product quality remains blocked until physical same-session evidence closes
+    the route, music, CPU, routing, and timecode gaps.
