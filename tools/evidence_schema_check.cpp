@@ -1079,7 +1079,21 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "capture_submit_counter_success_only", true) &&
       bool_field_is(hal_transport_runtime_gate, "playback_submit_counter_success_only", true) &&
       bool_field_is(hal_transport_runtime_gate, "runtime_submit_observability_present", true) &&
+      bool_field_is(hal_transport_runtime_gate, "stable_default_load_preserved", true) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "rejected_transport_variants_default_off", true) &&
+      bool_field_is(hal_transport_runtime_gate, "observability_defaults_preserved", true) &&
+      bool_field_is(hal_transport_runtime_gate, "prepared_runtime_not_next_default", true) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
+      string_field_is(
+          hal_transport_runtime_gate, "next_cpu_direction",
+          "OFFLINE_DELIBERATE_PLAYBACK_SCHEDULER_MODEL_PRESERVE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB") &&
+      string_field_is(
+          hal_transport_runtime_gate, "next_required_action",
+          "KEEP_DEFAULT_STABLE_LOAD_AND_DESIGN_OFFLINE_PLAYBACK_SCHEDULER_MODEL_BEFORE_ANY_NEW_HARDWARE_CANDIDATE") &&
+      string_field_is(
+          hal_transport_runtime_gate, "blocked_claim",
+          "NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB") &&
       object_present(summary, "hal_logical_capture_batching_contract") &&
       bool_field_is(hal_logical_capture_batching_contract, "build_exposes_capture_iso", true) &&
       bool_field_is(hal_logical_capture_batching_contract,

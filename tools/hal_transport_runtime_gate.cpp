@@ -103,6 +103,25 @@ int main(int argc, char** argv) {
   const bool hal_default_capture_paced =
       contains(makefile, "HAL_PLAYBACK_CAPTURE_PACED ?= 1") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1");
+  const bool rejected_transport_variants_default_off =
+      contains(makefile, "HAL_USB_CLOCK_ANCHOR ?= 0") &&
+      contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0") &&
+      contains(makefile, "HAL_REUSE_ISOC_COMPLETIONS ?= 0") &&
+      contains(makefile, "HAL_RAW_ISOC_COMPLETIONS ?= 0") &&
+      contains(makefile, "HAL_FAST_ISO_TRANSFER_CONFIG ?= 0") &&
+      contains(makefile, "HAL_IGNORE_OUTPUT_SAMPLE_TIME ?= 0") &&
+      contains(makefile, "HAL_FLUSH_OUTPUT_IN_WRITE_MIX ?= 0");
+  const bool stable_default_load_preserved =
+      contains(makefile, "HAL_ISO_FRAMES ?= 8") &&
+      contains(makefile, "HAL_PLAYBACK_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
+      contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
+      contains(makefile, "HAL_PLAYBACK_CAPTURE_PACED ?= 1") &&
+      contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1") &&
+      rejected_transport_variants_default_off;
+  const bool observability_defaults_preserved =
+      contains(makefile, "HAL_OUTPUT_WRITE_STATS ?= 1") &&
+      contains(makefile, "HAL_HOT_STREAM_STATS ?= 1") &&
+      contains(makefile, "HAL_HOT_STREAM_STATS_INTERVAL ?= 16");
   const bool hal_has_runtime_prepared_submit_guard =
       !contains(hal_source, "PreparedUsbSubmitPlanner") &&
       contains(hal_source, "OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
@@ -263,11 +282,15 @@ int main(int argc, char** argv) {
   const bool runtime_reduction_missing =
       hal_has_direct_usb_enqueue && hal_default_capture_paced &&
       !hal_prepared_runtime_physical_evidence_present;
+  const bool prepared_runtime_not_next_default =
+      runtime_reduction_missing && rejected_transport_variants_default_off &&
+      stable_default_load_preserved;
   const bool product_claim_blocked =
       runtime_reduction_missing && offline_prepared_model_supported &&
       hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
       current_quality_blocked && physical_ab_blocked &&
-      hal_safety_blocks_claims;
+      hal_safety_blocks_claims && stable_default_load_preserved &&
+      observability_defaults_preserved && prepared_runtime_not_next_default;
 
   std::vector<std::string> blockers;
   if (!evidence_present) {
@@ -275,6 +298,15 @@ int main(int argc, char** argv) {
   }
   if (!runtime_submit_observability_present) {
     blockers.push_back("runtime_submit_observability_missing");
+  }
+  if (!stable_default_load_preserved) {
+    blockers.push_back("stable_default_load_not_preserved");
+  }
+  if (!rejected_transport_variants_default_off) {
+    blockers.push_back("rejected_transport_variant_default_enabled");
+  }
+  if (!observability_defaults_preserved) {
+    blockers.push_back("observability_defaults_not_preserved");
   }
   if (runtime_reduction_missing) {
     blockers.push_back("hal_prepared_runtime_not_physically_validated");
@@ -311,12 +343,18 @@ int main(int argc, char** argv) {
       << "  \"schema\": \"opena8djcpp.hal-transport-runtime-gate.v1\",\n"
       << "  \"safety\": \"offline_source_and_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch\",\n"
       << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-      << "  \"meaning\": \"PASS means the guard correctly blocks HAL runtime superiority claims until real USB enqueue reduction exists\",\n"
+      << "  \"meaning\": \"PASS means the guard blocks HAL superiority claims and keeps rejected physical variants out of the stable default load\",\n"
       << "  \"evidence_present\": " << (evidence_present ? "true" : "false") << ",\n"
       << "  \"hal_has_direct_usb_enqueue\": " << (hal_has_direct_usb_enqueue ? "true" : "false")
       << ",\n"
       << "  \"hal_default_capture_paced\": " << (hal_default_capture_paced ? "true" : "false")
       << ",\n"
+      << "  \"stable_default_load_preserved\": "
+      << (stable_default_load_preserved ? "true" : "false") << ",\n"
+      << "  \"rejected_transport_variants_default_off\": "
+      << (rejected_transport_variants_default_off ? "true" : "false") << ",\n"
+      << "  \"observability_defaults_preserved\": "
+      << (observability_defaults_preserved ? "true" : "false") << ",\n"
       << "  \"hal_has_runtime_prepared_submit_guard\": "
       << (hal_has_runtime_prepared_submit_guard ? "true" : "false") << ",\n"
       << "  \"hal_prepared_runtime_source_contract_pass\": "
@@ -358,6 +396,8 @@ int main(int argc, char** argv) {
       << (runtime_submit_observability_present ? "true" : "false") << ",\n"
       << "  \"runtime_reduction_missing\": " << (runtime_reduction_missing ? "true" : "false")
       << ",\n"
+      << "  \"prepared_runtime_not_next_default\": "
+      << (prepared_runtime_not_next_default ? "true" : "false") << ",\n"
       << "  \"offline_prepared_model_supported\": "
       << (offline_prepared_model_supported ? "true" : "false") << ",\n"
       << "  \"offline_usb_submit_reduction_ratio\": "
@@ -372,10 +412,12 @@ int main(int argc, char** argv) {
       << ",\n";
   print_string_array("runtime_claim_blockers", blockers);
   std::cout
+      << "  \"next_cpu_direction\": "
+         "\"OFFLINE_DELIBERATE_PLAYBACK_SCHEDULER_MODEL_PRESERVE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB\",\n"
       << "  \"next_required_action\": "
-         "\"LOCK_GATED_ROUTE_REVALIDATION_THEN_PREPARED_RUNTIME_SUBMIT_COUNTER_AB_BEFORE_PRODUCT_AB\",\n"
+         "\"KEEP_DEFAULT_STABLE_LOAD_AND_DESIGN_OFFLINE_PLAYBACK_SCHEDULER_MODEL_BEFORE_ANY_NEW_HARDWARE_CANDIDATE\",\n"
       << "  \"blocked_claim\": "
-         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_PREPARED_RUNTIME_HAS_LOCK_GATED_SAME_SESSION_PHYSICAL_EVIDENCE\"\n"
+         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB\"\n"
       << "}\n";
 
   return pass ? 0 : 1;

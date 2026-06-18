@@ -9737,3 +9737,40 @@ Next implication:
   lock-gated human/stability baseline. It does not authorize audiophile
   superiority, CPU superiority, Timecode Vinyl readiness, or Legacy/main branch
   promotion without physical evidence.
+
+## 2026-06-18 - Close Stable Load and Retire Rejected Runtime Directions
+
+- Decision: keep the active default diagnostic C++ HAL as the stable load and
+  make the offline runtime gate explicitly reject drifting back to physical
+  candidates that already failed or hid evidence.
+- Reason: the deadline state needs one stable load, not another speculative
+  transport experiment. The low-telemetry candidate failed the short
+  source-reference window, the USB-clock candidate failed same-session A/B, and
+  prepared-runtime/default promotion remains unsupported by physical evidence.
+- Evidence:
+  - Active installed HAL hash still matches `build/OpenA8DJ.driver`:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `opena8djcpp_hal_transport_runtime_gate` now reports
+    `stable_default_load_preserved=true`,
+    `rejected_transport_variants_default_off=true`,
+    `observability_defaults_preserved=true`, and
+    `prepared_runtime_not_next_default=true`.
+  - Full offline gates after the contract update passed Debug `83/83` and
+    Release `84/84`; after committing the closure, provenance freshness passed
+    with `working_tree_clean_for_claim=true`.
+- Alternatives rejected:
+  - Use prepared runtime as the next human baseline: rejected because previous
+    physical evidence did not prove stable quality/CPU superiority.
+  - Use low-telemetry/stats-off as the stable load: rejected by the
+    source-reference window and because disabling observability hides evidence
+    needed for claims.
+  - Re-enable USB-clock, raw/reused completion handlers, flush-write, or
+    ignore-sample-time as defaults: rejected by prior physical evidence and
+    stability/quality regressions.
+- Next CPU direction: design an offline deliberate playback scheduler model
+  that preserves ISO8 logical cadence and observability before any new
+  lock-gated hardware candidate.
+- Readiness impact: this stabilizes the 15:00 EDT diagnostic load and prevents
+  accidental regression into failed candidate paths. It does not authorize
+  audiophile superiority, CPU superiority, Timecode Vinyl physical readiness, or
+  branch promotion.

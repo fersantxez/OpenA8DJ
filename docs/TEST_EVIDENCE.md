@@ -14907,3 +14907,38 @@ Follow-up correction:
     C++ HAL, not the lite candidate.
   - This remains a diagnostic baseline, not proof of audiophile superiority,
     CPU superiority, Timecode Vinyl readiness, or branch-promotion readiness.
+
+## 2026-06-18 - Stable Load Contract Closure
+
+- Scope:
+  - Updated `opena8djcpp_hal_transport_runtime_gate` and the offline summary
+    schema so the default stable load remains selected and rejected physical
+    variants remain default-off.
+  - No hardware, playback, recording, install/load, USB reset, CoreAudio
+    restart, default-device change, or service mutation occurred.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_evidence_schema_check -j`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Focused build: PASS.
+  - `opena8djcpp_hal_transport_runtime_gate`: PASS.
+  - Debug CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - `stable_default_load_preserved=true`.
+  - `rejected_transport_variants_default_off=true`.
+  - `observability_defaults_preserved=true`.
+  - `prepared_runtime_not_next_default=true`.
+  - `next_required_action=KEEP_DEFAULT_STABLE_LOAD_AND_DESIGN_OFFLINE_PLAYBACK_SCHEDULER_MODEL_BEFORE_ANY_NEW_HARDWARE_CANDIDATE`.
+  - Pre-commit provenance freshness: FAIL as expected while the worktree was
+    dirty; `summary_matches_head=true`, `working_tree_clean_for_claim=false`.
+  - Post-commit provenance freshness: PASS after rerun;
+    `working_tree_clean_for_claim=true`, `claimable_current_candidate=true`.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The current closed load is stable/default diagnostic C++ HAL, not the
+    low-telemetry candidate and not prepared runtime.
+  - This is a reproducible offline guardrail, not a product-readiness claim.
+  - A clean committed offline rerun now exists for the stable-load contract.

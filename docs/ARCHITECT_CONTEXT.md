@@ -3336,3 +3336,13 @@ Current implication:
   comparator reported `stream_summary_present=false` and lost submit/transfer
   rate gates. Offline gates now require this wiring through
   `opena8djcpp_physical_submit_comparison_contract`.
+- 15:16 EDT stable-load closure: active load remains the default diagnostic
+  C++ HAL with installed hash
+  `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  The low-telemetry candidate is rejected as immediate baseline. The runtime
+  gate now preserves the default stable load, keeps rejected variants
+  default-off, keeps observability on, and points the next CPU work to an
+  offline deliberate playback scheduler model before any new hardware
+  candidate. Full offline gates passed Debug `83/83` and Release `84/84`;
+  provenance freshness passed after the closure commit with
+  `working_tree_clean_for_claim=true`.
