@@ -2572,3 +2572,21 @@ Current implementation:
   remain forbidden until a lock-gated same-window route-validation bundle proves
   a separate known-good output into iRig capture and then compares mainline C
   against C++ on that same route.
+
+## Promotion Window Contract
+
+- `local-analysis/cpp-offline/promotion-window-contract.txt` must report:
+  - `promotion_window_contract=PASS`;
+  - `missing_known_good_route_blocked=true`;
+  - `skip_known_good_window_blocked=true`;
+  - `same_device_diagnostic_window_blocked=true`;
+  - `built_in_acoustic_diagnostic_window_blocked=true`;
+  - `audio8_known_good_output_rejected=true`;
+  - `ambiguous_known_good_output_rejected=true`.
+- `current-offline-gates.json` must expose the same booleans under
+  `promotion_window_contract`, and `opena8djcpp_evidence_schema_check` must
+  require them.
+- Product superiority remains impossible while the current physical route uses
+  `--skip-known-good`, same-device iRig loopback, built-in/acoustic output, or
+  any route that is not a same-window wired non-Audio8 known-good source into
+  the same iRig capture path.

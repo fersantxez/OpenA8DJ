@@ -1659,3 +1659,33 @@ PASS/FAIL semantics:
 - PASS never authorizes playback, recording, driver install/load, CoreAudio
   restart, USB reset, default-device changes, Timecode Vinyl claims, CPU
   superiority claims, or branch promotion.
+
+## Promotion Window Contract
+
+Purpose:
+
+- prove offline that physical-promotion evidence cannot skip the known-good
+  route step;
+- preserve the distinction between route diagnostics and product A/B evidence;
+- reject built-in/acoustic, same-device loopback, Audio 8, ambiguous, missing,
+  or skipped known-good routes for promotion.
+
+Command shape:
+
+```sh
+python3 scripts/test-promotion-window-contract.py
+./scripts/run-cpp-offline-gates
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/promotion-window-contract.txt`.
+
+PASS/FAIL semantics:
+
+- PASS means the promotion evaluator and route-request checks fail closed for
+  missing known-good route evidence, `--skip-known-good`, same-device iRig
+  diagnostics, built-in/acoustic routes, Audio 8 as the known-good source, and
+  ambiguous selectors.
+- PASS is still not product readiness. It only proves those escape hatches
+  cannot be promoted.

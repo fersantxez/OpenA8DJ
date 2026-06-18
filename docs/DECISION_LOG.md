@@ -8974,3 +8974,23 @@ Next implication:
   playback, recording, driver install/load, CoreAudio restart, USB reset,
   default-device change, physical A/B, Timecode Vinyl claim, CPU claim, or
   branch promotion.
+
+## 2026-06-18 - Make Skipped Known-Good Route A Tested Promotion Blocker
+
+- Decision: extend `scripts/test-promotion-window-contract.py`, the offline
+  summary, and the evidence schema so `--skip-known-good` is an explicit
+  tested promotion blocker.
+- Reason: the current physical path is blocked by route proof, not by C++
+  build readiness. A same-session mainline/C++ window without a validated
+  wired non-Audio8 known-good route can be useful as a diagnostic, but it must
+  never support product quality, CPU/resource, Timecode Vinyl, or branch
+  promotion claims.
+- Evidence:
+  - Focused contract test now exercises a fixture with
+    `skip_known_good=1` in the window manifest and `skip_known_good=true` in
+    preflight JSON.
+  - The evaluator preserves those flags and fails
+    `physical_window_not_diagnostic`.
+  - Offline summary now exposes `skip_known_good_window_blocked=true`.
+- Readiness impact: stronger claim safety only. This does not validate the
+  current iRig route or prove C++ superiority over mainline.

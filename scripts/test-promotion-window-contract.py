@@ -29,7 +29,10 @@ def run_evaluator(
     include_known_good: bool,
     built_in_diagnostic: bool,
     same_device_diagnostic: bool = False,
+    skip_known_good: bool = False,
 ) -> dict:
+    if "physical-superiority-window" not in window.parts:
+        window = window / "local-analysis" / "physical-superiority-window" / "fixture"
     cpp = window / "cpp-soundcheck"
     known_good = window / "known-good-route"
     write_json(
@@ -86,7 +89,7 @@ def run_evaluator(
                 "execute=1",
                 "route_only=0",
                 "candidate_only=0",
-                "skip_known_good=0",
+                f"skip_known_good={1 if skip_known_good else 0}",
                 f"allow_same_device_loopback_diagnostic={1 if same_device_diagnostic else 0}",
                 f"allow_built_in_output_acoustic_diagnostic={1 if built_in_diagnostic else 0}",
                 "",
@@ -100,7 +103,7 @@ def run_evaluator(
             "ready_to_execute_physical_window": True,
             "route_only": False,
             "candidate_only": False,
-            "skip_known_good": False,
+            "skip_known_good": skip_known_good,
             "allow_same_device_loopback_diagnostic": same_device_diagnostic,
             "allow_built_in_output_acoustic_diagnostic": built_in_diagnostic,
             "known_good_output_same_as_capture": same_device_diagnostic,
@@ -238,6 +241,21 @@ def main() -> int:
         if gate(missing, "same_window_known_good_audiophile_analyzers")["result"] != "FAIL":
             raise AssertionError("missing known-good audiophile analyzers did not fail")
 
+        skipped = run_evaluator(
+            root / "skip-known-good-window",
+            include_known_good=False,
+            built_in_diagnostic=False,
+            skip_known_good=True,
+        )
+        if gate(skipped, "physical_window_not_diagnostic")["result"] != "FAIL":
+            raise AssertionError("skip-known-good physical window did not fail")
+        preflight_flags = gate(skipped, "physical_window_not_diagnostic")["metrics"]["preflight_flags"]
+        if preflight_flags.get("skip_known_good") is not True:
+            raise AssertionError("skip-known-good preflight flag was not preserved")
+        manifest_flags = gate(skipped, "physical_window_not_diagnostic")["metrics"]["manifest_flags"]
+        if manifest_flags.get("skip_known_good") != "1":
+            raise AssertionError("skip-known-good manifest flag was not preserved")
+
         diagnostic = run_evaluator(root / "diagnostic-known-good", include_known_good=True, built_in_diagnostic=True)
         if gate(diagnostic, "same_window_known_good_route_revalidated")["result"] != "PASS":
             raise AssertionError("diagnostic fixture should still have same-window route file")
@@ -270,6 +288,12 @@ def main() -> int:
             raise AssertionError("ambiguous known-good route was considered valid")
 
     print("promotion_window_contract=PASS")
+    print("missing_known_good_route_blocked=true")
+    print("skip_known_good_window_blocked=true")
+    print("same_device_diagnostic_window_blocked=true")
+    print("built_in_acoustic_diagnostic_window_blocked=true")
+    print("audio8_known_good_output_rejected=true")
+    print("ambiguous_known_good_output_rejected=true")
     return 0
 
 

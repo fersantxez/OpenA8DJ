@@ -924,6 +924,13 @@ int main(int argc, char** argv) {
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&
       bool_field_is(promotion_window_contract, "diagnostic_window_blocked", true) &&
+      bool_field_is(promotion_window_contract, "missing_known_good_route_blocked", true) &&
+      bool_field_is(promotion_window_contract, "skip_known_good_window_blocked", true) &&
+      bool_field_is(promotion_window_contract, "same_device_diagnostic_window_blocked", true) &&
+      bool_field_is(promotion_window_contract, "built_in_acoustic_diagnostic_window_blocked",
+                    true) &&
+      bool_field_is(promotion_window_contract, "audio8_known_good_output_rejected", true) &&
+      bool_field_is(promotion_window_contract, "ambiguous_known_good_output_rejected", true) &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

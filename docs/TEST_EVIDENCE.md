@@ -13025,3 +13025,33 @@ Full offline gate after commit:
     separate wired non-Audio8/non-built-in known-good output into iRig capture.
   - No sound-quality, CPU/resource, Timecode Vinyl, product-readiness, or
     branch-promotion claim is allowed from this evidence.
+
+## 2026-06-18 - Promotion Window Skip-Known-Good Blocker
+
+- Commit context: before commit, after `e63423e`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline contract fixtures and summary/schema wiring only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `python3 scripts/test-promotion-window-contract.py`
+  - `python3 -m py_compile scripts/test-promotion-window-contract.py scripts/evaluate-promotion-readiness.py scripts/physical-window-preflight`
+  - `git diff --check`
+- Result:
+  - Focused contract: PASS.
+  - New explicit PASS flags:
+    `missing_known_good_route_blocked=true`,
+    `skip_known_good_window_blocked=true`,
+    `same_device_diagnostic_window_blocked=true`,
+    `built_in_acoustic_diagnostic_window_blocked=true`,
+    `audio8_known_good_output_rejected=true`,
+    `ambiguous_known_good_output_rejected=true`.
+- Interpretation:
+  - Physical windows that skip known-good route validation remain diagnostic
+    only.
+  - The C++ candidate still cannot claim sound-quality, CPU/resource,
+    Timecode Vinyl, product-readiness, or branch-promotion superiority until a
+    lock-gated same-window wired non-Audio8 known-good route and same-session
+    mainline/C++ comparison pass.

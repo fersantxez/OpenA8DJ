@@ -2488,6 +2488,12 @@ summary = {
         "diagnostic_window_blocked": "physical_window_not_diagnostic" in json.dumps(
             promotion_evaluator.get("gates", [])
         ),
+        "missing_known_good_route_blocked": "missing_known_good_route_blocked=true" in promotion_window_contract,
+        "skip_known_good_window_blocked": "skip_known_good_window_blocked=true" in promotion_window_contract,
+        "same_device_diagnostic_window_blocked": "same_device_diagnostic_window_blocked=true" in promotion_window_contract,
+        "built_in_acoustic_diagnostic_window_blocked": "built_in_acoustic_diagnostic_window_blocked=true" in promotion_window_contract,
+        "audio8_known_good_output_rejected": "audio8_known_good_output_rejected=true" in promotion_window_contract,
+        "ambiguous_known_good_output_rejected": "ambiguous_known_good_output_rejected=true" in promotion_window_contract,
         "evidence": "local-analysis/cpp-offline/promotion-window-contract.txt",
     },
     "not_ready": [
