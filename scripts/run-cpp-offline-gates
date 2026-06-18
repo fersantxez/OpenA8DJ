@@ -1195,6 +1195,27 @@ summary = {
         "same_session_audiophile_wav_analyzers_pass": product_quality_claim_gate.get(
             "same_session_audiophile_wav_analyzers_pass"
         ),
+        "timing_instability_blocks_quality_claim": product_quality_claim_gate.get(
+            "timing_instability_blocks_quality_claim"
+        ),
+        "latest_residual_classification": product_quality_claim_gate.get(
+            "latest_residual_classification"
+        ),
+        "latest_residual_timing_status": product_quality_claim_gate.get(
+            "latest_residual_timing_status"
+        ),
+        "latest_residual_timing_explain_db": product_quality_claim_gate.get(
+            "latest_residual_timing_explain_db"
+        ),
+        "latest_native_lag_jumps_gt_2_frames": product_quality_claim_gate.get(
+            "latest_native_lag_jumps_gt_2_frames"
+        ),
+        "latest_audiophile_cpp_delay_p95_frames": product_quality_claim_gate.get(
+            "latest_audiophile_cpp_delay_p95_frames"
+        ),
+        "latest_audiophile_python_delay_p95_frames": product_quality_claim_gate.get(
+            "latest_audiophile_python_delay_p95_frames"
+        ),
         "quality_claim_blockers": product_quality_claim_gate.get("quality_claim_blockers"),
         "blocked_claim": product_quality_claim_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/product-quality-claim-gate.json",

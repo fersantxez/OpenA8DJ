@@ -74,6 +74,12 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   comparison must consume run-local native WAV reanalysis plus C++ and Python
   audiophile WAV analysis sidecars. Missing or failing sidecars are hard
   blockers for audiophile quality and branch-promotion claims.
+- Timing instability is a hard quality blocker. `product_quality_claim_gate`
+  must expose `timing_instability_blocks_quality_claim=true` and include
+  `timing_instability_dominant_or_delay_unstable` in
+  `quality_claim_blockers` whenever the selected candidate has timing-dominant
+  residual attribution, native lag jumps, or C++/Python audiophile delay p95
+  above `2` frames.
 - `current-offline-gates.json` may report analyzer `status=PASS` only as
   diagnostic health. Product readiness must be read from
   `product_readiness_status`, `branch_promotion_allowed`, and

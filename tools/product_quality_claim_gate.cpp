@@ -1,6 +1,7 @@
 #include "evidence_json.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -51,8 +52,16 @@ bool string_array_has(std::string_view json, std::string_view key, std::string_v
   return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
 }
 
+std::string string_or(std::string_view json, std::string_view key, std::string_view fallback) {
+  return opena8djcpp::evidence_json::json_string(json, key).value_or(std::string(fallback));
+}
+
 double number_or(std::string_view json, std::string_view key, double fallback) {
   return opena8djcpp::evidence_json::json_number(json, key).value_or(fallback);
+}
+
+bool finite_gt(double value, double threshold) {
+  return std::isfinite(value) && value > threshold;
 }
 
 void print_string_array(const char* name, const std::vector<std::string>& values) {
@@ -99,11 +108,30 @@ int main(int argc, char** argv) {
   const bool tone_current_valid = bool_field_is(tone, "physical_measurement_valid_for_promotion", true);
   const bool promotion_allowed = last_string_field_is(promotion, "result", "PASS") &&
                                  bool_field_is(promotion, "branch_promotion_allowed", true);
+  const std::string residual_classification =
+      string_or(physical_compare, "residual_classification", "");
+  const std::string residual_timing_status =
+      string_or(physical_compare, "residual_timing_status", "");
+  const double residual_timing_explain_db =
+      number_or(physical_compare, "residual_timing_explain_db", -1.0);
+  const double native_lag_jumps =
+      number_or(physical_compare, "native_lag_jumps_gt_2_frames", -1.0);
+  const double audiophile_cpp_delay_p95 =
+      number_or(physical_compare, "audiophile_cpp_delay_p95_frames", -1.0);
+  const double audiophile_python_delay_p95 =
+      number_or(physical_compare, "audiophile_python_delay_p95_frames", -1.0);
+  const bool timing_instability_blocks_quality_claim =
+      residual_classification == "timing_instability_dominant" ||
+      residual_timing_status == "timing_explains_material_residual" ||
+      finite_gt(residual_timing_explain_db, 3.0) || finite_gt(native_lag_jumps, 0.0) ||
+      finite_gt(audiophile_cpp_delay_p95, 2.0) ||
+      finite_gt(audiophile_python_delay_p95, 2.0);
 
   const bool quality_claim_allowed = evidence_present && real_music_superiority &&
                                      audiophile_analyzers_pass && route_valid && tone_pass &&
                                      tone_current_valid && promotion_allowed &&
-                                     !soundcheck_analyzer_only;
+                                     !soundcheck_analyzer_only &&
+                                     !timing_instability_blocks_quality_claim;
 
   std::vector<std::string> blockers;
   if (!evidence_present) {
@@ -133,6 +161,9 @@ int main(int argc, char** argv) {
   if (!promotion_allowed) {
     blockers.push_back("branch_promotion_not_allowed");
   }
+  if (timing_instability_blocks_quality_claim) {
+    blockers.push_back("timing_instability_dominant_or_delay_unstable");
+  }
 
   const bool guard_pass = evidence_present && !quality_claim_allowed &&
                           (direct_usb_failed_after_clean_payload || blockers.size() >= 4U);
@@ -160,6 +191,17 @@ int main(int argc, char** argv) {
             << (tone_current_valid ? "true" : "false") << ",\n"
             << "  \"branch_promotion_allowed\": " << (promotion_allowed ? "true" : "false")
             << ",\n"
+            << "  \"timing_instability_blocks_quality_claim\": "
+            << (timing_instability_blocks_quality_claim ? "true" : "false") << ",\n"
+            << "  \"latest_residual_classification\": \"" << residual_classification << "\",\n"
+            << "  \"latest_residual_timing_status\": \"" << residual_timing_status << "\",\n"
+            << "  \"latest_residual_timing_explain_db\": " << residual_timing_explain_db
+            << ",\n"
+            << "  \"latest_native_lag_jumps_gt_2_frames\": " << native_lag_jumps << ",\n"
+            << "  \"latest_audiophile_cpp_delay_p95_frames\": " << audiophile_cpp_delay_p95
+            << ",\n"
+            << "  \"latest_audiophile_python_delay_p95_frames\": "
+            << audiophile_python_delay_p95 << ",\n"
             << "  \"latest_soundcheck_quality_alignment_score\": "
             << number_or(soundcheck, "quality_alignment_score", -1.0) << ",\n"
             << "  \"latest_soundcheck_snr_floor_db\": "

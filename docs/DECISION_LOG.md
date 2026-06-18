@@ -1,5 +1,36 @@
 # Decision Log
 
+## 2026-06-18 - Make Timing Instability An Explicit Quality Claim Blocker
+
+Decision:
+- `opena8djcpp_product_quality_claim_gate` now consumes the product
+  comparator's residual timing fields.
+- The gate emits `timing_instability_blocks_quality_claim=true` when the latest
+  candidate has timing-dominant residuals, native lag jumps, or excessive
+  audiophile delay p95.
+- `current-offline-gates.json` carries the residual classification, timing
+  status, timing explain dB, native lag jumps, and C++/Python audiophile delay
+  p95 fields.
+
+Reason:
+- The latest measured candidate is not merely below score thresholds; native
+  reanalysis classifies it as `timing_instability_dominant` with material lag
+  jumps and excessive delay-window instability.
+- Audiophile readiness must fail on unstable timing even if a future broad
+  quality score accidentally looks acceptable.
+
+Evidence:
+- Latest selected candidate:
+  `local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`.
+- Current values before the change: residual classification
+  `timing_instability_dominant`, native lag jumps `36`, C++ delay p95
+  `73.5` frames, Python delay p95 `2499.5` frames.
+
+Next implication:
+- A future product candidate must clear timing stability as a first-class
+  quality requirement before any sound-quality, timecode, or branch-promotion
+  claim can pass.
+
 ## 2026-06-18 - Backfill Latest Saved Soundcheck With Offline Audiophile Analysis
 
 Decision:

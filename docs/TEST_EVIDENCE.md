@@ -1,5 +1,26 @@
 # Test Evidence
 
+## 2026-06-18: Timing Instability Blocks Quality Claims
+
+- Scope:
+  - Hardened `opena8djcpp_product_quality_claim_gate` so timing instability is
+    a first-class product-quality blocker.
+  - Added summary fields for residual classification, timing status, timing
+    explain dB, native lag jumps, and C++/Python audiophile delay p95.
+  - No hardware, playback, recording, driver install/load, default-device
+    change, USB reset, or CoreAudio restart is involved.
+- Expected latest-candidate values:
+  - `timing_instability_blocks_quality_claim=true`.
+  - `latest_residual_classification=timing_instability_dominant`.
+  - `latest_native_lag_jumps_gt_2_frames=36`.
+  - `latest_audiophile_cpp_delay_p95_frames=73.5`.
+  - `latest_audiophile_python_delay_p95_frames=2499.5`.
+  - `quality_claim_blockers` includes
+    `timing_instability_dominant_or_delay_unstable`.
+- Interpretation:
+  - A broad quality score cannot authorize an audiophile claim unless timing
+    stability is also clean on the same selected candidate.
+
 ## 2026-06-18: Latest Soundcheck Audiophile Backfill
 
 - Scope:

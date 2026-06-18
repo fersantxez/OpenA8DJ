@@ -718,10 +718,14 @@ int main(int argc, char** argv) {
                     "direct_usb_capture_failed_after_clean_payload", true) &&
       bool_field_is(product_quality_claim_gate,
                     "same_session_audiophile_wav_analyzers_pass", false) &&
+      bool_field_is(product_quality_claim_gate,
+                    "timing_instability_blocks_quality_claim", true) &&
       string_array_has(product_quality_claim_gate, "quality_claim_blockers",
                        "same_session_audiophile_wav_analyzers_missing_or_failing") &&
       string_array_has(product_quality_claim_gate, "quality_claim_blockers",
                        "direct_usb_capture_failed_after_clean_payload") &&
+      string_array_has(product_quality_claim_gate, "quality_claim_blockers",
+                       "timing_instability_dominant_or_delay_unstable") &&
       string_field_is(
           product_quality_claim_gate, "blocked_claim",
           "NO_AUDIOPHILE_QUALITY_CLAIM_UNTIL_REAL_MUSIC_ANALYZERS_TONE_ROUTE_AND_SAME_SESSION_PROMOTION_PASS") &&

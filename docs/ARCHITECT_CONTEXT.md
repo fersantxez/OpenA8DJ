@@ -51,6 +51,12 @@ Branch: `driverkit/cpp-redesign`
   matched sidecars and still fails objectively: native quality alignment
   `0.845270`, C++ audiophile SNR floor `-7.052454 dB`, and Python audiophile SNR
   floor `-7.019721 dB`.
+- 2026-06-18 timing-instability claim status: product quality claims now fail
+  explicitly on timing instability. The selected run reports
+  `timing_instability_dominant`, native lag jumps `36`, C++ audiophile delay
+  p95 `73.5` frames, and Python audiophile delay p95 `2499.5` frames, so
+  `product_quality_claim_gate` must expose
+  `timing_instability_blocks_quality_claim=true`.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
   `audiophile-wav-analysis-maxlag6.json`, `fractional-time-warp.json`, and
