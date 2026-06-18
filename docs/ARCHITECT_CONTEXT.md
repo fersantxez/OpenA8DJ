@@ -3398,3 +3398,18 @@ Current implication:
   hardware lock is free. This is a stable diagnostic load only; product human
   listening, Timecode Vinyl certification, CPU/resource superiority, and branch
   promotion remain blocked.
+- 16:24 EDT current A/B and CPU sample: the post-close 8 s same-session
+  source-reference A/B again shows default C++ improving relative quality over
+  mainline (`quality_alignment_score 0.843286` vs `0.619615`, SNR
+  `2.430796 dB` vs `-2.874929 dB`) while failing absolute audiophile gates and
+  CPU/resource gates (`driver_cpu_p95 19.4` vs `6.2`). The follow-up driver
+  sample at
+  `local-analysis/cpu-sample/20260618T2024Z-default-cpp-postclose-driver-sample`
+  attributes CPU primarily to IOUSBHost async enqueue from capture/playback
+  paths, especially capture completion -> `queueCaptureTransfer` ->
+  `submitCaptureTransfer`. `writeOutput` and playback fill are not dominant.
+  Previously rejected knobs already cover the obvious HAL shortcuts: raw/reused
+  completion handlers, input decode batching, output-only no-capture, playback
+  coalescing, and capture batching above ISO8. Next performance work should
+  either preserve the current ISO8 quality family while reducing true enqueue
+  overhead, or move the improvement into the DriverKit/USB transport plan.

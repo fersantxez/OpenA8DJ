@@ -15158,3 +15158,63 @@ Follow-up correction:
     evidence.
   - Required next product evidence remains same-session source-reference A/B,
     runtime CPU/resource superiority, and Timecode Vinyl physical validation.
+
+## 2026-06-18 - Post-Close Default Source-Reference A/B And CPU Sample
+
+- Scope:
+  - Ran a current-HEAD lock-gated same-session source-reference A/B using the
+    stable default C++ HAL against the read-only mainline C HAL.
+  - The first attempted 12 s run failed fixture preparation because the
+    selected reference WAV is 8 s long; it was cleaned up by the runner and is
+    diagnostic only.
+  - Re-ran the window at 8 s, matching the fixture duration, with
+    `--leave-loaded`.
+  - Collected a separate C++ driver process sample during playback/capture.
+- Commands:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T2017Z-default-source-reference-ab-12s --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 12 --rate 48000 --buffer 512`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --leave-loaded --run-dir local-analysis/physical-evidence-window/20260618T2020Z-default-source-reference-ab-8s-postclose --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 8 --rate 48000 --buffer 512`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --rate 48000 --buffer 512 --seconds 8 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --stream-stats-snapshots --sample-driver-process --sample-driver-delay 3 --sample-driver-seconds 5 --run-dir local-analysis/cpu-sample/20260618T2024Z-default-cpp-postclose-driver-sample`
+- Result:
+  - 12 s attempt: FAIL before playback evidence because
+    `source is too short: 8.00s < 12.00s`; cleanup guard PASS, HAL unloaded,
+    lock free.
+  - 8 s A/B: same-session compare FAIL,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Mainline: `quality_alignment_score=0.619615`, SNR `-2.874929 dB`,
+    `lag_jumps_gt_2_frames=23`, driver CPU p95 `6.2`, coreaudiod p95 `6.0`.
+  - C++ default: `quality_alignment_score=0.843286`, SNR `2.430796 dB`,
+    `lag_jumps_gt_2_frames=24`, driver CPU p95 `19.4`, coreaudiod p95 `14.5`.
+  - C++ passed relative gates for quality alignment, SNR, mid residual, high
+    residual, clicks, clipping, and capture submit rate, but failed quiet-noise,
+    lag-jump, driver CPU, coreaudiod CPU, and audiophile analyzer gates.
+  - C++ submit cadence: capture about `1000.16/s`, playback about `545.54/s`.
+    Mainline playback submit counter remains not comparable.
+  - The `--leave-loaded` run left the stable C++ HAL installed; installed hash
+    still matches `build/OpenA8DJ.driver`.
+  - Hardware lock final state: free.
+- Driver process sample:
+  - Evidence:
+    `local-analysis/cpu-sample/20260618T2024Z-default-cpp-postclose-driver-sample/driver-sample/analysis.json`.
+  - `sample` ran successfully and reported
+    `dominant_interpretation=usbhost_async_enqueue_from_capture_and_playback_paths`.
+  - Keyword totals: `usbhost_enqueue=918`,
+    `capture_completion_callback=545`, `handle_capture=540`,
+    `queue_capture=873`, `queue_playback=207`, `fill_playback=45`,
+    `write_output=4`.
+  - Top hot path is capture completion -> `queueCaptureTransfer` ->
+    `submitCaptureTransfer` -> `IOUSBHostPipe enqueueIORequest...` /
+    `IOConnectCallAsyncMethod`, with playback enqueue as a secondary cost.
+- Interpretation:
+  - Current default C++ continues to beat mainline on several relative quality
+    metrics in this route, but absolute quality and CPU/resource gates fail.
+  - The process sample rules out `writeOutput`/mixing as the dominant CPU
+    cause for this candidate. The dominant CPU cost is the IOUSBHost async
+    enqueue cadence, especially capture ISO8 requeue.
+  - Previously tested cheap HAL knobs that touch this area remain physically
+    rejected: reused/raw completion handlers did not reduce CPU enough, input
+    decode batching broke quality, and capture batching above ISO8 caused
+    transaction storms or severe quality collapse.
+  - Next CPU work must preserve the best current ISO8 quality family or move
+    to a different transport architecture that reduces enqueue overhead with
+    new offline and physical evidence. No superiority or promotion claim is
+    allowed from this run.

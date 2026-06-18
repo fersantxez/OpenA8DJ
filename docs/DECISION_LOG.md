@@ -9943,3 +9943,40 @@ Next implication:
 - Readiness impact: a stable diagnostic load is closed for controlled review.
   Product readiness, audiophile superiority, Timecode Vinyl certification, CPU
   superiority, and branch promotion remain blocked.
+
+## 2026-06-18 - Treat IOUSBHost Enqueue Cadence As Dominant CPU Blocker
+
+- Decision: stop treating small HAL hot-path flags as the primary route to
+  mainline-level CPU. The next serious performance candidate must reduce true
+  IOUSBHost enqueue overhead while preserving the current ISO8 quality family,
+  or shift the work into the DriverKit/USB transport architecture.
+- Reason: the post-close driver sample attributes CPU to capture/playback
+  enqueue cadence, not output mixing or CoreAudio write callbacks. The dominant
+  stack is capture completion -> `queueCaptureTransfer` ->
+  `submitCaptureTransfer` -> `IOUSBHostPipe enqueueIORequest...` /
+  `IOConnectCallAsyncMethod`; playback enqueue is secondary.
+- Evidence:
+  - Current A/B:
+    `local-analysis/physical-evidence-window/20260618T2020Z-default-source-reference-ab-8s-postclose`.
+  - Same-session result remains FAIL:
+    C++ quality `0.843286` vs mainline `0.619615`, but C++ driver CPU p95
+    `19.4` vs mainline `6.2`, and absolute audiophile gates fail.
+  - Driver sample:
+    `local-analysis/cpu-sample/20260618T2024Z-default-cpp-postclose-driver-sample/driver-sample/analysis.json`.
+  - Sample interpretation:
+    `usbhost_async_enqueue_from_capture_and_playback_paths`; keyword totals
+    include `usbhost_enqueue=918`, `queue_capture=873`,
+    `capture_completion_callback=545`, `queue_playback=207`,
+    `fill_playback=45`, and `write_output=4`.
+- Alternatives rejected:
+  - Re-enable reused/raw completion handlers: rejected because prior physical
+    evidence showed only small CPU improvement and still failed quality/CPU.
+  - Batch input decode: rejected because the ISO8 input-batch candidate
+    physically destroyed quality.
+  - Batch capture above ISO8: rejected because ISO16/64 capture batching
+    physically failed with severe quality collapse or zero-complete storms.
+  - Treat playback scheduler as enough: rejected because it reduced playback
+    submit cadence but did not solve CPU or quality.
+- Readiness impact: product readiness remains blocked. This narrows the next
+  work to a measurable transport redesign rather than more low-impact HAL
+  flags.
