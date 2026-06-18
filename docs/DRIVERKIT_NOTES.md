@@ -173,3 +173,26 @@ Interpretation:
 - It prevents a future dext implementation from skipping timing and
   configuration contracts, but it does not solve the current physical
   quality/USB enqueue bottleneck by itself.
+
+## Runtime Binding Gap Gate
+
+Added on 2026-06-18:
+
+- `opena8djcpp_driverkit_runtime_binding_gap_gate` reads the DriverKit extension
+  source and the prepared C++ backend source.
+- It requires the prepared backend to be present while explicitly detecting that
+  the extension-facing runtime hooks remain stubs:
+  - `StartIO` passes through to `IOUserAudioDevice::StartIO`;
+  - `StopIO` passes through to `IOUserAudioDevice::StopIO`;
+  - `PerformDeviceConfigurationChange` returns `kIOReturnUnsupported`;
+  - `AbortDeviceConfigurationChange` returns success without real recovery;
+  - stream memory and zero timestamp bindings are absent;
+  - `StartDevice` still uses default `AudioStreamConfig{}`.
+
+Interpretation:
+
+- PASS means the blocker is correctly exposed in offline evidence.
+- PASS does not mean the DriverKit extension is runnable, signed, installed, or
+  ready for hardware.
+- The next implementation step is to bind `IOUserAudioDevice` to the skeleton's
+  stream memory, timestamps, configuration policy, and USB request adapter.

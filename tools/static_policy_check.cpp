@@ -108,6 +108,7 @@ int main(int argc, char** argv) {
       root / "tools/quality_root_cause_analysis.cpp",
       root / "tools/driverkit_runtime_contract.cpp",
       root / "tools/driverkit_extension_scaffold_contract.cpp",
+      root / "tools/driverkit_runtime_binding_gap_gate.cpp",
       root / "tools/driverkit_prepared_transport_contract.cpp",
       root / "tools/driverkit_usb_submit_binding_contract.cpp",
       root / "tools/driverkit_usb_request_lifecycle_contract.cpp",

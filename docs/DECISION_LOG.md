@@ -6995,3 +6995,37 @@ Alternatives discarded:
 Next implication:
 - Future physical A/B runs can report both accepted submit cadence and failed
   enqueue attempts before any CPU/resource superiority claim.
+
+## 2026-06-18: Gate DriverKit Runtime Binding Stubs
+
+Decision:
+- Added `opena8djcpp_driverkit_runtime_binding_gap_gate`.
+- The gate treats current `IOUserAudioDevice` pass-through/stub methods as an
+  explicit product blocker while still allowing offline CI to pass when the
+  blocker is truthfully reported.
+
+Reason:
+- The prepared C++ backend has stream models, preallocated request structures,
+  and USB submit planning, but the DriverKit extension source still leaves
+  `StartIO`, `StopIO`, configuration-change sequencing, stream memory, and zero
+  timestamp integration unimplemented.
+- A clean scaffold build must not become a false signal for audio quality,
+  timecode, CPU, or hardware readiness.
+
+Evidence:
+- The new gate requires `prepared_backend_available=true`,
+  `runtime_binding_blocked=true`, and
+  `product_driverkit_runtime_ready=false`.
+- It also requires the blocked claim:
+  `NO_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_WHILE_IOUSERAUDIODEVICE_PATHS_ARE_STUBS`.
+
+Alternatives discarded:
+- Treat the existing DriverKit scaffold contract as enough: rejected because it
+  verifies shape, not runtime binding.
+- Fail CTest while stubs exist: rejected because the useful offline state is a
+  passing diagnostic that records exactly why readiness remains blocked.
+
+Next implication:
+- The next DriverKit implementation step is to bind `IOUserAudioDevice` stream
+  memory, monotonic zero timestamps, configuration-change policy, and the
+  prepared USB request adapter to the skeleton before any dext runtime claim.

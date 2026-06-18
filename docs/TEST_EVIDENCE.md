@@ -10638,3 +10638,41 @@ Full offline gate rerun:
     counters that represent accepted USB work, not failed queue attempts.
   - This improves measurement truth only. It does not prove lower CPU, better
     sound quality, timecode readiness, or branch-promotion readiness.
+
+## 2026-06-18 DriverKit Runtime Binding Gap Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_driverkit_runtime_binding_gap_gate`.
+  - Wired the gate into CMake, CTest, offline evidence summary, evidence schema,
+    and static policy auditing.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `git diff --check`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_runtime_binding_gap_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_driverkit_runtime_binding_gap_gate`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_driverkit_(extension_scaffold_contract|runtime_binding_gap_gate|runtime_contract)' --output-on-failure`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `scripts/run-cpp-offline-gates`
+- Focused result before commit:
+  - Diagnostic PASS with `runtime_binding_blocked=true`,
+    `prepared_backend_available=true`, and
+    `product_driverkit_runtime_ready=false`.
+  - Focused DriverKit CTest: PASS for runtime contract, extension scaffold
+    contract, and runtime binding gap gate.
+  - Static policy: PASS, `forbidden_hits=0`.
+  - Full dirty offline package: Debug CTest `60/60`, Release CTest `61/61`,
+    evidence schema PASS with `required_files=63`, `missing_files=0`.
+  - Provenance freshness inside that dirty run correctly reported FAIL with
+    `working_tree_clean_for_claim=false` because the worktree was not clean for
+    a current-candidate claim before commit.
+- Interpretation:
+  - The DriverKit scaffold remains a non-runnable integration target until
+    `IOUserAudioDevice` stream memory, zero timestamps, configuration-change
+    sequencing, and the USB request adapter are bound to the prepared backend.

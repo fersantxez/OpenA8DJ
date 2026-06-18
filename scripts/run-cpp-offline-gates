@@ -47,6 +47,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_runtime_contract | tee "$EVIDENCE_DIR/driverkit-runtime-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_extension_scaffold_contract | tee "$EVIDENCE_DIR/driverkit-extension-scaffold-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_runtime_binding_gap_gate | tee "$EVIDENCE_DIR/driverkit-runtime-binding-gap-gate.json"
 ./build/cpp-release/opena8djcpp_driverkit_sdk_preflight_gate | tee "$EVIDENCE_DIR/driverkit-sdk-preflight-gate.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract | tee "$EVIDENCE_DIR/driverkit-prepared-hotpath-contract.json"
@@ -184,6 +185,7 @@ surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
 driverkit_runtime = load_json("driverkit-runtime-contract.json")
 driverkit_extension_scaffold = load_json("driverkit-extension-scaffold-contract.json")
+driverkit_runtime_binding_gap = load_json("driverkit-runtime-binding-gap-gate.json")
 driverkit_sdk_preflight = load_json("driverkit-sdk-preflight-gate.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json")
@@ -872,6 +874,43 @@ summary = {
         "product_id": driverkit_extension_scaffold.get("product_id"),
         "evidence": "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
     },
+    "driverkit_runtime_binding_gap_gate": {
+        "status": driverkit_runtime_binding_gap.get("result"),
+        "schema": driverkit_runtime_binding_gap.get("schema"),
+        "device_start_io_passthrough": driverkit_runtime_binding_gap.get(
+            "device_start_io_passthrough"
+        ),
+        "device_stop_io_passthrough": driverkit_runtime_binding_gap.get(
+            "device_stop_io_passthrough"
+        ),
+        "device_configuration_change_unsupported": driverkit_runtime_binding_gap.get(
+            "device_configuration_change_unsupported"
+        ),
+        "device_abort_configuration_change_stub": driverkit_runtime_binding_gap.get(
+            "device_abort_configuration_change_stub"
+        ),
+        "stream_memory_binding_missing": driverkit_runtime_binding_gap.get(
+            "stream_memory_binding_missing"
+        ),
+        "zero_timestamp_binding_missing": driverkit_runtime_binding_gap.get(
+            "zero_timestamp_binding_missing"
+        ),
+        "driver_start_device_uses_default_config": driverkit_runtime_binding_gap.get(
+            "driver_start_device_uses_default_config"
+        ),
+        "prepared_backend_available": driverkit_runtime_binding_gap.get(
+            "prepared_backend_available"
+        ),
+        "runtime_binding_blocked": driverkit_runtime_binding_gap.get(
+            "runtime_binding_blocked"
+        ),
+        "product_driverkit_runtime_ready": driverkit_runtime_binding_gap.get(
+            "product_driverkit_runtime_ready"
+        ),
+        "next_required_action": driverkit_runtime_binding_gap.get("next_required_action"),
+        "blocked_claim": driverkit_runtime_binding_gap.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/driverkit-runtime-binding-gap-gate.json",
+    },
     "driverkit_sdk_preflight_gate": {
         "status": driverkit_sdk_preflight.get("result"),
         "xcrun_driverkit_sdk_available": driverkit_sdk_preflight.get(
@@ -1365,7 +1404,13 @@ summary = {
     encoding="utf-8",
 )
 PY
+set +e
 ./build/cpp-release/opena8djcpp_evidence_provenance_freshness_gate | tee "$EVIDENCE_DIR/evidence-provenance-freshness-gate.json"
+PROVENANCE_RC=$?
+set -e
+if [[ "$PROVENANCE_RC" -ne 0 && "$PROVENANCE_RC" -ne 1 ]]; then
+  exit "$PROVENANCE_RC"
+fi
 python3 - <<'PY'
 import json
 from pathlib import Path

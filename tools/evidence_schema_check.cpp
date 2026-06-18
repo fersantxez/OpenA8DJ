@@ -79,6 +79,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
       root / "local-analysis/cpp-offline/driverkit-runtime-contract.json",
       root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-runtime-binding-gap-gate.json",
       root / "local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json",
       root / "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
@@ -143,6 +144,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto driverkit_sdk_preflight_gate =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_sdk_preflight_gate").value_or("");
+  const auto driverkit_runtime_binding_gap_gate =
+      opena8djcpp::evidence_json::json_object(summary, "driverkit_runtime_binding_gap_gate")
+          .value_or("");
   const auto driverkit_usb_request_lifecycle_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_lifecycle_contract")
           .value_or("");
@@ -209,6 +213,23 @@ int main(int argc, char** argv) {
       string_field_is(
           driverkit_sdk_preflight_gate, "blocked_claim",
           "NO_REAL_DRIVERKIT_DEXT_BUILD_OR_READINESS_CLAIM_WITHOUT_DRIVERKIT_SDK_AND_SELECTED_FULL_XCODE") &&
+      object_present(summary, "driverkit_runtime_binding_gap_gate") &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_start_io_passthrough", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_stop_io_passthrough", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "device_configuration_change_unsupported", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "device_abort_configuration_change_stub", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "stream_memory_binding_missing", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "zero_timestamp_binding_missing", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "driver_start_device_uses_default_config", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "prepared_backend_available", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "runtime_binding_blocked", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "product_driverkit_runtime_ready", false) &&
+      string_field_is(
+          driverkit_runtime_binding_gap_gate, "blocked_claim",
+          "NO_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_WHILE_IOUSERAUDIODEVICE_PATHS_ARE_STUBS") &&
       object_present(summary, "driverkit_usb_request_lifecycle_contract") &&
       number_field_is(driverkit_usb_request_lifecycle_contract, "stable_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_request_lifecycle_contract, "stable_completed_frames", 5808.0) &&

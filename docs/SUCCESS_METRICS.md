@@ -2258,3 +2258,10 @@ Prepared transport migration metric:
     came from a current lock-gated route-validation or same-session A/B window.
   This gate is an additional distortion/sideband detector; it never replaces
   music soundcheck, route health, CPU, routing, or Traktor/timecode gates.
+- `local-analysis/cpp-offline/driverkit-runtime-binding-gap-gate.json` must be
+  present. Current expected state is diagnostic PASS with
+  `runtime_binding_blocked=true` and `product_driverkit_runtime_ready=false`.
+  Physical or DriverKit runtime readiness cannot be claimed until this gate is
+  replaced by real binding evidence for `IOUserAudioDevice::StartIO`,
+  `StopIO`, stream memory descriptors, monotonic zero timestamps,
+  configuration-change sequencing, and the USB request adapter.

@@ -2561,3 +2561,11 @@ Current implication:
     loaded the candidate, enumerated `Open Audio 8 DJ` as 8 in / 8 out,
     preserved `iRig Stream`, then unloaded the HAL and left CoreAudio clean.
     This is install/reload safety only, not audio quality or CPU superiority.
+  - DriverKit runtime binding is now explicitly blocked by
+    `opena8djcpp_driverkit_runtime_binding_gap_gate`. The gate verifies that the
+    offline prepared backend exists, but the extension-facing
+    `IOUserAudioDevice` methods still pass through or return stubs:
+    `StartIO`, `StopIO`, configuration change, stream memory, zero timestamps,
+    and default stream config. This prevents any dext readiness claim until the
+    scaffold is wired to real stream memory, timing, and USB request adapter
+    behavior.
