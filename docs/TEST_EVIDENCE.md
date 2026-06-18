@@ -14632,3 +14632,46 @@ Readiness impact:
     rollback ready and no superiority claim.
   - It is not `audio-routing-human-rc`, not Timecode Vinyl certified, and not
     eligible for Legacy/main promotion.
+
+## 2026-06-18 - 14:40 EDT Build-Only Perfection Candidates
+
+- Commit: working tree after `a04c78a`.
+- Safety:
+  - Offline build-only. No hardware lock required because these commands did
+    not install, unload, reload, activate, play, capture, claim USB, change
+    CoreAudio defaults, or restart services.
+  - A prior parallel build attempt was discarded as evidence because both
+    candidate builders temporarily pass through `build/OpenA8DJ.driver`.
+    Trusted evidence below is from a sequential rebuild followed by `make dist`
+    to restore the distribution RC artifact.
+- Commands:
+  - `python3 -m py_compile scripts/build-hal-usb-clock-candidate scripts/build-hal-prepared-runtime-candidate`
+  - `make hal-usb-clock-candidate`
+  - `make hal-prepared-lite-candidate`
+  - `make dist`
+  - `shasum -a 256 build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL build/OpenA8DJ-usb-clock.driver/Contents/MacOS/OpenA8DJHAL build/OpenA8DJ-prepared-lite.driver/Contents/MacOS/OpenA8DJHAL build/OpenA8DJ-0.3.25.pkg build/OpenA8DJ-0.3.25.dmg`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/build/OpenA8DJ-usb-clock.driver/usb-clock-candidate.json`
+  - `/Users/fer/dev/audio8djcpp/build/OpenA8DJ-prepared-lite.driver/prepared-lite-candidate.json`
+- Result:
+  - Script syntax check: `PASS`.
+  - USB-clock candidate build: `PASS`.
+    HAL SHA-256:
+    `d97ef45d5b1304f025be94a5e968b41bfe4ed983dd81dc4b2807f5325f200423`.
+  - Prepared-lite candidate build: `PASS`.
+    HAL SHA-256:
+    `182eab563848a59cb2b889fec9e814bf9a0c2b7770f050ce6c16c1086fd1add0`.
+  - Distribution RC restored by `make dist`.
+    Default HAL SHA-256:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Package SHA-256:
+    `1641352c588163cfc6be47c8581daff8062b78415c3bd8ffc41b14fd4c202d8b`.
+  - DMG SHA-256:
+    `329944e2254a2a1565b9027c52d5e32ef9c6fbf848fd9095cd935eaed9527aa4`.
+- Decision:
+  - The default distribution HAL remains the 15:00 EDT
+    `diagnostic-functional-rc`.
+  - `OpenA8DJ-usb-clock.driver` and `OpenA8DJ-prepared-lite.driver` are opt-in
+    perfection candidates only. They have no physical evidence yet and cannot
+    support audiophile-quality, Timecode Vinyl, CPU, or mainline-superiority
+    claims.

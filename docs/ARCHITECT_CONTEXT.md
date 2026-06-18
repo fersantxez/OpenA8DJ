@@ -3285,3 +3285,11 @@ Current implication:
   `lag_jumps_gt_2_frames=33`. The correct label for the 15:00 EDT window is
   `diagnostic-functional-rc`, not product-quality readiness, not mainline
   superiority, not Timecode Vinyl certification, and not branch promotion.
+- 14:40 EDT stability-freeze update: for the 15:00 EDT target, functionality
+  and stability take priority over perfect sound quality and CPU/resource
+  superiority. The default distribution HAL remains the diagnostic functional
+  RC. Two opt-in perfection candidates now exist for later separate lock-gated
+  windows only: `build/OpenA8DJ-usb-clock.driver` for timing/quality and
+  `build/OpenA8DJ-prepared-lite.driver` for lower-risk prepared-submit CPU
+  work. Both are build-only artifacts with `product_claim_allowed=false`; they
+  must not replace the active RC without fresh physical evidence.

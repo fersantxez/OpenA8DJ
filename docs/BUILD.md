@@ -1337,3 +1337,53 @@ lock-gated physical step. `ROUTE_ONLY_READY` authorizes only route validation
 after lock acquisition. `FULL_AB_READY` means both the route and the C++/mainline
 bundle identities are present for a same-session A/B window. Neither status is
 a product-quality, CPU, Timecode Vinyl, or branch-promotion claim.
+
+## 15:00 EDT Opt-In Perfection Candidates
+
+The 15:00 EDT candidate stays the default distribution HAL unless later
+lock-gated evidence proves a better candidate. Experimental timing and CPU
+profiles must be built into separate bundle paths and must not replace the
+default diagnostic RC implicitly.
+
+USB clock/timing candidate:
+
+```sh
+make hal-usb-clock-candidate
+```
+
+This writes `build/OpenA8DJ-usb-clock.driver` and
+`build/OpenA8DJ-usb-clock.driver/usb-clock-candidate.json`. It enables USB
+clock anchoring and zero HAL timestamps, then rebuilds the normal local HAL
+bundle. It is offline build-only: no install, no CoreAudio reload, no USB
+claiming, no playback, no capture, and no default-device change.
+
+Prepared-lite CPU candidate:
+
+```sh
+make hal-prepared-lite-candidate
+```
+
+This writes `build/OpenA8DJ-prepared-lite.driver` and
+`build/OpenA8DJ-prepared-lite.driver/prepared-lite-candidate.json` with
+prepared-submit runtime enabled at `slots-per-submit=2`, capture queue depth
+`4`, playback queue target `4`, `HAL_CAPTURE_ISO_FRAMES=16`, and playback
+coalesce transfers `2`. It is a lower-risk follow-up to the rejected 8x
+prepared-runtime profile, not a replacement for the active diagnostic RC.
+
+After building either opt-in candidate, regenerate the default distribution
+artifact before packaging or physical testing the RC:
+
+```sh
+make dist
+shasum -a 256 build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL
+```
+
+The expected diagnostic RC HAL hash for the 2026-06-18 15:00 EDT window is:
+
+```text
+23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb
+```
+
+Neither opt-in candidate permits an audiophile-quality, Timecode Vinyl, CPU, or
+mainline-superiority claim until a separate lock-gated physical evidence window
+passes.

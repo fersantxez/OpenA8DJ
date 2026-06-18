@@ -5247,3 +5247,51 @@ Next action:
   functional RC.
 - For later perfection, test an opt-in USB-clock-anchor candidate for timing and
   a prepared-lite candidate for CPU, each under separate lock-gated windows.
+
+## 2026-06-18 Architect Continuation: 15:00 Stability Freeze
+
+Subagent:
+- Integration Readiness Auditor.
+
+Required warning:
+- The subagent received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Keep the 15:00 EDT candidate focused on functionality and stability, while
+  preserving quality/CPU experiments as isolated follow-up candidates.
+
+Findings:
+- The Makefile targets are opt-in and are not part of `all` or the normal
+  `hal` target.
+- The USB-clock builder requires a candidate path separate from
+  `build/OpenA8DJ.driver`, writes `product_claim_allowed=false`, and restores
+  the normal HAL after copying the experiment.
+- Risk remains if a build is interrupted while `build/OpenA8DJ.driver` is
+  temporarily experimental; therefore `make dist` is required before treating
+  the default distribution HAL as the RC again.
+
+Integrated action:
+- Added `make hal-usb-clock-candidate` for a separate USB-clock-anchor timing
+  bundle.
+- Added `make hal-prepared-lite-candidate` for a separate lower-risk
+  prepared-submit CPU bundle.
+- Rebuilt both candidates sequentially, then regenerated the distribution RC
+  with `make dist`.
+- Updated the human-test candidate document so the 15:00 policy clearly
+  prioritizes functionality and stability over perfection.
+
+Risks:
+- The new candidates are build-only and untested physically.
+- They must not be installed over the active diagnostic RC unless a separate
+  lock-gated window is explicitly chosen.
+- They do not change the current label: `diagnostic-functional-rc`.
+
+Next action:
+- Preserve the default RC for the 15:00 diagnostic human baseline.
+- After the baseline, run one experimental physical window at a time, starting
+  with USB-clock-anchor if timing/quality is the next blocker, or prepared-lite
+  if CPU/resource consumption becomes the limiting blocker.

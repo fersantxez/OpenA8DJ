@@ -315,6 +315,15 @@ is `diagnostic-functional-rc`: controlled human diagnostic listening may proceed
 with rollback ready, but product quality, CPU superiority, Timecode Vinyl
 certification, and Legacy/main promotion remain forbidden.
 
+14:40 EDT update: the 15:00 cut is now explicitly a stability/functionality
+freeze. The priority order is: installable default HAL identity, operational
+stability, Audio 8 DJ 8x8 enumeration, rollback safety, and controlled human
+diagnostic usefulness. Fine sound-quality tuning, CPU/resource superiority,
+USB-clock-anchor experiments, prepared-runtime/prepared-lite experiments, and
+Timecode Vinyl certification remain measured perfection work for later locked
+windows. None of those experiments replace the active default HAL or unlock a
+product claim without new physical evidence.
+
 ### Phase 1 - 11:06-11:45 EDT: Evidence Board Consistency
 
 - Regenerate offline evidence so current direct USB diagnostics under

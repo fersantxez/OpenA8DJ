@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+"""Build a separate opt-in HAL candidate with USB clock anchoring enabled.
+
+This script is build-only. It writes only under the C++ worktree, copies the
+experimental bundle to a separate path, then rebuilds the normal HAL bundle so
+build/OpenA8DJ.driver remains the conservative default candidate.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def run(argv: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        argv,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    info = path / "Contents/Info.plist"
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    return {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+    }
+
+
+def write_json(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ-usb-clock.driver")
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--stable-frame", action="store_true")
+    parser.add_argument("--anchor-filter", type=int, default=8)
+    args = parser.parse_args()
+
+    if args.anchor_filter < 0:
+        raise ValueError("--anchor-filter must be non-negative")
+
+    candidate = resolve_path(args.candidate)
+    require_inside_root(candidate, "--candidate")
+    if candidate == ROOT or candidate == DEFAULT_HAL:
+        raise ValueError("--candidate must be separate from the worktree and default HAL")
+    json_out = resolve_path(args.json_out) if args.json_out else None
+    if json_out is not None:
+        require_inside_root(json_out, "--json-out")
+
+    build_rc, build_stdout, build_stderr = run(
+        [
+            "make",
+            "-B",
+            "hal",
+            "HAL_USB_CLOCK_ANCHOR=1",
+            "HAL_USB_ZERO_TIMESTAMP=1",
+            f"HAL_USB_STABLE_FRAME={1 if args.stable_frame else 0}",
+            f"HAL_USB_ANCHOR_FILTER={args.anchor_filter}",
+        ]
+    )
+
+    copied = False
+    if build_rc == 0 and DEFAULT_HAL_BIN.is_file():
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+        copied = True
+
+    experimental_metrics = bundle_metrics(candidate)
+
+    restore_rc, restore_stdout, restore_stderr = run(["make", "-B", "hal"])
+    default_metrics = bundle_metrics(DEFAULT_HAL)
+
+    experimental_hash = str(experimental_metrics.get("executable_sha256", ""))
+    default_hash = str(default_metrics.get("executable_sha256", ""))
+    gates = [
+        {
+            "name": "usb_clock_build",
+            "result": "PASS" if build_rc == 0 else "FAIL",
+            "return_code": build_rc,
+        },
+        {
+            "name": "usb_clock_candidate_copied",
+            "result": "PASS" if copied else "FAIL",
+        },
+        {
+            "name": "usb_clock_candidate_complete",
+            "result": "PASS"
+            if experimental_metrics["bundle_exists"]
+            and experimental_metrics["info_plist_exists"]
+            and experimental_metrics["executable_exists"]
+            and int(experimental_metrics["executable_bytes"]) > 0
+            else "FAIL",
+        },
+        {
+            "name": "default_hal_restored",
+            "result": "PASS"
+            if restore_rc == 0
+            and default_metrics["bundle_exists"]
+            and default_metrics["info_plist_exists"]
+            and default_metrics["executable_exists"]
+            and int(default_metrics["executable_bytes"]) > 0
+            else "FAIL",
+            "return_code": restore_rc,
+        },
+        {
+            "name": "usb_clock_hash_differs_from_default",
+            "result": "PASS"
+            if experimental_hash and default_hash and experimental_hash != default_hash
+            else "FAIL",
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.hal-usb-clock-candidate.v1",
+        "safety": "offline_local_build_only_no_install_load_coreaudio_usb_hardware_or_default_device_touch",
+        "result": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "usb_clock_anchor_enabled": True,
+        "usb_zero_timestamp_enabled": True,
+        "usb_stable_frame_poll_enabled": bool(args.stable_frame),
+        "usb_anchor_filter": args.anchor_filter,
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "candidate_metrics": experimental_metrics,
+        "default_hal_after_restore": default_metrics,
+        "default_hal_restored": restore_rc == 0 and default_metrics["executable_exists"],
+        "candidate_hash_differs_from_default": bool(
+            experimental_hash and default_hash and experimental_hash != default_hash
+        ),
+        "gates": gates,
+        "blocked_claim": "NO_AUDIOPHILE_TIMING_OR_CPU_CLAIM_FROM_BUILD_ARTIFACT_WITHOUT_LOCK_GATED_PHYSICAL_EVIDENCE",
+    }
+    if build_rc != 0:
+        report["build_stderr"] = build_stderr[-4000:]
+        report["build_stdout"] = build_stdout[-4000:]
+    if restore_rc != 0:
+        report["restore_build_stderr"] = restore_stderr[-4000:]
+        report["restore_build_stdout"] = restore_stdout[-4000:]
+
+    text = json.dumps(report, indent=2, sort_keys=True)
+    print(text)
+    if json_out is not None:
+        write_json(json_out, report)
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

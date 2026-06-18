@@ -2693,3 +2693,10 @@ Current implementation:
 - The 15:00 EDT target is allowed to produce an installable diagnostic RC with
   `objective_achieved=false`; it is not allowed to produce a superiority claim
   without the physical gates above.
+- For the 15:00 EDT freeze specifically, the minimum useful result is
+  functionality and stability, not final superiority: installable default HAL
+  identity, Audio 8 DJ `8 in / 8 out` visibility, stable audio stack, rollback
+  path, and no immediate underrun/panic/click/clipping evidence in a short
+  diagnostic smoke. Sound-quality perfection, CPU/resource superiority, and
+  Timecode Vinyl certification remain required for product readiness but may be
+  completed in later measured iterations.
