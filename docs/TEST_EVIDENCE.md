@@ -15516,3 +15516,31 @@ Follow-up correction:
     CPU attribution window.
   - It is not product readiness, not mainline superiority, and not Timecode
     Vinyl physical validation.
+
+## 2026-06-18 - Post-Commit Stable Load Offline Freshness Gate
+
+- Scope:
+  - Reran the full offline gate suite after commit `d18adbc`.
+  - Did not install, unload, reload, play audio, record audio, change CoreAudio,
+    change USB, or touch hardware.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+- Result:
+  - Debug CTest: `86/86` PASS.
+  - Release CTest: `87/87` PASS.
+  - Evidence schema: PASS with `required_files=109`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Evidence freshness: PASS with `head_commit=d18adbc`,
+    `summary_base_commit=d18adbc`, `summary_matches_head=true`, and
+    `working_tree_clean_for_claim=true`.
+  - Offline summary: `status=PASS`, `diagnostic_status=PASS`,
+    `final_objective_status=NOT_READY`, `branch_promotion_allowed=false`.
+- Interpretation:
+  - The stable load is reproducible as an offline diagnostic RC state.
+  - It is still blocked for product quality, CPU superiority, Timecode Vinyl
+    physical validation, and branch promotion.
