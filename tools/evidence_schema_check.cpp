@@ -74,6 +74,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/timecode-readiness-gate.json",
       root / "local-analysis/cpp-offline/dvs-signal-smoke.json",
       root / "local-analysis/cpp-offline/dvs-packet-input-decode.json",
+      root / "local-analysis/cpp-offline/dvs-timecode-stress-margin.json",
       root / "local-analysis/cpp-offline/realtime-audit.json",
       root / "local-analysis/cpp-offline/driverkit-surface-model.json",
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
@@ -160,6 +161,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto audiophile_precision_claim_gate =
       opena8djcpp::evidence_json::json_object(summary, "audiophile_precision_claim_gate")
+          .value_or("");
+  const auto dvs_timecode_stress_margin =
+      opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
@@ -298,6 +302,18 @@ int main(int argc, char** argv) {
       string_field_is(
           audiophile_precision_claim_gate, "blocked_claim",
           "NO_AUDIOPHILE_PRECISION_OR_SUPERIORITY_CLAIM_WITHOUT_LTI_TIMEWARP_RUNTIME_AND_STATISTICAL_SAME_WINDOW_PASS") &&
+      object_present(summary, "dvs_timecode_stress_margin") &&
+      string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
+      number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&
+      number_field_is(dvs_timecode_stress_margin, "failures", 0.0) &&
+      number_field_is(dvs_timecode_stress_margin, "false_accepts", 0.0) &&
+      number_field_is(dvs_timecode_stress_margin, "deck_swaps", 0.0) &&
+      number_field_present(dvs_timecode_stress_margin, "min_abs_correlation") &&
+      number_field_present(dvs_timecode_stress_margin, "max_frequency_error_ppm") &&
+      number_field_present(dvs_timecode_stress_margin, "max_jitter_p95_frames") &&
+      number_field_present(dvs_timecode_stress_margin, "max_inactive_leakage_dbfs") &&
+      number_field_present(dvs_timecode_stress_margin,
+                           "min_inactive_to_active_tone_gap_db") &&
       object_present(summary, "physical_window_readiness_gate") &&
       bool_field_is(physical_window_readiness_gate, "ready_for_route_revalidation_window", true) &&
       bool_field_is(physical_window_readiness_gate, "ready_for_product_physical_ab", false) &&

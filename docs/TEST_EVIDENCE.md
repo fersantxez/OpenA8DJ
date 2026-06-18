@@ -10813,3 +10813,51 @@ Full offline gate rerun:
     superiority claims.
   - Current evidence remains unsuitable for claiming better sound quality,
     timebase stability, runtime resource use, or branch promotion.
+
+## 2026-06-17 DVS/Timecode Stress-Margin Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_dvs_timecode_stress_margin`.
+  - Wired it into CMake, CTest, `scripts/run-cpp-offline-gates`,
+    `opena8djcpp_timecode_readiness_gate`, evidence schema, and static policy.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `git diff --check`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_dvs_timecode_stress_margin opena8djcpp_timecode_readiness_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_dvs_timecode_stress_margin`
+  - `./build/cpp-release/opena8djcpp_dvs_timecode_stress_margin > local-analysis/cpp-offline/dvs-timecode-stress-margin.json`
+  - `./build/cpp-release/opena8djcpp_timecode_readiness_gate > local-analysis/cpp-offline/timecode-readiness-gate.json`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(dvs_timecode_stress_margin|dvs_signal_smoke|dvs_packet_input_decode|timecode_readiness_gate)' --output-on-failure`
+- Focused result:
+  - DVS/timecode CTest subset: `4/4` PASS.
+  - `opena8djcpp_dvs_timecode_stress_margin`: PASS.
+  - Rows: `48`.
+  - Failures: `0`.
+  - False accepts: `0`.
+  - Deck swaps: `0`.
+  - Minimum absolute correlation: `0.999407`.
+  - Maximum frequency error: `27.5531 ppm`.
+  - Maximum jitter p95: `0.0070985` frames.
+  - Maximum balance error: `0.451314 dB`.
+  - Maximum inactive tonal leakage: `-88.3757 dBFS`.
+  - Minimum active/inactive tonal gap: `82.7135 dB`.
+  - `opena8djcpp_timecode_readiness_gate` reports
+    `dvs_timecode_stress_margin_pass=true`, `offline_timecode_pass=true`,
+    `physical_traktor_timecode_blocked=true`, and
+    `product_timecode_ready=false`.
+- Interpretation:
+  - Offline DVS/timecode margin is stronger than before because clean decode,
+    stress decode, deck isolation, and false-accept behavior are now all
+    machine-checked.
+  - Per Banach audit, this remains a synthetic sine/quadrature DVS
+    routing/decode margin guard. It does not model proprietary Traktor vinyl
+    encoding, speed/direction semantics, turntable wow/flutter, or real scope
+    lock.
+  - This is still not physical Traktor/timecode vinyl readiness and does not
+    support branch promotion.

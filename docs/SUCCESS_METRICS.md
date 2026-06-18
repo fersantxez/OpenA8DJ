@@ -2309,3 +2309,22 @@ Current implementation:
   - mainline reference precision thresholds not met;
   - runtime residual correlation above threshold;
   - same-window statistical sample too small.
+- `local-analysis/cpp-offline/dvs-timecode-stress-margin.json` must be present
+  and PASS before offline timecode readiness can pass. Minimum expectations:
+  - rows: `48` across six stress cases, three profiles, two sample rates, and
+    four decks;
+  - failures: `0`;
+  - false accepts: `0`;
+  - deck swaps: `0`;
+  - minimum absolute correlation: `>= 0.97`;
+  - maximum frequency error: `<= 30 ppm`;
+  - maximum jitter p95: `<= 1.0` frame;
+  - maximum balance error: `<= 0.5 dB`;
+  - maximum inactive tonal leakage: `<= -80 dBFS`.
+  - minimum active/inactive tonal gap: `>= 6 dB` for swap detection.
+- Current focused DVS stress evidence passes with min correlation `0.999407`,
+  max frequency error `27.5531 ppm`, max jitter p95 `0.0070985` frames, max
+  balance error `0.451314 dB`, max inactive tonal leakage `-88.3757 dBFS`, zero
+  false accepts, zero deck swaps, and minimum active/inactive tonal gap
+  `82.7135 dB`. This is offline evidence only and cannot clear physical
+  Traktor/timecode readiness.

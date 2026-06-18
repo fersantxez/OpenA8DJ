@@ -2599,3 +2599,23 @@ Current implication:
     candidate mid/high coherence far below threshold, delay p95 around 66
     frames, runtime residual correlation above threshold, and only one
     same-window sample versus the minimum three.
+  - DVS/timecode offline stress now has a dedicated gate:
+    `opena8djcpp_dvs_timecode_stress_margin`. It packs synthetic Mode 2 input
+    for `timecode-vinyl`, `timecode-cd-line`, and `phono` across A/B/C/D at
+    44.1 and 48 kHz, then decodes/analyzes drift, noise, imbalance, dropout,
+    false accepts, deck swaps, and inactive-deck tonal leakage. Current focused
+    evidence is `48/48` PASS with zero false accepts, zero deck swaps, minimum
+    correlation `0.999407`, maximum frequency error `27.5531 ppm`, maximum
+    jitter p95 `0.0070985` frames, and maximum inactive tonal leakage
+    `-88.3757 dBFS`. `deck_swap` is measured separately from false accept by
+    comparing inactive-deck tone level against the active deck; current minimum
+    active/inactive gap is `82.7135 dB`.
+  - Timecode readiness still remains offline-only:
+    `opena8djcpp_timecode_readiness_gate` now requires the stress-margin gate,
+    but keeps `product_timecode_ready=false` and
+    `physical_status=BLOCKED_UNVALIDATED_DVS` until real Traktor/timecode
+    evidence exists on a validated capture route.
+  - Banach audit caveat: this stress gate is a synthetic sine/quadrature DVS
+    routing/decode margin guard. It is not a real Traktor-grade timecode vinyl
+    decoder test because it does not model the proprietary vinyl encoding,
+    direction/speed semantics, turntable wow/flutter, or scope-lock behavior.

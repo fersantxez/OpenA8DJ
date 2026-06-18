@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
       root / "tools/timecode_matrix.cpp",
       root / "tools/timecode_readiness_gate.cpp",
       root / "tools/dvs_signal_smoke.cpp",
+      root / "tools/dvs_timecode_stress_margin.cpp",
       root / "tools/realtime_audit.cpp",
       root / "tools/transport_budget_model.cpp",
       root / "tools/hot_path_timing_analysis.cpp",

@@ -3685,3 +3685,36 @@ Risk:
 - Integrated action:
   - Recorded the metric package in `docs/SUCCESS_METRICS.md` as the next
     analysis-gate direction.
+
+## 2026-06-17 Subagent Reuse Attempt: Banach DVS Stress Audit
+
+- Agent:
+  - Banach (`019ed889-50ec-71b0-aafc-0fc936e5ac36`)
+- Mission:
+  - Audit the new DVS/timecode stress-margin gate and thresholds for offline
+    defensibility.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Coordination note:
+  - Spawning a new QA subagent failed because the agent thread limit was already
+    reached. Banach was reused through `send_input` instead.
+- Status:
+  - Completed.
+- Findings:
+  - Thresholds are defensible for a synthetic offline DVS routing/decode margin
+    guard only.
+  - The gate does not prove real Traktor-grade timecode vinyl behavior because
+    it uses sine/quadrature carriers, not the actual proprietary vinyl encoding,
+    direction/speed semantics, wow/flutter, or scope-lock behavior.
+  - `deck_swap` needed to be separated from `false_accept`.
+  - `timecode_readiness_gate` should fail when offline timecode evidence fails,
+    while still keeping product readiness blocked without physical evidence.
+- Integrated action:
+  - `deck_swap` now compares active and inactive correlated tone levels and
+    reports `min_inactive_to_active_tone_gap_db`.
+  - `timecode_readiness_gate` now returns FAIL if offline evidence fails, but
+    still reports `product_timecode_ready=false` until physical evidence exists.

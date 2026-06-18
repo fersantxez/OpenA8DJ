@@ -279,6 +279,13 @@ target_link_libraries(opena8djcpp_dvs_packet_input_decode
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_dvs_timecode_stress_margin
+  tools/dvs_timecode_stress_margin.cpp)
+
+target_link_libraries(opena8djcpp_dvs_timecode_stress_margin
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_jitter_model
   tools/jitter_model.cpp)
 
@@ -413,6 +420,7 @@ add_test(NAME opena8djcpp_prepared_transport_pressure_gate COMMAND opena8djcpp_p
 add_test(NAME opena8djcpp_prepared_transport_migration_gate COMMAND opena8djcpp_prepared_transport_migration_gate)
 add_test(NAME opena8djcpp_dvs_signal_smoke COMMAND opena8djcpp_dvs_signal_smoke)
 add_test(NAME opena8djcpp_dvs_packet_input_decode COMMAND opena8djcpp_dvs_packet_input_decode)
+add_test(NAME opena8djcpp_dvs_timecode_stress_margin COMMAND opena8djcpp_dvs_timecode_stress_margin)
 add_test(NAME opena8djcpp_jitter_model COMMAND opena8djcpp_jitter_model)
 add_test(NAME opena8djcpp_transfer_pool_model COMMAND opena8djcpp_transfer_pool_model)
 add_test(NAME opena8djcpp_transport_budget_model COMMAND opena8djcpp_transport_budget_model)

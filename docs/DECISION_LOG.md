@@ -7148,3 +7148,53 @@ Next implication:
 - Future physical windows must produce repeated same-window mainline/C++ runs
   that pass LTI, time-warp, runtime-correlation, and statistical sample gates
   before any audiophile superiority claim.
+
+## 2026-06-17: Add DVS/Timecode Stress-Margin Gate
+
+Decision:
+- Added `opena8djcpp_dvs_timecode_stress_margin`.
+- Made `opena8djcpp_timecode_readiness_gate` require this new stress evidence
+  in addition to the existing timecode matrix, signal analysis, DVS packet
+  decode, and prepared-transport routing/timecode contract.
+
+Reason:
+- Basic DVS signal smoke and packet decode prove that profiles route and decode
+  under clean synthetic conditions. They do not prove margin against plausible
+  stressors such as frequency drift, input noise, deck crosstalk, stereo
+  imbalance, and small dropouts.
+- The correct offline leakage metric is correlated tonal leakage at the
+  timecode frequency. Total inactive-channel energy would incorrectly fail due
+  to deliberately injected synthetic noise.
+
+Evidence:
+- Focused DVS/timecode CTest subset PASS: `4/4`.
+- `opena8djcpp_dvs_timecode_stress_margin` focused PASS:
+  - rows `48`;
+  - failures `0`;
+  - false accepts `0`;
+  - deck swaps `0`;
+  - minimum absolute correlation `0.999407`;
+  - maximum frequency error `27.5531 ppm`;
+  - maximum jitter p95 `0.0070985` frames;
+  - maximum balance error `0.451314 dB`;
+  - maximum inactive tonal leakage `-88.3757 dBFS`;
+  - minimum active/inactive tonal gap `82.7135 dB`.
+- `opena8djcpp_timecode_readiness_gate` now reports
+  `dvs_timecode_stress_margin_pass=true` while keeping
+  `product_timecode_ready=false`.
+
+Alternatives discarded:
+- Treat synthetic packet decode as enough DVS evidence: rejected because it did
+  not exercise stress margin or deck false-accept behavior.
+- Fail on total inactive-channel RMS: rejected because injected broadband noise
+  is not the same thing as correlated timecode leakage between decks.
+
+Next implication:
+- This raises offline confidence in the DVS/timecode data path. It does not
+  prove Traktor/vinyl readiness; physical scope lock, deck validation, capture
+  route validation, and same-session mainline/C++ comparison remain required.
+- Banach audit accepted the thresholds as defensible only for a synthetic
+  routing/decode margin guard, not as evidence of real timecode-vinyl lock.
+- The expanded matrix uses a `30 ppm` synthetic frequency-error threshold
+  because the current zero-crossing estimator can add several ppm of error
+  under simultaneous drift, noise, crosstalk, and dropout.

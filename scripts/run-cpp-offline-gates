@@ -41,6 +41,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_timecode_signal_analysis | tee "$EVIDENCE_DIR/timecode-signal-analysis.json"
 ./build/cpp-release/opena8djcpp_dvs_signal_smoke | tee "$EVIDENCE_DIR/dvs-signal-smoke.json"
 ./build/cpp-release/opena8djcpp_dvs_packet_input_decode | tee "$EVIDENCE_DIR/dvs-packet-input-decode.json"
+./build/cpp-release/opena8djcpp_dvs_timecode_stress_margin | tee "$EVIDENCE_DIR/dvs-timecode-stress-margin.json"
 ./build/cpp-release/opena8djcpp_timecode_readiness_gate | tee "$EVIDENCE_DIR/timecode-readiness-gate.json"
 ./build/cpp-release/opena8djcpp_realtime_audit | tee "$EVIDENCE_DIR/realtime-audit.json"
 ./build/cpp-release/opena8djcpp_driverkit_surface_model | tee "$EVIDENCE_DIR/driverkit-surface-model.json"
@@ -156,6 +157,7 @@ timecode = load_json("timecode-matrix.json")
 timecode_signal = load_json("timecode-signal-analysis.json")
 dvs = load_json("dvs-signal-smoke.json")
 dvs_packet = load_json("dvs-packet-input-decode.json")
+dvs_timecode_stress_margin = load_json("dvs-timecode-stress-margin.json")
 timecode_readiness = load_json("timecode-readiness-gate.json")
 jitter = load_json("jitter-model.json")
 transfer_pool = load_json("transfer-pool-model.json")
@@ -335,6 +337,29 @@ summary = {
         "failures": dvs_packet.get("failures"),
         "playback_decode_off": dvs_packet.get("playback_decode_off"),
         "evidence": "local-analysis/cpp-offline/dvs-packet-input-decode.json",
+    },
+    "dvs_timecode_stress_margin": {
+        "status": dvs_timecode_stress_margin.get("result"),
+        "rows": dvs_timecode_stress_margin.get("row_count"),
+        "failures": dvs_timecode_stress_margin.get("failures"),
+        "false_accepts": dvs_timecode_stress_margin.get("false_accepts"),
+        "deck_swaps": dvs_timecode_stress_margin.get("deck_swaps"),
+        "min_abs_correlation": dvs_timecode_stress_margin.get("min_abs_correlation"),
+        "max_frequency_error_ppm": dvs_timecode_stress_margin.get(
+            "max_frequency_error_ppm"
+        ),
+        "max_jitter_p95_frames": dvs_timecode_stress_margin.get(
+            "max_jitter_p95_frames"
+        ),
+        "max_balance_db": dvs_timecode_stress_margin.get("max_balance_db"),
+        "max_inactive_leakage_dbfs": dvs_timecode_stress_margin.get(
+            "max_inactive_leakage_dbfs"
+        ),
+        "min_inactive_to_active_tone_gap_db": dvs_timecode_stress_margin.get(
+            "min_inactive_to_active_tone_gap_db"
+        ),
+        "thresholds": dvs_timecode_stress_margin.get("thresholds"),
+        "evidence": "local-analysis/cpp-offline/dvs-timecode-stress-margin.json",
     },
     "jitter_model": {
         "status": jitter.get("result"),

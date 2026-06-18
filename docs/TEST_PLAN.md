@@ -1501,3 +1501,36 @@ PASS/FAIL semantics:
   touch flags.
 - FAIL means no current-candidate quality, performance, timecode, routing, or
   branch-promotion claim is allowed from that evidence bundle.
+
+## DVS/Timecode Stress-Margin Gate
+
+Purpose:
+
+- prove offline margin for DVS/timecode input decode beyond clean signal smoke;
+- exercise `timecode-vinyl`, `timecode-cd-line`, and `phono` profiles across
+  A/B/C/D at 44.1 and 48 kHz with synthetic drift, noise, crosstalk, imbalance,
+  and dropouts;
+- detect false accepts, deck swaps, jitter, frequency error, balance error, and
+  correlated inactive-deck tonal leakage.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cpp-release --target opena8djcpp_dvs_timecode_stress_margin
+./build/cpp-release/opena8djcpp_dvs_timecode_stress_margin
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/dvs-timecode-stress-margin.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the offline Mode 2 input decode and timecode analyzer preserve the
+  active deck under synthetic stress with zero false accepts and zero deck
+  swaps. `deck_swap` is separate from `false_accept`: a swap requires an
+  inactive deck to approach the active deck's correlated tone level.
+- PASS does not mean Traktor/timecode vinyl readiness. Product timecode remains
+  blocked until real scope lock, physical deck validation, route validity, and
+  same-session mainline/C++ comparison exist.
