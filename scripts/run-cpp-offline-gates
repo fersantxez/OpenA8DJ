@@ -107,6 +107,7 @@ fi
 ./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee "$EVIDENCE_DIR/diagnostic-pass-semantics-gate.json"
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
 ./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee "$EVIDENCE_DIR/hal-transport-runtime-gate.json"
+./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract | tee "$EVIDENCE_DIR/hal-logical-capture-batching-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -173,6 +174,7 @@ physical_window_readiness_gate = load_json("physical-window-readiness-gate.json"
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
+hal_logical_capture_batching_contract = load_json("hal-logical-capture-batching-contract.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -680,6 +682,9 @@ summary = {
         "hal_has_no_runtime_prepared_submit": hal_transport_runtime_gate.get(
             "hal_has_no_runtime_prepared_submit"
         ),
+        "hal_has_logical_physical_capture_split": hal_transport_runtime_gate.get(
+            "hal_has_logical_physical_capture_split"
+        ),
         "offline_usb_submit_reduction_ratio": hal_transport_runtime_gate.get(
             "offline_usb_submit_reduction_ratio"
         ),
@@ -687,6 +692,32 @@ summary = {
         "next_required_action": hal_transport_runtime_gate.get("next_required_action"),
         "blocked_claim": hal_transport_runtime_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/hal-transport-runtime-gate.json",
+    },
+    "hal_logical_capture_batching_contract": {
+        "status": hal_logical_capture_batching_contract.get("result"),
+        "build_exposes_capture_iso": hal_logical_capture_batching_contract.get(
+            "build_exposes_capture_iso"
+        ),
+        "default_preserves_legacy_logical_size": hal_logical_capture_batching_contract.get(
+            "default_preserves_legacy_logical_size"
+        ),
+        "capture_queue_uses_physical_size": hal_logical_capture_batching_contract.get(
+            "capture_queue_uses_physical_size"
+        ),
+        "capture_clock_uses_physical_size": hal_logical_capture_batching_contract.get(
+            "capture_clock_uses_physical_size"
+        ),
+        "capture_paced_playback_accepts_full_batch": hal_logical_capture_batching_contract.get(
+            "capture_paced_playback_accepts_full_batch"
+        ),
+        "playback_logical_batcher_still_chunks": hal_logical_capture_batching_contract.get(
+            "playback_logical_batcher_still_chunks"
+        ),
+        "candidate_build_flags": hal_logical_capture_batching_contract.get(
+            "candidate_build_flags"
+        ),
+        "blocked_claim": hal_logical_capture_batching_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

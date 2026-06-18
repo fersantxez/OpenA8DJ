@@ -6911,3 +6911,51 @@ Next implication:
 - Free space or provide a build host with full Xcode/DriverKit SDK before the
   real DriverKit build target can replace the offline scaffold as a runnable
   dext candidate.
+
+## 2026-06-18: Split Logical ISO8 Cadence From Opt-In Batched Capture Transfers
+
+Decision:
+- Added `OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER` and `HAL_CAPTURE_ISO_FRAMES`
+  as an opt-in capture physical-transfer size.
+- Kept the default capture size equal to `HAL_ISO_FRAMES`, preserving the
+  existing ISO8 logical cadence by default.
+- Sized capture transfer pools, capture queue requests, capture cadence timing,
+  and capture-paced playback request buffering from
+  `kCaptureIsoFramesPerTransfer`.
+- Kept playback chunking through `kPlaybackIsoFramesPerTransfer`, so a larger
+  capture completion can feed multiple logical playback batches instead of
+  truncating after the first ISO8 group.
+- Added `opena8djcpp_hal_logical_capture_batching_contract` to make this source
+  property executable evidence.
+
+Reason:
+- Prior global `HAL_ISO_FRAMES=64` style experiments changed both capture and
+  playback geometry at once, which made the result too risky for audiophile
+  claims.
+- The safer performance path is to keep the proven logical audio cadence while
+  allowing capture USB submissions to be physically batched in an experimental
+  build such as `HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64
+  HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8`.
+- This can reduce capture enqueue cadence without changing the default product
+  behavior or claiming superiority before same-window physical metrics exist.
+
+Evidence:
+- Focused build: default HAL and opt-in capture ISO64 HAL both compile.
+- Focused gate: `opena8djcpp_hal_logical_capture_batching_contract` PASS.
+- Runtime superiority remains blocked by `opena8djcpp_hal_transport_runtime_gate`
+  because the loadable HAL still performs direct IOUSBHost enqueue work and no
+  same-session physical A/B CPU/audio evidence exists.
+
+Alternatives discarded:
+- Make capture ISO64 the default: rejected because it has no current physical
+  sound-quality, timecode, routing, or CPU superiority evidence.
+- Repeat global ISO64 for all paths: rejected because it changes too much at
+  once and previously failed to establish a safe promotion path.
+- Treat the split as proof of better performance: rejected because compile and
+  source contracts are not physical runtime metrics.
+
+Next implication:
+- The next lock-gated HAL diagnostic window can test the opt-in capture-batched
+  candidate against mainline in the same session, but promotion remains blocked
+  until route revalidation, music/tone capture, CPU sampling, routing matrix,
+  and Traktor/timecode vinyl evidence all pass from one physical bundle.

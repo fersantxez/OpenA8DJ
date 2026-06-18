@@ -111,6 +111,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/product-quality-claim-gate.json",
       root / "local-analysis/cpp-offline/hal-transport-runtime-gate.json",
+      root / "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
       root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
@@ -150,6 +151,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
   const auto hal_transport_runtime_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
+  const auto hal_logical_capture_batching_contract =
+      opena8djcpp::evidence_json::json_object(summary, "hal_logical_capture_batching_contract")
+          .value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const bool summary_pass =
@@ -219,7 +223,23 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "runtime_reduction_missing", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_direct_usb_enqueue", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_no_runtime_prepared_submit", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_logical_physical_capture_split", true) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
+      object_present(summary, "hal_logical_capture_batching_contract") &&
+      bool_field_is(hal_logical_capture_batching_contract, "build_exposes_capture_iso", true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "default_preserves_legacy_logical_size", true) &&
+      bool_field_is(hal_logical_capture_batching_contract, "capture_queue_uses_physical_size",
+                    true) &&
+      bool_field_is(hal_logical_capture_batching_contract, "capture_clock_uses_physical_size",
+                    true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "capture_paced_playback_accepts_full_batch", true) &&
+      bool_field_is(hal_logical_capture_batching_contract, "playback_logical_batcher_still_chunks",
+                    true) &&
+      string_field_is(
+          hal_logical_capture_batching_contract, "blocked_claim",
+          "NO_RUNTIME_CPU_SUPERIORITY_CLAIM_UNTIL_OPT_IN_CAPTURE_BATCHING_HAS_SAME_WINDOW_PHYSICAL_AB_METRICS") &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&

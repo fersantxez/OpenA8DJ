@@ -86,6 +86,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER OPENA8DJ_ISO_FRAMES_PER_TRANSFER
 #endif
 
+#ifndef OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER
+#define OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER OPENA8DJ_ISO_FRAMES_PER_TRANSFER
+#endif
+
 #ifndef OPENA8DJ_CAPTURE_QUEUE_DEPTH
 #define OPENA8DJ_CAPTURE_QUEUE_DEPTH 64
 #endif
@@ -258,6 +262,7 @@ enum {
     kPlaybackBaseIsoFramesPerTransfer = OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER,
     kPlaybackCoalesceTransfers = OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS < 1 ? 1 : OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS,
     kPlaybackIsoFramesPerTransfer = kPlaybackBaseIsoFramesPerTransfer * kPlaybackCoalesceTransfers,
+    kCaptureIsoFramesPerTransfer = OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER,
     kIsoBytesPerFrame = 512,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
@@ -845,7 +850,7 @@ static uint64_t ExpectedIsoTransferTicksForFrames(uint32_t isoFrames)
 
 static uint64_t ExpectedCaptureIsoTransferTicks(void)
 {
-    return ExpectedIsoTransferTicksForFrames(kIsoFramesPerTransfer);
+    return ExpectedIsoTransferTicksForFrames(kCaptureIsoFramesPerTransfer);
 }
 
 static uint64_t __attribute__((unused)) ExpectedPlaybackIsoTransferTicks(void)
@@ -2253,8 +2258,8 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
         for (uint32_t i = 0; i < kCaptureQueueDepth; i++) {
             OpenA8DJIsoTransfer *transfer =
-                CreateIsoTransferWithCapacity(kIsoFramesPerTransfer,
-                                              (NSUInteger)kIsoFramesPerTransfer * kIsoBytesPerFrame);
+                CreateIsoTransferWithCapacity(kCaptureIsoFramesPerTransfer,
+                                              (NSUInteger)kCaptureIsoFramesPerTransfer * kIsoBytesPerFrame);
             if (transfer != nil) {
                 transfer.pooled = YES;
 #if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
@@ -5046,14 +5051,14 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return;
     }
 
-    uint32_t requests[kIsoFramesPerTransfer];
-    for (uint32_t frame = 0; frame < kIsoFramesPerTransfer; frame++) {
+    uint32_t requests[kCaptureIsoFramesPerTransfer];
+    for (uint32_t frame = 0; frame < kCaptureIsoFramesPerTransfer; frame++) {
         requests[frame] = kIsoBytesPerFrame;
     }
 
     OpenA8DJIsoTransfer *transfer = [self checkoutTransferFromPool:_captureTransferPool
                                                           requests:requests
-                                                             count:kIsoFramesPerTransfer
+                                                             count:kCaptureIsoFramesPerTransfer
                                                          nextIndex:&_captureTransferPoolCursor
                                                     fallbackOffset:offsetof(OpenA8DJStreamStatsPayload,
                                                                             captureTransferPoolFallbackAllocations)];
@@ -5165,7 +5170,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     uint64_t filteredTransactions = 0;
     uint64_t shortTransfers = 0;
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_CAPTURE_PACED_PLAYBACK_REFILL
-    uint32_t playbackRequests[kIsoFramesPerTransfer];
+    uint32_t playbackRequests[kCaptureIsoFramesPerTransfer];
     NSUInteger playbackRequestCount = 0;
 #endif
 #if OPENA8DJ_ENABLE_TRACE
@@ -5235,7 +5240,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             if (count > maxCompleteCount) maxCompleteCount = count;
 #endif
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_CAPTURE_PACED_PLAYBACK_REFILL && !OPENA8DJ_VALID_CAPTURE_OUT_LAYOUT
-            if (playbackRequestCount < kIsoFramesPerTransfer) {
+            if (playbackRequestCount < kCaptureIsoFramesPerTransfer) {
                 playbackRequests[playbackRequestCount++] = count;
             }
 #endif
@@ -5252,7 +5257,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                 continue;
             }
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_CAPTURE_PACED_PLAYBACK_REFILL && OPENA8DJ_VALID_CAPTURE_OUT_LAYOUT
-            if (playbackRequestCount < kIsoFramesPerTransfer) {
+            if (playbackRequestCount < kCaptureIsoFramesPerTransfer) {
                 playbackRequests[playbackRequestCount++] = count;
             }
 #endif

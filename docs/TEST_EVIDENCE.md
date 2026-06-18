@@ -10347,3 +10347,56 @@ Full offline gate rerun:
   - The fast download helper is ready, but a full Xcode install is still
     blocked by available disk space. Do not attempt Xcode installation until
     the preflight reports enough free space.
+
+## 2026-06-18 HAL Logical/Capture Batching Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added an opt-in capture physical-transfer size:
+    `HAL_CAPTURE_ISO_FRAMES`.
+  - Default remains legacy-safe:
+    `HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)`.
+  - Updated capture transfer allocation, capture queue requests, capture
+    cadence diagnostics, and capture-paced playback request buffering to use
+    `kCaptureIsoFramesPerTransfer`.
+  - Added `opena8djcpp_hal_logical_capture_batching_contract`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    System Extension activation, service restart, default-device change,
+    sample-rate change, or buffer-size change was performed.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_hal_transport_runtime_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `make -B hal`
+  - `make -B hal HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8`
+- Results:
+  - Focused contract: PASS.
+  - `build_exposes_capture_iso=true`.
+  - `default_preserves_legacy_logical_size=true`.
+  - `capture_pool_uses_physical_size=true`.
+  - `capture_queue_uses_physical_size=true`.
+  - `capture_clock_uses_physical_size=true`.
+  - `capture_paced_playback_accepts_full_batch=true`.
+  - `playback_logical_batcher_still_chunks=true`.
+  - `opena8djcpp_hal_transport_runtime_gate` still reports
+    `runtime_reduction_missing=true` and `product_claim_blocked=true`.
+  - Full offline runner after commit `af4d579`: Debug CTest `57/57`,
+    Release CTest `58/58`, evidence schema `required_files=60`,
+    `missing_files=0`, provenance `head_commit=af4d579`,
+    `summary_matches_head=true`, and `working_tree_clean_for_claim=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-logical-capture-batching-contract.json`
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Interpretation:
+  - This creates a safer runtime experiment than global ISO64 by keeping ISO8
+    logical audio cadence and batching only physical capture transfers when
+    explicitly requested.
+  - It is not proof of better sound, lower CPU, Traktor/timecode readiness, or
+    branch-promotion readiness. Those remain blocked until same-window physical
+    metrics beat mainline.

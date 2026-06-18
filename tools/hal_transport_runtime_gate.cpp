@@ -89,6 +89,12 @@ int main(int argc, char** argv) {
   const bool hal_has_no_runtime_prepared_submit =
       !contains(hal_source, "PreparedUsbSubmitPlanner") &&
       !contains(hal_source, "OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME");
+  const bool hal_has_logical_physical_capture_split =
+      contains(hal_source, "OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
+      contains(hal_source,
+               "kCaptureIsoFramesPerTransfer = OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
+      contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
+      contains(hal_source, "ExpectedIsoTransferTicksForFrames(kCaptureIsoFramesPerTransfer)");
 
   const bool offline_prepared_model_supported =
       string_field_is(migration, "result", "PASS") &&
@@ -154,6 +160,8 @@ int main(int argc, char** argv) {
       << ",\n"
       << "  \"hal_has_no_runtime_prepared_submit\": "
       << (hal_has_no_runtime_prepared_submit ? "true" : "false") << ",\n"
+      << "  \"hal_has_logical_physical_capture_split\": "
+      << (hal_has_logical_physical_capture_split ? "true" : "false") << ",\n"
       << "  \"runtime_reduction_missing\": " << (runtime_reduction_missing ? "true" : "false")
       << ",\n"
       << "  \"offline_prepared_model_supported\": "

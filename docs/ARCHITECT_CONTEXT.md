@@ -2509,3 +2509,12 @@ Current implication:
   - Not ready to claim audiophile quality.
   - Not ready to claim better CPU/performance than mainline.
   - Timecode vinyl remains unproven physically.
+  - A new opt-in HAL capture batching path exists:
+    `HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8
+    HAL_PLAYBACK_ISO_FRAMES=8`. It keeps the default logical ISO8 cadence and
+    only batches physical capture USB transfers when explicitly requested.
+    This is a diagnostic/performance candidate, not product proof.
+  - `opena8djcpp_hal_logical_capture_batching_contract` guards that the build
+    exposes the capture physical-transfer flag, defaults remain legacy-safe,
+    capture pool/queue/timing use the physical size, and capture-paced playback
+    does not truncate larger capture completions.

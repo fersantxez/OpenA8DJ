@@ -344,6 +344,9 @@ add_executable(opena8djcpp_hal_candidate_safety_gate
 add_executable(opena8djcpp_hal_transport_runtime_gate
   tools/hal_transport_runtime_gate.cpp)
 
+add_executable(opena8djcpp_hal_logical_capture_batching_contract
+  tools/hal_logical_capture_batching_contract.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -411,6 +414,7 @@ add_test(NAME opena8djcpp_diagnostic_pass_semantics_gate COMMAND opena8djcpp_dia
 add_test(NAME opena8djcpp_product_quality_claim_gate COMMAND opena8djcpp_product_quality_claim_gate)
 add_test(NAME opena8djcpp_hal_candidate_safety_gate COMMAND opena8djcpp_hal_candidate_safety_gate)
 add_test(NAME opena8djcpp_hal_transport_runtime_gate COMMAND opena8djcpp_hal_transport_runtime_gate)
+add_test(NAME opena8djcpp_hal_logical_capture_batching_contract COMMAND opena8djcpp_hal_logical_capture_batching_contract)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

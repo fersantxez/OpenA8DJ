@@ -932,3 +932,36 @@ Implication:
   available.
 - Do not substitute a macOS full installer for this dependency; the missing
   component is the DriverKit SDK/toolchain.
+
+## Opt-In Capture USB Batching Candidate
+
+Default HAL build:
+
+```sh
+make -B hal
+```
+
+Opt-in capture-batched diagnostic build:
+
+```sh
+make -B hal \
+  HAL_ISO_FRAMES=8 \
+  HAL_CAPTURE_ISO_FRAMES=64 \
+  HAL_CAPTURE_QUEUE=8 \
+  HAL_PLAYBACK_ISO_FRAMES=8
+```
+
+This build keeps the logical playback/audio cadence at ISO8 while requesting
+larger physical capture transfers. It is intended to test lower capture enqueue
+cadence without making global ISO64 the default.
+
+Guard:
+
+```sh
+./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract
+```
+
+Passing this guard only proves the source/build contract. It does not prove
+sound quality, CPU superiority, Traktor/timecode behavior, routing safety, or
+branch-promotion readiness. Any physical run still requires the global hardware
+lock and same-window route revalidation plus mainline/C++ comparison.

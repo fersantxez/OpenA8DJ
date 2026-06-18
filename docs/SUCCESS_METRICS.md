@@ -2234,6 +2234,14 @@ Prepared transport migration metric:
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.
+- HAL capture batching must be protected by
+  `local-analysis/cpp-offline/hal-logical-capture-batching-contract.json`.
+  Minimum expectations: build exposes `HAL_CAPTURE_ISO_FRAMES`, default capture
+  physical size remains `$(HAL_ISO_FRAMES)`, capture pool/queue/timing use
+  `kCaptureIsoFramesPerTransfer`, capture-paced playback accepts a full
+  capture batch, and playback still chunks by the logical playback transfer
+  size. PASS here is source/build evidence only; CPU or audiophile superiority
+  still requires same-window physical metrics against mainline.
 - `local-analysis/cpp-offline/audiophile-tone-gate.json` must be present and
   PASS before a candidate can be considered for physical promotion. Minimum
   expectations:
