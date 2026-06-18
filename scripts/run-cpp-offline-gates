@@ -275,6 +275,20 @@ bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
 
+promotion_hard_blockers = [
+    "single_physical_promotion_evidence_bundle_missing",
+    "same_window_known_good_route_revalidation_missing",
+    "diagnostic_physical_window_not_promotable",
+    "same_session_mainline_cpp_physical_ab_missing",
+    "valid_irig_loopback_route_not_currently_proven_for_promotion",
+    "traktor_timecode_vinyl_physical_gate_missing",
+    "runtime_cpu_superiority_over_mainline_missing",
+    "real_driverkit_sdk_and_selected_xcode_missing",
+    "post_reboot_autologin_codex_resume_unfixed",
+]
+if hal_candidate_safety_gate.get("safety_window_status") != "PASS":
+    promotion_hard_blockers.append("latest_hal_candidate_safety_window_not_passing")
+
 summary = {
     "date": subprocess.check_output(["date", "+%F"], text=True).strip(),
     "worktree": str(root),
@@ -290,17 +304,7 @@ summary = {
         "measurement_valid_for_promotion"
     ),
     "physical_measurement_blockers": capture_route_health.get("promotion_blockers", []),
-    "promotion_hard_blockers": [
-        "single_physical_promotion_evidence_bundle_missing",
-        "same_window_known_good_route_revalidation_missing",
-        "diagnostic_physical_window_not_promotable",
-        "same_session_mainline_cpp_physical_ab_missing",
-        "valid_irig_loopback_route_not_currently_proven_for_promotion",
-        "traktor_timecode_vinyl_physical_gate_missing",
-        "runtime_cpu_superiority_over_mainline_missing",
-        "real_driverkit_sdk_and_selected_xcode_missing",
-        "post_reboot_autologin_codex_resume_unfixed",
-    ],
+    "promotion_hard_blockers": promotion_hard_blockers,
     "promotion_claim_policy": (
         "offline PASS is diagnostic only; branch promotion requires same-session physical "
         "quality, routing, timecode, CPU, recovery, and rollback evidence against mainline"
@@ -944,8 +948,13 @@ summary = {
     },
     "hal_candidate_safety_gate": {
         "status": hal_candidate_safety_gate.get("result"),
+        "safety_window_status": hal_candidate_safety_gate.get("safety_window_status"),
         "latest_run": hal_candidate_safety_gate.get("latest_run"),
         "summary_pass": hal_candidate_safety_gate.get("summary_pass"),
+        "guard_health_pass": hal_candidate_safety_gate.get("guard_health_pass"),
+        "guard_coreaudio_enumeration_pass": hal_candidate_safety_gate.get(
+            "guard_coreaudio_enumeration_pass"
+        ),
         "required_device_pass": hal_candidate_safety_gate.get("required_device_pass"),
         "audio8_enumerated_8x8": hal_candidate_safety_gate.get("audio8_enumerated_8x8"),
         "irig_preserved_during_guard": hal_candidate_safety_gate.get(
@@ -953,6 +962,27 @@ summary = {
         ),
         "post_unload_coreaudio_clean": hal_candidate_safety_gate.get(
             "post_unload_coreaudio_clean"
+        ),
+        "recovery_present": hal_candidate_safety_gate.get("recovery_present"),
+        "recovery_unloaded": hal_candidate_safety_gate.get("recovery_unloaded"),
+        "recovery_coreaudio_enumeration_pass": hal_candidate_safety_gate.get(
+            "recovery_coreaudio_enumeration_pass"
+        ),
+        "recovery_irig_visible": hal_candidate_safety_gate.get("recovery_irig_visible"),
+        "active_hal_left_loaded": hal_candidate_safety_gate.get("active_hal_left_loaded"),
+        "guard_coreaudiod_cpu_pct": hal_candidate_safety_gate.get(
+            "guard_coreaudiod_cpu_pct"
+        ),
+        "guard_opena8dj_driver_cpu_pct": hal_candidate_safety_gate.get(
+            "guard_opena8dj_driver_cpu_pct"
+        ),
+        "guard_max_label": hal_candidate_safety_gate.get("guard_max_label"),
+        "guard_max_label_cpu_pct": hal_candidate_safety_gate.get(
+            "guard_max_label_cpu_pct"
+        ),
+        "recovery_max_label": hal_candidate_safety_gate.get("recovery_max_label"),
+        "recovery_max_label_cpu_pct": hal_candidate_safety_gate.get(
+            "recovery_max_label_cpu_pct"
         ),
         "candidate_hash": hal_candidate_safety_gate.get("candidate_hash"),
         "promotion_blockers": hal_candidate_safety_gate.get("promotion_blockers"),

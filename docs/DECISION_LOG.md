@@ -7962,3 +7962,46 @@ Next implication:
 - Future offline evidence cannot silently hide why a physical capture route
   failed. Product claims remain blocked until a promotable route passes in the
   same session as the mainline/C++ comparison.
+
+## 2026-06-18: Treat Latest HAL Safety Failure As Consumable Blocker
+
+Decision:
+- Change `opena8djcpp_hal_candidate_safety_gate` so it can consume a failed
+  latest HAL safety window and still let the offline evidence summary finish.
+- Add `safety_window_status` and guard/recovery fields to the summary.
+- Add the dynamic hard blocker
+  `latest_hal_candidate_safety_window_not_passing` whenever the latest safety
+  window does not pass.
+
+Reason:
+- The latest lock-gated HAL safety recheck produced useful physical evidence:
+  Audio 8 DJ enumerated as 8x8 and iRig remained visible, but the safety guard
+  failed due high watched audio-stack CPU. Aborting the entire offline summary
+  would hide the current blocker; treating the window as product-safe would be
+  false.
+
+Evidence:
+- Latest run:
+  `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety`.
+- During guard:
+  - `Open Audio 8 DJ`, `uid=org.opena8dj.Audio8DJ`, `in=8 out=8`.
+  - `iRig Stream`, `in=2 out=2`.
+  - `audio_stack_health=FAIL`.
+  - `coreaudiod=56.3%`.
+  - `opena8dj_driver=0.3%`.
+  - max watched label `mediaremoted=57.3%`.
+- Recovery:
+  - HAL unloaded.
+  - OpenA8DJ driver pid absent.
+  - CoreAudio enumeration still passed.
+
+Alternatives discarded:
+- Keep the gate process failing: rejected because it prevents the offline
+  summary from preserving the latest physical blocker.
+- Convert the safety window to PASS: rejected because current hardware safety
+  did not pass.
+
+Next implication:
+- Offline gates may still pass as evidence-processing gates, but product
+  readiness and branch promotion remain blocked by the latest HAL safety
+  failure plus the invalid capture route.

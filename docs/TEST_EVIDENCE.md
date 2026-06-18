@@ -11644,3 +11644,43 @@ Full offline gate after commit:
     mainline/C++ physical comparison.
   - The route inventory now records this latest diagnostic failure as
     `latest_same_device_irig_diagnostic_failed`.
+
+## 2026-06-18 HAL Candidate Safety Recheck Failure
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Ran one lock-gated HAL candidate safety cycle against
+    `build/OpenA8DJ.driver`.
+  - The candidate was not left loaded.
+  - No default-device change, sample-rate change, buffer-size change, USB
+    reset, or reboot was requested.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --wait 2 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety`
+- Result:
+  - Script exit: FAIL.
+  - CoreAudio enumeration during guard: PASS.
+  - `Open Audio 8 DJ` enumerated as `in=8 out=8`,
+    `uid=org.opena8dj.Audio8DJ`.
+  - `iRig Stream` remained visible as `in=2 out=2`.
+  - `audio_stack_health=FAIL` during candidate guard.
+  - `process.coreaudiod.cpu_pct=56.3`.
+  - `process.opena8dj_driver.cpu_pct=0.3`.
+  - Max watched label during guard: `mediaremoted`, `57.3%`.
+  - Recovery unloaded OpenA8DJ:
+    `opena8dj_state=unloaded`, `opena8dj_driver_pids=none`.
+  - Post-run CoreAudio list showed only iRig Stream and built-in devices.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety/summary.txt`
+  - `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety/cycle-1/guard/audio-list.txt`
+  - `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety/cycle-1/guard/audio-stack-health.txt`
+  - `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety/recovery/summary.txt`
+  - `local-analysis/hal-candidate-safety/20260618T062630Z-default-current-safety/unloaded-after-failure.txt`
+- Interpretation:
+  - This is current physical evidence that the candidate can enumerate Audio 8
+    DJ as 8x8, but the latest safety window is not passing.
+  - Product, performance, quality, timecode, and branch-promotion claims remain
+    blocked.
+  - The HAL safety gate now records `safety_window_status=FAIL` while keeping
+    the evidence consumable and fail-closed.

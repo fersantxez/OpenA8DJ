@@ -2,7 +2,9 @@
 
 Status: product/superiority window not executed. A lock-gated iRig
 same-device diagnostic was executed on 2026-06-18 and failed route-quality
-validation; see `docs/TEST_EVIDENCE.md`.
+validation; see `docs/TEST_EVIDENCE.md`. A lock-gated HAL candidate safety
+recheck on 2026-06-18 enumerated Audio 8 DJ as 8x8 but failed the audio-stack
+health guard and unloaded the candidate.
 
 This plan is the earliest safe path to physical validation after offline gates
 pass. It does not authorize hardware use by itself.
@@ -78,6 +80,10 @@ Current route-inventory interpretation on 2026-06-18:
 - The latest same-device iRig diagnostic failed with alignment
   `0.009115610530373885`, SNR floor `-43.31856306497336 dB`, and `22` click
   outliers. It confirms that this same-device path cannot validate the route.
+- The latest HAL candidate safety recheck enumerated `Open Audio 8 DJ` as
+  `in=8 out=8` and preserved `iRig Stream`, but failed `audio_stack_health`
+  during guard (`coreaudiod=56.3%`, `mediaremoted=57.3%`). Recovery unloaded
+  OpenA8DJ and left iRig/built-ins visible.
 - The current lock-gated route action remains diagnostic only and cannot
   support product or promotion claims.
 

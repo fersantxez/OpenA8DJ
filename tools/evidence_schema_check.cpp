@@ -230,6 +230,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto hal_candidate_safety_gate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
       opena8djcpp::evidence_json::json_object(summary, "physical_route_inventory").value_or("");
   const auto hal_transport_runtime_gate =
@@ -273,6 +275,21 @@ int main(int argc, char** argv) {
                        "real_driverkit_sdk_and_selected_xcode_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
                       "post_reboot_autologin_codex_resume_unfixed") &&
+      object_present(summary, "hal_candidate_safety_gate") &&
+      string_field_is(hal_candidate_safety_gate, "status", "PASS") &&
+      string_field_present(hal_candidate_safety_gate, "safety_window_status") &&
+      bool_field_present(hal_candidate_safety_gate, "guard_health_pass") &&
+      bool_field_present(hal_candidate_safety_gate, "guard_coreaudio_enumeration_pass") &&
+      bool_field_present(hal_candidate_safety_gate, "recovery_present") &&
+      bool_field_present(hal_candidate_safety_gate, "recovery_unloaded") &&
+      bool_field_present(hal_candidate_safety_gate, "recovery_irig_visible") &&
+      bool_field_present(hal_candidate_safety_gate, "active_hal_left_loaded") &&
+      number_field_present(hal_candidate_safety_gate, "guard_coreaudiod_cpu_pct") &&
+      number_field_present(hal_candidate_safety_gate, "guard_opena8dj_driver_cpu_pct") &&
+      string_field_present(hal_candidate_safety_gate, "guard_max_label") &&
+      (string_field_is(hal_candidate_safety_gate, "safety_window_status", "PASS") ||
+       string_array_has(summary, "promotion_hard_blockers",
+                        "latest_hal_candidate_safety_window_not_passing")) &&
       object_present(summary, "hal_prepared_runtime_candidate") &&
       string_field_is(hal_prepared_runtime_candidate, "status", "PASS") &&
       bool_field_is(hal_prepared_runtime_candidate, "prepared_runtime_enabled", true) &&
