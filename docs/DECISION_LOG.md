@@ -1,5 +1,33 @@
 # Decision Log
 
+## 2026-06-18 - Require Monotonic Prepared Playback Sequence Without Explicit Scheduling
+
+Decision:
+- The opt-in HAL prepared-runtime path now maintains a monotonic playback
+  sequence when `firstFrameNumber == 0`.
+- Prepared playback descriptors use the monotonic fallback sequence for
+  `firstSequence` and `firstSampleTimestamp`, while preserving the `0`
+  `firstFrameNumber` passed to IOUSBHost for non-explicit scheduling.
+- `opena8djcpp_hal_prepared_runtime_binding_contract` and
+  `current-offline-gates.json` now require
+  `prepared_playback_sequence_monotonic_without_explicit_schedule=true`.
+
+Reason:
+- Without explicit scheduling, every prepared playback submit could otherwise
+  appear to start at sequence 0 in the offline runtime bridge. That weakens
+  descriptor accounting, makes submit cadence evidence harder to trust, and is
+  not acceptable for a future physical CPU/jitter comparison.
+
+Evidence:
+- `make -B hal-prepared-runtime`: PASS.
+- `opena8djcpp_hal_prepared_runtime_binding_contract`: PASS with
+  `prepared_playback_sequence_monotonic_without_explicit_schedule=true`.
+
+Next implication:
+- This improves the prepared-runtime candidate's observability for a future
+  lock-gated submit-cadence A/B. It is still not a product, CPU, jitter,
+  audiophile, or Timecode Vinyl readiness claim.
+
 ## 2026-06-18 - Make Resource Superiority A Fail-Closed Offline Model
 
 Decision:

@@ -2186,6 +2186,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_uint_fast64_t _captureTransfersCompletedAtomic;
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
     OpenA8DJPreparedRuntimeBridgeRef _preparedRuntimeBridge;
+    atomic_uint_fast64_t _preparedPlaybackSequenceAtomic;
 #endif
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
@@ -2302,6 +2303,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_captureTransfersCompletedAtomic, 0);
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
         _preparedRuntimeBridge = NULL;
+        atomic_init(&_preparedPlaybackSequenceAtomic, 0);
 #endif
         atomic_init(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
@@ -3802,6 +3804,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     atomic_store(&_playbackTransfersSubmittedAtomic, 0);
     atomic_store(&_playbackTransfersCompletedAtomic, 0);
     atomic_store(&_captureTransfersCompletedAtomic, 0);
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    atomic_store(&_preparedPlaybackSequenceAtomic, 0);
+#endif
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
     AtomicStreamStatsReset(&_atomicStreamStats);
 #endif
@@ -4589,6 +4594,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         OpenA8DJPreparedRuntimeBridgeDestroy(_preparedRuntimeBridge);
         _preparedRuntimeBridge = NULL;
     }
+    atomic_store(&_preparedPlaybackSequenceAtomic, 0);
     const uint32_t bytesPerPacket = CalculateBytesPerPacket(&_spec, _sampleRate);
     OpenA8DJPreparedRuntimeConfig preparedConfig = {
         .requestSlots = (uint32_t)(kCaptureQueueDepth + kPlaybackQueueMax),
@@ -5799,6 +5805,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     _outputPrefetchIndex = 0;
     _outputPrefetchCount = 0;
     _pendingPlaybackRequestCount = 0;
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    atomic_store(&_preparedPlaybackSequenceAtomic, 0);
+#endif
     if (scheduleReset) {
         _playbackScheduleValid = false;
         _nextPlaybackFrameNumber = 0;
@@ -5811,6 +5820,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 {
     _playbackScheduleValid = false;
     _nextPlaybackFrameNumber = 0;
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    atomic_store(&_preparedPlaybackSequenceAtomic, 0);
+#endif
     [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackReschedules)
                            value:1];
 }
@@ -6239,13 +6251,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                               value:(uint64_t)transfer.data.length];
         return NO;
     }
-    uint64_t firstSequence = firstFrameNumber / (uint64_t)kIsoFramesPerTransfer;
+    const uint64_t slotCount = (uint64_t)(transfer.transactionCount / kIsoFramesPerTransfer);
+    uint64_t firstSequence = 0;
+    uint64_t firstSampleTimestamp = firstFrameNumber;
+    if (firstFrameNumber != 0) {
+        firstSequence = firstFrameNumber / (uint64_t)kIsoFramesPerTransfer;
+        atomic_store_explicit(&_preparedPlaybackSequenceAtomic,
+                              firstSequence + slotCount,
+                              memory_order_relaxed);
+    } else {
+        firstSequence = atomic_fetch_add_explicit(&_preparedPlaybackSequenceAtomic,
+                                                 slotCount,
+                                                 memory_order_relaxed);
+        firstSampleTimestamp = firstSequence * (uint64_t)kIsoFramesPerTransfer;
+    }
     OpenA8DJPreparedRuntimeSubmit submit = OpenA8DJPreparedRuntimeBridgeQueueSubmit(
         _preparedRuntimeBridge,
         kOpenA8DJPreparedRuntimeDirectionPlayback,
         firstSequence,
-        firstFrameNumber,
-        (uint64_t)(transfer.transactionCount / kIsoFramesPerTransfer),
+        firstSampleTimestamp,
+        slotCount,
         (uint64_t)transfer.transactionCount,
         (uint64_t)transfer.data.length);
     if (!submit.accepted) {

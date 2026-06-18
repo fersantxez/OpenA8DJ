@@ -15,6 +15,17 @@ Branch: `driverkit/cpp-redesign`
   directory. The physical window/promotion evaluator treats these files as
   required same-window artifacts. This prepares a safer route-only hardware
   window; it is still not product readiness or branch-promotion evidence.
+- 2026-06-18 mainline physical-route archaeology status: the route that matters
+  for physical quality remains `Open Audio 8 DJ output -> external mixer ->
+  mixer REC OUT -> iRig Stream input -> macOS capture`, with iRig channels
+  `1,2` at `48 kHz`. The C++ line must not treat software-only, no-iRig, or
+  internal USB evidence as audiophile/product readiness. See
+  `docs/MAINLINE_PHYSICAL_ROUTE_NOTES.md`.
+- 2026-06-18 DriverKit readiness audit status: the exact dext readiness blocker
+  remains `real_driverkit_sdk_and_selected_xcode_missing`. Source scaffold and
+  offline contracts are useful, but a real DriverKit claim requires an opt-in
+  build-only/no-install SDK probe against full Xcode DriverKit/AudioDriverKit
+  tooling. See `docs/DRIVERKIT_READINESS_GAP.md`.
 - 2026-06-18 post-commit Direct USB route status: the lock-gated
   `20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s` run again proves
   the internal USB payload path is clean (`written/consumed/packed`
@@ -2940,6 +2951,12 @@ Current implication:
   prepared fixed-queue work. This is only an objective reason to schedule a
   controlled prepared-runtime physical A/B; it is not a CPU, jitter, sound
   quality, Timecode Vinyl, or branch-promotion claim.
+- Prepared-runtime binding hardening update: opt-in HAL prepared playback now
+  maintains a monotonic fallback sequence when IOUSBHost uses implicit
+  `firstFrameNumber=0`. The binding contract requires
+  `prepared_playback_sequence_monotonic_without_explicit_schedule=true`, so
+  future submit-cadence evidence will not collapse all prepared playback
+  descriptors to sequence 0.
 - Audiophile analyzer false-positive hardening update: both C++ and Python WAV
   analyzers now include degraded self-tests, and the offline gate requires
   those degraded fixtures to be rejected. This improves measurement integrity

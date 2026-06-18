@@ -42,6 +42,51 @@ Recommended next action:
   lock-gated physical window for route revalidation if a separate wired
   non-Audio8 output is visible.
 
+## 2026-06-18 - Physical Route and DriverKit SDK Gap Subagents
+
+Shared warning given:
+- "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+
+Subagents/results used:
+- Hegel, Mainline Physical Evidence Archaeologist:
+  read `/Users/fer/dev/opena8dj` in read-only mode and wrote
+  `docs/MAINLINE_PHYSICAL_ROUTE_NOTES.md`.
+- Volta, DriverKit Readiness Auditor:
+  audited the C++ worktree and official Apple DriverKit documentation, then
+  wrote `docs/DRIVERKIT_READINESS_GAP.md`.
+
+Findings:
+- Mainline's decisive physical evidence path is
+  `Open Audio 8 DJ output -> external mixer -> mixer REC OUT -> iRig Stream
+  input -> macOS capture`, with `iRig Stream` channels `1,2` at `48 kHz`.
+- Software-only and no-iRig gates do not prove release, human-listening, or
+  branch-promotion readiness.
+- A real DriverKit/dext claim remains blocked by
+  `real_driverkit_sdk_and_selected_xcode_missing`; the next safe software-only
+  improvement is an opt-in build-only DriverKit SDK probe that does not install
+  or activate a system extension.
+
+Files affected:
+- `docs/MAINLINE_PHYSICAL_ROUTE_NOTES.md`
+- `docs/DRIVERKIT_READINESS_GAP.md`
+- `docs/AGENT_HANDOFFS.md`
+- `docs/ARCHITECT_CONTEXT.md`
+
+Risks:
+- Physical route evidence is historical and route-shape evidence; it is not a
+  fresh pass for the current C++ candidate.
+- DriverKit source scaffold and contracts are not a dext readiness claim until
+  a real full-Xcode DriverKit SDK build-only probe passes.
+
+Recommended next action:
+- Keep physical/product claims blocked until the iRig/mixer route is freshly
+  revalidated under lock, and add the DriverKit SDK build-only probe as an
+  offline blocker-hardening task before any dext readiness statement.
+
 Date: 2026-06-16
 
 ## Global Warning Given To Agents

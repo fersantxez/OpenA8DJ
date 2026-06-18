@@ -427,6 +427,8 @@ int main(int argc, char** argv) {
       bool_field_is(hal_prepared_runtime_binding_contract,
                     "playback_enqueue_uses_prepared_geometry", true) &&
       bool_field_is(hal_prepared_runtime_binding_contract,
+                    "prepared_playback_sequence_monotonic_without_explicit_schedule", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
                     "capture_paced_playback_batches_to_prepared_geometry", true) &&
       bool_field_is(hal_prepared_runtime_binding_contract,
                     "capture_submit_counter_success_only", true) &&

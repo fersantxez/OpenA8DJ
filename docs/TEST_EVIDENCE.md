@@ -12853,3 +12853,32 @@ Full offline gate after commit:
   - It still does not prove lower CPU, lower jitter, better sound quality, or
     Timecode Vinyl readiness. Those claims remain blocked until same-session
     physical A/B evidence beats mainline on a validated route.
+
+## 2026-06-18 - Prepared Playback Sequence Monotonicity Hardening
+
+- Commit context: `4c421a9` plus uncommitted prepared-playback sequence
+  hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Local build and source/evidence contract only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or service mutation.
+- Commands:
+  - `make -B hal-prepared-runtime`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_binding_contract`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract`
+  - `git diff --check`
+- Evidence:
+  - `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+    after the next full offline gate run.
+- Result:
+  - Prepared HAL opt-in build: PASS.
+  - Binding contract: PASS.
+  - New contract field:
+    `prepared_playback_sequence_monotonic_without_explicit_schedule=true`.
+- Interpretation:
+  - Prepared playback descriptors will no longer collapse to sequence 0 when
+    IOUSBHost scheduling uses implicit `firstFrameNumber=0`.
+  - This strengthens future submit-cadence and CPU/jitter evidence, but it does
+    not prove product readiness without lock-gated physical A/B.

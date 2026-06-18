@@ -240,6 +240,18 @@ int main(int argc, char** argv) {
       contains(prepared_playback, "transfer.preparedRuntimeHandleValid = NO") &&
       contains(prepared_playback, "transactionListCount:transfer.transactionCount") &&
       contains(prepared_playback, "firstFrameNumber:firstFrameNumber");
+  const bool prepared_playback_sequence_monotonic_without_explicit_schedule =
+      contains(hal_source, "atomic_uint_fast64_t _preparedPlaybackSequenceAtomic") &&
+      contains(hal_source, "atomic_init(&_preparedPlaybackSequenceAtomic, 0)") &&
+      contains(hal_source, "atomic_store(&_preparedPlaybackSequenceAtomic, 0)") &&
+      contains(prepared_playback, "const uint64_t slotCount") &&
+      contains(prepared_playback, "if (firstFrameNumber != 0)") &&
+      contains(prepared_playback, "atomic_store_explicit(&_preparedPlaybackSequenceAtomic") &&
+      contains(prepared_playback, "atomic_fetch_add_explicit(&_preparedPlaybackSequenceAtomic") &&
+      contains(prepared_playback, "firstSampleTimestamp = firstSequence * (uint64_t)kIsoFramesPerTransfer") &&
+      appears_before(prepared_playback,
+                     "atomic_fetch_add_explicit(&_preparedPlaybackSequenceAtomic",
+                     "OpenA8DJPreparedRuntimeBridgeQueueSubmit");
   const bool capture_paced_playback_batches_to_prepared_geometry =
       contains(capture_paced_playback, "while (offset + kPlaybackIsoFramesPerTransfer <= count)") &&
       contains(capture_paced_playback,
@@ -349,6 +361,9 @@ int main(int argc, char** argv) {
   if (!playback_enqueue_uses_prepared_geometry) {
     blockers.push_back("playback_enqueue_not_prepared_geometry");
   }
+  if (!prepared_playback_sequence_monotonic_without_explicit_schedule) {
+    blockers.push_back("prepared_playback_sequence_not_monotonic_without_explicit_schedule");
+  }
   if (!capture_paced_playback_batches_to_prepared_geometry) {
     blockers.push_back("capture_paced_playback_not_prepared_batching");
   }
@@ -385,6 +400,8 @@ int main(int argc, char** argv) {
   print_bool("transfer_pool_lifetime_completion_owned", transfer_pool_lifetime_completion_owned);
   print_bool("capture_enqueue_uses_prepared_geometry", capture_enqueue_uses_prepared_geometry);
   print_bool("playback_enqueue_uses_prepared_geometry", playback_enqueue_uses_prepared_geometry);
+  print_bool("prepared_playback_sequence_monotonic_without_explicit_schedule",
+             prepared_playback_sequence_monotonic_without_explicit_schedule);
   print_bool("capture_paced_playback_batches_to_prepared_geometry",
              capture_paced_playback_batches_to_prepared_geometry);
   print_bool("capture_submit_counter_success_only", capture_submit_counter_success_only);

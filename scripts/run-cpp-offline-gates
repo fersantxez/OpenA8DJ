@@ -2064,6 +2064,9 @@ summary = {
         "playback_enqueue_uses_prepared_geometry": hal_prepared_runtime_binding_contract.get(
             "playback_enqueue_uses_prepared_geometry"
         ),
+        "prepared_playback_sequence_monotonic_without_explicit_schedule": hal_prepared_runtime_binding_contract.get(
+            "prepared_playback_sequence_monotonic_without_explicit_schedule"
+        ),
         "capture_paced_playback_batches_to_prepared_geometry": hal_prepared_runtime_binding_contract.get(
             "capture_paced_playback_batches_to_prepared_geometry"
         ),
