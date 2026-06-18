@@ -200,6 +200,7 @@ summary = {
     ),
     "physical_measurement_blockers": capture_route_health.get("promotion_blockers", []),
     "promotion_hard_blockers": [
+        "single_physical_promotion_evidence_bundle_missing",
         "same_session_mainline_cpp_physical_ab_missing",
         "valid_irig_loopback_route_not_currently_proven_for_promotion",
         "traktor_timecode_vinyl_physical_gate_missing",
@@ -1128,6 +1129,9 @@ summary = {
         "promotion_result": promotion_evaluator.get("result"),
         "branch_promotion_allowed": promotion_evaluator.get("branch_promotion_allowed"),
         "product_run": promotion_evaluator.get("evidence_selection", {}).get("product_run"),
+        "physical_promotion_bundle": promotion_evaluator.get("evidence_selection", {}).get(
+            "physical_promotion_bundle"
+        ),
         "failing_gates": [
             gate.get("name")
             for gate in promotion_evaluator.get("gates", [])

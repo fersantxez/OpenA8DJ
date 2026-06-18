@@ -6545,3 +6545,36 @@ Alternatives discarded:
 Next implication:
 - New critical offline contracts should leave machine-readable evidence files
   when they materially affect readiness decisions.
+
+## 2026-06-17: Promotion Evidence Must Be One Physical Bundle
+
+Decision:
+- Added `single_physical_promotion_evidence_bundle` to the promotion evaluator.
+- Added `single_physical_promotion_evidence_bundle_missing` to offline hard
+  blockers.
+
+Reason:
+- Independent physical artifacts can come from different routes, driver builds,
+  candidate parameters, or capture conditions. Combining the best artifact from
+  each run can create a false superiority claim.
+- Promotion requires a single lock-gated physical window with one route,
+  candidate, baseline, and run context.
+
+Evidence:
+- Focused evaluator run:
+  `local-analysis/promotion-readiness-after-bundle-integrity.json`, expected
+  FAIL with `product_window=null` and
+  `single_physical_promotion_evidence_bundle=FAIL`.
+- Full offline gates after integration: Debug CTest `52/52`, Release CTest
+  `53/53`, evidence schema `required_files=53`, `missing_files=0`.
+
+Alternatives discarded:
+- Keep only music/CPU same-folder pairing: rejected because latency, marker,
+  USB integrity, matrix, tone, and same-session comparison could still be
+  selected from unrelated windows.
+- Rely on docs to warn about mixed evidence: rejected because promotion gating
+  must encode this as machine-checkable policy.
+
+Next implication:
+- The next valid promotion window must write all promotion-critical artifacts
+  under one `local-analysis/physical-superiority-window/<id>` directory.

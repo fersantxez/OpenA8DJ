@@ -121,6 +121,8 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "branch_promotion_allowed", false) &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
       string_array_has(summary, "promotion_hard_blockers",
+                       "single_physical_promotion_evidence_bundle_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
                        "same_session_mainline_cpp_physical_ab_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
                        "traktor_timecode_vinyl_physical_gate_missing") &&

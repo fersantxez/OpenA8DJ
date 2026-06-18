@@ -2441,6 +2441,11 @@ Current implication:
     `local-analysis/cpp-offline/evidence-json-contract.json`. Current full
     offline evidence after adding the artifact: Debug CTest `52/52`, Release
     CTest `53/53`, evidence schema `required_files=53`, `missing_files=0`.
+  - Promotion readiness now has an explicit single-bundle gate. Music, CPU,
+    tone, latency, marker, USB integrity, matrix, and same-session comparison
+    evidence must all come from the same lock-gated
+    `local-analysis/physical-superiority-window/<id>` tree. Current evidence
+    fails this correctly with `product_window=null`.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

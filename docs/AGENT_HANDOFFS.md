@@ -3385,3 +3385,40 @@ Risk:
   - The gate still uses text checks over JSON artifacts. That is acceptable as
     a narrow offline guard for this slice, but a future hardening pass should
     move critical evidence gates to a small structured JSON reader.
+## 2026-06-17 Kant - Evidence Integrity Review
+
+- Subagent:
+  - `Kant`
+  - Agent id: `019ed803-8499-7193-8721-f35cbca91912`
+- Mission:
+  - Read-only review of the C++/DriverKit line for the next objective blocker
+    in gates, metrics, and evidence integrity.
+  - Explicitly forbidden from touching mainline, Rust, hardware, audio,
+    CoreAudio, or USB.
+- Findings:
+  - Highest priority risk: `scripts/evaluate-promotion-readiness.py` selected
+    latest evidence per type without requiring one shared run id, candidate,
+    baseline, or physical route. Only music and CPU were paired by folder.
+  - Additional risks: several diagnostic tools print PASS while product
+    readiness remains false; timecode is offline-only; the audiophile tone gate
+    is too narrow to prove real-music quality by itself.
+- Action taken:
+  - Added `single_physical_promotion_evidence_bundle` to the promotion
+    evaluator.
+  - Added `single_physical_promotion_evidence_bundle_missing` to offline hard
+    blockers.
+  - Full offline gates passed after integration: Debug CTest `52/52`, Release
+    CTest `53/53`, evidence schema `required_files=53`, `missing_files=0`.
+- Files affected by integration:
+  - `scripts/evaluate-promotion-readiness.py`
+  - `scripts/run-cpp-offline-gates`
+  - `tools/evidence_schema_check.cpp`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/SUCCESS_METRICS.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Remaining risk:
+  - Product readiness is still blocked until the route is valid and one
+    same-session physical bundle proves mainline-vs-C++ quality, CPU,
+    routing, and Traktor/timecode-vinyl behavior.

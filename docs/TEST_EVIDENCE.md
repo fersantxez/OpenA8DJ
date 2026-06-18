@@ -9955,3 +9955,44 @@ Full offline gate rerun:
   - The structured evidence parser is now represented as a first-class offline
     artifact, not only as an implicit CTest line.
   - Product readiness and branch promotion remain blocked.
+
+## 2026-06-17 Single Physical Promotion Bundle Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `single_physical_promotion_evidence_bundle` to
+    `scripts/evaluate-promotion-readiness.py`.
+  - The promotion evaluator now requires music, CPU, tone, physical latency,
+    marker latency, USB integrity, physical matrix, and same-session comparison
+    evidence to come from one `local-analysis/physical-superiority-window/<id>`
+    tree before branch promotion can ever pass.
+  - Added `single_physical_promotion_evidence_bundle_missing` to
+    `current-offline-gates.json` hard blockers and required it in the evidence
+    schema check.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `python3 -m py_compile scripts/evaluate-promotion-readiness.py`
+  - `python3 scripts/evaluate-promotion-readiness.py --json-out local-analysis/promotion-readiness-after-bundle-integrity.json`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused promotion evaluator returned `1` as expected with
+    `single_physical_promotion_evidence_bundle=FAIL`.
+  - `product_window=null` for the currently selected product run.
+  - Full offline Debug CTest: `52/52` passed.
+  - Full offline Release CTest: `53/53` passed.
+  - Evidence schema: `required_files=53`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/promotion-readiness-after-bundle-integrity.json`
+  - `local-analysis/cpp-offline/promotion-readiness-offline-check.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The evaluator now rejects collage evidence from different windows even if
+    individual artifacts look good in isolation.
+  - This directly blocks claims of better sound quality, better CPU, full
+    routing, or Traktor/timecode-vinyl readiness unless the evidence is
+    same-session and same-route.

@@ -2170,6 +2170,12 @@ Prepared transport migration metric:
   `local-analysis/cpp-offline/evidence-json-contract.json` with PASS, and the
   evidence schema must require it. Parser correctness is part of readiness
   evidence integrity.
+- Promotion requires a single physical evidence bundle. Music, CPU, tone,
+  physical latency, marker latency, USB integrity, physical matrix, and
+  same-session mainline/C++ comparison must all live under the same
+  `local-analysis/physical-superiority-window/<id>` directory. If any artifact
+  is missing, stale, outside that tree, or from another window,
+  `single_physical_promotion_evidence_bundle` must FAIL.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.

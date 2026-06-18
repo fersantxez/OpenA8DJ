@@ -209,6 +209,47 @@ def evidence_metadata(path):
     }
 
 
+def promotion_window_root(path):
+    parts = list(path.resolve().parts)
+    marker = "physical-superiority-window"
+    if marker not in parts:
+        return None
+    index = parts.index(marker)
+    if index + 1 >= len(parts):
+        return None
+    return Path(*parts[:index + 2])
+
+
+def promotion_bundle(paths):
+    product_run = paths["music"].parent if paths["music"].parent == paths["cpu"].parent else None
+    product_window = promotion_window_root(paths["music"]) if product_run else None
+    required = {
+        "music": paths["music"],
+        "cpu": paths["cpu"],
+        "tone": paths["tone"],
+        "physical_latency": paths["physical_latency"],
+        "physical_marker": paths["physical_marker"],
+        "usb_integrity": paths["usb_integrity"],
+        "physical_matrix": paths["physical_matrix"],
+        "same_session_compare": paths["same_session_compare"],
+    }
+    roots = {name: promotion_window_root(path) for name, path in required.items()}
+    missing_or_mixed = [
+        name for name, root in roots.items()
+        if product_window is None or root is None or root != product_window
+    ]
+    return {
+        "product_run": str(product_run) if product_run else None,
+        "product_window": str(product_window) if product_window else None,
+        "artifact_windows": {
+            name: str(root) if root else None for name, root in roots.items()
+        },
+        "missing_or_mixed_artifacts": missing_or_mixed,
+        "required_artifacts": sorted(required.keys()),
+        "same_window": product_window is not None and not missing_or_mixed,
+    }
+
+
 def evaluate(args):
     paths = {
         "offline": Path(args.offline),
@@ -251,6 +292,7 @@ def evaluate(args):
 
     bench_path = ROOT / "local-analysis/cpp-offline/offline-bench-release.json"
     bench = load_json(bench_path) if bench_path.is_file() else {}
+    bundle = promotion_bundle(paths)
 
     gates.extend([
         gate("latest_music_cpu_pair",
@@ -258,6 +300,10 @@ def evaluate(args):
              {"music": evidence_metadata(paths["music"]),
               "cpu": evidence_metadata(paths["cpu"])},
              "music metrics and CPU profile must come from the same soundcheck run"),
+        gate("single_physical_promotion_evidence_bundle",
+             bundle["same_window"],
+             bundle,
+             "promotion evidence must come from one lock-gated physical window with the same route, candidate, baseline, and run context"),
         gate("offline_all_gates",
              offline.get("status") == "PASS" and not offline.get("hardware_touched", True),
              {"status": offline.get("status"),
@@ -573,6 +619,7 @@ def evaluate(args):
         "evidence_selection": {
             "product_run": str(paths["music"].parent)
             if paths["music"].parent == paths["cpu"].parent else None,
+            "physical_promotion_bundle": bundle,
             "music": evidence_metadata(paths["music"]),
             "cpu": evidence_metadata(paths["cpu"]),
         },
