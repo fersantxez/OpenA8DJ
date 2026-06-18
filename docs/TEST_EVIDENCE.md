@@ -11725,3 +11725,38 @@ Full offline gate after commit:
     or product readiness.
   - Physical claims remain blocked until the submitter is bound to real HAL or
     DriverKit USB and compared against mainline in the same lock-gated session.
+
+## 2026-06-18 Prepared HAL Runtime Async Bridge
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added a C ABI / Obj-C++ bridge for the prepared HAL runtime and a pure-C++
+    async request lifecycle model.
+  - Built the default HAL and the opt-in prepared HAL candidate locally.
+  - No driver was installed or loaded; no CoreAudio, USB, hardware, defaults,
+    sample rate, buffer size, playback, or capture action was performed.
+- Commands:
+  - `make -B hal`
+  - `make -B hal-prepared-runtime`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Debug CTest: `77/77 PASS`.
+  - Release CTest: `78/78 PASS`.
+  - `prepared-usb-async-runtime-contract`: `PASS`.
+  - `hal-prepared-runtime-binding-contract`: `PASS`.
+  - `prepared-transport-migration-gate`: `PASS`.
+  - `hal-prepared-runtime-candidate`: `PASS`, local bundle only.
+- Evidence:
+  - `local-analysis/cpp-offline/prepared-usb-async-runtime-contract.json`
+  - `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `local-analysis/cpp-offline/hal-prepared-runtime-candidate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The opt-in prepared profile now registers bounded async descriptors before
+    real IOUSBHost enqueue and recycles handles only on completion/cancel.
+  - This is still offline/build evidence. Product quality, CPU superiority,
+    timecode vinyl readiness, and branch promotion remain blocked by missing
+    same-session physical A/B and the latest failed HAL safety window.

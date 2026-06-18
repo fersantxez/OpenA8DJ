@@ -98,6 +98,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
       root / "local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json",
+      root / "local-analysis/cpp-offline/prepared-usb-async-runtime-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json",

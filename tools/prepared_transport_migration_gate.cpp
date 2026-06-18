@@ -253,6 +253,8 @@ int main(int argc, char** argv) {
   const auto usb_submit_payload = read_file(base / "usb-submit-payload-contract.json");
   const auto prepared_usb_runtime_submit =
       read_file(base / "prepared-usb-runtime-submit-contract.json");
+  const auto prepared_usb_async_runtime =
+      read_file(base / "prepared-usb-async-runtime-contract.json");
   const auto hal_prepared_submit_adapter =
       read_file(base / "hal-prepared-submit-adapter-contract.json");
   const auto hal_prepared_runtime_source =
@@ -302,6 +304,12 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(prepared_usb_runtime_submit, "total_frames"));
   const double prepared_usb_runtime_submit_max_live =
       number_or_nan(json_number(prepared_usb_runtime_submit, "max_live_requests"));
+  const double prepared_usb_async_runtime_submit_calls =
+      number_or_nan(json_number(prepared_usb_async_runtime, "submit_calls"));
+  const double prepared_usb_async_runtime_completion_calls =
+      number_or_nan(json_number(prepared_usb_async_runtime, "completion_calls"));
+  const double prepared_usb_async_runtime_max_live =
+      number_or_nan(json_number(prepared_usb_async_runtime, "max_live_requests_observed"));
   const double hal_adapter_logical_slots =
       number_or_nan(json_number(hal_prepared_submit_adapter, "logical_slots"));
   const double hal_adapter_submit_calls =
@@ -441,6 +449,23 @@ int main(int argc, char** argv) {
       number_is_zero(prepared_usb_runtime_submit, "direction_order_errors") &&
       number_is_zero(prepared_usb_runtime_submit, "timestamp_mismatches") &&
       number_is_zero(prepared_usb_runtime_submit, "sequence_mismatches");
+  const bool prepared_usb_async_runtime_safe =
+      result_pass(prepared_usb_async_runtime) &&
+      json_bool(prepared_usb_async_runtime, "preallocated_only").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "bounded_live_requests").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "completion_owned_lifecycle").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "descriptor_shape_safe").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "no_fallback_allocations").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "drained").value_or(false) &&
+      json_bool(prepared_usb_async_runtime, "product_safe").value_or(false) &&
+      finite(prepared_usb_async_runtime_submit_calls) &&
+      prepared_usb_async_runtime_submit_calls == 4.0 &&
+      finite(prepared_usb_async_runtime_completion_calls) &&
+      prepared_usb_async_runtime_completion_calls == 4.0 &&
+      finite(prepared_usb_async_runtime_max_live) &&
+      prepared_usb_async_runtime_max_live <= 4.0 &&
+      number_is_zero(prepared_usb_async_runtime, "fallback_allocations") &&
+      number_is_zero(prepared_usb_async_runtime, "live_requests");
   const bool hal_prepared_submit_adapter_safe =
       result_pass(hal_prepared_submit_adapter) &&
       json_bool(hal_prepared_submit_adapter, "planner_safe").value_or(false) &&
@@ -481,8 +506,11 @@ int main(int argc, char** argv) {
       json_bool(hal_prepared_runtime_binding, "opt_in_profile_binds_64_transaction_geometry")
           .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "default_runtime_preserved").value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "prepared_bridge_opt_in_build_only")
+          .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "compile_time_geometry_guard_present")
           .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "prepared_bridge_api_present").value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "capture_pool_uses_prepared_geometry")
           .value_or(false) &&
       json_bool(hal_prepared_runtime_binding, "playback_pool_uses_prepared_geometry")
@@ -617,6 +645,7 @@ int main(int argc, char** argv) {
       {"usb_submit_descriptor_plan_safe", usb_submit_plan_safe},
       {"usb_submit_payload_plan_safe", usb_submit_payload_safe},
       {"prepared_usb_runtime_submitter_safe", prepared_usb_runtime_submit_safe},
+      {"prepared_usb_async_runtime_safe", prepared_usb_async_runtime_safe},
       {"hal_prepared_submit_adapter_safe", hal_prepared_submit_adapter_safe},
       {"hal_prepared_runtime_source_guarded", hal_prepared_runtime_source_guarded},
       {"hal_prepared_runtime_binding_safe", hal_prepared_runtime_binding_safe},
@@ -673,6 +702,13 @@ int main(int argc, char** argv) {
                prepared_usb_runtime_submit_total_frames);
   print_number("prepared_usb_runtime_submit_max_live_requests",
                prepared_usb_runtime_submit_max_live);
+  print_bool("prepared_usb_async_runtime_safe", prepared_usb_async_runtime_safe);
+  print_number("prepared_usb_async_runtime_submit_calls",
+               prepared_usb_async_runtime_submit_calls);
+  print_number("prepared_usb_async_runtime_completion_calls",
+               prepared_usb_async_runtime_completion_calls);
+  print_number("prepared_usb_async_runtime_max_live_requests",
+               prepared_usb_async_runtime_max_live);
   print_number("hal_prepared_submit_adapter_logical_slots", hal_adapter_logical_slots);
   print_number("hal_prepared_submit_adapter_usb_submit_calls", hal_adapter_submit_calls);
   print_number("hal_prepared_submit_adapter_total_bytes", hal_adapter_total_bytes);

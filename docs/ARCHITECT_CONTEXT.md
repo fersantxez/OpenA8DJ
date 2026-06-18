@@ -38,6 +38,14 @@ Branch: `driverkit/cpp-redesign`
   the hardware accepts the profile. This is still not a CPU, sound-quality,
   routing, Timecode Vinyl, or promotion claim; physical evidence is explicitly
   `false`.
+- 2026-06-18 prepared HAL async bridge status: the prepared profile now uses a
+  C ABI / Obj-C++ bridge into pure C++ `PreparedUsbAsyncRuntime`. The default
+  HAL remains C/Obj-C with `HAL_PREPARED_USB_SUBMIT_RUNTIME=0`; only
+  `make hal-prepared-runtime` links C++ core sources. Offline contracts prove
+  bounded async handles, completion/cancel-owned recycling, bridge API presence,
+  and opt-in-only build behavior. This is still not product readiness: CPU,
+  audio quality, route validity, Traktor/timecode vinyl, and branch promotion
+  remain blocked until same-session lock-gated evidence beats mainline.
 - 2026-06-17 status: C++ is not ready for branch promotion or physical
   readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
   improvement over mainline. ISO8/current-cadence builds remain high CPU and

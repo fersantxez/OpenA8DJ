@@ -4076,3 +4076,39 @@ Risks:
 Next action:
 - Bind the core submitter into the opt-in HAL prepared runtime path, preserving
   default HAL behavior and all current claim blockers.
+
+## 2026-06-18 Huygens: HAL Runtime Bridge Boundary
+
+Subagent:
+- `019ed97a-1def-7393-b53b-0258a535970e` (`Huygens`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Review the smallest safe way to bind the prepared USB submitter into the HAL
+  runtime without touching hardware.
+
+Finding:
+- Do not include C++ directly from `OpenA8DJUSB.m`; it is Objective-C.
+- The HAL needs an opt-in C ABI / Obj-C++ bridge with explicit async request
+  handles, completion-owned recycling, cancel/drain behavior, and separate
+  counters.
+- The default HAL must remain untouched and the prepared path must stay
+  build-only until lock-gated evidence exists.
+
+Integrated action:
+- Added `PreparedUsbAsyncRuntime` in core.
+- Added `OpenA8DJPreparedRuntimeBridge.h/.mm`.
+- Made `make hal-prepared-runtime` compile per-language objects and link C++
+  only for the prepared profile.
+- Updated binding, migration, schema, and offline-runner gates.
+
+Risks:
+- No physical USB submit cadence, CPU, audio quality, or timecode-vinyl behavior
+  is proven by this step.
+- Latest HAL safety evidence is still failing due audio-stack CPU.
+
+Next action:
+- Commit this bridge, rerun full offline gates from the clean HEAD, then request
+  only a lock-gated route/safety window before any product A/B.

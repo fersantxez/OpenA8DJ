@@ -86,6 +86,8 @@ int main(int argc, char** argv) {
   (void)argc;
   const auto root = repo_root(argv);
   const auto hal_source = read_file(root / "src/hal/OpenA8DJUSB.m");
+  const auto bridge_header = read_file(root / "src/hal/OpenA8DJPreparedRuntimeBridge.h");
+  const auto bridge_source = read_file(root / "src/hal/OpenA8DJPreparedRuntimeBridge.mm");
   const auto control_source = read_file(root / "src/tools/opena8dj-control.c");
   const auto makefile = read_file(root / "Makefile");
   const auto run_soundcheck = read_file(root / "scripts/run-soundcheck");
@@ -138,7 +140,8 @@ int main(int argc, char** argv) {
                     "                         status:(IOReturn)status\n"
                     "                   transactions:(IOUSB" "HostIsochronousTransaction *)transactions\n{");
 
-  const bool sources_present = !hal_source.empty() && !control_source.empty() &&
+  const bool sources_present = !hal_source.empty() && !bridge_header.empty() &&
+                               !bridge_source.empty() && !control_source.empty() &&
                                !makefile.empty() && !run_soundcheck.empty() &&
                                !stream_stats_analyzer.empty();
   const bool opt_in_profile_binds_64_transaction_geometry =
@@ -151,10 +154,29 @@ int main(int argc, char** argv) {
   const bool default_runtime_preserved =
       contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
-      contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1");
+      contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1") &&
+      contains(makefile, "HAL_SRC := $(HAL_BASE_SRC)");
+  const bool prepared_bridge_opt_in_build_only =
+      contains(makefile, "HAL_PREPARED_RUNTIME_SRC :=") &&
+      contains(makefile, "src/hal/OpenA8DJPreparedRuntimeBridge.mm") &&
+      contains(makefile, "core/src/prepared_usb_async_runtime.cpp") &&
+      contains(makefile, "ifeq ($(HAL_PREPARED_USB_SUBMIT_RUNTIME),1)") &&
+      contains(makefile, "HAL_SRC := $(HAL_BASE_SRC) $(HAL_PREPARED_RUNTIME_SRC)") &&
+      contains(makefile, "HAL_LD := xcrun clang++") &&
+      contains(makefile, "HAL_CFLAGS += -Icore/include -Isrc/hal");
   const bool compile_time_geometry_guard_present =
       contains(hal_source, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
       contains(hal_source, "kPreparedRuntimeGeometrySupported");
+  const bool prepared_bridge_api_present =
+      contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeCreate") &&
+      contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeQueueSubmit") &&
+      contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeComplete") &&
+      contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeCancelAll") &&
+      contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeSnapshotCounters") &&
+      contains(bridge_source, "opena8djcpp::PreparedUsbAsyncRuntime") &&
+      contains(bridge_source, "bridge->runtime.submit") &&
+      contains(bridge_source, "bridge->runtime.complete") &&
+      contains(bridge_source, "bridge->runtime.cancel_all");
 
   const bool capture_pool_uses_prepared_geometry =
       contains(hal_source, "CreateIsoTransferWithCapacity(kCaptureIsoFramesPerTransfer,") &&
@@ -173,11 +195,19 @@ int main(int argc, char** argv) {
       contains(submit_playback, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
       contains(submit_playback, "if (kPreparedRuntimeGeometrySupported)") &&
       contains(submit_playback, "enqueuePreparedPlaybackSubmitWithTransfer:transfer") &&
+      contains(prepared_capture, "OpenA8DJPreparedRuntimeBridgeQueueSubmit") &&
+      appears_before(prepared_capture, "OpenA8DJPreparedRuntimeBridgeQueueSubmit",
+                     "[_capturePipe enqueueIORequestWithData:transfer.data") &&
       contains(prepared_capture, "[_capturePipe enqueueIORequestWithData:transfer.data") &&
+      contains(prepared_playback, "OpenA8DJPreparedRuntimeBridgeQueueSubmit") &&
+      appears_before(prepared_playback, "OpenA8DJPreparedRuntimeBridgeQueueSubmit",
+                     "[_playbackPipe enqueueIORequestWithData:transfer.data") &&
       contains(prepared_playback, "[_playbackPipe enqueueIORequestWithData:transfer.data");
   const bool transfer_pool_lifetime_completion_owned =
       count_occurrences(hal_source, "captureCompletionHandler =") >= 1 &&
       count_occurrences(hal_source, "playbackCompletionHandler =") >= 1 &&
+      contains(capture_completion, "OpenA8DJPreparedRuntimeBridgeComplete") &&
+      contains(playback_completion, "OpenA8DJPreparedRuntimeBridgeComplete") &&
       contains(capture_completion, "[self releasePooledTransfer:transfer];") &&
       contains(playback_completion, "[self releasePooledTransfer:transfer];") &&
       !contains(capture_queue, "[self releasePooledTransfer:transfer];\n    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic") &&
@@ -188,6 +218,8 @@ int main(int argc, char** argv) {
       contains(capture_queue, "frame < kCaptureIsoFramesPerTransfer") &&
       contains(capture_queue, "count:kCaptureIsoFramesPerTransfer") &&
       contains(capture_queue, "[self submitCaptureTransfer:transfer") &&
+      contains(prepared_capture, "transfer.preparedRuntimeHandleValid = YES") &&
+      contains(prepared_capture, "transfer.preparedRuntimeHandleValid = NO") &&
       contains(prepared_capture, "transactionListCount:transfer.transactionCount") &&
       contains(prepared_capture, "firstFrameNumber:0");
   const bool playback_enqueue_uses_prepared_geometry =
@@ -196,6 +228,8 @@ int main(int argc, char** argv) {
       contains(playback_queue, "count:kPlaybackIsoFramesPerTransfer") &&
       contains(playback_with_requests, "count:count") &&
       contains(playback_with_requests, "[self submitPlaybackTransfer:transfer") &&
+      contains(prepared_playback, "transfer.preparedRuntimeHandleValid = YES") &&
+      contains(prepared_playback, "transfer.preparedRuntimeHandleValid = NO") &&
       contains(prepared_playback, "transactionListCount:transfer.transactionCount") &&
       contains(prepared_playback, "firstFrameNumber:firstFrameNumber");
   const bool capture_paced_playback_batches_to_prepared_geometry =
@@ -265,7 +299,9 @@ int main(int argc, char** argv) {
     blockers.push_back("hal_prepared_runtime_opt_in_geometry_not_bound");
   }
   if (!default_runtime_preserved) blockers.push_back("default_hal_runtime_geometry_drifted");
+  if (!prepared_bridge_opt_in_build_only) blockers.push_back("prepared_bridge_not_opt_in_only");
   if (!compile_time_geometry_guard_present) blockers.push_back("compile_time_geometry_guard_missing");
+  if (!prepared_bridge_api_present) blockers.push_back("prepared_bridge_api_missing");
   if (!capture_pool_uses_prepared_geometry) blockers.push_back("capture_pool_not_prepared_geometry");
   if (!playback_pool_uses_prepared_geometry) blockers.push_back("playback_pool_not_prepared_geometry");
   if (!prepared_runtime_dispatch_path_present) {
@@ -302,7 +338,9 @@ int main(int argc, char** argv) {
   print_bool("opt_in_profile_binds_64_transaction_geometry",
              opt_in_profile_binds_64_transaction_geometry);
   print_bool("default_runtime_preserved", default_runtime_preserved);
+  print_bool("prepared_bridge_opt_in_build_only", prepared_bridge_opt_in_build_only);
   print_bool("compile_time_geometry_guard_present", compile_time_geometry_guard_present);
+  print_bool("prepared_bridge_api_present", prepared_bridge_api_present);
   print_bool("capture_pool_uses_prepared_geometry", capture_pool_uses_prepared_geometry);
   print_bool("playback_pool_uses_prepared_geometry", playback_pool_uses_prepared_geometry);
   print_bool("prepared_runtime_dispatch_path_present", prepared_runtime_dispatch_path_present);

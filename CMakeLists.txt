@@ -22,6 +22,7 @@ add_library(opena8djcpp_core
   core/src/usb_submit_plan.cpp
   core/src/usb_request_pool.cpp
   core/src/prepared_usb_runtime_submit.cpp
+  core/src/prepared_usb_async_runtime.cpp
   core/src/timecode.cpp
   core/src/timecode_analysis.cpp
   core/src/driverkit_model.cpp)
@@ -263,6 +264,13 @@ target_link_libraries(opena8djcpp_prepared_usb_runtime_submit_contract
   PRIVATE
     opena8djcpp_core)
 
+add_executable(opena8djcpp_prepared_usb_async_runtime_contract
+  tools/prepared_usb_async_runtime_contract.cpp)
+
+target_link_libraries(opena8djcpp_prepared_usb_async_runtime_contract
+  PRIVATE
+    opena8djcpp_core)
+
 add_executable(opena8djcpp_hal_prepared_submit_adapter_contract
   tools/hal_prepared_submit_adapter_contract.cpp)
 
@@ -465,6 +473,7 @@ add_test(NAME opena8djcpp_runtime_adapter_contract COMMAND opena8djcpp_runtime_a
 add_test(NAME opena8djcpp_usb_submit_plan_contract COMMAND opena8djcpp_usb_submit_plan_contract)
 add_test(NAME opena8djcpp_usb_submit_payload_contract COMMAND opena8djcpp_usb_submit_payload_contract)
 add_test(NAME opena8djcpp_prepared_usb_runtime_submit_contract COMMAND opena8djcpp_prepared_usb_runtime_submit_contract)
+add_test(NAME opena8djcpp_prepared_usb_async_runtime_contract COMMAND opena8djcpp_prepared_usb_async_runtime_contract)
 add_test(NAME opena8djcpp_hal_prepared_submit_adapter_contract COMMAND opena8djcpp_hal_prepared_submit_adapter_contract)
 add_test(NAME opena8djcpp_hal_prepared_runtime_source_contract COMMAND opena8djcpp_hal_prepared_runtime_source_contract)
 add_test(NAME opena8djcpp_hal_prepared_runtime_binding_contract COMMAND opena8djcpp_hal_prepared_runtime_binding_contract)

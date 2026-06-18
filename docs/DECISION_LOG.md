@@ -8052,3 +8052,41 @@ Next implication:
 - The next implementation step is to bind this core submitter into the HAL
   prepared-runtime opt-in path, then run only a lock-gated route/safety window
   before any performance or quality claim.
+
+## 2026-06-18: Bind Prepared HAL Runtime Through C ABI Bridge
+
+Decision:
+- Add `PreparedUsbAsyncRuntime` as the core lifecycle model for real async USB
+  submissions.
+- Add `OpenA8DJPreparedRuntimeBridge.h/.mm` as an opt-in C ABI / Obj-C++ bridge
+  for the HAL prepared-runtime profile.
+- Keep `HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0` as the default. Only
+  `make hal-prepared-runtime` links the bridge and C++ core sources.
+
+Reason:
+- `OpenA8DJUSB.m` is Objective-C, not Objective-C++, so directly including C++
+  core headers would break the normal HAL build.
+- The physical USB lifecycle is async. Handles must remain live until
+  IOUSBHost completion or explicit cancel; an offline submitter that completes
+  internally is not sufficient for a real HAL path.
+- Separating the C ABI bridge preserves the current main HAL behavior while
+  allowing the prepared profile to register bounded descriptors before each
+  real `enqueueIORequestWithData`.
+
+Evidence:
+- `local-analysis/cpp-offline/prepared-usb-async-runtime-contract.json`
+- `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+- `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+- `make -B hal-prepared-runtime` builds a local candidate only; no install,
+  load, CoreAudio, USB, hardware, default-device, sample-rate, or buffer change.
+
+Alternatives discarded:
+- Compile the entire HAL in C++: rejected because it turns the C HAL source into
+  C++ and creates unnecessary language-risk in the default path.
+- Recycle request handles at submit time: rejected because real IOUSBHost
+  completion owns transfer lifetime.
+
+Next implication:
+- Offline migration evidence now supports preparing a controlled hardware
+  candidate. It still does not prove lower CPU, better sound quality, timecode
+  vinyl behavior, or branch promotion.

@@ -11,6 +11,10 @@
 #import <dispatch/dispatch.h>
 #import <mach/mach_time.h>
 
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+#include "OpenA8DJPreparedRuntimeBridge.h"
+#endif
+
 #include <math.h>
 #include <errno.h>
 #include <pthread.h>
@@ -1966,6 +1970,10 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 @property(nonatomic) uint64_t ledgerFirstFrameNumber;
 @property(nonatomic) uint64_t playbackPayloadDigest;
 @property(nonatomic) NSUInteger playbackPayloadLength;
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+@property(nonatomic) BOOL preparedRuntimeHandleValid;
+@property(nonatomic) OpenA8DJPreparedRuntimeHandle preparedRuntimeHandle;
+#endif
 @property(nonatomic, copy) OpenA8DJIsoCompletionHandler captureCompletionHandler;
 @property(nonatomic, copy) OpenA8DJIsoCompletionHandler playbackCompletionHandler;
 @end
@@ -2149,6 +2157,9 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     atomic_uint_fast64_t _playbackTransfersSubmittedAtomic;
     atomic_uint_fast64_t _playbackTransfersCompletedAtomic;
     atomic_uint_fast64_t _captureTransfersCompletedAtomic;
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    OpenA8DJPreparedRuntimeBridgeRef _preparedRuntimeBridge;
+#endif
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
     uint64_t _lastCaptureTransactionUSBTime;
@@ -2262,6 +2273,9 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_playbackTransfersSubmittedAtomic, 0);
         atomic_init(&_playbackTransfersCompletedAtomic, 0);
         atomic_init(&_captureTransfersCompletedAtomic, 0);
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+        _preparedRuntimeBridge = NULL;
+#endif
         atomic_init(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_STREAM_STATS_ATOMIC_ACCUMULATORS
         AtomicStreamStatsReset(&_atomicStreamStats);
@@ -2388,6 +2402,10 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 - (void)dealloc
 {
     [self close];
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    OpenA8DJPreparedRuntimeBridgeDestroy(_preparedRuntimeBridge);
+    _preparedRuntimeBridge = NULL;
+#endif
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     pthread_mutex_lock(&_diagnosticMutex);
     free(_diagnosticWrittenBuffer);
@@ -4510,6 +4528,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     [self openDiagnosticCapture];
 #endif
 
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (_preparedRuntimeBridge != NULL) {
+        OpenA8DJPreparedRuntimeBridgeDestroy(_preparedRuntimeBridge);
+        _preparedRuntimeBridge = NULL;
+    }
+    const uint32_t bytesPerPacket = CalculateBytesPerPacket(&_spec, _sampleRate);
+    OpenA8DJPreparedRuntimeConfig preparedConfig = {
+        .requestSlots = (uint32_t)(kCaptureQueueDepth + kPlaybackQueueMax),
+        .maxLiveRequests = (uint32_t)(kCaptureQueueDepth + kPlaybackQueueMax),
+        .slotsPerSubmit = kPreparedUsbSlotsPerSubmit,
+        .framesPerSlot = kIsoFramesPerTransfer,
+        .bytesPerSlot = bytesPerPacket * kIsoFramesPerTransfer,
+    };
+    _preparedRuntimeBridge = OpenA8DJPreparedRuntimeBridgeCreate(&preparedConfig);
+    if (_preparedRuntimeBridge == NULL) {
+        USBTrace("prepared runtime bridge start failed");
+        return NO;
+    }
+#endif
+
     atomic_store(&_streaming, true);
     [self startStreamKeepalive];
     __weak OpenA8DJUSBEngine *weakSelf = self;
@@ -4546,6 +4584,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     dispatch_sync(_queue, ^{
     });
     [self waitForPlaybackTransfersToDrain];
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (_preparedRuntimeBridge != NULL) {
+        (void)OpenA8DJPreparedRuntimeBridgeCancelAll(_preparedRuntimeBridge);
+    }
+#endif
     [self accumulateOutputFillStats:NULL force:YES];
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self closeDiagnosticCapture];
@@ -5239,6 +5282,42 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
                                             error:(NSError **)error
 {
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (_preparedRuntimeBridge == NULL ||
+        transfer.transactionCount != kCaptureIsoFramesPerTransfer ||
+        (transfer.transactionCount % kIsoFramesPerTransfer) != 0) {
+        return NO;
+    }
+    uint64_t firstSequence =
+        atomic_load_explicit(&_captureTransfersSubmittedAtomic, memory_order_relaxed) *
+        (uint64_t)kPreparedUsbSlotsPerSubmit;
+    OpenA8DJPreparedRuntimeSubmit submit = OpenA8DJPreparedRuntimeBridgeQueueSubmit(
+        _preparedRuntimeBridge,
+        kOpenA8DJPreparedRuntimeDirectionCapture,
+        firstSequence,
+        firstSequence * (uint64_t)kIsoFramesPerTransfer,
+        (uint64_t)(transfer.transactionCount / kIsoFramesPerTransfer),
+        (uint64_t)transfer.transactionCount,
+        (uint64_t)transfer.data.length);
+    if (!submit.accepted) {
+        return NO;
+    }
+    transfer.preparedRuntimeHandle = submit.handle;
+    transfer.preparedRuntimeHandleValid = YES;
+    BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
+                                         transactionList:transactions
+                                    transactionListCount:transfer.transactionCount
+                                        firstFrameNumber:0
+                                                 options:IOUSBHostIsochronousTransferOptionsNone
+                                                   error:error
+                                       completionHandler:completionHandler];
+    if (!queued) {
+        (void)OpenA8DJPreparedRuntimeBridgeComplete(_preparedRuntimeBridge,
+                                                    transfer.preparedRuntimeHandle);
+        transfer.preparedRuntimeHandleValid = NO;
+    }
+    return queued;
+#else
     return [_capturePipe enqueueIORequestWithData:transfer.data
                                  transactionList:transactions
                             transactionListCount:transfer.transactionCount
@@ -5246,6 +5325,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                          options:IOUSBHostIsochronousTransferOptionsNone
                                            error:error
                                completionHandler:completionHandler];
+#endif
 }
 
 - (void)handleCaptureTransfer:(OpenA8DJIsoTransfer *)transfer
@@ -5253,6 +5333,13 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                   transactions:(IOUSBHostIsochronousTransaction *)transactions
 {
     uint64_t captureCompletionTime = mach_absolute_time();
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (transfer.preparedRuntimeHandleValid) {
+        (void)OpenA8DJPreparedRuntimeBridgeComplete(_preparedRuntimeBridge,
+                                                    transfer.preparedRuntimeHandle);
+        transfer.preparedRuntimeHandleValid = NO;
+    }
+#endif
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
     uint64_t hotPathCaptureStartTime = captureCompletionTime;
     uint64_t hotPathDecodeTicks = 0;
@@ -6063,6 +6150,40 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                 completionHandler:(OpenA8DJIsoCompletionHandler)completionHandler
                                              error:(NSError **)error
 {
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (_preparedRuntimeBridge == NULL ||
+        transfer.transactionCount != kPlaybackIsoFramesPerTransfer ||
+        (transfer.transactionCount % kIsoFramesPerTransfer) != 0) {
+        return NO;
+    }
+    uint64_t firstSequence = firstFrameNumber / (uint64_t)kIsoFramesPerTransfer;
+    OpenA8DJPreparedRuntimeSubmit submit = OpenA8DJPreparedRuntimeBridgeQueueSubmit(
+        _preparedRuntimeBridge,
+        kOpenA8DJPreparedRuntimeDirectionPlayback,
+        firstSequence,
+        firstFrameNumber,
+        (uint64_t)(transfer.transactionCount / kIsoFramesPerTransfer),
+        (uint64_t)transfer.transactionCount,
+        (uint64_t)transfer.data.length);
+    if (!submit.accepted) {
+        return NO;
+    }
+    transfer.preparedRuntimeHandle = submit.handle;
+    transfer.preparedRuntimeHandleValid = YES;
+    BOOL queued = [_playbackPipe enqueueIORequestWithData:transfer.data
+                                          transactionList:transactions
+                                     transactionListCount:transfer.transactionCount
+                                         firstFrameNumber:firstFrameNumber
+                                                  options:IOUSBHostIsochronousTransferOptionsNone
+                                                    error:error
+                                        completionHandler:completionHandler];
+    if (!queued) {
+        (void)OpenA8DJPreparedRuntimeBridgeComplete(_preparedRuntimeBridge,
+                                                    transfer.preparedRuntimeHandle);
+        transfer.preparedRuntimeHandleValid = NO;
+    }
+    return queued;
+#else
     return [_playbackPipe enqueueIORequestWithData:transfer.data
                                   transactionList:transactions
                              transactionListCount:transfer.transactionCount
@@ -6070,6 +6191,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                           options:IOUSBHostIsochronousTransferOptionsNone
                                             error:error
                                 completionHandler:completionHandler];
+#endif
 }
 
 - (void)handlePlaybackTransfer:(OpenA8DJIsoTransfer *)transfer
@@ -6077,6 +6199,13 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                    transactions:(IOUSBHostIsochronousTransaction *)transactions
 {
     uint64_t playbackCompletionTime = mach_absolute_time();
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (transfer.preparedRuntimeHandleValid) {
+        (void)OpenA8DJPreparedRuntimeBridgeComplete(_preparedRuntimeBridge,
+                                                    transfer.preparedRuntimeHandle);
+        transfer.preparedRuntimeHandleValid = NO;
+    }
+#endif
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
     uint64_t hotPathPlaybackCompletionStartTime = playbackCompletionTime;
 #endif
