@@ -9707,3 +9707,33 @@ Next implication:
 - Readiness impact: improves future CPU/performance evidence attribution. It
   does not change the USB-clock rejection and does not unblock product
   readiness or branch promotion by itself.
+
+## 2026-06-18 - Add Low-Telemetry Human-Test Lite Candidate
+
+- Decision: add an opt-in `hal-human-test-lite-candidate` build path that
+  creates `build/OpenA8DJ-human-test-lite.driver` and then restores
+  `build/OpenA8DJ.driver`.
+- Reason: the same-session default C++ A/B is functionally stable and improves
+  alignment/SNR versus mainline, but it still loses on driver/coreaudiod CPU.
+  The least risky near-deadline variable is disabling diagnostic hot-stream
+  bookkeeping while preserving the default audio geometry, routing, packet
+  format, sample-rate policy, and USB cadence.
+- Evidence:
+  - `make hal-human-test-lite-candidate` reports `result=PASS`.
+  - Lite candidate hash:
+    `d5430f1bafd81542ce790b239f6b8745d9ba6201e71531a8e4d01ed53967ff75`.
+  - Default bundle was restored after local candidate build.
+  - `scripts/run-cpp-offline-gates` passed Debug `83/83` and Release `84/84`
+    tests after the change; provenance is expected to fail until this decision
+    and the build helper are committed and the gate is rerun.
+- Alternatives rejected:
+  - Make prepared runtime the human baseline: rejected because a prior physical
+    safety window saw high watched CPU and the runtime is not physically
+    validated.
+  - Retry USB-clock for human baseline: rejected by same-session physical A/B.
+  - Continue transport geometry tuning before the baseline: rejected because
+    prior ISO/coalescing/batch experiments caused broad physical regressions.
+- Readiness impact: this creates a controlled low-telemetry candidate for a
+  lock-gated human/stability baseline. It does not authorize audiophile
+  superiority, CPU superiority, Timecode Vinyl readiness, or Legacy/main branch
+  promotion without physical evidence.

@@ -79,6 +79,19 @@ Branch: `driverkit/cpp-redesign`
   are available for diagnostic review only; no honest human-test approval,
   Timecode Vinyl approval, superiority claim, or Legacy/main branch promotion
   is allowed.
+- 15:04 EDT stabilization priority update: per user direction, the immediate
+  baseline target is functionality and stability first, then quality/CPU
+  perfection in later iterations. A new opt-in local bundle,
+  `build/OpenA8DJ-human-test-lite.driver`, was generated with hot stream stats,
+  output write stats, transfer ledger, playback payload guard, hot-path timing,
+  and cadence diagnostics disabled. It preserves the default HAL geometry and
+  routing intent while reducing diagnostic work in the live path. Offline build
+  gates passed for the candidate hash
+  `d5430f1bafd81542ce790b239f6b8745d9ba6201e71531a8e4d01ed53967ff75`; this
+  does not yet prove quality, CPU superiority, Timecode Vinyl readiness, or
+  branch promotion. The next lock-gated action is a short safety/install smoke
+  plus source-reference soundcheck, then immediate restore to the default
+  diagnostic HAL if the lite candidate regresses.
 - 13:13 EDT continuation update: `scripts/human-test-rc-status` now consumes
   the route-contamination and Timecode physical-window gates directly. The live
   RC status is no longer a generic route block; it is

@@ -14806,3 +14806,65 @@ Follow-up correction:
   - This improves attribution for CPU/performance claims. It does not make the
     current candidate product-ready and does not unblock Timecode Vinyl or
     branch promotion.
+
+## 2026-06-18 - Default Source-Reference A/B With Stream Summary
+
+- Scope:
+  - Ran a lock-gated same-session physical A/B using the original reference WAV
+    as truth: mainline C HAL vs default C++ HAL, Audio 8 DJ output into iRig
+    capture, Pair A, `48 kHz`, buffer `512`, `12` seconds.
+  - Restored the default C++ HAL afterward with a longer `--wait 20` safety
+    window.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-evidence-window/20260618T185610Z-default-source-reference-ab-with-stream-summary`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T185610Z-restore-default-after-default-ab`
+- Result:
+  - Physical A/B result: `FAIL`,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Mainline C: `quality_alignment_score=0.684179`,
+    `snr_floor_db=-0.839426`,
+    `mid_band_residual_ratio=2.552995`,
+    `high_band_residual_ratio=1.772144`,
+    `lag_jumps_gt_2_frames=40`, `driver_cpu_p95=4.7`,
+    `coreaudiod_cpu_p95=9.7`.
+  - Default C++: `quality_alignment_score=0.876954`,
+    `snr_floor_db=4.663124`,
+    `mid_band_residual_ratio=2.804451`,
+    `high_band_residual_ratio=1.638575`,
+    `lag_jumps_gt_2_frames=33`, `driver_cpu_p95=15.4`,
+    `coreaudiod_cpu_p95=12.5`.
+  - Stream summaries are present for both legs. Transfer-ledger analysis reports
+    `no_ledger_rows`, which is an observability gap because transfer ledger is
+    disabled in the default candidate.
+  - Restore result: `hal_candidate_safety=PASS`, iRig visible, Audio 8 DJ
+    visible as `8 in / 8 out`, installed hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+- Interpretation:
+  - Default C++ is a real functional/stability candidate and beats mainline in
+    this window on alignment, SNR, high-band residual, and lag jumps.
+  - It still fails promotion on mid-band residual, quiet-mid noise, driver CPU,
+    coreaudiod CPU, playback submit-rate evidence, and strict audiophile
+    analyzer gates.
+
+## 2026-06-18 - Human-Test Lite Candidate Build
+
+- Scope:
+  - Added `scripts/build-hal-human-test-lite-candidate` and
+    `make hal-human-test-lite-candidate`.
+  - Built a separate low-telemetry HAL bundle under
+    `/Users/fer/dev/audio8djcpp/build/OpenA8DJ-human-test-lite.driver`.
+  - No hardware, playback, recording, install/load, default-device change,
+    USB reset, or CoreAudio restart occurred during the build.
+- Result:
+  - Candidate build: `PASS`.
+  - Candidate hash:
+    `d5430f1bafd81542ce790b239f6b8745d9ba6201e71531a8e4d01ed53967ff75`.
+  - Default bundle restored after build.
+  - Full offline gate after the change: Debug CTest `83/83` PASS, Release
+    CTest `84/84` PASS. Provenance freshness remains blocked until the helper
+    and docs are committed and the gate is rerun from a clean worktree.
+- Interpretation:
+  - The lite candidate is the next lowest-risk physical baseline candidate for
+    functionality/stability because it removes hot diagnostic work without
+    changing default audio geometry. It is not yet a quality, CPU, Timecode, or
+    promotion candidate.
