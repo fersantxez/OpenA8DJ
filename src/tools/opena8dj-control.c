@@ -276,6 +276,28 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t captureTransfersSubmitted;
     uint64_t captureSubmitAttempts;
     uint64_t playbackSubmitAttempts;
+    uint64_t preparedRuntimeSubmitCalls;
+    uint64_t preparedRuntimeCaptureSubmitCalls;
+    uint64_t preparedRuntimePlaybackSubmitCalls;
+    uint64_t preparedRuntimeCompletionCalls;
+    uint64_t preparedRuntimeCaptureCompletionCalls;
+    uint64_t preparedRuntimePlaybackCompletionCalls;
+    uint64_t preparedRuntimeCancelCalls;
+    uint64_t preparedRuntimeSubmitFailures;
+    uint64_t preparedRuntimeLiveLimitFailures;
+    uint64_t preparedRuntimeDescriptorMismatches;
+    uint64_t preparedRuntimeFallbackAllocations;
+    uint64_t preparedRuntimeInvalidCompletions;
+    uint64_t preparedRuntimeStaleCompletions;
+    uint64_t preparedRuntimeLateCompletionsAfterCancel;
+    uint64_t preparedRuntimeLiveRequests;
+    uint64_t preparedRuntimeMaxLiveRequests;
+    uint64_t preparedRuntimeSubmittedFrames;
+    uint64_t preparedRuntimeCompletedFrames;
+    uint64_t preparedRuntimeCancelledFrames;
+    uint64_t preparedRuntimeSubmittedBytes;
+    uint64_t preparedRuntimeCompletedBytes;
+    uint64_t preparedRuntimeCancelledBytes;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJTransferLedgerRequest {
@@ -1132,6 +1154,31 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->playbackTransactionFailures,
            (unsigned long long)stats->playbackShortTransfers,
            (unsigned long long)stats->playbackQueueFailures);
+    if (STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes)) {
+        printf("  prepared-runtime:       submit=%llu cap-submit=%llu play-submit=%llu completion=%llu cap-complete=%llu play-complete=%llu cancel=%llu failures=%llu live-limit=%llu descriptor-mismatch=%llu fallback-alloc=%llu invalid-complete=%llu stale-complete=%llu late-complete=%llu live=%llu max-live=%llu submitted-frames=%llu completed-frames=%llu cancelled-frames=%llu submitted-bytes=%llu completed-bytes=%llu cancelled-bytes=%llu\n",
+               (unsigned long long)stats->preparedRuntimeSubmitCalls,
+               (unsigned long long)stats->preparedRuntimeCaptureSubmitCalls,
+               (unsigned long long)stats->preparedRuntimePlaybackSubmitCalls,
+               (unsigned long long)stats->preparedRuntimeCompletionCalls,
+               (unsigned long long)stats->preparedRuntimeCaptureCompletionCalls,
+               (unsigned long long)stats->preparedRuntimePlaybackCompletionCalls,
+               (unsigned long long)stats->preparedRuntimeCancelCalls,
+               (unsigned long long)stats->preparedRuntimeSubmitFailures,
+               (unsigned long long)stats->preparedRuntimeLiveLimitFailures,
+               (unsigned long long)stats->preparedRuntimeDescriptorMismatches,
+               (unsigned long long)stats->preparedRuntimeFallbackAllocations,
+               (unsigned long long)stats->preparedRuntimeInvalidCompletions,
+               (unsigned long long)stats->preparedRuntimeStaleCompletions,
+               (unsigned long long)stats->preparedRuntimeLateCompletionsAfterCancel,
+               (unsigned long long)stats->preparedRuntimeLiveRequests,
+               (unsigned long long)stats->preparedRuntimeMaxLiveRequests,
+               (unsigned long long)stats->preparedRuntimeSubmittedFrames,
+               (unsigned long long)stats->preparedRuntimeCompletedFrames,
+               (unsigned long long)stats->preparedRuntimeCancelledFrames,
+               (unsigned long long)stats->preparedRuntimeSubmittedBytes,
+               (unsigned long long)stats->preparedRuntimeCompletedBytes,
+               (unsigned long long)stats->preparedRuntimeCancelledBytes);
+    }
     if (STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations)) {
         printf("  transfer-pool:          capture-fallback-alloc=%llu playback-fallback-alloc=%llu\n",
                (unsigned long long)stats->captureTransferPoolFallbackAllocations,
@@ -1355,6 +1402,42 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
                                 stats->playbackTransfersCompletedRaw : stats->playbackTransfers));
     printf("playbackTransfersSampled=%llu\n", (unsigned long long)stats->playbackTransfers);
     printf("playbackTransferErrors=%llu\n", (unsigned long long)stats->playbackTransactionFailures);
+    printf("preparedRuntimeSubmitCalls=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeSubmitCalls : 0));
+    printf("preparedRuntimeCaptureSubmitCalls=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeCaptureSubmitCalls : 0));
+    printf("preparedRuntimePlaybackSubmitCalls=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimePlaybackSubmitCalls : 0));
+    printf("preparedRuntimeCompletionCalls=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeCompletionCalls : 0));
+    printf("preparedRuntimeSubmitFailures=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeSubmitFailures : 0));
+    printf("preparedRuntimeLiveLimitFailures=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeLiveLimitFailures : 0));
+    printf("preparedRuntimeDescriptorMismatches=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeDescriptorMismatches : 0));
+    printf("preparedRuntimeFallbackAllocations=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeFallbackAllocations : 0));
+    printf("preparedRuntimeLiveRequests=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeLiveRequests : 0));
+    printf("preparedRuntimeMaxLiveRequests=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeMaxLiveRequests : 0));
+    printf("preparedRuntimeSubmittedFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeSubmittedFrames : 0));
+    printf("preparedRuntimeSubmittedBytes=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, preparedRuntimeCancelledBytes) ?
+                                stats->preparedRuntimeSubmittedBytes : 0));
     printf("captureTransferPoolFallbackAllocations=%llu\n",
            (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, playbackTransferPoolFallbackAllocations) ?
                                 stats->captureTransferPoolFallbackAllocations : 0));

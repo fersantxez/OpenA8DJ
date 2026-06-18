@@ -2796,3 +2796,15 @@ Current implication:
     `playback_bytes_per_slot` in core, bridge, HAL config, and contracts.
     Focused contracts and full offline gates pass, but provenance remains
     blocked until the fix is committed and gates are rerun on a clean tree.
+  - Follow-up prepared HAL diagnostic
+    `local-analysis/physical-superiority-window/20260618T072122Z-prepared-candidate-only-skip-route-7be2be6`
+    shows the fix succeeded for capture only: `captureTransfersSubmitted=1024`
+    and `captureTransfersCompleted=1024`, but playback still reports
+    `playbackSubmitAttempts=508` with `playbackTransfersSubmitted=0`.
+    Sound quality remains failed (`quality_alignment_score=0.116961`,
+    `analog_snr_db=-36.07`, `click_outliers=84`), so no readiness or
+    superiority claim is allowed.
+  - Current in-progress instrumentation appends prepared-runtime rejection
+    counters to stream stats and analysis. The next short hardware diagnostic
+    must identify whether playback is rejected by descriptor mismatch,
+    live-request limit, fallback/pool failure, or a lower IOUSBHost error.

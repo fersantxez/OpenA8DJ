@@ -11849,3 +11849,48 @@ Full offline gate after commit:
   - The next allowed physical action is another lock-gated prepared candidate
     diagnostic to verify real `captureTransfersSubmitted` and
     `playbackTransfersSubmitted` are nonzero and reduced as expected.
+
+## 2026-06-18 Prepared HAL Candidate Diagnostic After Directional Byte Fix
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+  - Commit under test: `7be2be6`
+- Physical diagnostic:
+  - Run dir:
+    `local-analysis/physical-superiority-window/20260618T072122Z-prepared-candidate-only-skip-route-7be2be6`
+  - Mode: `candidate-only`, `skip-known-good`, prepared-runtime HAL candidate.
+  - The run installed the candidate under the global hardware lock, played and
+    captured for 8 seconds, then unloaded it. Post-run inventory confirmed no
+    active OpenA8DJ HAL, Audio 8 DJ visible on USB, iRig Stream visible, and the
+    lock released.
+- Result:
+  - `SOUNDCHECK A 48000/512: FAIL`
+  - `quality_alignment_score=0.11696146189141628`
+  - `analog_snr_db=-36.07`
+  - `click_outliers=84`
+  - `lag_jumps_gt_2_frames=27`
+  - `capture_clipped_frames=0`
+- Stream evidence:
+  - `captureSubmitAttempts=1024`
+  - `captureTransfersSubmitted=1024`
+  - `captureTransfersCompleted=1024`
+  - `playbackSubmitAttempts=508`
+  - `playbackTransfersSubmitted=0`
+  - `outputFramesRead=195075`
+  - `playbackQueueFailures=508`
+- Interpretation:
+  - The directional byte fix moved capture from zero submits to real USB
+    submits and completions.
+  - Playback is still rejected before real IOUSBHost enqueue. The previous
+    counters cannot distinguish descriptor mismatch, live-request exhaustion,
+    or request-pool failure.
+  - Product quality, CPU/resource superiority, timecode vinyl readiness, and
+    branch promotion remain blocked.
+- Follow-up implemented:
+  - Added prepared-runtime rejection counters to the stream stats payload,
+    `opena8dj-control stream-stats` output, soundcheck TSV, stream-stats
+    analyzer, and HAL runtime contracts.
+  - `./scripts/run-cpp-offline-gates` after this instrumentation passed Debug
+    `77/77` and Release `78/78`, with product claims still blocked; provenance
+    was blocked only because these edits were not yet committed.

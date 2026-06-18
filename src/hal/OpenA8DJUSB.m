@@ -666,6 +666,28 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t captureTransfersSubmitted;
     uint64_t captureSubmitAttempts;
     uint64_t playbackSubmitAttempts;
+    uint64_t preparedRuntimeSubmitCalls;
+    uint64_t preparedRuntimeCaptureSubmitCalls;
+    uint64_t preparedRuntimePlaybackSubmitCalls;
+    uint64_t preparedRuntimeCompletionCalls;
+    uint64_t preparedRuntimeCaptureCompletionCalls;
+    uint64_t preparedRuntimePlaybackCompletionCalls;
+    uint64_t preparedRuntimeCancelCalls;
+    uint64_t preparedRuntimeSubmitFailures;
+    uint64_t preparedRuntimeLiveLimitFailures;
+    uint64_t preparedRuntimeDescriptorMismatches;
+    uint64_t preparedRuntimeFallbackAllocations;
+    uint64_t preparedRuntimeInvalidCompletions;
+    uint64_t preparedRuntimeStaleCompletions;
+    uint64_t preparedRuntimeLateCompletionsAfterCancel;
+    uint64_t preparedRuntimeLiveRequests;
+    uint64_t preparedRuntimeMaxLiveRequests;
+    uint64_t preparedRuntimeSubmittedFrames;
+    uint64_t preparedRuntimeCompletedFrames;
+    uint64_t preparedRuntimeCancelledFrames;
+    uint64_t preparedRuntimeSubmittedBytes;
+    uint64_t preparedRuntimeCompletedBytes;
+    uint64_t preparedRuntimeCancelledBytes;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -3802,6 +3824,35 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     stats.playbackTransfersSubmitted = atomic_load(&_playbackTransfersSubmittedAtomic);
     stats.playbackTransfersCompletedRaw = atomic_load(&_playbackTransfersCompletedAtomic);
     stats.captureTransfersCompletedRaw = atomic_load(&_captureTransfersCompletedAtomic);
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+    if (_preparedRuntimeBridge != NULL) {
+        OpenA8DJPreparedRuntimeCounters preparedCounters =
+            OpenA8DJPreparedRuntimeBridgeSnapshotCounters(_preparedRuntimeBridge);
+        stats.preparedRuntimeSubmitCalls = preparedCounters.submitCalls;
+        stats.preparedRuntimeCaptureSubmitCalls = preparedCounters.captureSubmitCalls;
+        stats.preparedRuntimePlaybackSubmitCalls = preparedCounters.playbackSubmitCalls;
+        stats.preparedRuntimeCompletionCalls = preparedCounters.completionCalls;
+        stats.preparedRuntimeCaptureCompletionCalls = preparedCounters.captureCompletionCalls;
+        stats.preparedRuntimePlaybackCompletionCalls = preparedCounters.playbackCompletionCalls;
+        stats.preparedRuntimeCancelCalls = preparedCounters.cancelCalls;
+        stats.preparedRuntimeSubmitFailures = preparedCounters.submitFailures;
+        stats.preparedRuntimeLiveLimitFailures = preparedCounters.liveLimitFailures;
+        stats.preparedRuntimeDescriptorMismatches = preparedCounters.descriptorMismatches;
+        stats.preparedRuntimeFallbackAllocations = preparedCounters.fallbackAllocations;
+        stats.preparedRuntimeInvalidCompletions = preparedCounters.invalidCompletions;
+        stats.preparedRuntimeStaleCompletions = preparedCounters.staleCompletions;
+        stats.preparedRuntimeLateCompletionsAfterCancel =
+            preparedCounters.lateCompletionsAfterCancel;
+        stats.preparedRuntimeLiveRequests = preparedCounters.liveRequests;
+        stats.preparedRuntimeMaxLiveRequests = preparedCounters.maxLiveRequests;
+        stats.preparedRuntimeSubmittedFrames = preparedCounters.submittedFrames;
+        stats.preparedRuntimeCompletedFrames = preparedCounters.completedFrames;
+        stats.preparedRuntimeCancelledFrames = preparedCounters.cancelledFrames;
+        stats.preparedRuntimeSubmittedBytes = preparedCounters.submittedBytes;
+        stats.preparedRuntimeCompletedBytes = preparedCounters.completedBytes;
+        stats.preparedRuntimeCancelledBytes = preparedCounters.cancelledBytes;
+    }
+#endif
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;

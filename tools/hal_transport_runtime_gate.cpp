@@ -198,6 +198,16 @@ int main(int argc, char** argv) {
       contains(stream_stats_analyzer, "\"playback_submit_failures\"") &&
       contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") &&
       contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"");
+  const bool prepared_runtime_rejection_observability_present =
+      contains(hal_source, "preparedRuntimeSubmitFailures") &&
+      contains(hal_source, "preparedRuntimeDescriptorMismatches") &&
+      contains(hal_source, "OpenA8DJPreparedRuntimeBridgeSnapshotCounters") &&
+      contains(control_source, "preparedRuntimeSubmitFailures=%llu") &&
+      contains(control_source, "preparedRuntimeDescriptorMismatches=%llu") &&
+      contains(run_soundcheck, "\"preparedRuntimeSubmitFailures\"") &&
+      contains(run_soundcheck, "\"preparedRuntimeDescriptorMismatches\"") &&
+      contains(stream_stats_analyzer, "\"preparedRuntimeSubmitFailures\",") &&
+      contains(stream_stats_analyzer, "\"prepared_runtime\"");
   const bool capture_submit_counter_success_only =
       contains(hal_source,
                "return;\n    }\n    atomic_fetch_add_explicit(&_captureTransfersSubmittedAtomic, 1, memory_order_relaxed);") &&
@@ -215,7 +225,8 @@ int main(int argc, char** argv) {
       hal_has_capture_submit_counter && hal_has_playback_submit_counter &&
       control_exposes_submit_counters && soundcheck_tsv_captures_submit_counters &&
       analyzer_summarizes_submit_counters && capture_submit_counter_success_only &&
-      playback_submit_counter_success_only;
+      playback_submit_counter_success_only &&
+      prepared_runtime_rejection_observability_present;
 
   const bool offline_prepared_model_supported =
       string_field_is(migration, "result", "PASS") &&

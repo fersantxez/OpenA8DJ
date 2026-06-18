@@ -30,6 +30,16 @@ COUNTERS = [
     "playbackTransfersCompleted",
     "playbackTransfersSampled",
     "playbackTransferErrors",
+    "preparedRuntimeSubmitCalls",
+    "preparedRuntimeCaptureSubmitCalls",
+    "preparedRuntimePlaybackSubmitCalls",
+    "preparedRuntimeCompletionCalls",
+    "preparedRuntimeSubmitFailures",
+    "preparedRuntimeLiveLimitFailures",
+    "preparedRuntimeDescriptorMismatches",
+    "preparedRuntimeFallbackAllocations",
+    "preparedRuntimeSubmittedFrames",
+    "preparedRuntimeSubmittedBytes",
     "captureTransferPoolFallbackAllocations",
     "playbackTransferPoolFallbackAllocations",
     "transferLedgerEntriesWritten",
@@ -315,6 +325,14 @@ def analyze(path):
         flags.append("panic_flags")
     if counters["playbackTransferErrors"]["delta"] > 0:
         flags.append("playback_transfer_errors")
+    if counters["preparedRuntimeSubmitFailures"]["delta"] > 0:
+        flags.append("prepared_runtime_submit_failures")
+    if counters["preparedRuntimeLiveLimitFailures"]["delta"] > 0:
+        flags.append("prepared_runtime_live_limit_failures")
+    if counters["preparedRuntimeDescriptorMismatches"]["delta"] > 0:
+        flags.append("prepared_runtime_descriptor_mismatches")
+    if counters["preparedRuntimeFallbackAllocations"]["delta"] > 0:
+        flags.append("prepared_runtime_fallback_allocations")
     if counters["captureTransferPoolFallbackAllocations"]["delta"] > 0:
         flags.append("capture_transfer_pool_fallback_allocations")
     if counters["playbackTransferPoolFallbackAllocations"]["delta"] > 0:
@@ -366,6 +384,18 @@ def analyze(path):
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_transfers_sampled_per_second": counters["playbackTransfersSampled"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,
+        "prepared_runtime": {
+            "submit_calls_delta": counters["preparedRuntimeSubmitCalls"]["delta"],
+            "capture_submit_calls_delta": counters["preparedRuntimeCaptureSubmitCalls"]["delta"],
+            "playback_submit_calls_delta": counters["preparedRuntimePlaybackSubmitCalls"]["delta"],
+            "completion_calls_delta": counters["preparedRuntimeCompletionCalls"]["delta"],
+            "submit_failures_delta": counters["preparedRuntimeSubmitFailures"]["delta"],
+            "live_limit_failures_delta": counters["preparedRuntimeLiveLimitFailures"]["delta"],
+            "descriptor_mismatches_delta": counters["preparedRuntimeDescriptorMismatches"]["delta"],
+            "fallback_allocations_delta": counters["preparedRuntimeFallbackAllocations"]["delta"],
+            "submitted_frames_delta": counters["preparedRuntimeSubmittedFrames"]["delta"],
+            "submitted_bytes_delta": counters["preparedRuntimeSubmittedBytes"]["delta"],
+        },
         "runtime_geometry": {
             "logical_iso_frames_per_transfer": logical_iso,
             "capture_iso_frames_per_transfer": capture_iso,

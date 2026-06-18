@@ -8130,3 +8130,43 @@ Next implication:
 - Rerun a lock-gated prepared candidate diagnostic after commit/freshness gates.
   The first pass criterion is nonzero real capture/playback USB submits with
   no qfail storm, not audio-quality superiority.
+
+## 2026-06-18: Expose Prepared Runtime Rejection Counters Before More Hardware Claims
+
+Decision:
+- Append prepared-runtime lifecycle and rejection counters to the HAL stream
+  stats payload.
+- Print those counters through `opena8dj-control stream-stats`.
+- Capture them in `scripts/run-soundcheck` TSV snapshots and summarize them in
+  `scripts/analyze-stream-stats.py`.
+- Require the observability in the prepared-runtime and HAL transport gates.
+
+Reason:
+- The post-fix physical diagnostic proved capture submits now reach USB, but
+  playback still fails before IOUSBHost enqueue:
+  `playbackSubmitAttempts=508` and `playbackTransfersSubmitted=0`.
+- The previous stats could not distinguish descriptor mismatch, live-request
+  exhaustion, fallback allocation, stale completion, or another request-pool
+  cause. Continuing hardware tests without that split would waste lock windows.
+
+Evidence:
+- Physical diagnostic:
+  `local-analysis/physical-superiority-window/20260618T072122Z-prepared-candidate-only-skip-route-7be2be6`
+- Offline gates after instrumentation:
+  - Debug CTest: `77/77 PASS`
+  - Release CTest: `78/78 PASS`
+  - `stream-stats-contract`: `PASS`, last field
+    `preparedRuntimeCancelledBytes`
+  - Product claims remain blocked by `product-quality-claim-gate` and
+    `hal-transport-runtime-gate`.
+
+Alternatives discarded:
+- Infer the cause from `playbackQueueFailures`: rejected because `qfail` only
+  means the queue call returned false, not why.
+- Add logging in the hot path: rejected because per-buffer logs are forbidden in
+  the real-time path.
+
+Next implication:
+- Commit and rerun freshness gates, then run one short lock-gated prepared
+  candidate diagnostic. Its first purpose is attribution of the playback
+  rejection cause, not audio-quality or branch-promotion evidence.

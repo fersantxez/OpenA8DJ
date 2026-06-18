@@ -293,6 +293,18 @@ int main(int argc, char** argv) {
       contains(run_soundcheck, "\"playbackSubmitAttempts\"") &&
       contains(stream_stats_analyzer, "\"capture_submit_reduction_ratio_vs_logical\"") &&
       contains(stream_stats_analyzer, "\"playback_submit_reduction_ratio_vs_base\"");
+  const bool prepared_runtime_rejection_observable =
+      contains(hal_source, "preparedRuntimeSubmitFailures") &&
+      contains(hal_source, "OpenA8DJPreparedRuntimeBridgeSnapshotCounters") &&
+      contains(hal_source, "preparedCounters.descriptorMismatches") &&
+      contains(control_source, "prepared-runtime:") &&
+      contains(control_source, "preparedRuntimeSubmitFailures=%llu") &&
+      contains(control_source, "preparedRuntimeDescriptorMismatches=%llu") &&
+      contains(run_soundcheck, "\"preparedRuntimeSubmitFailures\"") &&
+      contains(run_soundcheck, "\"preparedRuntimeDescriptorMismatches\"") &&
+      contains(stream_stats_analyzer, "\"preparedRuntimeSubmitFailures\"") &&
+      contains(stream_stats_analyzer, "\"prepared_runtime\"") &&
+      contains(stream_stats_analyzer, "prepared_runtime_descriptor_mismatches");
 
   constexpr std::uint32_t kLogicalIsoFrames = 8;
   constexpr std::uint32_t kPreparedSlotsPerSubmit = 8;
@@ -337,6 +349,9 @@ int main(int argc, char** argv) {
   if (!no_partial_submit_path) blockers.push_back("partial_submit_path_present");
   if (!runtime_geometry_observable) blockers.push_back("runtime_geometry_not_observable");
   if (!submit_cadence_observable) blockers.push_back("submit_cadence_not_observable");
+  if (!prepared_runtime_rejection_observable) {
+    blockers.push_back("prepared_runtime_rejection_not_observable");
+  }
 
   const bool pass = blockers.empty();
 
@@ -369,6 +384,8 @@ int main(int argc, char** argv) {
   print_bool("no_partial_submit_path", no_partial_submit_path);
   print_bool("runtime_geometry_observable", runtime_geometry_observable);
   print_bool("submit_cadence_observable", submit_cadence_observable);
+  print_bool("prepared_runtime_rejection_observable",
+             prepared_runtime_rejection_observable);
   print_number("expected_logical_iso_frames", kLogicalIsoFrames);
   print_number("expected_slots_per_submit", kPreparedSlotsPerSubmit);
   print_number("expected_capture_transactions_per_submit", kExpectedPreparedTransactions);
