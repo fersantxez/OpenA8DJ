@@ -9533,3 +9533,28 @@ Next implication:
 - Readiness impact: route revalidation planning is no longer blocked by the
   intentional diagnostic install. Product human listening and branch promotion
   remain blocked.
+
+## 2026-06-18 - Active Diagnostic HAL Must Match Current Installable Candidate
+
+- Decision: require `opena8djcpp_hal_candidate_safety_gate` to compare the
+  active installed HAL executable hash with the current signed installable
+  candidate in `build/OpenA8DJ.driver`.
+- Reason: CMake build steps can temporarily leave `build/OpenA8DJ.driver` in an
+  unsigned intermediate state, while `make dist` produces the signed artifact
+  that is actually installable. The RC gate must prove the active HAL matches
+  the current distribution candidate, not just a historical smoke manifest.
+- Evidence:
+  - Focused run after `make dist`:
+    `candidate_hash=23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`,
+    `current_candidate_hash=23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`,
+    `active_installed_hash=23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `diagnostic_install_active=true` only when
+    `active_installed_hash_matches_current_candidate=true`.
+- Alternatives rejected:
+  - Trust only the install smoke `candidate_hash`: rejected because it can stay
+    true after the local candidate changes.
+  - Compare against the raw CMake build before packaging: rejected because that
+    can be an unsigned intermediate, not the candidate that would be installed.
+- Readiness impact: strengthens diagnostic RC identity. It does not unblock
+  product listening, Timecode Vinyl physical readiness, CPU superiority, or
+  branch promotion.

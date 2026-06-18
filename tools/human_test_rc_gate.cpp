@@ -137,7 +137,8 @@ int main(int argc, char** argv) {
       !string_field_is(hal_safety, "safety_window_status", "PASS");
   const bool diagnostic_hal_installed_now =
       bool_field_is(hal_safety, "diagnostic_install_active", true) &&
-      bool_field_is(hal_safety, "driver_installed_or_activated_now", true);
+      bool_field_is(hal_safety, "driver_installed_or_activated_now", true) &&
+      bool_field_is(hal_safety, "active_installed_hash_matches_current_candidate", true);
   const bool safety_external_recovery_seen =
       string_array_has(hal_safety, "promotion_blockers", "safety_run_required_external_recovery");
   const bool capture_visible =

@@ -155,6 +155,7 @@ int main(int argc, char** argv) {
       bool_field_is(hal_safety, "diagnostic_install_active", true) &&
       bool_field_is(hal_safety, "active_hal_installed_now", true) &&
       bool_field_is(hal_safety, "installed_hash_matches_candidate", true) &&
+      bool_field_is(hal_safety, "active_installed_hash_matches_current_candidate", true) &&
       bool_field_is(hal_safety, "driver_installed_or_activated_now", true) &&
       bool_field_is(hal_safety, "product_claim_allowed", false) &&
       bool_field_is(hal_safety, "branch_promotion_allowed", false) &&

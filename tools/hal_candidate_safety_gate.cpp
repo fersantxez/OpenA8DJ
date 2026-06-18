@@ -1,4 +1,6 @@
 #include <cctype>
+#include <array>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -35,6 +37,44 @@ std::string read_file(const std::filesystem::path& path) {
 
 bool contains(const std::string& text, const std::string& needle) {
   return text.find(needle) != std::string::npos;
+}
+
+std::string shell_quote(const std::filesystem::path& path) {
+  std::string out = "'";
+  for (const char c : path.string()) {
+    if (c == '\'') {
+      out += "'\\''";
+    } else {
+      out.push_back(c);
+    }
+  }
+  out.push_back('\'');
+  return out;
+}
+
+std::string sha256_file(const std::filesystem::path& path) {
+  if (!std::filesystem::is_regular_file(path)) {
+    return {};
+  }
+  const std::string command = "/usr/bin/shasum -a 256 " + shell_quote(path);
+  std::array<char, 256> buffer{};
+  std::string output;
+  FILE* pipe = popen(command.c_str(), "r");
+  if (pipe == nullptr) {
+    return {};
+  }
+  while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+    output += buffer.data();
+  }
+  const int rc = pclose(pipe);
+  if (rc != 0) {
+    return {};
+  }
+  const auto space = output.find_first_of(" \t\r\n");
+  if (space == std::string::npos) {
+    return {};
+  }
+  return output.substr(0, space);
 }
 
 std::string json_escape(const std::string& input) {
@@ -233,12 +273,21 @@ int main(int argc, char** argv) {
   const auto candidate_hash = manifest_value(manifest, "candidate_hash").value_or("missing");
   const auto cycles = manifest_value(manifest, "cycles").value_or("missing");
   const auto installed_hal = std::filesystem::path("/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver");
+  const auto current_candidate_executable =
+      root / "build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL";
+  const auto active_installed_executable =
+      installed_hal / "Contents/MacOS/OpenA8DJHAL";
   const bool active_hal_installed_now = std::filesystem::is_directory(installed_hal);
+  const std::string current_candidate_hash = sha256_file(current_candidate_executable);
+  const std::string active_installed_hash = sha256_file(active_installed_executable);
   const std::string installed_hash_text =
       latest ? read_file(run_dir / "cycle-1/installed-hash.txt") : std::string{};
   const bool installed_hash_matches_candidate =
       active_hal_installed_now && candidate_hash != "missing" &&
       contains(installed_hash_text, candidate_hash);
+  const bool active_installed_hash_matches_current_candidate =
+      active_hal_installed_now && !current_candidate_hash.empty() &&
+      active_installed_hash == current_candidate_hash;
   const bool unloaded_by_design = leave_loaded == "0";
   const bool leave_loaded_by_design = leave_loaded == "1";
   const bool recovered_after_leave_loaded = external_recovery.has_value() && recovery_unloaded &&
@@ -246,8 +295,9 @@ int main(int argc, char** argv) {
                                             recovery_coreaudio_enumeration_pass;
   const bool diagnostic_install_active =
       leave_loaded_by_design && active_hal_installed_now && installed_hash_matches_candidate &&
-      guard_health_pass && guard_coreaudio_enumeration_pass && required_device_pass &&
-      audio8_enumerated && irig_preserved_during_guard;
+      active_installed_hash_matches_current_candidate && guard_health_pass &&
+      guard_coreaudio_enumeration_pass && required_device_pass && audio8_enumerated &&
+      irig_preserved_during_guard;
   const bool active_hal_left_loaded = diagnostic_install_active || !post_unload_coreaudio_clean;
   const double guard_coreaudiod_cpu_pct =
       key_number(guard_summary, "process.coreaudiod.cpu_pct");
@@ -283,6 +333,10 @@ int main(int argc, char** argv) {
   }
   if (!irig_preserved_during_guard) {
     blockers.push_back("irig_not_visible_during_hal_guard");
+  }
+  if (leave_loaded_by_design && active_hal_installed_now &&
+      !active_installed_hash_matches_current_candidate) {
+    blockers.push_back("active_installed_hal_hash_does_not_match_current_candidate");
   }
   if (!unloaded_by_design && !diagnostic_install_active && !recovered_after_leave_loaded) {
     blockers.push_back("safety_run_left_hal_loaded");
@@ -344,9 +398,15 @@ int main(int argc, char** argv) {
             << (active_hal_installed_now ? "true" : "false") << ",\n"
             << "  \"installed_hash_matches_candidate\": "
             << (installed_hash_matches_candidate ? "true" : "false") << ",\n"
+            << "  \"active_installed_hash_matches_current_candidate\": "
+            << (active_installed_hash_matches_current_candidate ? "true" : "false") << ",\n"
             << "  \"leave_loaded\": \"" << json_escape(leave_loaded) << "\",\n"
             << "  \"cycles\": \"" << json_escape(cycles) << "\",\n"
-            << "  \"candidate_hash\": \"" << json_escape(candidate_hash) << "\",\n";
+            << "  \"candidate_hash\": \"" << json_escape(candidate_hash) << "\",\n"
+            << "  \"current_candidate_hash\": \"" << json_escape(current_candidate_hash)
+            << "\",\n"
+            << "  \"active_installed_hash\": \"" << json_escape(active_installed_hash)
+            << "\",\n";
   print_string_array("promotion_blockers", blockers);
   std::cout << "  \"hardware_window_evidence\": true,\n"
             << "  \"driver_installed_or_activated_now\": "

@@ -353,6 +353,10 @@ int main(int argc, char** argv) {
       bool_field_present(hal_candidate_safety_gate, "recovery_unloaded") &&
       bool_field_present(hal_candidate_safety_gate, "recovery_irig_visible") &&
       bool_field_present(hal_candidate_safety_gate, "active_hal_left_loaded") &&
+      bool_field_present(hal_candidate_safety_gate,
+                         "active_installed_hash_matches_current_candidate") &&
+      string_field_present(hal_candidate_safety_gate, "current_candidate_hash") &&
+      string_field_present(hal_candidate_safety_gate, "active_installed_hash") &&
       number_field_present(hal_candidate_safety_gate, "guard_coreaudiod_cpu_pct") &&
       number_field_present(hal_candidate_safety_gate, "guard_opena8dj_driver_cpu_pct") &&
       string_field_present(hal_candidate_safety_gate, "guard_max_label") &&

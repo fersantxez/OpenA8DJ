@@ -217,6 +217,10 @@ fi
 ./build/cpp-release/opena8djcpp_capture_route_health_gate | tee "$EVIDENCE_DIR/capture-route-health-gate.json"
 ./build/cpp-release/opena8djcpp_irig_idle_capture_gate | tee "$EVIDENCE_DIR/irig-idle-capture-gate.json"
 ./build/cpp-release/opena8djcpp_historical_route_reference_gate | tee "$EVIDENCE_DIR/historical-route-reference-gate.json"
+make -C "$ROOT" dist >/dev/null
+python3 scripts/check-hal-bundle-complete \
+  --candidate build/OpenA8DJ.driver \
+  --json-out "$EVIDENCE_DIR/hal-bundle-complete.json" >/dev/null
 ./build/cpp-release/opena8djcpp_hal_candidate_safety_gate | tee "$EVIDENCE_DIR/hal-candidate-safety-gate.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
@@ -1222,6 +1226,11 @@ summary = {
             "recovery_max_label_cpu_pct"
         ),
         "candidate_hash": hal_candidate_safety_gate.get("candidate_hash"),
+        "current_candidate_hash": hal_candidate_safety_gate.get("current_candidate_hash"),
+        "active_installed_hash": hal_candidate_safety_gate.get("active_installed_hash"),
+        "active_installed_hash_matches_current_candidate": hal_candidate_safety_gate.get(
+            "active_installed_hash_matches_current_candidate"
+        ),
         "promotion_blockers": hal_candidate_safety_gate.get("promotion_blockers"),
         "hardware_window_evidence": hal_candidate_safety_gate.get("hardware_window_evidence"),
         "driver_installed_or_activated_now": hal_candidate_safety_gate.get(

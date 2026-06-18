@@ -13873,3 +13873,71 @@ Full offline gate after commit:
     gates.
   - Product readiness remains blocked pending route validation and same-session
     C++/mainline physical comparison.
+
+## 2026-06-18 - Active HAL Candidate Hash Identity Focused Check
+
+- Commit context: local changes after `acadc5e`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build/package/hash/evidence check only.
+  - No hardware lock acquired.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Command:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_candidate_safety_gate opena8djcpp_human_test_rc_gate opena8djcpp_physical_window_readiness_gate opena8djcpp_evidence_schema_check && make dist >/dev/null && ./build/cpp-release/opena8djcpp_hal_candidate_safety_gate && ./build/cpp-release/opena8djcpp_human_test_rc_gate && ./build/cpp-release/opena8djcpp_physical_window_readiness_gate`
+- Result:
+  - Focused build: PASS.
+  - `opena8djcpp_hal_candidate_safety_gate`: PASS.
+  - `candidate_hash`, `current_candidate_hash`, and
+    `active_installed_hash` all equal
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `active_installed_hash_matches_current_candidate=true`.
+  - `diagnostic_install_active=true`.
+  - `opena8djcpp_human_test_rc_gate`: PASS with
+    `diagnostic_hal_installed_now=true`,
+    `product_human_test_allowed=false`,
+    `cpu_superiority_claim_allowed=false`, and
+    `branch_promotion_allowed=false`.
+  - `opena8djcpp_physical_window_readiness_gate`: PASS with route validation
+    still blocked by missing non-Audio8 known-good output.
+- Readiness impact:
+  - Prevents stale active-HAL identity from being accepted as current RC.
+  - Product readiness remains blocked pending route validation and same-session
+    C++/mainline physical comparison.
+
+## 2026-06-18 - Full Offline Gates With Active HAL Hash Identity Guard
+
+- Commit context: local changes after `acadc5e`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build/package/evidence regeneration only.
+  - No hardware lock acquired by the offline script.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Debug/default CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS, `required_files=87`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Provenance freshness: FAIL only because `working_tree_clean_for_claim=false`
+    while these source and doc changes were still uncommitted.
+  - HAL executable hash in current candidate:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - HAL executable hash installed active:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `active_installed_hash_matches_current_candidate=true`.
+  - Regenerated package hash:
+    `15ec4fa00d094cd49f73a09230fd2072f38d32676f1f787fa63605395fa246c1`.
+  - Regenerated DMG hash:
+    `6dc4fc367f943df8e4d462a8382e6557228eb2a6dc8bf6803f53ecbad1547cb9`.
+- Readiness impact:
+  - Current offline gates now prove active diagnostic HAL identity against the
+    signed installable candidate.
+  - Product readiness remains blocked by missing known-good route,
+    same-session mainline/C++ physical A/B, CPU superiority, and physical
+    Timecode Vinyl gates.

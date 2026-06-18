@@ -3139,3 +3139,10 @@ Current implication:
   product/promotion claims remain closed. Full offline regeneration passed
   Debug `83/83`, Release `84/84`, and schema checks; provenance was expectedly
   non-claimable until the active-install classification changes are committed.
+- Active-candidate identity hardening update: HAL diagnostic-active status now
+  also requires the active installed executable hash to match the current
+  installable candidate in `build/OpenA8DJ.driver`. `scripts/run-cpp-offline-gates`
+  regenerates `make dist` before evaluating the active HAL safety gate so the
+  comparison is against the signed distribution candidate, not a transient
+  CMake-built executable. This prevents a stale installed HAL from being
+  accepted as the current RC after local build churn.
