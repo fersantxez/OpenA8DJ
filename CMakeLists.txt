@@ -38,7 +38,8 @@ target_compile_options(opena8djcpp_core
     -Wsign-conversion)
 
 add_library(opena8djcpp_driverkit_shell
-  driverkit/src/audio_driver_skeleton.cpp)
+  driverkit/src/audio_driver_skeleton.cpp
+  driverkit/src/audio_device_runtime_binding.cpp)
 
 target_include_directories(opena8djcpp_driverkit_shell
   PUBLIC
@@ -159,6 +160,13 @@ add_executable(opena8djcpp_driverkit_extension_scaffold_contract
 
 add_executable(opena8djcpp_driverkit_runtime_binding_gap_gate
   tools/driverkit_runtime_binding_gap_gate.cpp)
+
+add_executable(opena8djcpp_driverkit_device_binding_contract
+  tools/driverkit_device_binding_contract.cpp)
+
+target_link_libraries(opena8djcpp_driverkit_device_binding_contract
+  PRIVATE
+    opena8djcpp_driverkit_shell)
 
 add_executable(opena8djcpp_driverkit_sdk_preflight_gate
   tools/driverkit_sdk_preflight_gate.cpp)
@@ -384,6 +392,7 @@ add_test(NAME opena8djcpp_driverkit_shell_contract COMMAND opena8djcpp_driverkit
 add_test(NAME opena8djcpp_driverkit_runtime_contract COMMAND opena8djcpp_driverkit_runtime_contract)
 add_test(NAME opena8djcpp_driverkit_extension_scaffold_contract COMMAND opena8djcpp_driverkit_extension_scaffold_contract)
 add_test(NAME opena8djcpp_driverkit_runtime_binding_gap_gate COMMAND opena8djcpp_driverkit_runtime_binding_gap_gate)
+add_test(NAME opena8djcpp_driverkit_device_binding_contract COMMAND opena8djcpp_driverkit_device_binding_contract)
 add_test(NAME opena8djcpp_driverkit_sdk_preflight_gate COMMAND opena8djcpp_driverkit_sdk_preflight_gate)
 add_test(NAME opena8djcpp_driverkit_prepared_transport_contract COMMAND opena8djcpp_driverkit_prepared_transport_contract)
 add_test(NAME opena8djcpp_driverkit_prepared_hotpath_contract COMMAND opena8djcpp_driverkit_prepared_hotpath_contract)

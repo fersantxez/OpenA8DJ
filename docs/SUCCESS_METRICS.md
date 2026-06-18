@@ -2265,3 +2265,11 @@ Prepared transport migration metric:
   replaced by real binding evidence for `IOUserAudioDevice::StartIO`,
   `StopIO`, stream memory descriptors, monotonic zero timestamps,
   configuration-change sequencing, and the USB request adapter.
+- `local-analysis/cpp-offline/driverkit-device-binding-contract.json` must be
+  present. Minimum expectations: zero lifecycle/memory/timestamp/config/shutdown
+  failures, five initial IO memory descriptors, 4096 bytes for the 64-frame
+  default layout, 8192 bytes after a 128-frame stopped configuration change,
+  two stream-memory publications, two zero-timestamp publications, one stopped
+  configuration change accepted, one running configuration change rejected, and
+  `product_driverkit_runtime_ready=false` until the binding is compiled into a
+  real dext and physically validated.

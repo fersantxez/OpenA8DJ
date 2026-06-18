@@ -2569,3 +2569,12 @@ Current implication:
     and default stream config. This prevents any dext readiness claim until the
     scaffold is wired to real stream memory, timing, and USB request adapter
     behavior.
+  - A pure C++ device binding model now exists:
+    `AudioDeviceRuntimeBinding` plus
+    `opena8djcpp_driverkit_device_binding_contract`. It proves the intended
+    `IOUserAudioDevice` sequence offline: publish five stream-memory
+    descriptors, start IO after memory binding, publish monotonic zero
+    timestamps, reject running configuration changes, accept stopped
+    configuration changes, and stop IO before shutdown. This is not dext
+    readiness; the extension source still needs to call the binding and build
+    with DriverKit SDK.

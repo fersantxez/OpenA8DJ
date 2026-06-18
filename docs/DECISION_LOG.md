@@ -7029,3 +7029,41 @@ Next implication:
 - The next DriverKit implementation step is to bind `IOUserAudioDevice` stream
   memory, monotonic zero timestamps, configuration-change policy, and the
   prepared USB request adapter to the skeleton before any dext runtime claim.
+
+## 2026-06-18: Add Pure C++ Audio Device Runtime Binding
+
+Decision:
+- Added `AudioDeviceRuntimeBinding` and
+  `opena8djcpp_driverkit_device_binding_contract`.
+- The binding models the future `IOUserAudioDevice` lifecycle against
+  `AudioDriverSkeleton` without compiling or installing a dext.
+
+Reason:
+- The skeleton already had stream memory, timestamp, configuration, prepared
+  transport, and USB request-pool behavior, but there was no focused object that
+  represented the device-facing DriverKit sequence.
+- This separates a testable binding policy from Apple SDK mechanics, reducing
+  the risk of replacing the current extension stubs later.
+
+Evidence:
+- Focused binding contract PASS:
+  - `initial_io_memory_descriptors=5`;
+  - `initial_io_memory_total_bytes=4096`;
+  - `changed_io_memory_total_bytes=8192`;
+  - `stream_memory_publications=2`;
+  - `zero_timestamp_publications=2`;
+  - one configuration change accepted while stopped;
+  - one configuration change rejected while IO was running;
+  - `product_driverkit_runtime_ready=false`.
+
+Alternatives discarded:
+- Wire the `.iig` extension source directly first: rejected for this step
+  because this machine still lacks a usable DriverKit SDK and the binding policy
+  needed executable coverage before source-level SDK work.
+- Treat the binding model as dext readiness: rejected because the real extension
+  source still has stubs and there is no signed/runnable DriverKit artifact.
+
+Next implication:
+- Replace the extension `StartIO`/`StopIO`/configuration stubs with calls into
+  this binding, then build on a DriverKit SDK host and keep hardware validation
+  lock-gated.

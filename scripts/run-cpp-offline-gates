@@ -48,6 +48,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_runtime_contract | tee "$EVIDENCE_DIR/driverkit-runtime-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_extension_scaffold_contract | tee "$EVIDENCE_DIR/driverkit-extension-scaffold-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_runtime_binding_gap_gate | tee "$EVIDENCE_DIR/driverkit-runtime-binding-gap-gate.json"
+./build/cpp-release/opena8djcpp_driverkit_device_binding_contract | tee "$EVIDENCE_DIR/driverkit-device-binding-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_sdk_preflight_gate | tee "$EVIDENCE_DIR/driverkit-sdk-preflight-gate.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract | tee "$EVIDENCE_DIR/driverkit-prepared-hotpath-contract.json"
@@ -186,6 +187,7 @@ driverkit_shell = load_json("driverkit-shell-contract.json")
 driverkit_runtime = load_json("driverkit-runtime-contract.json")
 driverkit_extension_scaffold = load_json("driverkit-extension-scaffold-contract.json")
 driverkit_runtime_binding_gap = load_json("driverkit-runtime-binding-gap-gate.json")
+driverkit_device_binding = load_json("driverkit-device-binding-contract.json")
 driverkit_sdk_preflight = load_json("driverkit-sdk-preflight-gate.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json")
@@ -910,6 +912,45 @@ summary = {
         "next_required_action": driverkit_runtime_binding_gap.get("next_required_action"),
         "blocked_claim": driverkit_runtime_binding_gap.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/driverkit-runtime-binding-gap-gate.json",
+    },
+    "driverkit_device_binding_contract": {
+        "status": driverkit_device_binding.get("result"),
+        "schema": driverkit_device_binding.get("schema"),
+        "lifecycle_failures": driverkit_device_binding.get("lifecycle_failures"),
+        "memory_failures": driverkit_device_binding.get("memory_failures"),
+        "timestamp_failures": driverkit_device_binding.get("timestamp_failures"),
+        "config_failures": driverkit_device_binding.get("config_failures"),
+        "shutdown_failures": driverkit_device_binding.get("shutdown_failures"),
+        "initial_io_memory_descriptors": driverkit_device_binding.get(
+            "initial_io_memory_descriptors"
+        ),
+        "initial_io_memory_total_bytes": driverkit_device_binding.get(
+            "initial_io_memory_total_bytes"
+        ),
+        "changed_io_memory_total_bytes": driverkit_device_binding.get(
+            "changed_io_memory_total_bytes"
+        ),
+        "stream_memory_publications": driverkit_device_binding.get(
+            "stream_memory_publications"
+        ),
+        "zero_timestamp_publications": driverkit_device_binding.get(
+            "zero_timestamp_publications"
+        ),
+        "configuration_change_accepts": driverkit_device_binding.get(
+            "configuration_change_accepts"
+        ),
+        "configuration_change_rejects": driverkit_device_binding.get(
+            "configuration_change_rejects"
+        ),
+        "stop_io_idempotent_noops": driverkit_device_binding.get(
+            "stop_io_idempotent_noops"
+        ),
+        "product_driverkit_runtime_ready": driverkit_device_binding.get(
+            "product_driverkit_runtime_ready"
+        ),
+        "next_required_action": driverkit_device_binding.get("next_required_action"),
+        "blocked_claim": driverkit_device_binding.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/driverkit-device-binding-contract.json",
     },
     "driverkit_sdk_preflight_gate": {
         "status": driverkit_sdk_preflight.get("result"),

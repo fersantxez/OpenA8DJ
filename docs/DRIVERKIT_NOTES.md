@@ -196,3 +196,29 @@ Interpretation:
   ready for hardware.
 - The next implementation step is to bind `IOUserAudioDevice` to the skeleton's
   stream memory, timestamps, configuration policy, and USB request adapter.
+
+## Audio Device Runtime Binding Model
+
+Added on 2026-06-18:
+
+- `AudioDeviceRuntimeBinding` is a pure C++ model of the future
+  `IOUserAudioDevice` binding.
+- It owns the device-facing sequence around `AudioDriverSkeleton`:
+  - configure stream;
+  - publish the five stream-memory descriptors;
+  - start IO only after stream memory exists;
+  - publish a monotonic zero timestamp at IO start;
+  - reject configuration changes while IO is running;
+  - accept configuration changes while stopped and republish stream memory;
+  - make `StopIO` idempotent;
+  - stop IO before driver shutdown.
+- `opena8djcpp_driverkit_device_binding_contract` verifies the sequence
+  without DriverKit SDK, dext install, CoreAudio, USB, or hardware.
+
+Interpretation:
+
+- PASS means the next extension binding target is represented by executable C++
+  evidence.
+- PASS does not replace the runtime binding gap gate. The extension source still
+  needs to call this binding and then be built with a real DriverKit SDK before
+  any runnable dext claim.

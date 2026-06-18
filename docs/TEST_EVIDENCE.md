@@ -10676,3 +10676,42 @@ Full offline gate rerun:
   - The DriverKit scaffold remains a non-runnable integration target until
     `IOUserAudioDevice` stream memory, zero timestamps, configuration-change
     sequencing, and the USB request adapter are bound to the prepared backend.
+
+## 2026-06-18 DriverKit Device Binding Model
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `AudioDeviceRuntimeBinding`, a pure C++ model for the future
+    `IOUserAudioDevice` runtime binding.
+  - Added `opena8djcpp_driverkit_device_binding_contract`.
+  - Wired the contract into CMake, CTest, offline evidence summary, evidence
+    schema, and static policy auditing.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_device_binding_contract`
+  - `git diff --check`
+  - `./build/cpp-release/opena8djcpp_driverkit_device_binding_contract`
+- Focused result before full gates:
+  - `opena8djcpp_driverkit_device_binding_contract`: PASS.
+  - `initial_io_memory_descriptors=5`.
+  - `initial_io_memory_total_bytes=4096`.
+  - `changed_io_memory_total_bytes=8192`.
+  - `stream_memory_publications=2`.
+  - `zero_timestamp_publications=2`.
+  - `configuration_change_accepts=1`.
+  - `configuration_change_rejects=1`.
+  - `product_driverkit_runtime_ready=false`.
+  - Full dirty offline package: Debug CTest `61/61`, Release CTest `62/62`,
+    evidence schema PASS with `required_files=64`, `missing_files=0`.
+  - Provenance freshness inside that dirty run correctly reported FAIL with
+    `working_tree_clean_for_claim=false` because the worktree was not clean for
+    a current-candidate claim before commit.
+- Interpretation:
+  - The device-facing lifecycle policy is now executable offline.
+  - The real extension source still needs to call the binding and build with a
+    real DriverKit SDK before any dext runtime or physical readiness claim.
