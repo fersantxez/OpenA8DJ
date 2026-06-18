@@ -10256,6 +10256,10 @@ Full offline gate rerun:
   - Full offline Release CTest: `56/56` passed.
   - The full runner then failed provenance because the worktree was dirty; that
     is the expected safety behavior before committing the new gate.
+  - After committing the gate, the full runner passed against commit
+    `b0b80d8`: Debug CTest `55/55`, Release CTest `56/56`, evidence schema
+    `required_files=58`, `missing_files=0`, provenance
+    `summary_matches_head=true`, `working_tree_clean_for_claim=true`.
 - Evidence:
   - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
   - `local-analysis/cpp-offline/current-offline-gates.json`
