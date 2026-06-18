@@ -14416,6 +14416,7 @@ Readiness impact:
 
 Commit context:
 - Local changes after `cef6dfa`; expected dirty-worktree blocker until commit.
+- Final committed audit: `d9e9931`.
 
 Safety:
 - Existing evidence, git status, and toolchain/disk state only.
@@ -14435,6 +14436,22 @@ Expected result:
 - Promotion allowed: `false`.
 - DriverKit install/build attempt allowed now: `false`.
 - Route revalidation allowed now: `false`.
+
+Post-commit full gate result:
+- `./scripts/run-cpp-offline-gates`: PASS.
+- Debug CTest: `83/83` PASS.
+- Release CTest: `84/84` PASS.
+- Evidence schema: PASS, `required_files=102`, `missing_files=0`.
+- `current-offline-gates.json`: `base_commit=d9e9931`,
+  `objective_external_readiness_status=BLOCKED`,
+  `objective_external_ready=false`, `objective_external_promotion_allowed=false`.
+- Candidate hashes:
+  - HAL executable:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
+  - PKG:
+    `47a1695a3fc1264d820285da19c18be6087c8f54456d8ffede352dbf6676ae85`
+  - DMG:
+    `e60836a6a28f24a4f1bf24478306816fc54ac4558512f95ae239f6dc98646c00`
 
 Readiness impact:
 - The final objective now has a separate external blocker list:
