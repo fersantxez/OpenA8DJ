@@ -3530,3 +3530,18 @@ Current implication:
   `physical_evidence_present=false` plus `product_claim_allowed=false`.
   This is the next lower-risk transport experiment for a lock-gated physical
   window; it is not a product/human-test readiness claim.
+- 17:34 EDT prepared-lite source-reference A/B physical window:
+  `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab`
+  ran under the hardware lock against mainline
+  `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver` and C++
+  `build/OpenA8DJ-prepared-lite.driver`. Cleanup released the lock and left no
+  active `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`. Result: FAIL for
+  product/promotion. Prepared-lite improved same-session quality versus that
+  mainline run (`quality_alignment_score=0.739469` vs `0.063492`) and reduced
+  capture submit calls (`500.211/s` vs `4313.94/s`), but absolute quality still
+  failed (`quality < 0.98`, audiophile C++/Python analyzers FAIL,
+  `lag_jumps_gt_2_frames=23`) and CPU regressed
+  (`driver_cpu_p95=10.3%` vs `5.2%`, `coreaudiod_cpu_p95=74.4%` vs `6.0%`).
+  Prepared-lite is now physically rejected as a product candidate; its useful
+  learning is that lower submit cadence alone is not enough and the next work
+  must solve quality/timing and CPU spikes together.

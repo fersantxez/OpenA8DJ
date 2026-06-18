@@ -106,6 +106,10 @@ int main(int argc, char** argv) {
       read_file(root / "local-analysis/physical-evidence-window/"
                        "20260618T2020Z-default-source-reference-ab-8s-postclose/"
                        "same-session-physical-compare.json");
+  const auto prepared_lite_physical_compare =
+      read_file(root / "local-analysis/physical-evidence-window/"
+                       "20260618T213212Z-goal-continuation-prepared-lite-source-reference/"
+                       "source-reference-ab/same-session-physical-compare.json");
   const auto postclose_driver_sample =
       read_file(root / "local-analysis/cpu-sample/"
                        "20260618T2024Z-default-cpp-postclose-driver-sample/"
@@ -122,6 +126,7 @@ int main(int argc, char** argv) {
                                 !hal_prepared_lite_candidate.empty() &&
                                 !playback_scheduler_physical_compare.empty() &&
                                 !default_postclose_physical_compare.empty() &&
+                                !prepared_lite_physical_compare.empty() &&
                                 !postclose_driver_sample.empty();
 
   const bool hal_has_direct_usb_enqueue =
@@ -354,6 +359,29 @@ int main(int argc, char** argv) {
       contains(default_postclose_physical_compare, "\"quality_alignment_score\": 0.843286") &&
       contains(default_postclose_physical_compare, "\"driver_cpu_p95\": 19.4") &&
       contains(default_postclose_physical_compare, "\"coreaudiod_cpu_p95\": 14.5");
+  const auto prepared_lite_physical_baseline =
+      opena8djcpp::evidence_json::json_object(prepared_lite_physical_compare, "baseline")
+          .value_or(std::string_view{});
+  const auto prepared_lite_physical_candidate =
+      opena8djcpp::evidence_json::json_object(prepared_lite_physical_compare, "candidate")
+          .value_or(std::string_view{});
+  const bool prepared_lite_physically_rejected =
+      string_field_is(prepared_lite_physical_compare, "result", "FAIL") &&
+      string_field_is(prepared_lite_physical_compare, "readiness_claim",
+                      "BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE") &&
+      number_or(prepared_lite_physical_candidate, "quality_alignment_score", 0.0) >
+          number_or(prepared_lite_physical_baseline, "quality_alignment_score", 1.0) &&
+      number_or(prepared_lite_physical_candidate, "quality_alignment_score", 1.0) < 0.98 &&
+      number_or(prepared_lite_physical_candidate, "capture_submit_calls_per_second", 1000000.0) <
+          number_or(prepared_lite_physical_baseline, "capture_submit_calls_per_second", 0.0) &&
+      number_or(prepared_lite_physical_candidate, "driver_cpu_p95", 0.0) >
+          number_or(prepared_lite_physical_baseline, "driver_cpu_p95", 1000000.0) &&
+      number_or(prepared_lite_physical_candidate, "coreaudiod_cpu_p95", 0.0) >
+          number_or(prepared_lite_physical_baseline, "coreaudiod_cpu_p95", 1000000.0) &&
+      bool_field_is(prepared_lite_physical_candidate, "audiophile_cpp_wav_analysis_pass",
+                    false) &&
+      bool_field_is(prepared_lite_physical_candidate, "audiophile_python_wav_analysis_pass",
+                    false);
   const bool postclose_cpu_sample_points_to_usbhost_enqueue =
       contains(postclose_driver_sample,
                "\"dominant_interpretation\": \"usbhost_async_enqueue_from_capture_and_playback_paths\"") &&
@@ -391,6 +419,7 @@ int main(int argc, char** argv) {
       playback_scheduler_runtime_contract_pass && hal_playback_scheduler_candidate_pass &&
       hal_prepared_lite_candidate_pass &&
       playback_scheduler_physically_rejected && default_postclose_physically_rejected_for_product &&
+      prepared_lite_physically_rejected &&
       postclose_cpu_sample_points_to_usbhost_enqueue &&
       current_quality_blocked && physical_ab_blocked && hal_safety_blocks_claims &&
       stable_default_load_preserved &&
@@ -451,6 +480,11 @@ int main(int argc, char** argv) {
     blockers.push_back("default_postclose_physically_rejected_for_product");
   } else {
     blockers.push_back("default_postclose_rejection_missing");
+  }
+  if (prepared_lite_physically_rejected) {
+    blockers.push_back("prepared_lite_physically_rejected_for_product");
+  } else {
+    blockers.push_back("prepared_lite_physical_rejection_missing");
   }
   if (postclose_cpu_sample_points_to_usbhost_enqueue) {
     blockers.push_back("postclose_cpu_sample_points_to_usbhost_enqueue");
@@ -569,6 +603,29 @@ int main(int argc, char** argv) {
       << (bool_field_is(hal_prepared_lite_candidate, "physical_evidence_present", false)
               ? "false"
               : "true")
+      << ",\n"
+      << "  \"prepared_lite_physically_rejected\": "
+      << (prepared_lite_physically_rejected ? "true" : "false") << ",\n"
+      << "  \"prepared_lite_physical_baseline_quality_alignment_score\": "
+      << number_or(prepared_lite_physical_baseline, "quality_alignment_score", -1.0)
+      << ",\n"
+      << "  \"prepared_lite_physical_candidate_quality_alignment_score\": "
+      << number_or(prepared_lite_physical_candidate, "quality_alignment_score", -1.0)
+      << ",\n"
+      << "  \"prepared_lite_physical_baseline_capture_submit_calls_per_second\": "
+      << number_or(prepared_lite_physical_baseline, "capture_submit_calls_per_second", -1.0)
+      << ",\n"
+      << "  \"prepared_lite_physical_candidate_capture_submit_calls_per_second\": "
+      << number_or(prepared_lite_physical_candidate, "capture_submit_calls_per_second", -1.0)
+      << ",\n"
+      << "  \"prepared_lite_physical_baseline_driver_cpu_p95\": "
+      << number_or(prepared_lite_physical_baseline, "driver_cpu_p95", -1.0) << ",\n"
+      << "  \"prepared_lite_physical_candidate_driver_cpu_p95\": "
+      << number_or(prepared_lite_physical_candidate, "driver_cpu_p95", -1.0) << ",\n"
+      << "  \"prepared_lite_physical_baseline_coreaudiod_cpu_p95\": "
+      << number_or(prepared_lite_physical_baseline, "coreaudiod_cpu_p95", -1.0) << ",\n"
+      << "  \"prepared_lite_physical_candidate_coreaudiod_cpu_p95\": "
+      << number_or(prepared_lite_physical_candidate, "coreaudiod_cpu_p95", -1.0)
       << ",\n"
       << "  \"playback_scheduler_physically_rejected\": "
       << (playback_scheduler_physically_rejected ? "true" : "false") << ",\n"

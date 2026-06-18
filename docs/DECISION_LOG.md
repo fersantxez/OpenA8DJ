@@ -10253,3 +10253,34 @@ Next implication:
 - Readiness impact: this gives the next physical window a controlled candidate
   to measure. It does not permit human product test, CPU superiority claim,
   Timecode Vinyl physical certification, or branch promotion.
+
+## 2026-06-18 - Physically Reject Prepared-Lite As Product Candidate
+
+- Decision: consume the prepared-lite source-reference A/B as stable evidence
+  and keep prepared-lite out of the product/human-test path.
+- Reason: the 2x prepared-lite profile reduced capture submit cadence but did
+  not satisfy the objective. Sound quality still failed absolute gates and CPU
+  regressed against the same-session mainline run.
+- Evidence:
+  - Evidence path:
+    `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab`.
+  - Safety gates passed for both HAL bundles; final cleanup released the lock
+    and left no active OpenA8DJ HAL installed.
+  - Same-session compare result: `FAIL` with
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Quality improved relative to the broken mainline run
+    (`0.739469` vs `0.063492`) but stayed below the required `0.98`.
+  - Capture submit calls improved (`500.211/s` vs `4313.94/s`).
+  - CPU regressed: `driver_cpu_p95=10.3%` vs `5.2%`,
+    `coreaudiod_cpu_p95=74.4%` vs `6.0%`.
+  - Audiophile C++ and Python WAV analyzers both failed for the candidate.
+- Alternatives rejected:
+  - Promote prepared-lite because it reduced submit cadence: rejected because
+    CPU p95 and audio quality still fail.
+  - Treat relative quality improvement over a poor mainline run as readiness:
+    rejected because the objective requires absolute quality, functional
+    Timecode Vinyl evidence, and resource superiority.
+- Readiness impact: prepared-lite is useful as evidence that submit reduction
+  is possible, but it is not the next product candidate. The next architecture
+  step must reduce IOUSBHost/request lifecycle cost without increasing CPU
+  spikes or capture timing/quality failures.

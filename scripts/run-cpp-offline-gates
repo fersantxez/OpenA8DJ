@@ -1979,6 +1979,33 @@ summary = {
         "hal_prepared_lite_candidate_physical_evidence_present": hal_transport_runtime_gate.get(
             "hal_prepared_lite_candidate_physical_evidence_present"
         ),
+        "prepared_lite_physically_rejected": hal_transport_runtime_gate.get(
+            "prepared_lite_physically_rejected"
+        ),
+        "prepared_lite_physical_baseline_quality_alignment_score": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_baseline_quality_alignment_score"
+        ),
+        "prepared_lite_physical_candidate_quality_alignment_score": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_candidate_quality_alignment_score"
+        ),
+        "prepared_lite_physical_baseline_capture_submit_calls_per_second": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_baseline_capture_submit_calls_per_second"
+        ),
+        "prepared_lite_physical_candidate_capture_submit_calls_per_second": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_candidate_capture_submit_calls_per_second"
+        ),
+        "prepared_lite_physical_baseline_driver_cpu_p95": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_baseline_driver_cpu_p95"
+        ),
+        "prepared_lite_physical_candidate_driver_cpu_p95": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_candidate_driver_cpu_p95"
+        ),
+        "prepared_lite_physical_baseline_coreaudiod_cpu_p95": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_baseline_coreaudiod_cpu_p95"
+        ),
+        "prepared_lite_physical_candidate_coreaudiod_cpu_p95": hal_transport_runtime_gate.get(
+            "prepared_lite_physical_candidate_coreaudiod_cpu_p95"
+        ),
         "playback_scheduler_physically_rejected": hal_transport_runtime_gate.get(
             "playback_scheduler_physically_rejected"
         ),

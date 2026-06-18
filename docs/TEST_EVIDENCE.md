@@ -15681,3 +15681,44 @@ Follow-up correction:
   - The stable load is closed as an offline diagnostic state only.
   - A post-commit full gate rerun is required before the new evidence can be
     used as the current clean baseline.
+
+## 2026-06-18 - Prepared-Lite Source-Reference Physical A/B
+
+- Scope:
+  - Ran a lock-gated source-reference physical A/B using the prepared-lite
+    candidate.
+  - This played and captured audio, installed/reloaded HAL candidates, and
+    restarted CoreAudio only inside the hardware lock.
+  - Did not change default devices, sample rate defaults, buffer defaults, USB
+    state, Traktor, or system services outside the runner's HAL/CoreAudio
+    safety sequence.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ-prepared-lite.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 8 --rate 48000 --buffer 512 --prepared-lite-candidate`
+- Evidence:
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/summary.txt`
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/physical-window-preflight.json`
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/same-session-physical-compare.json`
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/promotion-readiness.json`
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/cpp-soundcheck/stream-stats-summary.json`
+  - `local-analysis/physical-evidence-window/20260618T213212Z-goal-continuation-prepared-lite-source-reference/source-reference-ab/mainline-soundcheck/stream-stats-summary.json`
+- Result:
+  - HAL safety: PASS for mainline and prepared-lite.
+  - Final cleanup: lock released; no active
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`.
+  - Same-session compare: FAIL,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Prepared-lite quality: `quality_alignment_score=0.739469`,
+    `snr_floor_db=-0.264335`, `lag_jumps_gt_2_frames=23`.
+  - Mainline quality in the same window: `quality_alignment_score=0.063492`,
+    `snr_floor_db=-26.603060`, `lag_jumps_gt_2_frames=24`.
+  - Prepared-lite capture submit calls: `500.211/s`; mainline:
+    `4313.94/s`.
+  - Prepared-lite CPU regressed: `driver_cpu_p95=10.3%` vs `5.2%`,
+    `coreaudiod_cpu_p95=74.4%` vs `6.0%`.
+  - Candidate audiophile C++ and Python WAV analyzers: FAIL.
+- Interpretation:
+  - Prepared-lite validates the submit-reduction hypothesis, but not the
+    product objective.
+  - It is physically rejected as a product/human-test candidate until a new
+    transport/runtime design can preserve the submit reduction without CPU
+    spikes, timing instability, and absolute quality failure.

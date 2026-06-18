@@ -78,6 +78,9 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
       root / "local-analysis/cpp-offline/hal-prepared-lite-candidate.json",
       root / "local-analysis/cpp-offline/hal-prepared-lite-bundle-complete.json",
+      root / "local-analysis/physical-evidence-window/"
+             "20260618T213212Z-goal-continuation-prepared-lite-source-reference/"
+             "source-reference-ab/same-session-physical-compare.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-candidate.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-bundle-complete.json",
       root / "local-analysis/cpp-offline/hal-hotpath-diagnostic-candidate.json",
@@ -1286,6 +1289,25 @@ int main(int argc, char** argv) {
                       "hal_prepared_lite_candidate_expected_submit_reduction_ratio", 2.0) &&
       bool_field_is(hal_transport_runtime_gate,
                     "hal_prepared_lite_candidate_physical_evidence_present", false) &&
+      bool_field_is(hal_transport_runtime_gate, "prepared_lite_physically_rejected", true) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_baseline_quality_alignment_score", 0.063492) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_candidate_quality_alignment_score", 0.739469) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_baseline_capture_submit_calls_per_second",
+                      4313.935681) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_candidate_capture_submit_calls_per_second",
+                      500.210669) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_baseline_driver_cpu_p95", 5.2) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_candidate_driver_cpu_p95", 10.3) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_baseline_coreaudiod_cpu_p95", 6.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "prepared_lite_physical_candidate_coreaudiod_cpu_p95", 74.4) &&
       bool_field_is(hal_transport_runtime_gate, "playback_scheduler_physically_rejected",
                     true) &&
       bool_field_is(hal_transport_runtime_gate,
