@@ -1,5 +1,38 @@
 # Decision Log
 
+## 2026-06-18 - Add Default-Off DriverKit SDK Build Probe
+
+Decision:
+- Add `OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON` as the only CMake path that
+  exposes `opena8djcpp_driverkit_extension_build_probe`.
+- Add `scripts/driverkit-sdk-build-probe` to perform build-only DriverKit SDK
+  readiness checks without installing, signing, activating, loading, unloading,
+  resetting USB, touching CoreAudio, changing audio devices, or touching
+  hardware.
+- Upgrade `opena8djcpp_driverkit_sdk_preflight_gate` to schema v2 with explicit
+  `xcodebuild`, SDK path/version, `clang`, `iig`, `codesign`, and
+  `build_only_probe_allowed` fields.
+
+Reason:
+- A DriverKit readiness claim must be tied to a real SDK/toolchain build
+  artifact, not only source scaffold and offline C++ contracts.
+- The host currently has Command Line Tools selected and no DriverKit SDK. The
+  correct behavior is fail-closed with exact missing-tool evidence.
+
+Evidence:
+- `opena8djcpp_driverkit_sdk_preflight_gate`: PASS as an environment
+  measurement, with `build_only_probe_allowed=false`.
+- `opena8djcpp_driverkit_extension_scaffold_contract`: PASS and requires the
+  build-only probe documentation.
+- `cmake -S ... -DOPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON`: PASS.
+- `cmake --build ... --target opena8djcpp_driverkit_extension_build_probe`:
+  expected BLOCKED on this host because the DriverKit SDK/toolchain is missing.
+
+Next implication:
+- DriverKit/dext readiness remains blocked until full Xcode with DriverKit SDK
+  is installed/selected and the build-only probe passes. No product, hardware,
+  or branch-promotion claim follows from this change.
+
 ## 2026-06-18 - Require Monotonic Prepared Playback Sequence Without Explicit Scheduling
 
 Decision:

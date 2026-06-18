@@ -1004,6 +1004,29 @@ Implication:
 - Do not substitute a macOS full installer for this dependency; the missing
   component is the DriverKit SDK/toolchain.
 
+### Build-Only DriverKit SDK Probe
+
+The real SDK build probe is opt-in and build-only:
+
+```sh
+cmake -S /Users/fer/dev/audio8djcpp -B /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe -DOPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON
+cmake --build /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe --target opena8djcpp_driverkit_extension_build_probe
+```
+
+Expected behavior on the current host is `BLOCKED`, because Command Line Tools
+are selected and the DriverKit SDK/`iig` toolchain is absent. A future PASS must
+write JSON evidence and still report:
+
+- `driver_installed_or_activated=false`;
+- `system_extension_activated=false`;
+- `coreaudio_touched=false`;
+- `usb_touched=false`;
+- `hardware_touched=false`.
+
+This probe must never call `systemextensionsctl`, install a dext, activate a
+System Extension, reset USB, restart CoreAudio, change default devices, play
+audio, or record audio.
+
 ## Local Audiophile Analysis Environment
 
 High-precision offline WAV analysis uses a local virtualenv inside this

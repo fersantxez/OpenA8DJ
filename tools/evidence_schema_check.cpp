@@ -448,13 +448,29 @@ int main(int argc, char** argv) {
       number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&
       object_present(summary, "driverkit_sdk_preflight_gate") &&
+      string_field_is(driverkit_sdk_preflight_gate, "schema",
+                      "opena8djcpp.driverkit-sdk-preflight-gate.v2") &&
       bool_field_is(driverkit_sdk_preflight_gate, "product_driverkit_build_allowed", false) &&
       bool_field_is(driverkit_sdk_preflight_gate, "real_driverkit_claim_blocked", true) &&
+      string_field_present(driverkit_sdk_preflight_gate, "driverkit_sdk_path") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "driverkit_sdk_path_available") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "driverkit_sdk_path_exists") &&
+      string_field_present(driverkit_sdk_preflight_gate, "driverkit_sdk_version") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "driverkit_sdk_version_available") &&
+      string_field_present(driverkit_sdk_preflight_gate, "developer_dir_effective") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "xcodebuild_driverkit_sdk_visible") &&
+      string_field_present(driverkit_sdk_preflight_gate, "driverkit_clang_path") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "clang_available") &&
+      string_field_present(driverkit_sdk_preflight_gate, "driverkit_iig_path") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "iig_available") &&
+      string_field_present(driverkit_sdk_preflight_gate, "codesign_path") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "codesign_available") &&
       number_field_present(driverkit_sdk_preflight_gate, "applications_free_gib") &&
       number_field_present(driverkit_sdk_preflight_gate, "xcode_install_minimum_free_gib") &&
       bool_field_present(driverkit_sdk_preflight_gate, "xcode_install_disk_space_ok") &&
       bool_field_present(driverkit_sdk_preflight_gate,
                          "noninteractive_xcode_install_prerequisites_met") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "build_only_probe_allowed") &&
       string_field_is(
           driverkit_sdk_preflight_gate, "blocked_claim",
           "NO_REAL_DRIVERKIT_DEXT_BUILD_OR_READINESS_CLAIM_WITHOUT_DRIVERKIT_SDK_AND_SELECTED_FULL_XCODE") &&

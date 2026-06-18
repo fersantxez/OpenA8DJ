@@ -21,6 +21,11 @@ must preserve:
 Before this scaffold can become a runnable dext:
 
 - install/select full Xcode with DriverKit SDK;
+- run the build-only DriverKit SDK probe
+  `opena8djcpp_driverkit_extension_build_probe` with
+  `OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON`; the probe must emit evidence
+  with `driver_installed_or_activated=false` and
+  `system_extension_activated=false`;
 - obtain DriverKit, DriverKit Audio Family, and USB transport entitlements;
 - bind `OpenA8DJAudioDriver` to real `IOUserAudioDriver`;
 - bind `OpenA8DJAudioDevice` and `IOUserAudioStream` buffers to the prepared
@@ -42,3 +47,15 @@ Before this scaffold can become a runnable dext:
 
 Do not install, activate, unload, reload, or sign this scaffold from default
 developer commands.
+
+Safe build-only probe sequence, when full Xcode with DriverKit SDK is already
+installed and selected:
+
+```sh
+cmake -S /Users/fer/dev/audio8djcpp -B /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe -DOPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON
+cmake --build /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe --target opena8djcpp_driverkit_extension_build_probe
+```
+
+This sequence must not run `systemextensionsctl`, install a dext, activate a
+System Extension, change audio devices, restart CoreAudio, reset USB, or touch
+hardware.

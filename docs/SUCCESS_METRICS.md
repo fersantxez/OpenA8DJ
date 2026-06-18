@@ -1980,11 +1980,19 @@ Required before any real DriverKit/dext build or readiness claim:
 - The gate must report the selected developer directory, DriverKit SDK
   availability, installed Xcode count, `xcodes` availability, and fast-download
   helper availability.
+- The gate must use schema `opena8djcpp.driverkit-sdk-preflight-gate.v2` and
+  report `driverkit_sdk_path`, `driverkit_sdk_version`,
+  `xcodebuild_driverkit_sdk_visible`, `clang_available`, `iig_available`,
+  `codesign_available`, and `build_only_probe_allowed`.
 - The gate must also report `/Applications` free space, the minimum free-space
   threshold for Xcode installation, and
   `noninteractive_xcode_install_prerequisites_met`.
 - Real DriverKit build claims require
-  `product_driverkit_build_allowed=true`.
+  `product_driverkit_build_allowed=true`, `build_only_probe_allowed=true`, and
+  an opt-in `opena8djcpp_driverkit_extension_build_probe` result of `PASS`.
+- A build probe pass must explicitly record `driver_installed_or_activated=false`,
+  `system_extension_activated=false`, `coreaudio_touched=false`,
+  `usb_touched=false`, and `hardware_touched=false`.
 - While the current host reports `xcrun_driverkit_sdk_available=false`,
   `selected_full_xcode=false`, `xcode_app_present=false`, and
   `xcodes_installed_count=0`, the offline summary must keep

@@ -1673,9 +1673,31 @@ summary = {
         "xcrun_driverkit_sdk_available": driverkit_sdk_preflight.get(
             "xcrun_driverkit_sdk_available"
         ),
+        "schema": driverkit_sdk_preflight.get("schema"),
+        "driverkit_sdk_path": driverkit_sdk_preflight.get("driverkit_sdk_path"),
+        "driverkit_sdk_path_available": driverkit_sdk_preflight.get(
+            "driverkit_sdk_path_available"
+        ),
+        "driverkit_sdk_path_exists": driverkit_sdk_preflight.get(
+            "driverkit_sdk_path_exists"
+        ),
+        "driverkit_sdk_version": driverkit_sdk_preflight.get("driverkit_sdk_version"),
+        "driverkit_sdk_version_available": driverkit_sdk_preflight.get(
+            "driverkit_sdk_version_available"
+        ),
         "xcode_select_path": driverkit_sdk_preflight.get("xcode_select_path"),
+        "developer_dir_effective": driverkit_sdk_preflight.get("developer_dir_effective"),
         "selected_full_xcode": driverkit_sdk_preflight.get("selected_full_xcode"),
+        "xcodebuild_driverkit_sdk_visible": driverkit_sdk_preflight.get(
+            "xcodebuild_driverkit_sdk_visible"
+        ),
         "xcode_app_present": driverkit_sdk_preflight.get("xcode_app_present"),
+        "driverkit_clang_path": driverkit_sdk_preflight.get("driverkit_clang_path"),
+        "clang_available": driverkit_sdk_preflight.get("clang_available"),
+        "driverkit_iig_path": driverkit_sdk_preflight.get("driverkit_iig_path"),
+        "iig_available": driverkit_sdk_preflight.get("iig_available"),
+        "codesign_path": driverkit_sdk_preflight.get("codesign_path"),
+        "codesign_available": driverkit_sdk_preflight.get("codesign_available"),
         "xcodes_cli_present": driverkit_sdk_preflight.get("xcodes_cli_present"),
         "xcodes_cli_usable": driverkit_sdk_preflight.get("xcodes_cli_usable"),
         "xcodes_installed_count": driverkit_sdk_preflight.get("xcodes_installed_count"),
@@ -1698,6 +1720,9 @@ summary = {
         ),
         "noninteractive_xcode_install_prerequisites_met": driverkit_sdk_preflight.get(
             "noninteractive_xcode_install_prerequisites_met"
+        ),
+        "build_only_probe_allowed": driverkit_sdk_preflight.get(
+            "build_only_probe_allowed"
         ),
         "product_driverkit_build_allowed": driverkit_sdk_preflight.get(
             "product_driverkit_build_allowed"

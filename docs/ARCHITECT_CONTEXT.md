@@ -26,6 +26,14 @@ Branch: `driverkit/cpp-redesign`
   offline contracts are useful, but a real DriverKit claim requires an opt-in
   build-only/no-install SDK probe against full Xcode DriverKit/AudioDriverKit
   tooling. See `docs/DRIVERKIT_READINESS_GAP.md`.
+- 2026-06-18 DriverKit build-probe hardening status: the repo now has a
+  default-off `OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON` CMake path and
+  `opena8djcpp_driverkit_extension_build_probe`. On this host the probe is
+  correctly `BLOCKED`, not product-ready: active developer tools are Command
+  Line Tools, DriverKit SDK is absent, `iig` is absent, and `/Applications`
+  free space is below the full-Xcode threshold. The probe records
+  `driver_installed_or_activated=false`, `system_extension_activated=false`,
+  `coreaudio_touched=false`, `usb_touched=false`, and `hardware_touched=false`.
 - 2026-06-18 post-commit Direct USB route status: the lock-gated
   `20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s` run again proves
   the internal USB payload path is clean (`written/consumed/packed`

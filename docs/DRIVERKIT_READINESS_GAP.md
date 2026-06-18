@@ -125,7 +125,20 @@ cargar, no descargar Xcode, no usar hardware.
 
 ## Siguiente cambio minimo recomendado
 
-Agregar un `DriverKit SDK build probe` opt-in, sin instalar ni activar dext:
+Estado 2026-06-18: este cambio minimo ya fue implementado como
+`OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON`,
+`opena8djcpp_driverkit_extension_build_probe`, y
+`scripts/driverkit-sdk-build-probe`.
+
+El probe configura correctamente y, en este host, queda `BLOCKED` por
+`real_driverkit_sdk_toolchain_missing_or_not_selected`. Eso es el resultado
+seguro esperado mientras no haya full Xcode con DriverKit SDK seleccionado.
+El probe escribe evidencia con `driver_installed_or_activated=false`,
+`system_extension_activated=false`, `coreaudio_touched=false`,
+`usb_touched=false`, and `hardware_touched=false`.
+
+La recomendacion original era agregar un `DriverKit SDK build probe` opt-in,
+sin instalar ni activar dext:
 
 1. Extender `opena8djcpp_driverkit_sdk_preflight_gate` a schema v2 con las
    comprobaciones de SDK/toolchain anteriores.

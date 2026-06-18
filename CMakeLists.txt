@@ -173,6 +173,22 @@ target_link_libraries(opena8djcpp_driverkit_device_binding_contract
 add_executable(opena8djcpp_driverkit_sdk_preflight_gate
   tools/driverkit_sdk_preflight_gate.cpp)
 
+option(OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD
+  "Enable build-only DriverKit SDK probe target; never install or activate a dext."
+  OFF)
+
+if(OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD)
+  add_custom_target(opena8djcpp_driverkit_extension_build_probe
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+      ${CMAKE_BINARY_DIR}/driverkit-sdk-probe
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/driverkit-sdk-build-probe
+      --source-root ${CMAKE_CURRENT_SOURCE_DIR}
+      --build-dir ${CMAKE_BINARY_DIR}/driverkit-sdk-probe
+      --evidence ${CMAKE_BINARY_DIR}/driverkit-sdk-probe/driverkit-sdk-build-probe.json
+    COMMENT "Running build-only DriverKit SDK probe without install or activation"
+    VERBATIM)
+endif()
+
 add_executable(opena8djcpp_driverkit_prepared_transport_contract
   tools/driverkit_prepared_transport_contract.cpp)
 

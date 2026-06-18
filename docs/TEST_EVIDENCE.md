@@ -12882,3 +12882,40 @@ Full offline gate after commit:
     IOUSBHost scheduling uses implicit `firstFrameNumber=0`.
   - This strengthens future submit-cadence and CPU/jitter evidence, but it does
     not prove product readiness without lock-gated physical A/B.
+
+## 2026-06-18 - DriverKit SDK Build Probe Hardening
+
+- Commit context: after `7f984d9`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Software/toolchain checks only.
+  - No playback, recording, driver install/load/unload, System Extension
+    activation, CoreAudio restart, USB reset, default-device change, or
+    hardware access.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_sdk_preflight_gate opena8djcpp_driverkit_extension_scaffold_contract opena8djcpp_evidence_schema_check`
+  - `scripts/driverkit-sdk-build-probe --source-root /Users/fer/dev/audio8djcpp --build-dir /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe-manual --evidence /Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/driverkit-sdk-build-probe-manual.json`
+  - `cmake -S /Users/fer/dev/audio8djcpp -B /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe -DOPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD=ON`
+  - `cmake --build /Users/fer/dev/audio8djcpp/build/driverkit-sdk-probe --target opena8djcpp_driverkit_extension_build_probe`
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-sdk-build-probe-manual.json`
+  - `build/driverkit-sdk-probe/driverkit-sdk-probe/driverkit-sdk-build-probe.json`
+  - `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json` after the
+    next full offline gate run.
+- Result:
+  - Preflight schema v2 focused build: PASS.
+  - Scaffold contract focused run: PASS.
+  - Opt-in CMake configuration: PASS.
+  - Opt-in build probe execution: expected BLOCKED on this host.
+  - Blocker:
+    `real_driverkit_sdk_toolchain_missing_or_not_selected`.
+  - Safety fields recorded by the probe:
+    `driver_installed_or_activated=false`,
+    `system_extension_activated=false`, `coreaudio_touched=false`,
+    `usb_touched=false`, and `hardware_touched=false`.
+- Interpretation:
+  - The DriverKit path now has a concrete build-only/no-install probe.
+  - This does not make the dext runnable or product-ready. It makes the current
+    blocker measurable and preserves a safe path to compile-only validation
+    once full Xcode with DriverKit SDK is available.

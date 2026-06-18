@@ -45,6 +45,7 @@ int main(int argc, char** argv) {
   const auto driver_cpp = read_file(extension / "src/OpenA8DJAudioDriver.cpp");
   const auto device_cpp = read_file(extension / "src/OpenA8DJAudioDevice.cpp");
   const auto readme = read_file(extension / "README.md");
+  const auto cmake = read_file(root / "CMakeLists.txt");
 
   const bool files_present = !info.empty() && !entitlements.empty() && !driver_iig.empty() &&
                              !device_iig.empty() && !driver_cpp.empty() &&
@@ -122,10 +123,17 @@ int main(int argc, char** argv) {
       "preallocated request pool",
       "stop cancellation accounting",
       "late completions",
+      "build-only DriverKit SDK probe",
+      "opena8djcpp_driverkit_extension_build_probe",
+      "driver_installed_or_activated=false",
+      "system_extension_activated=false",
   });
   const bool default_build_excludes_extension =
-      read_file(root / "CMakeLists.txt").find("driverkit/extension/src/OpenA8DJAudioDriver.cpp") ==
-      std::string::npos;
+      cmake.find("OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD") != std::string::npos &&
+      cmake.find("OFF)") != std::string::npos &&
+      cmake.find("opena8djcpp_driverkit_extension_build_probe") != std::string::npos &&
+      cmake.find("driverkit/extension/src/OpenA8DJAudioDriver.cpp") == std::string::npos &&
+      cmake.find("driverkit/extension/src/OpenA8DJAudioDevice.cpp") == std::string::npos;
 
   const bool pass = files_present && info_pass && entitlement_pass && iig_pass &&
                     runtime_binding_pass && safety_pass && default_build_excludes_extension;
