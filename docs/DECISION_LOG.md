@@ -1,5 +1,30 @@
 # Decision Log
 
+## 2026-06-18 - Automate Wide-Lag Audiophile Analysis For Direct USB Route Diagnostics
+
+Decision:
+- Make `scripts/run-direct-usb-soundcheck` always generate
+  `audiophile-wav-analysis-maxlag6.json` with `--max-lag-seconds 6`.
+- Require that behavior from `opena8djcpp_audiophile_analysis_stack_contract`.
+
+Reason:
+- The latest direct USB route diagnostic had about `4.927 s` of capture lag.
+  The default 1-second audiophile search window was therefore too narrow for
+  trustworthy route attribution.
+- Manual reanalysis found the real blocker: internal USB payloads are clean,
+  while the captured analog/iRig route still fails SNR, coherence, and delay
+  stability. Future route diagnostics must preserve that corrected analysis
+  automatically.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260618T092456Z-direct-usb-current-route-irig-pairA-12s/audiophile-wav-analysis-maxlag6.json`
+- `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+
+Next implication:
+- Direct USB diagnostics now fail closed with the same wide-lag audiophile
+  evidence expected by the claim gates. This does not unblock product
+  readiness; it makes the current blocker harder to misread.
+
 ## 2026-06-18 - Make Direct USB Clean / Analog Capture Failed A Hard Claim Blocker
 
 Decision:

@@ -9,6 +9,13 @@ Branch: `driverkit/cpp-redesign`
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.
 - `/Users/fer/dev/opena8dj` is the C/Objective-C mainline and is read-only for this effort.
 - `/Users/fer/dev/audio8djrust` is the Rust experiment and is read-only for this effort.
+- 2026-06-18 direct USB analysis hardening status: future
+  `scripts/run-direct-usb-soundcheck` runs now automatically generate
+  `audiophile-wav-analysis-maxlag6.json` with a 6-second lag search, and the
+  audiophile analysis stack contract requires it. This preserves the corrected
+  attribution from the current route regression: internal USB payload evidence
+  can be clean while the physical analog/iRig capture route still fails. This
+  is not readiness evidence; it is fail-closed measurement discipline.
 - 2026-06-18 capture-batch diagnostic status: C++ now has an opt-in HAL build
   profile, `make hal-capture-batch-diagnostic`, that keeps logical playback at
   ISO8 while batching capture at `HAL_CAPTURE_ISO_FRAMES=64`. The default HAL

@@ -1,5 +1,33 @@
 # Test Evidence
 
+## 2026-06-18: Direct USB Wide-Lag Audiophile Analysis Automated
+
+- Scope:
+  - Updated `scripts/run-direct-usb-soundcheck` so every future direct USB
+    route diagnostic automatically writes
+    `audiophile-wav-analysis-maxlag6.json`.
+  - Updated `opena8djcpp_audiophile_analysis_stack_contract` so this
+    wide-lag direct USB analyzer is a required offline contract.
+  - No hardware, CoreAudio, USB, driver load/unload, playback, capture,
+    default-device change, or service restart was performed for this change.
+- Commands:
+  - `bash -n scripts/run-direct-usb-soundcheck`
+  - `cmake --build build/cpp-release --target opena8djcpp_audiophile_analysis_stack_contract`
+  - `./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract | tee local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+- Result:
+  - Shell syntax: PASS.
+  - Build: PASS.
+  - Audiophile analysis stack contract: PASS, including
+    `direct_usb_runs_wide_lag_audiophile=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+- Interpretation:
+  - Future direct USB route tests will preserve the corrected 6-second lag
+    search automatically. This is analysis hardening only; product quality,
+    CPU/resource, Timecode Vinyl, and branch-promotion claims remain blocked
+    until route revalidation and same-session mainline/C++ physical comparison
+    pass.
+
 ## 2026-06-18: Route Failure Claim Gates Hardened
 
 - Scope:

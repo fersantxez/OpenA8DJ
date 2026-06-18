@@ -27,8 +27,39 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Carver | Read-only steady CPU/sample audit after v5 profiling. | recommended output-only no-capture ISO experiment; integrated as opt-in only |
 | Einstein | Read-only C++ versus mainline HAL CPU divergence audit. | findings integrated in this document |
 | Ohm | Read-only capture-route isolation review after clean Direct USB / failed iRig evidence. | known-good source first, then Audio 8 direct-to-iRig; integrated below |
+| Maxwell | Read-only route forensics after current direct USB/iRig evidence. | concluded failures are route/timebase/capture instability, not simple channel/polarity/clipping or digital payload corruption |
+| Peirce | Read-only product-claim gate audit after route regression. | recommended hard blocker for clean direct USB payload plus failed physical capture; integrated into claim gates |
 
 ## Findings Integrated
+
+### Chief Architect Integration: Direct USB Wide-Lag Audiophile Analysis
+
+- Date: 2026-06-18.
+- Subagent dependency:
+  - Maxwell classified the latest direct USB/iRig failure as physical
+    route/timebase/capture instability after a clean internal USB payload.
+  - Peirce recommended preserving that split as a hard product-claim blocker.
+- Integrated action:
+  - Updated `scripts/run-direct-usb-soundcheck` to generate
+    `audiophile-wav-analysis-maxlag6.json` automatically for direct USB route
+    diagnostics.
+  - Updated `opena8djcpp_audiophile_analysis_stack_contract` to require that
+    wide-lag direct USB analyzer path.
+- Files affected:
+  - `scripts/run-direct-usb-soundcheck`
+  - `tools/audiophile_analysis_stack_contract.cpp`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Risk:
+  - This improves measurement reliability only. It does not prove better sound
+    quality, lower CPU/resource use, routing completeness, or Timecode Vinyl
+    readiness.
+- Next action:
+  - Run full offline gates from clean evidence, then only use the hardware lock
+    for route revalidation with a known-good non-Audio8 source before any
+    product A/B.
 
 ### Chief Architect Integration: HAL Prepared Runtime Binding Contract
 

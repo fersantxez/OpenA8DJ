@@ -365,6 +365,18 @@ analysis_rc="${analysis_rc:-0}"
   --json-out "$run_dir/lti-transfer-quality.json" \
   > "$run_dir/lti-transfer-quality.log" 2>&1 || true
 
+audiophile_maxlag6_rc=0
+"$python_bin" "$root/scripts/analyze-audiophile-wav.py" \
+  --reference "$reference" \
+  --capture "$capture" \
+  --capture-channels "$capture_channels" \
+  --seconds "$seconds" \
+  --max-lag-seconds 6 \
+  --label "direct-usb-${pair}-maxlag6" \
+  --json-out "$run_dir/audiophile-wav-analysis-maxlag6.json" \
+  > "$run_dir/audiophile-wav-analysis-maxlag6.stdout" \
+  2> "$run_dir/audiophile-wav-analysis-maxlag6.err" || audiophile_maxlag6_rc=$?
+
 if [ "$collect_usb_diagnostics" = "1" ]; then
   if [ -s "$driver_diag_dir/opena8dj-output-capture.txt" ]; then
     "$python_bin" "$root/scripts/analyze-driver-capture.py" "$reference" \
@@ -425,6 +437,8 @@ first_energy_after_first_write_seconds="$(nsec_delta_seconds "$first_write_nsec"
   echo "lead_frames=$lead_frames"
   echo "playback_profile=$([ "$playback_profile" = "1" ] && echo forced || echo default)"
   echo "usb_diagnostics=$([ "$collect_usb_diagnostics" = "1" ] && echo "$driver_diag_dir" || echo "disabled")"
+  echo "audiophile_wav_analysis_maxlag6=$run_dir/audiophile-wav-analysis-maxlag6.json"
+  echo "audiophile_wav_analysis_maxlag6_rc=$audiophile_maxlag6_rc"
   echo "quality_alignment_score=$quality"
   echo "snr_db_min=$snr"
   echo "mid_band_residual_ratio=$mid"
