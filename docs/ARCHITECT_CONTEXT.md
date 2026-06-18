@@ -2669,3 +2669,21 @@ Current implication:
     prove product quality, runtime CPU/resource superiority, Traktor/timecode
     vinyl readiness, or branch-promotion readiness. Those still require
     lock-gated physical evidence on a validated capture route.
+  - Current in-progress candidate after `630080e` adds native C++ fractional
+    time-warp analysis and a parity guard against the saved Python/SciPy
+    `fractional-time-warp.json` artifacts from
+    `20260617T212050Z-mainline-vs-cpp-raw-reuse-irig`. Focused Debug and
+    Release tests pass. The parity guard reports `timewarp_parity_pass=true`,
+    `cpp_timewarp_claim_allowed=true`, zero blockers, matching
+    `fractional_time_warp_rejected` classifications for candidate and
+    baseline, and deltas close to zero for scalar/matrix improvement, delay p95,
+    delay median, and window median SNR delta.
+  - This removes only the C++/Python fractional time-warp analyzer parity
+    blocker. It does not change the product state: current physical evidence
+    still blocks audiophile quality, runtime CPU/resource superiority,
+    Traktor/timecode vinyl readiness, and branch promotion.
+  - Runtime/performance blocker remains as reported by the performance
+    subagent: prepared USB submit exists as core/DriverKit skeleton contracts,
+    but the real runtime still must demonstrate the prepared backend and CPU
+    reduction under physical same-session comparison before any claim over
+    mainline is valid.

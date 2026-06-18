@@ -2352,6 +2352,17 @@ Current implementation:
   revalidation, same-session physical A/B, runtime CPU/resource comparison, and
   real Traktor/timecode vinyl evidence are still required before superiority
   claims.
+- `local-analysis/cpp-offline/fractional-time-warp-cpp-self-test.json` must be
+  present and PASS. This validates the native C++ fractional delay estimator on
+  a deterministic synthetic fixture and keeps `product_claim_allowed=false`.
+- `local-analysis/cpp-offline/fractional-time-warp-parity-gate.json` must be
+  present and PASS as a guard. Current expected state is
+  `timewarp_parity_pass=true` and `cpp_timewarp_claim_allowed=true`; this means
+  the C++ fractional time-warp analyzer is close enough to the Python/SciPy
+  oracle on the saved physical evidence covered by the parity gate. This only
+  removes the C++/Python time-warp analyzer parity blocker. It does not satisfy
+  candidate time-warp stability, physical route validity, CPU/resource
+  superiority, or product readiness.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

@@ -18,11 +18,11 @@ python3 scripts/check-hal-bundle-complete \
 ./build/cpp-offline/opena8djcpp_driverkit_usb_submit_binding_contract > "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_request_lifecycle_contract > "$EVIDENCE_DIR/driverkit-usb-request-lifecycle-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_request_shutdown_contract > "$EVIDENCE_DIR/driverkit-usb-request-shutdown-contract.json"
-ctest --test-dir build/cpp-offline --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
+ctest --test-dir build/cpp-offline -E opena8djcpp_evidence_schema_check --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
 
 cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
 cmake --build build/cpp-release
-ctest --test-dir build/cpp-release --output-on-failure | tee "$EVIDENCE_DIR/ctest-release.txt"
+ctest --test-dir build/cpp-release -E opena8djcpp_evidence_schema_check --output-on-failure | tee "$EVIDENCE_DIR/ctest-release.txt"
 ./build/cpp-release/opena8djcpp_packet_matrix | tee "$EVIDENCE_DIR/packet-matrix.json"
 ./build/cpp-release/opena8djcpp_protocol_contract | tee "$EVIDENCE_DIR/protocol-contract.json"
 ./build/cpp-release/opena8djcpp_simulated_output_matrix | tee "$EVIDENCE_DIR/simulated-output-matrix.json"
@@ -93,6 +93,11 @@ fi
   --json-out "$EVIDENCE_DIR/lti-transfer-quality-cpp-self-test.json"
 ./build/cpp-release/opena8djcpp_lti_transfer_quality_parity_gate \
   | tee "$EVIDENCE_DIR/lti-transfer-quality-parity-gate.json"
+./build/cpp-release/opena8djcpp_fractional_time_warp \
+  --self-test \
+  --json-out "$EVIDENCE_DIR/fractional-time-warp-cpp-self-test.json"
+./build/cpp-release/opena8djcpp_fractional_time_warp_parity_gate \
+  | tee "$EVIDENCE_DIR/fractional-time-warp-parity-gate.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -195,6 +200,8 @@ audiophile_wav_analysis_python_self_test = load_json("audiophile-wav-analysis-se
 audiophile_analysis_stack_contract = load_json("audiophile-analysis-stack-contract.json")
 lti_transfer_quality_cpp_self_test = load_json("lti-transfer-quality-cpp-self-test.json")
 lti_transfer_quality_parity_gate = load_json("lti-transfer-quality-parity-gate.json")
+fractional_time_warp_cpp_self_test = load_json("fractional-time-warp-cpp-self-test.json")
+fractional_time_warp_parity_gate = load_json("fractional-time-warp-parity-gate.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -725,6 +732,49 @@ summary = {
         "blockers": lti_transfer_quality_parity_gate.get("blockers"),
         "blocked_claim": lti_transfer_quality_parity_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json",
+    },
+    "fractional_time_warp_cpp_self_test": {
+        "status": fractional_time_warp_cpp_self_test.get("result"),
+        "schema": fractional_time_warp_cpp_self_test.get("schema"),
+        "estimated_delay_frames": fractional_time_warp_cpp_self_test.get(
+            "estimated_delay_frames"
+        ),
+        "score": fractional_time_warp_cpp_self_test.get("score"),
+        "product_claim_allowed": fractional_time_warp_cpp_self_test.get(
+            "product_claim_allowed"
+        ),
+        "evidence": "local-analysis/cpp-offline/fractional-time-warp-cpp-self-test.json",
+    },
+    "fractional_time_warp_parity_gate": {
+        "status": fractional_time_warp_parity_gate.get("result"),
+        "schema": fractional_time_warp_parity_gate.get("schema"),
+        "evidence_present": fractional_time_warp_parity_gate.get("evidence_present"),
+        "timewarp_parity_pass": fractional_time_warp_parity_gate.get(
+            "timewarp_parity_pass"
+        ),
+        "cpp_timewarp_claim_allowed": fractional_time_warp_parity_gate.get(
+            "cpp_timewarp_claim_allowed"
+        ),
+        "run_count": len(fractional_time_warp_parity_gate.get("comparisons", [])),
+        "max_scalar_improvement_delta_db": max(
+            [
+                run.get("scalar_improvement_delta_db")
+                for run in fractional_time_warp_parity_gate.get("comparisons", [])
+                if run.get("scalar_improvement_delta_db") is not None
+            ]
+            or [None]
+        ),
+        "max_matrix_improvement_delta_db": max(
+            [
+                run.get("matrix_improvement_delta_db")
+                for run in fractional_time_warp_parity_gate.get("comparisons", [])
+                if run.get("matrix_improvement_delta_db") is not None
+            ]
+            or [None]
+        ),
+        "blockers": fractional_time_warp_parity_gate.get("blockers"),
+        "blocked_claim": fractional_time_warp_parity_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/fractional-time-warp-parity-gate.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

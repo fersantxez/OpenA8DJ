@@ -108,6 +108,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/audiophile-analysis-stack-contract.json",
       root / "local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json",
       root / "local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json",
+      root / "local-analysis/cpp-offline/fractional-time-warp-cpp-self-test.json",
+      root / "local-analysis/cpp-offline/fractional-time-warp-parity-gate.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -181,6 +183,12 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto lti_transfer_quality_parity_gate =
       opena8djcpp::evidence_json::json_object(summary, "lti_transfer_quality_parity_gate")
+          .value_or("");
+  const auto fractional_time_warp_cpp_self_test =
+      opena8djcpp::evidence_json::json_object(summary, "fractional_time_warp_cpp_self_test")
+          .value_or("");
+  const auto fractional_time_warp_parity_gate =
+      opena8djcpp::evidence_json::json_object(summary, "fractional_time_warp_parity_gate")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -396,6 +404,28 @@ int main(int argc, char** argv) {
       string_field_is(
           lti_transfer_quality_parity_gate, "blocked_claim",
           "CPP_LTI_TRANSFER_QUALITY_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM") &&
+      object_present(summary, "fractional_time_warp_cpp_self_test") &&
+      string_field_is(fractional_time_warp_cpp_self_test, "status", "PASS") &&
+      string_field_is(fractional_time_warp_cpp_self_test, "schema",
+                      "opena8djcpp.fractional-time-warp-cpp-self-test.v1") &&
+      number_field_present(fractional_time_warp_cpp_self_test, "estimated_delay_frames") &&
+      number_field_present(fractional_time_warp_cpp_self_test, "score") &&
+      bool_field_is(fractional_time_warp_cpp_self_test, "product_claim_allowed", false) &&
+      object_present(summary, "fractional_time_warp_parity_gate") &&
+      string_field_is(fractional_time_warp_parity_gate, "status", "PASS") &&
+      string_field_is(fractional_time_warp_parity_gate, "schema",
+                      "opena8djcpp.fractional-time-warp-parity-gate.v1") &&
+      bool_field_is(fractional_time_warp_parity_gate, "evidence_present", true) &&
+      bool_field_is(fractional_time_warp_parity_gate, "timewarp_parity_pass", true) &&
+      bool_field_is(fractional_time_warp_parity_gate, "cpp_timewarp_claim_allowed", true) &&
+      number_field_is(fractional_time_warp_parity_gate, "run_count", 2.0) &&
+      number_field_present(fractional_time_warp_parity_gate,
+                           "max_scalar_improvement_delta_db") &&
+      number_field_present(fractional_time_warp_parity_gate,
+                           "max_matrix_improvement_delta_db") &&
+      string_field_is(
+          fractional_time_warp_parity_gate, "blocked_claim",
+          "CPP_FRACTIONAL_TIME_WARP_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&

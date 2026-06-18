@@ -7502,3 +7502,59 @@ Next implication:
 - The next analysis migration target is fractional time-warp parity, followed
   by runtime discontinuity correlation parity.
 - This does not authorize product readiness or mainline replacement.
+
+## 2026-06-18: Add Native C++ Fractional Time-Warp Parity Guard
+
+Decision:
+- Added `opena8djcpp_fractional_time_warp` as an offline-only native C++
+  analyzer for the fractional delay/time-warp diagnostic previously implemented
+  in `scripts/analyze-fractional-time-warp.py`.
+- Added `opena8djcpp_fractional_time_warp_parity_gate` to compare C++ output
+  against the saved Python/SciPy `fractional-time-warp.json` oracle evidence
+  for the same-session candidate/mainline run
+  `20260617T212050Z-mainline-vs-cpp-raw-reuse-irig`.
+- Integrated the tools into CMake/CTest and the offline evidence runner.
+- Kept product claims blocked: parity means only that the C++ analyzer can be
+  trusted for the saved evidence covered by the guard.
+
+Reason:
+- Audiophile claims depend on timebase evidence. A Python-only diagnostic is
+  useful as an oracle, but the C++ line needs native, reproducible analyzers
+  for long-term gates.
+- The implementation ports the same core behavior: per-window fractional peak
+  estimation, median-smoothed delay curve, scalar and 2x2 matrix fit before and
+  after warp, and `3 dB` / `6 dB` classification thresholds.
+- Matching the saved Python/SciPy output is the objective test that the native
+  analyzer is not silently changing the meaning of the metric.
+
+Evidence:
+- Focused Debug CTest:
+  - `opena8djcpp_fractional_time_warp_self_test`: PASS.
+  - `opena8djcpp_fractional_time_warp_parity_gate`: PASS.
+- Focused Release CTest:
+  - `opena8djcpp_fractional_time_warp_self_test`: PASS.
+  - `opena8djcpp_fractional_time_warp_parity_gate`: PASS.
+- Parity guard:
+  - `timewarp_parity_pass=true`.
+  - `cpp_timewarp_claim_allowed=true`.
+  - `blockers=[]`.
+  - Candidate scalar improvement delta about `0.0000041 dB`.
+  - Candidate matrix improvement delta about `0.0000039 dB`.
+  - Baseline scalar improvement delta about `0.00000005 dB`.
+  - Baseline matrix improvement delta about `0.0000004 dB`.
+  - Candidate and baseline classifications both match the Python oracle:
+    `fractional_time_warp_rejected`.
+
+Alternatives discarded:
+- Treat the existing Python diagnostic as sufficient forever: rejected. The C++
+  line needs native gates and fewer runtime dependencies for reproducible
+  quality evidence.
+- Loosen the claim gate because time-warp is now native: rejected. Native
+  parity does not make the physical capture route valid or prove the driver is
+  better than mainline.
+
+Next implication:
+- The next analysis migration target is runtime discontinuity correlation
+  parity.
+- Runtime CPU/resource superiority still requires prepared-submit runtime
+  evidence and lock-gated physical comparison against mainline.

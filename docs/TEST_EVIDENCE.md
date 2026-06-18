@@ -11167,3 +11167,53 @@ Full offline gate after commit:
   - This is current offline evidence for the committed C++ candidate only.
   - It does not authorize audio-quality, CPU/resource, Traktor/timecode vinyl,
     hardware-readiness, branch-promotion, or mainline-replacement claims.
+
+## 2026-06-18 Native C++ Fractional Time-Warp Parity
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_fractional_time_warp` as a native C++ offline analyzer
+    for the fractional delay/time-warp diagnostic.
+  - Added `opena8djcpp_fractional_time_warp_parity_gate` to compare C++ output
+    against saved Python/SciPy `fractional-time-warp.json` artifacts.
+  - Integrated both tools into CMake/CTest and `scripts/run-cpp-offline-gates`.
+  - Reordered the offline runner so `opena8djcpp_evidence_schema_check` runs
+    as the final explicit evidence validation instead of reading the previous
+    run's summary inside early CTest.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused commands:
+  - `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline --target opena8djcpp_fractional_time_warp opena8djcpp_fractional_time_warp_parity_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_fractional_time_warp --self-test`
+  - `./build/cpp-offline/opena8djcpp_fractional_time_warp_parity_gate`
+  - `ctest --test-dir build/cpp-offline -R 'fractional_time_warp' --output-on-failure`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release && cmake --build build/cpp-release --target opena8djcpp_fractional_time_warp opena8djcpp_fractional_time_warp_parity_gate opena8djcpp_evidence_schema_check && ctest --test-dir build/cpp-release -R 'fractional_time_warp' --output-on-failure`
+- Focused result:
+  - Debug fractional time-warp CTest: `2/2` PASS.
+  - Release fractional time-warp CTest: `2/2` PASS.
+  - Self-test estimated delay: `1.5` frames.
+  - Self-test score: `1`.
+  - Parity gate: `result=PASS`.
+  - Parity gate: `evidence_present=true`.
+  - Parity gate: `timewarp_parity_pass=true`.
+  - Parity gate: `cpp_timewarp_claim_allowed=true`.
+  - Parity gate: `blockers=[]`.
+- Key parity deltas:
+  - Candidate scalar improvement delta: about `0.0000041 dB`.
+  - Candidate matrix improvement delta: about `0.0000039 dB`.
+  - Candidate delay p95 delta: `0` frames.
+  - Baseline scalar improvement delta: about `0.00000005 dB`.
+  - Baseline matrix improvement delta: about `0.0000004 dB`.
+  - Baseline delay p95 delta: about `0.000016` frames.
+- Evidence:
+  - `local-analysis/cpp-offline/fractional-time-warp-cpp-self-test.json`
+  - `local-analysis/cpp-offline/fractional-time-warp-parity-gate.json`
+- Interpretation:
+  - C++ fractional time-warp parity against the saved Python/SciPy oracle
+    evidence now passes.
+  - This removes only the time-warp analyzer parity blocker. Product quality,
+    runtime CPU/resource superiority, Traktor/timecode vinyl readiness, and
+    branch promotion remain blocked until their physical gates pass.

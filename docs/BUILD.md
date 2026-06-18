@@ -1047,6 +1047,31 @@ numerically close enough to the Python/SciPy oracle for the saved evidence used
 by this parity gate. Product quality and branch-promotion claims remain blocked
 by the physical route, same-session A/B, runtime CPU, and timecode vinyl gates.
 
+The native fractional time-warp migration is:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_fractional_time_warp
+./build/cpp-release/opena8djcpp_fractional_time_warp --self-test
+```
+
+The parity guard is:
+
+```sh
+./build/cpp-release/opena8djcpp_fractional_time_warp_parity_gate
+```
+
+It reruns the C++ fractional delay/time-warp analyzer on saved same-session
+physical evidence and compares it against the existing Python/SciPy JSON. The
+current intended result is `PASS` with `timewarp_parity_pass=true`; that means
+the native analyzer is numerically close enough to the Python/SciPy oracle for
+the saved evidence covered by the parity gate. It is still not a product
+readiness, sound-quality, CPU, or branch-promotion claim.
+
+`scripts/run-cpp-offline-gates` runs CTest before generating all final JSON
+evidence, so it excludes `opena8djcpp_evidence_schema_check` from those early
+CTest sweeps and runs the schema check explicitly at the end after all evidence
+has been regenerated.
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

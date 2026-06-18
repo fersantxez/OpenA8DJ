@@ -3838,3 +3838,37 @@ Risk:
     `local-analysis/physical-superiority-window/...`.
   - Next action: only after explicit lock-gated window, run route
     revalidation; do not run mainline-vs-C++ A/B until route passes.
+
+## 2026-06-18 Architect Integration: Native Time-Warp Port
+
+- Safety:
+  - No subagent was authorized to touch hardware/audio/CoreAudio/USB.
+  - Mainline `/Users/fer/dev/opena8dj` and Rust
+    `/Users/fer/dev/audio8djrust` remained read-only.
+- Avicenna (`019ed8f6-406c-79e1-b2e0-bf28b50a5b02`):
+  - Mission: identify the next highest-value offline analyzer/oracle after LTI
+    parity.
+  - Finding: port `scripts/analyze-fractional-time-warp.py` to native C++ and
+    add a parity gate against saved Python/SciPy evidence. Current thresholds:
+    partial improvement `3.0 dB`, strong improvement `6.0 dB`, max lag `64`
+    frames, window `0.25s`, hop `0.125s`, median filter `5`.
+  - Integrated action: added `opena8djcpp_fractional_time_warp` and
+    `opena8djcpp_fractional_time_warp_parity_gate`, then integrated them into
+    CMake/CTest, the offline runner, schema check, and docs.
+  - Risk: passing analyzer parity does not prove physical route validity,
+    sound quality, CPU/resource superiority, or branch-promotion readiness.
+  - Next action: port runtime discontinuity correlation next.
+- Planck (`019ed8f6-66de-7a40-bf67-55d91551b70f`):
+  - Mission: identify why performance/resource superiority over mainline
+    remains blocked.
+  - Finding: prepared submit and request-pool contracts exist, but real runtime
+    evidence is still missing; `hal-transport-runtime-gate.json` still reports
+    prepared submit not integrated into runtime. DriverKit extension sources
+    still contain placeholder/future binding points and artificial timestamp
+    behavior.
+  - Integrated action: no runtime code changed in this pass; the architect kept
+    the time-warp analyzer work separate from runtime/performance changes.
+  - Risk: lowering submit count can reduce CPU but still break timing or sound;
+    physical A/B must prove both resource use and audio quality.
+  - Next action: integrate prepared submit into runtime as a compile-only,
+    no-hardware slice before requesting any lock-gated physical comparison.
