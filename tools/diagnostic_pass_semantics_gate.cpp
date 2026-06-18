@@ -68,10 +68,12 @@ int main(int argc, char** argv) {
   const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
   const auto promotion = read_file(evidence / "promotion-readiness-offline-check.json");
+  const auto capture_route = read_file(evidence / "capture-route-health-gate.json");
 
   const bool evidence_present =
       !soundcheck.empty() && !physical_compare.empty() && !timecode.empty() &&
-      !migration.empty() && !physical_window.empty() && !promotion.empty();
+      !migration.empty() && !physical_window.empty() && !promotion.empty() &&
+      !capture_route.empty();
 
   const bool soundcheck_protected =
       (string_field_is(soundcheck, "mode", "analyzer_health_check") &&
@@ -99,6 +101,15 @@ int main(int argc, char** argv) {
   const bool promotion_not_allowed =
       last_string_field_is(promotion, "result", "FAIL") &&
       bool_field_is(promotion, "branch_promotion_allowed", false);
+  const bool capture_route_not_product =
+      string_field_is(capture_route, "result", "PASS") &&
+      string_field_is(capture_route, "diagnostic_result", "PASS") &&
+      bool_field_is(capture_route, "diagnostic_pass_not_product_readiness", true) &&
+      string_field_is(capture_route, "route_measurement_status", "BLOCKED_FOR_PROMOTION") &&
+      bool_field_is(capture_route, "measurement_valid_for_promotion", false) &&
+      bool_field_is(capture_route, "product_claim_allowed", false) &&
+      bool_field_is(capture_route, "branch_promotion_allowed", false) &&
+      has_readiness_claim(capture_route, "DIAGNOSTIC_ONLY_CAPTURE_ROUTE_NOT_VALID_FOR_PROMOTION");
 
   std::vector<std::string> protected_diagnostic_passes;
   if (soundcheck_protected) {
@@ -125,11 +136,14 @@ int main(int argc, char** argv) {
   if (promotion_not_allowed) {
     protected_diagnostic_passes.push_back("promotion_not_allowed");
   }
+  if (capture_route_not_product) {
+    protected_diagnostic_passes.push_back("capture_route_health_not_product");
+  }
 
   const bool pass = evidence_present && soundcheck_protected &&
                     physical_compare_not_promotion && timecode_offline_only &&
                     migration_not_product && physical_window_not_product &&
-                    promotion_not_allowed;
+                    promotion_not_allowed && capture_route_not_product;
 
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.diagnostic-pass-semantics-gate.v1\",\n"
@@ -149,6 +163,8 @@ int main(int argc, char** argv) {
             << (physical_window_not_product ? "true" : "false") << ",\n"
             << "  \"promotion_not_allowed\": " << (promotion_not_allowed ? "true" : "false")
             << ",\n";
+  std::cout << "  \"capture_route_not_product\": "
+            << (capture_route_not_product ? "true" : "false") << ",\n";
   print_string_array("protected_diagnostic_passes", protected_diagnostic_passes);
   std::cout << "  \"blocked_claim\": \"DIAGNOSTIC_PASS_DOES_NOT_MEAN_PRODUCT_READINESS_OR_BRANCH_PROMOTION\"\n"
             << "}\n";

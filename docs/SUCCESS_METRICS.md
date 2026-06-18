@@ -51,6 +51,15 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   `direct_usb_capture_failed_after_clean_payload=false` before physical quality
   evidence can support promotion. The current value is `true`, with latest
   attribution `post_usb_device_analog_or_capture_route_dominant`.
+- `capture_route_health_gate.result=PASS` is diagnostic-only unless the same
+  object also reports `route_measurement_status=VALID_FOR_PROMOTION`,
+  `measurement_valid_for_promotion=true`, `product_claim_allowed=true`, and
+  `branch_promotion_allowed=true`.
+- While the current route is blocked, `current-offline-gates.json` must expose
+  `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+  `diagnostic_pass_not_product_readiness=true`,
+  `product_claim_allowed=false`, and `branch_promotion_allowed=false` inside
+  `capture_route_health_gate`.
 - `current-offline-gates.json` may report analyzer `status=PASS` only as
   diagnostic health. Product readiness must be read from
   `product_readiness_status`, `branch_promotion_allowed`, and

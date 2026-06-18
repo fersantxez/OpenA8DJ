@@ -1,5 +1,50 @@
 # Test Evidence
 
+## 2026-06-18: Capture Route Diagnostic PASS Semantics Hardened
+
+- Scope:
+  - Hardened `opena8djcpp_capture_route_health_gate` so its `result=PASS`
+    cannot be mistaken for product readiness. It now emits
+    `diagnostic_result=PASS`, `diagnostic_pass_not_product_readiness=true`,
+    `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+    `product_claim_allowed=false`, and `branch_promotion_allowed=false` while
+    the route remains invalid.
+  - Propagated those fields into `current-offline-gates.json`.
+  - Hardened `opena8djcpp_diagnostic_pass_semantics_gate` and
+    `opena8djcpp_evidence_schema_check` so offline evidence fails if the
+    capture-route diagnostic PASS lacks explicit non-product/non-promotion
+    semantics.
+  - No hardware, CoreAudio playback/capture, USB reset, driver load/unload,
+    default-device change, or service restart was performed.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_capture_route_health_gate opena8djcpp_diagnostic_pass_semantics_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_capture_route_health_gate | tee local-analysis/cpp-offline/capture-route-health-gate.json`
+  - `./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Focused build: PASS.
+  - Capture route health gate: diagnostic PASS, with
+    `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+    `measurement_valid_for_promotion=false`,
+    `product_claim_allowed=false`, and
+    `branch_promotion_allowed=false`.
+  - Diagnostic PASS semantics gate: PASS, including
+    `capture_route_health_not_product`.
+  - Full offline gates before commit: Debug CTest `77/77` PASS, Release CTest
+    `78/78` PASS, evidence schema PASS, product readiness FAIL, branch
+    promotion false. Provenance/freshness intentionally failed because the
+    worktree contained this uncommitted hardening.
+- Evidence:
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`
+  - `local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The current route is still objectively blocked for promotion:
+    `shared_capture_route_unhealthy`,
+    `candidate_not_better_than_mainline_reference`, and
+    `direct_usb_capture_failed_after_clean_payload`. The change only makes the
+    evidence harder to misuse; it does not make the C++ candidate ready.
+
 ## 2026-06-18: Known-Good Route Evidence Hardened Before Hardware
 
 - Scope:

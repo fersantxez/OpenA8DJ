@@ -335,6 +335,10 @@ int main(int argc, char** argv) {
   required_experiments.push_back("traktor_timecode_vinyl_scope_on_validated_route");
 
   const bool measurement_valid_for_promotion = blockers.empty();
+  const bool product_claim_allowed = measurement_valid_for_promotion;
+  const bool branch_promotion_allowed = measurement_valid_for_promotion;
+  const char* route_measurement_status =
+      measurement_valid_for_promotion ? "VALID_FOR_PROMOTION" : "BLOCKED_FOR_PROMOTION";
   const bool pass = true;
 
   std::cout << std::fixed << std::setprecision(6);
@@ -342,8 +346,15 @@ int main(int argc, char** argv) {
             << "  \"schema\": \"opena8djcpp.capture-route-health-gate.v1\",\n"
             << "  \"safety\": \"offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch\",\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
+            << "  \"diagnostic_result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
+            << "  \"diagnostic_pass_not_product_readiness\": true,\n"
+            << "  \"route_measurement_status\": \"" << route_measurement_status << "\",\n"
             << "  \"measurement_valid_for_promotion\": "
             << (measurement_valid_for_promotion ? "true" : "false") << ",\n"
+            << "  \"product_claim_allowed\": "
+            << (product_claim_allowed ? "true" : "false") << ",\n"
+            << "  \"branch_promotion_allowed\": "
+            << (branch_promotion_allowed ? "true" : "false") << ",\n"
             << "  \"digital_payload_clean\": " << (digital_payload_clean ? "true" : "false") << ",\n"
             << "  \"shared_route_unhealthy\": "
             << ((shared_route_unhealthy || common_route_low) ? "true" : "false") << ",\n"

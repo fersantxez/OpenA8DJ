@@ -1161,6 +1161,14 @@ Capture route health gate:
 - Product promotion requires `measurement_valid_for_promotion=true`; otherwise
   the next step is a lock-gated capture route revalidation rather than driver
   promotion.
+- If `result=PASS` but the route is still invalid, the artifact must also emit
+  `diagnostic_result=PASS`,
+  `diagnostic_pass_not_product_readiness=true`,
+  `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+  `product_claim_allowed=false`, and `branch_promotion_allowed=false`.
+  `opena8djcpp_diagnostic_pass_semantics_gate` and
+  `opena8djcpp_evidence_schema_check` must fail if those fields are missing
+  from regenerated offline evidence.
 - `scripts/evaluate-promotion-readiness.py` must treat
   `measurement_valid_for_promotion=false` or
   `direct_usb_capture_failed_after_clean_payload=true` as first-class

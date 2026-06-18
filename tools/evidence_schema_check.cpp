@@ -235,6 +235,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto capture_route_health_gate =
+      opena8djcpp::evidence_json::json_object(summary, "capture_route_health_gate").value_or("");
   const auto direct_usb_path_attribution =
       opena8djcpp::evidence_json::json_object(summary, "direct_usb_path_attribution").value_or("");
   const auto direct_usb_latest_run =
@@ -687,6 +689,17 @@ int main(int argc, char** argv) {
       bool_field_is(physical_route_inventory, "audio_played", false) &&
       bool_field_is(physical_route_inventory, "audio_recorded", false) &&
       bool_field_is(physical_route_inventory, "driver_installed_or_activated", false) &&
+      object_present(summary, "capture_route_health_gate") &&
+      string_field_is(capture_route_health_gate, "status", "PASS") &&
+      string_field_is(capture_route_health_gate, "diagnostic_result", "PASS") &&
+      bool_field_is(capture_route_health_gate, "diagnostic_pass_not_product_readiness", true) &&
+      string_field_is(capture_route_health_gate, "route_measurement_status",
+                      "BLOCKED_FOR_PROMOTION") &&
+      bool_field_is(capture_route_health_gate, "measurement_valid_for_promotion", false) &&
+      bool_field_is(capture_route_health_gate, "product_claim_allowed", false) &&
+      bool_field_is(capture_route_health_gate, "branch_promotion_allowed", false) &&
+      bool_field_is(capture_route_health_gate,
+                    "direct_usb_capture_failed_after_clean_payload", true) &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
       bool_field_is(product_quality_claim_gate, "quality_claim_allowed", false) &&

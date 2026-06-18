@@ -8424,3 +8424,36 @@ Next implication:
 - Readiness impact: do not run branch-promotion A/B, timecode-vinyl claim, or
   CPU-superiority claim against the current route. The next physical window
   must be route/timebase isolation, not optimization.
+
+## 2026-06-18 - Make Capture Route PASS Diagnostic-Only By Contract
+
+- Decision: keep `capture_route_health_gate.result=PASS` as analyzer health,
+  but require explicit non-product fields whenever the physical route is not
+  valid for promotion.
+- Reason: the project needs machine-readable protection against confusing
+  "the diagnostic ran" with "the capture route proves audiophile readiness".
+  The current evidence still shows a clean internal USB payload while the
+  analog/iRig capture fails after that boundary.
+- Required fields:
+  - `diagnostic_result=PASS`
+  - `diagnostic_pass_not_product_readiness=true`
+  - `route_measurement_status=BLOCKED_FOR_PROMOTION`
+  - `measurement_valid_for_promotion=false`
+  - `product_claim_allowed=false`
+  - `branch_promotion_allowed=false`
+- Evidence:
+  - Focused build of `opena8djcpp_capture_route_health_gate`,
+    `opena8djcpp_diagnostic_pass_semantics_gate`, and
+    `opena8djcpp_evidence_schema_check`: PASS.
+  - Full offline gates before commit: Debug CTest `77/77` PASS, Release CTest
+    `78/78` PASS, evidence schema PASS, provenance intentionally blocked by
+    dirty worktree.
+- Alternatives rejected:
+  - Treat the capture-route gate as FAIL while blocked: rejected because the
+    diagnostic itself is healthy and should remain usable in CTest.
+  - Leave interpretation to documentation only: rejected because branch
+    promotion needs fail-closed machine-readable fields.
+- Readiness impact: no C++ quality, CPU/resource, Timecode Vinyl, or branch
+  promotion claim can cite capture-route `PASS` unless
+  `measurement_valid_for_promotion=true` and the same-session physical bundle
+  also passes.

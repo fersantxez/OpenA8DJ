@@ -15,6 +15,14 @@ Branch: `driverkit/cpp-redesign`
   directory. The physical window/promotion evaluator treats these files as
   required same-window artifacts. This prepares a safer route-only hardware
   window; it is still not product readiness or branch-promotion evidence.
+- 2026-06-18 capture route diagnostic semantics status:
+  `capture_route_health_gate.result=PASS` now means only that the offline
+  diagnostic ran over existing evidence. The same artifact and the top-level
+  summary must also expose `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+  `measurement_valid_for_promotion=false`, `product_claim_allowed=false`, and
+  `branch_promotion_allowed=false` while the current route remains invalid.
+  `diagnostic_pass_semantics_gate` protects this contract with
+  `capture_route_health_not_product`.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
   `audiophile-wav-analysis-maxlag6.json` with a 6-second lag search, and the

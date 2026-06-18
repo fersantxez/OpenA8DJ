@@ -546,7 +546,14 @@ summary = {
     },
     "capture_route_health_gate": {
         "status": capture_route_health.get("result"),
+        "diagnostic_result": capture_route_health.get("diagnostic_result"),
+        "diagnostic_pass_not_product_readiness": capture_route_health.get(
+            "diagnostic_pass_not_product_readiness"
+        ),
+        "route_measurement_status": capture_route_health.get("route_measurement_status"),
         "measurement_valid_for_promotion": capture_route_health.get("measurement_valid_for_promotion"),
+        "product_claim_allowed": capture_route_health.get("product_claim_allowed"),
+        "branch_promotion_allowed": capture_route_health.get("branch_promotion_allowed"),
         "digital_payload_clean": capture_route_health.get("digital_payload_clean"),
         "shared_route_unhealthy": capture_route_health.get("shared_route_unhealthy"),
         "candidate_capture_low": capture_route_health.get("candidate_capture_low"),
