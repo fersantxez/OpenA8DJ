@@ -104,6 +104,71 @@ fi
   --json-out "$EVIDENCE_DIR/audiophile-wav-analysis-self-test.json"
 ./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract \
   | tee "$EVIDENCE_DIR/audiophile-analysis-stack-contract.json"
+
+LATEST_SOUNDCHECK="$(
+  python3 - <<'PY'
+from pathlib import Path
+
+root = Path("local-analysis/soundcheck")
+best = None
+best_key = None
+if root.is_dir():
+    for path in root.iterdir():
+        metrics = path / "metrics.json"
+        cpu = path / "cpu-profile.tsv"
+        if not path.is_dir() or not metrics.is_file() or not cpu.is_file():
+            continue
+        key = (max(metrics.stat().st_mtime, cpu.stat().st_mtime), str(path))
+        if best_key is None or key > best_key:
+            best_key = key
+            best = path
+if best is not None:
+    print(best)
+PY
+)"
+if [[ -n "$LATEST_SOUNDCHECK" &&
+      -f "$LATEST_SOUNDCHECK/captured.wav" &&
+      -f "$LATEST_SOUNDCHECK/fixture/reference.wav" ]]; then
+  LATEST_SECONDS="$(
+    python3 - "$LATEST_SOUNDCHECK/metrics.json" <<'PY'
+import json
+import sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as handle:
+        metrics = json.load(handle)
+    seconds = float(metrics.get("compared_seconds", 12.0))
+    if seconds <= 0:
+        seconds = 12.0
+except Exception:
+    seconds = 12.0
+print(f"{seconds:.6f}")
+PY
+  )"
+  set +e
+  ./build/cpp-release/opena8djcpp_soundcheck_wav_quality "$LATEST_SOUNDCHECK" \
+    > "$LATEST_SOUNDCHECK/native-quality.json" \
+    2> "$LATEST_SOUNDCHECK/native-quality.err"
+  echo "$?" > "$LATEST_SOUNDCHECK/native-quality.rc"
+  ./build/cpp-release/opena8djcpp_audiophile_wav_analysis \
+    --reference "$LATEST_SOUNDCHECK/fixture/reference.wav" \
+    --capture "$LATEST_SOUNDCHECK/captured.wav" \
+    --seconds "$LATEST_SECONDS" \
+    --label "latest-soundcheck-offline-backfill" \
+    --json-out "$LATEST_SOUNDCHECK/audiophile-wav-analysis-cpp.json" \
+    > "$LATEST_SOUNDCHECK/audiophile-wav-analysis-cpp.stdout" \
+    2> "$LATEST_SOUNDCHECK/audiophile-wav-analysis-cpp.err"
+  echo "$?" > "$LATEST_SOUNDCHECK/audiophile-wav-analysis-cpp.rc"
+  "$ANALYSIS_PY" scripts/analyze-audiophile-wav.py \
+    --reference "$LATEST_SOUNDCHECK/fixture/reference.wav" \
+    --capture "$LATEST_SOUNDCHECK/captured.wav" \
+    --seconds "$LATEST_SECONDS" \
+    --label "latest-soundcheck-offline-backfill" \
+    --json-out "$LATEST_SOUNDCHECK/audiophile-wav-analysis.json" \
+    > "$LATEST_SOUNDCHECK/audiophile-wav-analysis.stdout" \
+    2> "$LATEST_SOUNDCHECK/audiophile-wav-analysis.err"
+  echo "$?" > "$LATEST_SOUNDCHECK/audiophile-wav-analysis.rc"
+  set -e
+fi
 ./build/cpp-release/opena8djcpp_lti_transfer_quality \
   --self-test \
   --json-out "$EVIDENCE_DIR/lti-transfer-quality-cpp-self-test.json"

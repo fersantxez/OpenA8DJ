@@ -70,6 +70,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   lacks a visible wired non-Audio8 known-good output.
   `product_claim_allowed=false`, and `branch_promotion_allowed=false` inside
   `capture_route_health_gate`.
+- If a saved soundcheck has `captured.wav` and `fixture/reference.wav`, product
+  comparison must consume run-local native WAV reanalysis plus C++ and Python
+  audiophile WAV analysis sidecars. Missing or failing sidecars are hard
+  blockers for audiophile quality and branch-promotion claims.
 - `current-offline-gates.json` may report analyzer `status=PASS` only as
   diagnostic health. Product readiness must be read from
   `product_readiness_status`, `branch_promotion_allowed`, and

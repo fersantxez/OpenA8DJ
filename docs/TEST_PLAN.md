@@ -1510,6 +1510,19 @@ Both analyzers are offline-only. They do not install, unload, reload, or touch
 any driver, USB device, CoreAudio state, default device, sample rate, or buffer
 size.
 
+`scripts/run-cpp-offline-gates` must backfill the latest complete saved
+soundcheck before product comparison when the run has both `captured.wav` and
+`fixture/reference.wav`. The backfill is offline WAV analysis only and must
+write:
+
+- `native-quality.json`
+- `audiophile-wav-analysis-cpp.json`
+- `audiophile-wav-analysis.json`
+
+The adjacent `.rc` files preserve analyzer exit codes. A nonzero RC means the
+analyzer rejected the run and the comparator must keep product/audiophile
+claims blocked, not silently skip the precision evidence.
+
 `scripts/run-physical-superiority-window --execute` now writes both analyzer
 artifacts for each Audio 8 leg when `captured.wav` and
 `fixture/reference.wav` exist:

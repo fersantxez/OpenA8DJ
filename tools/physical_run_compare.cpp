@@ -433,13 +433,19 @@ std::filesystem::path normalized_path(const std::filesystem::path& path) {
 NativeWavStats read_native_wav_stats(const std::filesystem::path& root,
                                      const std::filesystem::path& candidate) {
   NativeWavStats stats;
-  const auto json = read_file(root / "local-analysis/cpp-offline/soundcheck-wav-quality.json");
+  const auto candidate_json = candidate / "native-quality.json";
+  const auto json = std::filesystem::is_regular_file(candidate_json)
+                        ? read_file(candidate_json)
+                        : read_file(root / "local-analysis/cpp-offline/soundcheck-wav-quality.json");
   if (json.empty()) {
     return stats;
   }
   stats.evidence_present = true;
-  stats.run_dir = json_string(json, "run_dir").value_or("");
-  if (!stats.run_dir.empty()) {
+  stats.run_dir =
+      json_string(json, "run_dir").value_or(std::filesystem::absolute(candidate).string());
+  if (std::filesystem::is_regular_file(candidate_json)) {
+    stats.matched_candidate = true;
+  } else if (!stats.run_dir.empty()) {
     stats.matched_candidate =
         normalized_path(stats.run_dir) == normalized_path(std::filesystem::absolute(candidate));
   }

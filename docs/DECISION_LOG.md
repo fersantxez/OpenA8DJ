@@ -1,5 +1,35 @@
 # Decision Log
 
+## 2026-06-18 - Backfill Latest Saved Soundcheck With Offline Audiophile Analysis
+
+Decision:
+- `scripts/run-cpp-offline-gates` now reanalyzes the latest complete saved
+  soundcheck WAV pair before product comparison.
+- It writes run-local `native-quality.json`, C++ audiophile analysis, Python
+  audiophile analysis, and their `.rc` files beside the saved run.
+- `opena8djcpp_physical_run_compare` treats run-local `native-quality.json` as
+  matched to that exact candidate.
+
+Reason:
+- Product comparison previously reported native WAV reanalysis as available but
+  not matched, and treated missing audiophile sidecars as blockers. That was
+  fail-closed but less precise than possible because the saved WAVs can be
+  analyzed offline without touching hardware.
+
+Evidence:
+- Focused backfill on
+  `local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`
+  produced all three sidecars.
+- The comparator now reports
+  `native_wav_reanalysis=AVAILABLE_USED_FOR_CURRENT_OFFLINE_GATE`.
+- The candidate remains rejected: native quality `0.845270`, C++ audiophile
+  SNR floor `-7.052454 dB`, Python audiophile SNR floor `-7.019721 dB`, and
+  both audiophile analyzers return nonzero RC.
+
+Next implication:
+- Missing sidecars should no longer hide precision evidence for the latest
+  saved soundcheck. Analyzer failures remain hard product blockers.
+
 ## 2026-06-18 - Split Route Revalidation Plan Readiness From Executable Route Window
 
 Decision:

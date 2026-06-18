@@ -1,5 +1,35 @@
 # Test Evidence
 
+## 2026-06-18: Latest Soundcheck Audiophile Backfill
+
+- Scope:
+  - Hardened `scripts/run-cpp-offline-gates` so the latest saved soundcheck WAV
+    pair is reanalyzed offline before product comparison.
+  - `opena8djcpp_physical_run_compare` now treats a run-local
+    `native-quality.json` as matched evidence for that exact run.
+  - No playback, recording, driver install/load, default-device change, USB
+    reset, CoreAudio restart, or hardware access is part of this backfill.
+- Expected artifacts beside the latest complete soundcheck:
+  - `native-quality.json`
+  - `native-quality.rc`
+  - `audiophile-wav-analysis-cpp.json`
+  - `audiophile-wav-analysis-cpp.rc`
+  - `audiophile-wav-analysis.json`
+  - `audiophile-wav-analysis.rc`
+- Focused result:
+  - Run:
+    `local-analysis/soundcheck/20260618T092133Z-default-control-d3b6b28-irig-pairA-12s`
+  - Native reanalysis is now consumed as
+    `AVAILABLE_USED_FOR_CURRENT_OFFLINE_GATE`.
+  - `native-quality.rc=1`, `audiophile-wav-analysis-cpp.rc=1`,
+    `audiophile-wav-analysis.rc=1`.
+  - Native quality alignment `0.845270`.
+  - C++ audiophile SNR floor `-7.052454 dB`.
+  - Python audiophile SNR floor `-7.019721 dB`.
+- Interpretation:
+  - Analyzer failures remain product blockers. This change prevents missing
+    sidecar files from masking the stricter audiophile analysis path.
+
 ## 2026-06-18: Route Window Readiness Requires Visible Known-Good Output
 
 - Scope:

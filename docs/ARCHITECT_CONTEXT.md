@@ -44,6 +44,13 @@ Branch: `driverkit/cpp-redesign`
   `ready_for_route_revalidation_window=false` when that source is missing. The
   next required action is to provision/connect a wired non-Audio8 known-good
   output before acquiring the lock for route revalidation.
+- 2026-06-18 latest saved soundcheck analysis status: the offline gate runner
+  now backfills run-local native/C++/Python WAV analysis sidecars for the latest
+  complete saved soundcheck before product comparison. The focused run
+  `20260618T092133Z-default-control-d3b6b28-irig-pairA-12s` is now measured with
+  matched sidecars and still fails objectively: native quality alignment
+  `0.845270`, C++ audiophile SNR floor `-7.052454 dB`, and Python audiophile SNR
+  floor `-7.019721 dB`.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
   `audiophile-wav-analysis-maxlag6.json`, `fractional-time-warp.json`, and

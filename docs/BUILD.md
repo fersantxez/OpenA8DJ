@@ -1068,6 +1068,22 @@ exist:
 - `audiophile-wav-analysis-cpp.json`
 - `audiophile-wav-analysis.json`
 
+The offline gate runner also backfills the latest complete saved soundcheck
+without touching hardware. When `captured.wav` and `fixture/reference.wav`
+exist, it writes these sidecars beside that run before evaluating product
+superiority:
+
+- `native-quality.json`
+- `native-quality.rc`
+- `audiophile-wav-analysis-cpp.json`
+- `audiophile-wav-analysis-cpp.rc`
+- `audiophile-wav-analysis.json`
+- `audiophile-wav-analysis.rc`
+
+Nonzero analyzer return codes are preserved as evidence and do not abort the
+offline gate runner. The product comparator consumes the JSON and keeps claims
+blocked unless the sidecars pass.
+
 The offline gate runner also executes a compiled analysis-stack contract:
 
 ```sh
