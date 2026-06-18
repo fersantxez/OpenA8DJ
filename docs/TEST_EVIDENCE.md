@@ -14942,3 +14942,29 @@ Follow-up correction:
     low-telemetry candidate and not prepared runtime.
   - This is a reproducible offline guardrail, not a product-readiness claim.
   - A clean committed offline rerun now exists for the stable-load contract.
+
+## 2026-06-18 - Offline Playback Scheduler Model
+
+- Scope:
+  - Added a pure C++ offline ISO8 playback lead scheduler model and contract.
+  - No hardware, playback, recording, install/load, default-device change, USB
+    reset, CoreAudio restart, or service mutation occurred.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_playback_scheduler_contract opena8djcpp_transport_budget_model -j`
+  - `./build/cpp-release/opena8djcpp_playback_scheduler_contract | tee local-analysis/cpp-offline/playback-scheduler-contract.json`
+  - `./build/cpp-release/opena8djcpp_transport_budget_model | tee local-analysis/cpp-offline/transport-budget-model.json`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(playback_scheduler_contract|transport_budget_model)' --output-on-failure`
+- Result:
+  - Focused playback scheduler contract: PASS.
+  - Focused transport budget model: PASS.
+  - Focused CTest: `2/2` PASS.
+  - Stable scheduler row: `256` capture submit calls, `33` playback request
+    submit calls, playback submit reduction ratio `8`, total submit reduction
+    ratio about `1.79931`, playback lead `5..12`, zero underflows, zero pool
+    overflows, zero batch overflows, zero capture gaps, zero cadence
+    violations.
+- Interpretation:
+  - This is the next measurable CPU/performance hypothesis.
+  - It does not authorize a hardware install, a product claim, Timecode Vinyl
+    readiness, or branch promotion.

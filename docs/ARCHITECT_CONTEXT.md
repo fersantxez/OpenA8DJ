@@ -3346,3 +3346,10 @@ Current implication:
   candidate. Full offline gates passed Debug `83/83` and Release `84/84`;
   provenance freshness passed after the closure commit with
   `working_tree_clean_for_claim=true`.
+- 15:30 EDT CPU-path model update: an offline ISO8 playback lead scheduler now
+  exists as the next performance hypothesis. It preserves capture submit
+  continuity while reducing playback submit calls in the stable model from one
+  call per logical slot to `33` request submits for `264` playback slots. This
+  is not a hardware claim; the next allowed performance work is an opt-in
+  runtime binding plus lock-gated source-reference A/B after offline gates pass
+  from a clean commit.

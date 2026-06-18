@@ -2700,3 +2700,20 @@ Current implementation:
   diagnostic smoke. Sound-quality perfection, CPU/resource superiority, and
   Timecode Vinyl certification remain required for product readiness but may be
   completed in later measured iterations.
+
+## Playback Scheduler Metric
+
+- `local-analysis/cpp-offline/playback-scheduler-contract.json` must report
+  `result=PASS` before any playback scheduler runtime candidate can be built.
+- Minimum offline thresholds:
+  - `stable_capture_request_submit_calls=256`;
+  - `stable_playback_request_submit_calls<=33`;
+  - `stable_playback_submit_reduction_ratio>=8`;
+  - `stable_total_submit_reduction_ratio>1.5`;
+  - playback lead bounded inside the configured safe window, currently `5..12`;
+  - zero playback underflows, pool overflows, batch overflows, capture gaps, and
+    logical cadence violations.
+- PASS only authorizes the next implementation step: an opt-in runtime binding
+  candidate. It does not prove CPU/resource superiority or product audio
+  quality until a lock-gated physical A/B beats mainline under the same source
+  reference and workload.

@@ -131,6 +131,7 @@ int main(int argc, char** argv) {
   const auto evidence = repo_root(argv) / "local-analysis/cpp-offline";
   const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
   const auto hot_path = read_file(evidence / "hot-path-timing-analysis.json");
+  const auto playback_scheduler = read_file(evidence / "playback-scheduler-contract.json");
   const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
 
@@ -213,7 +214,6 @@ int main(int argc, char** argv) {
     budgets.push_back(budget);
   }
 
-  const bool model_passes = product_candidates == 0 && quality_passes == 0 && cpu_passes >= 1;
   const bool prepared_contracts_present =
       !migration.empty() && string_field_is(migration, "result", "PASS") &&
       bool_field_is(migration, "migration_candidate_supported", true) &&
@@ -255,6 +255,16 @@ int main(int argc, char** argv) {
       predicted_prepared_fixed_queue_ticks_per_second > 0.0 &&
       predicted_prepared_fixed_queue_ticks_per_second < fixed_queue_ticks_per_second &&
       prepared_max_gap_ratio <= 1.25 && prepared_safe_logical_gap <= 1.0;
+  const bool playback_scheduler_model_pass =
+      !playback_scheduler.empty() && string_field_is(playback_scheduler, "result", "PASS") &&
+      bool_field_is(playback_scheduler, "physical_evidence_present", false) &&
+      bool_field_is(playback_scheduler, "product_claim_allowed", false) &&
+      number_or(playback_scheduler, "stable_capture_request_submit_calls", 0.0) == 256.0 &&
+      number_or(playback_scheduler, "stable_playback_request_submit_calls", 999.0) <= 33.0 &&
+      number_or(playback_scheduler, "stable_playback_submit_reduction_ratio", 0.0) >= 8.0 &&
+      number_or(playback_scheduler, "stable_total_submit_reduction_ratio", 0.0) > 1.5 &&
+      number_or(playback_scheduler, "stable_min_playback_lead_slots", 0.0) >= 4.0 &&
+      number_or(playback_scheduler, "stable_max_playback_lead_slots", 999.0) <= 12.0;
   const bool quality_claim_blocked =
       !product_quality.empty() && string_field_is(product_quality, "result", "PASS") &&
       bool_field_is(product_quality, "quality_claim_allowed", false);
@@ -267,6 +277,13 @@ int main(int argc, char** argv) {
       prepared_max_gap_ratio <= 1.25 && prepared_safe_logical_gap <= 1.0 &&
       hot_path_present && fixed_queue_to_playback_fill_ratio > 1.0;
   const bool runtime_cpu_superiority_claim_allowed = false;
+  const bool model_passes =
+      product_candidates == 0 && quality_passes == 0 && cpu_passes >= 1 &&
+      playback_scheduler_model_pass;
+  const bool playback_scheduler_physical_evidence_present =
+      !bool_field_is(playback_scheduler, "physical_evidence_present", false);
+  const bool playback_scheduler_product_claim_allowed =
+      !bool_field_is(playback_scheduler, "product_claim_allowed", false);
 
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.transport-budget-model.v1\",\n"
@@ -304,6 +321,26 @@ int main(int argc, char** argv) {
             << ", \"claim_blockers\": [\"same_session_physical_cpu_ab_missing\", "
                "\"prepared_runtime_not_physically_validated\", "
                "\"route_or_product_quality_claim_blocked\"]},\n"
+            << "  \"playback_scheduler_model\": {"
+            << "\"model_pass\": " << (playback_scheduler_model_pass ? "true" : "false")
+            << ", \"stable_capture_request_submit_calls\": "
+            << number_or(playback_scheduler, "stable_capture_request_submit_calls", -1.0)
+            << ", \"stable_playback_request_submit_calls\": "
+            << number_or(playback_scheduler, "stable_playback_request_submit_calls", -1.0)
+            << ", \"stable_playback_submit_reduction_ratio\": "
+            << number_or(playback_scheduler, "stable_playback_submit_reduction_ratio", -1.0)
+            << ", \"stable_total_submit_reduction_ratio\": "
+            << number_or(playback_scheduler, "stable_total_submit_reduction_ratio", -1.0)
+            << ", \"stable_min_playback_lead_slots\": "
+            << number_or(playback_scheduler, "stable_min_playback_lead_slots", -1.0)
+            << ", \"stable_max_playback_lead_slots\": "
+            << number_or(playback_scheduler, "stable_max_playback_lead_slots", -1.0)
+            << ", \"physical_evidence_present\": "
+            << (playback_scheduler_physical_evidence_present ? "true" : "false")
+            << ", \"product_claim_allowed\": "
+            << (playback_scheduler_product_claim_allowed ? "true" : "false")
+            << ", \"next_required_action\": "
+               "\"IMPLEMENT_OPT_IN_PLAYBACK_LEAD_SCHEDULER_RUNTIME_BINDING_THEN_SOURCE_REFERENCE_AB\"},\n"
             << "  \"thresholds\": {\"quality_alignment_score\": " << kQualityGate
             << ", \"driver_cpu_p95\": " << kDriverCpuP95Gate
             << ", \"lag_jumps_gt_2_frames\": " << kLagJumpGate << "},\n"

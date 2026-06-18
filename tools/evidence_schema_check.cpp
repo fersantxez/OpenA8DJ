@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-usb-request-lifecycle-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
+      root / "local-analysis/cpp-offline/playback-scheduler-contract.json",
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
@@ -287,6 +288,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
       opena8djcpp::evidence_json::json_object(summary, "transport_budget_model").value_or("");
+  const auto playback_scheduler_contract =
+      opena8djcpp::evidence_json::json_object(summary, "playback_scheduler_contract")
+          .value_or("");
   const auto hal_transport_runtime_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
   const auto hal_logical_capture_batching_contract =
@@ -451,9 +455,24 @@ int main(int argc, char** argv) {
                            "prepared_runtime_predicted_fixed_queue_ticks_per_second") &&
       number_field_is(transport_budget_model,
                       "prepared_runtime_predicted_fixed_queue_work_reduction_ratio", 8.0) &&
+      bool_field_is(transport_budget_model, "playback_scheduler_model_pass", true) &&
+      number_field_is(transport_budget_model,
+                      "playback_scheduler_stable_playback_submit_reduction_ratio", 8.0) &&
+      number_field_present(transport_budget_model,
+                           "playback_scheduler_stable_total_submit_reduction_ratio") &&
       bool_field_is(transport_budget_model, "runtime_cpu_superiority_claim_allowed", false) &&
       string_array_has(transport_budget_model, "resource_claim_blockers",
                        "same_session_physical_cpu_ab_missing") &&
+      object_present(summary, "playback_scheduler_contract") &&
+      string_field_is(playback_scheduler_contract, "status", "PASS") &&
+      number_field_is(playback_scheduler_contract,
+                      "stable_capture_request_submit_calls", 256.0) &&
+      number_field_is(playback_scheduler_contract,
+                      "stable_playback_request_submit_calls", 33.0) &&
+      number_field_is(playback_scheduler_contract,
+                      "stable_playback_submit_reduction_ratio", 8.0) &&
+      bool_field_is(playback_scheduler_contract, "physical_evidence_present", false) &&
+      bool_field_is(playback_scheduler_contract, "product_claim_allowed", false) &&
       string_array_has(summary, "promotion_hard_blockers",
                        "real_driverkit_sdk_and_selected_xcode_missing") &&
       string_array_has(summary, "promotion_hard_blockers",

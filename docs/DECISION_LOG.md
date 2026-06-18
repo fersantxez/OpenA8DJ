@@ -9774,3 +9774,33 @@ Next implication:
   accidental regression into failed candidate paths. It does not authorize
   audiophile superiority, CPU superiority, Timecode Vinyl physical readiness, or
   branch promotion.
+
+## 2026-06-18 - Add Offline ISO8 Playback Lead Scheduler Model
+
+- Decision: add a pure C++ offline playback lead scheduler model before any new
+  low-CPU hardware candidate.
+- Reason: the stable diagnostic HAL must remain the closed load, but the next
+  performance path needs an objective way to reduce playback submit work while
+  preserving ISO8 logical cadence, capture continuity, preallocated pools, and
+  fail-closed evidence semantics.
+- Evidence:
+  - `opena8djcpp_playback_scheduler_contract` models a stable ISO8 batch-8 row
+    with `256` capture submits preserved, `33` playback request submits for
+    `264` logical playback slots, playback submit reduction ratio `8`, total
+    submit reduction ratio about `1.79931`, playback lead bounded `5..12`, and
+    zero underflows, pool overflows, batch overflows, capture gaps, or cadence
+    violations.
+  - Negative rows reject unbatched playback, suppressed refills, non-ISO8
+    cadence, playback completion gaps, capture gaps, and batch overflows.
+  - `transport-budget-model` now consumes the playback scheduler evidence and
+    refuses the next CPU direction if the scheduler model does not pass.
+- Alternatives rejected:
+  - Directly bind another runtime candidate to hardware: rejected because the
+    current stable load must stay closed and prior transport variants produced
+    physical regressions.
+  - Reduce capture submit cadence first: rejected by same-day hardware evidence
+    showing capture cadence changes are quality-sensitive.
+- Readiness impact: this creates a measurable next performance hypothesis only.
+  It does not authorize hardware readiness, CPU superiority, audiophile
+  superiority, Timecode Vinyl readiness, or branch promotion until an opt-in
+  runtime binding passes lock-gated physical A/B.

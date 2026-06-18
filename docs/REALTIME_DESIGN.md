@@ -613,3 +613,25 @@ Offline gate:
 
 This prevents a future DriverKit/USB adapter from hiding stop/restart bugs as
 successful completions. It still does not prove physical USB behavior.
+
+## Playback Lead Scheduler Boundary
+
+The next low-CPU path must reduce playback submit work without changing capture
+cadence or the logical ISO8 audio model.
+
+Offline gate:
+
+- `opena8djcpp_playback_scheduler_contract`.
+- Required stable row keeps `capture_request_submit_calls=256`.
+- Required stable row submits `264` logical playback slots through no more than
+  `33` playback request submit calls.
+- Required playback submit reduction ratio is at least `8`.
+- Required total submit reduction ratio is greater than `1.5`.
+- Playback lead must stay bounded between the configured low/high watermarks;
+  current stable model observes `5..12` slots.
+- Required failures are zero playback underflows, pool overflows, batch
+  overflows, capture gaps, and logical cadence violations.
+
+This is still an offline model. A real HAL or DriverKit binding must keep all
+buffers and request objects preallocated, must not allocate or log in the audio
+callback, and must not hide a playback gap by sacrificing capture continuity.
