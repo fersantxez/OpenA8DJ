@@ -270,6 +270,15 @@ int main(int argc, char** argv) {
       string_field_is(summary, "status", "PASS") &&
       string_field_is(summary, "diagnostic_status", "PASS") &&
       bool_field_is(summary, "branch_promotion_allowed", false) &&
+      bool_field_is(summary, "route_revalidation_plan_ready", true) &&
+      bool_field_present(summary, "current_promotion_route_ready") &&
+      bool_field_present(summary, "current_known_good_output_missing") &&
+      bool_field_present(summary, "ready_for_route_revalidation_window") &&
+      bool_field_is(summary, "ready_for_product_physical_ab", false) &&
+      bool_field_is(summary, "ready_for_branch_promotion", false) &&
+      string_field_present(summary, "current_route_next_lock_gated_action") &&
+      string_array_has(summary, "current_route_inventory_blockers",
+                       "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
       string_array_has(summary, "promotion_hard_blockers",
                        "single_physical_promotion_evidence_bundle_missing") &&

@@ -2939,3 +2939,8 @@ Current implication:
   those degraded fixtures to be rejected. This improves measurement integrity
   only; physical route validity, strict SNR/delay, CPU/resource superiority,
   Timecode Vinyl, and branch promotion remain blocked.
+- Live route inventory update: Audio 8 DJ and iRig Stream are USB-visible, and
+  iRig Stream is CoreAudio-visible with 2 inputs / 2 outputs. Promotion remains
+  blocked because no separate wired non-Audio8/non-built-in known-good output
+  is visible; only same-device iRig diagnostics are currently possible, and
+  those are not valid superiority evidence.

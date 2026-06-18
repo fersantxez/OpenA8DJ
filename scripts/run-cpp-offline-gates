@@ -423,6 +423,18 @@ summary = {
     "product_readiness_status": promotion_evaluator.get("result", "NOT_READY"),
     "branch_promotion_allowed": promotion_evaluator.get("branch_promotion_allowed", False),
     "quality_claim_allowed": product_quality_claim_gate.get("quality_claim_allowed", False),
+    "route_revalidation_plan_ready": physical_window_readiness_gate.get(
+        "route_revalidation_plan_ready", False
+    ),
+    "current_promotion_route_ready": physical_window_readiness_gate.get(
+        "current_promotion_route_ready", False
+    ),
+    "current_known_good_output_missing": physical_window_readiness_gate.get(
+        "current_known_good_output_missing", True
+    ),
+    "ready_for_route_revalidation_window": physical_window_readiness_gate.get(
+        "ready_for_route_revalidation_window", False
+    ),
     "ready_for_product_physical_ab": physical_window_readiness_gate.get(
         "ready_for_product_physical_ab", False
     ),
@@ -437,6 +449,15 @@ summary = {
         "measurement_valid_for_promotion"
     ),
     "physical_measurement_blockers": capture_route_health.get("promotion_blockers", []),
+    "current_route_inventory_blockers": physical_route_inventory.get("decision", {}).get(
+        "blockers", []
+    ),
+    "current_route_next_lock_gated_action": physical_route_inventory.get("decision", {}).get(
+        "next_lock_gated_action"
+    ),
+    "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
+        "decision", {}
+    ).get("non_audio8_non_builtin_known_good_outputs", []),
     "promotion_hard_blockers": promotion_hard_blockers,
     "promotion_claim_policy": (
         "offline PASS is diagnostic only; branch promotion requires same-session physical "

@@ -12733,3 +12733,45 @@ Full offline gate after commit:
   - It still cannot claim audiophile quality, Timecode Vinyl readiness,
     lower CPU/resource usage, or superiority over mainline without same-session
     lock-gated physical evidence on a validated route.
+
+## 2026-06-18 - Lock-Gated Live Route Inventory
+
+- Commit context: `aba676d` plus uncommitted route-summary hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Command:
+  - Acquired `$HOME/.opena8dj/hardware-gate.lock` with purpose
+    `live route inventory only`.
+  - Ran:
+    `scripts/physical-route-inventory --json-out local-analysis/cpp-offline/physical-route-inventory-20260618T112451Z-live.json`.
+  - Copied the result to
+    `local-analysis/cpp-offline/physical-route-inventory.json` for the offline
+    summary.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-route-inventory-20260618T112451Z-live.json`.
+- Safety:
+  - Lock acquired and released.
+  - Enumerated CoreAudio/USB only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or service mutation.
+- Result:
+  - Inventory `result=PASS`.
+  - USB: Audio 8 DJ visible; iRig Stream visible.
+  - CoreAudio devices visible:
+    iRig Stream with 2 inputs / 2 outputs at 48 kHz,
+    MacBook Air Microphone,
+    MacBook Air Speakers.
+  - `decision.promotion_route_ready=false`.
+  - `decision.non_audio8_non_builtin_known_good_outputs=[]`.
+  - `decision.next_lock_gated_action=LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY`.
+  - Remaining blockers:
+    `audio8dj_not_visible_as_coreaudio_device`,
+    `active_opena8dj_hal_not_installed`,
+    `non_audio8_non_builtin_known_good_output_not_visible`,
+    `latest_same_device_irig_diagnostic_failed`.
+- Interpretation:
+  - The physical capture hardware is visible enough for diagnostics.
+  - A promotion-valid route is still unavailable because there is no separate
+    wired non-Audio8/non-built-in known-good output visible.
+  - Same-device iRig diagnostics may help troubleshoot, but cannot prove
+    superiority over mainline.

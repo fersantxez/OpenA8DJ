@@ -8743,3 +8743,26 @@ Next implication:
 - Readiness impact: measurement-integrity hardening only. It does not clear
   the physical route, SNR/delay, CPU/resource, Timecode Vinyl, or branch
   promotion blockers.
+
+## 2026-06-18 - Promote Route-Revalidation Blockers To Offline Summary Top Level
+
+- Decision: `scripts/run-cpp-offline-gates` now writes top-level route fields
+  for `route_revalidation_plan_ready`, `current_promotion_route_ready`,
+  `current_known_good_output_missing`, `ready_for_route_revalidation_window`,
+  `current_route_inventory_blockers`, `current_route_next_lock_gated_action`,
+  and visible non-Audio8/non-built-in known-good outputs. The evidence schema
+  now requires those fields.
+- Reason: physical route validity is currently the critical blocker for any
+  claim against mainline. Keeping that state only inside nested objects made it
+  too easy to see offline PASS and miss that no promotion-valid route exists.
+- Evidence:
+  - Lock-gated live inventory:
+    `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/physical-route-inventory-20260618T112451Z-live.json`.
+  - USB visibility: Audio 8 DJ visible, iRig Stream visible.
+  - CoreAudio visibility: iRig Stream input/output visible, built-in microphone
+    and MacBook Air Speakers visible.
+  - Promotion route: not ready; no non-Audio8/non-built-in known-good output
+    visible; latest same-device iRig diagnostic still failed.
+- Readiness impact: reporting safety only. This does not authorize playback,
+  recording, driver install/load, physical A/B, Timecode Vinyl, CPU claims, or
+  branch promotion.
