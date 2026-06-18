@@ -107,6 +107,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
       root / "local-analysis/cpp-offline/audiophile-analysis-stack-contract.json",
       root / "local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json",
+      root / "local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -177,6 +178,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto lti_transfer_quality_cpp_self_test =
       opena8djcpp::evidence_json::json_object(summary, "lti_transfer_quality_cpp_self_test")
+          .value_or("");
+  const auto lti_transfer_quality_parity_gate =
+      opena8djcpp::evidence_json::json_object(summary, "lti_transfer_quality_parity_gate")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -379,6 +383,21 @@ int main(int argc, char** argv) {
       string_field_is(
           lti_transfer_quality_cpp_self_test, "blocked_claim",
           "CPP_LTI_TRANSFER_ANALYSIS_IS_DIAGNOSTIC_UNTIL_PARITY_WITH_PYTHON_AND_SAME_SESSION_PHYSICAL_EVIDENCE_PASS") &&
+      object_present(summary, "lti_transfer_quality_parity_gate") &&
+      string_field_is(lti_transfer_quality_parity_gate, "status", "PASS") &&
+      string_field_is(lti_transfer_quality_parity_gate, "schema",
+                      "opena8djcpp.lti-transfer-quality-parity-gate.v1") &&
+      bool_field_is(lti_transfer_quality_parity_gate, "evidence_present", true) &&
+      bool_field_is(lti_transfer_quality_parity_gate, "lti_parity_pass", false) &&
+      bool_field_is(lti_transfer_quality_parity_gate, "cpp_lti_claim_allowed", false) &&
+      number_field_is(lti_transfer_quality_parity_gate, "run_count", 2.0) &&
+      number_field_present(lti_transfer_quality_parity_gate, "max_lti_snr_delta_db") &&
+      number_field_present(lti_transfer_quality_parity_gate, "max_lti_mid_ratio_delta") &&
+      string_array_has(lti_transfer_quality_parity_gate, "blockers",
+                       "cpp_lti_transfer_quality_not_yet_numerically_equivalent_to_python_oracle") &&
+      string_field_is(
+          lti_transfer_quality_parity_gate, "blocked_claim",
+          "NO_CPP_LTI_TRANSFER_QUALITY_CLAIM_UNTIL_PARITY_WITH_PYTHON_ORACLE_PASSES_ON_SAVED_PHYSICAL_EVIDENCE") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&

@@ -2343,6 +2343,12 @@ Current implementation:
   of the LTI transfer-quality analysis on a generated broadband fixture. It is
   diagnostic only until a parity gate compares C++ against the existing
   Python/SciPy output on saved physical evidence.
+- `local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json` must be
+  present and `PASS` as a guard. Current expected state is
+  `lti_parity_pass=false` and `cpp_lti_claim_allowed=false`; this means the C++
+  LTI analyzer may not replace the Python/SciPy oracle for claim-critical
+  evidence yet. Future readiness requires `lti_parity_pass=true` on saved
+  physical evidence before using C++ LTI metrics in superiority claims.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

@@ -1034,6 +1034,17 @@ coherence by band, transfer magnitude by band, and LTI SNR delta. It is not yet
 a replacement for Python in product claims; the next required step is a parity
 gate against saved physical evidence.
 
+The parity guard is:
+
+```sh
+./build/cpp-release/opena8djcpp_lti_transfer_quality_parity_gate
+```
+
+It reruns the C++ LTI analyzer on saved same-session physical evidence and
+compares it against the existing Python/SciPy JSON. The current intended result
+is `PASS` with `lti_parity_pass=false`; that means the guard is active and C++
+LTI claim use remains blocked.
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

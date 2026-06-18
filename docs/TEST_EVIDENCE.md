@@ -11080,3 +11080,33 @@ Full offline gate rerun:
   - The native C++ LTI analyzer can measure a generated broadband fixture.
   - It is not yet a replacement for Python/SciPy in product claims; parity on
     saved physical evidence is still required.
+
+## 2026-06-18 LTI C++/Python Parity Guard
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_lti_transfer_quality_parity_gate`.
+  - Integrated it into CMake/CTest and the offline evidence runner.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused command:
+  - `./build/cpp-offline/opena8djcpp_lti_transfer_quality_parity_gate | tee local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json`
+- Focused result:
+  - `result=PASS`
+  - `evidence_present=true`
+  - `lti_parity_pass=false`
+  - `cpp_lti_claim_allowed=false`
+- Key deltas:
+  - candidate LTI SNR delta about `13.3798 dB`;
+  - candidate LTI mid-ratio delta about `1.27924`;
+  - baseline LTI SNR delta about `10.185 dB`;
+  - baseline LTI mid-ratio delta about `2.72628`.
+- Evidence:
+  - `local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json`
+- Interpretation:
+  - The guard is active and correctly blocks C++ LTI claim use.
+  - The C++ analyzer needs closer Welch/CSD or reconstruction parity before it
+    can replace Python/SciPy for claim-critical LTI evidence.

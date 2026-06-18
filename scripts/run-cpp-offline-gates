@@ -91,6 +91,8 @@ fi
 ./build/cpp-release/opena8djcpp_lti_transfer_quality \
   --self-test \
   --json-out "$EVIDENCE_DIR/lti-transfer-quality-cpp-self-test.json"
+./build/cpp-release/opena8djcpp_lti_transfer_quality_parity_gate \
+  | tee "$EVIDENCE_DIR/lti-transfer-quality-parity-gate.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -192,6 +194,7 @@ audiophile_wav_analysis_cpp_self_test = load_json("audiophile-wav-analysis-cpp-s
 audiophile_wav_analysis_python_self_test = load_json("audiophile-wav-analysis-self-test.json")
 audiophile_analysis_stack_contract = load_json("audiophile-analysis-stack-contract.json")
 lti_transfer_quality_cpp_self_test = load_json("lti-transfer-quality-cpp-self-test.json")
+lti_transfer_quality_parity_gate = load_json("lti-transfer-quality-parity-gate.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -693,6 +696,35 @@ summary = {
         ),
         "blocked_claim": lti_transfer_quality_cpp_self_test.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json",
+    },
+    "lti_transfer_quality_parity_gate": {
+        "status": lti_transfer_quality_parity_gate.get("result"),
+        "schema": lti_transfer_quality_parity_gate.get("schema"),
+        "evidence_present": lti_transfer_quality_parity_gate.get("evidence_present"),
+        "lti_parity_pass": lti_transfer_quality_parity_gate.get("lti_parity_pass"),
+        "cpp_lti_claim_allowed": lti_transfer_quality_parity_gate.get(
+            "cpp_lti_claim_allowed"
+        ),
+        "run_count": len(lti_transfer_quality_parity_gate.get("runs", [])),
+        "max_lti_snr_delta_db": max(
+            [
+                run.get("lti_snr_delta_db")
+                for run in lti_transfer_quality_parity_gate.get("runs", [])
+                if run.get("lti_snr_delta_db") is not None
+            ]
+            or [None]
+        ),
+        "max_lti_mid_ratio_delta": max(
+            [
+                run.get("lti_mid_ratio_delta")
+                for run in lti_transfer_quality_parity_gate.get("runs", [])
+                if run.get("lti_mid_ratio_delta") is not None
+            ]
+            or [None]
+        ),
+        "blockers": lti_transfer_quality_parity_gate.get("blockers"),
+        "blocked_claim": lti_transfer_quality_parity_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

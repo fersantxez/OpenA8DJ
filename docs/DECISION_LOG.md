@@ -7417,3 +7417,43 @@ Next implication:
 - Add a parity gate that runs the C++ LTI analyzer on saved physical runs and
   compares core fields against `scripts/analyze-lti-transfer-quality.py` before
   using the C++ output for claim-critical gates.
+
+## 2026-06-18: Add LTI C++/Python Parity Guard
+
+Decision:
+- Added `opena8djcpp_lti_transfer_quality_parity_gate`.
+- The gate reruns the C++ LTI analyzer on the saved same-session physical
+  mainline/C++ run from `20260617T212050Z-mainline-vs-cpp-raw-reuse-irig` and
+  compares it against the existing Python/SciPy LTI JSON.
+- It passes as a guard while reporting `lti_parity_pass=false` and
+  `cpp_lti_claim_allowed=false`.
+
+Reason:
+- The C++ LTI analyzer self-test proves the tool can measure a deterministic
+  generated fixture, but it does not prove numerical equivalence with the
+  existing SciPy oracle on real saved captures.
+- The focused parity run shows useful partial agreement: alignment lag and
+  scalar SNR are close. It also shows claim-critical divergence: LTI SNR delta
+  and LTI residual ratios differ by much more than the allowed tolerance.
+
+Evidence:
+- Candidate saved physical leg:
+  - alignment lag delta: `1` frame;
+  - scalar SNR delta: about `0.0766 dB`;
+  - LTI SNR delta: about `13.38 dB`;
+  - LTI mid-ratio delta: about `1.279`.
+- Baseline saved physical leg:
+  - alignment lag delta: `5` frames;
+  - scalar SNR delta: about `0.0343 dB`;
+  - LTI SNR delta: about `10.185 dB`;
+  - LTI mid-ratio delta: about `2.726`.
+
+Alternatives discarded:
+- Claim the C++ LTI analyzer is equivalent because its self-test passes:
+  rejected. The saved physical evidence contradicts equivalence.
+- Remove the C++ LTI analyzer: rejected. It already provides a useful native
+  measurement path; it just needs parity work before claim use.
+
+Next implication:
+- Improve the C++ LTI reconstruction/PSD path or add a closer Welch/CSD model
+  until the parity gate can flip `lti_parity_pass=true`.
