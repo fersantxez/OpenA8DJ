@@ -122,6 +122,7 @@ int main(int argc, char** argv) {
       root / "tools/prepared_transport_pressure_gate.cpp",
       root / "tools/prepared_transport_migration_gate.cpp",
       root / "tools/physical_run_compare.cpp",
+      root / "tools/physical_submit_comparison_contract.cpp",
       root / "tools/direct_usb_path_attribution.cpp",
       root / "tools/irig_idle_capture_gate.cpp",
       root / "tools/physical_window_readiness_gate.cpp",

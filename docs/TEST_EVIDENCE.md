@@ -10547,3 +10547,43 @@ Full offline gate rerun:
   - CPU superiority remains unproven. The current HAL still performs direct USB
     enqueue work and still requires same-session physical CPU and quality
     evidence against mainline.
+
+## 2026-06-18 Physical Submit Comparison Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `capture_submit_calls_per_second` and
+    `playback_submit_calls_per_second` to `physical_run_compare`.
+  - Same-session run-to-run comparison now requires C++ to be no worse than
+    mainline on capture and playback submit cadence before branch-promotion
+    support can pass.
+  - Added a source contract,
+    `opena8djcpp_physical_submit_comparison_contract`, to keep the chain
+    intact from `run-soundcheck` -> stream-stats analyzer ->
+    `physical_run_compare` -> promotion evaluator.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_physical_submit_comparison_contract opena8djcpp_physical_run_compare opena8djcpp_static_policy_check opena8djcpp_evidence_schema_check`
+  - `python3 -m py_compile scripts/analyze-stream-stats.py scripts/evaluate-promotion-readiness.py`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `git diff --check`
+  - `./build/cpp-release/opena8djcpp_physical_submit_comparison_contract`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_physical_submit_comparison_contract|opena8djcpp_physical_run_compare' --output-on-failure`
+- Focused results before commit:
+  - Submit comparison contract: PASS, with
+    `analyzer_outputs_submit_rates=true`,
+    `soundcheck_records_submit_counters=true`,
+    `compare_reads_submit_rates=true`,
+    `same_session_gates_include_submit_rates=true`,
+    `promotion_depends_on_same_session_compare=true`.
+  - Focused CTest: PASS for both `opena8djcpp_physical_run_compare` and
+    `opena8djcpp_physical_submit_comparison_contract`.
+- Interpretation:
+  - The next physical same-session A/B must now prove resource improvement with
+    submit cadence evidence, not just process CPU samples.
+  - This still does not make the candidate ready for hardware promotion; it
+    hardens the promotion gate for when valid route evidence exists.

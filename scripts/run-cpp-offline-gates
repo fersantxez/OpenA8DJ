@@ -109,6 +109,7 @@ fi
 ./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee "$EVIDENCE_DIR/hal-transport-runtime-gate.json"
 ./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract | tee "$EVIDENCE_DIR/hal-logical-capture-batching-contract.json"
 ./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract | tee "$EVIDENCE_DIR/hal-runtime-geometry-observability-contract.json"
+./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee "$EVIDENCE_DIR/physical-submit-comparison-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -177,6 +178,7 @@ product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
 hal_logical_capture_batching_contract = load_json("hal-logical-capture-batching-contract.json")
 hal_runtime_geometry_observability_contract = load_json("hal-runtime-geometry-observability-contract.json")
+physical_submit_comparison_contract = load_json("physical-submit-comparison-contract.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -761,6 +763,32 @@ summary = {
         ),
         "blocked_claim": hal_runtime_geometry_observability_contract.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json",
+    },
+    "physical_submit_comparison_contract": {
+        "status": physical_submit_comparison_contract.get("result"),
+        "analyzer_outputs_submit_rates": physical_submit_comparison_contract.get(
+            "analyzer_outputs_submit_rates"
+        ),
+        "soundcheck_records_submit_counters": physical_submit_comparison_contract.get(
+            "soundcheck_records_submit_counters"
+        ),
+        "compare_reads_submit_rates": physical_submit_comparison_contract.get(
+            "compare_reads_submit_rates"
+        ),
+        "compare_has_legacy_fallback": physical_submit_comparison_contract.get(
+            "compare_has_legacy_fallback"
+        ),
+        "same_session_gates_include_submit_rates": physical_submit_comparison_contract.get(
+            "same_session_gates_include_submit_rates"
+        ),
+        "compare_prints_submit_rates": physical_submit_comparison_contract.get(
+            "compare_prints_submit_rates"
+        ),
+        "promotion_depends_on_same_session_compare": physical_submit_comparison_contract.get(
+            "promotion_depends_on_same_session_compare"
+        ),
+        "blocked_claim": physical_submit_comparison_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/physical-submit-comparison-contract.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

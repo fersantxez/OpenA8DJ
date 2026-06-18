@@ -59,8 +59,14 @@ struct RunStats {
   bool captured_wav_present = false;
   double capture_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
+  double playback_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
   double capture_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_submit_reduction_ratio_vs_logical = std::numeric_limits<double>::quiet_NaN();
+  double playback_submit_reduction_ratio_vs_base = std::numeric_limits<double>::quiet_NaN();
+  double capture_submit_rate_ratio_to_expected = std::numeric_limits<double>::quiet_NaN();
+  double playback_submit_rate_ratio_to_expected = std::numeric_limits<double>::quiet_NaN();
   double quality = std::numeric_limits<double>::quiet_NaN();
   double snr = std::numeric_limits<double>::quiet_NaN();
   double mid = std::numeric_limits<double>::quiet_NaN();
@@ -395,10 +401,28 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
       number_or_nan(json_number(stream_summary, "capture_transfers_per_second"));
   run.playback_transfers_per_second =
       number_or_nan(json_number(stream_summary, "playback_transfers_completed_per_second"));
+  run.capture_submit_calls_per_second =
+      number_or_nan(json_number(stream_summary, "capture_transfers_submitted_per_second"));
+  if (!std::isfinite(run.capture_submit_calls_per_second)) {
+    run.capture_submit_calls_per_second = run.capture_transfers_per_second;
+  }
+  run.playback_submit_calls_per_second =
+      number_or_nan(json_number(stream_summary, "playback_transfers_submitted_per_second"));
+  if (!std::isfinite(run.playback_submit_calls_per_second)) {
+    run.playback_submit_calls_per_second = run.playback_transfers_per_second;
+  }
   run.capture_transfers_sampled_per_second =
       number_or_nan(json_number(stream_summary, "capture_transfers_sampled_per_second"));
   run.playback_transfers_sampled_per_second =
       number_or_nan(json_number(stream_summary, "playback_transfers_sampled_per_second"));
+  run.capture_submit_reduction_ratio_vs_logical =
+      number_or_nan(json_number(stream_summary, "capture_submit_reduction_ratio_vs_logical"));
+  run.playback_submit_reduction_ratio_vs_base =
+      number_or_nan(json_number(stream_summary, "playback_submit_reduction_ratio_vs_base"));
+  run.capture_submit_rate_ratio_to_expected =
+      number_or_nan(json_number(stream_summary, "capture_submit_rate_ratio_to_expected"));
+  run.playback_submit_rate_ratio_to_expected =
+      number_or_nan(json_number(stream_summary, "playback_submit_rate_ratio_to_expected"));
   run.reference_wav_present = std::filesystem::is_regular_file(path / "fixture/reference.wav");
   run.captured_wav_present = std::filesystem::is_regular_file(path / "captured.wav");
   run.quality = number_or_nan(json_number(metrics, "quality_alignment_score"));
@@ -555,6 +579,10 @@ std::vector<GateResult> run_to_run_gates(const RunStats& candidate, const RunSta
       {"driver_cpu_p95", Direction::LessOrEqual, candidate.driver.p95, baseline.driver.p95},
       {"coreaudiod_cpu_p95", Direction::LessOrEqual, candidate.coreaudiod.p95,
        baseline.coreaudiod.p95},
+      {"capture_submit_calls_per_second", Direction::LessOrEqual,
+       candidate.capture_submit_calls_per_second, baseline.capture_submit_calls_per_second},
+      {"playback_submit_calls_per_second", Direction::LessOrEqual,
+       candidate.playback_submit_calls_per_second, baseline.playback_submit_calls_per_second},
   };
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
@@ -637,6 +665,24 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << ",\n";
   std::cout << indent << "  \"playback_transfers_sampled_per_second\": ";
   print_json_number(run.playback_transfers_sampled_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_calls_per_second\": ";
+  print_json_number(run.capture_submit_calls_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_submit_calls_per_second\": ";
+  print_json_number(run.playback_submit_calls_per_second);
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_reduction_ratio_vs_logical\": ";
+  print_json_number(run.capture_submit_reduction_ratio_vs_logical);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_submit_reduction_ratio_vs_base\": ";
+  print_json_number(run.playback_submit_reduction_ratio_vs_base);
+  std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_rate_ratio_to_expected\": ";
+  print_json_number(run.capture_submit_rate_ratio_to_expected);
+  std::cout << ",\n";
+  std::cout << indent << "  \"playback_submit_rate_ratio_to_expected\": ";
+  print_json_number(run.playback_submit_rate_ratio_to_expected);
   std::cout << ",\n";
   std::cout << indent << "  \"practical_pass\": " << (practical_pass(run) ? "true" : "false")
             << ",\n";

@@ -87,6 +87,9 @@ Branch: `driverkit/cpp-redesign`
   capture/playback submit ratios from the active runtime geometry. This still
   does not prove CPU superiority; it makes the next lock-gated A/B capable of
   measuring it.
+- Same-session physical comparison now has a source-level contract requiring
+  capture/playback submit cadence to participate in mainline-vs-C++ comparison
+  before runtime CPU/resource superiority can be claimed.
 - 2026-06-17 hot-path timing is now opt-in (`HAL_HOT_PATH_TIMING=1`) and off
   by default. A locked iRig run showed physical quality still FAILs
   (`quality_alignment_score=0.970666`, SNR `10.78 dB`, `19` lag jumps) and

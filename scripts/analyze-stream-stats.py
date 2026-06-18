@@ -335,6 +335,7 @@ def analyze(path):
         "capture_transfers_per_second": counters["captureTransfersCompleted"]["per_second"],
         "capture_transfers_submitted_per_second": counters["captureTransfersSubmitted"]["per_second"],
         "capture_transfers_sampled_per_second": counters["captureTransfersSampled"]["per_second"],
+        "playback_transfers_submitted_per_second": counters["playbackTransfersSubmitted"]["per_second"],
         "playback_transfers_completed_per_second": counters["playbackTransfersCompleted"]["per_second"],
         "playback_transfers_sampled_per_second": counters["playbackTransfersSampled"]["per_second"],
         "playback_minus_capture_transfer_delta": transfer_balance_delta,

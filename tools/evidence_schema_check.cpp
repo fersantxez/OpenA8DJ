@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-transport-runtime-gate.json",
       root / "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
       root / "local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json",
+      root / "local-analysis/cpp-offline/physical-submit-comparison-contract.json",
       root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
@@ -158,6 +159,9 @@ int main(int argc, char** argv) {
   const auto hal_runtime_geometry_observability_contract =
       opena8djcpp::evidence_json::json_object(
           summary, "hal_runtime_geometry_observability_contract")
+          .value_or("");
+  const auto physical_submit_comparison_contract =
+      opena8djcpp::evidence_json::json_object(summary, "physical_submit_comparison_contract")
           .value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
@@ -265,6 +269,20 @@ int main(int argc, char** argv) {
       string_field_is(
           hal_runtime_geometry_observability_contract, "blocked_claim",
           "NO_PHYSICAL_HAL_QUALITY_OR_PERFORMANCE_CLAIM_WITHOUT_ACTIVE_RUNTIME_GEOMETRY_IN_EVIDENCE") &&
+      object_present(summary, "physical_submit_comparison_contract") &&
+      bool_field_is(physical_submit_comparison_contract, "analyzer_outputs_submit_rates", true) &&
+      bool_field_is(physical_submit_comparison_contract, "soundcheck_records_submit_counters",
+                    true) &&
+      bool_field_is(physical_submit_comparison_contract, "compare_reads_submit_rates", true) &&
+      bool_field_is(physical_submit_comparison_contract, "compare_has_legacy_fallback", true) &&
+      bool_field_is(physical_submit_comparison_contract,
+                    "same_session_gates_include_submit_rates", true) &&
+      bool_field_is(physical_submit_comparison_contract, "compare_prints_submit_rates", true) &&
+      bool_field_is(physical_submit_comparison_contract,
+                    "promotion_depends_on_same_session_compare", true) &&
+      string_field_is(
+          physical_submit_comparison_contract, "blocked_claim",
+          "NO_RUNTIME_CPU_OR_RESOURCE_SUPERIORITY_CLAIM_WITHOUT_SAME_SESSION_SUBMIT_CADENCE_COMPARISON") &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&
