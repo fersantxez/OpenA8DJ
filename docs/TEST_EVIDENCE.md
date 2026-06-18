@@ -13557,3 +13557,48 @@ Full offline gate after commit:
   - It blocks any honest claim that the C++ line is already audibly superior to
     mainline while the latest clean USB payload still produces failed iRig
     capture metrics.
+
+## 2026-06-18 - Frozen HAL/PKG Candidate For 15:00 EDT Diagnostic Window
+
+- Commit context: `221979b`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Build, package, hash, and offline evidence only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Commands:
+  - `./scripts/run-cpp-offline-gates`
+  - `make dist`
+  - `shasum -a 256 build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL build/OpenA8DJ-0.3.25.pkg build/OpenA8DJ-0.3.25.dmg build/OpenA8DJ-0.3.25-checksums.txt`
+- Results:
+  - Debug/offline CTest: `81/81` PASS.
+  - Release CTest: `82/82` PASS.
+  - `evidence-provenance-freshness-gate`: PASS,
+    `head_commit=221979b`, `summary_base_commit=221979b`,
+    `claimable_current_candidate=true`.
+  - `current-offline-gates.json`: generated under
+    `local-analysis/cpp-offline/current-offline-gates.json`.
+  - `product-quality-claim-gate`: PASS as guard,
+    `quality_claim_allowed=false`.
+  - `physical-window-readiness-gate`: PASS as blocker/plan gate,
+    `ready_for_product_physical_ab=false`,
+    `next_required_action=PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION`.
+  - HAL executable SHA-256:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - PKG SHA-256:
+    `bc708c84fb9b0cd59e363670ad539f1ec5b32ad11a810728906c6b18eba44b70`.
+  - DMG SHA-256:
+    `604451b94d82839c6ce2650d440a4afb2b69f391610834527ac7c1b16f1e6d81`.
+  - Checksum file SHA-256:
+    `0f9a50c055c6a47a73b9160342b09bd346ce7bc4b47f48dd86518f96404d87bf`.
+- Readiness impact:
+  - This is the first frozen installable HAL/PKG diagnostic candidate for the
+    15:00 EDT target.
+  - Product-quality, low-CPU superiority, Timecode Vinyl physical readiness,
+    DriverKit/dext readiness, and branch promotion remain blocked by the
+    explicit gates.

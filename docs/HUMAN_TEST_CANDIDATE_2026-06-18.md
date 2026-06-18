@@ -61,6 +61,39 @@ The candidate identity for the human-test window must include:
 - DMG SHA-256;
 - `local-analysis/cpp-offline/current-offline-gates.json`.
 
+## Frozen Candidate Identity - 11:10 EDT
+
+- Branch: `driverkit/cpp-redesign`.
+- Commit: `221979b`.
+- HAL executable:
+  - `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
+  - SHA-256:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
+- PKG:
+  - `build/OpenA8DJ-0.3.25.pkg`
+  - SHA-256:
+    `bc708c84fb9b0cd59e363670ad539f1ec5b32ad11a810728906c6b18eba44b70`
+- DMG:
+  - `build/OpenA8DJ-0.3.25.dmg`
+  - SHA-256:
+    `604451b94d82839c6ce2650d440a4afb2b69f391610834527ac7c1b16f1e6d81`
+- Checksum file:
+  - `build/OpenA8DJ-0.3.25-checksums.txt`
+  - SHA-256:
+    `0f9a50c055c6a47a73b9160342b09bd346ce7bc4b47f48dd86518f96404d87bf`
+- Offline gates:
+  - Debug/offline CTest: `81/81` PASS.
+  - Release CTest: `82/82` PASS.
+  - `evidence-provenance-freshness-gate`: PASS,
+    `claimable_current_candidate=true`.
+  - `product-quality-claim-gate`: PASS as guard, but
+    `quality_claim_allowed=false`.
+  - `physical-window-readiness-gate`: PASS as blocker/plan gate, but
+    `ready_for_product_physical_ab=false`.
+
+This identity is installable as a HAL/PKG diagnostic candidate. It is not
+approved as a product-quality or mainline-superiority candidate.
+
 ## Lock-Gated Install And Physical Smoke
 
 Do not run these steps unless the global audio/hardware lock is acquired:
