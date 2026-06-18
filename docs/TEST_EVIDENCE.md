@@ -15355,3 +15355,36 @@ Follow-up correction:
   - Next safe closure step is to commit the observability and gate updates,
     rerun offline gates on a clean worktree, then decide whether a lock-gated
     fresh HAL safety smoke is worth spending before any diagnostic install.
+
+## 2026-06-18 - 16:56 Clean Offline Closure On Commit b2f69ad
+
+- Scope:
+  - Committed the USB enqueue observability and rejected-scheduler gate updates,
+    then reran the complete offline gate suite from a clean worktree.
+  - No install, unload/reload, playback, recording, CoreAudio restart, USB
+    reset, default-device change, mainline write, or Rust write occurred.
+- Command:
+  - `scripts/run-cpp-offline-gates`
+- Result:
+  - Commit: `b2f69ad` (`Close USB enqueue observability load`).
+  - Debug/offline CTest: `85/85` PASS.
+  - Release CTest: `86/86` PASS.
+  - `current-offline-gates.json`: `status=PASS`,
+    `base_commit=b2f69ad`, `working_tree_dirty=false`,
+    `hardware_touched=false`, `coreaudio_touched=false`, `usb_touched=false`.
+  - `opena8djcpp_evidence_provenance_freshness_gate`: PASS with
+    `head_commit=b2f69ad`, `summary_base_commit=b2f69ad`, and
+    `claimable_current_candidate=true`.
+  - `opena8djcpp_human_test_rc_gate`: PASS as diagnostic classification only,
+    with `diagnostic_rc_artifacts_ready=true`,
+    `product_human_test_allowed=false`, and
+    `timecode_vinyl_human_test_allowed=false`.
+  - Final objective status remains `NOT_READY`; branch promotion remains
+    forbidden.
+- Interpretation:
+  - This is now a clean, attributable offline diagnostic closure.
+  - It is not a product/human-test release. The next required physical action
+    remains:
+    `LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL`,
+    followed by source-reference mainline/C++ A/B, CPU/resource comparison, and
+    physical Timecode Vinyl certification.

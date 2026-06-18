@@ -3453,3 +3453,12 @@ Current implication:
   physical step is a lock-gated fresh HAL safety smoke if we decide to install
   the diagnostic observability candidate, followed by source-reference A/B,
   CPU comparison, and Timecode Vinyl gates.
+- 16:56 EDT clean offline closure: after commit `b2f69ad`, the full offline
+  gate suite passed again from a clean worktree. `current-offline-gates.json`
+  reports `status=PASS`, `base_commit=b2f69ad`,
+  `working_tree_dirty=false`, and no hardware/CoreAudio/USB touch. The
+  provenance freshness gate now passes and marks the offline evidence
+  attributable to `b2f69ad`. Product/human readiness is still blocked:
+  `product_human_test_allowed=false`,
+  `timecode_vinyl_human_test_allowed=false`, final objective status
+  `NOT_READY`, and branch promotion forbidden.
