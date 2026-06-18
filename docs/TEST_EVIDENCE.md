@@ -13931,10 +13931,10 @@ Full offline gate after commit:
   - HAL executable hash installed active:
     `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
   - `active_installed_hash_matches_current_candidate=true`.
-  - Regenerated package hash:
-    `15ec4fa00d094cd49f73a09230fd2072f38d32676f1f787fa63605395fa246c1`.
-  - Regenerated DMG hash:
-    `6dc4fc367f943df8e4d462a8382e6557228eb2a6dc8bf6803f53ecbad1547cb9`.
+  - `make dist` regenerated the package, DMG, and checksum file before the
+    active-HAL identity gate. The executable HAL hash is the stable diagnostic
+    identity; package/DMG container hashes are recorded in
+    `build/OpenA8DJ-0.3.25-checksums.txt` for the current distribution pass.
 - Readiness impact:
   - Current offline gates now prove active diagnostic HAL identity against the
     signed installable candidate.
