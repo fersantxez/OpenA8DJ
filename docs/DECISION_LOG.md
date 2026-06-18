@@ -10118,3 +10118,39 @@ Next implication:
 - Readiness impact: this tightens the DriverKit/USB transport path before any
   future physical candidate. It is not physical evidence, not a CPU superiority
   claim, and not product readiness.
+
+## 2026-06-18 - Reject Source-Reference A/B As Promotion Evidence
+
+- Decision: keep the C++ line in diagnostic/offline status after the
+  source-reference A/B window at
+  `local-analysis/physical-evidence-window/20260618T204940Z/source-reference-ab`.
+- Reason: the lock-gated same-session window produced useful evidence but did
+  not satisfy the product objective. Both HAL candidates loaded/enumerated, and
+  C++ measured better than this mainline run on signal correlation/SNR, but C++
+  still missed absolute quality thresholds and consumed more CPU.
+- Evidence:
+  - Mainline HAL safety smoke: PASS.
+  - C++ HAL safety smoke: PASS.
+  - Final HAL state after cleanup: no active
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`.
+  - Same-session compare: FAIL, `branch_promotion_supported=false`.
+  - C++ vs mainline:
+    - `quality_alignment_score=0.843449` vs `-0.057779`;
+    - `snr_floor_db=2.49` vs `-30.58`;
+    - `lag_jumps_gt_2_frames=23` vs `24`;
+    - `capture_submit_calls_per_second=1000.54` vs `4313.89`;
+    - `driver_cpu_p95=14.7%` vs `4.8%`;
+    - `coreaudiod_cpu_p95=21.6%` vs `3.7%`.
+  - Promotion readiness: FAIL, including `physical_music_quality`,
+    `runtime_cpu_beats_mainline`, `same_session_mainline_cpp_physical_compare`,
+    `capture_route_measurement_valid_for_promotion`, and
+    `traktor_timecode_physical`.
+- Alternatives rejected:
+  - Treat relative signal improvement as enough for a human/product test:
+    rejected because absolute quality gates failed and CPU regressed.
+  - Promote because the mainline run was worse: rejected because the objective
+    is not "less bad than a broken window"; it requires objective quality,
+    functionality, Timecode Vinyl, and resource superiority.
+- Readiness impact: C++ remains blocked for product/human readiness and branch
+  promotion. Next work must reduce runtime CPU and stabilize physical output
+  quality before another promotion attempt.

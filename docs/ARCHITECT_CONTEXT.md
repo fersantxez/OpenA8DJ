@@ -3473,3 +3473,17 @@ Current implication:
   regressions, 5808 frames, 185856 bytes, and 8-frame minimum lead. The prepared
   migration gate now requires this schedule contract. This still does not
   prove physical CPU, quality, or Timecode Vinyl readiness.
+- 16:51-16:53 EDT source-reference A/B after clean load closure:
+  `local-analysis/physical-evidence-window/20260618T204940Z/source-reference-ab`
+  ran under the hardware lock with the source-reference policy, mainline
+  `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`, and C++ `build/OpenA8DJ.driver`.
+  Both HAL safety smokes passed and cleanup left no active
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`. The same-session comparison
+  failed promotion. C++ beat that specific mainline run on alignment/SNR
+  (`quality_alignment_score=0.843449` vs `-0.057779`, `snr_floor_db=2.49` vs
+  `-30.58`) and reduced capture submit calls (`1000.54/s` vs `4313.89/s`), but
+  it still failed absolute audiophile gates (`quality < 0.98`, SNR < 35 dB,
+  `lag_jumps_gt_2_frames=23`) and used more CPU
+  (`driver_cpu_p95=14.7%` vs `4.8%`, `coreaudiod_cpu_p95=21.6%` vs `3.7%`).
+  This is diagnostic evidence only. Product/human readiness, CPU superiority,
+  branch promotion, and Timecode Vinyl remain blocked.
