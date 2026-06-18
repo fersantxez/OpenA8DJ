@@ -27,6 +27,13 @@ Branch: `driverkit/cpp-redesign`
   explanation. The active driver sample again points to IOUSBHost async enqueue
   from capture/playback paths as the CPU blocker. The candidate was unloaded
   after diagnostics and audio-stack health passed.
+- 2026-06-18 DriverKit SDK state is now measured by an executable offline gate:
+  this machine has Command Line Tools selected at
+  `/Library/Developer/CommandLineTools`, `xcrun --sdk driverkit --show-sdk-path`
+  cannot locate the DriverKit SDK, no `/Applications/Xcode*.app` is installed,
+  `xcodes` CLI is installed and usable at version `2.0.2`, and `aria2c` is not
+  installed. Real DriverKit/dext build and readiness claims remain blocked until
+  full Xcode with DriverKit SDK is installed and selected.
 - The archived iRig WAV frontier now has a C++ forensic gate. It found `61`
   physical runs with WAV evidence, deeply analyzed `12`, and found `0` strict
   audiophile/product candidates. The best analyzed run is

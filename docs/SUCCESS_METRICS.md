@@ -1896,6 +1896,30 @@ Current status:
 - PASS in the focused build run.
 - This is not a runnable/signed dext and not physical readiness.
 
+## 2026-06-18 DriverKit SDK Preflight Gate
+
+Required before any real DriverKit/dext build or readiness claim:
+
+- `opena8djcpp_driverkit_sdk_preflight_gate` must run in the full offline gate.
+- `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json` must exist.
+- The gate must report the selected developer directory, DriverKit SDK
+  availability, installed Xcode count, `xcodes` availability, and fast-download
+  helper availability.
+- Real DriverKit build claims require
+  `product_driverkit_build_allowed=true`.
+- While the current host reports `xcrun_driverkit_sdk_available=false`,
+  `selected_full_xcode=false`, `xcode_app_present=false`, and
+  `xcodes_installed_count=0`, the offline summary must keep
+  `real_driverkit_sdk_and_selected_xcode_missing` in
+  `promotion_hard_blockers`.
+
+Current interpretation:
+
+- This is an environment/toolchain blocker, not a product blocker caused by the
+  C++ core.
+- It prevents a false readiness claim: the DriverKit scaffold and contracts are
+  useful, but they are not a signed, linked, runnable dext candidate.
+
 ## 2026-06-17 C++ Loopback Quality Analyzer Gate
 
 Required for objective audio-quality analysis:

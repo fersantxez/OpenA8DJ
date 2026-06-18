@@ -40,7 +40,8 @@ Date: 2026-06-16
 
 ## Local Toolchain Blocker
 
-Observed on 2026-06-16:
+Observed on 2026-06-16 and refreshed on 2026-06-18 by
+`opena8djcpp_driverkit_sdk_preflight_gate`:
 
 - `xcrun --show-sdk-path` works and points to
   `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk`.
@@ -49,14 +50,22 @@ Observed on 2026-06-16:
 - `xcrun --sdk driverkit --show-sdk-path` cannot locate a DriverKit SDK.
 - No `DriverKit*.sdk` or `AudioDriverKit` path was found under
   `/Applications/Xcode.app` or `/Library/Developer/CommandLineTools`.
+- No `/Applications/Xcode*.app` is currently installed.
+- `xcodes` CLI is installed and usable (`2.0.2`), and the available list shows
+  `26.5 (17F42) [Apple Silicon]` for this host, but `xcodes installed` reports
+  zero installed Xcodes.
+- `aria2c` is not installed.
 
 Conclusion:
 
 - A real AudioDriverKit dext target cannot be compiled on this machine in the current toolchain state.
-- This is an environment/toolchain blocker, not a reason to touch system extensions or install anything automatically.
+- This is an environment/toolchain blocker, not a reason to touch system
+  extensions or install/activate any driver.
 - The current substitute gates are `opena8djcpp_driverkit_surface_model` and
   `opena8djcpp_driverkit_shell_contract`, which validate the intended
   device/stream/sample-rate model and bounded lifecycle offline.
+- `opena8djcpp_driverkit_sdk_preflight_gate` must continue to block real dext
+  readiness while `product_driverkit_build_allowed=false`.
 
 Required before real dext build:
 

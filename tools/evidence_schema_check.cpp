@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-shell-contract.json",
       root / "local-analysis/cpp-offline/driverkit-runtime-contract.json",
       root / "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json",
       root / "local-analysis/cpp-offline/driverkit-prepared-hotpath-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-request-lifecycle-contract.json",
@@ -129,6 +130,8 @@ int main(int argc, char** argv) {
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
           .value_or("");
+  const auto driverkit_sdk_preflight_gate =
+      opena8djcpp::evidence_json::json_object(summary, "driverkit_sdk_preflight_gate").value_or("");
   const auto driverkit_usb_request_lifecycle_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_lifecycle_contract")
           .value_or("");
@@ -159,6 +162,8 @@ int main(int argc, char** argv) {
       string_array_has(summary, "promotion_hard_blockers",
                        "runtime_cpu_superiority_over_mainline_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
+                       "real_driverkit_sdk_and_selected_xcode_missing") &&
+      string_array_has(summary, "promotion_hard_blockers",
                        "post_reboot_autologin_codex_resume_unfixed") &&
       object_present(summary, "runtime_adapter_contract") &&
       number_field_is(runtime_adapter_contract, "stable_usb_submit_reduction_ratio", 8.0) &&
@@ -172,6 +177,12 @@ int main(int argc, char** argv) {
       object_present(summary, "driverkit_usb_submit_binding_contract") &&
       number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&
+      object_present(summary, "driverkit_sdk_preflight_gate") &&
+      bool_field_is(driverkit_sdk_preflight_gate, "product_driverkit_build_allowed", false) &&
+      bool_field_is(driverkit_sdk_preflight_gate, "real_driverkit_claim_blocked", true) &&
+      string_field_is(
+          driverkit_sdk_preflight_gate, "blocked_claim",
+          "NO_REAL_DRIVERKIT_DEXT_BUILD_OR_READINESS_CLAIM_WITHOUT_DRIVERKIT_SDK_AND_SELECTED_FULL_XCODE") &&
       object_present(summary, "driverkit_usb_request_lifecycle_contract") &&
       number_field_is(driverkit_usb_request_lifecycle_contract, "stable_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_request_lifecycle_contract, "stable_completed_frames", 5808.0) &&

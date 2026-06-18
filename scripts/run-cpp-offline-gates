@@ -47,6 +47,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_shell_contract | tee "$EVIDENCE_DIR/driverkit-shell-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_runtime_contract | tee "$EVIDENCE_DIR/driverkit-runtime-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_extension_scaffold_contract | tee "$EVIDENCE_DIR/driverkit-extension-scaffold-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_sdk_preflight_gate | tee "$EVIDENCE_DIR/driverkit-sdk-preflight-gate.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_transport_contract | tee "$EVIDENCE_DIR/driverkit-prepared-transport-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_prepared_hotpath_contract | tee "$EVIDENCE_DIR/driverkit-prepared-hotpath-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_usb_submit_binding_contract | tee "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
@@ -177,6 +178,7 @@ surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
 driverkit_runtime = load_json("driverkit-runtime-contract.json")
 driverkit_extension_scaffold = load_json("driverkit-extension-scaffold-contract.json")
+driverkit_sdk_preflight = load_json("driverkit-sdk-preflight-gate.json")
 driverkit_prepared_transport = load_json("driverkit-prepared-transport-contract.json")
 driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json")
 driverkit_usb_submit_binding = load_json("driverkit-usb-submit-binding-contract.json")
@@ -222,6 +224,7 @@ summary = {
         "valid_irig_loopback_route_not_currently_proven_for_promotion",
         "traktor_timecode_vinyl_physical_gate_missing",
         "runtime_cpu_superiority_over_mainline_missing",
+        "real_driverkit_sdk_and_selected_xcode_missing",
         "post_reboot_autologin_codex_resume_unfixed",
     ],
     "promotion_claim_policy": (
@@ -760,6 +763,37 @@ summary = {
         "vendor_id": driverkit_extension_scaffold.get("vendor_id"),
         "product_id": driverkit_extension_scaffold.get("product_id"),
         "evidence": "local-analysis/cpp-offline/driverkit-extension-scaffold-contract.json",
+    },
+    "driverkit_sdk_preflight_gate": {
+        "status": driverkit_sdk_preflight.get("result"),
+        "xcrun_driverkit_sdk_available": driverkit_sdk_preflight.get(
+            "xcrun_driverkit_sdk_available"
+        ),
+        "xcode_select_path": driverkit_sdk_preflight.get("xcode_select_path"),
+        "selected_full_xcode": driverkit_sdk_preflight.get("selected_full_xcode"),
+        "xcode_app_present": driverkit_sdk_preflight.get("xcode_app_present"),
+        "xcodes_cli_present": driverkit_sdk_preflight.get("xcodes_cli_present"),
+        "xcodes_cli_usable": driverkit_sdk_preflight.get("xcodes_cli_usable"),
+        "xcodes_installed_count": driverkit_sdk_preflight.get("xcodes_installed_count"),
+        "aria2_present": driverkit_sdk_preflight.get("aria2_present"),
+        "recommended_xcode_version_for_current_host": driverkit_sdk_preflight.get(
+            "recommended_xcode_version_for_current_host"
+        ),
+        "noninteractive_install_tooling_present": driverkit_sdk_preflight.get(
+            "noninteractive_install_tooling_present"
+        ),
+        "fast_download_helper_present": driverkit_sdk_preflight.get(
+            "fast_download_helper_present"
+        ),
+        "product_driverkit_build_allowed": driverkit_sdk_preflight.get(
+            "product_driverkit_build_allowed"
+        ),
+        "real_driverkit_claim_blocked": driverkit_sdk_preflight.get(
+            "real_driverkit_claim_blocked"
+        ),
+        "blocked_claim": driverkit_sdk_preflight.get("blocked_claim"),
+        "next_required_action": driverkit_sdk_preflight.get("next_required_action"),
+        "evidence": "local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json",
     },
     "driverkit_prepared_transport_contract": {
         "status": driverkit_prepared_transport.get("result"),

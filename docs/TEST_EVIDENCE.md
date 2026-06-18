@@ -10267,3 +10267,40 @@ Full offline gate rerun:
   - The prepared transport model is not runtime proof. CPU and audiophile
     superiority remain blocked while the loadable HAL still requeues USB
     directly in the hot path.
+
+## 2026-06-18 DriverKit SDK Preflight Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_driverkit_sdk_preflight_gate`.
+  - The gate is offline and developer-tool-only: it checks selected developer
+    directory, DriverKit SDK availability, local Xcode apps, `xcodes`, installed
+    Xcodes, and `aria2c`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    System Extension activation, service restart, default-device change,
+    sample-rate change, or buffer-size change was performed.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_sdk_preflight_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_driverkit_sdk_preflight_gate | tee local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json`
+- Results:
+  - Focused gate: PASS as a guard.
+  - `xcrun_driverkit_sdk_available=false`.
+  - `xcode_select_path=/Library/Developer/CommandLineTools`.
+  - `selected_full_xcode=false`.
+  - `xcode_app_present=false`.
+  - `xcodes_cli_present=true`.
+  - `xcodes_cli_usable=true`.
+  - `xcodes_installed_count=0`.
+  - `aria2_present=false`.
+  - `recommended_xcode_version_for_current_host=26.5 (17F42) [Apple Silicon]`.
+  - `product_driverkit_build_allowed=false`.
+  - `real_driverkit_claim_blocked=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json`
+- Interpretation:
+  - The DriverKit source scaffold and offline contracts are not a real dext
+    candidate yet. Real DriverKit build claims remain blocked until full Xcode
+    with DriverKit SDK is installed and selected.

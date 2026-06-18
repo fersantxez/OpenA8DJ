@@ -6836,3 +6836,43 @@ Next implication:
 - The next real implementation must either integrate a runtime path that
   actually reduces USB enqueue/submit cadence, or move to a full
   DriverKit/USBDriverKit build environment with the proper SDK.
+
+## 2026-06-18: DriverKit SDK Availability Is a Promotion Blocker
+
+Decision:
+- Added `opena8djcpp_driverkit_sdk_preflight_gate`.
+- Added `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json` to the
+  full offline evidence bundle, summary, CTest, and schema requirements.
+- Added `real_driverkit_sdk_and_selected_xcode_missing` to promotion hard
+  blockers while this host lacks full Xcode and DriverKit SDK.
+
+Reason:
+- The C++ line has a DriverKit scaffold and offline DriverKit-facing contracts,
+  but this host currently cannot compile a real DriverKit dext because the
+  selected developer directory is Command Line Tools and `xcrun --sdk driverkit`
+  fails.
+- A real DriverKit candidate must be measurable as a build artifact, not only a
+  source skeleton.
+
+Evidence:
+- Focused gate run reports `xcrun_driverkit_sdk_available=false`,
+  `xcode_select_path=/Library/Developer/CommandLineTools`,
+  `selected_full_xcode=false`, `xcode_app_present=false`,
+  `xcodes_cli_present=true`, `xcodes_cli_usable=true`,
+  `xcodes_installed_count=0`, `aria2_present=false`, and
+  `real_driverkit_claim_blocked=true`.
+- `xcodes list` shows `26.5 (17F42) [Apple Silicon]` as available for this
+  host, but it is not installed.
+
+Alternatives discarded:
+- Treat the DriverKit scaffold as a real dext candidate: rejected because it
+  does not build/link against AudioDriverKit/DriverKit on this machine.
+- Start a multi-gigabyte Xcode install without first recording the blocker:
+  rejected because the product evidence must explain why DriverKit readiness is
+  currently blocked and what exact condition clears it.
+
+Next implication:
+- Before any real DriverKit/dext build claim, install and select full Xcode with
+  DriverKit SDK, rerun this preflight gate, then build the DriverKit target into
+  the build directory only. Installation/activation still requires a separate
+  lock-gated window.
