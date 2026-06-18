@@ -1,0 +1,206 @@
+#!/usr/bin/env python3
+"""Summarize whether the current C++ candidate can enter human testing.
+
+This is read-only. It does not acquire the hardware lock, play audio, record
+audio, install/uninstall drivers, restart CoreAudio, reset USB, change defaults,
+or mutate the mainline/Rust worktrees.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+PKG = ROOT / "build/OpenA8DJ-0.3.25.pkg"
+DMG = ROOT / "build/OpenA8DJ-0.3.25.dmg"
+CANDIDATE = ROOT / "build/OpenA8DJ.driver"
+CPP_OFFLINE = ROOT / "local-analysis/cpp-offline"
+WATCHER_JSON = CPP_OFFLINE / "watch-known-good-route.json"
+WINDOW_PLAN_JSON = CPP_OFFLINE / "physical-evidence-window-plan.json"
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def run(argv: list[str], timeout: int = 20) -> tuple[int, str, str]:
+    try:
+        completed = subprocess.run(
+            argv,
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+            check=False,
+        )
+        return completed.returncode, completed.stdout, completed.stderr
+    except subprocess.TimeoutExpired as exc:
+        return 124, exc.stdout or "", exc.stderr or "timeout"
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def file_info(path: Path) -> dict[str, Any]:
+    exists = path.exists()
+    return {
+        "path": str(path),
+        "exists": exists,
+        "bytes": path.stat().st_size if exists and path.is_file() else 0,
+        "sha256": sha256(path) if exists and path.is_file() else "",
+    }
+
+
+def bundle_info(path: Path) -> dict[str, Any]:
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    complete = path.is_dir() and executable.is_file()
+    return {
+        "path": str(path),
+        "exists": path.is_dir(),
+        "executable": str(executable),
+        "executable_exists": executable.is_file(),
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+        "complete": complete,
+    }
+
+
+def parse_audio_stack_health(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in text.splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def main() -> int:
+    git_rc, git_head, git_err = run(["git", "rev-parse", "--short", "HEAD"], timeout=5)
+    dirty_rc, dirty_out, dirty_err = run(["git", "status", "--short"], timeout=5)
+    audio_rc, audio_out, audio_err = run([str(ROOT / "build/audio-list")], timeout=10)
+    health_rc, health_out, health_err = run(
+        [str(ROOT / "scripts/audio-stack-health"), "--threshold", "25", "--total-threshold", "120", "--wait", "1"],
+        timeout=20,
+    )
+
+    watcher = load_json(WATCHER_JSON)
+    plan = load_json(WINDOW_PLAN_JSON)
+    health = parse_audio_stack_health(health_out)
+
+    devices_text = audio_out.lower()
+    irig_visible = "irig" in devices_text
+    audio8_visible = "open audio 8 dj" in devices_text or "opena8dj" in devices_text
+    audio8_8x8 = "in=8 out=8" in devices_text
+    package_ready = PKG.is_file() and DMG.is_file() and bundle_info(CANDIDATE)["complete"]
+    route_ready = bool(plan.get("route_only_ready")) or bool(watcher.get("route_revalidation_ready"))
+    full_ab_ready = bool(plan.get("full_ab_ready"))
+    stack_ok = health.get("audio_stack_health") == "PASS" and health_rc == 0
+
+    blockers: list[str] = []
+    if git_rc != 0:
+        blockers.append("git_head_unreadable")
+    if dirty_rc != 0:
+        blockers.append("git_status_unreadable")
+    if dirty_out.strip():
+        blockers.append("worktree_dirty")
+    if not package_ready:
+        blockers.append("installable_artifacts_missing")
+    if audio_rc != 0:
+        blockers.append("audio_inventory_failed")
+    if not irig_visible:
+        blockers.append("irig_not_visible")
+    if not audio8_visible:
+        blockers.append("audio8_not_visible")
+    if audio8_visible and not audio8_8x8:
+        blockers.append("audio8_not_8x8")
+    if not stack_ok:
+        blockers.append("audio_stack_unhealthy")
+    if not route_ready:
+        blockers.append("known_good_physical_route_not_ready")
+
+    if full_ab_ready and not blockers:
+        status = "LOCK_GATED_FULL_AB_READY"
+        next_action = "acquire_lock_and_run_full_ab_command_from_physical_evidence_window_plan"
+    elif route_ready and not blockers:
+        status = "LOCK_GATED_ROUTE_ONLY_READY"
+        next_action = "acquire_lock_and_run_route_only_command_from_physical_evidence_window_plan"
+    elif package_ready and irig_visible and audio8_visible and audio8_8x8 and stack_ok:
+        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_BLOCKED"
+        next_action = "provision_wired_non_audio8_non_builtin_output_then_rerun_watcher"
+    else:
+        status = "BLOCKED"
+        next_action = "fix_blockers_before_any_human_test_window"
+
+    report = {
+        "schema": "opena8djcpp.human-test-rc-status.v1",
+        "timestamp_utc": utc_now(),
+        "safety": "read_only_no_lock_no_audio_no_recording_no_install_no_reset_no_defaults",
+        "result": "PASS",
+        "status": status,
+        "next_action": next_action,
+        "head_commit": git_head.strip() if git_rc == 0 else "",
+        "git_status_return_code": dirty_rc,
+        "working_tree_clean": dirty_rc == 0 and not dirty_out.strip(),
+        "working_tree_status": dirty_out.strip().splitlines(),
+        "package": file_info(PKG),
+        "dmg": file_info(DMG),
+        "candidate": bundle_info(CANDIDATE),
+        "audio_inventory_return_code": audio_rc,
+        "audio_inventory_stderr": audio_err.strip(),
+        "irig_visible": irig_visible,
+        "audio8_visible": audio8_visible,
+        "audio8_8x8": audio8_8x8,
+        "audio_stack_return_code": health_rc,
+        "audio_stack_health": health,
+        "audio_stack_stderr": health_err.strip(),
+        "watcher_json": str(WATCHER_JSON),
+        "watcher_status": watcher.get("status", ""),
+        "watcher_route_revalidation_ready": bool(watcher.get("route_revalidation_ready")),
+        "watcher_next_action": watcher.get("next_action", ""),
+        "physical_evidence_window_plan_json": str(WINDOW_PLAN_JSON),
+        "physical_evidence_window_plan_status": plan.get("status", ""),
+        "physical_evidence_window_plan_route_only_ready": bool(plan.get("route_only_ready")),
+        "physical_evidence_window_plan_full_ab_ready": bool(plan.get("full_ab_ready")),
+        "physical_evidence_window_plan_next_action": plan.get("next_action", ""),
+        "physical_evidence_window_plan_route_command": plan.get("route_only_command_argv", []),
+        "physical_evidence_window_plan_full_ab_command": plan.get("full_ab_command_argv", []),
+        "blockers": list(dict.fromkeys(blockers)),
+        "product_claim_allowed": False,
+        "mainline_superiority_claim_allowed": False,
+        "timecode_vinyl_certification_allowed": False,
+        "branch_promotion_allowed": False,
+        "human_meaning": (
+            "This can identify a controlled human-test RC state; it never proves "
+            "audiophile quality, Timecode Vinyl certification, mainline superiority, "
+            "or branch promotion by itself."
+        ),
+    }
+
+    json.dump(report, sys.stdout, indent=2, sort_keys=True)
+    sys.stdout.write("\n")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

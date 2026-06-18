@@ -14070,3 +14070,38 @@ Full offline gate after commit:
     missing non-Audio8 known-good output.
   - Product human listening, Timecode Vinyl physical readiness,
     CPU/resource superiority, and branch promotion remain blocked.
+# 2026-06-18 12:34 EDT - Human-Test RC Status Consolidator
+
+Command:
+- `scripts/human-test-rc-status > local-analysis/cpp-offline/human-test-rc-status.json`
+
+Commit:
+- `d41b2d3` before the consolidator patch.
+
+Result:
+- `PASS` as a read-only status classifier.
+- Status: `DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_BLOCKED`.
+- iRig visible: `true`.
+- Audio 8 visible: `true`.
+- Audio 8 8-in / 8-out: `true`.
+- Audio stack health: `PASS`, total watched CPU `0.3%`.
+- Package: `build/OpenA8DJ-0.3.25.pkg`,
+  SHA256 `de249bc1a39daf0aff1bb954d2065d82b9deb50a326ab0b88bc0de14e329d63d`.
+- DMG: `build/OpenA8DJ-0.3.25.dmg`,
+  SHA256 `84e5cb27e45b3e9e0ebd28b5464f03d7569a0e2ed136e377749b80a7603392c1`.
+- Candidate HAL executable SHA256:
+  `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+
+Blockers:
+- Worktree dirty because this status script and plan/doc changes were being
+  integrated.
+- `known_good_physical_route_not_ready`.
+
+Evidence:
+- `local-analysis/cpp-offline/human-test-rc-status.json`
+
+Interpretation:
+- The artifacts are suitable for a diagnostic RC decision packet, not for a
+  product/audiophile/mainline-superiority claim.
+- Next action remains provisioning a wired non-Audio8/non-built-in output,
+  then rerunning the watcher and the generated lock-gated physical command.

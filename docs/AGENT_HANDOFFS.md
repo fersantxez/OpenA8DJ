@@ -4881,3 +4881,71 @@ Risks:
 Next action:
 - Keep the RC diagnostic-only until a validated known-good route and rollback
   plan exist for the exact same physical window.
+
+## 2026-06-18 Kepler: Physical Route Captain For 15:00 RC
+
+Subagent:
+- `019edb93-1623-7ce0-be5b-bab0a28d6753` (`Kepler`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Inspect the C++ route/evidence scripts read-only and produce an operational
+  six-hour physical-route plan for a controlled human-test RC.
+
+Findings:
+- `iRig Stream` and `Open Audio 8 DJ` are visible, and the hardware lock is
+  free.
+- Audio 8 is visible as an 8-in / 8-out CoreAudio device.
+- The blocker is not iRig absence; it is lack of a wired non-Audio8,
+  non-built-in known-good output source for objective route validation.
+- Built-in speakers, iRig-as-both-output-and-capture, virtual devices, and
+  Audio 8 as the known-good source must stay diagnostic-only.
+
+Integrated action:
+- Added the route-blocked 15:00 RC strategy to `docs/CPP_DRIVERKIT_PLAN.md`.
+- Added `scripts/human-test-rc-status` so the current RC state can be
+  regenerated as one read-only JSON summary.
+
+Risks:
+- Running product listening before known-good route validation would produce a
+  non-attributable result and could falsely blame or clear the driver.
+
+Next action:
+- Provision a wired non-Audio8/non-built-in output into the iRig capture path,
+  rerun the watcher, then run only the generated lock-gated command.
+
+## 2026-06-18 Herschel: Metrics Compression For 15:00 RC
+
+Subagent:
+- `019edb93-2b9d-71b0-8521-5f7cebda9249` (`Herschel`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Compress the remaining 2026-06-18 work into a 15:00 America/New_York
+  decision plan with must-have metrics, abort conditions, and allowed claims.
+
+Findings:
+- `current-offline-gates.json` is PASS at commit `d41b2d3`, but product human
+  testing, Timecode Vinyl human testing, CPU superiority, and branch promotion
+  are all still disallowed.
+- Current artifacts support a diagnostic HAL/PKG RC only.
+- The next useful metric is not another HAL tuning result; it is a lock-gated
+  known-good physical route validation followed by same-session C++/mainline
+  A/B if route validation passes.
+
+Integrated action:
+- Kept the 15:00 output taxonomy explicit: route-blocked, diagnostic human
+  test, limited human test needing A/B, or product claim allowed only with
+  actual same-session physical evidence.
+
+Risks:
+- Treating offline Timecode/DVS gates as physical Timecode Vinyl readiness
+  would overclaim. Physical Traktor/timecode remains a separate gate.
+
+Next action:
+- Use `local-analysis/cpp-offline/human-test-rc-status.json` as the live RC
+  decision packet before any hardware window.

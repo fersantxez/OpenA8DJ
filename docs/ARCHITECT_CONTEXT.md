@@ -9,7 +9,16 @@ Branch: `driverkit/cpp-redesign`
 - Near-term target: produce a stable, complete first human-test candidate by
   15:00 America/New_York. This is not the same as proving superiority over
   mainline or authorizing branch promotion.
-- Current time snapshot: 09:58 EDT, leaving roughly five hours.
+- 12:34 EDT update: `scripts/human-test-rc-status` now consolidates the live
+  RC state into `local-analysis/cpp-offline/human-test-rc-status.json`. Current
+  classification is `DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_BLOCKED`: iRig is
+  visible, Audio 8 is visible as 8-in / 8-out, the audio stack is healthy, and
+  the installable HAL/PKG/DMG artifacts exist, but no wired non-Audio8,
+  non-built-in known-good output is visible for objective route validation.
+  This permits a diagnostic RC packet only; it still blocks product quality,
+  CPU superiority, physical Timecode Vinyl, and branch-promotion claims.
+- Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
+  remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus
   install/uninstall/runbook and lock-gated quality/CPU evidence.
 - DriverKit/dext blocker on this host: Command Line Tools are selected,

@@ -259,6 +259,7 @@ python3 -m py_compile \
   scripts/known-good-route-selector \
   scripts/watch-known-good-route \
   scripts/plan-physical-evidence-window \
+  scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
   scripts/analyze-audiophile-wav.py
@@ -287,6 +288,7 @@ fi
 ./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee "$EVIDENCE_DIR/physical-submit-comparison-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_runtime_physical_window_contract | tee "$EVIDENCE_DIR/prepared-runtime-physical-window-contract.json"
 ./build/cpp-release/opena8djcpp_human_test_rc_gate | tee "$EVIDENCE_DIR/human-test-rc-gate.json"
+python3 scripts/human-test-rc-status > "$EVIDENCE_DIR/human-test-rc-status.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -432,6 +434,7 @@ prepared_runtime_physical_window_contract = load_json(
     "prepared-runtime-physical-window-contract.json"
 )
 human_test_rc_gate = load_json("human-test-rc-gate.json")
+human_test_rc_status = load_json("human-test-rc-status.json")
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
@@ -526,6 +529,9 @@ summary = {
         "next_action"
     ),
     "human_test_rc_status": human_test_rc_gate.get("result"),
+    "human_test_rc_status_live": human_test_rc_status.get("status"),
+    "human_test_rc_status_next_action": human_test_rc_status.get("next_action"),
+    "human_test_rc_status_blockers": human_test_rc_status.get("blockers", []),
     "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
         "diagnostic_rc_artifacts_ready"
     ),
