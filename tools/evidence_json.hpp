@@ -127,6 +127,20 @@ inline std::optional<bool> json_bool(std::string_view json, std::string_view key
   return std::nullopt;
 }
 
+inline std::optional<bool> json_bool_last(std::string_view json, std::string_view key) {
+  const auto start = find_last_value_start(json, key);
+  if (!start) {
+    return std::nullopt;
+  }
+  if (json.substr(*start, 4U) == "true") {
+    return true;
+  }
+  if (json.substr(*start, 5U) == "false") {
+    return false;
+  }
+  return std::nullopt;
+}
+
 inline std::optional<double> json_number(std::string_view json, std::string_view key) {
   const auto start = find_value_start(json, key);
   if (!start) {

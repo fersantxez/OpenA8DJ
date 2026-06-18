@@ -76,6 +76,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/ctest-release.txt",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-candidate.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
+      root / "local-analysis/cpp-offline/hal-prepared-lite-candidate.json",
+      root / "local-analysis/cpp-offline/hal-prepared-lite-bundle-complete.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-candidate.json",
       root / "local-analysis/cpp-offline/hal-playback-scheduler-bundle-complete.json",
       root / "local-analysis/cpp-offline/hal-hotpath-diagnostic-candidate.json",
@@ -215,6 +217,13 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto hal_playback_scheduler_candidate =
       opena8djcpp::evidence_json::json_object(summary, "hal_playback_scheduler_candidate")
+          .value_or("");
+  const auto hal_prepared_lite_candidate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_lite_candidate")
+          .value_or("");
+  const auto hal_prepared_lite_bundle_complete =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "hal_prepared_lite_bundle_complete")
           .value_or("");
   const auto hal_playback_scheduler_bundle_complete =
       opena8djcpp::evidence_json::json_object(summary,
@@ -569,6 +578,26 @@ int main(int argc, char** argv) {
       bool_field_is(hal_prepared_runtime_candidate, "product_claim_allowed", false) &&
       object_present(summary, "hal_prepared_runtime_bundle_complete") &&
       string_field_is(hal_prepared_runtime_bundle_complete, "status", "PASS") &&
+      object_present(summary, "hal_prepared_lite_candidate") &&
+      string_field_is(hal_prepared_lite_candidate, "status", "PASS") &&
+      bool_field_is(hal_prepared_lite_candidate, "prepared_runtime_enabled", true) &&
+      string_field_is(hal_prepared_lite_candidate, "prepared_runtime_mode",
+                      "capture_and_playback") &&
+      bool_field_is(hal_prepared_lite_candidate, "playback_only_runtime", false) &&
+      bool_field_is(hal_prepared_lite_candidate, "capture_runtime_enabled", true) &&
+      bool_field_is(hal_prepared_lite_candidate, "playback_runtime_enabled", true) &&
+      number_field_is(hal_prepared_lite_candidate, "logical_iso_frames", 8.0) &&
+      number_field_is(hal_prepared_lite_candidate, "prepared_submit_frames", 16.0) &&
+      number_field_is(hal_prepared_lite_candidate, "capture_iso_frames", 16.0) &&
+      number_field_is(hal_prepared_lite_candidate, "playback_base_iso_frames", 8.0) &&
+      number_field_is(hal_prepared_lite_candidate, "playback_coalesce_transfers", 2.0) &&
+      number_field_is(hal_prepared_lite_candidate, "expected_submit_reduction_ratio", 2.0) &&
+      bool_field_is(hal_prepared_lite_candidate, "default_hal_restored", true) &&
+      bool_field_is(hal_prepared_lite_candidate, "prepared_hash_differs_from_default", true) &&
+      bool_field_is(hal_prepared_lite_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_prepared_lite_candidate, "product_claim_allowed", false) &&
+      object_present(summary, "hal_prepared_lite_bundle_complete") &&
+      string_field_is(hal_prepared_lite_bundle_complete, "status", "PASS") &&
       object_present(summary, "hal_playback_scheduler_candidate") &&
       string_field_is(hal_playback_scheduler_candidate, "status", "PASS") &&
       bool_field_is(hal_playback_scheduler_candidate, "prepared_runtime_enabled", true) &&
@@ -1248,6 +1277,15 @@ int main(int argc, char** argv) {
                       "hal_playback_scheduler_candidate_prepared_submit_frames", 64.0) &&
       number_field_is(hal_transport_runtime_gate,
                       "hal_playback_scheduler_candidate_playback_coalesce_transfers", 8.0) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_lite_candidate_pass", true) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_prepared_lite_candidate_capture_iso_frames", 16.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_prepared_lite_candidate_prepared_submit_frames", 16.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_prepared_lite_candidate_expected_submit_reduction_ratio", 2.0) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "hal_prepared_lite_candidate_physical_evidence_present", false) &&
       bool_field_is(hal_transport_runtime_gate, "playback_scheduler_physically_rejected",
                     true) &&
       bool_field_is(hal_transport_runtime_gate,

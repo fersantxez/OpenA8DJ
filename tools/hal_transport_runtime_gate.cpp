@@ -48,6 +48,10 @@ bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
   return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
 }
 
+bool bool_last_field_is(std::string_view json, std::string_view key, bool expected) {
+  return opena8djcpp::evidence_json::json_bool_last(json, key).value_or(!expected) == expected;
+}
+
 bool gate_array_has_name(std::string_view json, std::string_view expected) {
   return opena8djcpp::evidence_json::json_object_array_contains_string_field(json, "gates", "name",
                                                                             expected);
@@ -92,6 +96,8 @@ int main(int argc, char** argv) {
       read_file(evidence / "playback-scheduler-runtime-contract.json");
   const auto hal_playback_scheduler_candidate =
       read_file(evidence / "hal-playback-scheduler-candidate.json");
+  const auto hal_prepared_lite_candidate =
+      read_file(evidence / "hal-prepared-lite-candidate.json");
   const auto playback_scheduler_physical_compare =
       read_file(root / "local-analysis/physical-evidence-window/"
                        "20260618T2002Z-playback-scheduler-source-reference-ab-8s/"
@@ -113,6 +119,7 @@ int main(int argc, char** argv) {
                                 !prepared_runtime_binding.empty() &&
                                 !playback_scheduler_runtime.empty() &&
                                 !hal_playback_scheduler_candidate.empty() &&
+                                !hal_prepared_lite_candidate.empty() &&
                                 !playback_scheduler_physical_compare.empty() &&
                                 !default_postclose_physical_compare.empty() &&
                                 !postclose_driver_sample.empty();
@@ -316,6 +323,22 @@ int main(int argc, char** argv) {
       bool_field_is(hal_playback_scheduler_candidate, "default_hal_restored", true) &&
       bool_field_is(hal_playback_scheduler_candidate, "physical_evidence_present", false) &&
       bool_field_is(hal_playback_scheduler_candidate, "product_claim_allowed", false);
+  const bool hal_prepared_lite_candidate_pass =
+      string_field_is(hal_prepared_lite_candidate, "result", "PASS") &&
+      string_field_is(hal_prepared_lite_candidate, "prepared_runtime_mode",
+                      "capture_and_playback") &&
+      bool_field_is(hal_prepared_lite_candidate, "playback_only_runtime", false) &&
+      bool_field_is(hal_prepared_lite_candidate, "capture_runtime_enabled", true) &&
+      bool_field_is(hal_prepared_lite_candidate, "playback_runtime_enabled", true) &&
+      number_or(hal_prepared_lite_candidate, "logical_iso_frames", 0.0) == 8.0 &&
+      number_or(hal_prepared_lite_candidate, "capture_iso_frames", 0.0) == 16.0 &&
+      number_or(hal_prepared_lite_candidate, "prepared_submit_frames", 0.0) == 16.0 &&
+      number_or(hal_prepared_lite_candidate, "playback_coalesce_transfers", 0.0) == 2.0 &&
+      number_or(hal_prepared_lite_candidate, "expected_submit_reduction_ratio", 0.0) == 2.0 &&
+      bool_field_is(hal_prepared_lite_candidate, "default_hal_restored", true) &&
+      bool_last_field_is(hal_prepared_lite_candidate, "prepared_hash_differs_from_default", true) &&
+      bool_field_is(hal_prepared_lite_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_prepared_lite_candidate, "product_claim_allowed", false);
   const bool playback_scheduler_physically_rejected =
       string_field_is(playback_scheduler_physical_compare, "result", "FAIL") &&
       string_field_is(playback_scheduler_physical_compare, "readiness_claim",
@@ -366,6 +389,7 @@ int main(int argc, char** argv) {
       runtime_reduction_missing && offline_prepared_model_supported &&
       hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
       playback_scheduler_runtime_contract_pass && hal_playback_scheduler_candidate_pass &&
+      hal_prepared_lite_candidate_pass &&
       playback_scheduler_physically_rejected && default_postclose_physically_rejected_for_product &&
       postclose_cpu_sample_points_to_usbhost_enqueue &&
       current_quality_blocked && physical_ab_blocked && hal_safety_blocks_claims &&
@@ -414,6 +438,9 @@ int main(int argc, char** argv) {
   }
   if (!hal_playback_scheduler_candidate_pass) {
     blockers.push_back("hal_playback_scheduler_candidate_missing_or_failing");
+  }
+  if (!hal_prepared_lite_candidate_pass) {
+    blockers.push_back("hal_prepared_lite_candidate_missing_or_failing");
   }
   if (playback_scheduler_physically_rejected) {
     blockers.push_back("playback_scheduler_physically_rejected");
@@ -528,6 +555,20 @@ int main(int argc, char** argv) {
       << number_or(hal_playback_scheduler_candidate, "prepared_submit_frames", -1.0) << ",\n"
       << "  \"hal_playback_scheduler_candidate_playback_coalesce_transfers\": "
       << number_or(hal_playback_scheduler_candidate, "playback_coalesce_transfers", -1.0)
+      << ",\n"
+      << "  \"hal_prepared_lite_candidate_pass\": "
+      << (hal_prepared_lite_candidate_pass ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_lite_candidate_capture_iso_frames\": "
+      << number_or(hal_prepared_lite_candidate, "capture_iso_frames", -1.0) << ",\n"
+      << "  \"hal_prepared_lite_candidate_prepared_submit_frames\": "
+      << number_or(hal_prepared_lite_candidate, "prepared_submit_frames", -1.0) << ",\n"
+      << "  \"hal_prepared_lite_candidate_expected_submit_reduction_ratio\": "
+      << number_or(hal_prepared_lite_candidate, "expected_submit_reduction_ratio", -1.0)
+      << ",\n"
+      << "  \"hal_prepared_lite_candidate_physical_evidence_present\": "
+      << (bool_field_is(hal_prepared_lite_candidate, "physical_evidence_present", false)
+              ? "false"
+              : "true")
       << ",\n"
       << "  \"playback_scheduler_physically_rejected\": "
       << (playback_scheduler_physically_rejected ? "true" : "false") << ",\n"

@@ -3519,3 +3519,14 @@ Current implication:
   or DriverKit USB runtime, not sample packing/decode. Product readiness,
   human product test, Timecode Vinyl physical certification, CPU superiority,
   and branch promotion remain blocked.
+- 17:27 EDT stable-load close candidate: added a separate prepared-lite HAL
+  candidate to the offline evidence set:
+  `build/OpenA8DJ-prepared-lite.driver`. It uses the prepared runtime in
+  capture and playback with `logical_iso_frames=8`,
+  `prepared_submit_frames=16`, `capture_iso_frames=16`,
+  `playback_coalesce_transfers=2`, and expected submit reduction `2x`. The
+  build script restores `build/OpenA8DJ.driver` after copying the candidate,
+  verifies the candidate hash differs from the default, and records
+  `physical_evidence_present=false` plus `product_claim_allowed=false`.
+  This is the next lower-risk transport experiment for a lock-gated physical
+  window; it is not a product/human-test readiness claim.

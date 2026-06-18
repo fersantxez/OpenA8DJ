@@ -20,6 +20,15 @@ python3 scripts/check-hal-bundle-complete \
   --candidate build/OpenA8DJ-prepared-runtime.driver \
   --json-out "$EVIDENCE_DIR/hal-prepared-runtime-bundle-complete.json"
 python3 scripts/build-hal-prepared-runtime-candidate \
+  --candidate build/OpenA8DJ-prepared-lite.driver \
+  --json-out "$EVIDENCE_DIR/hal-prepared-lite-candidate.json" \
+  --slots-per-submit 2 \
+  --capture-queue 4 \
+  --playback-queue 4
+python3 scripts/check-hal-bundle-complete \
+  --candidate build/OpenA8DJ-prepared-lite.driver \
+  --json-out "$EVIDENCE_DIR/hal-prepared-lite-bundle-complete.json"
+python3 scripts/build-hal-prepared-runtime-candidate \
   --candidate build/OpenA8DJ-playback-scheduler.driver \
   --json-out "$EVIDENCE_DIR/hal-playback-scheduler-candidate.json" \
   --playback-only
@@ -477,6 +486,8 @@ hardware_lock_policy = load_json("hardware-lock-policy.json")
 hal_bundle_complete = load_json("hal-bundle-complete.json")
 hal_prepared_runtime_candidate = load_json("hal-prepared-runtime-candidate.json")
 hal_prepared_runtime_bundle_complete = load_json("hal-prepared-runtime-bundle-complete.json")
+hal_prepared_lite_candidate = load_json("hal-prepared-lite-candidate.json")
+hal_prepared_lite_bundle_complete = load_json("hal-prepared-lite-bundle-complete.json")
 hal_playback_scheduler_candidate = load_json("hal-playback-scheduler-candidate.json")
 hal_playback_scheduler_bundle_complete = load_json(
     "hal-playback-scheduler-bundle-complete.json"
@@ -1953,6 +1964,21 @@ summary = {
         "hal_playback_scheduler_candidate_playback_coalesce_transfers": hal_transport_runtime_gate.get(
             "hal_playback_scheduler_candidate_playback_coalesce_transfers"
         ),
+        "hal_prepared_lite_candidate_pass": hal_transport_runtime_gate.get(
+            "hal_prepared_lite_candidate_pass"
+        ),
+        "hal_prepared_lite_candidate_capture_iso_frames": hal_transport_runtime_gate.get(
+            "hal_prepared_lite_candidate_capture_iso_frames"
+        ),
+        "hal_prepared_lite_candidate_prepared_submit_frames": hal_transport_runtime_gate.get(
+            "hal_prepared_lite_candidate_prepared_submit_frames"
+        ),
+        "hal_prepared_lite_candidate_expected_submit_reduction_ratio": hal_transport_runtime_gate.get(
+            "hal_prepared_lite_candidate_expected_submit_reduction_ratio"
+        ),
+        "hal_prepared_lite_candidate_physical_evidence_present": hal_transport_runtime_gate.get(
+            "hal_prepared_lite_candidate_physical_evidence_present"
+        ),
         "playback_scheduler_physically_rejected": hal_transport_runtime_gate.get(
             "playback_scheduler_physically_rejected"
         ),
@@ -3072,6 +3098,58 @@ summary = {
         "status": hal_prepared_runtime_bundle_complete.get("result"),
         "candidate": hal_prepared_runtime_bundle_complete.get("candidate"),
         "evidence": "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
+    },
+    "hal_prepared_lite_candidate": {
+        "status": hal_prepared_lite_candidate.get("result"),
+        "candidate": hal_prepared_lite_candidate.get("candidate"),
+        "prepared_runtime_enabled": hal_prepared_lite_candidate.get(
+            "prepared_runtime_enabled"
+        ),
+        "prepared_runtime_mode": hal_prepared_lite_candidate.get(
+            "prepared_runtime_mode"
+        ),
+        "playback_only_runtime": hal_prepared_lite_candidate.get(
+            "playback_only_runtime"
+        ),
+        "capture_runtime_enabled": hal_prepared_lite_candidate.get(
+            "capture_runtime_enabled"
+        ),
+        "playback_runtime_enabled": hal_prepared_lite_candidate.get(
+            "playback_runtime_enabled"
+        ),
+        "logical_iso_frames": hal_prepared_lite_candidate.get("logical_iso_frames"),
+        "prepared_submit_frames": hal_prepared_lite_candidate.get(
+            "prepared_submit_frames"
+        ),
+        "capture_iso_frames": hal_prepared_lite_candidate.get("capture_iso_frames"),
+        "playback_base_iso_frames": hal_prepared_lite_candidate.get(
+            "playback_base_iso_frames"
+        ),
+        "playback_coalesce_transfers": hal_prepared_lite_candidate.get(
+            "playback_coalesce_transfers"
+        ),
+        "expected_submit_reduction_ratio": hal_prepared_lite_candidate.get(
+            "expected_submit_reduction_ratio"
+        ),
+        "default_hal_restored": hal_prepared_lite_candidate.get(
+            "default_hal_restored"
+        ),
+        "prepared_hash_differs_from_default": hal_prepared_lite_candidate.get(
+            "prepared_hash_differs_from_default"
+        ),
+        "physical_evidence_present": hal_prepared_lite_candidate.get(
+            "physical_evidence_present"
+        ),
+        "product_claim_allowed": hal_prepared_lite_candidate.get(
+            "product_claim_allowed"
+        ),
+        "blocked_claim": hal_prepared_lite_candidate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-prepared-lite-candidate.json",
+    },
+    "hal_prepared_lite_bundle_complete": {
+        "status": hal_prepared_lite_bundle_complete.get("result"),
+        "candidate": hal_prepared_lite_bundle_complete.get("candidate"),
+        "evidence": "local-analysis/cpp-offline/hal-prepared-lite-bundle-complete.json",
     },
     "hal_playback_scheduler_candidate": {
         "status": hal_playback_scheduler_candidate.get("result"),

@@ -15646,3 +15646,38 @@ Follow-up correction:
   - Human/product readiness is still blocked. The next allowed window is
     lock-gated source-reference/mainline/C++ physical A/B plus CPU comparison,
     followed by Timecode Vinyl physical validation.
+
+## 2026-06-18 - Prepared-Lite Stable Offline Gate Pre-Commit
+
+- Scope:
+  - Added the prepared-lite HAL candidate to the offline evidence and schema
+    checks.
+  - Did not install, unload, reload, play audio, record audio, change
+    CoreAudio, change USB, change defaults, or touch hardware.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_evidence_schema_check -j`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/hal-prepared-lite-candidate.json`
+  - `local-analysis/cpp-offline/hal-prepared-lite-bundle-complete.json`
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+- Result:
+  - Focused HAL transport runtime gate: PASS.
+  - Debug CTest: `86/86` PASS.
+  - Release CTest: `87/87` PASS.
+  - Offline summary: `status=PASS`, `product_readiness_status=FAIL`,
+    `human_test_product_allowed=false`, `branch_promotion_allowed=false`,
+    `final_objective_status=NOT_READY`.
+  - Prepared-lite evidence: `capture_iso_frames=16`,
+    `prepared_submit_frames=16`, `playback_coalesce_transfers=2`,
+    `expected_submit_reduction_ratio=2`,
+    `physical_evidence_present=false`, and `product_claim_allowed=false`.
+  - Provenance freshness before commit: FAIL as expected because the worktree
+    contains the prepared-lite evidence/schema changes.
+- Interpretation:
+  - The stable load is closed as an offline diagnostic state only.
+  - A post-commit full gate rerun is required before the new evidence can be
+    used as the current clean baseline.

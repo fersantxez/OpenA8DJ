@@ -10219,3 +10219,37 @@ Next implication:
 - Readiness impact: next CPU work should target true IOUSBHost enqueue/requeue
   cost, request lifecycle, or a DriverKit/USB prepared runtime. No product,
   human, Timecode Vinyl, CPU superiority, or branch promotion claim is allowed.
+
+## 2026-06-18 - Add Prepared-Lite Candidate To Stable Offline Evidence
+
+- Decision: add `hal-prepared-lite-candidate` to the reproducible offline
+  gate set and schema. The candidate is a conservative prepared-runtime
+  profile with 2 logical ISO slots per submit, not the previously rejected 8x
+  physical profile.
+- Reason: the current physical evidence says CPU is dominated by fixed
+  IOUSBHost enqueue/requeue/request lifecycle work, while aggressive prepared
+  and playback-scheduler variants have already been physically rejected. A 2x
+  candidate is a safer next experiment for resource reduction because it lowers
+  submit cadence without making it a product default or repeating the rejected
+  8x path.
+- Evidence:
+  - `build/OpenA8DJ-prepared-lite.driver` is generated separately from the
+    default HAL bundle.
+  - `local-analysis/cpp-offline/hal-prepared-lite-candidate.json` reports
+    `result=PASS`, `prepared_runtime_mode=capture_and_playback`,
+    `capture_iso_frames=16`, `prepared_submit_frames=16`,
+    `playback_coalesce_transfers=2`, and
+    `expected_submit_reduction_ratio=2`.
+  - The candidate and default executable hashes differ, and the script restores
+    the default `build/OpenA8DJ.driver` after creating the opt-in bundle.
+  - `hal_transport_runtime_gate` still blocks product claims and records
+    `hal_prepared_lite_candidate_physical_evidence_present=false`.
+- Alternatives rejected:
+  - Make prepared-lite the default stable HAL: rejected because it has no
+    lock-gated physical quality, CPU, or Timecode Vinyl evidence.
+  - Re-run the 8x prepared/playback-scheduler path as the next stable load:
+    rejected because existing physical evidence already rejected those variants
+    for product readiness.
+- Readiness impact: this gives the next physical window a controlled candidate
+  to measure. It does not permit human product test, CPU superiority claim,
+  Timecode Vinyl physical certification, or branch promotion.
