@@ -9834,3 +9834,31 @@ Next implication:
 - Readiness impact: this authorizes only a future default-off HAL candidate
   implementation. It still does not authorize physical readiness, quality
   superiority, CPU superiority, Timecode Vinyl readiness, or branch promotion.
+
+## 2026-06-18 - Add Default-Off HAL Playback Scheduler Candidate
+
+- Decision: add a separate HAL candidate bundle for the playback scheduler
+  path, preserving the default diagnostic HAL and keeping capture on logical
+  ISO8.
+- Reason: prior physical evidence rejected capture batching variants, while
+  the offline scheduler model points to playback submit reduction as the next
+  plausible CPU/resource win. The candidate therefore enables prepared runtime
+  only for playback and leaves capture submits direct.
+- Evidence:
+  - `make hal-playback-scheduler-candidate` produces
+    `build/OpenA8DJ-playback-scheduler.driver`.
+  - Candidate JSON records `prepared_runtime_mode=playback_only`,
+    `capture_runtime_enabled=false`, `playback_runtime_enabled=true`,
+    `capture_iso_frames=8`, `prepared_submit_frames=64`,
+    `playback_coalesce_transfers=8`, and
+    `expected_submit_reduction_ratio=8`.
+  - The builder restores `build/OpenA8DJ.driver` after candidate creation and
+    records `default_hal_restored=true`.
+- Alternatives rejected:
+  - Promote the existing prepared-runtime candidate: rejected because it still
+    batches capture and playback together.
+  - Change the default HAL directly: rejected because the 15:00 diagnostic RC
+    is the stable load until physical evidence proves a replacement.
+- Readiness impact: this authorizes only a future lock-gated measurement
+  window. It does not authorize product readiness, audiophile superiority, CPU
+  superiority, Timecode Vinyl readiness, or branch promotion.

@@ -153,9 +153,14 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS=8");
   const bool default_runtime_preserved =
       contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0") &&
+      contains(makefile, "HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME ?= 0") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1") &&
       contains(makefile, "HAL_SRC := $(HAL_BASE_SRC)");
+  const bool playback_scheduler_candidate_build_present =
+      contains(makefile, "hal-playback-scheduler-candidate:") &&
+      contains(makefile, "--candidate build/OpenA8DJ-playback-scheduler.driver") &&
+      contains(makefile, "--playback-only");
   const bool prepared_bridge_opt_in_build_only =
       contains(makefile, "HAL_PREPARED_RUNTIME_SRC :=") &&
       contains(makefile, "src/hal/OpenA8DJPreparedRuntimeBridge.mm") &&
@@ -166,7 +171,9 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_CFLAGS += -Icore/include -Isrc/hal");
   const bool compile_time_geometry_guard_present =
       contains(hal_source, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
-      contains(hal_source, "kPreparedRuntimeGeometrySupported");
+      contains(hal_source, "kPreparedRuntimeGeometrySupported") &&
+      contains(hal_source, "kPreparedRuntimeCaptureEnabled") &&
+      contains(hal_source, "kPreparedRuntimePlaybackEnabled");
   const bool prepared_bridge_api_present =
       contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeCreate") &&
       contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeQueueSubmit") &&
@@ -198,10 +205,10 @@ int main(int argc, char** argv) {
       contains(capture_queue, "[self submitCaptureTransfer:transfer") &&
       contains(playback_with_requests, "[self submitPlaybackTransfer:transfer") &&
       contains(submit_capture, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
-      contains(submit_capture, "if (kPreparedRuntimeGeometrySupported)") &&
+      contains(submit_capture, "if (kPreparedRuntimeCaptureEnabled)") &&
       contains(submit_capture, "enqueuePreparedCaptureSubmitWithTransfer:transfer") &&
       contains(submit_playback, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
-      contains(submit_playback, "if (kPreparedRuntimeGeometrySupported)") &&
+      contains(submit_playback, "if (kPreparedRuntimePlaybackEnabled)") &&
       contains(submit_playback, "enqueuePreparedPlaybackSubmitWithTransfer:transfer") &&
       contains(prepared_capture, "OpenA8DJPreparedRuntimeBridgeQueueSubmit") &&
       appears_before(prepared_capture, "OpenA8DJPreparedRuntimeBridgeQueueSubmit",
@@ -341,6 +348,9 @@ int main(int argc, char** argv) {
     blockers.push_back("hal_prepared_runtime_opt_in_geometry_not_bound");
   }
   if (!default_runtime_preserved) blockers.push_back("default_hal_runtime_geometry_drifted");
+  if (!playback_scheduler_candidate_build_present) {
+    blockers.push_back("playback_scheduler_candidate_build_missing");
+  }
   if (!prepared_bridge_opt_in_build_only) blockers.push_back("prepared_bridge_not_opt_in_only");
   if (!compile_time_geometry_guard_present) blockers.push_back("compile_time_geometry_guard_missing");
   if (!prepared_bridge_api_present) blockers.push_back("prepared_bridge_api_missing");
@@ -389,6 +399,8 @@ int main(int argc, char** argv) {
   print_bool("opt_in_profile_binds_64_transaction_geometry",
              opt_in_profile_binds_64_transaction_geometry);
   print_bool("default_runtime_preserved", default_runtime_preserved);
+  print_bool("playback_scheduler_candidate_build_present",
+             playback_scheduler_candidate_build_present);
   print_bool("prepared_bridge_opt_in_build_only", prepared_bridge_opt_in_build_only);
   print_bool("compile_time_geometry_guard_present", compile_time_geometry_guard_present);
   print_bool("prepared_bridge_api_present", prepared_bridge_api_present);

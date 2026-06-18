@@ -657,3 +657,24 @@ Offline gate:
 This binding is the contract for the next HAL opt-in candidate. It must be
 inserted before the real submit boundary, around the playback refill decision,
 while `submitPlaybackTransfer` remains the submit/observability boundary.
+
+## HAL Playback Scheduler Candidate Boundary
+
+The default-off HAL candidate preserves the real-time rule learned from failed
+physical variants: do not reduce capture cadence before a same-session A/B
+proves it is safe.
+
+Implementation constraints:
+
+- capture remains direct logical ISO8;
+- playback may coalesce eight logical ISO8 slots into one prepared runtime
+  submit;
+- the prepared runtime bridge remains preallocated at stream start;
+- no extra allocation, logging, disk I/O, or blocking IPC is introduced in the
+  submit/completion path;
+- completion ownership remains with the USB completion handlers;
+- stream stats must expose prepared runtime submit/completion counters so the
+  physical A/B can compare CPU/resource behavior against mainline.
+
+The candidate is build-only until a hardware lock window explicitly installs or
+loads it.

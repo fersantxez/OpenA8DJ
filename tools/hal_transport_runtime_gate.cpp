@@ -90,6 +90,8 @@ int main(int argc, char** argv) {
       read_file(evidence / "hal-prepared-runtime-binding-contract.json");
   const auto playback_scheduler_runtime =
       read_file(evidence / "playback-scheduler-runtime-contract.json");
+  const auto hal_playback_scheduler_candidate =
+      read_file(evidence / "hal-playback-scheduler-candidate.json");
 
   const bool evidence_present = !hal_source.empty() && !control_source.empty() &&
                                 !run_soundcheck.empty() && !stream_stats_analyzer.empty() &&
@@ -97,7 +99,8 @@ int main(int argc, char** argv) {
                                 !product_quality.empty() && !physical_window.empty() &&
                                 !hal_safety.empty() && !prepared_runtime_source.empty() &&
                                 !prepared_runtime_binding.empty() &&
-                                !playback_scheduler_runtime.empty();
+                                !playback_scheduler_runtime.empty() &&
+                                !hal_playback_scheduler_candidate.empty();
 
   const bool hal_has_direct_usb_enqueue =
       contains(hal_source, "enqueueIORequestWithData:transfer.data") &&
@@ -276,6 +279,19 @@ int main(int argc, char** argv) {
           1.5 &&
       bool_field_is(playback_scheduler_runtime, "physical_evidence_present", false) &&
       bool_field_is(playback_scheduler_runtime, "product_claim_allowed", false);
+  const bool hal_playback_scheduler_candidate_pass =
+      string_field_is(hal_playback_scheduler_candidate, "result", "PASS") &&
+      string_field_is(hal_playback_scheduler_candidate, "prepared_runtime_mode", "playback_only") &&
+      bool_field_is(hal_playback_scheduler_candidate, "playback_only_runtime", true) &&
+      bool_field_is(hal_playback_scheduler_candidate, "capture_runtime_enabled", false) &&
+      bool_field_is(hal_playback_scheduler_candidate, "playback_runtime_enabled", true) &&
+      number_or(hal_playback_scheduler_candidate, "logical_iso_frames", 0.0) == 8.0 &&
+      number_or(hal_playback_scheduler_candidate, "capture_iso_frames", 0.0) == 8.0 &&
+      number_or(hal_playback_scheduler_candidate, "prepared_submit_frames", 0.0) == 64.0 &&
+      number_or(hal_playback_scheduler_candidate, "playback_coalesce_transfers", 0.0) == 8.0 &&
+      bool_field_is(hal_playback_scheduler_candidate, "default_hal_restored", true) &&
+      bool_field_is(hal_playback_scheduler_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_playback_scheduler_candidate, "product_claim_allowed", false);
 
   const bool current_quality_blocked =
       string_field_is(product_quality, "result", "PASS") &&
@@ -305,8 +321,9 @@ int main(int argc, char** argv) {
   const bool product_claim_blocked =
       runtime_reduction_missing && offline_prepared_model_supported &&
       hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
-      playback_scheduler_runtime_contract_pass && current_quality_blocked && physical_ab_blocked &&
-      hal_safety_blocks_claims && stable_default_load_preserved &&
+      playback_scheduler_runtime_contract_pass && hal_playback_scheduler_candidate_pass &&
+      current_quality_blocked && physical_ab_blocked && hal_safety_blocks_claims &&
+      stable_default_load_preserved &&
       observability_defaults_preserved && prepared_runtime_not_next_default;
 
   std::vector<std::string> blockers;
@@ -345,6 +362,9 @@ int main(int argc, char** argv) {
   }
   if (!playback_scheduler_runtime_contract_pass) {
     blockers.push_back("playback_scheduler_runtime_contract_missing_or_failing");
+  }
+  if (!hal_playback_scheduler_candidate_pass) {
+    blockers.push_back("hal_playback_scheduler_candidate_missing_or_failing");
   }
   if (current_quality_blocked) {
     blockers.push_back("physical_quality_claim_blocked");
@@ -434,6 +454,15 @@ int main(int argc, char** argv) {
       << "  \"playback_scheduler_runtime_reduction_ratio\": "
       << number_or(playback_scheduler_runtime, "stable_playback_submit_reduction_ratio", -1.0)
       << ",\n"
+      << "  \"hal_playback_scheduler_candidate_pass\": "
+      << (hal_playback_scheduler_candidate_pass ? "true" : "false") << ",\n"
+      << "  \"hal_playback_scheduler_candidate_capture_iso_frames\": "
+      << number_or(hal_playback_scheduler_candidate, "capture_iso_frames", -1.0) << ",\n"
+      << "  \"hal_playback_scheduler_candidate_prepared_submit_frames\": "
+      << number_or(hal_playback_scheduler_candidate, "prepared_submit_frames", -1.0) << ",\n"
+      << "  \"hal_playback_scheduler_candidate_playback_coalesce_transfers\": "
+      << number_or(hal_playback_scheduler_candidate, "playback_coalesce_transfers", -1.0)
+      << ",\n"
       << "  \"current_quality_blocked\": " << (current_quality_blocked ? "true" : "false")
       << ",\n"
       << "  \"physical_ab_blocked\": " << (physical_ab_blocked ? "true" : "false") << ",\n"
@@ -444,9 +473,9 @@ int main(int argc, char** argv) {
   print_string_array("runtime_claim_blockers", blockers);
   std::cout
       << "  \"next_cpu_direction\": "
-         "\"OPT_IN_HAL_PLAYBACK_SCHEDULER_BINDING_PRESERVE_CAPTURE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB\",\n"
+         "\"LOCK_GATED_PLAYBACK_SCHEDULER_CANDIDATE_SOURCE_REFERENCE_AB_PRESERVE_CAPTURE_ISO8\",\n"
       << "  \"next_required_action\": "
-         "\"KEEP_DEFAULT_STABLE_LOAD_AND_IMPLEMENT_OPT_IN_HAL_PLAYBACK_SCHEDULER_CANDIDATE_BEFORE_HARDWARE_AB\",\n"
+         "\"KEEP_DEFAULT_STABLE_LOAD_AND_RUN_PLAYBACK_SCHEDULER_CANDIDATE_LOCK_GATED_SOURCE_REFERENCE_AB\",\n"
       << "  \"blocked_claim\": "
          "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB\"\n"
       << "}\n";

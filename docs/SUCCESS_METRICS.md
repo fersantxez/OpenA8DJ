@@ -2736,3 +2736,25 @@ Current implementation:
 - PASS only authorizes a default-off HAL binding candidate. It does not prove
   CPU/resource superiority until a lock-gated physical A/B beats mainline under
   the same source reference and workload.
+
+## HAL Playback Scheduler Candidate Metric
+
+- `local-analysis/cpp-offline/hal-playback-scheduler-candidate.json` must
+  report `result=PASS` before the candidate can be considered for a physical
+  window.
+- Minimum offline thresholds:
+  - `prepared_runtime_mode=playback_only`;
+  - `capture_runtime_enabled=false`;
+  - `playback_runtime_enabled=true`;
+  - `logical_iso_frames=8`;
+  - `capture_iso_frames=8`;
+  - `prepared_submit_frames=64`;
+  - `playback_coalesce_transfers=8`;
+  - `expected_submit_reduction_ratio=8`;
+  - `default_hal_restored=true`;
+  - `prepared_hash_differs_from_default=true`;
+  - `physical_evidence_present=false`;
+  - `product_claim_allowed=false`.
+- PASS only authorizes a lock-gated source-reference physical A/B. It does not
+  prove lower CPU, better sound quality, Timecode Vinyl function, or branch
+  promotion.

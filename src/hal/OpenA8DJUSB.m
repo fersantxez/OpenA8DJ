@@ -126,6 +126,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME 0
 #endif
 
+#ifndef OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME
+#define OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME 0
+#endif
+
 #ifndef OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT
 #define OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT 8
 #endif
@@ -134,9 +138,14 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #if OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT < 2
 #error OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME requires at least 2 slots per submit
 #endif
-#if OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != \
+#if !OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME && \
+    OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != \
     (OPENA8DJ_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT)
 #error prepared capture runtime must batch physical capture transfers over logical ISO frames
+#endif
+#if OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME && \
+    OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != OPENA8DJ_ISO_FRAMES_PER_TRANSFER
+#error playback-only prepared runtime must preserve capture ISO geometry
 #endif
 #if (OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS) != \
     (OPENA8DJ_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT)
@@ -305,6 +314,11 @@ enum {
         kPlaybackIsoFramesPerTransfer == (kIsoFramesPerTransfer * kPreparedUsbSlotsPerSubmit) ? 1 : 0,
     kPreparedRuntimeGeometrySupported =
         kPreparedRuntimeEnabled && kPreparedRuntimeCaptureGeometry && kPreparedRuntimePlaybackGeometry,
+    kPreparedRuntimeCaptureEnabled =
+        kPreparedRuntimeEnabled && !OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME &&
+        kPreparedRuntimeCaptureGeometry,
+    kPreparedRuntimePlaybackEnabled =
+        kPreparedRuntimeEnabled && kPreparedRuntimePlaybackGeometry,
     kIsoBytesPerFrame = 512,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
@@ -5408,7 +5422,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                           error:(NSError **)error
 {
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
-    if (kPreparedRuntimeGeometrySupported) {
+    if (kPreparedRuntimeCaptureEnabled) {
         return [self enqueuePreparedCaptureSubmitWithTransfer:transfer
                                                  transactions:transactions
                                             completionHandler:completionHandler
@@ -6281,7 +6295,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                            error:(NSError **)error
 {
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
-    if (kPreparedRuntimeGeometrySupported) {
+    if (kPreparedRuntimePlaybackEnabled) {
         return [self enqueuePreparedPlaybackSubmitWithTransfer:transfer
                                                   transactions:transactions
                                               firstFrameNumber:firstFrameNumber

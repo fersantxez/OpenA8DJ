@@ -3360,3 +3360,13 @@ Current implication:
   is a default-off HAL playback scheduler candidate around capture-paced
   playback refill, followed by lock-gated source-reference A/B. No product
   claim is allowed from this offline binding.
+- 16:05 EDT HAL playback-scheduler candidate update: a separate build-only HAL
+  candidate now exists at `build/OpenA8DJ-playback-scheduler.driver`. It keeps
+  capture at logical ISO8 (`capture_iso_frames=8`), enables prepared runtime
+  only for playback, batches playback to `64` frames per submit through
+  `HAL_PLAYBACK_COALESCE_TRANSFERS=8`, restores the default
+  `build/OpenA8DJ.driver` after the candidate build, and records
+  `product_claim_allowed=false`. This is the first HAL artifact aligned with
+  the offline scheduler model; it is still untested physically and must not
+  replace the diagnostic RC without lock-gated source-reference A/B, CPU
+  comparison, and Timecode Vinyl evidence.

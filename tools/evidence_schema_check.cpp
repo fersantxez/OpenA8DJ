@@ -76,6 +76,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/ctest-release.txt",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-candidate.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
+      root / "local-analysis/cpp-offline/hal-playback-scheduler-candidate.json",
+      root / "local-analysis/cpp-offline/hal-playback-scheduler-bundle-complete.json",
       root / "local-analysis/cpp-offline/packet-matrix.json",
       root / "local-analysis/cpp-offline/protocol-contract.json",
       root / "local-analysis/cpp-offline/simulated-output-matrix.json",
@@ -207,6 +209,13 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto hal_prepared_runtime_bundle_complete =
       opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_bundle_complete")
+          .value_or("");
+  const auto hal_playback_scheduler_candidate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_playback_scheduler_candidate")
+          .value_or("");
+  const auto hal_playback_scheduler_bundle_complete =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "hal_playback_scheduler_bundle_complete")
           .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
@@ -526,6 +535,25 @@ int main(int argc, char** argv) {
       bool_field_is(hal_prepared_runtime_candidate, "product_claim_allowed", false) &&
       object_present(summary, "hal_prepared_runtime_bundle_complete") &&
       string_field_is(hal_prepared_runtime_bundle_complete, "status", "PASS") &&
+      object_present(summary, "hal_playback_scheduler_candidate") &&
+      string_field_is(hal_playback_scheduler_candidate, "status", "PASS") &&
+      bool_field_is(hal_playback_scheduler_candidate, "prepared_runtime_enabled", true) &&
+      string_field_is(hal_playback_scheduler_candidate, "prepared_runtime_mode", "playback_only") &&
+      bool_field_is(hal_playback_scheduler_candidate, "playback_only_runtime", true) &&
+      bool_field_is(hal_playback_scheduler_candidate, "capture_runtime_enabled", false) &&
+      bool_field_is(hal_playback_scheduler_candidate, "playback_runtime_enabled", true) &&
+      number_field_is(hal_playback_scheduler_candidate, "logical_iso_frames", 8.0) &&
+      number_field_is(hal_playback_scheduler_candidate, "prepared_submit_frames", 64.0) &&
+      number_field_is(hal_playback_scheduler_candidate, "capture_iso_frames", 8.0) &&
+      number_field_is(hal_playback_scheduler_candidate, "playback_base_iso_frames", 8.0) &&
+      number_field_is(hal_playback_scheduler_candidate, "playback_coalesce_transfers", 8.0) &&
+      number_field_is(hal_playback_scheduler_candidate, "expected_submit_reduction_ratio", 8.0) &&
+      bool_field_is(hal_playback_scheduler_candidate, "default_hal_restored", true) &&
+      bool_field_is(hal_playback_scheduler_candidate, "prepared_hash_differs_from_default", true) &&
+      bool_field_is(hal_playback_scheduler_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_playback_scheduler_candidate, "product_claim_allowed", false) &&
+      object_present(summary, "hal_playback_scheduler_bundle_complete") &&
+      string_field_is(hal_playback_scheduler_bundle_complete, "status", "PASS") &&
       object_present(summary, "runtime_adapter_contract") &&
       number_field_is(runtime_adapter_contract, "stable_usb_submit_reduction_ratio", 8.0) &&
       object_present(summary, "usb_submit_plan_contract") &&
@@ -1127,13 +1155,20 @@ int main(int argc, char** argv) {
                       "playback_scheduler_runtime_playback_submits", 33.0) &&
       number_field_is(hal_transport_runtime_gate,
                       "playback_scheduler_runtime_reduction_ratio", 8.0) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_playback_scheduler_candidate_pass", true) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_playback_scheduler_candidate_capture_iso_frames", 8.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_playback_scheduler_candidate_prepared_submit_frames", 64.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_playback_scheduler_candidate_playback_coalesce_transfers", 8.0) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       string_field_is(
           hal_transport_runtime_gate, "next_cpu_direction",
-          "OPT_IN_HAL_PLAYBACK_SCHEDULER_BINDING_PRESERVE_CAPTURE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB") &&
+          "LOCK_GATED_PLAYBACK_SCHEDULER_CANDIDATE_SOURCE_REFERENCE_AB_PRESERVE_CAPTURE_ISO8") &&
       string_field_is(
           hal_transport_runtime_gate, "next_required_action",
-          "KEEP_DEFAULT_STABLE_LOAD_AND_IMPLEMENT_OPT_IN_HAL_PLAYBACK_SCHEDULER_CANDIDATE_BEFORE_HARDWARE_AB") &&
+          "KEEP_DEFAULT_STABLE_LOAD_AND_RUN_PLAYBACK_SCHEDULER_CANDIDATE_LOCK_GATED_SOURCE_REFERENCE_AB") &&
       string_field_is(
           hal_transport_runtime_gate, "blocked_claim",
           "NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB") &&

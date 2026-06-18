@@ -1370,6 +1370,25 @@ queue target `4`, `HAL_CAPTURE_ISO_FRAMES=16`, and playback coalesce transfers
 `2`. It is a lower-risk follow-up to the rejected 8x prepared-runtime profile,
 not a replacement for the active diagnostic RC.
 
+Playback-scheduler CPU candidate:
+
+```sh
+make hal-playback-scheduler-candidate
+```
+
+This writes `build/OpenA8DJ-playback-scheduler.driver` and
+`build/hal-candidates/playback-scheduler-candidate.json`. It enables prepared
+runtime only for playback (`HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME=1`), keeps
+capture at logical ISO8, and uses playback coalescing of eight logical ISO8
+slots per prepared submit. It then rebuilds the normal
+`build/OpenA8DJ.driver` so the default bundle stays conservative.
+
+This candidate is the next CPU/resource measurement artifact after the offline
+playback scheduler model. It is not installable by default and must not be used
+for a product claim until a lock-gated same-session physical A/B proves sound
+quality, CPU/resource behavior, routing, and Timecode Vinyl behavior against
+mainline.
+
 Candidate evidence JSON must stay outside the `.driver` bundle. Writing extra
 files into the bundle root breaks the seal and can make the lock-gated safety
 installer fail codesign with `unsealed contents present in the bundle root`.

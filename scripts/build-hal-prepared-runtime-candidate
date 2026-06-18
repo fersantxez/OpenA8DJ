@@ -93,14 +93,20 @@ def main() -> int:
     parser.add_argument("--playback-base-iso-frames", type=int, default=8)
     parser.add_argument("--capture-queue", type=int, default=8)
     parser.add_argument("--playback-queue", type=int, default=8)
+    parser.add_argument(
+        "--playback-only",
+        action="store_true",
+        help="preserve capture at logical ISO frames and use prepared runtime only for playback submits",
+    )
     args = parser.parse_args()
     if args.slots_per_submit < 2:
         raise ValueError("--slots-per-submit must be at least 2")
     if args.logical_iso_frames <= 0 or args.playback_base_iso_frames <= 0:
         raise ValueError("ISO frame counts must be positive")
-    capture_iso_frames = args.logical_iso_frames * args.slots_per_submit
-    playback_coalesce_transfers = capture_iso_frames // args.playback_base_iso_frames
-    if playback_coalesce_transfers * args.playback_base_iso_frames != capture_iso_frames:
+    prepared_submit_frames = args.logical_iso_frames * args.slots_per_submit
+    capture_iso_frames = args.logical_iso_frames if args.playback_only else prepared_submit_frames
+    playback_coalesce_transfers = prepared_submit_frames // args.playback_base_iso_frames
+    if playback_coalesce_transfers * args.playback_base_iso_frames != prepared_submit_frames:
         raise ValueError("--playback-base-iso-frames must divide logical_iso_frames * slots_per_submit")
 
     candidate = resolve_path(args.candidate)
@@ -118,6 +124,7 @@ def main() -> int:
             "-B",
             "hal",
             "HAL_PREPARED_USB_SUBMIT_RUNTIME=1",
+            f"HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME={1 if args.playback_only else 0}",
             f"HAL_PREPARED_USB_SLOTS_PER_SUBMIT={args.slots_per_submit}",
             f"HAL_ISO_FRAMES={args.logical_iso_frames}",
             f"HAL_CAPTURE_ISO_FRAMES={capture_iso_frames}",
@@ -183,8 +190,13 @@ def main() -> int:
         "result": "PASS" if passed else "FAIL",
         "candidate": str(candidate),
         "prepared_runtime_enabled": True,
+        "prepared_runtime_mode": "playback_only" if args.playback_only else "capture_and_playback",
+        "playback_only_runtime": args.playback_only,
+        "capture_runtime_enabled": not args.playback_only,
+        "playback_runtime_enabled": True,
         "prepared_runtime_slots_per_submit": args.slots_per_submit,
         "logical_iso_frames": args.logical_iso_frames,
+        "prepared_submit_frames": prepared_submit_frames,
         "capture_iso_frames": capture_iso_frames,
         "playback_base_iso_frames": args.playback_base_iso_frames,
         "playback_coalesce_transfers": playback_coalesce_transfers,

@@ -65,10 +65,13 @@ int main(int argc, char** argv) {
   const bool makefile_present = !makefile.empty();
   const bool default_off =
       contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0") &&
+      contains(makefile, "HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME ?= 0") &&
       contains(makefile, "HAL_PREPARED_USB_SLOTS_PER_SUBMIT ?= 8");
   const bool cflags_expose_runtime =
       contains(makefile,
                "-DOPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME=$(HAL_PREPARED_USB_SUBMIT_RUNTIME)") &&
+      contains(makefile,
+               "-DOPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME=$(HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME)") &&
       contains(makefile,
                "-DOPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT=$(HAL_PREPARED_USB_SLOTS_PER_SUBMIT)");
   const bool opt_in_target_present =
@@ -77,11 +80,17 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_PREPARED_USB_SLOTS_PER_SUBMIT=8") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES=64") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS=8");
+  const bool playback_scheduler_candidate_present =
+      contains(makefile, "hal-playback-scheduler-candidate:") &&
+      contains(makefile, "--candidate build/OpenA8DJ-playback-scheduler.driver") &&
+      contains(makefile, "--json-out build/hal-candidates/playback-scheduler-candidate.json") &&
+      contains(makefile, "--playback-only");
   const bool opt_in_target_build_only =
       contains(makefile, "hal-prepared-runtime:\n\t$(MAKE) -B hal") &&
       !contains(makefile, "hal-prepared-runtime:\n\t$(MAKE) -B install-hal");
   const bool source_declares_runtime_macros =
       contains(hal_source, "#ifndef OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
+      contains(hal_source, "#ifndef OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME") &&
       contains(hal_source, "#ifndef OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT");
   const bool source_has_compile_time_geometry_guards =
       contains(hal_source, "#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
@@ -89,6 +98,10 @@ int main(int argc, char** argv) {
                "OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != \\\n"
                "    (OPENA8DJ_ISO_FRAMES_PER_TRANSFER * "
                "OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT)") &&
+      contains(hal_source,
+               "OPENA8DJ_HAL_PREPARED_USB_PLAYBACK_ONLY_RUNTIME && \\\n"
+               "    OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != "
+               "OPENA8DJ_ISO_FRAMES_PER_TRANSFER") &&
       contains(hal_source,
                "(OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER * "
                "OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS) != \\\n"
@@ -99,7 +112,9 @@ int main(int argc, char** argv) {
       contains(hal_source, "kPreparedRuntimeEnabled") &&
       contains(hal_source, "kPreparedRuntimeCaptureGeometry") &&
       contains(hal_source, "kPreparedRuntimePlaybackGeometry") &&
-      contains(hal_source, "kPreparedRuntimeGeometrySupported");
+      contains(hal_source, "kPreparedRuntimeGeometrySupported") &&
+      contains(hal_source, "kPreparedRuntimeCaptureEnabled") &&
+      contains(hal_source, "kPreparedRuntimePlaybackEnabled");
   const bool default_geometry_preserved =
       appears_before(makefile, "HAL_ISO_FRAMES ?= 8", "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1");
@@ -110,6 +125,9 @@ int main(int argc, char** argv) {
   if (!default_off) blockers.push_back("prepared_runtime_not_default_off");
   if (!cflags_expose_runtime) blockers.push_back("prepared_runtime_cflags_missing");
   if (!opt_in_target_present) blockers.push_back("prepared_runtime_target_missing");
+  if (!playback_scheduler_candidate_present) {
+    blockers.push_back("playback_scheduler_candidate_target_missing");
+  }
   if (!opt_in_target_build_only) blockers.push_back("prepared_runtime_target_not_build_only");
   if (!source_declares_runtime_macros) blockers.push_back("prepared_runtime_macros_missing");
   if (!source_has_compile_time_geometry_guards) {
@@ -133,6 +151,7 @@ int main(int argc, char** argv) {
   print_bool("prepared_runtime_default_off", default_off);
   print_bool("prepared_runtime_cflags_exposed", cflags_expose_runtime);
   print_bool("prepared_runtime_opt_in_target_present", opt_in_target_present);
+  print_bool("playback_scheduler_candidate_target_present", playback_scheduler_candidate_present);
   print_bool("prepared_runtime_opt_in_target_build_only", opt_in_target_build_only);
   print_bool("source_declares_runtime_macros", source_declares_runtime_macros);
   print_bool("source_has_compile_time_geometry_guards", source_has_compile_time_geometry_guards);

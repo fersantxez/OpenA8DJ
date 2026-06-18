@@ -14995,3 +14995,32 @@ Follow-up correction:
   - It only authorizes implementing a default-off HAL playback scheduler
     candidate. It does not authorize a hardware install, product claim, Timecode
     Vinyl readiness, or branch promotion.
+
+## 2026-06-18 - Default-Off HAL Playback Scheduler Candidate
+
+- Scope:
+  - Added a separate HAL candidate bundle for playback-only prepared runtime.
+  - No hardware, playback, recording, install/load, default-device change, USB
+    reset, CoreAudio restart, or service mutation occurred.
+- Commands:
+  - `make -B hal-playback-scheduler-candidate`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_source_contract opena8djcpp_hal_prepared_runtime_binding_contract opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check opena8djcpp_hal_transport_runtime_gate -j`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_runtime_source_contract`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract`
+- Result:
+  - Candidate build: PASS.
+  - Candidate path:
+    `build/OpenA8DJ-playback-scheduler.driver`.
+  - Candidate mode: `prepared_runtime_mode=playback_only`.
+  - Capture remains direct: `capture_runtime_enabled=false`,
+    `capture_iso_frames=8`.
+  - Playback runtime enabled: `playback_runtime_enabled=true`,
+    `prepared_submit_frames=64`, `playback_coalesce_transfers=8`.
+  - Default local HAL restored after candidate build:
+    `default_hal_restored=true`.
+  - Focused source and binding contracts: PASS.
+- Interpretation:
+  - This is the first HAL artifact matching the offline playback scheduler
+    hypothesis.
+  - It still does not authorize hardware install, product claim, Timecode Vinyl
+    readiness, CPU superiority, or branch promotion.
