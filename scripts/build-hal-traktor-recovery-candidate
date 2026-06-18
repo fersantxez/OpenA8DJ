@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""Build a separate HAL candidate for Traktor/timecode recovery.
+
+The candidate restores the mainline-style four stereo output streams while
+keeping the macOS-safe single 8-channel input stream. It also enables strict
+idle silence and touched-cycle flushing so a client that uses only one stereo
+pair cannot leave the HAL waiting for unrelated output streams.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def reject_inside_bundle(path: Path, bundle: Path, label: str) -> None:
+    try:
+        path.relative_to(bundle)
+    except ValueError:
+        return
+    raise ValueError(f"{label} must not be written inside the candidate bundle: {path}")
+
+
+def run(argv: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        argv,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    info = path / "Contents/Info.plist"
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    return {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+    }
+
+
+def write_json(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ-traktor-recovery.driver")
+    parser.add_argument("--json-out", default="build/hal-candidates/traktor-recovery-candidate.json")
+    parser.add_argument("--stream-usage", choices=("0", "1"), default="0")
+    parser.add_argument("--flush-touched-output", choices=("0", "1"), default="1")
+    parser.add_argument("--output-start-byte", choices=("2", "4"), default="4")
+    args = parser.parse_args()
+
+    candidate = resolve_path(args.candidate)
+    json_out = resolve_path(args.json_out)
+    require_inside_root(candidate, "--candidate")
+    require_inside_root(json_out, "--json-out")
+    reject_inside_bundle(json_out, candidate, "--json-out")
+    if candidate == ROOT or candidate == DEFAULT_HAL:
+        raise ValueError("--candidate must be separate from the worktree and default HAL")
+
+    build_rc, build_stdout, build_stderr = run(
+        [
+            "make",
+            "-B",
+            "hal",
+            "HAL_OUTPUT_STREAMS=4",
+            "HAL_INPUT_STREAMS=1",
+            "HAL_INPUT_IO=1",
+            "HAL_INPUT_DECODE=1",
+            f"HAL_STREAM_USAGE={args.stream_usage}",
+            f"HAL_FLUSH_TOUCHED_OUTPUT={args.flush_touched_output}",
+            "HAL_STRICT_IDLE_SILENCE=1",
+            f"HAL_OUTPUT_START_BYTE={args.output_start_byte}",
+            "HAL_OUTPUT_PREFETCH_FRAMES=64",
+            "HAL_OUTPUT_GAIN=0.50f",
+            "HAL_ISO_FRAMES=8",
+            "HAL_CAPTURE_ISO_FRAMES=8",
+            "HAL_PLAYBACK_ISO_FRAMES=8",
+            "HAL_CAPTURE_QUEUE=8",
+            "HAL_PLAYBACK_QUEUE=8",
+            "HAL_PLAYBACK_COALESCE_TRANSFERS=1",
+            "HAL_TRANSFER_LEDGER=0",
+            "HAL_PLAYBACK_PAYLOAD_GUARD=0",
+            "HAL_CADENCE_DIAGNOSTIC=0",
+            "HAL_HOT_PATH_TIMING=0",
+        ]
+    )
+
+    copied = False
+    if build_rc == 0 and DEFAULT_HAL_BIN.is_file():
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+        copied = True
+
+    candidate_metrics = bundle_metrics(candidate)
+    restore_rc, restore_stdout, restore_stderr = run(["make", "-B", "hal"])
+    default_metrics = bundle_metrics(DEFAULT_HAL)
+
+    candidate_hash = str(candidate_metrics.get("executable_sha256", ""))
+    default_hash = str(default_metrics.get("executable_sha256", ""))
+    gates = [
+        {"name": "traktor_recovery_build", "result": "PASS" if build_rc == 0 else "FAIL", "return_code": build_rc},
+        {"name": "traktor_recovery_candidate_copied", "result": "PASS" if copied else "FAIL"},
+        {
+            "name": "traktor_recovery_candidate_complete",
+            "result": "PASS"
+            if candidate_metrics["bundle_exists"]
+            and candidate_metrics["info_plist_exists"]
+            and candidate_metrics["executable_exists"]
+            and int(candidate_metrics["executable_bytes"]) > 0
+            else "FAIL",
+        },
+        {
+            "name": "default_hal_restored",
+            "result": "PASS"
+            if restore_rc == 0
+            and default_metrics["bundle_exists"]
+            and default_metrics["info_plist_exists"]
+            and default_metrics["executable_exists"]
+            and int(default_metrics["executable_bytes"]) > 0
+            else "FAIL",
+            "return_code": restore_rc,
+        },
+        {
+            "name": "traktor_recovery_hash_differs_from_default",
+            "result": "PASS" if candidate_hash and default_hash and candidate_hash != default_hash else "FAIL",
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.hal-traktor-recovery-candidate.v1",
+        "safety": "offline_local_build_only_no_install_load_coreaudio_usb_hardware_or_default_device_touch",
+        "result": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "input_streams": 1,
+        "input_channels": 8,
+        "output_streams": 4,
+        "output_channels": 8,
+        "stream_usage_enabled": args.stream_usage == "1",
+        "flush_touched_output_enabled": args.flush_touched_output == "1",
+        "strict_idle_silence_enabled": True,
+        "output_start_byte": int(args.output_start_byte),
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "traktor_timecode_claim_allowed": False,
+        "candidate_metrics": candidate_metrics,
+        "default_hal_after_restore": default_metrics,
+        "default_hal_restored": restore_rc == 0 and default_metrics["executable_exists"],
+        "candidate_hash_differs_from_default": bool(candidate_hash and default_hash and candidate_hash != default_hash),
+        "gates": gates,
+        "blocked_claim": "NO_AUDIOPHILE_TIMECODE_OR_CPU_CLAIM_FROM_BUILD_ARTIFACT_WITHOUT_LOCK_GATED_PHYSICAL_EVIDENCE",
+    }
+    if build_rc != 0:
+        report["build_stderr"] = build_stderr[-4000:]
+        report["build_stdout"] = build_stdout[-4000:]
+    if restore_rc != 0:
+        report["restore_build_stderr"] = restore_stderr[-4000:]
+        report["restore_build_stdout"] = restore_stdout[-4000:]
+
+    write_json(json_out, report)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

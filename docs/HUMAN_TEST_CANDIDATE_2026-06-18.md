@@ -376,3 +376,34 @@ product claim without new physical evidence.
   - `LIMITED_HUMAN_TEST_PASS_NEEDS_MAINLINE_AB`;
   - `PRODUCT_CLAIM_ALLOWED` only if all strict quality, CPU, routing, and
     same-session comparison gates pass.
+## 18:28 EDT Human Result For b9cca32 Loaded RC
+
+Decision: `DIAGNOSTIC_HUMAN_TEST_REJECTED`.
+
+The loaded `b9cca32` RC failed the human test immediately:
+
+- Idle/headphones: audible CPU/background noise with no music playing.
+- Playback: "Cable Guy by DJ Deep" sounded metallic/radio-like, with missing
+  bass and dominant midrange.
+- Traktor/timecode: Scratch Control showed no useful signal on A/B/C/D.
+
+Evidence:
+
+- `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject`
+- Candidate hash:
+  `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`
+
+Recovery:
+
+- The rejected HAL was force-unloaded under lock.
+- Post-unload guard passed.
+- `OpenA8DJ.driver` is absent.
+- iRig remained visible.
+
+Next candidate requirements before another human load:
+
+- Prove strict idle silence and stale-output flushing.
+- Prove output packet/packing correctness with an audible fixture, not only
+  structural packet checks.
+- Prove HAL input stream delivery to the CoreAudio client path used by Traktor
+  and preserve A/B/C/D deck mapping.

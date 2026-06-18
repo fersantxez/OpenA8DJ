@@ -15805,3 +15805,85 @@ Follow-up correction:
     as product readiness.
   - Post-commit freshness must be rerun before the evidence can be treated as
     attributable to the new HEAD.
+## 2026-06-18 - b9cca32 Loaded HAL RC Human Rejection And Recovery
+
+- Scope:
+  - Captured the operator's first human headphone/playback/Traktor feedback for
+    the loaded `b9cca32` HAL RC.
+  - Forced the rejected HAL candidate to unload under the hardware lock and
+    verified the audio stack recovered.
+  - Did not change default devices, sample rate, buffer size, USB topology, or
+    install a replacement candidate.
+- Evidence:
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject/human-feedback.txt`
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject/audio-list-loaded.txt`
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject/installed-vs-build-hash.txt`
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject/force-unload`
+- Result:
+  - Human rejection: FAIL.
+  - Idle/headphone symptom: audible CPU/background noise with no music.
+  - Playback symptom: metallic/radio-like sound, missing bass, midrange-heavy.
+  - Traktor/timecode symptom: no Scratch Control signal on A/B/C/D.
+  - Loaded candidate commit: `b9cca32`.
+  - Loaded candidate hash:
+    `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`.
+  - Recovery: forced HAL unload PASS, `OpenA8DJ.driver` absent, audio stack
+    health PASS, iRig still visible.
+- Interpretation:
+  - This is decisive negative evidence. The candidate is not a human/product
+    baseline and cannot support any claim of better sound quality,
+    functionality, Timecode Vinyl readiness, CPU superiority, or branch
+    promotion.
+
+## 2026-06-18 - Traktor Recovery HAL Candidate Load
+
+- Scope:
+  - Built three separate offline recovery variants after the `b9cca32` human
+    rejection:
+    `OpenA8DJ-traktor-recovery-streamusage0.driver`,
+    `OpenA8DJ-traktor-recovery-streamusage1.driver`, and
+    `OpenA8DJ-traktor-recovery-start2.driver`.
+  - Loaded only the conservative `streamusage0/start4` candidate.
+  - Applied `timecode-vinyl` profile and captured control/input/stream
+    snapshots.
+- Commands:
+  - `scripts/build-hal-traktor-recovery-candidate --candidate build/OpenA8DJ-traktor-recovery-streamusage0.driver --json-out build/hal-candidates/traktor-recovery-streamusage0-candidate.json --stream-usage 0 --flush-touched-output 1 --output-start-byte 4`
+  - `scripts/build-hal-traktor-recovery-candidate --candidate build/OpenA8DJ-traktor-recovery-streamusage1.driver --json-out build/hal-candidates/traktor-recovery-streamusage1-candidate.json --stream-usage 1 --flush-touched-output 1 --output-start-byte 4`
+  - `scripts/build-hal-traktor-recovery-candidate --candidate build/OpenA8DJ-traktor-recovery-start2.driver --json-out build/hal-candidates/traktor-recovery-start2-candidate.json --stream-usage 0 --flush-touched-output 1 --output-start-byte 2`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ-traktor-recovery-streamusage0.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T2240Z-traktor-recovery-streamusage0-load`
+  - `build/opena8dj-control profile timecode-vinyl`
+- Evidence:
+  - `build/hal-candidates/traktor-recovery-streamusage0-candidate.json`
+  - `build/hal-candidates/traktor-recovery-streamusage1-candidate.json`
+  - `build/hal-candidates/traktor-recovery-start2-candidate.json`
+  - `local-analysis/human-test-candidate/20260618T2240Z-traktor-recovery-streamusage0-load`
+- Result:
+  - Offline candidate builds: PASS.
+  - Bundle smoke/parity: PASS for all three candidates.
+  - Loaded candidate: `OpenA8DJ-traktor-recovery-streamusage0.driver`.
+  - HAL safety load: PASS; candidate left loaded.
+  - CoreAudio surface while loaded: iRig Stream visible, Open Audio 8 DJ visible
+    as `8 in / 8 out` at 48 kHz.
+  - Timecode profile: PASS with input mode `0`, software lock on, input decode
+    on, source map identity.
+  - Pre-human runtime input stats: nonzero frames on A/B/C/D.
+  - Final pre-human guard: PASS with `coreaudiod=0.0%` and
+    `opena8dj_driver=0.0%`.
+- Interpretation:
+  - This candidate directly addresses the latest failure class, but is still
+    diagnostic. Human listening and Traktor scope decide whether it is better
+    than the rejected `b9cca32` RC.
+  - No quality, CPU superiority, Timecode Vinyl readiness, or branch promotion
+    claim is allowed from this load alone.
+
+Follow-up offline verification:
+
+- `build/hal-parity-smoke build/OpenA8DJ.driver`: PASS for the restored
+  default HAL, with input streams/channels `1/8` and output streams/channels
+  `1/8`.
+- `./build/cpp-offline/opena8djcpp_core_tests`: PASS.
+- `build/hal-smoke build/OpenA8DJ.driver`: FAIL with return code `15` because
+  the smoke tool still hardcodes `streamCount == 5`; the restored default HAL
+  intentionally reports two global streams (`1 input + 1 output`). This is a
+  smoke-tool expectation gap, not evidence against the loaded Traktor recovery
+  candidate, whose own smoke/parity passed with five global streams.

@@ -47,6 +47,10 @@
 #define OPENA8DJ_FLUSH_OUTPUT_IN_WRITE_MIX 0
 #endif
 
+#ifndef OPENA8DJ_FLUSH_TOUCHED_OUTPUT
+#define OPENA8DJ_FLUSH_TOUCHED_OUTPUT 0
+#endif
+
 #ifndef OPENA8DJ_BACKGROUND_WARM_OPEN
 #define OPENA8DJ_BACKGROUND_WARM_OPEN 0
 #endif
@@ -1172,11 +1176,15 @@ static void FlushOutputCycle(void)
 
 static bool OutputCycleHasExpectedStreams(void)
 {
+#if OPENA8DJ_FLUSH_TOUCHED_OUTPUT
+    return gOutputCycleTouched;
+#else
     UInt32 expectedMask = atomic_load(&gExpectedOutputStreamMask) & kOpenA8DJAllOutputStreamMask;
     if (expectedMask == 0) {
         expectedMask = kOpenA8DJAllOutputStreamMask;
     }
     return (gOutputCycleStreamMask & expectedMask) == expectedMask;
+#endif
 }
 
 static Float64 HostTicksPerFrame(Float64 sampleRate)

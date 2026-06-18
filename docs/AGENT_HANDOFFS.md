@@ -5581,3 +5581,48 @@ Next action:
   - Bind the persistent transport model to an opt-in HAL/DriverKit candidate
     only after the offline contract remains clean post-commit; then run a
     lock-gated source-reference A/B before any product claim.
+## 2026-06-18 - Human Rejection Recovery Subagents
+
+Shared safety prompt used for both subagents:
+
+> PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+> instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+> /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+> escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+> sin lock global y sin autorización de ventana.
+
+Subagent: output/packing explorer.
+
+- Mission: inspect HAL output path after the human report of idle CPU noise and
+  metallic playback.
+- Findings:
+  - Offline packet tests share the same `start4/check8` premise as the HAL, so
+    they can pass while the physical device rejects the phase audibly.
+  - Last-frame replay can hide underruns from counters while causing audible
+    stale output in gaps.
+  - Big-endian 24-bit output remains the best-supported path; native/little
+    endian was already physically rejected.
+  - `NaN/Inf` should be converted to silence before quantization.
+- Integrated actions:
+  - Added `OPENA8DJ_STRICT_IDLE_SILENCE`.
+  - Added `isfinite(sample)` guard in `FloatToOutputI24`.
+  - Built a separate `start2` diagnostic candidate but did not load it first.
+
+Subagent: input/Traktor explorer.
+
+- Mission: inspect HAL/CoreAudio input path after Traktor Scratch Control
+  showed no signal on A/B/C/D.
+- Findings:
+  - The known Traktor-compatible baseline is one 8-channel input stream and
+    four stereo output streams.
+  - Input should not be changed to four stereo streams without evidence.
+  - `inputDecodeEnabled=false` or an unapplied hardware profile would make
+    `ReadInput` deliver zeros.
+  - Real runtime snapshots are needed to distinguish "Traktor did not ask" from
+    "HAL returned zeros" from "USB decode has no data."
+- Integrated actions:
+  - Built `OpenA8DJ-traktor-recovery-streamusage0.driver` with input `1x8`,
+    output `4x2`, strict idle silence, and touched-output flushing.
+  - Applied and verified `timecode-vinyl`: input mode `0`, software lock on,
+    input decode on, identity source map.
+  - Captured nonzero input stats on A/B/C/D before human retest.

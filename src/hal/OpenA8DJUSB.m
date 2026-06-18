@@ -224,6 +224,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ENABLE_STREAM_KEEPALIVE 1
 #endif
 
+#ifndef OPENA8DJ_STRICT_IDLE_SILENCE
+#define OPENA8DJ_STRICT_IDLE_SILENCE 0
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
 #endif
@@ -1895,6 +1899,9 @@ static int32_t S24BEToS32(const uint8_t *bytes)
 
 static void FloatToOutputI24(float sample, uint8_t *bytes)
 {
+    if (!isfinite(sample)) {
+        sample = 0.0f;
+    }
     sample *= OPENA8DJ_OUTPUT_GAIN;
     if (sample > 1.0f) sample = 1.0f;
     if (sample < -1.0f) sample = -1.0f;
@@ -5109,8 +5116,10 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         _outputReplayRunFrames = 0;
         _outputPlaybackPrimed = true;
         _outputHasStartedPlayback = true;
-    } else if (!startupSilence && _outputLastFrameValid &&
-               _outputReplayRunFrames < kOutputMaxReplayFrames) {
+    }
+#if !OPENA8DJ_STRICT_IDLE_SILENCE
+    else if (!startupSilence && _outputLastFrameValid &&
+             _outputReplayRunFrames < kOutputMaxReplayFrames) {
         float scale = 1.0f;
         if (_outputReplayRunFrames >= kOutputReplayHoldFrames &&
             kOutputMaxReplayFrames > kOutputReplayHoldFrames + 1) {
@@ -5123,7 +5132,12 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         }
         _outputReplayRunFrames++;
         replayedFrame = true;
-    } else if (startupSilence) {
+    }
+#endif
+    else if (startupSilence) {
+        _outputReplayRunFrames = 0;
+    } else if (!haveFrame) {
+        _outputLastFrameValid = false;
         _outputReplayRunFrames = 0;
     }
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE

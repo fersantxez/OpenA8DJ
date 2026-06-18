@@ -3574,3 +3574,64 @@ Current implication:
   `branch_promotion_allowed=false`. Next required action remains a lock-gated
   same-session source-reference mainline-vs-C++ A/B before any human product,
   audiophile, CPU, Timecode Vinyl, or branch promotion claim.
+## 2026-06-18 18:28 EDT - Human Rejection Of Loaded b9cca32 HAL RC
+
+- Status: `b9cca32` loaded HAL RC is hard-rejected for product/human readiness.
+- Human feedback:
+  - Idle/headphones: audible CPU/background noise with no music playing.
+  - Playback: "Cable Guy by DJ Deep" sounded metallic/radio-like, with missing
+    bass and dominant midrange.
+  - Traktor/timecode: Scratch Control showed no useful signal on A/B/C/D while
+    calculating input.
+- Evidence:
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject`
+  - Candidate hash:
+    `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`
+- Recovery:
+  - The rejected HAL was force-unloaded under the hardware lock.
+  - `OpenA8DJ.driver` was left absent.
+  - CoreAudio/audio-stack health passed after unload.
+  - iRig remained visible.
+- Architectural consequence:
+  - Offline gates missed audible and Traktor-critical failures.
+  - The next candidate must explicitly prove strict idle silence/stale-output
+    flushing, physical USB output-packing correctness against audible fixtures,
+    and HAL input stream delivery for Traktor/timecode before another human
+    load.
+
+## 2026-06-18 18:40 EDT - Traktor Recovery Candidate Loaded
+
+- Status: `OpenA8DJ-traktor-recovery-streamusage0.driver` is loaded for a
+  controlled human diagnostic test.
+- Candidate intent:
+  - Restore the known Traktor-compatible HAL surface: one 8-channel input
+    stream plus four stereo output streams A/B/C/D.
+  - Keep default-device behavior unchanged: output may be default, input may
+    not.
+  - Add strict idle silence: no replay of stale output frames during gaps.
+  - Flush any touched output cycle so a client using a single pair cannot stall
+    waiting for unrelated output streams.
+  - Preserve `HAL_OUTPUT_START_BYTE=4`; the `start2` phase candidate is built
+    but not loaded.
+- Loaded evidence:
+  - `local-analysis/human-test-candidate/20260618T2240Z-traktor-recovery-streamusage0-load`
+  - Candidate source bundle:
+    `build/OpenA8DJ-traktor-recovery-streamusage0.driver`
+  - Offline candidate hash:
+    `f640ae2d47ac105ed6b501b4ced24546c9b16c17e23e373825cd4bfc29957484`
+  - Installed post-codesign hash:
+    `48231426d590544ad15437e92908c1dee1fe15b14852271b01c877025b5ca5d4`
+- Verification:
+  - HAL safety load: PASS, left loaded.
+  - CoreAudio enumeration: `Open Audio 8 DJ` visible as `8 in / 8 out` at
+    48 kHz; iRig Stream still visible.
+  - Timecode profile applied: `input-mode=0`, `software-lock=on`,
+    `input-decode=on`, source map `A=A B=B C=C D=D`.
+  - Runtime input snapshot before human test showed nonzero input stats on
+    A/B/C/D.
+  - Final guard before human test: PASS, `coreaudiod=0.0%`,
+    `opena8dj_driver=0.0%`.
+- Claim boundary:
+  - This is not a product readiness claim and not a superiority claim.
+  - If playback remains metallic, the next prepared diagnostic candidate is
+    `build/OpenA8DJ-traktor-recovery-start2.driver`.

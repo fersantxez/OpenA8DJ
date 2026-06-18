@@ -10356,3 +10356,33 @@ Next implication:
   next physical window a cleaner transport path to test. It still does not
   authorize product human testing, branch promotion, or any claim of beating
   mainline.
+## 2026-06-18 - Reject Loaded b9cca32 HAL RC After Human Headphone And Traktor Test
+
+- Decision: mark the `b9cca32` loaded HAL RC as product-rejected and do not use
+  it as the next human-test baseline.
+- Reason: direct human testing found three severe failures that offline gates
+  did not protect against: audible CPU/background noise at idle, metallic
+  playback with missing bass, and no visible Traktor Scratch Control/Timecode
+  signal on A/B/C/D.
+- Evidence:
+  - `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject`
+  - Installed/build candidate hash:
+    `b61b7d2c64dcb583dbbf48e61675ab457eaa65933957acc0c5f77f2f7dce5bd5`
+  - Human symptoms recorded in `human-feedback.txt`:
+    `idle_headphone_noise=audible_cpu_noise_no_music`,
+    `playback_quality=metallic_radio_like_no_bass_midrange_dominant`, and
+    `traktor_timecode=no_signal_channel_a_b_c_d_calculate_in`.
+  - Follow-up forced unload evidence:
+    `local-analysis/human-feedback/20260618T1828Z-b9cca32-human-reject/force-unload`
+- Alternatives rejected:
+  - Treat the loaded RC as stable enough for continued listening: rejected
+    because idle noise and metallic playback are primary product failures.
+  - Treat offline CTest/evidence freshness as sufficient: rejected because they
+    missed the audible output and Traktor input failures.
+  - Continue physical testing on the same loaded binary: rejected until a new
+    candidate proves stricter idle-silence, output-packing, and input/timecode
+    publication contracts offline.
+- Readiness impact: human/product readiness is blocked harder than before.
+  The next candidate must explicitly prove silence handling, output packet
+  correctness against audible fixtures, and input stream delivery before it is
+  reloaded for another human test.
