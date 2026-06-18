@@ -302,6 +302,19 @@ to "installed diagnostic RC", but it does not unlock product listening because
 the known-good route remains missing and the latest Audio 8 route matrix still
 does not prove useful correlated capture.
 
+14:30 EDT update: per operator priority, the 15:00 target is now functionality
+and stability first, with quality and CPU perfection deferred. The default C++
+HAL at commit `64e2ae6` passed a fresh lock-gated `--leave-loaded` safety smoke
+and remains active. Post-load and post-smoke guards passed; Audio 8 enumerates
+as `8 in / 8 out` at `48 kHz`, iRig Stream remains visible, and watched
+audio-stack CPU is idle after the smoke. A dense functional smoke played Audio
+8 pair A and captured iRig without clipping, click outliers, output underruns,
+or panic flags. Strict quality still failed (`quality_alignment_score=0.864227`,
+`analog_snr_db=4.21`, `lag_jumps_gt_2_frames=33`). Therefore the current label
+is `diagnostic-functional-rc`: controlled human diagnostic listening may proceed
+with rollback ready, but product quality, CPU superiority, Timecode Vinyl
+certification, and Legacy/main promotion remain forbidden.
+
 ### Phase 1 - 11:06-11:45 EDT: Evidence Board Consistency
 
 - Regenerate offline evidence so current direct USB diagnostics under
@@ -348,6 +361,7 @@ does not prove useful correlated capture.
 ### Phase 5 - 14:45-15:00 EDT: Decision Packet
 
 - Final decision must be one of:
+  - `DIAGNOSTIC_FUNCTIONAL_RC_ACTIVE_NOT_SUPERIOR`;
   - `DIAGNOSTIC_HUMAN_TEST_COMPLETED_NOT_SUPERIOR`;
   - `HUMAN_TEST_BLOCKED_BY_CAPTURE_ROUTE`;
   - `LIMITED_HUMAN_TEST_PASS_NEEDS_MAINLINE_AB`;

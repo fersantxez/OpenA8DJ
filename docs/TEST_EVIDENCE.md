@@ -14578,3 +14578,57 @@ Readiness impact:
   - Prepared-runtime remains rejected for human testing until its load/safety
     CPU spike is eliminated and it can complete a locked soundcheck.
   - Do not use prepared-runtime for the one-hour baseline candidate.
+
+## 2026-06-18 - 14:30 EDT Diagnostic Functional RC Smoke, Default C++ HAL
+
+- Commit: `64e2ae6`.
+- Safety: global hardware lock acquired for the HAL safety load and for both
+  soundcheck smokes. The default C++ HAL was intentionally left loaded after
+  the safety gate. No USB reset, reboot, default-device change, or Traktor
+  launch was requested.
+- Candidate:
+  - `/Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver`
+  - HAL SHA-256:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
+- Safety command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 10 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T182714Z-default-hal-diagnostic-leave-loaded`
+- Safety evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182714Z-default-hal-diagnostic-leave-loaded`
+- Safety result:
+  - `hal_candidate_safety=PASS`.
+  - `Open Audio 8 DJ` enumerated as `8 in / 8 out` at `48 kHz`.
+  - `iRig Stream` remained visible as `2 in / 2 out`.
+  - Immediate post-load guard:
+    `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182755Z-post-load-audio-stack`,
+    `audio_stack_health=PASS`, `total_watched_cpu_pct=0.0`,
+    `opena8dj_state=loaded`.
+- Functional smoke commands:
+  - Start-mode smoke:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file /Users/fer/dev/audio8djcpp/local-analysis/cpu-sample/20260617-current-default-driver-hot-sample/soundcheck/fixture/reference.wav --pair A --rate 48000 --buffer 512 --seconds 8 --mode start --target-peak-db -16 --capture-device 'iRig Stream' --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/human-test-candidate/20260618T182829Z-active-default-hal-functional-smoke`
+  - Dense smoke:
+    `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --skip-build --music-file /Users/fer/dev/audio8djcpp/local-analysis/cpu-sample/20260617-current-default-driver-hot-sample/soundcheck/fixture/reference.wav --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device 'iRig Stream' --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/human-test-candidate/20260618T182903Z-active-default-hal-dense-smoke`
+- Functional smoke evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182829Z-active-default-hal-functional-smoke`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182903Z-active-default-hal-dense-smoke`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182903Z-active-default-hal-dense-smoke/stream-stats-summary.json`
+- Dense smoke result:
+  - Soundcheck strict quality result: `FAIL`.
+  - `quality_alignment_score=0.864227`, `analog_snr_db=4.21`,
+    `lag_jumps_gt_2_frames=33`.
+  - `click_outliers=0`, `capture_clipped_frames=0`.
+  - Stream/transport summary: `outputUnderruns=0`, `outputPanicFlags=0`,
+    `capture_submit_failures=0`, `capture_transfers_per_second=1000.294568`,
+    `playback_transfers_submitted_per_second=545.721648`.
+  - Diagnostic flags: `stream_stats_timeouts` and
+    `playback_submit_attempts_less_than_submitted`; these block a product claim
+    but did not indicate an immediate post-smoke stack failure.
+  - Post-smoke guard:
+    `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T182947Z-post-smoke-audio-stack`,
+    `audio_stack_health=PASS`, `total_watched_cpu_pct=0.1`,
+    `opena8dj_state=loaded`.
+- Decision:
+  - Label for 15:00 EDT is `diagnostic-functional-rc`.
+  - It is acceptable only for controlled human diagnostic listening with
+    rollback ready and no superiority claim.
+  - It is not `audio-routing-human-rc`, not Timecode Vinyl certified, and not
+    eligible for Legacy/main promotion.

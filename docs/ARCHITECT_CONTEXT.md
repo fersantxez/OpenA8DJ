@@ -3273,3 +3273,15 @@ Current implication:
   and the source-reference physical A/B has not been executed. This prevents
   promotion or DriverKit build attempts from being inferred from the diagnostic
   RC packet.
+- 14:30 EDT diagnostic-functionality update: the default C++ HAL at commit
+  `64e2ae6` passed a lock-gated `--leave-loaded` safety smoke and is active at
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`. `Open Audio 8 DJ` is visible
+  as `8 in / 8 out` at `48 kHz`, `iRig Stream` remains visible, post-load and
+  post-smoke audio-stack guards passed, and watched audio-stack CPU was idle
+  after the smoke. A dense source-reference functional smoke produced real
+  playback/capture evidence with `0` output underruns, `0` panic flags, `0`
+  clicks, and `0` clipped capture frames, but strict quality still failed:
+  `quality_alignment_score=0.864227`, `analog_snr_db=4.21`,
+  `lag_jumps_gt_2_frames=33`. The correct label for the 15:00 EDT window is
+  `diagnostic-functional-rc`, not product-quality readiness, not mainline
+  superiority, not Timecode Vinyl certification, and not branch promotion.

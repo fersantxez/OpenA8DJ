@@ -5200,3 +5200,50 @@ Risks:
 Next action:
 - Run the lock-gated source-reference A/B window when the user opens the
   hardware window, then evaluate quality/CPU evidence before any claim.
+
+## 2026-06-18 Architect Continuation: 15:00 Diagnostic Functional RC
+
+Subagents:
+- Physical Quality Evidence Analyst.
+- Prepared Runtime Performance Analyst.
+
+Required warning:
+- Both subagents received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Re-prioritize the 15:00 EDT target toward functionality and stability rather
+  than audiophile-quality or CPU superiority.
+
+Findings:
+- The default C++ HAL improves over the same-session mainline on alignment and
+  SNR because its transport geometry is coherent and avoids mainline panic
+  flags, but it still fails quality thresholds. The remaining quality blocker
+  looks like timing/pacing and route/capture residual, not basic packet packing.
+- Prepared-runtime is not suitable for the 15:00 RC. Its failure looks like a
+  CoreAudio enumeration/load CPU storm, not a visible spin inside the
+  `OpenA8DJ.driver` process. The next safe performance experiment is a
+  prepared-lite profile, likely `slots-per-submit=2`, not the current 8x batch.
+
+Integrated action:
+- Kept the default HAL as the diagnostic RC candidate.
+- Ran a lock-gated `--leave-loaded` safety smoke and left the default HAL active
+  after it passed.
+- Ran short source-reference functional smokes through Audio 8 DJ to iRig.
+- Documented the result as `diagnostic-functional-rc` only.
+
+Risks:
+- Physical quality still fails strict thresholds.
+- Timecode Vinyl remains unproven physically.
+- CPU/resource superiority over mainline is not proven.
+- The active HAL is suitable only for controlled diagnostic listening with
+  rollback ready, not for product claims.
+
+Next action:
+- For the human window, use the active default HAL only as a diagnostic
+  functional RC.
+- For later perfection, test an opt-in USB-clock-anchor candidate for timing and
+  a prepared-lite candidate for CPU, each under separate lock-gated windows.
