@@ -105,6 +105,7 @@ fi
 ./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
 ./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee "$EVIDENCE_DIR/diagnostic-pass-semantics-gate.json"
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
+./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee "$EVIDENCE_DIR/hal-transport-runtime-gate.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -170,6 +171,7 @@ hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
+hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
 realtime = load_json("realtime-audit.json")
 surface = load_json("driverkit-surface-model.json")
 driverkit_shell = load_json("driverkit-shell-contract.json")
@@ -663,6 +665,25 @@ summary = {
         "quality_claim_blockers": product_quality_claim_gate.get("quality_claim_blockers"),
         "blocked_claim": product_quality_claim_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/product-quality-claim-gate.json",
+    },
+    "hal_transport_runtime_gate": {
+        "status": hal_transport_runtime_gate.get("result"),
+        "runtime_reduction_missing": hal_transport_runtime_gate.get(
+            "runtime_reduction_missing"
+        ),
+        "hal_has_direct_usb_enqueue": hal_transport_runtime_gate.get(
+            "hal_has_direct_usb_enqueue"
+        ),
+        "hal_has_no_runtime_prepared_submit": hal_transport_runtime_gate.get(
+            "hal_has_no_runtime_prepared_submit"
+        ),
+        "offline_usb_submit_reduction_ratio": hal_transport_runtime_gate.get(
+            "offline_usb_submit_reduction_ratio"
+        ),
+        "product_claim_blocked": hal_transport_runtime_gate.get("product_claim_blocked"),
+        "next_required_action": hal_transport_runtime_gate.get("next_required_action"),
+        "blocked_claim": hal_transport_runtime_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-transport-runtime-gate.json",
     },
     "realtime_audit": {
         "status": realtime.get("result"),

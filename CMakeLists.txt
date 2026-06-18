@@ -338,6 +338,9 @@ add_executable(opena8djcpp_evidence_provenance_freshness_gate
 add_executable(opena8djcpp_hal_candidate_safety_gate
   tools/hal_candidate_safety_gate.cpp)
 
+add_executable(opena8djcpp_hal_transport_runtime_gate
+  tools/hal_transport_runtime_gate.cpp)
+
 add_executable(opena8djcpp_static_policy_check
   tools/static_policy_check.cpp)
 
@@ -403,6 +406,7 @@ add_test(NAME opena8djcpp_evidence_json_contract COMMAND opena8djcpp_evidence_js
 add_test(NAME opena8djcpp_diagnostic_pass_semantics_gate COMMAND opena8djcpp_diagnostic_pass_semantics_gate)
 add_test(NAME opena8djcpp_product_quality_claim_gate COMMAND opena8djcpp_product_quality_claim_gate)
 add_test(NAME opena8djcpp_hal_candidate_safety_gate COMMAND opena8djcpp_hal_candidate_safety_gate)
+add_test(NAME opena8djcpp_hal_transport_runtime_gate COMMAND opena8djcpp_hal_transport_runtime_gate)
 add_test(NAME opena8djcpp_static_policy_check COMMAND opena8djcpp_static_policy_check)
 add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardware_lock_policy_check)
 

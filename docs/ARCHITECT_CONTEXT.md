@@ -2479,6 +2479,18 @@ Current implication:
     a stale `base_commit` could leave schema PASS attached to an older commit.
     The new provenance gate requires `current-offline-gates.json` to match HEAD
     and a clean claimable worktree before current-candidate claims are allowed.
+  - HAL runtime transport claims are now guarded separately. The new
+    `opena8djcpp_hal_transport_runtime_gate` reads the HAL source plus existing
+    evidence and reports that the prepared transport model supports an `8x`
+    submit reduction offline, but the loadable HAL still performs direct
+    IOUSBHost enqueue work and has no integrated prepared-submit runtime. This
+    blocks any CPU or audiophile superiority claim until actual runtime enqueue
+    cadence is reduced.
+- Toolchain blocker:
+  - This machine currently has Command Line Tools selected at
+    `/Library/Developer/CommandLineTools`; `xcrun --sdk driverkit
+    --show-sdk-path` cannot locate the DriverKit SDK. A real dext build needs
+    full Xcode/DriverKit SDK or an equivalent configured build host.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

@@ -896,3 +896,27 @@ This requires `sudo -n sample` to be available. Output is written to
 `driver-sample/status.json`, `driver-sample/opena8dj-driver.sample.txt`, and
 `driver-sample/analysis.json`. This is diagnostic evidence only; it does not
 replace physical quality gates or same-session mainline comparison.
+
+## DriverKit SDK Availability
+
+Current local status:
+
+```sh
+xcrun --sdk driverkit --show-sdk-path
+```
+
+Result on this machine:
+
+- DriverKit SDK is not available.
+- `xcode-select -p` points at `/Library/Developer/CommandLineTools`.
+- No `/Applications/Xcode*.app` is currently visible.
+
+Implication:
+
+- The C++ core, HAL candidate, offline gates, and DriverKit model contracts can
+  build here.
+- A real DriverKit/System Extension/dext target cannot be compiled here until
+  full Xcode with DriverKit SDK, or an equivalent configured build host, is
+  available.
+- Do not substitute a macOS full installer for this dependency; the missing
+  component is the DriverKit SDK/toolchain.

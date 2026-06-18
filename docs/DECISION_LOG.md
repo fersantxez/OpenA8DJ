@@ -6791,3 +6791,48 @@ Alternatives discarded:
 
 Next implication:
 - Promotion is impossible unless the offline evidence bundle is fresh for HEAD.
+
+## 2026-06-18: Block HAL Runtime Superiority Claims Until Real USB Submit Reduction Exists
+
+Decision:
+- Added `opena8djcpp_hal_transport_runtime_gate`.
+- Added `local-analysis/cpp-offline/hal-transport-runtime-gate.json` to the
+  full offline evidence bundle, summary, CTest, and schema requirements.
+- Treat the current HAL candidate as a safety/loadable diagnostic candidate,
+  not a CPU-superiority candidate, while `OpenA8DJUSB.m` still performs direct
+  `enqueueIORequestWithData` work from capture/playback paths.
+
+Reason:
+- Existing prepared transport contracts model an 8x USB submit reduction, but
+  the loadable HAL runtime still has the direct IOUSBHost enqueue hot path.
+- Physical sampling attributes current driver CPU to IOUSBHost/Mach enqueue
+  work. A model that is not wired to real enqueue cadence cannot prove lower
+  CPU or audiophile quality.
+- Prior coalescing/refill probes reduced CPU but damaged physical quality, so
+  a simple HAL cadence knob is not acceptable as product work.
+
+Evidence:
+- Focused gate run:
+  `opena8djcpp_hal_transport_runtime_gate` reports
+  `runtime_reduction_missing=true`, `hal_has_direct_usb_enqueue=true`,
+  `hal_has_no_runtime_prepared_submit=true`,
+  `offline_usb_submit_reduction_ratio=8`, and
+  `product_claim_blocked=true`.
+- The first full offline run after adding the gate intentionally failed
+  provenance because the worktree was dirty; that confirms current-candidate
+  claims remain blocked until this change is committed and rerun cleanly.
+- Local toolchain check: `xcrun --sdk driverkit --show-sdk-path` fails because
+  this machine currently has Command Line Tools only, not a DriverKit SDK.
+
+Alternatives discarded:
+- Claim the prepared transport model as runtime performance evidence:
+  rejected because it does not reduce actual HAL IOUSBHost enqueue calls.
+- Keep tuning HAL coalesce/refill knobs: rejected because prior physical runs
+  already showed CPU reduction with unacceptable quality collapse.
+- Install a macOS full installer as a substitute for DriverKit: rejected; the
+  missing dependency is Xcode/DriverKit SDK, not a macOS reinstall.
+
+Next implication:
+- The next real implementation must either integrate a runtime path that
+  actually reduces USB enqueue/submit cadence, or move to a full
+  DriverKit/USBDriverKit build environment with the proper SDK.

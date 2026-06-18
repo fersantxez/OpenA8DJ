@@ -10227,3 +10227,39 @@ Full offline gate rerun:
 - Interpretation:
   - A clean compile or stale offline PASS is not enough. Evidence must be
     attributable to the exact C++ candidate commit being discussed.
+
+## 2026-06-18 HAL Transport Runtime Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_hal_transport_runtime_gate`.
+  - The gate is offline only: it reads `src/hal/OpenA8DJUSB.m`, `Makefile`,
+    and existing JSON evidence under `local-analysis/cpp-offline`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_transport_runtime_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Focused gate: PASS as a guard.
+  - `runtime_reduction_missing=true`.
+  - `hal_has_direct_usb_enqueue=true`.
+  - `hal_has_no_runtime_prepared_submit=true`.
+  - `offline_usb_submit_reduction_ratio=8`.
+  - `product_claim_blocked=true`.
+  - Full offline Debug CTest: `55/55` passed.
+  - Full offline Release CTest: `56/56` passed.
+  - The full runner then failed provenance because the worktree was dirty; that
+    is the expected safety behavior before committing the new gate.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The prepared transport model is not runtime proof. CPU and audiophile
+    superiority remain blocked while the loadable HAL still requeues USB
+    directly in the hot path.

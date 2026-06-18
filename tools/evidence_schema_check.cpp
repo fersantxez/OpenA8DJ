@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/product-quality-claim-gate.json",
+      root / "local-analysis/cpp-offline/hal-transport-runtime-gate.json",
       root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
@@ -136,6 +137,8 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
+  const auto hal_transport_runtime_gate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const bool summary_pass =
@@ -188,6 +191,11 @@ int main(int argc, char** argv) {
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
+      object_present(summary, "hal_transport_runtime_gate") &&
+      bool_field_is(hal_transport_runtime_gate, "runtime_reduction_missing", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_direct_usb_enqueue", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_no_runtime_prepared_submit", true) &&
+      bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&
