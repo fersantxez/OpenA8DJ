@@ -66,6 +66,19 @@ Branch: `driverkit/cpp-redesign`
   buffer, analyzers, and CPU sampling. Product superiority, Timecode Vinyl
   readiness, and Legacy/main promotion remain forbidden until that A/B, CPU, and
   Timecode evidence pass.
+- 14:15 EDT source-reference baseline result: a lock-gated physical A/B ran
+  with Audio 8 DJ output into iRig capture and the reference WAV as truth.
+  Default C++ HAL loaded, captured, and unloaded cleanly, but failed product
+  thresholds. It improved same-session alignment/SNR versus the mainline run
+  (`quality_alignment_score=0.886579`, SNR `4.70 dB` vs mainline
+  `0.679484`, SNR `-0.86 dB`), while still failing mid-band residual,
+  quiet-noise, lag-jump, CPU/resource, submit-evidence, and dual-audiophile
+  analyzer gates. Prepared-runtime was also tried and rejected before
+  soundcheck because HAL safety saw `total_watched_cpu_pct=125.5`
+  (`coreaudiod=69.4%`, `mediaremoted=55.4%`). Current decision: RC artifacts
+  are available for diagnostic review only; no honest human-test approval,
+  Timecode Vinyl approval, superiority claim, or Legacy/main branch promotion
+  is allowed.
 - 13:13 EDT continuation update: `scripts/human-test-rc-status` now consumes
   the route-contamination and Timecode physical-window gates directly. The live
   RC status is no longer a generic route block; it is

@@ -14522,3 +14522,59 @@ Readiness impact:
 - The baseline window can use the original file or generated tone as reference.
 - Product claims remain blocked until same-session source-reference A/B,
   CPU/resource, and Timecode Vinyl physical evidence pass.
+## 2026-06-18 - Source-Reference Physical A/B Baseline, Default C++ HAL
+
+- Commit: `3ea4eeb`.
+- Safety: global hardware lock acquired by `scripts/run-physical-superiority-window`
+  and released at the end. The runner loaded/unloaded explicit HAL candidates;
+  no default devices, USB resets, reboots, or service restarts were requested.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T181020Z/source-reference-ab-ref35s --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --capture-device 'iRig Stream' --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/cpu-sample/20260617-current-default-driver-hot-sample/soundcheck/fixture/reference.wav --pair A --seconds 12 --rate 48000 --buffer 512`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-evidence-window/20260618T181020Z/source-reference-ab-ref35s`.
+- Result:
+  - Same-session compare: `FAIL`.
+  - Promotion readiness: `FAIL`.
+  - Mainline C soundcheck: `FAIL`, `quality_alignment_score=0.679484`,
+    `analog_snr_db=-0.86`, `lag_jumps_gt_2_frames=38`.
+  - C++ default HAL soundcheck: `FAIL`, `quality_alignment_score=0.886579`,
+    `analog_snr_db=4.70`, `lag_jumps_gt_2_frames=36`.
+  - C++ improved alignment/SNR versus this same-session mainline run, but failed
+    product thresholds and failed comparison gates for mid-band residual,
+    quiet-mid noise, driver CPU p95, CoreAudio CPU p95, submit-rate evidence,
+    and dual audiophile analyzer pass.
+  - Transport observation: C++ default HAL kept `logical-iso=8`,
+    `capture-iso=8`, `playback-iso=8`, `coalesce=1`,
+    `outputUnderruns=0`, `outputPanicFlags=0`; mainline evidence in this
+    window showed invalid/unstable geometry and many `outputPanicFlags`.
+  - Post-run guard: `audio_stack_health=PASS`, `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`.
+- Decision:
+  - This is a useful baseline, not a human-test approval. The default C++ HAL
+    is not ready for product listening or branch promotion.
+  - The active blocker is now measured: C++ physical quality is still far below
+    audiophile thresholds and CPU/resource superiority is not proven.
+
+## 2026-06-18 - Source-Reference Physical A/B Baseline, Prepared Runtime HAL
+
+- Commit: `3ea4eeb`.
+- Safety: global hardware lock acquired by `scripts/run-physical-superiority-window`
+  and released at the end. The prepared-runtime candidate was tested only as a
+  controlled physical experiment.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T181320Z/source-reference-ab-prepared-runtime --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ-prepared-runtime.driver --prepared-runtime-candidate --capture-device 'iRig Stream' --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/cpu-sample/20260617-current-default-driver-hot-sample/soundcheck/fixture/reference.wav --pair A --seconds 12 --rate 48000 --buffer 512`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-evidence-window/20260618T181320Z/source-reference-ab-prepared-runtime`.
+- Result:
+  - Mainline C soundcheck: `FAIL`, `quality_alignment_score=0.174402`,
+    `analog_snr_db=-24.55`, `lag_jumps_gt_2_frames=41`.
+  - Prepared-runtime C++ HAL safety: `FAIL` before soundcheck.
+  - Guard failure reason: audio stack CPU exceeded threshold after loading the
+    prepared-runtime HAL: `total_watched_cpu_pct=125.5`,
+    `coreaudiod=69.4%`, `mediaremoted=55.4%`.
+  - Post-run guard: `audio_stack_health=PASS`, `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`.
+- Decision:
+  - Prepared-runtime remains rejected for human testing until its load/safety
+    CPU spike is eliminated and it can complete a locked soundcheck.
+  - Do not use prepared-runtime for the one-hour baseline candidate.
