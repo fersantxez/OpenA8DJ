@@ -129,6 +129,7 @@ fi
 ./build/cpp-release/opena8djcpp_hal_candidate_safety_gate | tee "$EVIDENCE_DIR/hal-candidate-safety-gate.json"
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
+python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 python3 -m py_compile \
   scripts/check-hal-bundle-complete \
@@ -154,7 +155,6 @@ if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; the
 fi
 ./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee "$EVIDENCE_DIR/prepared-transport-migration-gate.json"
 ./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee "$EVIDENCE_DIR/physical-window-readiness-gate.json"
-python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
 ./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
 ./build/cpp-release/opena8djcpp_diagnostic_pass_semantics_gate | tee "$EVIDENCE_DIR/diagnostic-pass-semantics-gate.json"
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
@@ -1011,6 +1011,15 @@ summary = {
     },
     "physical_window_readiness_gate": {
         "status": physical_window_readiness_gate.get("result"),
+        "route_revalidation_plan_ready": physical_window_readiness_gate.get(
+            "route_revalidation_plan_ready"
+        ),
+        "current_promotion_route_ready": physical_window_readiness_gate.get(
+            "current_promotion_route_ready"
+        ),
+        "current_known_good_output_missing": physical_window_readiness_gate.get(
+            "current_known_good_output_missing"
+        ),
         "ready_for_route_revalidation_window": physical_window_readiness_gate.get(
             "ready_for_route_revalidation_window"
         ),

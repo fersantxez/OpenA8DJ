@@ -1,5 +1,34 @@
 # Decision Log
 
+## 2026-06-18 - Split Route Revalidation Plan Readiness From Executable Route Window
+
+Decision:
+- `opena8djcpp_physical_window_readiness_gate` now consumes
+  `physical-route-inventory.json`.
+- It reports `route_revalidation_plan_ready=true` for the prepared, fail-closed
+  route-only workflow, but keeps `ready_for_route_revalidation_window=false`
+  when no wired non-Audio8, non-built-in known-good output is currently visible.
+- `scripts/run-cpp-offline-gates` now generates physical route inventory before
+  running the physical-window readiness gate, and propagates the new fields into
+  `current-offline-gates.json`.
+
+Reason:
+- The previous `ready_for_route_revalidation_window=true` could be misread as
+  "the machine currently has a valid route source attached." It only meant the
+  route-only workflow and blockers were defined.
+- The current inventory sees Audio 8 DJ on USB and `iRig Stream`, but no
+  separate wired non-Audio8 output. Same-device iRig and built-in acoustic
+  diagnostics are not promotion-valid.
+
+Evidence:
+- `local-analysis/cpp-offline/physical-route-inventory.json`
+- `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+
+Next implication:
+- Do not run product A/B, CPU superiority, or timecode-vinyl physical claims.
+  The next physical step requires a real non-Audio8 known-good output connected
+  into the iRig route, then a lock-gated known-good route revalidation.
+
 ## 2026-06-18 - Require Time-Warp Rejection Before Direct USB Route Attribution Blocks Claims
 
 Decision:

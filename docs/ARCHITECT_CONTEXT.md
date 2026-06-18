@@ -37,6 +37,13 @@ Branch: `driverkit/cpp-redesign`
   `branch_promotion_allowed=false` while the current route remains invalid.
   `diagnostic_pass_semantics_gate` protects this contract with
   `capture_route_health_not_product`.
+- 2026-06-18 physical route inventory status: current CoreAudio/USB inventory
+  sees `iRig Stream` and Audio 8 DJ on USB, but no visible wired non-Audio8,
+  non-built-in known-good output. `physical_window_readiness_gate` now separates
+  `route_revalidation_plan_ready=true` from
+  `ready_for_route_revalidation_window=false` when that source is missing. The
+  next required action is to provision/connect a wired non-Audio8 known-good
+  output before acquiring the lock for route revalidation.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
   `audiophile-wav-analysis-maxlag6.json`, `fractional-time-warp.json`, and

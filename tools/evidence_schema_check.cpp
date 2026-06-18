@@ -633,11 +633,15 @@ int main(int argc, char** argv) {
       number_field_present(dvs_timecode_stress_margin,
                            "min_inactive_to_active_tone_gap_db") &&
       object_present(summary, "physical_window_readiness_gate") &&
-      bool_field_is(physical_window_readiness_gate, "ready_for_route_revalidation_window", true) &&
+      bool_field_present(physical_window_readiness_gate,
+                         "ready_for_route_revalidation_window") &&
+      bool_field_is(physical_window_readiness_gate, "route_revalidation_plan_ready", true) &&
+      bool_field_present(physical_window_readiness_gate,
+                         "current_promotion_route_ready") &&
+      bool_field_present(physical_window_readiness_gate,
+                         "current_known_good_output_missing") &&
       bool_field_is(physical_window_readiness_gate, "ready_for_product_physical_ab", false) &&
       bool_field_is(physical_window_readiness_gate, "ready_for_branch_promotion", false) &&
-      string_array_has(physical_window_readiness_gate, "allowed_window_types",
-                       "ROUTE_REVALIDATION_ONLY") &&
       string_array_has(physical_window_readiness_gate, "allowed_window_types",
                        "NO_PROMOTION_AB_UNTIL_ROUTE_PASS") &&
       string_field_is(

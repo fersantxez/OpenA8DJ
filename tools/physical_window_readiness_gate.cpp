@@ -80,11 +80,12 @@ int main(int argc, char** argv) {
   const auto promotion = read_file(evidence / "promotion-readiness-offline-check.json");
   const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
   const auto hardware_policy = read_file(evidence / "hardware-lock-policy.json");
+  const auto route_inventory = read_file(evidence / "physical-route-inventory.json");
 
   const bool evidence_present =
       !capture_route.empty() && !direct_usb.empty() && !historical_route.empty() &&
       !hal_safety.empty() && !physical_frontier.empty() && !promotion.empty() &&
-      !migration.empty() && !hardware_policy.empty();
+      !migration.empty() && !hardware_policy.empty() && !route_inventory.empty();
 
   const bool offline_clean =
       string_field_is(capture_route, "safety",
@@ -99,6 +100,19 @@ int main(int argc, char** argv) {
                       "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch") &&
       string_field_is(migration, "safety",
                       "offline_existing_evidence_only_no_audio_coreaudio_usb_or_hardware_touch");
+  const bool route_inventory_clean =
+      string_field_is(route_inventory, "schema", "opena8djcpp.physical-route-inventory.v1") &&
+      last_string_field_is(route_inventory, "result", "PASS") &&
+      bool_field_is(route_inventory, "hardware_touched", false) &&
+      bool_field_is(route_inventory, "audio_played", false) &&
+      bool_field_is(route_inventory, "audio_recorded", false) &&
+      bool_field_is(route_inventory, "driver_installed_or_activated", false);
+  const bool current_promotion_route_ready =
+      bool_field_is(route_inventory, "promotion_route_ready", true);
+  const bool current_known_good_output_missing =
+      !current_promotion_route_ready &&
+      string_array_has(route_inventory, "blockers",
+                       "non_audio8_non_builtin_known_good_output_not_visible");
   const bool product_blocked =
       last_string_field_is(promotion, "result", "FAIL") &&
       bool_field_is(promotion, "branch_promotion_allowed", false) &&
@@ -159,6 +173,9 @@ int main(int argc, char** argv) {
                        "scripts/run-known-good-route-soundcheck");
 
   std::vector<std::string> required_next_actions;
+  if (current_known_good_output_missing) {
+    required_next_actions.push_back("provision_wired_non_audio8_known_good_output");
+  }
   required_next_actions.push_back("lock_gated_known_good_non_audio8_route_revalidation");
   required_next_actions.push_back("same_session_mainline_cpp_physical_ab_on_validated_route");
   required_next_actions.push_back("runtime_cpu_superiority_against_mainline");
@@ -166,18 +183,25 @@ int main(int argc, char** argv) {
   required_next_actions.push_back("post_reboot_autologin_codex_resume_fix");
 
   std::vector<std::string> allowed_window_types;
-  if (evidence_present && offline_clean && scripts_present && lock_policy_covers_window) {
+  if (evidence_present && offline_clean && route_inventory_clean && scripts_present &&
+      lock_policy_covers_window && current_promotion_route_ready) {
     allowed_window_types.push_back("ROUTE_REVALIDATION_ONLY");
+  }
+  if (evidence_present && offline_clean && route_inventory_clean && scripts_present &&
+      lock_policy_covers_window && !current_promotion_route_ready) {
+    allowed_window_types.push_back("NO_ROUTE_REVALIDATION_UNTIL_NON_AUDIO8_SOURCE_VISIBLE");
   }
   if (route_not_valid_for_promotion) {
     allowed_window_types.push_back("NO_PROMOTION_AB_UNTIL_ROUTE_PASS");
   }
 
-  const bool ready_for_route_revalidation_window =
+  const bool route_revalidation_plan_ready =
       evidence_present && offline_clean && scripts_present && lock_policy_covers_window &&
-      migration_ready_only_offline && hal_safety_is_only_precondition &&
+      route_inventory_clean && migration_ready_only_offline && hal_safety_is_only_precondition &&
       product_blocked && route_not_valid_for_promotion && direct_usb_blocks_route_claim &&
       historical_route_not_current && no_product_candidate_runs;
+  const bool ready_for_route_revalidation_window =
+      route_revalidation_plan_ready && current_promotion_route_ready;
   const bool ready_for_product_physical_ab =
       false;  // Product A/B remains blocked until the route is revalidated under lock.
   const bool ready_for_branch_promotion = false;
@@ -186,8 +210,9 @@ int main(int argc, char** argv) {
       evidence_present && offline_clean && product_blocked && route_not_valid_for_promotion &&
       direct_usb_blocks_route_claim && historical_route_not_current &&
       hal_safety_is_only_precondition && no_product_candidate_runs &&
-      migration_ready_only_offline && scripts_present && lock_policy_covers_window &&
-      ready_for_route_revalidation_window && !ready_for_product_physical_ab &&
+      migration_ready_only_offline && route_inventory_clean && scripts_present &&
+      lock_policy_covers_window && route_revalidation_plan_ready &&
+      !ready_for_product_physical_ab &&
       !ready_for_branch_promotion;
 
   std::cout << "{\n"
@@ -210,6 +235,14 @@ int main(int argc, char** argv) {
             << (no_product_candidate_runs ? "true" : "false") << ",\n"
             << "  \"migration_ready_only_offline\": "
             << (migration_ready_only_offline ? "true" : "false") << ",\n"
+            << "  \"route_inventory_clean\": "
+            << (route_inventory_clean ? "true" : "false") << ",\n"
+            << "  \"current_promotion_route_ready\": "
+            << (current_promotion_route_ready ? "true" : "false") << ",\n"
+            << "  \"current_known_good_output_missing\": "
+            << (current_known_good_output_missing ? "true" : "false") << ",\n"
+            << "  \"route_revalidation_plan_ready\": "
+            << (route_revalidation_plan_ready ? "true" : "false") << ",\n"
             << "  \"scripts_present\": " << (scripts_present ? "true" : "false") << ",\n"
             << "  \"lock_policy_covers_window\": "
             << (lock_policy_covers_window ? "true" : "false") << ",\n"
@@ -221,7 +254,11 @@ int main(int argc, char** argv) {
             << (ready_for_branch_promotion ? "true" : "false") << ",\n";
   print_string_array("allowed_window_types", allowed_window_types);
   print_string_array("required_next_actions", required_next_actions);
-  std::cout << "  \"next_required_action\": \"LOCK_GATED_KNOWN_GOOD_NON_AUDIO8_ROUTE_REVALIDATION\",\n"
+  std::cout << "  \"next_required_action\": \""
+            << (current_known_good_output_missing
+                    ? "PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION"
+                    : "LOCK_GATED_KNOWN_GOOD_NON_AUDIO8_ROUTE_REVALIDATION")
+            << "\",\n"
             << "  \"blocked_claim\": \"NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS\"\n"
             << "}\n";
 

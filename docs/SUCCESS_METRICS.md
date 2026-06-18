@@ -65,6 +65,9 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - While the current route is blocked, `current-offline-gates.json` must expose
   `route_measurement_status=BLOCKED_FOR_PROMOTION`,
   `diagnostic_pass_not_product_readiness=true`,
+  `route_revalidation_plan_ready=true`, and
+  `ready_for_route_revalidation_window=false` whenever physical route inventory
+  lacks a visible wired non-Audio8 known-good output.
   `product_claim_allowed=false`, and `branch_promotion_allowed=false` inside
   `capture_route_health_gate`.
 - `current-offline-gates.json` may report analyzer `status=PASS` only as

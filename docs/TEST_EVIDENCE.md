@@ -1,5 +1,27 @@
 # Test Evidence
 
+## 2026-06-18: Route Window Readiness Requires Visible Known-Good Output
+
+- Scope:
+  - Ran read-only physical route inventory.
+  - Hardened physical-window readiness so plan readiness is distinct from a
+    currently executable route window.
+  - No audio playback, recording, driver install/load, default-device change,
+    USB reset, or CoreAudio restart was performed.
+- Result:
+  - Inventory sees `iRig Stream` as input/output and Audio 8 DJ on USB.
+  - No non-Audio8, non-built-in known-good output is visible.
+  - `route_revalidation_plan_ready=true`.
+  - `ready_for_route_revalidation_window=false`.
+  - `next_required_action=PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION`.
+- Evidence:
+  - `local-analysis/cpp-offline/physical-route-inventory.json`
+  - `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+- Interpretation:
+  - The code path is prepared for a route-only hardware window, but this
+    machine is not currently wired for promotion-valid route revalidation.
+    Same-device iRig and built-in speaker diagnostics remain diagnostic only.
+
 ## 2026-06-18: Direct USB Time-Warp Attribution Hardened
 
 - Scope:
