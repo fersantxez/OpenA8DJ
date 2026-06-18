@@ -216,6 +216,9 @@ fi
 ./build/cpp-release/opena8djcpp_direct_usb_path_attribution | tee "$EVIDENCE_DIR/direct-usb-path-attribution.json"
 ./build/cpp-release/opena8djcpp_capture_route_health_gate | tee "$EVIDENCE_DIR/capture-route-health-gate.json"
 ./build/cpp-release/opena8djcpp_irig_idle_capture_gate | tee "$EVIDENCE_DIR/irig-idle-capture-gate.json"
+python3 scripts/analyze-route-contamination.py \
+  --json-out "$EVIDENCE_DIR/route-contamination-analysis.json" \
+  >/dev/null
 ./build/cpp-release/opena8djcpp_historical_route_reference_gate | tee "$EVIDENCE_DIR/historical-route-reference-gate.json"
 make -C "$ROOT" dist >/dev/null
 python3 scripts/check-hal-bundle-complete \
@@ -264,6 +267,8 @@ python3 -m py_compile \
   scripts/plan-physical-evidence-window \
   scripts/plan-timecode-physical-window \
   scripts/test-plan-timecode-physical-window.py \
+  scripts/analyze-route-contamination.py \
+  scripts/test-route-contamination-analysis.py \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
@@ -273,6 +278,7 @@ python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-goo
 python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-good-route-test.txt"
 python3 scripts/test-plan-physical-evidence-window.py | tee "$EVIDENCE_DIR/physical-evidence-window-plan-test.txt"
 python3 scripts/test-plan-timecode-physical-window.py | tee "$EVIDENCE_DIR/timecode-physical-window-plan-test.txt"
+python3 scripts/test-route-contamination-analysis.py | tee "$EVIDENCE_DIR/route-contamination-analysis-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -389,6 +395,7 @@ physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
 direct_usb_path_attribution = load_json("direct-usb-path-attribution.json")
 irig_idle_capture_gate = load_json("irig-idle-capture-gate.json")
+route_contamination_analysis = load_json("route-contamination-analysis.json")
 historical_route_reference_gate = load_json("historical-route-reference-gate.json")
 hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
@@ -551,6 +558,20 @@ summary = {
     ),
     "human_test_product_allowed": human_test_rc_gate.get("product_human_test_allowed"),
     "human_test_next_required_action": human_test_rc_gate.get("next_required_action"),
+    "route_contamination_status": route_contamination_analysis.get("result"),
+    "route_contamination_classification": route_contamination_analysis.get("classification"),
+    "route_contamination_internal_usb_clean": route_contamination_analysis.get(
+        "internal_usb_clean"
+    ),
+    "route_contamination_idle_capture_non_silent": route_contamination_analysis.get(
+        "idle_capture_non_silent"
+    ),
+    "route_contamination_human_product_test_allowed": route_contamination_analysis.get(
+        "human_product_test_allowed"
+    ),
+    "route_contamination_next_required_action": route_contamination_analysis.get(
+        "next_required_action"
+    ),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -1244,6 +1265,35 @@ summary = {
         "latest_run": irig_idle_capture_gate.get("latest_run"),
         "readiness_claim": irig_idle_capture_gate.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/irig-idle-capture-gate.json",
+    },
+    "route_contamination_analysis": {
+        "status": route_contamination_analysis.get("result"),
+        "schema": route_contamination_analysis.get("schema"),
+        "classification": route_contamination_analysis.get("classification"),
+        "internal_usb_clean": route_contamination_analysis.get("internal_usb_clean"),
+        "physical_capture_failed": route_contamination_analysis.get("physical_capture_failed"),
+        "timewarp_explains_failure": route_contamination_analysis.get(
+            "timewarp_explains_failure"
+        ),
+        "idle_capture_non_silent": route_contamination_analysis.get("idle_capture_non_silent"),
+        "contamination_classified": route_contamination_analysis.get(
+            "contamination_classified"
+        ),
+        "product_claim_allowed": route_contamination_analysis.get("product_claim_allowed"),
+        "branch_promotion_allowed": route_contamination_analysis.get(
+            "branch_promotion_allowed"
+        ),
+        "timecode_vinyl_claim_allowed": route_contamination_analysis.get(
+            "timecode_vinyl_claim_allowed"
+        ),
+        "human_product_test_allowed": route_contamination_analysis.get(
+            "human_product_test_allowed"
+        ),
+        "diagnostic_rc_allowed": route_contamination_analysis.get("diagnostic_rc_allowed"),
+        "next_required_action": route_contamination_analysis.get("next_required_action"),
+        "direct_usb": route_contamination_analysis.get("direct_usb"),
+        "idle_capture": route_contamination_analysis.get("idle_capture"),
+        "evidence": "local-analysis/cpp-offline/route-contamination-analysis.json",
     },
     "historical_route_reference_gate": {
         "status": historical_route_reference_gate.get("result"),

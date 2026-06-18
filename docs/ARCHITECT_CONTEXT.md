@@ -47,6 +47,15 @@ Branch: `driverkit/cpp-redesign`
   analog/capture route, mixer monitoring, gain staging, or iRig-side capture
   state. Do not spend the remaining window on product A/B or Timecode Vinyl
   certification until the route is validated.
+- 13:18 EDT route-contamination gate update: `scripts/analyze-route-contamination.py`
+  now makes the downstream-route blocker machine-checkable in the offline
+  gate bundle. Current classification is
+  `DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB`: internal USB
+  is clean, physical iRig capture fails, fractional time-warp is rejected as
+  the explanation, and iRig idle capture is non-silent. The gate explicitly
+  allows only a diagnostic RC and blocks human product testing, Timecode Vinyl
+  certification, quality claims, CPU superiority claims, and branch promotion
+  until a wired non-Audio8 known-good route is validated.
 - Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
   remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus

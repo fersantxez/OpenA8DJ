@@ -134,6 +134,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
       root / "local-analysis/cpp-offline/direct-usb-path-attribution.json",
       root / "local-analysis/cpp-offline/irig-idle-capture-gate.json",
+      root / "local-analysis/cpp-offline/route-contamination-analysis.json",
+      root / "local-analysis/cpp-offline/route-contamination-analysis-test.txt",
       root / "local-analysis/cpp-offline/historical-route-reference-gate.json",
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
@@ -257,6 +259,9 @@ int main(int argc, char** argv) {
   const auto direct_usb_latest_run =
       opena8djcpp::evidence_json::json_object(direct_usb_path_attribution, "latest_run")
           .value_or("");
+  const auto route_contamination_analysis =
+      opena8djcpp::evidence_json::json_object(summary, "route_contamination_analysis")
+          .value_or("");
   const auto hal_candidate_safety_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
@@ -348,6 +353,13 @@ int main(int argc, char** argv) {
       bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
       bool_field_is(summary, "human_test_product_allowed", false) &&
       string_field_present(summary, "human_test_next_required_action") &&
+      string_field_is(summary, "route_contamination_status", "PASS") &&
+      string_field_is(summary, "route_contamination_classification",
+                      "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
+      bool_field_is(summary, "route_contamination_internal_usb_clean", true) &&
+      bool_field_is(summary, "route_contamination_idle_capture_non_silent", true) &&
+      bool_field_is(summary, "route_contamination_human_product_test_allowed", false) &&
+      string_field_present(summary, "route_contamination_next_required_action") &&
       string_array_has(summary, "current_route_inventory_blockers",
                        "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
@@ -808,6 +820,24 @@ int main(int argc, char** argv) {
       number_field_present(direct_usb_latest_run, "audiophile_snr_floor_db") &&
       number_field_present(direct_usb_latest_run, "audiophile_mid_coherence_floor") &&
       number_field_present(direct_usb_latest_run, "audiophile_delay_p95_frames") &&
+      object_present(summary, "route_contamination_analysis") &&
+      string_field_is(route_contamination_analysis, "schema",
+                      "opena8djcpp.route-contamination-analysis.v1") &&
+      string_field_is(route_contamination_analysis, "status", "PASS") &&
+      string_field_is(route_contamination_analysis, "classification",
+                      "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
+      bool_field_is(route_contamination_analysis, "internal_usb_clean", true) &&
+      bool_field_is(route_contamination_analysis, "physical_capture_failed", true) &&
+      bool_field_is(route_contamination_analysis, "timewarp_explains_failure", false) &&
+      bool_field_is(route_contamination_analysis, "idle_capture_non_silent", true) &&
+      bool_field_is(route_contamination_analysis, "contamination_classified", true) &&
+      bool_field_is(route_contamination_analysis, "product_claim_allowed", false) &&
+      bool_field_is(route_contamination_analysis, "branch_promotion_allowed", false) &&
+      bool_field_is(route_contamination_analysis, "timecode_vinyl_claim_allowed", false) &&
+      bool_field_is(route_contamination_analysis, "human_product_test_allowed", false) &&
+      bool_field_is(route_contamination_analysis, "diagnostic_rc_allowed", true) &&
+      string_field_is(route_contamination_analysis, "next_required_action",
+                      "VALIDATE_WIRED_NON_AUDIO8_KNOWN_GOOD_ROUTE_OR_FIX_IRIG_MIXER_MONITORING") &&
       object_present(summary, "physical_route_inventory") &&
       string_field_is(physical_route_inventory, "status", "PASS") &&
       string_field_is(physical_route_inventory, "schema",

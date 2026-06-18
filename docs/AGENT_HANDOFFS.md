@@ -4949,3 +4949,38 @@ Risks:
 Next action:
 - Use `local-analysis/cpp-offline/human-test-rc-status.json` as the live RC
   decision packet before any hardware window.
+
+## 2026-06-18 Kuhn: Human RC Auditor
+
+Subagent:
+- `019edbb1-d0fb-7592-b4a3-443e2c61ed95` (`Kuhn`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Audit whether a human-test RC can honestly be declared before 15:00 EDT.
+
+Findings:
+- The current candidate is a `diagnostic-installable-rc`, not a product human
+  RC.
+- Offline gates and packaging are ready, but the route/capture evidence blocks
+  product listening, Timecode Vinyl physical testing, same-session mainline/C++
+  A/B, and CPU superiority claims.
+- DriverKit/deXt is not viable on this host today because the real DriverKit
+  SDK/selected full Xcode prerequisites are missing. The practical candidate
+  today is HAL/PKG.
+
+Integrated action:
+- Added a route-contamination analysis gate so the downstream clean-USB /
+  failed-capture condition is visible in `current-offline-gates.json` instead
+  of only in narrative docs.
+
+Risks:
+- Any human listening before route validation can be a false negative from the
+  external capture/monitoring path rather than the driver.
+
+Next action:
+- Keep the 15:00 decision taxonomy explicit: diagnostic RC if route remains
+  blocked; limited product human test only after a wired non-Audio8 known-good
+  source validates the iRig route under lock.

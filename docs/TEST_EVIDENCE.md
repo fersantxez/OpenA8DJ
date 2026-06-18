@@ -14272,3 +14272,46 @@ Readiness impact:
 - Product human listening, CPU/resource superiority, and branch promotion
   remain blocked by missing known-good route and missing same-session physical
   evidence.
+
+## 2026-06-18 - Route Contamination Analysis Gate
+
+Commit context:
+- Local changes after `fc4fd46`; expected provenance failure until commit.
+
+Safety:
+- Offline analysis of existing direct-USB and iRig idle evidence only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, or external worktree mutation.
+
+Commands:
+- `python3 -m py_compile scripts/analyze-route-contamination.py scripts/test-route-contamination-analysis.py`
+- `python3 scripts/test-route-contamination-analysis.py`
+- `python3 scripts/analyze-route-contamination.py --json-out local-analysis/cpp-offline/route-contamination-analysis.json`
+- `./scripts/run-cpp-offline-gates`
+
+Result:
+- Route contamination fixture: PASS.
+- Full offline gate after integration: Debug CTest `83/83` PASS, Release CTest
+  `84/84` PASS.
+- Evidence schema: PASS, `required_files=95`, `missing_files=0`.
+- Offline summary: `status=PASS`, `diagnostic_status=PASS`,
+  `product_readiness_status=FAIL`, `branch_promotion_allowed=false`.
+- Route contamination status: PASS with
+  `classification=DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB`.
+- Supporting physical evidence:
+  - Direct USB diagnostics: `usb_alignment_score=1.0`,
+    `usb_snr_floor_db=999`, `usb_check_errors=0`, `usb_panic_flags=0`.
+  - Physical iRig capture: `quality_alignment_score=0.836459`,
+    `capture_snr_floor_db=-10.776581 dB`.
+  - Time-warp explanation rejected:
+    `timewarp_scalar_improvement_db=1.86161`,
+    `timewarp_matrix_improvement_db=1.86869`.
+  - iRig idle capture is non-silent: RMS `0.0006506`, peak `0.01190186`,
+    first energy at record second `0.0`.
+
+Readiness impact:
+- The RC remains installable/diagnostic only.
+- Human product listening, Timecode Vinyl certification, CPU superiority, and
+  branch promotion remain blocked until a wired non-Audio8 known-good output is
+  validated into the iRig route and same-session physical A/B passes.
