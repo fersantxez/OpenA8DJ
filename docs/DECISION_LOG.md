@@ -1,5 +1,45 @@
 # Decision Log
 
+## 2026-06-18: Add Default-Off HAL Prepared Runtime Build Profile
+
+Decision:
+- Add a local `hal-prepared-runtime` build target and source-level compile-time
+  guards for a prepared USB submit runtime profile.
+- Keep `HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0` as the default and require
+  offline source/evidence gates before any physical use.
+- Update `hal_transport_runtime_gate` so it accepts a guarded opt-in profile
+  while still blocking CPU, sound-quality, Timecode Vinyl, and branch-promotion
+  claims until lock-gated same-session physical evidence exists.
+
+Reason:
+- The previous offline adapter proved the HAL geometry can map into prepared
+  USB request submits, but there was no buildable HAL profile for the next
+  controlled runtime experiment.
+- The risky part is not making the flag exist; it is preventing it from
+  silently becoming the default or being mistaken for measured superiority.
+
+Evidence:
+- Focused gates passed:
+  `opena8djcpp_hal_prepared_runtime_source_contract`,
+  `opena8djcpp_prepared_transport_migration_gate`,
+  `opena8djcpp_hal_transport_runtime_gate`, and
+  `opena8djcpp_static_policy_check`.
+- Local build-only profile compiled with `make -B hal-prepared-runtime`; the
+  normal local HAL bundle was then rebuilt with `make -B hal`.
+- No install, load, CoreAudio mutation, USB reset, playback, capture, or
+  hardware access was performed.
+
+Alternatives discarded:
+- Enabling the prepared runtime by default: rejected because there is no
+  physical A/B evidence yet.
+- Treating local compilation as a CPU-quality win: rejected because the active
+  runtime still has no measured prepared-submit reduction.
+
+Next implication:
+- Run full offline gates from a clean commit. Only after those pass can a
+  lock-gated route revalidation window be requested for the prepared runtime
+  candidate.
+
 ## 2026-06-18: Add HAL Prepared-Submit Adapter Contract Before Runtime Mutation
 
 Decision:

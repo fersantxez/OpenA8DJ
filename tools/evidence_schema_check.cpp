@@ -92,6 +92,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
+      root / "local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json",
       root / "local-analysis/cpp-offline/prepared-transport-pressure-gate.json",
       root / "local-analysis/cpp-offline/prepared-transport-migration-gate.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
@@ -154,6 +155,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "usb_submit_payload_contract").value_or("");
   const auto hal_prepared_submit_adapter_contract =
       opena8djcpp::evidence_json::json_object(summary, "hal_prepared_submit_adapter_contract")
+          .value_or("");
+  const auto hal_prepared_runtime_source_contract =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_source_contract")
           .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
@@ -270,6 +274,20 @@ int main(int argc, char** argv) {
       bool_field_is(hal_prepared_submit_adapter_contract, "request_pool_safe", true) &&
       bool_field_is(hal_prepared_submit_adapter_contract, "hal_geometry_preserved", true) &&
       bool_field_is(hal_prepared_submit_adapter_contract, "payload_equivalent", true) &&
+      object_present(summary, "hal_prepared_runtime_source_contract") &&
+      string_field_is(hal_prepared_runtime_source_contract, "status", "PASS") &&
+      bool_field_is(hal_prepared_runtime_source_contract, "prepared_runtime_default_off", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract, "prepared_runtime_cflags_exposed", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract,
+                    "prepared_runtime_opt_in_target_present", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract,
+                    "prepared_runtime_opt_in_target_build_only", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract,
+                    "source_has_compile_time_geometry_guards", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract,
+                    "source_exposes_runtime_geometry_constants", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract, "default_geometry_preserved", true) &&
+      bool_field_is(hal_prepared_runtime_source_contract, "runtime_claim_still_blocked", true) &&
       object_present(summary, "driverkit_usb_submit_binding_contract") &&
       number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&
@@ -516,7 +534,14 @@ int main(int argc, char** argv) {
       object_present(summary, "hal_transport_runtime_gate") &&
       bool_field_is(hal_transport_runtime_gate, "runtime_reduction_missing", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_direct_usb_enqueue", true) &&
-      bool_field_is(hal_transport_runtime_gate, "hal_has_no_runtime_prepared_submit", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_has_runtime_prepared_submit_guard", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_source_contract_pass",
+                    true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_default_off", true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_opt_in_target_present",
+                    true) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "hal_prepared_runtime_physical_evidence_present", false) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_logical_physical_capture_split", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_capture_submit_counter", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_has_playback_submit_counter", true) &&

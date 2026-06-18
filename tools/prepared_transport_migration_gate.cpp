@@ -253,6 +253,8 @@ int main(int argc, char** argv) {
   const auto usb_submit_payload = read_file(base / "usb-submit-payload-contract.json");
   const auto hal_prepared_submit_adapter =
       read_file(base / "hal-prepared-submit-adapter-contract.json");
+  const auto hal_prepared_runtime_source =
+      read_file(base / "hal-prepared-runtime-source-contract.json");
   const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
@@ -420,6 +422,19 @@ int main(int argc, char** argv) {
       number_is_zero(hal_prepared_submit_adapter, "direction_order_errors") &&
       number_is_zero(hal_prepared_submit_adapter, "timestamp_mismatches") &&
       number_is_zero(hal_prepared_submit_adapter, "sequence_mismatches");
+  const bool hal_prepared_runtime_source_guarded =
+      result_pass(hal_prepared_runtime_source) &&
+      json_bool(hal_prepared_runtime_source, "prepared_runtime_default_off").value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "prepared_runtime_cflags_exposed").value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "prepared_runtime_opt_in_target_present")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "prepared_runtime_opt_in_target_build_only")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "source_has_compile_time_geometry_guards")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "source_exposes_runtime_geometry_constants")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_source, "runtime_claim_still_blocked").value_or(false);
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -525,6 +540,7 @@ int main(int argc, char** argv) {
       {"usb_submit_descriptor_plan_safe", usb_submit_plan_safe},
       {"usb_submit_payload_plan_safe", usb_submit_payload_safe},
       {"hal_prepared_submit_adapter_safe", hal_prepared_submit_adapter_safe},
+      {"hal_prepared_runtime_source_guarded", hal_prepared_runtime_source_guarded},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -573,6 +589,12 @@ int main(int argc, char** argv) {
   print_number("hal_prepared_submit_adapter_total_bytes", hal_adapter_total_bytes);
   print_number("hal_prepared_submit_adapter_total_frames", hal_adapter_total_frames);
   print_number("hal_prepared_submit_adapter_max_live_requests", hal_adapter_max_live);
+  print_bool("hal_prepared_runtime_source_guarded", hal_prepared_runtime_source_guarded);
+  print_bool("hal_prepared_runtime_default_off",
+             json_bool(hal_prepared_runtime_source, "prepared_runtime_default_off").value_or(false));
+  print_bool("hal_prepared_runtime_opt_in_target_present",
+             json_bool(hal_prepared_runtime_source, "prepared_runtime_opt_in_target_present")
+                 .value_or(false));
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

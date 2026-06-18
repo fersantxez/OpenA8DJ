@@ -114,6 +114,28 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS 1
 #endif
 
+#ifndef OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+#define OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME 0
+#endif
+
+#ifndef OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT
+#define OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT 8
+#endif
+
+#if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
+#if OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT < 2
+#error OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME requires at least 2 slots per submit
+#endif
+#if OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER != \
+    (OPENA8DJ_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT)
+#error prepared capture runtime must batch physical capture transfers over logical ISO frames
+#endif
+#if (OPENA8DJ_PLAYBACK_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS) != \
+    (OPENA8DJ_ISO_FRAMES_PER_TRANSFER * OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT)
+#error prepared playback runtime must batch physical playback transfers over logical ISO frames
+#endif
+#endif
+
 #ifndef OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
 #define OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE 0
 #endif
@@ -263,6 +285,14 @@ enum {
     kPlaybackCoalesceTransfers = OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS < 1 ? 1 : OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS,
     kPlaybackIsoFramesPerTransfer = kPlaybackBaseIsoFramesPerTransfer * kPlaybackCoalesceTransfers,
     kCaptureIsoFramesPerTransfer = OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER,
+    kPreparedUsbSlotsPerSubmit = OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT,
+    kPreparedRuntimeEnabled = OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME ? 1 : 0,
+    kPreparedRuntimeCaptureGeometry =
+        kCaptureIsoFramesPerTransfer == (kIsoFramesPerTransfer * kPreparedUsbSlotsPerSubmit) ? 1 : 0,
+    kPreparedRuntimePlaybackGeometry =
+        kPlaybackIsoFramesPerTransfer == (kIsoFramesPerTransfer * kPreparedUsbSlotsPerSubmit) ? 1 : 0,
+    kPreparedRuntimeGeometrySupported =
+        kPreparedRuntimeEnabled && kPreparedRuntimeCaptureGeometry && kPreparedRuntimePlaybackGeometry,
     kIsoBytesPerFrame = 512,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,

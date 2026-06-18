@@ -64,6 +64,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_usb_submit_plan_contract | tee "$EVIDENCE_DIR/usb-submit-plan-contract.json"
 ./build/cpp-release/opena8djcpp_usb_submit_payload_contract | tee "$EVIDENCE_DIR/usb-submit-payload-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_submit_adapter_contract | tee "$EVIDENCE_DIR/hal-prepared-submit-adapter-contract.json"
+./build/cpp-release/opena8djcpp_hal_prepared_runtime_source_contract | tee "$EVIDENCE_DIR/hal-prepared-runtime-source-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_pressure_gate | tee "$EVIDENCE_DIR/prepared-transport-pressure-gate.json"
 ./build/cpp-release/opena8djcpp_jitter_model | tee "$EVIDENCE_DIR/jitter-model.json"
 ./build/cpp-release/opena8djcpp_transfer_pool_model | tee "$EVIDENCE_DIR/transfer-pool-model.json"
@@ -245,6 +246,7 @@ runtime_adapter = load_json("runtime-adapter-contract.json")
 usb_submit_plan = load_json("usb-submit-plan-contract.json")
 usb_submit_payload = load_json("usb-submit-payload-contract.json")
 hal_prepared_submit_adapter = load_json("hal-prepared-submit-adapter-contract.json")
+hal_prepared_runtime_source_contract = load_json("hal-prepared-runtime-source-contract.json")
 prepared_transport_pressure = load_json("prepared-transport-pressure-gate.json")
 prepared_transport_migration = load_json("prepared-transport-migration-gate.json")
 static = load_json("static-policy.json")
@@ -993,8 +995,20 @@ summary = {
         "hal_has_direct_usb_enqueue": hal_transport_runtime_gate.get(
             "hal_has_direct_usb_enqueue"
         ),
-        "hal_has_no_runtime_prepared_submit": hal_transport_runtime_gate.get(
-            "hal_has_no_runtime_prepared_submit"
+        "hal_has_runtime_prepared_submit_guard": hal_transport_runtime_gate.get(
+            "hal_has_runtime_prepared_submit_guard"
+        ),
+        "hal_prepared_runtime_source_contract_pass": hal_transport_runtime_gate.get(
+            "hal_prepared_runtime_source_contract_pass"
+        ),
+        "hal_prepared_runtime_default_off": hal_transport_runtime_gate.get(
+            "hal_prepared_runtime_default_off"
+        ),
+        "hal_prepared_runtime_opt_in_target_present": hal_transport_runtime_gate.get(
+            "hal_prepared_runtime_opt_in_target_present"
+        ),
+        "hal_prepared_runtime_physical_evidence_present": hal_transport_runtime_gate.get(
+            "hal_prepared_runtime_physical_evidence_present"
         ),
         "hal_has_logical_physical_capture_split": hal_transport_runtime_gate.get(
             "hal_has_logical_physical_capture_split"
@@ -1597,6 +1611,39 @@ summary = {
         "blocked_claim": hal_prepared_submit_adapter.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
     },
+    "hal_prepared_runtime_source_contract": {
+        "status": hal_prepared_runtime_source_contract.get("result"),
+        "schema": hal_prepared_runtime_source_contract.get("schema"),
+        "prepared_runtime_default_off": hal_prepared_runtime_source_contract.get(
+            "prepared_runtime_default_off"
+        ),
+        "prepared_runtime_cflags_exposed": hal_prepared_runtime_source_contract.get(
+            "prepared_runtime_cflags_exposed"
+        ),
+        "prepared_runtime_opt_in_target_present": hal_prepared_runtime_source_contract.get(
+            "prepared_runtime_opt_in_target_present"
+        ),
+        "prepared_runtime_opt_in_target_build_only": hal_prepared_runtime_source_contract.get(
+            "prepared_runtime_opt_in_target_build_only"
+        ),
+        "source_has_compile_time_geometry_guards": hal_prepared_runtime_source_contract.get(
+            "source_has_compile_time_geometry_guards"
+        ),
+        "source_exposes_runtime_geometry_constants": hal_prepared_runtime_source_contract.get(
+            "source_exposes_runtime_geometry_constants"
+        ),
+        "default_geometry_preserved": hal_prepared_runtime_source_contract.get(
+            "default_geometry_preserved"
+        ),
+        "runtime_claim_still_blocked": hal_prepared_runtime_source_contract.get(
+            "runtime_claim_still_blocked"
+        ),
+        "next_required_action": hal_prepared_runtime_source_contract.get(
+            "next_required_action"
+        ),
+        "blocked_claim": hal_prepared_runtime_source_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json",
+    },
     "prepared_transport_pressure_gate": {
         "status": prepared_transport_pressure.get("result"),
         "schema": prepared_transport_pressure.get("schema"),
@@ -1677,6 +1724,15 @@ summary = {
         ),
         "hal_prepared_submit_adapter_total_frames": prepared_transport_migration.get(
             "hal_prepared_submit_adapter_total_frames"
+        ),
+        "hal_prepared_runtime_source_guarded": prepared_transport_migration.get(
+            "hal_prepared_runtime_source_guarded"
+        ),
+        "hal_prepared_runtime_default_off": prepared_transport_migration.get(
+            "hal_prepared_runtime_default_off"
+        ),
+        "hal_prepared_runtime_opt_in_target_present": prepared_transport_migration.get(
+            "hal_prepared_runtime_opt_in_target_present"
         ),
         "driverkit_usb_submit_binding_logical_slots": prepared_transport_migration.get(
             "driverkit_usb_submit_binding_logical_slots"

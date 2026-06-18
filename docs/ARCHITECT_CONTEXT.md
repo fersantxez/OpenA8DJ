@@ -18,6 +18,16 @@ Branch: `driverkit/cpp-redesign`
   gap but does not change the live HAL runtime yet; `hal_transport_runtime_gate`
   must continue blocking CPU/product claims until the adapter is bound to real
   HAL or DriverKit USB and same-session physical A/B passes.
+- 2026-06-18 HAL prepared-runtime profile status: the HAL Makefile and source
+  now expose a default-off prepared USB submit runtime profile guarded by
+  `OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME=0`. The opt-in local build target
+  `make -B hal-prepared-runtime` compiles with ISO8 logical slots batched into
+  64-frame capture/playback submits, and compile-time geometry checks reject
+  mismatched profiles. This remains source/build evidence only: it was not
+  installed, loaded, or physically measured, and
+  `hal_transport_runtime_gate` still reports
+  `runtime_reduction_missing=true` plus
+  `hal_prepared_runtime_physical_evidence_present=false`.
 - 2026-06-17 status: C++ is not ready for branch promotion or physical
   readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
   improvement over mainline. ISO8/current-cadence builds remain high CPU and

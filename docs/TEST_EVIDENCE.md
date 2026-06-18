@@ -1,5 +1,43 @@
 # Test Evidence
 
+## 2026-06-18: HAL Prepared Runtime Source Contract And Opt-In Build
+
+- Scope:
+  - Added a default-off HAL prepared USB submit runtime profile.
+  - Added `opena8djcpp_hal_prepared_runtime_source_contract`.
+  - Wired the new source contract into the migration/runtime/schema/static
+    gates.
+  - Compiled the opt-in local HAL profile and rebuilt the normal local HAL
+    profile afterward.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_source_contract opena8djcpp_hal_transport_runtime_gate opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_runtime_source_contract | tee local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `make -B hal-prepared-runtime`
+  - `make -B hal`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(hal_prepared_runtime_source_contract|hal_transport_runtime_gate|prepared_transport_migration_gate|static_policy_check)' --output-on-failure`
+- Result:
+  - Focused CTest: `4/4` passed.
+  - New source contract: `PASS`.
+  - Migration gate: `PASS`, now including
+    `hal_prepared_runtime_source_guarded=true`.
+  - Runtime gate: `PASS` as a claim blocker, with
+    `runtime_reduction_missing=true`,
+    `hal_prepared_runtime_default_off=true`, and
+    `hal_prepared_runtime_physical_evidence_present=false`.
+  - `hal-prepared-runtime` compiled as a local build-only target; no driver was
+    installed, loaded, activated, or tested physically.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+- Interpretation:
+  - This is a safer next-step candidate for a future lock-gated physical
+    experiment, not evidence of better sound, lower CPU, or Timecode Vinyl
+    readiness.
+
 ## 2026-06-17/18: Current C++ HAL Physical Diagnostic Fails Quality And CPU
 
 - Scope:

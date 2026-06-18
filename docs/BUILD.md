@@ -115,6 +115,32 @@ Runtime submit counters are also part of the physical evidence path:
 HAL payload through `opena8dj-control`, `run-soundcheck` TSV snapshots, and
 `scripts/analyze-stream-stats.py`.
 
+### Prepared Runtime Build Profile
+
+The HAL Makefile includes a build-only prepared-submit runtime profile:
+
+```sh
+make -B hal-prepared-runtime
+```
+
+This target compiles a local `build/OpenA8DJ.driver` with
+`OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME=1`,
+`OPENA8DJ_HAL_PREPARED_USB_SLOTS_PER_SUBMIT=8`,
+`HAL_CAPTURE_ISO_FRAMES=64`, and `HAL_PLAYBACK_COALESCE_TRANSFERS=8`.
+The default remains `HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0`.
+
+The profile is intentionally not an install, reload, activation, playback, or
+capture target. After compiling it for offline verification, rebuild the normal
+local HAL bundle with:
+
+```sh
+make -B hal
+```
+
+`opena8djcpp_hal_prepared_runtime_source_contract` and
+`opena8djcpp_hal_transport_runtime_gate` must remain green before the profile
+can be considered for a lock-gated physical route revalidation window.
+
 ## Build Options
 
 The CMake options should make the safe path explicit:

@@ -77,6 +77,20 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   `hal_geometry_preserved=true`, and `payload_equivalent=true`. This is an
   offline migration prerequisite only; it does not prove lower CPU, audio
   quality, Timecode Vinyl readiness, hardware readiness, or branch promotion.
+- `opena8djcpp_hal_prepared_runtime_source_contract` must pass before any
+  prepared HAL runtime profile can be physically tested. Required values:
+  `prepared_runtime_default_off=true`,
+  `prepared_runtime_cflags_exposed=true`,
+  `prepared_runtime_opt_in_target_present=true`,
+  `prepared_runtime_opt_in_target_build_only=true`,
+  `source_has_compile_time_geometry_guards=true`,
+  `source_exposes_runtime_geometry_constants=true`,
+  `default_geometry_preserved=true`, and
+  `runtime_claim_still_blocked=true`.
+- A local `make -B hal-prepared-runtime` build is not a product metric. CPU,
+  resource, audiophile-quality, routing, Timecode Vinyl, and branch-promotion
+  claims require lock-gated same-session physical A/B evidence against the
+  mainline reference, including submit cadence and CPU/resource counters.
 
 ### Mainline C Reference
 

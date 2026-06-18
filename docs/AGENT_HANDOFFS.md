@@ -30,6 +30,38 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 
 ## Findings Integrated
 
+### Chief Architect Integration: HAL Prepared Runtime Build Profile
+
+- Date: 2026-06-18.
+- Subagent dependency:
+  - Wegener's runtime audit identified that the active HAL path still directly
+    enqueues USB requests and recommended a prepared-submit adapter contract
+    before live mutation.
+  - Lagrange's readiness audit kept product claims blocked until same-session
+    physical A/B, Timecode Vinyl, CPU/resource, and route evidence exist.
+- Integrated action:
+  - Added default-off HAL prepared runtime build flags and `hal-prepared-runtime`.
+  - Added `opena8djcpp_hal_prepared_runtime_source_contract`.
+  - Updated migration/runtime/schema/static gates so the profile is
+    opt-in-only, build-only, and still product-claim-blocked.
+- Files affected:
+  - `Makefile`
+  - `src/hal/OpenA8DJUSB.m`
+  - `tools/hal_prepared_runtime_source_contract.cpp`
+  - `tools/hal_transport_runtime_gate.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+  - `scripts/run-cpp-offline-gates`
+- Risk:
+  - The profile compiles but has not been installed, loaded, or physically
+    measured. Do not treat it as better than mainline until lock-gated
+    same-session A/B evidence proves lower CPU/resource use and no quality,
+    routing, or Timecode Vinyl regression.
+- Next action:
+  - Run full offline gates from clean HEAD, then request a route-revalidation
+    hardware window only if all evidence and lock conditions are satisfied.
+
 ### Ohm Capture Route Isolation Reviewer
 
 - Agent: `019ed6ea-d814-7c92-9173-f606afb367ed`.

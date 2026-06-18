@@ -84,12 +84,14 @@ int main(int argc, char** argv) {
   const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
   const auto hal_safety = read_file(evidence / "hal-candidate-safety-gate.json");
+  const auto prepared_runtime_source =
+      read_file(evidence / "hal-prepared-runtime-source-contract.json");
 
   const bool evidence_present = !hal_source.empty() && !control_source.empty() &&
                                 !run_soundcheck.empty() && !stream_stats_analyzer.empty() &&
                                 !makefile.empty() && !migration.empty() &&
                                 !product_quality.empty() && !physical_window.empty() &&
-                                !hal_safety.empty();
+                                !hal_safety.empty() && !prepared_runtime_source.empty();
 
   const bool hal_has_direct_usb_enqueue =
       contains(hal_source, "enqueueIORequestWithData:transfer.data") &&
@@ -98,9 +100,18 @@ int main(int argc, char** argv) {
   const bool hal_default_capture_paced =
       contains(makefile, "HAL_PLAYBACK_CAPTURE_PACED ?= 1") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1");
-  const bool hal_has_no_runtime_prepared_submit =
+  const bool hal_has_runtime_prepared_submit_guard =
       !contains(hal_source, "PreparedUsbSubmitPlanner") &&
-      !contains(hal_source, "OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME");
+      contains(hal_source, "OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME") &&
+      contains(hal_source, "kPreparedRuntimeGeometrySupported");
+  const bool hal_prepared_runtime_source_contract_pass =
+      string_field_is(prepared_runtime_source, "result", "PASS") &&
+      bool_field_is(prepared_runtime_source, "prepared_runtime_default_off", true) &&
+      bool_field_is(prepared_runtime_source, "prepared_runtime_opt_in_target_present", true) &&
+      bool_field_is(prepared_runtime_source, "prepared_runtime_opt_in_target_build_only", true) &&
+      bool_field_is(prepared_runtime_source, "source_has_compile_time_geometry_guards", true) &&
+      bool_field_is(prepared_runtime_source, "runtime_claim_still_blocked", true);
+  const bool hal_prepared_runtime_physical_evidence_present = false;
   const bool hal_has_logical_physical_capture_split =
       contains(hal_source, "OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
       contains(hal_source,
@@ -203,10 +214,12 @@ int main(int argc, char** argv) {
                       "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
 
   const bool runtime_reduction_missing =
-      hal_has_direct_usb_enqueue && hal_default_capture_paced && hal_has_no_runtime_prepared_submit;
+      hal_has_direct_usb_enqueue && hal_default_capture_paced &&
+      !hal_prepared_runtime_physical_evidence_present;
   const bool product_claim_blocked =
-      runtime_reduction_missing && offline_prepared_model_supported && current_quality_blocked &&
-      physical_ab_blocked && hal_load_is_only_safety;
+      runtime_reduction_missing && offline_prepared_model_supported &&
+      hal_prepared_runtime_source_contract_pass && current_quality_blocked && physical_ab_blocked &&
+      hal_load_is_only_safety;
 
   std::vector<std::string> blockers;
   if (!evidence_present) {
@@ -217,7 +230,13 @@ int main(int argc, char** argv) {
   }
   if (runtime_reduction_missing) {
     blockers.push_back("hal_runtime_still_direct_usb_enqueue");
-    blockers.push_back("hal_runtime_prepared_submit_not_integrated");
+    blockers.push_back("hal_prepared_runtime_not_physically_validated");
+  }
+  if (!hal_has_runtime_prepared_submit_guard) {
+    blockers.push_back("hal_prepared_runtime_source_guard_missing");
+  }
+  if (!hal_prepared_runtime_source_contract_pass) {
+    blockers.push_back("hal_prepared_runtime_source_contract_missing_or_failing");
   }
   if (!offline_prepared_model_supported) {
     blockers.push_back("offline_prepared_transport_model_not_supported");
@@ -245,8 +264,21 @@ int main(int argc, char** argv) {
       << ",\n"
       << "  \"hal_default_capture_paced\": " << (hal_default_capture_paced ? "true" : "false")
       << ",\n"
-      << "  \"hal_has_no_runtime_prepared_submit\": "
-      << (hal_has_no_runtime_prepared_submit ? "true" : "false") << ",\n"
+      << "  \"hal_has_runtime_prepared_submit_guard\": "
+      << (hal_has_runtime_prepared_submit_guard ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_runtime_source_contract_pass\": "
+      << (hal_prepared_runtime_source_contract_pass ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_runtime_default_off\": "
+      << (bool_field_is(prepared_runtime_source, "prepared_runtime_default_off", true) ? "true"
+                                                                                       : "false")
+      << ",\n"
+      << "  \"hal_prepared_runtime_opt_in_target_present\": "
+      << (bool_field_is(prepared_runtime_source, "prepared_runtime_opt_in_target_present", true)
+              ? "true"
+              : "false")
+      << ",\n"
+      << "  \"hal_prepared_runtime_physical_evidence_present\": "
+      << (hal_prepared_runtime_physical_evidence_present ? "true" : "false") << ",\n"
       << "  \"hal_has_logical_physical_capture_split\": "
       << (hal_has_logical_physical_capture_split ? "true" : "false") << ",\n"
       << "  \"hal_has_capture_submit_counter\": "
@@ -282,9 +314,9 @@ int main(int argc, char** argv) {
   print_string_array("runtime_claim_blockers", blockers);
   std::cout
       << "  \"next_required_action\": "
-         "\"IMPLEMENT_REAL_PREPARED_USB_SUBMIT_RUNTIME_OR_FULL_DRIVERKIT_USB_TRANSPORT\",\n"
+         "\"COMPILE_OPT_IN_HAL_PREPARED_RUNTIME_THEN_LOCK_GATED_ROUTE_REVALIDATION_BEFORE_PHYSICAL_AB\",\n"
       << "  \"blocked_claim\": "
-         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_WHILE_HAL_RUNTIME_STILL_REQUEUES_USB_DIRECTLY\"\n"
+         "\"NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_PREPARED_RUNTIME_HAS_LOCK_GATED_SAME_SESSION_PHYSICAL_EVIDENCE\"\n"
       << "}\n";
 
   return pass ? 0 : 1;
