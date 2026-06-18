@@ -119,6 +119,46 @@ def gate(result: dict, name: str) -> dict:
     raise AssertionError(f"missing gate {name}")
 
 
+def run_known_good_request_fixture(root: Path) -> dict:
+    root.mkdir(parents=True, exist_ok=True)
+    audio_list = root / "audio-list.txt"
+    audio_list.write_text(
+        "\n".join(
+            [
+                "Dispositivos Core Audio: 3",
+                "  1  id=91  Open Audio 8 DJ  uid=org.opena8dj.Audio8DJ  in=8 out=8 rate=48000",
+                "  2  id=93  iRig Stream  uid=AppleUSBAudioEngine:IK Multimedia:iRig Stream:152349:2,1  in=2 out=2 rate=48000",
+                "  3  id=81  Wired Test Output  uid=ExternalWiredOutput  in=0 out=2 rate=48000",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output = root / "known-good-request.json"
+    completed = subprocess.run(
+        [
+            "python3",
+            str(ROOT / "scripts/validate-known-good-route-request.py"),
+            "--audio-list-file",
+            str(audio_list),
+            "--output-device",
+            "Open",
+            "--capture-device",
+            "iRig Stream",
+            "--json-out",
+            str(output),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 1:
+        raise AssertionError("ambiguous Open route did not fail")
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="opena8djcpp-promotion-contract-") as temp:
         root = Path(temp)
@@ -133,6 +173,12 @@ def main() -> int:
             raise AssertionError("diagnostic fixture should still have same-window route file")
         if gate(diagnostic, "physical_window_not_diagnostic")["result"] != "FAIL":
             raise AssertionError("diagnostic physical window did not fail")
+
+        known_good = run_known_good_request_fixture(root / "known-good-request")
+        if gate(known_good, "output_not_audio8")["result"] != "FAIL":
+            raise AssertionError("resolved Open Audio 8 DJ output was not rejected")
+        if known_good["valid_for_promotion"] is not False:
+            raise AssertionError("rejected Audio 8 route was considered valid")
 
     print("promotion_window_contract=PASS")
     return 0

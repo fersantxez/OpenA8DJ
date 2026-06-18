@@ -122,6 +122,10 @@ Physical promotion bundle rule:
 - Built-in/acoustic output, historical route-only evidence, candidate-only
   runs, and skipped known-good checks are diagnostic only and must not satisfy
   branch promotion.
+- The standalone known-good route runner must validate the resolved CoreAudio
+  output identity under lock before playback/capture. A requested substring
+  that resolves to OpenA8DJ/Audio 8 is a hard failure, even if the original
+  text did not literally name Audio 8.
 
 ## Baseline Inputs
 

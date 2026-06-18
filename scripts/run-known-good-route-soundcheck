@@ -204,6 +204,33 @@ opena8dj_acquire_hardware_lock \
 trap opena8dj_release_hardware_lock EXIT
 cp "$(opena8dj_lock_root)/owner" "$run_dir/lock-owner.txt" 2>/dev/null || true
 
+validate_args=(
+  "$root/scripts/validate-known-good-route-request.py"
+  --capture-device "$capture_device"
+  --json-out "$run_dir/known-good-route-request.json"
+)
+if [ -n "$output_device_uid" ]; then
+  validate_args+=(--output-device-uid "$output_device_uid")
+else
+  validate_args+=(--output-device "$output_device")
+fi
+if [ "$allow_same_device_loopback_diagnostic" -eq 1 ]; then
+  validate_args+=(--allow-same-device-loopback-diagnostic)
+fi
+if [ "$allow_built_in_output_acoustic_diagnostic" -eq 1 ]; then
+  validate_args+=(--allow-built-in-output-acoustic-diagnostic)
+fi
+if ! /usr/bin/python3 "${validate_args[@]}" > "$run_dir/known-good-route-request.stdout" \
+  2> "$run_dir/known-good-route-request.stderr"; then
+  {
+    echo "KNOWN_GOOD_ROUTE: FAIL"
+    echo "reason=known_good_route_request_invalid"
+    echo "request=$run_dir/known-good-route-request.json"
+    echo "run_dir=$run_dir"
+  } > "$run_dir/summary.txt"
+  exit 2
+fi
+
 "$root/build/audio-record" "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
   > "$record_log" 2>&1 &
 recorder_pid=$!

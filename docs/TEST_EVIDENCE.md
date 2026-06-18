@@ -42,6 +42,33 @@
     used to claim better sound quality, lower CPU, full routing, timecode
     readiness, or branch promotion.
 
+## 2026-06-17: Standalone Known-Good Route Resolution Guard
+
+- Scope:
+  - Added `scripts/validate-known-good-route-request.py`.
+  - `scripts/run-known-good-route-soundcheck` now validates the resolved
+    CoreAudio output under the hardware lock before playback/capture.
+  - The validator blocks resolved OpenA8DJ/Audio 8 outputs, built-in/acoustic
+    output unless diagnostic, same-device loopback unless diagnostic, and
+    virtual capture paths.
+- Commands:
+  - `python3 -m py_compile scripts/validate-known-good-route-request.py scripts/test-promotion-window-contract.py`
+  - `python3 scripts/test-promotion-window-contract.py`
+  - Synthetic fixture check: `Wired` output returned `0`, ambiguous `Open`
+    returned `1` because it resolved to `Open Audio 8 DJ`.
+- Result:
+  - PASS.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, buffer-size
+    change, playback, capture, or Traktor action was performed.
+- Evidence:
+  - `scripts/test-promotion-window-contract.py`
+  - `scripts/validate-known-good-route-request.py`
+- Interpretation:
+  - The standalone route checker now has the same anti-false-positive posture
+    as the physical promotion window: a future known-good route cannot silently
+    become Audio 8 itself.
+
 ## 2026-06-17: C++ Physical Capture Forensics Over Archived iRig WAVs
 
 - Change:

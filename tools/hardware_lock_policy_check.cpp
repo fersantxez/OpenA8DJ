@@ -132,6 +132,8 @@ int main(int argc, char** argv) {
                                               "explicit non-Audio8 CoreAudio output playback, iRig Stream capture",
                                               "trap opena8dj_release_hardware_lock EXIT",
                                               "--output-device or --output-device-uid is required",
+                                              "validate-known-good-route-request.py",
+                                              "known-good-route-request.json",
                                               "known-good output source must be a wired route source, not built-in/acoustic output",
                                               "--allow-built-in-output-acoustic-diagnostic",
                                               "driver-install,HAL-load,default-device-change,CoreAudio-restart,USB-reset",

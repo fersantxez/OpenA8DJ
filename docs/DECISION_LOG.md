@@ -33,6 +33,34 @@ Evidence:
   `same_window_known_good_route_revalidated` as a failing gate until current
   same-window evidence exists.
 
+## 2026-06-17: Validate Standalone Known-Good Route Resolution Under Lock
+
+Decision:
+- Add `scripts/validate-known-good-route-request.py`.
+- `scripts/run-known-good-route-soundcheck` now runs that validator after
+  acquiring the global hardware lock and before playback/capture.
+- The validator rejects a requested known-good output if the resolved CoreAudio
+  device is OpenA8DJ/Audio 8, built-in/acoustic without diagnostic opt-in, the
+  same device as capture, or a virtual/pre-device capture path.
+
+Reason:
+- The physical-window preflight already rejects resolved Audio 8 devices, but
+  the standalone known-good route runner could still be called directly.
+- An ambiguous output substring such as `Open` must not be allowed to resolve
+  to `Open Audio 8 DJ` and then masquerade as an independent route proof.
+
+Alternatives discarded:
+- Relying only on argument-text rejection: rejected because device resolution
+  can turn a harmless-looking substring into Audio 8.
+- Running live CoreAudio enumeration before the lock: rejected. The standalone
+  runner now performs live validation only after lock acquisition; offline tests
+  use a synthetic `audio-list` text fixture.
+
+Evidence:
+- `python3 scripts/test-promotion-window-contract.py` passes and verifies that
+  a synthetic `Open` request resolving to `Open Audio 8 DJ` fails.
+- Manual offline fixture check returned `Wired` route `0` and `Open` route `1`.
+
 ## 2026-06-17: Add C++ Physical Capture Forensics Before Further Hardware Claims
 
 Decision:

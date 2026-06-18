@@ -87,6 +87,7 @@ python3 -m py_compile \
   scripts/analyze-timebase-family.py \
   scripts/evaluate-promotion-readiness.py \
   scripts/test-promotion-window-contract.py \
+  scripts/validate-known-good-route-request.py \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"

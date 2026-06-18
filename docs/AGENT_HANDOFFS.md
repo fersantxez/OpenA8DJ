@@ -3505,6 +3505,10 @@ Risk:
     regression test for missing route evidence and diagnostic-window rejection.
   - Hardened `physical-window-preflight` to reject resolved known-good devices
     that are actually OpenA8DJ/Audio 8.
+  - Follow-up integration added `scripts/validate-known-good-route-request.py`
+    and wired it into `scripts/run-known-good-route-soundcheck` after hardware
+    lock acquisition, so direct standalone route checks also reject resolved
+    Audio 8 outputs.
 - Risk:
   - This closes a false-positive promotion path. It does not provide the
     missing physical evidence; the next real step remains a locked known-good
