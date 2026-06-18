@@ -8238,3 +8238,35 @@ Next implication:
   The next allowed hardware step is a short lock-gated diagnostic of the
   capture-batch candidate, verifying submit-rate reduction, no qfail storm,
   preserved iRig capture, and physical quality not worse before any broader A/B.
+
+## 2026-06-18 - Reject Capture-Batch Diagnostic For Physical Quality
+
+- Decision: reject `hal-capture-batch-diagnostic` as a product or performance
+  candidate.
+- Reason: lock-gated iRig physical evidence showed catastrophic quality
+  regression even though the active geometry matched the intended design
+  (`captureIsoFramesPerTransfer=64`, playback still ISO8). The run failed with
+  `quality_alignment_score=0.241975`, `analog_snr_db=-13.76`, and
+  `lag_jumps_gt_2_frames=39`.
+- Evidence:
+  - Safety/load PASS:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hal-candidate-safety/20260618T091526Z-capture-batch-d952cb1`
+  - Rejected soundcheck:
+    `/Users/fer/dev/audio8djcpp/local-analysis/soundcheck/20260618T091632Z-capture-batch-diagnostic-d952cb1-irig-pairA-12s`
+  - Cleanup PASS:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/20260618T091755Z-force-unload-rejected-capture-batch-d952cb1`
+- Technical interpretation: the capture side submitted fewer larger transfers,
+  but playback was still replenished from capture completions. With capture
+  completions arriving every 64 frames, playback submission became bursty:
+  `playbackCompletionDeltaOutliers=1514`. Zero `outputUnderruns` did not imply
+  good analog timing.
+- Alternatives now preferred:
+  - Keep the one-stream default baseline as the current less-bad C++ HAL.
+  - Do not pursue capture-only batching unless playback cadence is first
+    decoupled from physical capture completion size with separate timing
+    evidence.
+  - Attack CPU using lower-risk paths first: reduce per-transfer Objective-C
+    overhead, prepared request lifecycle, or playback scheduling only if
+    same-window quality evidence remains stable.
+- Readiness impact: no CPU/resource, audiophile quality, timecode, or branch
+  promotion claim may cite capture batching as positive evidence.

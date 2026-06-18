@@ -12007,3 +12007,47 @@ Full offline gate after commit:
     capture, require active runtime geometry in stream stats, verify capture
     submit rate reduction, verify playback submit cadence did not coalesce, and
     unload/clean up afterward.
+
+## 2026-06-18 - Capture-Batch Diagnostic Physical Rejection
+
+- Commit under test: `d952cb1`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Lock-gated hardware window.
+  - Temporarily installed/loaded only the C++ HAL candidate.
+  - No default-device change, USB reset, Traktor launch, or reboot.
+  - The rejected HAL was force-unloaded after the run and CoreAudio
+    enumeration recovered.
+- Preflight:
+  - Command: `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 10 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hal-candidate-safety/20260618T091526Z-capture-batch-d952cb1`
+  - Result: `hal_candidate_safety=PASS`.
+  - CoreAudio inventory during guard: `iRig Stream` present as `2x2`, `Open
+    Audio 8 DJ` present as `8x8`.
+- Physical soundcheck:
+  - Command: `scripts/run-soundcheck --skip-build --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --capture-device "iRig Stream" --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/soundcheck/20260618T091632Z-capture-batch-diagnostic-d952cb1-irig-pairA-12s`
+  - Evidence: `/Users/fer/dev/audio8djcpp/local-analysis/soundcheck/20260618T091632Z-capture-batch-diagnostic-d952cb1-irig-pairA-12s`.
+  - Result: `FAIL`.
+  - Metrics: `quality_alignment_score=0.241975`, `analog_snr_db=-13.76`,
+    `lag_jumps_gt_2_frames=39`, `capture_clipped_frames=0`.
+  - Runtime geometry: `logicalIsoFramesPerTransfer=8`,
+    `captureIsoFramesPerTransfer=64`,
+    `playbackBaseIsoFramesPerTransfer=8`,
+    `playbackIsoFramesPerTransfer=8`, `playbackCoalesceTransfers=1`.
+  - Submit counters after run: `captureTransfersSubmitted=1523`,
+    `playbackTransfersSubmitted=6610`.
+  - Cadence counters: `outputUnderruns=0`, `outputActiveUnderruns=0`,
+    `playbackCompletionDeltaOutliers=1514`, `clockAnchorValid=0`.
+  - CPU: OpenA8DJ driver stayed around `~10%`, but this is not a win because
+    the audio-quality gate failed catastrophically.
+- Cleanup:
+  - Command: `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 8 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/20260618T091755Z-force-unload-rejected-capture-batch-d952cb1`
+  - Result: `audio_stack_guard=PASS`, `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`.
+- Interpretation:
+  - Capture batching reduced capture-side submit cadence, but coupling
+    playback replenishment to 64-frame capture completions produced bursty
+    playback timing. The proof is the high playback-completion outlier count
+    and failed analog quality despite zero output underrun counters.
+  - This candidate is rejected for product, performance, and branch-promotion
+    purposes. It must not be used as evidence that C++ is better than mainline.
