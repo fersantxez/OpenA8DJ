@@ -58,19 +58,20 @@ Exit criteria:
 
 Hard deadline:
 - 15:00 America/New_York is the operational target for a first human-test RC.
-- At 12:32 EDT the remaining runway is roughly 2.5 hours, not six hours.
+- At 12:48 EDT the remaining runway is roughly 2.2 hours, not six hours.
 - The six-hour target remains useful only as a stabilization ceiling if the
   route or evidence blocks the 15:00 cut.
 
-Current truth at 12:32 EDT:
+Current truth at 12:48 EDT:
 - C++ worktree is `/Users/fer/dev/audio8djcpp` on
-  `driverkit/cpp-redesign`, commit `d41b2d3`.
+  `driverkit/cpp-redesign`, commit `1b09b12`.
 - `build/OpenA8DJ-0.3.25.pkg` and `build/OpenA8DJ-0.3.25.dmg` exist.
-- Offline gates have passed post-commit, but product readiness is still
-  blocked by physical evidence.
-- CoreAudio currently exposes `iRig Stream` and `Open Audio 8 DJ`; no wired
-  non-Audio8, non-built-in known-good output is visible for objective route
-  revalidation.
+- Offline gates have passed post-commit: Debug CTest `83/83`, Release CTest
+  `84/84`, evidence schema PASS with `93` required files, and provenance
+  freshness PASS for `1b09b12`.
+- CoreAudio currently exposes `iRig Stream` and `Open Audio 8 DJ` as `8 in /
+  8 out`; the audio stack is idle-healthy. No wired non-Audio8, non-built-in
+  known-good output is visible for objective route revalidation.
 - The active blocker is measurement-route validity, not iRig absence.
 
 15:00 RC strategy:
@@ -94,6 +95,19 @@ Current truth at 12:32 EDT:
 6. Third physical gate is Timecode Vinyl smoke: input channel presence,
    timecode-profile/routing behavior, no deck leakage, and no CPU spike. This
    can be a smoke gate for human RC; it is not a full DVS certification.
+
+Timebox policy:
+- If route validation is still blocked at 14:00 EDT, freeze the deliverable as
+  a diagnostic installable RC plus written physical-window plan; do not spend
+  the last hour on transport tuning.
+- If route validation passes by 14:00 EDT, use the remaining window only for
+  same-session C++/mainline A/B and CPU/submit-cadence evidence.
+- If A/B passes but Traktor/timecode cannot be run safely before 15:00 EDT,
+  label the result `human-test-rc-audio-routing-only`; do not claim Timecode
+  Vinyl readiness.
+- If Timecode Vinyl smoke also passes, label the result
+  `human-test-rc-timecode-smoke-passed`, still not `mainline-superior` unless
+  quality and CPU metrics beat mainline in the same session.
 
 Must-have before a human-test RC can be offered:
 - Clean worktree or explicit dirty-state manifest.

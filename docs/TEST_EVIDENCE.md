@@ -1,5 +1,39 @@
 # Test Evidence
 
+## 2026-06-18: Post-Commit Timecode Planner RC Evidence
+
+- Scope:
+  - Added the Timecode Vinyl physical-window planner and dry-run runner to the
+    offline gate path.
+  - Re-ran the full offline gate after committing the planner at `1b09b12`.
+  - Ran only read-only device inventory and audio-stack health checks after the
+    gate. No lock was acquired and no playback, recording, install, unload,
+    CoreAudio restart, USB reset, default-device change, or Traktor automation
+    occurred in this verification step.
+- Result:
+  - Commit: `1b09b12`.
+  - Debug CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS, `required_files=93`, `missing_files=0`.
+  - Evidence provenance: PASS, `head_commit=1b09b12`,
+    `summary_base_commit=1b09b12`,
+    `working_tree_clean_for_claim=true`.
+  - Timecode physical-window plan: `BLOCKED`,
+    `ready_for_lock_gated_timecode_window=false`, next action
+    `VALIDATE_KNOWN_GOOD_ROUTE_AND_SAME_SESSION_AB_BEFORE_TRAKTOR_TIMECODE`.
+  - Read-only live inventory: `iRig Stream` visible, `Open Audio 8 DJ` visible
+    as `8 in / 8 out` at `48 kHz`.
+  - Read-only audio-stack health: PASS, watched CPU around `0.4%` total and
+    `opena8dj_driver=0.0%` idle.
+- Evidence:
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/timecode-physical-window-plan.json`
+  - `local-analysis/cpp-offline/timecode-physical-window-plan-test.txt`
+- Interpretation:
+  - The current C++/HAL RC base is reproducible offline and installable as a
+    diagnostic package. It still cannot claim audiophile quality, CPU/resource
+    superiority, physical Timecode Vinyl readiness, or mainline replacement.
+
 ## 2026-06-18: Human-Test Milestone And Low-Risk Offline Hardening
 
 - Scope:

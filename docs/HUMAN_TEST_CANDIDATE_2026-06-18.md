@@ -8,6 +8,18 @@ the C++ line beats mainline C.
 ## Decision
 
 - Use the HAL bundle / PKG path for the first human-test candidate.
+- 12:48 EDT status: commit `1b09b12` is the current measured RC base. The full
+  offline gate has fresh post-commit evidence: Debug CTest `83/83`, Release
+  CTest `84/84`, evidence schema PASS with `93` files, and provenance freshness
+  PASS. `iRig Stream` and `Open Audio 8 DJ` are visible in CoreAudio, and Audio
+  8 exposes `8 in / 8 out` at `48 kHz`. Audio stack health is PASS at idle.
+  This is enough for a controlled diagnostic RC package, not for a product
+  quality, CPU superiority, or Timecode Vinyl readiness claim.
+- 12:48 EDT closure policy: stop expanding scope. The only allowed path to a
+  stronger label before 15:00 EDT is route validation, same-session mainline vs
+  C++ A/B, CPU/submit-cadence comparison, and a bounded Traktor/timecode smoke,
+  all under lock. If any of those cannot be completed safely, ship the
+  installable RC as diagnostic-only with blockers preserved.
 - 11:21 EDT status: the A/B/C/D physical channel-matrix sweep is now a hard
   route/capture blocker for product human testing. All four output pairs were
   present in evidence but failed with expected correlated amplitudes around
@@ -67,14 +79,14 @@ The candidate identity for the human-test window must include:
 - DMG SHA-256;
 - `local-analysis/cpp-offline/current-offline-gates.json`.
 
-## Frozen Candidate Identity - 11:10 EDT
+## Frozen Candidate Identity - 12:48 EDT
 
 - Branch: `driverkit/cpp-redesign`.
-- Commit: `221979b`.
+- Commit: `1b09b12`.
 - HAL executable:
   - `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`
-  - SHA-256:
-    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
+  - SHA-256 must be recorded from the final `make dist` run used for the
+    physical window.
 - PKG:
   - `build/OpenA8DJ-0.3.25.pkg`
   - SHA-256 must be recorded from the final `make dist` run used for the
@@ -87,8 +99,9 @@ The candidate identity for the human-test window must include:
   - `build/OpenA8DJ-0.3.25-checksums.txt`
   - Contains the per-run PKG/DMG SHA-256 values.
 - Offline gates:
-  - Debug/offline CTest: `81/81` PASS.
-  - Release CTest: `82/82` PASS.
+  - Debug/offline CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS with `93` required files.
   - `evidence-provenance-freshness-gate`: PASS,
     `claimable_current_candidate=true`.
   - `product-quality-claim-gate`: PASS as guard, but
@@ -98,6 +111,24 @@ The candidate identity for the human-test window must include:
 
 This identity is installable as a HAL/PKG diagnostic candidate. It is not
 approved as a product-quality or mainline-superiority candidate.
+
+## 15:00 EDT Human-Test Guidance
+
+The first version for a human test can be considered complete enough only if it
+has a precise label:
+
+- `diagnostic-installable-rc`: package installs and enumerates, offline gates
+  pass, iRig and Audio 8 are visible, but physical product route or A/B is
+  missing or blocked.
+- `audio-routing-human-rc`: route validation and same-session mainline/C++ A/B
+  pass on real music and CPU/submit evidence is collected, but Traktor/timecode
+  physical smoke is missing.
+- `timecode-smoke-human-rc`: all of the above plus bounded Traktor/timecode
+  smoke passes with no deck leakage or CPU spike.
+
+The label `mainline-superior` is forbidden today unless the same-session
+physical A/B proves C++ is at least as stable and measurably better on the
+written quality and CPU metrics.
 
 ## Lock-Gated Install And Physical Smoke
 
