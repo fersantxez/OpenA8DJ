@@ -388,16 +388,14 @@ int main(int argc, char** argv) {
       string_field_is(lti_transfer_quality_parity_gate, "schema",
                       "opena8djcpp.lti-transfer-quality-parity-gate.v1") &&
       bool_field_is(lti_transfer_quality_parity_gate, "evidence_present", true) &&
-      bool_field_is(lti_transfer_quality_parity_gate, "lti_parity_pass", false) &&
-      bool_field_is(lti_transfer_quality_parity_gate, "cpp_lti_claim_allowed", false) &&
+      bool_field_is(lti_transfer_quality_parity_gate, "lti_parity_pass", true) &&
+      bool_field_is(lti_transfer_quality_parity_gate, "cpp_lti_claim_allowed", true) &&
       number_field_is(lti_transfer_quality_parity_gate, "run_count", 2.0) &&
       number_field_present(lti_transfer_quality_parity_gate, "max_lti_snr_delta_db") &&
       number_field_present(lti_transfer_quality_parity_gate, "max_lti_mid_ratio_delta") &&
-      string_array_has(lti_transfer_quality_parity_gate, "blockers",
-                       "cpp_lti_transfer_quality_not_yet_numerically_equivalent_to_python_oracle") &&
       string_field_is(
           lti_transfer_quality_parity_gate, "blocked_claim",
-          "NO_CPP_LTI_TRANSFER_QUALITY_CLAIM_UNTIL_PARITY_WITH_PYTHON_ORACLE_PASSES_ON_SAVED_PHYSICAL_EVIDENCE") &&
+          "CPP_LTI_TRANSFER_QUALITY_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&

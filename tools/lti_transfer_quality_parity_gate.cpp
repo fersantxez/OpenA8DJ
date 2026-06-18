@@ -283,9 +283,13 @@ int main(int argc, char** argv) {
     }
     std::cout << "\"" << blockers[index] << "\"";
   }
-  std::cout << "],\n"
-            << "  \"blocked_claim\": \"NO_CPP_LTI_TRANSFER_QUALITY_CLAIM_UNTIL_PARITY_WITH_PYTHON_ORACLE_PASSES_ON_SAVED_PHYSICAL_EVIDENCE\"\n"
-            << "}\n";
+  std::cout << "],\n";
+  if (parity_pass) {
+    std::cout << "  \"blocked_claim\": \"CPP_LTI_TRANSFER_QUALITY_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM\"\n";
+  } else {
+    std::cout << "  \"blocked_claim\": \"NO_CPP_LTI_TRANSFER_QUALITY_CLAIM_UNTIL_PARITY_WITH_PYTHON_ORACLE_PASSES_ON_SAVED_PHYSICAL_EVIDENCE\"\n";
+  }
+  std::cout << "}\n";
 
   return 0;
 }

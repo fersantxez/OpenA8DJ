@@ -1042,8 +1042,10 @@ The parity guard is:
 
 It reruns the C++ LTI analyzer on saved same-session physical evidence and
 compares it against the existing Python/SciPy JSON. The current intended result
-is `PASS` with `lti_parity_pass=false`; that means the guard is active and C++
-LTI claim use remains blocked.
+is `PASS` with `lti_parity_pass=true`; that means the native C++ LTI analyzer is
+numerically close enough to the Python/SciPy oracle for the saved evidence used
+by this parity gate. Product quality and branch-promotion claims remain blocked
+by the physical route, same-session A/B, runtime CPU, and timecode vinyl gates.
 
 ## Opt-In Capture USB Batching Candidate
 

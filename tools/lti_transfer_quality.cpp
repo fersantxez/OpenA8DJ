@@ -349,57 +349,193 @@ std::vector<double> frequency_grid() {
           2000.0, 3000.0, 4000.0, 5000.0, 7000.0, 9000.0, 11000.0};
 }
 
+std::size_t floor_power_of_two(std::size_t value) {
+  std::size_t out = 1U;
+  while ((out << 1U) <= value) {
+    out <<= 1U;
+  }
+  return out;
+}
+
+void fft_radix2(std::vector<std::complex<double>>& values, bool inverse) {
+  const auto count = values.size();
+  for (std::size_t index = 1U, bit = 0U; index < count; ++index) {
+    std::size_t mask = count >> 1U;
+    for (; (bit & mask) != 0U; mask >>= 1U) {
+      bit &= ~mask;
+    }
+    bit |= mask;
+    if (index < bit) {
+      std::swap(values[index], values[bit]);
+    }
+  }
+
+  for (std::size_t length = 2U; length <= count; length <<= 1U) {
+    const double angle = (inverse ? 2.0 : -2.0) * kPi / static_cast<double>(length);
+    const std::complex<double> root(std::cos(angle), std::sin(angle));
+    for (std::size_t start = 0U; start < count; start += length) {
+      std::complex<double> step(1.0, 0.0);
+      for (std::size_t offset = 0U; offset < length / 2U; ++offset) {
+        const auto even = values[start + offset];
+        const auto odd = values[start + offset + length / 2U] * step;
+        values[start + offset] = even + odd;
+        values[start + offset + length / 2U] = even - odd;
+        step *= root;
+      }
+    }
+  }
+
+  if (inverse) {
+    const double scale = 1.0 / static_cast<double>(count);
+    for (auto& value : values) {
+      value *= scale;
+    }
+  }
+}
+
+std::vector<double> unwrap_phase(const std::vector<std::complex<double>>& values) {
+  std::vector<double> phase;
+  phase.reserve(values.size());
+  double previous = 0.0;
+  double correction = 0.0;
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    const double raw = std::arg(values[index]);
+    if (index > 0U) {
+      const double delta = raw - previous;
+      if (delta > kPi) {
+        correction -= 2.0 * kPi;
+      } else if (delta < -kPi) {
+        correction += 2.0 * kPi;
+      }
+    }
+    phase.push_back(raw + correction);
+    previous = raw;
+  }
+  return phase;
+}
+
+std::vector<double> moving_average_same(const std::vector<double>& values, std::uint32_t bins) {
+  if (bins <= 1U || values.empty()) {
+    return values;
+  }
+  std::vector<double> out(values.size(), 0.0);
+  const auto half = static_cast<std::int64_t>(bins / 2U);
+  for (std::size_t index = 0; index < values.size(); ++index) {
+    double sum = 0.0;
+    for (std::uint32_t tap = 0; tap < bins; ++tap) {
+      const auto source =
+          static_cast<std::int64_t>(index) + static_cast<std::int64_t>(tap) - half;
+      if (source >= 0 && source < static_cast<std::int64_t>(values.size())) {
+        sum += values[static_cast<std::size_t>(source)];
+      }
+    }
+    out[index] = sum / static_cast<double>(bins);
+  }
+  return out;
+}
+
+std::vector<std::complex<double>> windowed_fft(std::span<const double> values,
+                                               std::size_t offset,
+                                               std::size_t nperseg,
+                                               const std::vector<double>& window) {
+  double mean = 0.0;
+  for (std::size_t index = 0; index < nperseg; ++index) {
+    mean += values[offset + index];
+  }
+  mean /= static_cast<double>(nperseg);
+
+  std::vector<std::complex<double>> segment(nperseg);
+  for (std::size_t index = 0; index < nperseg; ++index) {
+    segment[index] = (values[offset + index] - mean) * window[index];
+  }
+  fft_radix2(segment, false);
+  return segment;
+}
+
 std::vector<SpectralPoint> estimate_transfer(std::span<const double> reference,
                                              std::span<const double> capture,
                                              double scalar_gain,
                                              std::uint32_t sample_rate,
-                                             std::uint32_t requested_nperseg) {
-  const auto nperseg = std::min<std::size_t>(requested_nperseg, reference.size());
+                                             std::uint32_t requested_nperseg,
+                                             std::uint32_t smooth_bins) {
+  const auto nperseg =
+      floor_power_of_two(std::min<std::size_t>(requested_nperseg, reference.size()));
   const auto hop = std::max<std::size_t>(1U, nperseg / 2U);
-  std::vector<SpectralPoint> points;
-  for (const double frequency : frequency_grid()) {
-    std::complex<double> pxy{};
-    double pxx = 0.0;
-    double pyy = 0.0;
-    double scalar_residual_power = 0.0;
-    double scalar_signal_power = 0.0;
-    std::uint32_t windows = 0;
-    for (std::size_t offset = 0; offset + nperseg <= reference.size(); offset += hop) {
-      const auto ref_window = reference.subspan(offset, nperseg);
-      const auto cap_window = capture.subspan(offset, nperseg);
-      const auto x = dft_at(ref_window, frequency, sample_rate);
-      const auto y = dft_at(cap_window, frequency, sample_rate);
-      pxy += y * std::conj(x);
-      pxx += std::norm(x);
-      pyy += std::norm(y);
+  const auto bins = nperseg / 2U + 1U;
+  std::vector<double> window(nperseg);
+  for (std::size_t index = 0; index < nperseg; ++index) {
+    window[index] =
+        0.5 - 0.5 * std::cos(2.0 * kPi * static_cast<double>(index) /
+                             static_cast<double>(nperseg));
+  }
+
+  std::vector<std::complex<double>> pxy(bins);
+  std::vector<double> pxx(bins, 0.0);
+  std::vector<double> pyy(bins, 0.0);
+  std::vector<double> scalar_residual_power(bins, 0.0);
+  std::vector<double> scalar_signal_power(bins, 0.0);
+  std::uint32_t windows = 0;
+  for (std::size_t offset = 0; offset + nperseg <= reference.size(); offset += hop) {
+    const auto x_fft = windowed_fft(reference, offset, nperseg, window);
+    const auto y_fft = windowed_fft(capture, offset, nperseg, window);
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+      const auto x = x_fft[bin];
+      const auto y = y_fft[bin];
+      pxy[bin] += std::conj(y) * x;
+      pxx[bin] += std::norm(x);
+      pyy[bin] += std::norm(y);
       const auto scalar_pred = scalar_gain * x;
-      scalar_signal_power += std::norm(scalar_pred);
-      scalar_residual_power += std::norm(y - scalar_pred);
-      ++windows;
+      scalar_signal_power[bin] += std::norm(scalar_pred);
+      scalar_residual_power[bin] += std::norm(y - scalar_pred);
     }
-    if (windows == 0U) {
-      continue;
+    ++windows;
+  }
+
+  std::vector<SpectralPoint> points;
+  if (windows == 0U) {
+    return points;
+  }
+
+  std::vector<std::complex<double>> transfer(bins);
+  std::vector<double> magnitude(bins);
+  for (std::size_t bin = 0; bin < bins; ++bin) {
+    transfer[bin] = pxy[bin] / std::max(pxx[bin], kEpsilon);
+    magnitude[bin] = std::abs(transfer[bin]);
+  }
+  auto phase = unwrap_phase(transfer);
+  if (smooth_bins > 1U) {
+    magnitude = moving_average_same(magnitude, smooth_bins);
+    phase = moving_average_same(phase, smooth_bins);
+  }
+  for (std::size_t bin = 0; bin < bins; ++bin) {
+    transfer[bin] =
+        magnitude[bin] * std::complex<double>(std::cos(phase[bin]), std::sin(phase[bin]));
+  }
+
+  std::vector<double> lti_signal_power(bins, 0.0);
+  std::vector<double> lti_residual_power(bins, 0.0);
+  for (std::size_t offset = 0; offset + nperseg <= reference.size(); offset += hop) {
+    const auto x_fft = windowed_fft(reference, offset, nperseg, window);
+    const auto y_fft = windowed_fft(capture, offset, nperseg, window);
+    for (std::size_t bin = 0; bin < bins; ++bin) {
+      const auto predicted = transfer[bin] * x_fft[bin];
+      lti_signal_power[bin] += std::norm(predicted);
+      lti_residual_power[bin] += std::norm(y_fft[bin] - predicted);
     }
-    const auto transfer = pxy / std::max(pxx, kEpsilon);
-    const auto coherence = std::norm(pxy) / std::max(pxx * pyy, kEpsilon);
-    double lti_signal_power = 0.0;
-    double lti_residual_power = 0.0;
-    for (std::size_t offset = 0; offset + nperseg <= reference.size(); offset += hop) {
-      const auto ref_window = reference.subspan(offset, nperseg);
-      const auto cap_window = capture.subspan(offset, nperseg);
-      const auto x = dft_at(ref_window, frequency, sample_rate);
-      const auto y = dft_at(cap_window, frequency, sample_rate);
-      const auto predicted = transfer * x;
-      lti_signal_power += std::norm(predicted);
-      lti_residual_power += std::norm(y - predicted);
-    }
+  }
+
+  points.reserve(bins);
+  for (std::size_t bin = 0; bin < bins; ++bin) {
+    const double frequency = static_cast<double>(bin) * static_cast<double>(sample_rate) /
+                             static_cast<double>(nperseg);
+    const auto coherence = std::norm(pxy[bin]) / std::max(pxx[bin] * pyy[bin], kEpsilon);
     points.push_back({frequency,
-                      transfer,
+                      transfer[bin],
                       std::clamp(coherence, 0.0, 1.0),
-                      scalar_residual_power / windows,
-                      scalar_signal_power / windows,
-                      lti_residual_power / windows,
-                      lti_signal_power / windows});
+                      scalar_residual_power[bin] / windows,
+                      scalar_signal_power[bin] / windows,
+                      lti_residual_power[bin] / windows,
+                      lti_signal_power[bin] / windows});
   }
   return points;
 }
@@ -447,7 +583,8 @@ double total_ratio(const std::vector<SpectralPoint>& points, bool lti) {
 ChannelMetrics analyze_channel(std::span<const double> reference,
                                std::span<const double> capture,
                                std::uint32_t sample_rate,
-                               std::uint32_t nperseg) {
+                               std::uint32_t nperseg,
+                               std::uint32_t smooth_bins) {
   ChannelMetrics out{};
   const double ref_power = dot(reference, reference);
   out.scalar_gain = ref_power > 0.0 ? dot(reference, capture) / ref_power : 0.0;
@@ -463,7 +600,8 @@ ChannelMetrics analyze_channel(std::span<const double> reference,
   out.scalar_snr_db =
       out.scalar_residual_rms > 0.0 ? db20(scalar_signal_rms / out.scalar_residual_rms) : 999.0;
 
-  const auto points = estimate_transfer(reference, capture, out.scalar_gain, sample_rate, nperseg);
+  const auto points =
+      estimate_transfer(reference, capture, out.scalar_gain, sample_rate, nperseg, smooth_bins);
   out.scalar_mid_ratio = band_ratio(points, 1000.0, 5000.0, false);
   out.scalar_high_ratio = band_ratio(points, 5000.0, 12000.0, false);
   out.lti_mid_ratio = band_ratio(points, 1000.0, 5000.0, true);
@@ -522,8 +660,10 @@ RunMetrics analyze_buffers(const std::string& run_label,
   out.alignment_lag = alignment.lag;
   out.compared_frames = usable;
   out.compared_seconds = static_cast<double>(usable) / reference.sample_rate;
-  out.left = analyze_channel(ref_left, cap_left, reference.sample_rate, cli.nperseg);
-  out.right = analyze_channel(ref_right, cap_right, reference.sample_rate, cli.nperseg);
+  out.left =
+      analyze_channel(ref_left, cap_left, reference.sample_rate, cli.nperseg, cli.smooth_bins);
+  out.right =
+      analyze_channel(ref_right, cap_right, reference.sample_rate, cli.nperseg, cli.smooth_bins);
   out.min_lti_snr_delta_db = std::min(out.left.lti_snr_delta_db, out.right.lti_snr_delta_db);
   out.max_lti_mid_ratio_delta =
       std::max(out.left.lti_mid_ratio_delta, out.right.lti_mid_ratio_delta);
@@ -545,17 +685,22 @@ StereoBuffer make_self_test_reference(std::uint32_t sample_rate, double seconds)
   out.sample_rate = sample_rate;
   const auto frames = static_cast<std::size_t>(sample_rate * seconds);
   out.frames.reserve(frames);
-  const auto freqs = frequency_grid();
+  std::uint32_t left_state = 0x12345678U;
+  std::uint32_t right_state = 0x87654321U;
+  auto next = [](std::uint32_t& state) {
+    state ^= state << 13U;
+    state ^= state >> 17U;
+    state ^= state << 5U;
+    return (static_cast<double>(state & 0x00ffffffU) / static_cast<double>(0x00800000U)) - 1.0;
+  };
+  double left_lp = 0.0;
+  double right_lp = 0.0;
   for (std::size_t index = 0; index < frames; ++index) {
-    const double t = static_cast<double>(index) / sample_rate;
-    double left = 0.0;
-    double right = 0.0;
-    for (std::size_t f = 0; f < freqs.size(); ++f) {
-      const double amp = 0.018 + 0.004 * static_cast<double>((f % 5U) + 1U);
-      left += amp * std::sin(2.0 * kPi * freqs[f] * t + 0.17 * static_cast<double>(f));
-      right += amp * std::sin(2.0 * kPi * freqs[f] * t + 0.31 * static_cast<double>(f + 1U));
-    }
-    out.frames.push_back({left, right});
+    left_lp = 0.985 * left_lp + 0.015 * next(left_state);
+    right_lp = 0.982 * right_lp + 0.018 * next(right_state);
+    const double left = 0.65 * next(left_state) + 0.35 * left_lp;
+    const double right = 0.65 * next(right_state) + 0.35 * right_lp;
+    out.frames.push_back({0.045 * left, 0.045 * right});
   }
   return out;
 }

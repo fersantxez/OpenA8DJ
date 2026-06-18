@@ -2659,14 +2659,13 @@ Current implication:
     passes on a clean worktree with Debug/offline CTest `67/67`, Release CTest
     `68/68`, evidence schema `required_files=71` and `missing_files=0`, and
     provenance freshness `PASS`.
-  - The new LTI parity guard currently reports `lti_parity_pass=false` and
-    `cpp_lti_claim_allowed=false`. This is intentional fail-closed behavior:
-    the native C++ LTI self-test is useful diagnostically, but it is not
-    numerically equivalent to the Python/SciPy oracle on saved physical
-    evidence. Product claims must continue to use the Python/SciPy LTI oracle
-    until C++ parity passes.
-  - A short-lived experiment attempted to move the C++ analyzer closer to the
-    SciPy Welch/CSD reconstruction path. It was not kept because the full-length
-    FFT/IFFT approach was too slow for a mandatory gate and regressed the
-    existing self-test. The stable tree keeps the guard and explicitly records
-    the parity blocker instead of lowering thresholds.
+  - The LTI parity guard now reports `lti_parity_pass=true` and
+    `cpp_lti_claim_allowed=true` on saved physical evidence after replacing the
+    sparse 14-frequency C++ estimate with dense segmented FFT Welch/CSD-style
+    analysis and matching the Python/SciPy CSD orientation. Worst focused
+    parity deltas are about `0.17541 dB` LTI SNR, `0.112662` LTI mid-ratio, and
+    `0.0838413` LTI high-ratio, all within the parity thresholds.
+  - This removes only the C++/Python LTI analyzer parity blocker. It does not
+    prove product quality, runtime CPU/resource superiority, Traktor/timecode
+    vinyl readiness, or branch-promotion readiness. Those still require
+    lock-gated physical evidence on a validated capture route.

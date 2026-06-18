@@ -2345,10 +2345,13 @@ Current implementation:
   Python/SciPy output on saved physical evidence.
 - `local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json` must be
   present and `PASS` as a guard. Current expected state is
-  `lti_parity_pass=false` and `cpp_lti_claim_allowed=false`; this means the C++
-  LTI analyzer may not replace the Python/SciPy oracle for claim-critical
-  evidence yet. Future readiness requires `lti_parity_pass=true` on saved
-  physical evidence before using C++ LTI metrics in superiority claims.
+  `lti_parity_pass=true` and `cpp_lti_claim_allowed=true`; this means the C++
+  LTI analyzer is close enough to the Python/SciPy oracle on the saved physical
+  evidence covered by the parity gate. This only removes the C++/Python LTI
+  parity blocker. It does not satisfy product readiness, because route
+  revalidation, same-session physical A/B, runtime CPU/resource comparison, and
+  real Traktor/timecode vinyl evidence are still required before superiority
+  claims.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

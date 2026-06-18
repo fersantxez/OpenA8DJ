@@ -7425,8 +7425,8 @@ Decision:
 - The gate reruns the C++ LTI analyzer on the saved same-session physical
   mainline/C++ run from `20260617T212050Z-mainline-vs-cpp-raw-reuse-irig` and
   compares it against the existing Python/SciPy LTI JSON.
-- It passes as a guard while reporting `lti_parity_pass=false` and
-  `cpp_lti_claim_allowed=false`.
+- In its initial form, it passed as a guard while reporting
+  `lti_parity_pass=false` and `cpp_lti_claim_allowed=false`.
 
 Reason:
 - The C++ LTI analyzer self-test proves the tool can measure a deterministic
@@ -7457,3 +7457,48 @@ Alternatives discarded:
 Next implication:
 - Improve the C++ LTI reconstruction/PSD path or add a closer Welch/CSD model
   until the parity gate can flip `lti_parity_pass=true`.
+
+## 2026-06-18: Make C++ LTI Analysis Numerically Comparable To Python/SciPy
+
+Decision:
+- Replaced the sparse 14-frequency DFT estimate in
+  `opena8djcpp_lti_transfer_quality` with a dense Welch/CSD-style segmented FFT
+  estimate.
+- Matched the Python/SciPy cross-spectral orientation used by
+  `signal.csd(got, ref)`.
+- Kept the analysis offline-only and dependency-free; no hardware, USB,
+  CoreAudio, driver install/reload, playback, or recording is involved.
+
+Reason:
+- The previous C++ analyzer could pass a generated fixture but diverged from
+  Python/SciPy on saved physical evidence because it estimated LTI behavior at a
+  sparse frequency grid and used the opposite CSD orientation.
+- The requested objective requires metrics that can be trusted, not just
+  compiled tools. Passing parity against the existing oracle removes one source
+  of metric ambiguity.
+
+Evidence:
+- Candidate saved physical leg:
+  - alignment lag delta: `1` frame;
+  - scalar SNR delta: about `0.0766 dB`;
+  - LTI SNR delta: about `0.1754 dB`;
+  - LTI mid-ratio delta: about `0.0542`;
+  - LTI high-ratio delta: about `0.0049`.
+- Baseline saved physical leg:
+  - alignment lag delta: `5` frames;
+  - scalar SNR delta: about `0.0343 dB`;
+  - LTI SNR delta: about `0.0182 dB`;
+  - LTI mid-ratio delta: about `0.1127`;
+  - LTI high-ratio delta: about `0.0838`.
+
+Alternatives discarded:
+- Lower parity thresholds: rejected. It would hide real analyzer disagreement.
+- Full-length FFT/IFFT reconstruction in the always-on gate: rejected for now
+  because an earlier attempt was too slow for mandatory offline gates. Segment
+  FFT Welch/CSD gives a fast, close-enough comparison for the current claim
+  guard.
+
+Next implication:
+- The next analysis migration target is fractional time-warp parity, followed
+  by runtime discontinuity correlation parity.
+- This does not authorize product readiness or mainline replacement.

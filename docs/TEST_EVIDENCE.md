@@ -11097,8 +11097,8 @@ Full offline gate rerun:
 - Focused result:
   - `result=PASS`
   - `evidence_present=true`
-  - `lti_parity_pass=false`
-  - `cpp_lti_claim_allowed=false`
+  - Initial guard state: `lti_parity_pass=false`
+  - Initial guard state: `cpp_lti_claim_allowed=false`
 - Key deltas:
   - candidate LTI SNR delta about `13.3798 dB`;
   - candidate LTI mid-ratio delta about `1.27924`;
@@ -11110,6 +11110,46 @@ Full offline gate rerun:
   - The guard is active and correctly blocks C++ LTI claim use.
   - The C++ analyzer needs closer Welch/CSD or reconstruction parity before it
     can replace Python/SciPy for claim-critical LTI evidence.
+
+## 2026-06-18 Dense C++ LTI Welch/CSD Parity
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Updated `opena8djcpp_lti_transfer_quality` from sparse DFT probes to dense
+    segmented FFT Welch/CSD-style analysis.
+  - Corrected CSD orientation to match Python/SciPy `signal.csd(got, ref)`.
+  - Updated `opena8djcpp_lti_transfer_quality_parity_gate` semantics so parity
+    success allows C++ LTI metric use while still blocking product claims
+    elsewhere.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused commands:
+  - `./build/cpp-offline/opena8djcpp_lti_transfer_quality --self-test --json-out local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json`
+  - `./build/cpp-offline/opena8djcpp_lti_transfer_quality_parity_gate | tee local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json`
+- Focused result:
+  - `result=PASS`
+  - `evidence_present=true`
+  - `lti_parity_pass=true`
+  - `cpp_lti_claim_allowed=true`
+  - `blockers=[]`
+- Key parity deltas:
+  - candidate LTI SNR delta about `0.17541 dB`;
+  - candidate LTI mid-ratio delta about `0.0541819`;
+  - candidate LTI high-ratio delta about `0.00491169`;
+  - baseline LTI SNR delta about `0.0182171 dB`;
+  - baseline LTI mid-ratio delta about `0.112662`;
+  - baseline LTI high-ratio delta about `0.0838413`.
+- Evidence:
+  - `local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json`
+  - `local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json`
+- Interpretation:
+  - C++ LTI parity against the saved Python/SciPy oracle evidence now passes.
+  - This removes only the LTI analyzer parity blocker. Product quality,
+    runtime CPU/resource superiority, Traktor/timecode vinyl readiness, and
+    branch promotion remain blocked until their physical gates pass.
 
 Full offline gate after commit:
 - Commit:
