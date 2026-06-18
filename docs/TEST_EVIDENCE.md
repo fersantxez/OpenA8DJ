@@ -10311,3 +10311,39 @@ Full offline gate rerun:
   - The DriverKit source scaffold and offline contracts are not a real dext
     candidate yet. Real DriverKit build claims remain blocked until full Xcode
     with DriverKit SDK is installed and selected.
+
+## 2026-06-18 DriverKit Xcode Install Prerequisite Preflight
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Installed `aria2` via Homebrew so `xcodes` can use the faster
+    multi-connection download path.
+  - Extended `opena8djcpp_driverkit_sdk_preflight_gate` to measure
+    `/Applications` free space, a conservative full-Xcode free-space threshold,
+    and `noninteractive_xcode_install_prerequisites_met`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    System Extension activation, service restart, default-device change,
+    sample-rate change, or buffer-size change was performed.
+- Commands:
+  - `brew install aria2`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_sdk_preflight_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_driverkit_sdk_preflight_gate | tee local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json`
+- Results:
+  - Focused gate: PASS as a guard.
+  - `aria2_present=true`.
+  - `fast_download_helper_present=true`.
+  - `applications_free_gib=12.641`.
+  - `xcode_install_minimum_free_gib=80.000`.
+  - `xcode_install_disk_space_ok=false`.
+  - `noninteractive_xcode_install_prerequisites_met=false`.
+  - `product_driverkit_build_allowed=false`.
+  - `real_driverkit_claim_blocked=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json`
+- Interpretation:
+  - The fast download helper is ready, but a full Xcode install is still
+    blocked by available disk space. Do not attempt Xcode installation until
+    the preflight reports enough free space.

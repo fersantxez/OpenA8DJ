@@ -31,9 +31,11 @@ Branch: `driverkit/cpp-redesign`
   this machine has Command Line Tools selected at
   `/Library/Developer/CommandLineTools`, `xcrun --sdk driverkit --show-sdk-path`
   cannot locate the DriverKit SDK, no `/Applications/Xcode*.app` is installed,
-  `xcodes` CLI is installed and usable at version `2.0.2`, and `aria2c` is not
-  installed. Real DriverKit/dext build and readiness claims remain blocked until
-  full Xcode with DriverKit SDK is installed and selected.
+  and `xcodes` CLI is installed and usable at version `2.0.2`. `aria2c` is now
+  installed for faster future downloads, but `/Applications` currently has only
+  about `12.641 GiB` free against the preflight's conservative `80 GiB` minimum
+  for a full Xcode install. Real DriverKit/dext build and readiness claims
+  remain blocked until full Xcode with DriverKit SDK is installed and selected.
 - The archived iRig WAV frontier now has a C++ forensic gate. It found `61`
   physical runs with WAV evidence, deeply analyzed `12`, and found `0` strict
   audiophile/product candidates. The best analyzed run is

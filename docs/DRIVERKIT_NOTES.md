@@ -54,7 +54,9 @@ Observed on 2026-06-16 and refreshed on 2026-06-18 by
 - `xcodes` CLI is installed and usable (`2.0.2`), and the available list shows
   `26.5 (17F42) [Apple Silicon]` for this host, but `xcodes installed` reports
   zero installed Xcodes.
-- `aria2c` is not installed.
+- `aria2c` is installed, so `xcodes` can use the faster download path.
+- `/Applications` currently has about `12.641 GiB` free. The preflight requires
+  `80 GiB` free before attempting full Xcode installation.
 
 Conclusion:
 
@@ -65,11 +67,15 @@ Conclusion:
   `opena8djcpp_driverkit_shell_contract`, which validate the intended
   device/stream/sample-rate model and bounded lifecycle offline.
 - `opena8djcpp_driverkit_sdk_preflight_gate` must continue to block real dext
-  readiness while `product_driverkit_build_allowed=false`.
+  readiness while `product_driverkit_build_allowed=false`, and must keep
+  `noninteractive_xcode_install_prerequisites_met=false` while disk space is
+  below the Xcode installation threshold.
 
 Required before real dext build:
 
 - Full Xcode with DriverKit SDK.
+- At least `80 GiB` free on the `/Applications` volume before attempting a
+  full Xcode install with `xcodes`.
 - Appropriate DriverKit and AudioDriverKit entitlements.
 - Xcode or CMake/Xcode generator configuration for the dext bundle.
 - Explicit user-approved window before any activation, installation, reload, or system-extension command.

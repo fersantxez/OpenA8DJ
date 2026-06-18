@@ -1,9 +1,12 @@
 #include <array>
+#include <cstdint>
 #include <cstdio>
 #include <filesystem>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <sys/statvfs.h>
 
 namespace {
 
@@ -73,9 +76,21 @@ std::uint32_t non_empty_line_count(const std::string& text) {
   return lines;
 }
 
+std::uint64_t free_bytes_at_path(const char* path) {
+  struct statvfs stats {};
+  if (statvfs(path, &stats) != 0) {
+    return 0;
+  }
+  return static_cast<std::uint64_t>(stats.f_bavail) *
+         static_cast<std::uint64_t>(stats.f_frsize);
+}
+
 }  // namespace
 
 int main() {
+  constexpr double kBytesPerGiB = 1024.0 * 1024.0 * 1024.0;
+  constexpr double kMinimumXcodeInstallFreeGiB = 80.0;
+
   const auto xcode_select = run_command("xcode-select -p 2>&1");
   const auto driverkit_sdk = run_command("xcrun --sdk driverkit --show-sdk-path 2>&1");
   const auto xcode_apps = run_command("ls -1d /Applications/Xcode*.app 2>/dev/null");
@@ -83,6 +98,9 @@ int main() {
   const auto xcodes_version = run_command("xcodes version 2>&1");
   const auto xcodes_installed = run_command("xcodes installed 2>&1");
   const auto aria2_path = run_command("command -v aria2c 2>/dev/null");
+  const auto applications_free_bytes = free_bytes_at_path("/Applications");
+  const double applications_free_gib =
+      static_cast<double>(applications_free_bytes) / kBytesPerGiB;
 
   const bool sdk_available = driverkit_sdk.status == 0 && contains(driverkit_sdk.output, "DriverKit");
   const bool selected_full_xcode = contains(xcode_select.output, "Xcode") &&
@@ -91,10 +109,15 @@ int main() {
   const bool xcodes_cli_present = !xcodes_path.output.empty();
   const bool xcodes_cli_usable = xcodes_version.status == 0 && contains(xcodes_version.output, "2.");
   const bool aria2_present = !aria2_path.output.empty();
+  const bool xcode_install_disk_space_ok =
+      applications_free_gib >= kMinimumXcodeInstallFreeGiB;
   const auto installed_count = non_empty_line_count(xcodes_installed.output);
+  const bool noninteractive_xcode_install_prerequisites_met =
+      xcodes_cli_present && xcodes_cli_usable && aria2_present && xcode_install_disk_space_ok;
   const bool product_driverkit_build_allowed = sdk_available && selected_full_xcode;
   const bool real_driverkit_claim_blocked = !product_driverkit_build_allowed;
 
+  std::cout << std::fixed << std::setprecision(3);
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.driverkit-sdk-preflight-gate.v1\",\n"
             << "  \"result\": \"PASS\",\n"
@@ -117,10 +140,17 @@ int main() {
             << "  \"xcodes_version\": \"" << json_escape(xcodes_version.output) << "\",\n"
             << "  \"xcodes_installed_count\": " << installed_count << ",\n"
             << "  \"aria2_present\": " << (aria2_present ? "true" : "false") << ",\n"
+            << "  \"applications_free_bytes\": " << applications_free_bytes << ",\n"
+            << "  \"applications_free_gib\": " << applications_free_gib << ",\n"
+            << "  \"xcode_install_minimum_free_gib\": " << kMinimumXcodeInstallFreeGiB << ",\n"
+            << "  \"xcode_install_disk_space_ok\": "
+            << (xcode_install_disk_space_ok ? "true" : "false") << ",\n"
             << "  \"recommended_xcode_version_for_current_host\": \"26.5 (17F42) [Apple Silicon]\",\n"
             << "  \"noninteractive_install_tooling_present\": "
             << (xcodes_cli_present ? "true" : "false") << ",\n"
             << "  \"fast_download_helper_present\": " << (aria2_present ? "true" : "false") << ",\n"
+            << "  \"noninteractive_xcode_install_prerequisites_met\": "
+            << (noninteractive_xcode_install_prerequisites_met ? "true" : "false") << ",\n"
             << "  \"product_driverkit_build_allowed\": "
             << (product_driverkit_build_allowed ? "true" : "false") << ",\n"
             << "  \"real_driverkit_claim_blocked\": "
@@ -131,9 +161,11 @@ int main() {
                     : "")
             << "\",\n"
             << "  \"next_required_action\": \""
-            << (real_driverkit_claim_blocked
-                    ? "Install and select full Xcode with DriverKit SDK, then rerun this gate before any real dext build claim"
-                    : "Build DriverKit target into build directory only; do not install or activate without lock-gated window")
+            << (product_driverkit_build_allowed
+                    ? "Build DriverKit target into build directory only; do not install or activate without lock-gated window"
+                    : (noninteractive_xcode_install_prerequisites_met
+                           ? "Install and select full Xcode with DriverKit SDK, then rerun this gate before any real dext build claim"
+                           : "Free enough disk for full Xcode installation, then install/select Xcode with DriverKit SDK and rerun this gate"))
             << "\"\n"
             << "}\n";
 

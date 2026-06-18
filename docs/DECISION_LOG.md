@@ -6876,3 +6876,38 @@ Next implication:
   DriverKit SDK, rerun this preflight gate, then build the DriverKit target into
   the build directory only. Installation/activation still requires a separate
   lock-gated window.
+
+## 2026-06-18: Do Not Attempt Full Xcode Install Until Disk Gate Passes
+
+Decision:
+- Installed `aria2` so `xcodes` can use the faster download path.
+- Extended `opena8djcpp_driverkit_sdk_preflight_gate` to measure
+  `/Applications` free space and a conservative `80 GiB` minimum before a full
+  Xcode install attempt.
+- Treat `noninteractive_xcode_install_prerequisites_met=false` as a toolchain
+  blocker for installing Xcode on this host.
+
+Reason:
+- Installing full Xcode is a large system-level developer-tool change. Starting
+  it with insufficient disk risks partial installs, failed expansion, or cleanup
+  work that does not advance driver quality.
+- The current machine has enough tooling to start a download, but not enough
+  measured free space to do it safely.
+
+Evidence:
+- Focused preflight after installing `aria2` reports `aria2_present=true`,
+  `fast_download_helper_present=true`, `applications_free_gib=12.641`,
+  `xcode_install_minimum_free_gib=80.000`,
+  `xcode_install_disk_space_ok=false`, and
+  `noninteractive_xcode_install_prerequisites_met=false`.
+
+Alternatives discarded:
+- Start `xcodes install 26.5` immediately: rejected because the free-space
+  gate fails.
+- Keep the blocker as prose only: rejected because future readiness claims must
+  be based on executable evidence.
+
+Next implication:
+- Free space or provide a build host with full Xcode/DriverKit SDK before the
+  real DriverKit build target can replace the offline scaffold as a runnable
+  dext candidate.

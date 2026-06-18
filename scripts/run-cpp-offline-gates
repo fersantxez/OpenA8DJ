@@ -776,6 +776,13 @@ summary = {
         "xcodes_cli_usable": driverkit_sdk_preflight.get("xcodes_cli_usable"),
         "xcodes_installed_count": driverkit_sdk_preflight.get("xcodes_installed_count"),
         "aria2_present": driverkit_sdk_preflight.get("aria2_present"),
+        "applications_free_gib": driverkit_sdk_preflight.get("applications_free_gib"),
+        "xcode_install_minimum_free_gib": driverkit_sdk_preflight.get(
+            "xcode_install_minimum_free_gib"
+        ),
+        "xcode_install_disk_space_ok": driverkit_sdk_preflight.get(
+            "xcode_install_disk_space_ok"
+        ),
         "recommended_xcode_version_for_current_host": driverkit_sdk_preflight.get(
             "recommended_xcode_version_for_current_host"
         ),
@@ -784,6 +791,9 @@ summary = {
         ),
         "fast_download_helper_present": driverkit_sdk_preflight.get(
             "fast_download_helper_present"
+        ),
+        "noninteractive_xcode_install_prerequisites_met": driverkit_sdk_preflight.get(
+            "noninteractive_xcode_install_prerequisites_met"
         ),
         "product_driverkit_build_allowed": driverkit_sdk_preflight.get(
             "product_driverkit_build_allowed"

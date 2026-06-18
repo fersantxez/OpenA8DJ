@@ -1905,6 +1905,9 @@ Required before any real DriverKit/dext build or readiness claim:
 - The gate must report the selected developer directory, DriverKit SDK
   availability, installed Xcode count, `xcodes` availability, and fast-download
   helper availability.
+- The gate must also report `/Applications` free space, the minimum free-space
+  threshold for Xcode installation, and
+  `noninteractive_xcode_install_prerequisites_met`.
 - Real DriverKit build claims require
   `product_driverkit_build_allowed=true`.
 - While the current host reports `xcrun_driverkit_sdk_available=false`,
@@ -1912,6 +1915,9 @@ Required before any real DriverKit/dext build or readiness claim:
   `xcodes_installed_count=0`, the offline summary must keep
   `real_driverkit_sdk_and_selected_xcode_missing` in
   `promotion_hard_blockers`.
+- A full Xcode install attempt must not start while
+  `xcode_install_disk_space_ok=false`. Current measured state is about
+  `12.641 GiB` free against an `80 GiB` minimum.
 
 Current interpretation:
 

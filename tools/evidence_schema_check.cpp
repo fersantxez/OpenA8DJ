@@ -34,6 +34,14 @@ bool object_present(std::string_view json, std::string_view key) {
   return opena8djcpp::evidence_json::json_object(json, key).has_value();
 }
 
+bool bool_field_present(std::string_view json, std::string_view key) {
+  return opena8djcpp::evidence_json::json_bool(json, key).has_value();
+}
+
+bool number_field_present(std::string_view json, std::string_view key) {
+  return opena8djcpp::evidence_json::json_number(json, key).has_value();
+}
+
 bool string_array_has(std::string_view json, std::string_view key, std::string_view expected) {
   return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
 }
@@ -180,6 +188,11 @@ int main(int argc, char** argv) {
       object_present(summary, "driverkit_sdk_preflight_gate") &&
       bool_field_is(driverkit_sdk_preflight_gate, "product_driverkit_build_allowed", false) &&
       bool_field_is(driverkit_sdk_preflight_gate, "real_driverkit_claim_blocked", true) &&
+      number_field_present(driverkit_sdk_preflight_gate, "applications_free_gib") &&
+      number_field_present(driverkit_sdk_preflight_gate, "xcode_install_minimum_free_gib") &&
+      bool_field_present(driverkit_sdk_preflight_gate, "xcode_install_disk_space_ok") &&
+      bool_field_present(driverkit_sdk_preflight_gate,
+                         "noninteractive_xcode_install_prerequisites_met") &&
       string_field_is(
           driverkit_sdk_preflight_gate, "blocked_claim",
           "NO_REAL_DRIVERKIT_DEXT_BUILD_OR_READINESS_CLAIM_WITHOUT_DRIVERKIT_SDK_AND_SELECTED_FULL_XCODE") &&

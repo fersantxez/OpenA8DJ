@@ -274,8 +274,11 @@ Current local blocker:
 - `xcodes` CLI is installed and usable (`2.0.2`), and it lists
   `26.5 (17F42) [Apple Silicon]` as the matching full Xcode for this host, but
   `xcodes installed` currently returns zero installed Xcodes.
-- `aria2c` is not installed, so a future Xcode download would use the slower
-  default transfer path unless the fast helper is installed first.
+- `aria2c` is installed, so future `xcodes` downloads can use the faster
+  multi-connection helper.
+- `/Applications` currently has about `12.641 GiB` free. The preflight uses a
+  conservative `80 GiB` minimum before attempting a full Xcode install, because
+  the machine must have room for the download, expansion, and rollback margin.
 - `opena8djcpp_driverkit_sdk_preflight_gate` records this state in
   `local-analysis/cpp-offline/driverkit-sdk-preflight-gate.json` and blocks any
   real DriverKit/dext build claim while the SDK and selected full Xcode are
