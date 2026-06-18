@@ -6578,3 +6578,34 @@ Alternatives discarded:
 Next implication:
 - The next valid promotion window must write all promotion-critical artifacts
   under one `local-analysis/physical-superiority-window/<id>` directory.
+
+## 2026-06-17: Diagnostic PASS Must Not Mean Product Readiness
+
+Decision:
+- Added `opena8djcpp_diagnostic_pass_semantics_gate`.
+- Added its machine-readable artifact to the full offline evidence bundle.
+- Updated the evidence schema check to validate nested structured summary
+  fields for prepared transport, DriverKit USB request counters, and
+  physical-window readiness.
+
+Reason:
+- Several gates correctly return PASS for analyzer health or offline coverage,
+  while product readiness is still false. That is acceptable only if the
+  evidence itself makes the distinction impossible to miss.
+
+Evidence:
+- Full offline gates after integration: Debug CTest `53/53`, Release CTest
+  `54/54`, evidence schema `required_files=54`, `missing_files=0`,
+  `summary_pass=true`, `manifest_pass=true`.
+- `local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json` reports
+  `blocked_claim=DIAGNOSTIC_PASS_DOES_NOT_MEAN_PRODUCT_READINESS_OR_BRANCH_PROMOTION`.
+
+Alternatives discarded:
+- Rely on prose-only warnings: rejected because readiness claims must be
+  machine-checkable.
+- Treat diagnostic PASS as failure: rejected because analyzer health is still
+  useful evidence when its limited meaning is explicit.
+
+Next implication:
+- New analyzer gates that can PASS before product readiness must either be
+  covered by this semantics gate or expose equivalent blocked-claim fields.

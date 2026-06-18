@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
+      root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
@@ -115,6 +116,23 @@ int main(int argc, char** argv) {
   }
 
   const auto summary = read_file(root / "local-analysis/cpp-offline/current-offline-gates.json");
+  const auto runtime_adapter_contract =
+      opena8djcpp::evidence_json::json_object(summary, "runtime_adapter_contract").value_or("");
+  const auto usb_submit_plan_contract =
+      opena8djcpp::evidence_json::json_object(summary, "usb_submit_plan_contract").value_or("");
+  const auto usb_submit_payload_contract =
+      opena8djcpp::evidence_json::json_object(summary, "usb_submit_payload_contract").value_or("");
+  const auto driverkit_usb_submit_binding_contract =
+      opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
+          .value_or("");
+  const auto driverkit_usb_request_lifecycle_contract =
+      opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_lifecycle_contract")
+          .value_or("");
+  const auto driverkit_usb_request_shutdown_contract =
+      opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_shutdown_contract")
+          .value_or("");
+  const auto physical_window_readiness_gate =
+      opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is(summary, "diagnostic_status", "PASS") &&
@@ -131,32 +149,35 @@ int main(int argc, char** argv) {
       string_array_has(summary, "promotion_hard_blockers",
                        "post_reboot_autologin_codex_resume_unfixed") &&
       object_present(summary, "runtime_adapter_contract") &&
-      number_field_is(summary, "stable_usb_submit_reduction_ratio", 8.0) &&
+      number_field_is(runtime_adapter_contract, "stable_usb_submit_reduction_ratio", 8.0) &&
       object_present(summary, "usb_submit_plan_contract") &&
-      number_field_is(summary, "stable_logical_slots", 528.0) &&
-      number_field_is(summary, "stable_total_frames", 5808.0) &&
-      number_field_is(summary, "usb_submit_plan_stable_usb_submit_calls", 66.0) &&
+      number_field_is(usb_submit_plan_contract, "stable_logical_slots", 528.0) &&
+      number_field_is(usb_submit_plan_contract, "stable_total_frames", 5808.0) &&
+      number_field_is(usb_submit_plan_contract, "stable_usb_submit_calls", 66.0) &&
       object_present(summary, "usb_submit_payload_contract") &&
-      number_field_is(summary, "usb_submit_payload_descriptors", 66.0) &&
-      number_field_is(summary, "usb_submit_payload_total_frames", 5808.0) &&
+      number_field_is(usb_submit_payload_contract, "descriptors", 66.0) &&
+      number_field_is(usb_submit_payload_contract, "total_frames", 5808.0) &&
       object_present(summary, "driverkit_usb_submit_binding_contract") &&
-      number_field_is(summary, "driverkit_usb_submit_binding_usb_submit_calls", 66.0) &&
-      number_field_is(summary, "driverkit_usb_submit_binding_total_frames", 5808.0) &&
+      number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
+      number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&
       object_present(summary, "driverkit_usb_request_lifecycle_contract") &&
-      number_field_is(summary, "driverkit_usb_request_lifecycle_submit_calls", 66.0) &&
-      number_field_is(summary, "driverkit_usb_request_lifecycle_completed_frames", 5808.0) &&
+      number_field_is(driverkit_usb_request_lifecycle_contract, "stable_submit_calls", 66.0) &&
+      number_field_is(driverkit_usb_request_lifecycle_contract, "stable_completed_frames", 5808.0) &&
       object_present(summary, "driverkit_usb_request_shutdown_contract") &&
-      number_field_is(summary, "driverkit_usb_request_shutdown_cancelled_requests", 3.0) &&
-      number_field_is(summary, "driverkit_usb_request_shutdown_live_requests_after_stop", 0.0) &&
+      number_field_is(driverkit_usb_request_shutdown_contract, "cancelled_requests", 3.0) &&
+      number_field_is(driverkit_usb_request_shutdown_contract, "live_requests_after_stop", 0.0) &&
       object_present(summary, "physical_window_readiness_gate") &&
-      bool_field_is(summary, "ready_for_route_revalidation_window", true) &&
-      bool_field_is(summary, "ready_for_product_physical_ab", false) &&
-      bool_field_is(summary, "ready_for_branch_promotion", false) &&
-      string_array_has(summary, "allowed_window_types", "ROUTE_REVALIDATION_ONLY") &&
-      string_array_has(summary, "allowed_window_types", "NO_PROMOTION_AB_UNTIL_ROUTE_PASS") &&
+      bool_field_is(physical_window_readiness_gate, "ready_for_route_revalidation_window", true) &&
+      bool_field_is(physical_window_readiness_gate, "ready_for_product_physical_ab", false) &&
+      bool_field_is(physical_window_readiness_gate, "ready_for_branch_promotion", false) &&
+      string_array_has(physical_window_readiness_gate, "allowed_window_types",
+                       "ROUTE_REVALIDATION_ONLY") &&
+      string_array_has(physical_window_readiness_gate, "allowed_window_types",
+                       "NO_PROMOTION_AB_UNTIL_ROUTE_PASS") &&
       string_field_is(
-          summary, "blocked_claim",
+          physical_window_readiness_gate, "blocked_claim",
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
+      object_present(summary, "diagnostic_pass_semantics_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&
       bool_field_is(summary, "usb_touched", false);

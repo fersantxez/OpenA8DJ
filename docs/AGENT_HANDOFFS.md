@@ -3409,10 +3409,18 @@ Risk:
     blockers.
   - Full offline gates passed after integration: Debug CTest `52/52`, Release
     CTest `53/53`, evidence schema `required_files=53`, `missing_files=0`.
+  - Added `opena8djcpp_diagnostic_pass_semantics_gate` so diagnostic PASS
+    artifacts must explicitly say why they are not product readiness or branch
+    promotion evidence.
+  - Full offline gates passed after diagnostic semantics integration: Debug
+    CTest `53/53`, Release CTest `54/54`, evidence schema
+    `required_files=54`, `missing_files=0`.
 - Files affected by integration:
   - `scripts/evaluate-promotion-readiness.py`
   - `scripts/run-cpp-offline-gates`
   - `tools/evidence_schema_check.cpp`
+  - `tools/diagnostic_pass_semantics_gate.cpp`
+  - `CMakeLists.txt`
   - `docs/TEST_EVIDENCE.md`
   - `docs/DECISION_LOG.md`
   - `docs/ARCHITECT_CONTEXT.md`

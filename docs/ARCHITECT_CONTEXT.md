@@ -2446,6 +2446,13 @@ Current implication:
     evidence must all come from the same lock-gated
     `local-analysis/physical-superiority-window/<id>` tree. Current evidence
     fails this correctly with `product_window=null`.
+  - Diagnostic PASS semantics are now machine-checked. The new
+    `opena8djcpp_diagnostic_pass_semantics_gate` requires analyzer PASS
+    artifacts to carry explicit non-product-readiness fields for soundcheck,
+    physical comparison, offline timecode, migration, physical-window
+    readiness, and promotion evaluation. Current full offline evidence after
+    integration: Debug CTest `53/53`, Release CTest `54/54`, evidence schema
+    `required_files=54`, `missing_files=0`.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

@@ -1402,3 +1402,30 @@ PASS/FAIL semantics:
 - `offline_timecode_pass=true` means synthetic/offline DVS contracts pass.
 - `product_timecode_ready=false` blocks any Traktor/timecode-vinyl readiness
   claim until physical lock evidence exists.
+
+## Diagnostic PASS Semantics Gate
+
+Purpose:
+
+- prevent analyzer-health PASS artifacts from being read as product readiness;
+- protect the distinction between offline diagnostics, route-revalidation
+  preconditions, physical product A/B, and branch promotion.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-offline
+cmake --build build/cpp-offline --target opena8djcpp_diagnostic_pass_semantics_gate
+./build/cpp-offline/opena8djcpp_diagnostic_pass_semantics_gate
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json`.
+
+PASS/FAIL semantics:
+
+- `result=PASS` means protected diagnostic artifacts include explicit
+  non-product-readiness semantics.
+- It must not clear product sound-quality, CPU, routing, timecode-vinyl, or
+  branch-promotion blockers.

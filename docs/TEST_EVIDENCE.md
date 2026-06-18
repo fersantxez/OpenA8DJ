@@ -9996,3 +9996,37 @@ Full offline gate rerun:
   - This directly blocks claims of better sound quality, better CPU, full
     routing, or Traktor/timecode-vinyl readiness unless the evidence is
     same-session and same-route.
+
+## 2026-06-17 Diagnostic PASS Semantics Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_diagnostic_pass_semantics_gate`.
+  - The gate checks that diagnostic PASS artifacts remain explicitly
+    non-product-readiness evidence for soundcheck, physical comparison,
+    timecode, prepared migration, physical-window readiness, and promotion.
+  - Hardened `opena8djcpp_evidence_schema_check` to validate structured fields
+    inside the actual nested summary objects rather than expecting duplicated
+    top-level fields.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Commands:
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - `opena8djcpp_diagnostic_pass_semantics_gate`: PASS.
+  - Full offline Debug CTest: `53/53` passed.
+  - Full offline Release CTest: `54/54` passed.
+  - Evidence schema: PASS with `required_files=54`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+- Interpretation:
+  - Analyzer PASS is now mechanically separated from product readiness.
+  - The candidate still cannot be claimed better than mainline until the same
+    lock-gated physical bundle proves route validity, mainline-vs-C++ quality,
+    CPU, routing, and Traktor/timecode vinyl behavior.

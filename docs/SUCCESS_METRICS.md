@@ -2176,6 +2176,14 @@ Prepared transport migration metric:
   `local-analysis/physical-superiority-window/<id>` directory. If any artifact
   is missing, stale, outside that tree, or from another window,
   `single_physical_promotion_evidence_bundle` must FAIL.
+- Diagnostic PASS artifacts must be protected by
+  `local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json`. Minimum
+  expectations: `soundcheck-wav-quality.json` remains analyzer-only,
+  `physical-run-product-superiority.json` cannot imply branch promotion,
+  `timecode-readiness-gate.json` keeps `product_timecode_ready=false` until
+  physical Traktor/vinyl evidence exists, migration stays `product_ready=false`,
+  physical-window readiness stays route-revalidation-only, and promotion
+  evaluation keeps `branch_promotion_allowed=false`.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.
