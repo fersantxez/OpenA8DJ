@@ -14347,3 +14347,36 @@ Readiness impact:
   fail-closed decision: package/diagnostic review is allowed, but product audio
   listening is explicitly forbidden while the measured route is contaminated
   after a clean USB boundary.
+
+## 2026-06-18 - Final Objective Readiness Gate
+
+Commit context:
+- Local changes after `b1f22b7`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Offline evaluation of existing evidence and git status only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, or external worktree mutation.
+
+Commands:
+- `python3 -m py_compile scripts/evaluate-final-objective-readiness.py scripts/test-final-objective-readiness.py`
+- `python3 scripts/test-final-objective-readiness.py`
+- `python3 scripts/evaluate-final-objective-readiness.py --json-out local-analysis/cpp-offline/final-objective-readiness.json`
+
+Result:
+- Final objective readiness fixture: PASS.
+- Live evaluator result: PASS for evaluator execution only.
+- Current objective status: `NOT_READY`.
+- `objective_achieved=false`.
+- `quality_superiority_proven=false`.
+- `performance_superiority_proven=false`.
+- `timecode_vinyl_physical_proven=false`.
+- `branch_promotion_allowed=false`.
+
+Readiness impact:
+- The 15:00 EDT target is an installable diagnostic/human-smoke RC unless the
+  route prerequisite changes before the window.
+- Product listening, CPU/resource superiority, Timecode Vinyl certification,
+  and Legacy/main promotion require a validated wired non-Audio8 route,
+  same-session mainline/C++ physical A/B, and lock-gated CPU/submit evidence.

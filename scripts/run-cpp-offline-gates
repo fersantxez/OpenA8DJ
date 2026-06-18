@@ -269,6 +269,8 @@ python3 -m py_compile \
   scripts/test-plan-timecode-physical-window.py \
   scripts/analyze-route-contamination.py \
   scripts/test-route-contamination-analysis.py \
+  scripts/evaluate-final-objective-readiness.py \
+  scripts/test-final-objective-readiness.py \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
@@ -279,6 +281,7 @@ python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-
 python3 scripts/test-plan-physical-evidence-window.py | tee "$EVIDENCE_DIR/physical-evidence-window-plan-test.txt"
 python3 scripts/test-plan-timecode-physical-window.py | tee "$EVIDENCE_DIR/timecode-physical-window-plan-test.txt"
 python3 scripts/test-route-contamination-analysis.py | tee "$EVIDENCE_DIR/route-contamination-analysis-test.txt"
+python3 scripts/test-final-objective-readiness.py | tee "$EVIDENCE_DIR/final-objective-readiness-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -288,6 +291,9 @@ set -e
 if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; then
   exit "$PROMOTION_EVALUATOR_RC"
 fi
+python3 scripts/evaluate-final-objective-readiness.py \
+  --json-out "$EVIDENCE_DIR/final-objective-readiness.json" \
+  >/dev/null
 ./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee "$EVIDENCE_DIR/prepared-transport-migration-gate.json"
 ./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee "$EVIDENCE_DIR/physical-window-readiness-gate.json"
 ./build/cpp-release/opena8djcpp_evidence_json_contract | tee "$EVIDENCE_DIR/evidence-json-contract.json"
@@ -449,6 +455,7 @@ prepared_runtime_physical_window_contract = load_json(
 )
 human_test_rc_gate = load_json("human-test-rc-gate.json")
 human_test_rc_status = load_json("human-test-rc-status.json")
+final_objective_readiness = load_json("final-objective-readiness.json")
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
@@ -567,6 +574,14 @@ summary = {
     ),
     "human_test_rc_timecode_physical_window_ready": human_test_rc_status.get(
         "timecode_physical_window_ready"
+    ),
+    "final_objective_status": final_objective_readiness.get("objective_status"),
+    "final_objective_achieved": final_objective_readiness.get("objective_achieved"),
+    "final_objective_branch_promotion_allowed": final_objective_readiness.get(
+        "branch_promotion_allowed"
+    ),
+    "final_objective_next_required_action": final_objective_readiness.get(
+        "next_required_action"
     ),
     "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
         "diagnostic_rc_artifacts_ready"
@@ -2906,6 +2921,33 @@ summary = {
         ),
         "blockers": human_test_rc_status.get("blockers", []),
         "evidence": "local-analysis/cpp-offline/human-test-rc-status.json",
+    },
+    "final_objective_readiness": {
+        "status": final_objective_readiness.get("result"),
+        "schema": final_objective_readiness.get("schema"),
+        "objective_status": final_objective_readiness.get("objective_status"),
+        "objective_achieved": final_objective_readiness.get("objective_achieved"),
+        "quality_superiority_proven": final_objective_readiness.get(
+            "quality_superiority_proven"
+        ),
+        "functionality_superiority_or_parity_proven": final_objective_readiness.get(
+            "functionality_superiority_or_parity_proven"
+        ),
+        "performance_superiority_proven": final_objective_readiness.get(
+            "performance_superiority_proven"
+        ),
+        "timecode_vinyl_physical_proven": final_objective_readiness.get(
+            "timecode_vinyl_physical_proven"
+        ),
+        "legacy_main_promotion_plan_allowed": final_objective_readiness.get(
+            "legacy_main_promotion_plan_allowed"
+        ),
+        "branch_promotion_allowed": final_objective_readiness.get(
+            "branch_promotion_allowed"
+        ),
+        "blockers": final_objective_readiness.get("blockers", []),
+        "next_required_action": final_objective_readiness.get("next_required_action"),
+        "evidence": "local-analysis/cpp-offline/final-objective-readiness.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

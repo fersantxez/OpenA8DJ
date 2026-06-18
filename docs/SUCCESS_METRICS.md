@@ -2654,3 +2654,27 @@ Current implementation:
   `--skip-known-good`, same-device iRig loopback, built-in/acoustic output, or
   any virtual/pre-device or non-iRig capture route that is not a same-window
   wired non-Audio8 known-good source into the same physical iRig capture path.
+
+## Final Objective Metric
+
+- `local-analysis/cpp-offline/final-objective-readiness.json` must be present
+  in every claimable evidence bundle.
+- The evaluator may report `result=PASS` while the product remains not ready;
+  only `objective_achieved=true` permits a final objective claim.
+- Required before `objective_achieved=true`:
+  - current clean worktree evidence from the C++ branch;
+  - no mutation in `/Users/fer/dev/opena8dj` or
+    `/Users/fer/dev/audio8djrust`;
+  - installable artifacts with candidate hashes recorded;
+  - DriverKit/deXt runtime readiness or an explicit documented reason why the
+    current RC is HAL-only;
+  - validated wired non-Audio8 known-good physical route into iRig;
+  - same-session C mainline vs C++ quality comparison with C++ strictly better
+    or equal where equality is the declared criterion;
+  - CPU/resource p95 no worse than mainline and preferably lower under the same
+    physical workload;
+  - physical Traktor/Timecode Vinyl evidence at required sample rates;
+  - explicit approval gate before any Legacy/main branch movement.
+- The 15:00 EDT target is allowed to produce an installable diagnostic RC with
+  `objective_achieved=false`; it is not allowed to produce a superiority claim
+  without the physical gates above.

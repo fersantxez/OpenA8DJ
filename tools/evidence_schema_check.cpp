@@ -162,6 +162,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
       root / "local-analysis/cpp-offline/promotion-window-contract.txt",
+      root / "local-analysis/cpp-offline/final-objective-readiness.json",
+      root / "local-analysis/cpp-offline/final-objective-readiness-test.txt",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",
@@ -305,6 +307,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const auto product_quality_claim_gate =
       opena8djcpp::evidence_json::json_object(summary, "product_quality_claim_gate").value_or("");
+  const auto final_objective_readiness =
+      opena8djcpp::evidence_json::json_object(summary, "final_objective_readiness").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is_last(summary, "diagnostic_status", "PASS") &&
@@ -371,6 +375,10 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "human_test_rc_timecode_physical_window_ready", false) &&
       bool_field_is(summary, "human_test_product_allowed", false) &&
       string_field_present(summary, "human_test_next_required_action") &&
+      string_field_is(summary, "final_objective_status", "NOT_READY") &&
+      bool_field_is(summary, "final_objective_achieved", false) &&
+      bool_field_is(summary, "final_objective_branch_promotion_allowed", false) &&
+      string_field_present(summary, "final_objective_next_required_action") &&
       string_field_is(summary, "route_contamination_status", "PASS") &&
       string_field_is(summary, "route_contamination_classification",
                       "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
@@ -1199,6 +1207,33 @@ int main(int argc, char** argv) {
       bool_field_is(promotion_window_contract, "ambiguous_known_good_output_rejected", true) &&
       bool_field_is(promotion_window_contract, "virtual_capture_window_blocked", true) &&
       bool_field_is(promotion_window_contract, "non_irig_capture_window_blocked", true) &&
+      object_present(summary, "final_objective_readiness") &&
+      string_field_is(final_objective_readiness, "status", "PASS") &&
+      string_field_is(final_objective_readiness, "schema",
+                      "opena8djcpp.final-objective-readiness.v1") &&
+      string_field_is(final_objective_readiness, "objective_status", "NOT_READY") &&
+      bool_field_is(final_objective_readiness, "objective_achieved", false) &&
+      bool_field_is(final_objective_readiness, "quality_superiority_proven", false) &&
+      bool_field_is(final_objective_readiness, "functionality_superiority_or_parity_proven",
+                    false) &&
+      bool_field_is(final_objective_readiness, "performance_superiority_proven", false) &&
+      bool_field_is(final_objective_readiness, "timecode_vinyl_physical_proven", false) &&
+      bool_field_is(final_objective_readiness, "legacy_main_promotion_plan_allowed", false) &&
+      bool_field_is(final_objective_readiness, "branch_promotion_allowed", false) &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "real DriverKit/dext build and runtime readiness are not proven on this host") &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "wired non-Audio8 known-good route is not validated and route is contaminated after clean USB") &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "same-session physical quality has not beaten mainline") &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "runtime CPU/resource superiority over mainline is not physically proven") &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "physical Traktor/Timecode Vinyl window is blocked or uncertified") &&
+      string_array_has(final_objective_readiness, "blockers",
+                       "Legacy/main promotion remains forbidden until all objective evidence passes") &&
+      string_field_is(final_objective_readiness, "next_required_action",
+                      "VALIDATE_WIRED_NON_AUDIO8_ROUTE_THEN_SAME_SESSION_MAINLINE_CPP_AB_CPU_TIMECODE") &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

@@ -5018,3 +5018,40 @@ Next action:
 - Do not run product listening or Timecode Vinyl. First validate a wired
   non-Audio8 known-good output into iRig under lock; only then run same-session
   mainline/C++ A/B and CPU/submit comparison.
+
+## 2026-06-18 Architect Continuation: Final Objective Gate
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Turn the user's full objective into an executable fail-closed readiness
+  evaluator before the 15:00 EDT human-test decision.
+
+Findings:
+- At 13:20 EDT the remaining window is less than two hours, not six.
+- The candidate can be packaged and reviewed as an installable diagnostic RC,
+  but it cannot honestly be called better than mainline without validated
+  physical route evidence, same-session A/B quality, CPU/resource comparison,
+  and Timecode Vinyl physical proof.
+
+Integrated action:
+- Added `scripts/evaluate-final-objective-readiness.py` and a fixture test.
+- Integrated final objective fields into `scripts/run-cpp-offline-gates` and
+  `opena8djcpp_evidence_schema_check`.
+
+Risks:
+- A human test performed through the currently contaminated route can create a
+  false product failure or false recovery signal.
+
+Next action:
+- Run focused checks, commit the final objective gate, then regenerate the full
+  offline bundle. If a known-good output becomes visible before 15:00, use the
+  planned lock-gated route-validation and same-session A/B path; otherwise
+  freeze the diagnostic RC and evidence package.

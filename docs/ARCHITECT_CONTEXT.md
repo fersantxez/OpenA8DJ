@@ -3218,3 +3218,19 @@ Current implication:
   `route_only_ready=false`, and `full_ab_ready=false` because the known-good
   non-Audio8 output is still missing. This reduces human-window ambiguity
   without touching mainline, Rust, hardware, CoreAudio, USB, or defaults.
+- 13:20 EDT schedule correction: the requested 15:00 EDT target leaves under
+  two hours, not six. The achievable target is a frozen installable RC package
+  plus a fail-closed evidence bundle and exact lock-gated commands for route
+  validation, same-session mainline/C++ A/B, CPU/resource comparison, and
+  Timecode Vinyl physical certification if the route prerequisite becomes
+  valid. Product superiority, Timecode Vinyl readiness, and Legacy/main
+  promotion remain forbidden until those physical gates pass.
+- Final objective readiness gate: `scripts/evaluate-final-objective-readiness.py`
+  now evaluates the full user objective from existing evidence and git status
+  only. Its own `result=PASS` only means the evaluator ran; the readiness claim
+  is `objective_achieved`. Current expected classification is
+  `objective_status=NOT_READY`, `objective_achieved=false`,
+  `branch_promotion_allowed=false`, with blockers for real DriverKit runtime,
+  contaminated/missing known-good route, missing same-session physical quality
+  win over mainline, missing runtime CPU/resource superiority, blocked physical
+  Traktor/Timecode Vinyl, and forbidden Legacy/main promotion.

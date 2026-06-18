@@ -1870,3 +1870,40 @@ PASS/FAIL semantics:
 - Product Timecode Vinyl readiness still requires current route validation,
   same-session mainline/C++ comparison, real Traktor scope observation, and CPU
   evidence under lock.
+
+## Final Objective Readiness Gate
+
+Purpose:
+
+- keep the full user objective executable as a single fail-closed audit;
+- prevent installable diagnostic RC status from being confused with product
+  superiority or Legacy/main promotion readiness;
+- require quality, functionality, Timecode Vinyl, CPU/resource, route, and
+  DriverKit/runtime evidence before any final objective claim.
+
+Command shape:
+
+```sh
+scripts/evaluate-final-objective-readiness.py \
+  --json-out local-analysis/cpp-offline/final-objective-readiness.json
+
+scripts/test-final-objective-readiness.py
+```
+
+Expected current result:
+
+- `result=PASS` for evaluator execution;
+- `objective_status=NOT_READY`;
+- `objective_achieved=false`;
+- `quality_superiority_proven=false`;
+- `performance_superiority_proven=false`;
+- `timecode_vinyl_physical_proven=false`;
+- `branch_promotion_allowed=false`.
+
+15:00 EDT decision rule:
+
+- If no wired non-Audio8 known-good output is validated before the window, ship
+  only the installable diagnostic RC and evidence packet for review.
+- If the route is validated under lock, run the same-window mainline/C++ A/B,
+  CPU/submit comparison, and Timecode Vinyl physical window before any product
+  listening or superiority claim.
