@@ -14380,3 +14380,34 @@ Readiness impact:
 - Product listening, CPU/resource superiority, Timecode Vinyl certification,
   and Legacy/main promotion require a validated wired non-Audio8 route,
   same-session mainline/C++ physical A/B, and lock-gated CPU/submit evidence.
+
+## 2026-06-18 - Human-Test RC Packet Generator
+
+Commit context:
+- Local changes after `8d576bd`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Existing evidence and artifact hash generation only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, or external worktree mutation.
+
+Commands:
+- `python3 -m py_compile scripts/build-human-test-rc-packet.py scripts/test-build-human-test-rc-packet.py`
+- `python3 scripts/test-build-human-test-rc-packet.py`
+- `python3 scripts/build-human-test-rc-packet.py --json-out local-analysis/cpp-offline/human-test-rc-packet.json --markdown-out local-analysis/cpp-offline/human-test-rc-packet.md`
+
+Expected result:
+- Packet fixture: PASS.
+- Packet status: `DIAGNOSTIC_RC_PACKET_READY`.
+- Product human test allowed: `false`.
+- Objective achieved: `false`.
+- Next allowed command while the route is absent: read-only
+  `scripts/watch-known-good-route`.
+
+Readiness impact:
+- The next physical/human handoff now has a single current packet with hashes,
+  blockers, allowed window types, and commands.
+- It keeps the RC useful for diagnostic package review while blocking product
+  claims until route validation, same-session A/B, CPU, DriverKit, and Timecode
+  evidence exist.

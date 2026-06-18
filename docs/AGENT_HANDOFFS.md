@@ -5055,3 +5055,37 @@ Next action:
   offline bundle. If a known-good output becomes visible before 15:00, use the
   planned lock-gated route-validation and same-session A/B path; otherwise
   freeze the diagnostic RC and evidence package.
+
+## 2026-06-18 Architect Continuation: Human-Test RC Packet
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Make the next human/diagnostic window operable from one evidence packet
+  instead of scattered JSON and docs.
+
+Findings:
+- A read-only watcher at 17:27Z still found iRig and Audio 8 visible, but no
+  valid non-Audio8/non-built-in output for route validation.
+- DriverKit remains blocked by missing full Xcode/DriverKit SDK on this host.
+
+Integrated action:
+- Added `scripts/build-human-test-rc-packet.py` and fixture test.
+- Integrated the packet into `scripts/run-cpp-offline-gates` and
+  `opena8djcpp_evidence_schema_check`.
+
+Risks:
+- The packet can make a diagnostic RC easier to review; it must not be
+  interpreted as product audio readiness.
+
+Next action:
+- Regenerate the full offline bundle and commit if the schema requires the
+  packet successfully. Then use the packet's watcher command until a valid
+  route appears.

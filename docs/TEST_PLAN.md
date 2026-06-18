@@ -1907,3 +1907,38 @@ Expected current result:
 - If the route is validated under lock, run the same-window mainline/C++ A/B,
   CPU/submit comparison, and Timecode Vinyl physical window before any product
   listening or superiority claim.
+
+## Human-Test RC Packet
+
+Purpose:
+
+- produce one operator-facing packet for the next human/diagnostic window;
+- keep installable artifacts, hashes, blockers, allowed window types, and next
+  commands together in the evidence bundle;
+- make the packet fail closed when the candidate is diagnostic-only.
+
+Command shape:
+
+```sh
+scripts/build-human-test-rc-packet.py \
+  --json-out local-analysis/cpp-offline/human-test-rc-packet.json \
+  --markdown-out local-analysis/cpp-offline/human-test-rc-packet.md
+
+scripts/test-build-human-test-rc-packet.py
+```
+
+Expected current result:
+
+- `packet_status=DIAGNOSTIC_RC_PACKET_READY`;
+- `objective.achieved=false`;
+- `human_test.product_human_test_allowed=false`;
+- `route.route_only_ready=false`;
+- `timecode.physical_window_ready=false`;
+- `driverkit.product_driverkit_build_allowed=false`;
+- next command is the read-only known-good route watcher.
+
+PASS/FAIL semantics:
+
+- Packet PASS means the decision packet was built from current evidence.
+- It is not product readiness and does not allow human product listening unless
+  the embedded route, A/B, CPU, and Timecode gates allow it.

@@ -3234,3 +3234,12 @@ Current implication:
   contaminated/missing known-good route, missing same-session physical quality
   win over mainline, missing runtime CPU/resource superiority, blocked physical
   Traktor/Timecode Vinyl, and forbidden Legacy/main promotion.
+- Human-test RC packet update: `scripts/build-human-test-rc-packet.py` now
+  converts the current evidence bundle into JSON plus Markdown under
+  `local-analysis/cpp-offline`. It records package/DMG/HAL hashes, objective
+  status, human-test status, route status, Timecode status, DriverKit SDK
+  status, promotion policy, and the next allowed command. Current expected
+  packet state is `DIAGNOSTIC_RC_PACKET_READY`: package review is allowed, but
+  product audio listening, CPU superiority, Timecode Vinyl certification, and
+  Legacy/main promotion remain blocked until the route and same-session
+  physical evidence pass.

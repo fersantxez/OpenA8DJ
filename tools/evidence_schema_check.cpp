@@ -164,6 +164,9 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/promotion-window-contract.txt",
       root / "local-analysis/cpp-offline/final-objective-readiness.json",
       root / "local-analysis/cpp-offline/final-objective-readiness-test.txt",
+      root / "local-analysis/cpp-offline/human-test-rc-packet.json",
+      root / "local-analysis/cpp-offline/human-test-rc-packet.md",
+      root / "local-analysis/cpp-offline/human-test-rc-packet-test.txt",
       root / "local-analysis/cpp-offline/offline-bench-release.json",
       root / "docs/PHYSICAL_TEST_WINDOW_PLAN.md",
       root / "docs/OFFLINE_READINESS_REPORT.md",
@@ -309,6 +312,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "product_quality_claim_gate").value_or("");
   const auto final_objective_readiness =
       opena8djcpp::evidence_json::json_object(summary, "final_objective_readiness").value_or("");
+  const auto human_test_rc_packet =
+      opena8djcpp::evidence_json::json_object(summary, "human_test_rc_packet").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
       string_field_is_last(summary, "diagnostic_status", "PASS") &&
@@ -379,6 +384,11 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "final_objective_achieved", false) &&
       bool_field_is(summary, "final_objective_branch_promotion_allowed", false) &&
       string_field_present(summary, "final_objective_next_required_action") &&
+      string_field_is(summary, "human_test_rc_packet_status", "DIAGNOSTIC_RC_PACKET_READY") &&
+      bool_field_is(summary, "human_test_rc_packet_product_human_test_allowed", false) &&
+      bool_field_is(summary, "human_test_rc_packet_objective_achieved", false) &&
+      string_array_has(summary, "human_test_rc_packet_next_commands",
+                       "read_only_route_watcher") &&
       string_field_is(summary, "route_contamination_status", "PASS") &&
       string_field_is(summary, "route_contamination_classification",
                       "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
@@ -1234,6 +1244,23 @@ int main(int argc, char** argv) {
                        "Legacy/main promotion remains forbidden until all objective evidence passes") &&
       string_field_is(final_objective_readiness, "next_required_action",
                       "VALIDATE_WIRED_NON_AUDIO8_ROUTE_THEN_SAME_SESSION_MAINLINE_CPP_AB_CPU_TIMECODE") &&
+      object_present(summary, "human_test_rc_packet") &&
+      string_field_is(human_test_rc_packet, "status", "PASS") &&
+      string_field_is(human_test_rc_packet, "schema",
+                      "opena8djcpp.human-test-rc-packet.v1") &&
+      string_field_is(human_test_rc_packet, "packet_status",
+                      "DIAGNOSTIC_RC_PACKET_READY") &&
+      bool_field_is(human_test_rc_packet, "artifacts_ready", true) &&
+      bool_field_is(human_test_rc_packet, "objective_achieved", false) &&
+      bool_field_is(human_test_rc_packet, "product_human_test_allowed", false) &&
+      bool_field_is(human_test_rc_packet, "route_only_ready", false) &&
+      bool_field_is(human_test_rc_packet, "full_ab_ready", false) &&
+      bool_field_is(human_test_rc_packet, "timecode_physical_window_ready", false) &&
+      bool_field_is(human_test_rc_packet, "driverkit_build_allowed", false) &&
+      bool_field_is(human_test_rc_packet, "legacy_main_promotion_allowed", false) &&
+      string_array_has(human_test_rc_packet, "next_commands", "read_only_route_watcher") &&
+      string_field_is(human_test_rc_packet, "evidence",
+                      "local-analysis/cpp-offline/human-test-rc-packet.json") &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

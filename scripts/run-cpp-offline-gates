@@ -271,6 +271,8 @@ python3 -m py_compile \
   scripts/test-route-contamination-analysis.py \
   scripts/evaluate-final-objective-readiness.py \
   scripts/test-final-objective-readiness.py \
+  scripts/build-human-test-rc-packet.py \
+  scripts/test-build-human-test-rc-packet.py \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
@@ -282,6 +284,7 @@ python3 scripts/test-plan-physical-evidence-window.py | tee "$EVIDENCE_DIR/physi
 python3 scripts/test-plan-timecode-physical-window.py | tee "$EVIDENCE_DIR/timecode-physical-window-plan-test.txt"
 python3 scripts/test-route-contamination-analysis.py | tee "$EVIDENCE_DIR/route-contamination-analysis-test.txt"
 python3 scripts/test-final-objective-readiness.py | tee "$EVIDENCE_DIR/final-objective-readiness-test.txt"
+python3 scripts/test-build-human-test-rc-packet.py | tee "$EVIDENCE_DIR/human-test-rc-packet-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -3093,6 +3096,89 @@ summary["promotion_readiness_evaluator"] = {
         if gate.get("result") != "PASS"
     ],
     "evidence": "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
+}
+summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+python3 scripts/evaluate-final-objective-readiness.py \
+  --json-out "$EVIDENCE_DIR/final-objective-readiness.json" \
+  >/dev/null
+python3 scripts/build-human-test-rc-packet.py \
+  --json-out "$EVIDENCE_DIR/human-test-rc-packet.json" \
+  --markdown-out "$EVIDENCE_DIR/human-test-rc-packet.md" \
+  >/dev/null
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+root = Path.cwd()
+evidence = root / "local-analysis/cpp-offline"
+summary_path = evidence / "current-offline-gates.json"
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+final_objective = json.loads((evidence / "final-objective-readiness.json").read_text(encoding="utf-8"))
+packet = json.loads((evidence / "human-test-rc-packet.json").read_text(encoding="utf-8"))
+
+summary["final_objective_status"] = final_objective.get("objective_status")
+summary["final_objective_achieved"] = final_objective.get("objective_achieved")
+summary["final_objective_branch_promotion_allowed"] = final_objective.get(
+    "branch_promotion_allowed"
+)
+summary["final_objective_next_required_action"] = final_objective.get(
+    "next_required_action"
+)
+summary["human_test_rc_packet_status"] = packet.get("packet_status")
+summary["human_test_rc_packet_product_human_test_allowed"] = (
+    packet.get("human_test", {}).get("product_human_test_allowed")
+)
+summary["human_test_rc_packet_objective_achieved"] = (
+    packet.get("objective", {}).get("achieved")
+)
+summary["human_test_rc_packet_next_commands"] = [
+    command.get("name") for command in packet.get("next_commands", [])
+]
+summary["final_objective_readiness"] = {
+    "status": final_objective.get("result"),
+    "schema": final_objective.get("schema"),
+    "objective_status": final_objective.get("objective_status"),
+    "objective_achieved": final_objective.get("objective_achieved"),
+    "quality_superiority_proven": final_objective.get("quality_superiority_proven"),
+    "functionality_superiority_or_parity_proven": final_objective.get(
+        "functionality_superiority_or_parity_proven"
+    ),
+    "performance_superiority_proven": final_objective.get("performance_superiority_proven"),
+    "timecode_vinyl_physical_proven": final_objective.get(
+        "timecode_vinyl_physical_proven"
+    ),
+    "legacy_main_promotion_plan_allowed": final_objective.get(
+        "legacy_main_promotion_plan_allowed"
+    ),
+    "branch_promotion_allowed": final_objective.get("branch_promotion_allowed"),
+    "blockers": final_objective.get("blockers", []),
+    "next_required_action": final_objective.get("next_required_action"),
+    "evidence": "local-analysis/cpp-offline/final-objective-readiness.json",
+}
+summary["human_test_rc_packet"] = {
+    "status": packet.get("result"),
+    "schema": packet.get("schema"),
+    "packet_status": packet.get("packet_status"),
+    "artifacts_ready": packet.get("artifacts_ready"),
+    "objective_achieved": packet.get("objective", {}).get("achieved"),
+    "product_human_test_allowed": packet.get("human_test", {}).get(
+        "product_human_test_allowed"
+    ),
+    "route_only_ready": packet.get("route", {}).get("route_only_ready"),
+    "full_ab_ready": packet.get("route", {}).get("full_ab_ready"),
+    "timecode_physical_window_ready": packet.get("timecode", {}).get(
+        "physical_window_ready"
+    ),
+    "driverkit_build_allowed": packet.get("driverkit", {}).get(
+        "product_driverkit_build_allowed"
+    ),
+    "legacy_main_promotion_allowed": packet.get("promotion_policy", {}).get(
+        "legacy_main_promotion_allowed"
+    ),
+    "next_commands": [command.get("name") for command in packet.get("next_commands", [])],
+    "evidence": "local-analysis/cpp-offline/human-test-rc-packet.json",
+    "markdown": "local-analysis/cpp-offline/human-test-rc-packet.md",
 }
 summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
