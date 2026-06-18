@@ -10963,3 +10963,32 @@ Full offline gate rerun:
     physical promotion evidence.
   - This is still not an audiophile quality claim, not timecode-vinyl physical
     readiness, and not branch promotion support.
+
+## 2026-06-18 Physical Window Audiophile Analyzer Wiring
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Updated `scripts/run-physical-superiority-window` so physical mainline and
+    C++ soundcheck legs generate both compiled C++ and Python/SciPy audiophile
+    analyzer JSON when `fixture/reference.wav` and `captured.wav` exist.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Commands:
+  - `bash -n scripts/run-physical-superiority-window`
+  - `scripts/run-physical-superiority-window --capture-device 'iRig Stream' --skip-known-good --run-dir local-analysis/physical-superiority-window/dry-run-audiophile-analyzers-wiring`
+- Results:
+  - Syntax check: PASS.
+  - Dry-run: PASS, plan-only.
+  - Dry-run summary included: `native C++ WAV quality analysis plus C++/Python
+    audiophile analysis for both runs`.
+- Evidence:
+  - `local-analysis/physical-superiority-window/dry-run-audiophile-analyzers-wiring/summary.txt`
+  - `local-analysis/physical-superiority-window/dry-run-audiophile-analyzers-wiring/window-manifest.txt`
+- Interpretation:
+  - Future lock-gated physical windows will produce the analyzer files needed
+    for stricter quality review.
+  - This is source/planning evidence only; it does not validate a physical route
+    or support product readiness.

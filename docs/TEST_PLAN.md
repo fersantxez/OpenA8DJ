@@ -1497,6 +1497,13 @@ Both analyzers are offline-only. They do not install, unload, reload, or touch
 any driver, USB device, CoreAudio state, default device, sample rate, or buffer
 size.
 
+`scripts/run-physical-superiority-window --execute` now writes both analyzer
+artifacts for each Audio 8 leg when `captured.wav` and
+`fixture/reference.wav` exist:
+
+- `<leg>/audiophile-wav-analysis-cpp.json`
+- `<leg>/audiophile-wav-analysis.json`
+
 PASS/FAIL semantics:
 
 - Current expected PASS means the guard is active and

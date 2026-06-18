@@ -7289,3 +7289,31 @@ Next implication:
 - A physical promotion window must pass both the compiled C++ analyzer and the
   Python/SciPy analyzer on current same-session evidence before any sound
   quality claim can move forward.
+
+## 2026-06-18: Wire Audiophile Analyzers Into Physical Window Evidence
+
+Decision:
+- Updated `scripts/run-physical-superiority-window` so each Audio 8 soundcheck
+  leg writes both:
+  - `audiophile-wav-analysis-cpp.json`;
+  - `audiophile-wav-analysis.json`.
+- The script now builds `opena8djcpp_audiophile_wav_analysis` with the other
+  physical-window tools and records per-leg analyzer return codes in
+  `window-soundcheck-status.txt`.
+
+Reason:
+- A future physical window is the only evidence that can move the project
+  toward an audiophile-quality claim. The high-precision analyzers must be part
+  of that window by default, not a manual afterthought.
+- This keeps the current safety model intact: the analyzers only read the WAVs
+  saved by the lock-gated soundcheck and write JSON beside them.
+
+Evidence:
+- Source change only so far; no physical window was executed in this step.
+- `bash -n scripts/run-physical-superiority-window` is required after this
+  change before the next commit.
+
+Next implication:
+- Same-session mainline/C++ physical A/B evidence will now carry both analyzer
+  outputs per leg. Product superiority remains blocked unless those analyzer
+  results, route validity, CPU/submit cadence, and Traktor/timecode gates pass.

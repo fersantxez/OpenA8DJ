@@ -1002,6 +1002,13 @@ The C++ analyzer accepts the same `--reference`, `--capture`,
 arguments. Both tools are read-only with respect to audio hardware. They only
 read WAV files and write JSON evidence.
 
+The physical superiority window script runs both analyzers automatically for
+each Audio 8 soundcheck leg when `fixture/reference.wav` and `captured.wav`
+exist:
+
+- `audiophile-wav-analysis-cpp.json`
+- `audiophile-wav-analysis.json`
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

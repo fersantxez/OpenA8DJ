@@ -13,7 +13,8 @@ Execution sequence when --execute is present:
   2. validate a known-good non-Audio8 source through the iRig capture route;
   3. install/reload the explicit mainline HAL candidate and run soundcheck;
   4. install/reload the explicit C++ HAL candidate and run soundcheck;
-  5. run native C++ WAV quality analysis for both captures;
+  5. run native C++ WAV quality analysis plus C++/Python audiophile analyzers
+     for both captures;
   6. compare same-session mainline vs C++ physical metrics;
   7. run promotion-readiness evaluation against the C++ evidence;
   8. unload the active candidate unless --leave-loaded is present.
@@ -201,7 +202,7 @@ if [ "$execute" -ne 1 ]; then
     echo "1 known-good non-Audio8 route -> iRig"
     echo "2 mainline HAL safety install/reload and soundcheck"
     echo "3 C++ HAL safety install/reload and soundcheck"
-    echo "4 native C++ WAV quality analysis for both runs"
+    echo "4 native C++ WAV quality analysis plus C++/Python audiophile analysis for both runs"
     echo "5 same-session physical comparison"
     echo "6 promotion-readiness evaluator"
     echo "run_dir=$run_dir"
@@ -291,7 +292,10 @@ if [ "$skip_build" -ne 1 ]; then
   make -C "$root" build/audio-wav-play build/audio-record build/opena8dj-control >/dev/null
   cmake -S "$root" -B "$root/build/cpp-release" -DCMAKE_BUILD_TYPE=Release >/dev/null
   cmake --build "$root/build/cpp-release" \
-    --target opena8djcpp_soundcheck_wav_quality opena8djcpp_physical_run_compare >/dev/null
+    --target \
+      opena8djcpp_soundcheck_wav_quality \
+      opena8djcpp_audiophile_wav_analysis \
+      opena8djcpp_physical_run_compare >/dev/null
 fi
 
 if [ "$skip_known_good" -ne 1 ]; then
@@ -397,23 +401,60 @@ run_audio8_soundcheck() {
   fi
   local soundcheck_rc=0
   local native_rc=0
+  local audiophile_cpp_rc=0
+  local audiophile_python_rc=0
   set +e
   "${soundcheck_args[@]}"
   soundcheck_rc=$?
   set -e
 
-  if [ -f "$out_dir/captured.wav" ]; then
+  if [ -f "$out_dir/captured.wav" ] && [ -f "$out_dir/fixture/reference.wav" ]; then
     set +e
     "$root/build/cpp-release/opena8djcpp_soundcheck_wav_quality" "$out_dir" \
       > "$out_dir/native-quality.json" \
       2> "$out_dir/native-quality.err"
     native_rc=$?
+    "$root/build/cpp-release/opena8djcpp_audiophile_wav_analysis" \
+      --reference "$out_dir/fixture/reference.wav" \
+      --capture "$out_dir/captured.wav" \
+      --capture-channels "$capture_channels" \
+      --seconds "$seconds" \
+      --label "$label-physical-window" \
+      --json-out "$out_dir/audiophile-wav-analysis-cpp.json" \
+      > "$out_dir/audiophile-wav-analysis-cpp.stdout" \
+      2> "$out_dir/audiophile-wav-analysis-cpp.err"
+    audiophile_cpp_rc=$?
+    analysis_py="${ANALYSIS_PY:-$root/.venv-analysis/bin/python}"
+    if [ -x "$analysis_py" ]; then
+      "$analysis_py" "$root/scripts/analyze-audiophile-wav.py" \
+        --reference "$out_dir/fixture/reference.wav" \
+        --capture "$out_dir/captured.wav" \
+        --capture-channels "$capture_channels" \
+        --seconds "$seconds" \
+        --label "$label-physical-window" \
+        --json-out "$out_dir/audiophile-wav-analysis.json" \
+        > "$out_dir/audiophile-wav-analysis.stdout" \
+        2> "$out_dir/audiophile-wav-analysis.err"
+      audiophile_python_rc=$?
+    else
+      audiophile_python_rc=126
+      echo "missing analysis environment: run scripts/setup-analysis-env or set ANALYSIS_PY" \
+        > "$out_dir/audiophile-wav-analysis.err"
+    fi
     set -e
   else
     native_rc=125
+    audiophile_cpp_rc=125
+    audiophile_python_rc=125
     {
-      echo "native quality skipped: missing captured.wav"
+      echo "native quality skipped: missing captured.wav or fixture/reference.wav"
     } > "$out_dir/native-quality.err"
+    {
+      echo "audiophile analysis skipped: missing captured.wav or fixture/reference.wav"
+    } > "$out_dir/audiophile-wav-analysis-cpp.err"
+    {
+      echo "audiophile analysis skipped: missing captured.wav or fixture/reference.wav"
+    } > "$out_dir/audiophile-wav-analysis.err"
   fi
 
   {
@@ -421,6 +462,8 @@ run_audio8_soundcheck() {
     echo "hal_safety_rc=$hal_safety_rc"
     echo "soundcheck_rc=$soundcheck_rc"
     echo "native_rc=$native_rc"
+    echo "audiophile_cpp_rc=$audiophile_cpp_rc"
+    echo "audiophile_python_rc=$audiophile_python_rc"
     echo "out_dir=$out_dir"
   } > "$out_dir/window-soundcheck-status.txt"
 
@@ -489,11 +532,15 @@ set -e
     echo "mainline_hal_candidate_safety=$run_dir/mainline-hal-candidate-safety"
     echo "mainline_soundcheck=$run_dir/mainline-soundcheck"
     echo "mainline_native_quality=$run_dir/mainline-soundcheck/native-quality.json"
+    echo "mainline_audiophile_cpp=$run_dir/mainline-soundcheck/audiophile-wav-analysis-cpp.json"
+    echo "mainline_audiophile_python=$run_dir/mainline-soundcheck/audiophile-wav-analysis.json"
     echo "mainline_soundcheck_rc=$mainline_soundcheck_rc"
   fi
   echo "cpp_hal_candidate_safety=$run_dir/cpp-hal-candidate-safety"
   echo "cpp_soundcheck=$run_dir/cpp-soundcheck"
   echo "cpp_native_quality=$run_dir/cpp-soundcheck/native-quality.json"
+  echo "cpp_audiophile_cpp=$run_dir/cpp-soundcheck/audiophile-wav-analysis-cpp.json"
+  echo "cpp_audiophile_python=$run_dir/cpp-soundcheck/audiophile-wav-analysis.json"
   echo "cpp_soundcheck_rc=$cpp_soundcheck_rc"
   echo "same_session_compare=$run_dir/same-session-physical-compare.json"
   echo "same_session_rc=$same_session_rc"
