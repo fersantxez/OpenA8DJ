@@ -86,12 +86,15 @@ int main(int argc, char** argv) {
   const auto hal_safety = read_file(evidence / "hal-candidate-safety-gate.json");
   const auto prepared_runtime_source =
       read_file(evidence / "hal-prepared-runtime-source-contract.json");
+  const auto prepared_runtime_binding =
+      read_file(evidence / "hal-prepared-runtime-binding-contract.json");
 
   const bool evidence_present = !hal_source.empty() && !control_source.empty() &&
                                 !run_soundcheck.empty() && !stream_stats_analyzer.empty() &&
                                 !makefile.empty() && !migration.empty() &&
                                 !product_quality.empty() && !physical_window.empty() &&
-                                !hal_safety.empty() && !prepared_runtime_source.empty();
+                                !hal_safety.empty() && !prepared_runtime_source.empty() &&
+                                !prepared_runtime_binding.empty();
 
   const bool hal_has_direct_usb_enqueue =
       contains(hal_source, "enqueueIORequestWithData:transfer.data") &&
@@ -111,6 +114,27 @@ int main(int argc, char** argv) {
       bool_field_is(prepared_runtime_source, "prepared_runtime_opt_in_target_build_only", true) &&
       bool_field_is(prepared_runtime_source, "source_has_compile_time_geometry_guards", true) &&
       bool_field_is(prepared_runtime_source, "runtime_claim_still_blocked", true);
+  const bool hal_prepared_runtime_binding_contract_pass =
+      string_field_is(prepared_runtime_binding, "result", "PASS") &&
+      bool_field_is(prepared_runtime_binding, "opt_in_profile_binds_64_transaction_geometry",
+                    true) &&
+      bool_field_is(prepared_runtime_binding, "default_runtime_preserved", true) &&
+      bool_field_is(prepared_runtime_binding, "capture_pool_uses_prepared_geometry", true) &&
+      bool_field_is(prepared_runtime_binding, "playback_pool_uses_prepared_geometry", true) &&
+      bool_field_is(prepared_runtime_binding, "transfer_pool_lifetime_completion_owned", true) &&
+      bool_field_is(prepared_runtime_binding, "capture_enqueue_uses_prepared_geometry", true) &&
+      bool_field_is(prepared_runtime_binding, "playback_enqueue_uses_prepared_geometry", true) &&
+      bool_field_is(prepared_runtime_binding,
+                    "capture_paced_playback_batches_to_prepared_geometry", true) &&
+      bool_field_is(prepared_runtime_binding, "capture_submit_counter_success_only", true) &&
+      bool_field_is(prepared_runtime_binding, "playback_submit_counter_success_only", true) &&
+      bool_field_is(prepared_runtime_binding, "completion_counters_completion_owned", true) &&
+      bool_field_is(prepared_runtime_binding, "timestamps_use_physical_counts", true) &&
+      bool_field_is(prepared_runtime_binding, "runtime_geometry_observable", true) &&
+      bool_field_is(prepared_runtime_binding, "submit_cadence_observable", true) &&
+      number_or(prepared_runtime_binding, "expected_submit_reduction_ratio", 0.0) >= 8.0 &&
+      bool_field_is(prepared_runtime_binding, "physical_evidence_present", false) &&
+      bool_field_is(prepared_runtime_binding, "product_claim_allowed", false);
   const bool hal_prepared_runtime_physical_evidence_present = false;
   const bool hal_has_logical_physical_capture_split =
       contains(hal_source, "OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
@@ -196,6 +220,7 @@ int main(int argc, char** argv) {
       bool_field_is(migration, "migration_candidate_supported", true) &&
       bool_field_is(migration, "product_ready", false) &&
       bool_field_is(migration, "branch_promotion_supported", false) &&
+      bool_field_is(migration, "hal_prepared_runtime_binding_safe", true) &&
       number_or(migration, "runtime_adapter_stable_usb_submit_reduction_ratio", 0.0) >= 8.0 &&
       gate_array_has_name(migration, "driverkit_usb_request_lifecycle_safe") &&
       gate_array_has_name(migration, "driverkit_usb_request_shutdown_safe");
@@ -218,7 +243,8 @@ int main(int argc, char** argv) {
       !hal_prepared_runtime_physical_evidence_present;
   const bool product_claim_blocked =
       runtime_reduction_missing && offline_prepared_model_supported &&
-      hal_prepared_runtime_source_contract_pass && current_quality_blocked && physical_ab_blocked &&
+      hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
+      current_quality_blocked && physical_ab_blocked &&
       hal_load_is_only_safety;
 
   std::vector<std::string> blockers;
@@ -237,6 +263,9 @@ int main(int argc, char** argv) {
   }
   if (!hal_prepared_runtime_source_contract_pass) {
     blockers.push_back("hal_prepared_runtime_source_contract_missing_or_failing");
+  }
+  if (!hal_prepared_runtime_binding_contract_pass) {
+    blockers.push_back("hal_prepared_runtime_binding_contract_missing_or_failing");
   }
   if (!offline_prepared_model_supported) {
     blockers.push_back("offline_prepared_transport_model_not_supported");
@@ -268,6 +297,10 @@ int main(int argc, char** argv) {
       << (hal_has_runtime_prepared_submit_guard ? "true" : "false") << ",\n"
       << "  \"hal_prepared_runtime_source_contract_pass\": "
       << (hal_prepared_runtime_source_contract_pass ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_runtime_binding_contract_pass\": "
+      << (hal_prepared_runtime_binding_contract_pass ? "true" : "false") << ",\n"
+      << "  \"hal_prepared_runtime_expected_submit_reduction_ratio\": "
+      << number_or(prepared_runtime_binding, "expected_submit_reduction_ratio", -1.0) << ",\n"
       << "  \"hal_prepared_runtime_default_off\": "
       << (bool_field_is(prepared_runtime_source, "prepared_runtime_default_off", true) ? "true"
                                                                                        : "false")

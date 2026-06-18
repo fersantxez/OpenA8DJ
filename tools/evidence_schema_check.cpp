@@ -93,6 +93,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json",
+      root / "local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json",
       root / "local-analysis/cpp-offline/prepared-transport-pressure-gate.json",
       root / "local-analysis/cpp-offline/prepared-transport-migration-gate.json",
       root / "local-analysis/cpp-offline/jitter-model.json",
@@ -158,6 +159,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto hal_prepared_runtime_source_contract =
       opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_source_contract")
+          .value_or("");
+  const auto hal_prepared_runtime_binding_contract =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_binding_contract")
           .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
@@ -288,6 +292,37 @@ int main(int argc, char** argv) {
                     "source_exposes_runtime_geometry_constants", true) &&
       bool_field_is(hal_prepared_runtime_source_contract, "default_geometry_preserved", true) &&
       bool_field_is(hal_prepared_runtime_source_contract, "runtime_claim_still_blocked", true) &&
+      object_present(summary, "hal_prepared_runtime_binding_contract") &&
+      string_field_is(hal_prepared_runtime_binding_contract, "status", "PASS") &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "opt_in_profile_binds_64_transaction_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract, "default_runtime_preserved", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "capture_pool_uses_prepared_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "playback_pool_uses_prepared_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "transfer_pool_lifetime_completion_owned", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "capture_enqueue_uses_prepared_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "playback_enqueue_uses_prepared_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "capture_paced_playback_batches_to_prepared_geometry", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "capture_submit_counter_success_only", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "playback_submit_counter_success_only", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "completion_counters_completion_owned", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract,
+                    "timestamps_use_physical_counts", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract, "runtime_geometry_observable", true) &&
+      bool_field_is(hal_prepared_runtime_binding_contract, "submit_cadence_observable", true) &&
+      number_field_is(hal_prepared_runtime_binding_contract, "expected_submit_reduction_ratio",
+                      8.0) &&
+      bool_field_is(hal_prepared_runtime_binding_contract, "physical_evidence_present", false) &&
+      bool_field_is(hal_prepared_runtime_binding_contract, "product_claim_allowed", false) &&
       object_present(summary, "driverkit_usb_submit_binding_contract") &&
       number_field_is(driverkit_usb_submit_binding_contract, "usb_submit_calls", 66.0) &&
       number_field_is(driverkit_usb_submit_binding_contract, "total_frames", 5808.0) &&
@@ -537,6 +572,10 @@ int main(int argc, char** argv) {
       bool_field_is(hal_transport_runtime_gate, "hal_has_runtime_prepared_submit_guard", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_source_contract_pass",
                     true) &&
+      bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_binding_contract_pass",
+                    true) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "hal_prepared_runtime_expected_submit_reduction_ratio", 8.0) &&
       bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_default_off", true) &&
       bool_field_is(hal_transport_runtime_gate, "hal_prepared_runtime_opt_in_target_present",
                     true) &&

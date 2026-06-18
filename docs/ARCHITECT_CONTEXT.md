@@ -28,6 +28,16 @@ Branch: `driverkit/cpp-redesign`
   `hal_transport_runtime_gate` still reports
   `runtime_reduction_missing=true` plus
   `hal_prepared_runtime_physical_evidence_present=false`.
+- 2026-06-18 prepared-runtime binding status:
+  `opena8djcpp_hal_prepared_runtime_binding_contract` now proves offline that
+  the opt-in HAL profile is bound to the actual transfer-pool allocation,
+  capture/playback enqueue geometry, capture-paced playback batching,
+  completion-owned lifetime, timestamp accounting, and submit-cadence
+  observability. Required geometry is ISO8 logical slots into 64-transaction
+  capture/playback submits, so the expected submit-rate reduction is `8x` if
+  the hardware accepts the profile. This is still not a CPU, sound-quality,
+  routing, Timecode Vinyl, or promotion claim; physical evidence is explicitly
+  `false`.
 - 2026-06-17 status: C++ is not ready for branch promotion or physical
   readiness claims. Locked physical runs show a CPU-quality tradeoff, not an
   improvement over mainline. ISO8/current-cadence builds remain high CPU and

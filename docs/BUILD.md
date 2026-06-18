@@ -137,7 +137,8 @@ local HAL bundle with:
 make -B hal
 ```
 
-`opena8djcpp_hal_prepared_runtime_source_contract` and
+`opena8djcpp_hal_prepared_runtime_source_contract`,
+`opena8djcpp_hal_prepared_runtime_binding_contract`, and
 `opena8djcpp_hal_transport_runtime_gate` must remain green before the profile
 can be considered for a lock-gated physical route revalidation window.
 

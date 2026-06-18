@@ -1,5 +1,51 @@
 # Decision Log
 
+## 2026-06-18: Require HAL Prepared Runtime Binding Contract Before Claims
+
+Decision:
+- Add `opena8djcpp_hal_prepared_runtime_binding_contract` as a required
+  offline gate between the build-only prepared HAL profile and any physical
+  runtime experiment.
+- Require the contract from `prepared_transport_migration_gate`,
+  `hal_transport_runtime_gate`, evidence schema, static policy, and the full
+  offline runner.
+- Keep the claim blockers intact: the binding contract can prove source/runtime
+  geometry wiring, but cannot prove lower CPU, better sound, Timecode Vinyl
+  correctness, or branch promotion.
+
+Reason:
+- The prepared profile is meaningful only if its 64-transaction geometry is
+  actually used by transfer pools, enqueue calls, capture-paced playback
+  batching, completion-owned lifetimes, timestamps, and observable counters.
+- A compile-only target is too weak to justify hardware claims, while a direct
+  runtime rewrite is too risky without a precise contract for what must remain
+  true.
+
+Evidence:
+- `opena8djcpp_hal_prepared_runtime_binding_contract`: PASS.
+- Focused CTest passed:
+  `opena8djcpp_hal_prepared_runtime_binding_contract`,
+  `opena8djcpp_prepared_transport_migration_gate`,
+  `opena8djcpp_hal_transport_runtime_gate`, and
+  `opena8djcpp_static_policy_check`.
+- Key contract values:
+  `expected_logical_iso_frames=8`, `expected_slots_per_submit=8`,
+  `expected_capture_transactions_per_submit=64`,
+  `expected_playback_transactions_per_submit=64`,
+  `expected_submit_reduction_ratio=8`,
+  `physical_evidence_present=false`, and `product_claim_allowed=false`.
+
+Alternatives discarded:
+- Treating `make -B hal-prepared-runtime` as runtime proof: rejected because
+  it does not measure accepted USB submits, CPU, jitter, or audio quality.
+- Installing/loading the candidate before this contract: rejected because
+  transfer lifetime and completion semantics are hot-path risks.
+
+Next implication:
+- The next hardware step remains a lock-gated route revalidation and then a
+  prepared-runtime physical A/B that records submit counters, CPU/resource
+  counters, capture quality, routing isolation, and Timecode Vinyl evidence.
+
 ## 2026-06-18: Add Default-Off HAL Prepared Runtime Build Profile
 
 Decision:

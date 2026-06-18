@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
       root / "tools/usb_submit_payload_contract.cpp",
       root / "tools/hal_prepared_submit_adapter_contract.cpp",
       root / "tools/hal_prepared_runtime_source_contract.cpp",
+      root / "tools/hal_prepared_runtime_binding_contract.cpp",
       root / "tools/prepared_transport_pressure_gate.cpp",
       root / "tools/prepared_transport_migration_gate.cpp",
       root / "tools/physical_run_compare.cpp",

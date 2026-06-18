@@ -255,6 +255,8 @@ int main(int argc, char** argv) {
       read_file(base / "hal-prepared-submit-adapter-contract.json");
   const auto hal_prepared_runtime_source =
       read_file(base / "hal-prepared-runtime-source-contract.json");
+  const auto hal_prepared_runtime_binding =
+      read_file(base / "hal-prepared-runtime-binding-contract.json");
   const auto pressure = read_file(base / "prepared-transport-pressure-gate.json");
   const auto runtime = read_file(base / "driverkit-runtime-contract.json");
   const auto hot_path = read_file(base / "hot-path-timing-analysis.json");
@@ -435,6 +437,40 @@ int main(int argc, char** argv) {
       json_bool(hal_prepared_runtime_source, "source_exposes_runtime_geometry_constants")
           .value_or(false) &&
       json_bool(hal_prepared_runtime_source, "runtime_claim_still_blocked").value_or(false);
+  const bool hal_prepared_runtime_binding_safe =
+      result_pass(hal_prepared_runtime_binding) &&
+      json_bool(hal_prepared_runtime_binding, "opt_in_profile_binds_64_transaction_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "default_runtime_preserved").value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "compile_time_geometry_guard_present")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "capture_pool_uses_prepared_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "playback_pool_uses_prepared_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "transfer_pool_lifetime_completion_owned")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "capture_enqueue_uses_prepared_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "playback_enqueue_uses_prepared_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding,
+                "capture_paced_playback_batches_to_prepared_geometry")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "capture_submit_counter_success_only")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "playback_submit_counter_success_only")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "completion_counters_completion_owned")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "timestamps_use_physical_counts")
+          .value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "runtime_geometry_observable").value_or(false) &&
+      json_bool(hal_prepared_runtime_binding, "submit_cadence_observable").value_or(false) &&
+      json_number(hal_prepared_runtime_binding, "expected_submit_reduction_ratio").value_or(0.0) >=
+          8.0 &&
+      !json_bool(hal_prepared_runtime_binding, "physical_evidence_present").value_or(true) &&
+      !json_bool(hal_prepared_runtime_binding, "product_claim_allowed").value_or(true);
   const bool routing_and_timecode_safe =
       number_is_zero(packet, "channel_identity_failures") &&
       json_bool(packet, "product_safe").value_or(false) &&
@@ -541,6 +577,7 @@ int main(int argc, char** argv) {
       {"usb_submit_payload_plan_safe", usb_submit_payload_safe},
       {"hal_prepared_submit_adapter_safe", hal_prepared_submit_adapter_safe},
       {"hal_prepared_runtime_source_guarded", hal_prepared_runtime_source_guarded},
+      {"hal_prepared_runtime_binding_safe", hal_prepared_runtime_binding_safe},
       {"routing_and_timecode_safe_offline_only", routing_and_timecode_safe},
       {"driverkit_runtime_bridge_offline_safe", runtime_bridge_safe},
       {"driverkit_prepared_hotpath_batch_publication_safe", driverkit_prepared_hotpath_safe},
@@ -590,11 +627,15 @@ int main(int argc, char** argv) {
   print_number("hal_prepared_submit_adapter_total_frames", hal_adapter_total_frames);
   print_number("hal_prepared_submit_adapter_max_live_requests", hal_adapter_max_live);
   print_bool("hal_prepared_runtime_source_guarded", hal_prepared_runtime_source_guarded);
+  print_bool("hal_prepared_runtime_binding_safe", hal_prepared_runtime_binding_safe);
   print_bool("hal_prepared_runtime_default_off",
              json_bool(hal_prepared_runtime_source, "prepared_runtime_default_off").value_or(false));
   print_bool("hal_prepared_runtime_opt_in_target_present",
              json_bool(hal_prepared_runtime_source, "prepared_runtime_opt_in_target_present")
                  .value_or(false));
+  print_number("hal_prepared_runtime_expected_submit_reduction_ratio",
+               number_or_nan(json_number(hal_prepared_runtime_binding,
+                                         "expected_submit_reduction_ratio")));
   print_number("fixed_queue_to_playback_fill_ratio", fixed_to_fill);
   print_number("prepared_transport_pressure_rows", pressure_rows);
   print_number("prepared_transport_pressure_total_frames", pressure_total_frames);

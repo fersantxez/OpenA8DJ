@@ -87,6 +87,25 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   `source_exposes_runtime_geometry_constants=true`,
   `default_geometry_preserved=true`, and
   `runtime_claim_still_blocked=true`.
+- `opena8djcpp_hal_prepared_runtime_binding_contract` must pass before any
+  prepared HAL runtime profile can be considered for a lock-gated hardware
+  experiment. Required values:
+  `opt_in_profile_binds_64_transaction_geometry=true`,
+  `capture_pool_uses_prepared_geometry=true`,
+  `playback_pool_uses_prepared_geometry=true`,
+  `transfer_pool_lifetime_completion_owned=true`,
+  `capture_enqueue_uses_prepared_geometry=true`,
+  `playback_enqueue_uses_prepared_geometry=true`,
+  `capture_paced_playback_batches_to_prepared_geometry=true`,
+  `capture_submit_counter_success_only=true`,
+  `playback_submit_counter_success_only=true`,
+  `completion_counters_completion_owned=true`,
+  `timestamps_use_physical_counts=true`,
+  `runtime_geometry_observable=true`,
+  `submit_cadence_observable=true`,
+  `expected_submit_reduction_ratio=8`,
+  `physical_evidence_present=false`, and `product_claim_allowed=false`.
+  This is a hard prerequisite for physical measurement, not a product metric.
 - A local `make -B hal-prepared-runtime` build is not a product metric. CPU,
   resource, audiophile-quality, routing, Timecode Vinyl, and branch-promotion
   claims require lock-gated same-session physical A/B evidence against the

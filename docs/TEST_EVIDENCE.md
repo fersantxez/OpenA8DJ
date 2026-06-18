@@ -1,6 +1,44 @@
 # Test Evidence
 
-## 2026-06-18: Full Offline Gates After Guarded HAL Prepared Runtime Profile
+## 2026-06-18: HAL Prepared Runtime Binding Contract
+
+- Scope:
+  - Added an offline contract proving the default-off HAL prepared-runtime
+    profile is bound to actual transfer-pool geometry, capture/playback enqueue
+    geometry, capture-paced batching, completion-owned lifetime, timestamp
+    accounting, and submit-cadence observability.
+  - No hardware, CoreAudio runtime, USB reset, driver install, driver load,
+    playback, capture, default-device change, sample-rate change, or buffer
+    change.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_binding_contract opena8djcpp_hal_transport_runtime_gate opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract | tee local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(hal_prepared_runtime_binding_contract|hal_transport_runtime_gate|prepared_transport_migration_gate|static_policy_check)' --output-on-failure`
+- Result:
+  - Focused CTest: `4/4` passed.
+  - Binding contract: `PASS`.
+  - Migration gate: `PASS`, now including
+    `hal_prepared_runtime_binding_safe=true` and expected submit reduction
+    ratio `8`.
+  - Runtime gate: `PASS` as a claim blocker, now including
+    `hal_prepared_runtime_binding_contract_pass=true`.
+  - `hal_transport_runtime_gate` still reports
+    `runtime_reduction_missing=true`,
+    `hal_prepared_runtime_physical_evidence_present=false`, and
+    `product_claim_blocked=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+  - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
+- Interpretation:
+  - The opt-in profile is now objectively wired to the HAL source geometry and
+    observability. It is still not evidence of better sound, lower CPU/resource
+    use, routing correctness on hardware, or Timecode Vinyl readiness.
+
+## 2026-06-18: Full Offline Gates After HAL Prepared Runtime Binding Contract
 
 - Scope:
   - Full offline build/test/evidence generation from the C++ worktree.
@@ -11,15 +49,16 @@
   - `./scripts/run-cpp-offline-gates`
 - Result:
   - Overall summary: `PASS`.
-  - Debug CTest: `73/73` passed.
-  - Release CTest: `74/74` passed.
-  - Evidence schema: `77` required files, `0` missing.
+  - Debug CTest: `74/74` passed.
+  - Release CTest: `75/75` passed.
+  - Evidence schema: `78` required files, `0` missing.
   - Provenance: evidence matched current HEAD and clean worktree.
   - Safety flags: `hardware_touched=false`, `coreaudio_touched=false`,
     `usb_touched=false`.
   - Product readiness remains `FAIL`, branch promotion remains blocked, and
     physical measurement is not valid for promotion.
-  - New prepared-runtime source contract passed, but
+  - New prepared-runtime source and binding contracts passed, with expected
+    prepared submit reduction ratio `8`, but
     `hal_transport_runtime_gate` still reports
     `runtime_reduction_missing=true` and
     `hal_prepared_runtime_physical_evidence_present=false`.
@@ -27,6 +66,7 @@
   - `local-analysis/cpp-offline/current-offline-gates.json`
   - `local-analysis/cpp-offline/evidence-schema.json`
   - `local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json`
+  - `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
   - `local-analysis/cpp-offline/hal-transport-runtime-gate.json`
 - Interpretation:
   - The C++ line is objectively healthier offline and now has a controlled

@@ -30,6 +30,35 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 
 ## Findings Integrated
 
+### Chief Architect Integration: HAL Prepared Runtime Binding Contract
+
+- Date: 2026-06-18.
+- Subagent dependency:
+  - Mendel reviewed the active HAL path read-only and warned that a full
+    prepared runtime rewrite is not yet the safe next slice. The key risks are
+    transfer lifetime, single completion per physical submit, stop/cancel
+    behavior, timestamp accounting, and observable submit counters.
+- Integrated action:
+  - Added `opena8djcpp_hal_prepared_runtime_binding_contract`.
+  - Required it from migration, runtime, schema, static, and full offline gates.
+  - Kept product and CPU claims blocked until lock-gated physical evidence
+    proves accepted submit reduction and clean capture quality.
+- Files affected:
+  - `tools/hal_prepared_runtime_binding_contract.cpp`
+  - `tools/hal_transport_runtime_gate.cpp`
+  - `tools/prepared_transport_migration_gate.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - `tools/static_policy_check.cpp`
+  - `scripts/run-cpp-offline-gates`
+  - `CMakeLists.txt`
+- Risk:
+  - The binding proves source geometry and observability only. It does not
+    prove that Audio 8 DJ accepts the 64-transaction runtime profile, nor that
+    CPU, jitter, routing, sound quality, or Timecode Vinyl beat mainline.
+- Next action:
+  - Run full offline gates, then only request a hardware window if a known-good
+    wired capture route is available and the global hardware lock is acquired.
+
 ### Chief Architect Integration: HAL Prepared Runtime Build Profile
 
 - Date: 2026-06-18.
