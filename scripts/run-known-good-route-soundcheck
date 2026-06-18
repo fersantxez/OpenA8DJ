@@ -16,11 +16,14 @@ Options:
   --output-device NAME       Explicit non-Audio8 output device name/substring
   --output-device-uid UID    Explicit non-Audio8 output device UID
   --capture-device NAME      External capture device, e.g. "iRig Stream"
+  --capture-device-uid UID   Optional capture UID used to reject ambiguous names
   --capture-channels LIST    Capture channels, default 1,2
   --reference-wav PATH       Existing stereo PCM16 WAV reference
   --seconds N                Capture/reference seconds, default from WAV
   --postroll-seconds N       Capture tail after playback, default 2
   --max-lag N                Analyzer max lag frames, default 360000
+  --audiophile-max-lag-seconds N
+                              Audiophile analyzer max lag seconds, default 6
   --allow-same-device-loopback-diagnostic
                               Allow output and capture device names to match;
                               diagnostic only, never promotion evidence
@@ -79,16 +82,85 @@ print(f"{frames / rate:.6f}")
 PY
 }
 
+reference_wav_preflight() {
+  /usr/bin/python3 - "$1" "$2" "$3" <<'PY'
+import hashlib
+import json
+import math
+import struct
+import sys
+import wave
+from pathlib import Path
+
+path = Path(sys.argv[1])
+requested_seconds = float(sys.argv[2])
+out = Path(sys.argv[3])
+report = {
+    "schema": "opena8djcpp.reference-wav-preflight.v1",
+    "safety": "offline_wav_header_and_pcm_scan_only_no_audio_coreaudio_usb_or_hardware_touch",
+    "path": str(path),
+}
+try:
+    with wave.open(str(path), "rb") as wav:
+        channels = wav.getnchannels()
+        sample_width = wav.getsampwidth()
+        rate = wav.getframerate()
+        frames = wav.getnframes()
+        payload = wav.readframes(frames)
+    duration = frames / rate if rate else 0.0
+    clipped_samples = 0
+    peak = 0
+    if sample_width == 2 and payload:
+        samples = struct.unpack("<" + "h" * (len(payload) // 2), payload)
+        peak = max((abs(value) for value in samples), default=0)
+        clipped_samples = sum(1 for value in samples if abs(value) >= 32767)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    gates = [
+        {"name": "stereo", "result": "PASS" if channels == 2 else "FAIL"},
+        {"name": "pcm16", "result": "PASS" if sample_width == 2 else "FAIL"},
+        {"name": "supported_rate", "result": "PASS" if rate in (44100, 48000) else "FAIL"},
+        {
+            "name": "duration_covers_requested_seconds",
+            "result": "PASS" if duration + 1e-6 >= requested_seconds else "FAIL",
+        },
+        {"name": "no_reference_clipping", "result": "PASS" if clipped_samples == 0 else "FAIL"},
+    ]
+    report.update(
+        {
+            "channels": channels,
+            "sample_width_bytes": sample_width,
+            "sample_rate": rate,
+            "frames": frames,
+            "duration_seconds": duration,
+            "requested_seconds": requested_seconds,
+            "peak_sample_abs": peak,
+            "clipped_samples": clipped_samples,
+            "sha256": digest,
+            "gates": gates,
+            "result": "PASS" if all(gate["result"] == "PASS" for gate in gates) else "FAIL",
+        }
+    )
+except Exception as exc:  # noqa: BLE001 - command-line evidence should carry the exact failure.
+    report.update({"result": "FAIL", "error": str(exc), "gates": []})
+out.parent.mkdir(parents=True, exist_ok=True)
+out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+print(json.dumps(report, sort_keys=True))
+raise SystemExit(0 if report.get("result") == "PASS" else 1)
+PY
+}
+
 root="$(repo_root)"
 run_dir=""
 output_device=""
 output_device_uid=""
 capture_device=""
+capture_device_uid=""
 capture_channels="1,2"
 reference_wav=""
 seconds=""
 postroll_seconds="2"
 max_lag="360000"
+audiophile_max_lag_seconds="6"
 allow_same_device_loopback_diagnostic=0
 allow_built_in_output_acoustic_diagnostic=0
 skip_build=0
@@ -99,11 +171,13 @@ while [ "$#" -gt 0 ]; do
     --output-device|--output-device-name) output_device="$2"; shift 2 ;;
     --output-device-uid) output_device_uid="$2"; shift 2 ;;
     --capture-device) capture_device="$2"; shift 2 ;;
+    --capture-device-uid) capture_device_uid="$2"; shift 2 ;;
     --capture-channels) capture_channels="$2"; shift 2 ;;
     --reference-wav) reference_wav="$2"; shift 2 ;;
     --seconds) seconds="$2"; shift 2 ;;
     --postroll-seconds) postroll_seconds="$2"; shift 2 ;;
     --max-lag) max_lag="$2"; shift 2 ;;
+    --audiophile-max-lag-seconds) audiophile_max_lag_seconds="$2"; shift 2 ;;
     --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
     --allow-built-in-output-acoustic-diagnostic) allow_built_in_output_acoustic_diagnostic=1; shift ;;
     --skip-build) skip_build=1; shift ;;
@@ -172,9 +246,11 @@ esac
 mkdir -p "$run_dir/fixture"
 
 if [ "$skip_build" -ne 1 ]; then
-  make -C "$root" build/audio-wav-play build/audio-record >/dev/null
+  make -C "$root" build/audio-wav-play build/audio-record build/audio-list >/dev/null
   cmake -S "$root" -B "$root/build/cpp-release" -DCMAKE_BUILD_TYPE=Release >/dev/null
-  cmake --build "$root/build/cpp-release" --target opena8djcpp_soundcheck_wav_quality >/dev/null
+  cmake --build "$root/build/cpp-release" \
+    --target opena8djcpp_soundcheck_wav_quality opena8djcpp_audiophile_wav_analysis \
+    >/dev/null
 fi
 
 cp "$reference_wav" "$run_dir/fixture/reference.wav"
@@ -184,6 +260,9 @@ record_log="$run_dir/record.log"
 play_log="$run_dir/play.log"
 metrics="$run_dir/metrics.json"
 native_metrics="$run_dir/native-quality.json"
+audiophile_cpp_metrics="$run_dir/audiophile-wav-analysis-cpp.json"
+audiophile_python_metrics="$run_dir/audiophile-wav-analysis.json"
+reference_preflight="$run_dir/reference-wav-preflight.json"
 analysis_log="$run_dir/analysis.txt"
 analysis_err="$run_dir/analysis.err"
 
@@ -192,6 +271,18 @@ import sys
 print(f"{float(sys.argv[1]) + float(sys.argv[2]):.6f}")
 PY
 )"
+
+if ! reference_wav_preflight "$reference" "$seconds" "$reference_preflight" \
+  > "$run_dir/reference-wav-preflight.stdout" \
+  2> "$run_dir/reference-wav-preflight.err"; then
+  {
+    echo "KNOWN_GOOD_ROUTE: FAIL"
+    echo "reason=reference_wav_preflight_failed"
+    echo "reference_preflight=$reference_preflight"
+    echo "run_dir=$run_dir"
+  } > "$run_dir/summary.txt"
+  exit 2
+fi
 
 # shellcheck source=scripts/hardware-lock-lib.sh
 source "$root/scripts/hardware-lock-lib.sh"
@@ -209,6 +300,9 @@ validate_args=(
   --capture-device "$capture_device"
   --json-out "$run_dir/known-good-route-request.json"
 )
+if [ -n "$capture_device_uid" ]; then
+  validate_args+=(--capture-device-uid "$capture_device_uid")
+fi
 if [ -n "$output_device_uid" ]; then
   validate_args+=(--output-device-uid "$output_device_uid")
 else
@@ -285,6 +379,45 @@ else
   printf '{"schema":"opena8djcpp.soundcheck-wav-quality.v1","result":"FAIL","error":"native_analyzer_missing"}\n' \
     > "$native_metrics"
 fi
+
+audiophile_cpp_rc=0
+if [ -x "$root/build/cpp-release/opena8djcpp_audiophile_wav_analysis" ]; then
+  "$root/build/cpp-release/opena8djcpp_audiophile_wav_analysis" \
+    --reference "$reference" \
+    --capture "$capture" \
+    --capture-channels "$capture_channels" \
+    --seconds "$seconds" \
+    --max-lag-seconds "$audiophile_max_lag_seconds" \
+    --label "known-good-route-cpp" \
+    --json-out "$audiophile_cpp_metrics" \
+    > "$run_dir/audiophile-wav-analysis-cpp.stdout" \
+    2> "$run_dir/audiophile-wav-analysis-cpp.err" || audiophile_cpp_rc=$?
+else
+  audiophile_cpp_rc=127
+  printf '{"schema":"opena8djcpp.audiophile-wav-analysis-cpp.v1","result":"FAIL","error":"cpp_audiophile_analyzer_missing","product_claim_allowed":false}\n' \
+    > "$audiophile_cpp_metrics"
+fi
+
+audiophile_python_rc=0
+analysis_py="${ANALYSIS_PY:-$root/.venv-analysis/bin/python}"
+if [ -x "$analysis_py" ]; then
+  "$analysis_py" "$root/scripts/analyze-audiophile-wav.py" \
+    --reference "$reference" \
+    --capture "$capture" \
+    --capture-channels "$capture_channels" \
+    --seconds "$seconds" \
+    --max-lag-seconds "$audiophile_max_lag_seconds" \
+    --label "known-good-route-python" \
+    --json-out "$audiophile_python_metrics" \
+    > "$run_dir/audiophile-wav-analysis.stdout" \
+    2> "$run_dir/audiophile-wav-analysis.err" || audiophile_python_rc=$?
+else
+  audiophile_python_rc=126
+  printf '{"schema":"opena8djcpp.audiophile-wav-analysis.v1","result":"FAIL","error":"analysis_python_missing","product_claim_allowed":false}\n' \
+    > "$audiophile_python_metrics"
+  echo "missing analysis environment: run scripts/setup-analysis-env or set ANALYSIS_PY" \
+    > "$run_dir/audiophile-wav-analysis.err"
+fi
 set -e
 
 result="$(/usr/bin/python3 - "$metrics" <<'PY'
@@ -303,16 +436,25 @@ PY
   echo "output_device=${output_device:-}"
   echo "output_device_uid=${output_device_uid:-}"
   echo "capture_device=$capture_device"
+  echo "capture_device_uid=${capture_device_uid:-}"
   echo "capture_channels=$capture_channels"
   echo "reference=$reference"
+  echo "reference_preflight=$reference_preflight"
   echo "capture=$capture"
   echo "metrics=$metrics"
   echo "native_metrics=$native_metrics"
+  echo "audiophile_cpp_metrics=$audiophile_cpp_metrics"
+  echo "audiophile_python_metrics=$audiophile_python_metrics"
+  echo "audiophile_max_lag_seconds=$audiophile_max_lag_seconds"
   echo "analysis_log=$analysis_log"
   echo "analysis_err=$analysis_err"
   echo "analysis_rc=$analysis_rc"
   echo "native_rc=$native_rc"
+  echo "audiophile_cpp_rc=$audiophile_cpp_rc"
+  echo "audiophile_python_rc=$audiophile_python_rc"
   echo "run_dir=$run_dir"
 } > "$run_dir/summary.txt"
 
-[ "$analysis_rc" -eq 0 ] && [ "$native_rc" -eq 0 ] && [ "$result" = "PASS" ]
+[ "$analysis_rc" -eq 0 ] && [ "$native_rc" -eq 0 ] &&
+  [ "$audiophile_cpp_rc" -eq 0 ] && [ "$audiophile_python_rc" -eq 0 ] &&
+  [ "$result" = "PASS" ]

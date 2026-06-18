@@ -29,8 +29,46 @@ PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instala
 | Ohm | Read-only capture-route isolation review after clean Direct USB / failed iRig evidence. | known-good source first, then Audio 8 direct-to-iRig; integrated below |
 | Maxwell | Read-only route forensics after current direct USB/iRig evidence. | concluded failures are route/timebase/capture instability, not simple channel/polarity/clipping or digital payload corruption |
 | Peirce | Read-only product-claim gate audit after route regression. | recommended hard blocker for clean direct USB payload plus failed physical capture; integrated into claim gates |
+| Curie | Read-only audit of route revalidation scripts and gates before next hardware window. | recommended unambiguous device identity, reference WAV preflight, and dual audiophile analyzers for known-good route evidence |
 
 ## Findings Integrated
+
+### Chief Architect Integration: Known-Good Route Evidence Hardening
+
+- Date: 2026-06-18.
+- Subagent dependency:
+  - Curie audited `run-known-good-route-soundcheck`,
+    `validate-known-good-route-request.py`, `physical-window-preflight`,
+    `run-physical-superiority-window`, and route-readiness gates in read-only
+    mode.
+- Integrated action:
+  - Added dual C++/Python audiophile WAV analysis to
+    `scripts/run-known-good-route-soundcheck`.
+  - Added reference WAV preflight before lock acquisition.
+  - Made known-good output/capture selectors fail on ambiguous CoreAudio name
+    matches.
+  - Made promotion readiness require same-window known-good audiophile analyzer
+    artifacts.
+  - Extended promotion-window contract tests for missing audiophile artifacts
+    and ambiguous known-good selectors.
+- Files affected:
+  - `scripts/run-known-good-route-soundcheck`
+  - `scripts/validate-known-good-route-request.py`
+  - `scripts/physical-window-preflight`
+  - `scripts/evaluate-promotion-readiness.py`
+  - `scripts/test-promotion-window-contract.py`
+  - `tools/audiophile_analysis_stack_contract.cpp`
+  - `docs/TEST_EVIDENCE.md`
+  - `docs/DECISION_LOG.md`
+  - `docs/ARCHITECT_CONTEXT.md`
+  - `docs/AGENT_HANDOFFS.md`
+- Risk:
+  - These changes only strengthen route-evidence quality. They do not prove
+    that the current physical route is good, nor that C++ beats mainline.
+- Next action:
+  - Run full offline gates, then use the hardware lock only for a route-only
+    known-good non-Audio8 -> iRig revalidation when a real wired source is
+    available.
 
 ### Chief Architect Integration: Direct USB Wide-Lag Audiophile Analysis
 

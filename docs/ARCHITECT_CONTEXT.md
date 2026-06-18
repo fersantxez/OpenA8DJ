@@ -9,6 +9,12 @@ Branch: `driverkit/cpp-redesign`
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.
 - `/Users/fer/dev/opena8dj` is the C/Objective-C mainline and is read-only for this effort.
 - `/Users/fer/dev/audio8djrust` is the Rust experiment and is read-only for this effort.
+- 2026-06-18 known-good route hardening status: route revalidation now requires
+  unambiguous CoreAudio device resolution, a reference WAV preflight, and dual
+  C++/Python audiophile WAV analysis from the same `known-good-route` evidence
+  directory. The physical window/promotion evaluator treats these files as
+  required same-window artifacts. This prepares a safer route-only hardware
+  window; it is still not product readiness or branch-promotion evidence.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
   `audiophile-wav-analysis-maxlag6.json` with a 6-second lag search, and the

@@ -95,11 +95,12 @@ def device_matches(device: dict[str, object], name: str, uid: str) -> bool:
     return False
 
 
-def find_device(devices: list[dict[str, object]], name: str, uid: str) -> dict[str, object] | None:
-    for device in devices:
-        if device_matches(device, name, uid):
-            return device
-    return None
+def find_devices(devices: list[dict[str, object]], name: str, uid: str) -> list[dict[str, object]]:
+    return [device for device in devices if device_matches(device, name, uid)]
+
+
+def unique_device(matches: list[dict[str, object]]) -> dict[str, object] | None:
+    return matches[0] if len(matches) == 1 else None
 
 
 def load_audio_list(args: argparse.Namespace) -> tuple[int, str, str]:
@@ -131,6 +132,7 @@ def main() -> int:
     parser.add_argument("--output-device", default="")
     parser.add_argument("--output-device-uid", default="")
     parser.add_argument("--capture-device", required=True)
+    parser.add_argument("--capture-device-uid", default="")
     parser.add_argument("--allow-same-device-loopback-diagnostic", action="store_true")
     parser.add_argument("--allow-built-in-output-acoustic-diagnostic", action="store_true")
     parser.add_argument("--audio-list-file", default="")
@@ -139,8 +141,10 @@ def main() -> int:
 
     audio_rc, audio_stdout, audio_stderr = load_audio_list(args)
     devices = parse_audio_list(audio_stdout)
-    output = find_device(devices, args.output_device, args.output_device_uid)
-    capture = find_device(devices, args.capture_device, "")
+    output_matches = find_devices(devices, args.output_device, args.output_device_uid)
+    capture_matches = find_devices(devices, args.capture_device, args.capture_device_uid)
+    output = unique_device(output_matches)
+    capture = unique_device(capture_matches)
     output_identity = " ".join(
         (
             args.output_device,
@@ -149,7 +153,14 @@ def main() -> int:
             str((output or {}).get("uid", "")),
         )
     )
-    capture_identity = " ".join((args.capture_device, str((capture or {}).get("name", ""))))
+    capture_identity = " ".join(
+        (
+            args.capture_device,
+            args.capture_device_uid,
+            str((capture or {}).get("name", "")),
+            str((capture or {}).get("uid", "")),
+        )
+    )
     same_device = (
         output is not None
         and capture is not None
@@ -169,9 +180,23 @@ def main() -> int:
         pass_gate("output_device_specified", {"name": args.output_device, "uid": args.output_device_uid})
         if args.output_device or args.output_device_uid
         else fail_gate("output_device_specified", {}, "output device name or UID is required"),
+        pass_gate("output_device_unambiguous", {"match_count": len(output_matches), "matches": output_matches})
+        if len(output_matches) == 1
+        else fail_gate(
+            "output_device_unambiguous",
+            {"match_count": len(output_matches), "matches": output_matches},
+            "output selector must resolve exactly one device; use UID when name is ambiguous",
+        ),
         pass_gate("output_device_visible", {"device": output or {}})
         if output is not None and int(output.get("outputs", 0)) >= 2
         else fail_gate("output_device_visible", {"device": output or {}}, "output must be visible with at least two channels"),
+        pass_gate("capture_device_unambiguous", {"match_count": len(capture_matches), "matches": capture_matches})
+        if len(capture_matches) == 1
+        else fail_gate(
+            "capture_device_unambiguous",
+            {"match_count": len(capture_matches), "matches": capture_matches},
+            "capture selector must resolve exactly one device; use UID when name is ambiguous",
+        ),
         pass_gate("capture_device_visible", {"device": capture or {}})
         if capture is not None and int(capture.get("inputs", 0)) >= 2
         else fail_gate("capture_device_visible", {"device": capture or {}}, "capture must be visible with at least two channels"),
@@ -197,6 +222,12 @@ def main() -> int:
         and not args.allow_same_device_loopback_diagnostic
         and not args.allow_built_in_output_acoustic_diagnostic,
         "resolved_output_audio8": resolved_audio8,
+        "resolved_output_name": str((output or {}).get("name", "")),
+        "resolved_output_uid": str((output or {}).get("uid", "")),
+        "resolved_capture_name": str((capture or {}).get("name", "")),
+        "resolved_capture_uid": str((capture or {}).get("uid", "")),
+        "output_match_count": len(output_matches),
+        "capture_match_count": len(capture_matches),
         "output_builtin_or_acoustic": built_in_output,
         "output_same_as_capture": same_device,
         "capture_virtual": virtual_capture,

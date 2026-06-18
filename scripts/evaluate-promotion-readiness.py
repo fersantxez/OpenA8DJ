@@ -83,6 +83,14 @@ DEFAULTS = {
         "local-analysis/physical-superiority-window/**/known-good-route/metrics.json",
         ROOT / "local-analysis/physical-superiority-window/REQUIRED-known-good-route-metrics.json",
     ),
+    "known_good_audiophile_cpp": latest_file(
+        "local-analysis/physical-superiority-window/**/known-good-route/audiophile-wav-analysis-cpp.json",
+        ROOT / "local-analysis/physical-superiority-window/REQUIRED-known-good-audiophile-cpp.json",
+    ),
+    "known_good_audiophile_python": latest_file(
+        "local-analysis/physical-superiority-window/**/known-good-route/audiophile-wav-analysis.json",
+        ROOT / "local-analysis/physical-superiority-window/REQUIRED-known-good-audiophile-python.json",
+    ),
     "same_session_compare": latest_file(
         "local-analysis/physical-superiority-window/**/same-session-physical-compare.json",
         ROOT / "local-analysis/physical-superiority-window/REQUIRED-same-session-physical-compare.json",
@@ -254,6 +262,8 @@ def promotion_bundle(paths):
         "usb_integrity": paths["usb_integrity"],
         "physical_matrix": paths["physical_matrix"],
         "known_good_route": paths["known_good_route"],
+        "known_good_audiophile_cpp": paths["known_good_audiophile_cpp"],
+        "known_good_audiophile_python": paths["known_good_audiophile_python"],
         "same_session_compare": paths["same_session_compare"],
     }
     roots = {name: promotion_window_root(path) for name, path in required.items()}
@@ -286,6 +296,8 @@ def evaluate(args):
         "usb_integrity": Path(args.usb_integrity),
         "physical_matrix": Path(args.physical_matrix),
         "known_good_route": Path(args.known_good_route),
+        "known_good_audiophile_cpp": Path(args.known_good_audiophile_cpp),
+        "known_good_audiophile_python": Path(args.known_good_audiophile_python),
         "same_session_compare": Path(args.same_session_compare),
         "capture_route_health": Path(args.capture_route_health),
         "direct_usb_attribution": Path(args.direct_usb_attribution),
@@ -305,6 +317,8 @@ def evaluate(args):
     usb_integrity = parse_key_values(paths["usb_integrity"])
     physical_matrix = load_json_or_empty(paths["physical_matrix"])
     known_good_route = load_json_or_empty(paths["known_good_route"])
+    known_good_audiophile_cpp = load_json_or_empty(paths["known_good_audiophile_cpp"])
+    known_good_audiophile_python = load_json_or_empty(paths["known_good_audiophile_python"])
     same_session_compare = load_json_or_empty(paths["same_session_compare"])
     capture_route_health = load_json_or_empty(paths["capture_route_health"])
     direct_usb_attribution = load_json_or_empty(paths["direct_usb_attribution"])
@@ -363,6 +377,18 @@ def evaluate(args):
               "known_good_window": str(promotion_window_root(paths["known_good_route"])),
               "product_window": str(promotion_window_root(paths["music"]))},
              "the iRig capture route must be revalidated with a non-Audio8 wired source in the same physical promotion window"),
+        gate("same_window_known_good_audiophile_analyzers",
+             known_good_audiophile_cpp.get("result") == "PASS" and
+             known_good_audiophile_python.get("result") == "PASS" and
+             paths["known_good_audiophile_cpp"].parent == paths["known_good_route"].parent and
+             paths["known_good_audiophile_python"].parent == paths["known_good_route"].parent and
+             promotion_window_root(paths["known_good_audiophile_cpp"]) == promotion_window_root(paths["music"]) and
+             promotion_window_root(paths["known_good_audiophile_python"]) == promotion_window_root(paths["music"]),
+             {"cpp": evidence_metadata(paths["known_good_audiophile_cpp"]),
+              "python": evidence_metadata(paths["known_good_audiophile_python"]),
+              "cpp_result": known_good_audiophile_cpp.get("result"),
+              "python_result": known_good_audiophile_python.get("result")},
+             "known-good route revalidation must include passing C++ and Python audiophile WAV analyzers in the same window"),
         gate("physical_window_not_diagnostic",
              window_not_diagnostic,
              {"manifest": evidence_metadata(window_manifest_path),
@@ -716,6 +742,8 @@ def evaluate(args):
             "window_manifest": evidence_metadata(window_manifest_path),
             "window_preflight": evidence_metadata(window_preflight_path),
             "known_good_route": evidence_metadata(paths["known_good_route"]),
+            "known_good_audiophile_cpp": evidence_metadata(paths["known_good_audiophile_cpp"]),
+            "known_good_audiophile_python": evidence_metadata(paths["known_good_audiophile_python"]),
             "music": evidence_metadata(paths["music"]),
             "cpu": evidence_metadata(paths["cpu"]),
         },
@@ -736,6 +764,8 @@ def main():
     parser.add_argument("--usb-integrity", default=str(DEFAULTS["usb_integrity"]))
     parser.add_argument("--physical-matrix", default=str(DEFAULTS["physical_matrix"]))
     parser.add_argument("--known-good-route", default=str(DEFAULTS["known_good_route"]))
+    parser.add_argument("--known-good-audiophile-cpp", default=str(DEFAULTS["known_good_audiophile_cpp"]))
+    parser.add_argument("--known-good-audiophile-python", default=str(DEFAULTS["known_good_audiophile_python"]))
     parser.add_argument("--same-session-compare", default=str(DEFAULTS["same_session_compare"]))
     parser.add_argument("--capture-route-health", default=str(DEFAULTS["capture_route_health"]))
     parser.add_argument("--direct-usb-attribution", default=str(DEFAULTS["direct_usb_attribution"]))

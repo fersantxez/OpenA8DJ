@@ -1,5 +1,43 @@
 # Test Evidence
 
+## 2026-06-18: Known-Good Route Evidence Hardened Before Hardware
+
+- Scope:
+  - Hardened `scripts/run-known-good-route-soundcheck` so a route
+    revalidation must now produce both `audiophile-wav-analysis-cpp.json` and
+    `audiophile-wav-analysis.json`, in addition to the classic soundcheck and
+    native quality JSON.
+  - Added a reference WAV preflight before hardware lock acquisition:
+    stereo PCM16, 44.1/48 kHz, duration covering the requested window, no
+    clipped samples, and SHA-256 provenance.
+  - Hardened `validate-known-good-route-request.py` and
+    `physical-window-preflight` so name selectors must resolve exactly one
+    CoreAudio device. Ambiguous names now fail and require a more specific
+    selector/UID.
+  - Hardened `evaluate-promotion-readiness.py` so known-good route promotion
+    evidence requires the same-window dual audiophile analyzer JSON files.
+  - No hardware, CoreAudio playback/capture, USB reset, driver load/unload,
+    default-device change, or service restart was performed.
+- Commands:
+  - `bash -n scripts/run-known-good-route-soundcheck`
+  - `python3 -m py_compile scripts/validate-known-good-route-request.py scripts/physical-window-preflight scripts/evaluate-promotion-readiness.py scripts/test-promotion-window-contract.py`
+  - `./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract | tee local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+  - `python3 scripts/test-promotion-window-contract.py`
+- Result:
+  - Shell syntax: PASS.
+  - Python compile checks: PASS.
+  - Audiophile analysis stack contract: PASS, including
+    `known_good_route_runs_both=true`.
+  - Promotion-window contract: PASS, including rejection of missing known-good
+    audiophile artifacts and ambiguous known-good device selectors.
+- Evidence:
+  - `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+- Interpretation:
+  - The next physical route revalidation is now harder to misuse as evidence.
+    A route-only PASS must prove the wired non-Audio8 source -> iRig path with
+    unambiguous device identity, a valid reference WAV, and dual audiophile
+    analysis. This still does not prove C++ is better than mainline.
+
 ## 2026-06-18: Direct USB Wide-Lag Audiophile Analysis Automated
 
 - Scope:

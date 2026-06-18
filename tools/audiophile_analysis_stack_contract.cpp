@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
   const auto python_analyzer = read_file(root / "scripts/analyze-audiophile-wav.py");
   const auto physical_window = read_file(root / "scripts/run-physical-superiority-window");
   const auto direct_usb = read_file(root / "scripts/run-direct-usb-soundcheck");
+  const auto known_good = read_file(root / "scripts/run-known-good-route-soundcheck");
   const auto physical_compare = read_file(root / "tools/physical_run_compare.cpp");
   const auto product_gate = read_file(root / "tools/product_quality_claim_gate.cpp");
   const auto offline_runner = read_file(root / "scripts/run-cpp-offline-gates");
@@ -104,6 +105,16 @@ int main(int argc, char** argv) {
       contains(direct_usb, "audiophile_wav_analysis_maxlag6_rc");
   if (!direct_usb_runs_wide_lag_audiophile) {
     blockers.push_back("direct_usb_runner_missing_wide_lag_audiophile_analysis");
+  }
+
+  const bool known_good_runs_both =
+      contains(known_good, "opena8djcpp_audiophile_wav_analysis") &&
+      contains(known_good, "audiophile-wav-analysis-cpp.json") &&
+      contains(known_good, "audiophile-wav-analysis.json") &&
+      contains(known_good, "audiophile_cpp_rc") &&
+      contains(known_good, "audiophile_python_rc");
+  if (!known_good_runs_both) {
+    blockers.push_back("known_good_route_does_not_run_dual_audiophile_analyzers");
   }
 
   const bool comparator_requires_both =
@@ -159,6 +170,8 @@ int main(int argc, char** argv) {
             << (physical_window_runs_both ? "true" : "false") << ",\n"
             << "  \"direct_usb_runs_wide_lag_audiophile\": "
             << (direct_usb_runs_wide_lag_audiophile ? "true" : "false") << ",\n"
+            << "  \"known_good_route_runs_both\": "
+            << (known_good_runs_both ? "true" : "false") << ",\n"
             << "  \"comparator_requires_both\": "
             << (comparator_requires_both ? "true" : "false") << ",\n"
             << "  \"product_claim_blocks_without_both\": "

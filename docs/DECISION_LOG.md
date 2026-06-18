@@ -1,5 +1,38 @@
 # Decision Log
 
+## 2026-06-18 - Require Strong Known-Good Route Evidence Before Product A/B
+
+Decision:
+- A known-good non-Audio8 -> iRig route revalidation is no longer sufficient
+  with only classic soundcheck metrics.
+- `scripts/run-known-good-route-soundcheck` must generate passing C++ and
+  Python audiophile WAV analyzer JSON files.
+- Device selectors for known-good output and iRig capture must resolve exactly
+  one CoreAudio device, or the preflight/validator fails.
+- Known-good route promotion evidence must include the same-window
+  `audiophile-wav-analysis-cpp.json` and `audiophile-wav-analysis.json`.
+- The reference WAV is now preflighted before lock acquisition and recorded by
+  SHA-256.
+
+Reason:
+- The current blocker is physical route/capture validity. If the reference
+  route itself is measured with weaker analyzers than the C++/mainline
+  product window, a later product comparison can inherit a bad baseline.
+- Ambiguous CoreAudio name matching can silently bind the wrong output or
+  capture device. UID or unique names are required for defensible physical
+  evidence.
+- A clipped, mono, wrong-rate, or too-short reference WAV would waste a
+  hardware window and could be mistaken for device degradation.
+
+Evidence:
+- `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+- `scripts/test-promotion-window-contract.py`: PASS.
+
+Next implication:
+- The next allowed hardware action remains route revalidation only, but it is
+  now stricter: known-good route evidence must be unambiguous and pass the same
+  audiophile analysis discipline used for product claims.
+
 ## 2026-06-18 - Automate Wide-Lag Audiophile Analysis For Direct USB Route Diagnostics
 
 Decision:

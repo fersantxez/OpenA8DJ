@@ -58,6 +58,22 @@ def run_evaluator(window: Path, include_known_good: bool, diagnostic: bool) -> d
                 "click_outliers": 0,
             },
         )
+        write_json(
+            known_good / "audiophile-wav-analysis-cpp.json",
+            {
+                "schema": "opena8djcpp.audiophile-wav-analysis-cpp.v1",
+                "result": "PASS",
+                "snr_db_min": 80.0,
+            },
+        )
+        write_json(
+            known_good / "audiophile-wav-analysis.json",
+            {
+                "schema": "opena8djcpp.audiophile-wav-analysis.v1",
+                "result": "PASS",
+                "snr_db_min": 80.0,
+            },
+        )
     write_text(
         window / "window-manifest.txt",
         "\n".join(
@@ -94,6 +110,10 @@ def run_evaluator(window: Path, include_known_good: bool, diagnostic: bool) -> d
         str(cpp / "cpu-profile.tsv"),
         "--known-good-route",
         str(known_good / "metrics.json"),
+        "--known-good-audiophile-cpp",
+        str(known_good / "audiophile-wav-analysis-cpp.json"),
+        "--known-good-audiophile-python",
+        str(known_good / "audiophile-wav-analysis.json"),
         "--same-session-compare",
         str(window / "same-session-physical-compare.json"),
         "--json-out",
@@ -155,7 +175,47 @@ def run_known_good_request_fixture(root: Path) -> dict:
         check=False,
     )
     if completed.returncode != 1:
-        raise AssertionError("ambiguous Open route did not fail")
+        raise AssertionError("Open Audio 8 route did not fail")
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
+def run_ambiguous_known_good_request_fixture(root: Path) -> dict:
+    root.mkdir(parents=True, exist_ok=True)
+    audio_list = root / "audio-list.txt"
+    audio_list.write_text(
+        "\n".join(
+            [
+                "Dispositivos Core Audio: 3",
+                "  1  id=93  iRig Stream  uid=AppleUSBAudioEngine:IK Multimedia:iRig Stream:152349:2,1  in=2 out=2 rate=48000",
+                "  2  id=81  Wired Test Output  uid=ExternalWiredOutputA  in=0 out=2 rate=48000",
+                "  3  id=82  Wired Test Output Backup  uid=ExternalWiredOutputB  in=0 out=2 rate=48000",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output = root / "known-good-request.json"
+    completed = subprocess.run(
+        [
+            "python3",
+            str(ROOT / "scripts/validate-known-good-route-request.py"),
+            "--audio-list-file",
+            str(audio_list),
+            "--output-device",
+            "Wired Test Output",
+            "--capture-device",
+            "iRig Stream",
+            "--json-out",
+            str(output),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 1:
+        raise AssertionError("ambiguous known-good route selector did not fail")
     return json.loads(output.read_text(encoding="utf-8"))
 
 
@@ -167,10 +227,14 @@ def main() -> int:
             raise AssertionError("missing known-good route did not fail")
         if "known_good_route" not in missing["evidence_selection"]["physical_promotion_bundle"]["required_artifacts"]:
             raise AssertionError("known-good route is not a required bundle artifact")
+        if gate(missing, "same_window_known_good_audiophile_analyzers")["result"] != "FAIL":
+            raise AssertionError("missing known-good audiophile analyzers did not fail")
 
         diagnostic = run_evaluator(root / "diagnostic-known-good", include_known_good=True, diagnostic=True)
         if gate(diagnostic, "same_window_known_good_route_revalidated")["result"] != "PASS":
             raise AssertionError("diagnostic fixture should still have same-window route file")
+        if gate(diagnostic, "same_window_known_good_audiophile_analyzers")["result"] != "PASS":
+            raise AssertionError("diagnostic fixture should include same-window audiophile analyzer files")
         if gate(diagnostic, "physical_window_not_diagnostic")["result"] != "FAIL":
             raise AssertionError("diagnostic physical window did not fail")
 
@@ -179,6 +243,12 @@ def main() -> int:
             raise AssertionError("resolved Open Audio 8 DJ output was not rejected")
         if known_good["valid_for_promotion"] is not False:
             raise AssertionError("rejected Audio 8 route was considered valid")
+
+        ambiguous = run_ambiguous_known_good_request_fixture(root / "ambiguous-known-good-request")
+        if gate(ambiguous, "output_device_unambiguous")["result"] != "FAIL":
+            raise AssertionError("ambiguous known-good selector was not rejected")
+        if ambiguous["valid_for_promotion"] is not False:
+            raise AssertionError("ambiguous known-good route was considered valid")
 
     print("promotion_window_contract=PASS")
     return 0
