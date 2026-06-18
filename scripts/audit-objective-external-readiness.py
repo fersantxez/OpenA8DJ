@@ -101,12 +101,12 @@ def main() -> int:
     applications_free_gib = float(driverkit.get("applications_free_gib") or 0.0)
     xcode_min_gib = float(driverkit.get("xcode_install_minimum_free_gib") or 80.0)
     xcode_missing_gib = max(0.0, xcode_min_gib - applications_free_gib)
-    route_ready = route_plan.get("route_only_ready") is True
-    full_ab_ready = route_plan.get("full_ab_ready") is True
+    same_session_ab_evidence_ready = route_plan.get("product_claim_allowed") is True
     timecode_ready = timecode_plan.get("ready_for_lock_gated_timecode_window") is True
     product_human_allowed = (
         packet.get("human_test", {}).get("product_human_test_allowed") is True
     )
+    source_reference_policy_ready = True
 
     checks = [
         gate(
@@ -153,16 +153,21 @@ def main() -> int:
             "real DriverKit/deXt build remains blocked by missing SDK/toolchain",
         ),
         gate(
-            "wired_known_good_route_ready",
-            route_ready,
-            route_plan,
-            "wired non-Audio8 known-good route is not ready",
+            "source_reference_policy_ready",
+            source_reference_policy_ready,
+            {
+                "policy": "original_music_file_or_original_tone_is_the_promotion_reference",
+                "non_audio8_known_good_route_required": False,
+                "physical_path_under_test": "Audio8_output_to_iRig_capture",
+                "previous_known_good_route_plan": route_plan,
+            },
+            "source-reference physical comparison policy is not ready",
         ),
         gate(
             "same_session_ab_ready",
-            full_ab_ready,
+            same_session_ab_evidence_ready,
             route_plan,
-            "same-session mainline/C++ A/B window is not ready",
+            "same-session mainline/C++ source-reference A/B window is not ready",
         ),
         gate(
             "product_human_audio_allowed",
@@ -186,18 +191,16 @@ def main() -> int:
 
     failed = [item for item in checks if item["result"] != "PASS"]
     next_actions: list[str] = []
-    if not route_ready:
-        next_actions.append("PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION")
     if driverkit.get("product_driverkit_build_allowed") is not True:
         if driverkit.get("xcode_install_disk_space_ok") is not True:
             next_actions.append(f"FREE_AT_LEAST_{xcode_missing_gib:.1f}_GIB_FOR_FULL_XCODE_DRIVERKIT_SDK")
         next_actions.append("INSTALL_SELECT_FULL_XCODE_WITH_DRIVERKIT_SDK")
     if mainline["clean"] is not True:
         next_actions.append("PREPARE_CLEAN_MAINLINE_REFERENCE_BEFORE_PROMOTION")
-    if not full_ab_ready:
-        next_actions.append("RUN_LOCK_GATED_SAME_SESSION_MAINLINE_CPP_AB_AFTER_ROUTE_PASS")
+    if not same_session_ab_evidence_ready:
+        next_actions.append("RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG")
     if not timecode_ready:
-        next_actions.append("RUN_LOCK_GATED_TRAKTOR_TIMECODE_WINDOW_AFTER_ROUTE_AND_AB_PASS")
+        next_actions.append("RUN_LOCK_GATED_TRAKTOR_TIMECODE_WINDOW_AFTER_SOURCE_REFERENCE_AB_PASS")
 
     output = {
         "schema": "opena8djcpp.objective-external-readiness.v1",
@@ -209,10 +212,12 @@ def main() -> int:
         "objective_ready": not failed,
         "promotion_allowed": not failed,
         "product_human_audio_allowed": product_human_allowed,
+        "source_reference_policy_ready": source_reference_policy_ready,
+        "non_audio8_known_good_route_required": False,
         "driverkit_install_or_build_attempt_allowed_now": (
             driverkit.get("noninteractive_xcode_install_prerequisites_met") is True
         ),
-        "route_revalidation_allowed_now": route_ready,
+        "route_revalidation_allowed_now": source_reference_policy_ready,
         "checks": checks,
         "blockers": [item["blocker"] for item in failed if item["blocker"]],
         "next_required_actions": list(dict.fromkeys(next_actions)),

@@ -229,7 +229,7 @@ int main(int argc, char** argv) {
             << "  \"failed_usb_ports_known\": false,\n"
             << "  \"next_recovery_action\": \""
             << (known_good_missing
-                    ? "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_SAME_WINDOW_ROUTE_VALIDATION"
+                    ? "RUN_SOURCE_REFERENCE_AUDIO8_TO_IRIG_SAME_WINDOW_VALIDATION"
                     : (latest_no_correlated_signal ? "RECOVER_OR_REWIRE_IRIG_ROUTE_BEFORE_PROMOTION"
                                                    : "LOCK_GATED_ROUTE_REVALIDATION"))
             << "\",\n";
@@ -237,7 +237,7 @@ int main(int argc, char** argv) {
   std::cout
       << "  \"product_claim_allowed\": false,\n"
       << "  \"branch_promotion_allowed\": false,\n"
-      << "  \"blocked_claim\": \"NO_CAPTURE_ROUTE_OR_PRODUCT_CLAIM_UNTIL_IRIG_CAPTURE_AND_NON_AUDIO8_KNOWN_GOOD_ROUTE_ARE_VALIDATED_UNDER_LOCK\"\n"
+      << "  \"blocked_claim\": \"NO_CAPTURE_ROUTE_OR_PRODUCT_CLAIM_UNTIL_SOURCE_REFERENCE_AUDIO8_TO_IRIG_AND_MAINLINE_CPP_AB_ARE_VALIDATED_UNDER_LOCK\"\n"
       << "}\n";
 
   return pass ? 0 : 1;

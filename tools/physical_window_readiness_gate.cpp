@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
       bool_field_is(capture_route, "shared_route_unhealthy", true) &&
       string_array_has(capture_route, "promotion_blockers", "shared_capture_route_unhealthy") &&
       string_array_has(capture_route, "required_physical_experiments",
-                       "same_session_mainline_cpp_physical_ab_on_validated_route");
+                       "same_session_mainline_cpp_physical_ab_against_source_reference");
   const auto latest_direct_usb = opena8djcpp::evidence_json::json_object(direct_usb, "latest_run");
   const bool direct_usb_blocks_route_claim =
       string_field_is(direct_usb, "result", "PASS") && latest_direct_usb.has_value() &&
@@ -176,47 +176,36 @@ int main(int argc, char** argv) {
       gate_array_has_name(migration, "driverkit_usb_request_shutdown_safe");
   const bool scripts_present =
       std::filesystem::is_regular_file(root / "scripts/physical-window-preflight") &&
-      std::filesystem::is_regular_file(root / "scripts/run-physical-superiority-window") &&
-      std::filesystem::is_regular_file(root / "scripts/run-known-good-route-soundcheck");
+      std::filesystem::is_regular_file(root / "scripts/run-physical-superiority-window");
   const bool lock_policy_covers_window =
       string_field_is(hardware_policy, "result", "PASS") &&
       string_array_has(hardware_policy, "sensitive_paths",
-                       "scripts/run-physical-superiority-window") &&
-      string_array_has(hardware_policy, "sensitive_paths",
-                       "scripts/run-known-good-route-soundcheck");
+                       "scripts/run-physical-superiority-window");
+  const bool source_reference_policy_ready =
+      evidence_present && offline_clean && route_inventory_clean && scripts_present &&
+      lock_policy_covers_window && hal_safety_precondition_ready;
 
   std::vector<std::string> required_next_actions;
-  if (current_known_good_output_missing) {
-    required_next_actions.push_back("provision_wired_non_audio8_known_good_output");
-  }
-  required_next_actions.push_back("lock_gated_known_good_non_audio8_route_revalidation");
-  required_next_actions.push_back("same_session_mainline_cpp_physical_ab_on_validated_route");
+  required_next_actions.push_back("lock_gated_source_reference_mainline_cpp_physical_ab");
   required_next_actions.push_back("runtime_cpu_superiority_against_mainline");
   required_next_actions.push_back("traktor_timecode_vinyl_physical_gate");
   required_next_actions.push_back("post_reboot_autologin_codex_resume_fix");
 
   std::vector<std::string> allowed_window_types;
-  if (evidence_present && offline_clean && route_inventory_clean && scripts_present &&
-      lock_policy_covers_window && current_promotion_route_ready) {
-    allowed_window_types.push_back("ROUTE_REVALIDATION_ONLY");
+  if (source_reference_policy_ready) {
+    allowed_window_types.push_back("SOURCE_REFERENCE_MAINLINE_CPP_AB_UNDER_LOCK");
   }
-  if (evidence_present && offline_clean && route_inventory_clean && scripts_present &&
-      lock_policy_covers_window && !current_promotion_route_ready) {
-    allowed_window_types.push_back("NO_ROUTE_REVALIDATION_UNTIL_NON_AUDIO8_SOURCE_VISIBLE");
-  }
-  if (route_not_valid_for_promotion) {
-    allowed_window_types.push_back("NO_PROMOTION_AB_UNTIL_ROUTE_PASS");
-  }
+  allowed_window_types.push_back("NO_PROMOTION_CLAIM_UNTIL_SOURCE_REFERENCE_AB_CPU_TIMECODE_PASS");
 
   const bool route_revalidation_plan_ready =
       evidence_present && offline_clean && scripts_present && lock_policy_covers_window &&
       route_inventory_clean && migration_ready_only_offline && hal_safety_precondition_ready &&
       product_blocked && route_not_valid_for_promotion && direct_usb_blocks_route_claim &&
       historical_route_not_current && no_product_candidate_runs;
-  const bool ready_for_route_revalidation_window =
-      route_revalidation_plan_ready && current_promotion_route_ready;
+  const bool ready_for_route_revalidation_window = source_reference_policy_ready;
+  const bool ready_for_source_reference_ab_window = source_reference_policy_ready;
   const bool ready_for_product_physical_ab =
-      false;  // Product A/B remains blocked until the route is revalidated under lock.
+      false;  // Product A/B remains blocked until source-reference A/B evidence passes.
   const bool ready_for_branch_promotion = false;
 
   const bool pass =
@@ -225,6 +214,7 @@ int main(int argc, char** argv) {
       hal_safety_precondition_ready && no_product_candidate_runs &&
       migration_ready_only_offline && route_inventory_clean && scripts_present &&
       lock_policy_covers_window && route_revalidation_plan_ready &&
+      source_reference_policy_ready && ready_for_source_reference_ab_window &&
       !ready_for_product_physical_ab &&
       !ready_for_branch_promotion;
 
@@ -258,6 +248,9 @@ int main(int argc, char** argv) {
             << (current_promotion_route_ready ? "true" : "false") << ",\n"
             << "  \"current_known_good_output_missing\": "
             << (current_known_good_output_missing ? "true" : "false") << ",\n"
+            << "  \"non_audio8_known_good_route_required\": false,\n"
+            << "  \"source_reference_policy_ready\": "
+            << (source_reference_policy_ready ? "true" : "false") << ",\n"
             << "  \"route_revalidation_plan_ready\": "
             << (route_revalidation_plan_ready ? "true" : "false") << ",\n"
             << "  \"scripts_present\": " << (scripts_present ? "true" : "false") << ",\n"
@@ -265,18 +258,17 @@ int main(int argc, char** argv) {
             << (lock_policy_covers_window ? "true" : "false") << ",\n"
             << "  \"ready_for_route_revalidation_window\": "
             << (ready_for_route_revalidation_window ? "true" : "false") << ",\n"
+            << "  \"ready_for_source_reference_ab_window\": "
+            << (ready_for_source_reference_ab_window ? "true" : "false") << ",\n"
             << "  \"ready_for_product_physical_ab\": "
             << (ready_for_product_physical_ab ? "true" : "false") << ",\n"
             << "  \"ready_for_branch_promotion\": "
             << (ready_for_branch_promotion ? "true" : "false") << ",\n";
   print_string_array("allowed_window_types", allowed_window_types);
   print_string_array("required_next_actions", required_next_actions);
-  std::cout << "  \"next_required_action\": \""
-            << (current_known_good_output_missing
-                    ? "PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION"
-                    : "LOCK_GATED_KNOWN_GOOD_NON_AUDIO8_ROUTE_REVALIDATION")
-            << "\",\n"
-            << "  \"blocked_claim\": \"NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS\"\n"
+  std::cout << "  \"next_required_action\": "
+               "\"LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG\",\n"
+            << "  \"blocked_claim\": \"NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_SOURCE_REFERENCE_MAINLINE_CPP_PHYSICAL_COMPARE_CPU_AND_TIMECODE_PASS\"\n"
             << "}\n";
 
   return pass ? 0 : 1;

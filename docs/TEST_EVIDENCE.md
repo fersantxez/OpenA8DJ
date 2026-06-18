@@ -14460,3 +14460,65 @@ Readiness impact:
   Timecode window.
 - This makes it explicit that the diagnostic RC packet is useful but still not
   enough for product or branch-promotion claims.
+
+## 2026-06-18 - Human-Test Packet External Readiness Propagation
+
+Commit context:
+- Local changes after `7dbc959`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Existing evidence and artifact metadata only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, Xcode install, or external worktree
+  mutation.
+
+Commands:
+- `python3 -m py_compile scripts/build-human-test-rc-packet.py scripts/test-build-human-test-rc-packet.py`
+- `python3 scripts/test-build-human-test-rc-packet.py`
+- `bash -n scripts/run-cpp-offline-gates`
+- `git diff --check`
+- `cmake --build build/cpp-release --target opena8djcpp_evidence_schema_check`
+
+Expected result:
+- Human-test RC packet fixture: PASS.
+- Packet carries `external_readiness.status=BLOCKED`.
+- Packet carries `external_readiness.objective_ready=false`.
+- Packet carries `external_readiness.promotion_allowed=false`.
+- `opena8djcpp_evidence_schema_check` requires those fields.
+
+Readiness impact:
+- The operator-facing human-test packet now embeds the external readiness audit.
+- A future packet cannot imply product human audio, Timecode Vinyl readiness, or
+  Legacy/main promotion while the external audit is blocked.
+
+## 2026-06-18 - Source-Reference Human Baseline Pivot
+
+Commit context:
+- Local changes after `7dbc959`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Existing evidence and artifact metadata only.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, Xcode install, or external worktree
+  mutation.
+
+Commands:
+- `python3 -m py_compile ... scripts/plan-physical-evidence-window scripts/analyze-route-contamination.py`
+- `python3 scripts/test-audit-objective-external-readiness.py`
+- `python3 scripts/test-build-human-test-rc-packet.py`
+- `python3 scripts/test-plan-physical-evidence-window.py`
+- `cmake --build build/cpp-release --target opena8djcpp_physical_window_readiness_gate opena8djcpp_human_test_rc_gate opena8djcpp_capture_route_health_gate opena8djcpp_capture_readiness_contract opena8djcpp_evidence_schema_check`
+
+Observed focused result:
+- Physical evidence window plan reports `SOURCE_REFERENCE_AB_READY`.
+- `source_reference_policy_ready=true`.
+- `non_audio8_known_good_route_required=false`.
+- Human-test RC packet next command is
+  `lock_gated_source_reference_mainline_cpp_ab`.
+
+Readiness impact:
+- The baseline window can use the original file or generated tone as reference.
+- Product claims remain blocked until same-session source-reference A/B,
+  CPU/resource, and Timecode Vinyl physical evidence pass.

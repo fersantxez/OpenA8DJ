@@ -55,7 +55,17 @@ Branch: `driverkit/cpp-redesign`
   the explanation, and iRig idle capture is non-silent. The gate explicitly
   allows only a diagnostic RC and blocks human product testing, Timecode Vinyl
   certification, quality claims, CPU superiority claims, and branch promotion
-  until a wired non-Audio8 known-good route is validated.
+  until the physical Audio 8 DJ -> iRig path is validated against the original
+  source file or generated tone.
+- 13:55 EDT source-reference policy correction: the promotion/baseline
+  reference is now the original WAV/music file or generated tone. A separate
+  non-Audio8 wired known-good output is no longer an active prerequisite for the
+  human baseline. The next physical command must run a lock-gated same-session
+  source-reference A/B: original file/tone -> Audio 8 DJ -> iRig capture,
+  comparing mainline C and C++ with the same reference, capture pair, rate,
+  buffer, analyzers, and CPU sampling. Product superiority, Timecode Vinyl
+  readiness, and Legacy/main promotion remain forbidden until that A/B, CPU, and
+  Timecode evidence pass.
 - 13:13 EDT continuation update: `scripts/human-test-rc-status` now consumes
   the route-contamination and Timecode physical-window gates directly. The live
   RC status is no longer a generic route block; it is
@@ -3211,13 +3221,12 @@ Current implication:
   `next_action=PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`).
   This is a human-window accelerator, not product readiness.
 - Physical evidence window planner update: `scripts/plan-physical-evidence-window`
-  now consumes watcher output and produces the exact lock-gated route-only and
-  full same-session A/B commands when prerequisites are present. Current live
-  plan classifies the C++ HAL candidate and `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`
-  mainline bundle as complete, but keeps `status=BLOCKED`,
-  `route_only_ready=false`, and `full_ab_ready=false` because the known-good
-  non-Audio8 output is still missing. This reduces human-window ambiguity
-  without touching mainline, Rust, hardware, CoreAudio, USB, or defaults.
+  now produces the exact lock-gated source-reference A/B command. Current plan
+  is `SOURCE_REFERENCE_AB_READY`, with
+  `non_audio8_known_good_route_required=false`; it uses the original reference
+  WAV/tone as the truth source and captures Audio 8 DJ output through iRig.
+  This reduces human-window ambiguity without touching mainline, Rust, hardware,
+  CoreAudio, USB, or defaults.
 - 13:20 EDT schedule correction: the requested 15:00 EDT target leaves under
   two hours, not six. The achievable target is a frozen installable RC package
   plus a fail-closed evidence bundle and exact lock-gated commands for route
@@ -3231,7 +3240,7 @@ Current implication:
   is `objective_achieved`. Current expected classification is
   `objective_status=NOT_READY`, `objective_achieved=false`,
   `branch_promotion_allowed=false`, with blockers for real DriverKit runtime,
-  contaminated/missing known-good route, missing same-session physical quality
+  missing source-reference physical A/B, missing same-session physical quality
   win over mainline, missing runtime CPU/resource superiority, blocked physical
   Traktor/Timecode Vinyl, and forbidden Legacy/main promotion.
 - Human-test RC packet update: `scripts/build-human-test-rc-packet.py` now
@@ -3241,13 +3250,13 @@ Current implication:
   status, promotion policy, and the next allowed command. Current expected
   packet state is `DIAGNOSTIC_RC_PACKET_READY`: package review is allowed, but
   product audio listening, CPU superiority, Timecode Vinyl certification, and
-  Legacy/main promotion remain blocked until the route and same-session
-  physical evidence pass.
+  Legacy/main promotion remain blocked until the source-reference A/B, CPU, and
+  Timecode physical evidence pass.
 - External readiness audit update: `scripts/audit-objective-external-readiness.py`
   now separates C++ candidate evidence from external prerequisites. Current
   expected status is `BLOCKED`: C++ is clean, Rust is clean, but mainline has
   pre-existing dirty state, DriverKit is blocked by missing full Xcode/SDK and
   insufficient disk (`applications_free_gib` about `3.8` vs `80.0` required),
-  and the wired non-Audio8 known-good route remains absent. This prevents
+  and the source-reference physical A/B has not been executed. This prevents
   promotion or DriverKit build attempts from being inferred from the diagnostic
   RC packet.

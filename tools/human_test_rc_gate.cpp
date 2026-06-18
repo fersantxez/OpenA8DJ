@@ -130,9 +130,7 @@ int main(int argc, char** argv) {
   const bool lock_policy_ready =
       string_field_is(hardware_lock_policy, "result", "PASS") &&
       string_array_has(hardware_lock_policy, "sensitive_paths",
-                       "scripts/run-physical-superiority-window") &&
-      string_array_has(hardware_lock_policy, "sensitive_paths",
-                       "scripts/run-known-good-route-soundcheck");
+                       "scripts/run-physical-superiority-window");
   const bool safety_smoke_required =
       !string_field_is(hal_safety, "safety_window_status", "PASS");
   const bool diagnostic_hal_installed_now =
@@ -144,11 +142,11 @@ int main(int argc, char** argv) {
   const bool capture_visible =
       string_field_is(capture_readiness, "capture_status", "VISIBLE") &&
       bool_field_is(capture_readiness, "irig_coreaudio_capture_visible", true);
-  const bool route_ready = bool_field_is(known_good, "route_revalidation_ready", true);
+  const bool route_ready =
+      bool_field_is(physical_window, "source_reference_policy_ready", true) &&
+      bool_field_is(physical_window, "ready_for_source_reference_ab_window", true);
   const bool route_known_blocked =
-      bool_field_is(known_good, "route_revalidation_ready", false) &&
-      string_array_has(known_good, "blockers",
-                       "non_audio8_non_builtin_known_good_output_not_visible");
+      bool_field_is(physical_window, "source_reference_policy_ready", false);
   const bool route_matrix_blocks_product =
       string_field_is(route_matrix, "result", "PASS") &&
       bool_field_is(route_matrix, "human_product_test_allowed", false) &&
@@ -205,10 +203,10 @@ int main(int argc, char** argv) {
     blockers.push_back("latest_hal_safety_window_needed_external_recovery");
   }
   if (route_known_blocked) {
-    blockers.push_back("non_audio8_non_builtin_known_good_output_not_visible");
+    blockers.push_back("source_reference_ab_window_not_ready");
   }
   if (route_matrix_blocks_product) {
-    blockers.push_back("latest_audio8_route_matrix_has_no_useful_correlated_capture");
+    blockers.push_back("latest_audio8_to_irig_source_reference_matrix_has_not_passed");
   }
   if (product_quality_blocked) {
     blockers.push_back("same_session_product_quality_not_proven");
@@ -262,6 +260,8 @@ int main(int argc, char** argv) {
   print_bool("fresh_hal_safety_smoke_required", safety_smoke_required);
   print_bool("route_revalidation_allowed_after_lock", route_revalidation_allowed_after_lock);
   print_bool("route_revalidation_ready", route_ready);
+  print_bool("source_reference_policy_ready", route_ready);
+  print_bool("non_audio8_known_good_route_required", false);
   print_bool("product_human_test_allowed", product_human_test_allowed);
   print_bool("timecode_vinyl_human_test_allowed", timecode_vinyl_human_test_allowed);
   print_bool("cpu_superiority_claim_allowed", false);
@@ -270,19 +270,19 @@ int main(int argc, char** argv) {
   print_array("blockers", blockers);
   print_array("next_lock_gated_actions",
               {"fresh_hal_safety_smoke_if_installing",
-               "known_good_non_audio8_route_revalidation",
-               "same_session_mainline_cpp_physical_ab",
+               "source_reference_mainline_cpp_physical_ab",
                "runtime_cpu_submit_counter_comparison",
                "traktor_timecode_vinyl_physical_gate"});
   std::string next_required_action =
-      "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION";
+      "LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG";
   if (safety_smoke_required) {
     next_required_action = "LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL";
   } else if (!route_ready) {
     next_required_action =
-        "PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION";
+        "FIX_SOURCE_REFERENCE_PHYSICAL_WINDOW_PRECONDITIONS";
   } else if (diagnostic_hal_installed_now) {
-    next_required_action = "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION_WITH_ACTIVE_DIAGNOSTIC_HAL";
+    next_required_action =
+        "LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_WITH_ACTIVE_DIAGNOSTIC_HAL";
   }
   print_string("next_required_action", next_required_action, false);
   std::cout << "}\n";

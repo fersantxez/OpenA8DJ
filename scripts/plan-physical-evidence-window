@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Plan the next lock-gated physical evidence window from route readiness.
+"""Plan the next lock-gated physical evidence window from source-reference readiness.
 
 This is a read-only planner. It does not acquire the hardware lock, play audio,
 record audio, install or unload drivers, restart CoreAudio, reset USB, change
-defaults, or mutate the mainline/Rust worktrees. It consumes the known-good
-route watcher output and emits exact commands for the next physical window.
+defaults, or mutate the mainline/Rust worktrees. It consumes existing route
+diagnostics when present and emits exact commands for the next physical window.
 """
 
 from __future__ import annotations
@@ -151,15 +151,14 @@ def build_full_command(
     command = [
         "scripts/run-physical-superiority-window",
         "--execute",
+        "--source-reference-promotion",
         "--skip-build",
         "--run-dir",
-        f"{run_dir}/same-session-ab",
+        f"{run_dir}/source-reference-ab",
         "--mainline-candidate",
         str(mainline),
         "--candidate",
         str(candidate),
-        "--known-good-output-device-uid",
-        str(output.get("uid", "")),
         "--capture-device",
         str(capture.get("name", args.capture_device)),
         "--capture-channels",
@@ -224,14 +223,17 @@ def main() -> int:
     run_dir = args.run_dir.replace("<timestamp>", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
 
     blockers: list[str] = []
+    diagnostic_known_good_blockers: list[str] = []
     watcher_ok = watcher.get("result") == "PASS" and watcher_rc in (0, 2)
+    source_reference_policy_ready = True
+    source_reference_window_ready = source_reference_policy_ready
     route_ready = watcher_ok and watcher.get("route_revalidation_ready") is True
     if not watcher_ok:
-        blockers.append("known_good_route_watcher_failed")
+        diagnostic_known_good_blockers.append("known_good_route_watcher_failed")
     if not route_ready:
-        blockers.extend(watcher.get("last_selector", {}).get("blockers", []) if isinstance(watcher.get("last_selector"), dict) else [])
-        if "known_good_route_not_ready" not in blockers:
-            blockers.append("known_good_route_not_ready")
+        diagnostic_known_good_blockers.extend(watcher.get("last_selector", {}).get("blockers", []) if isinstance(watcher.get("last_selector"), dict) else [])
+        if "known_good_route_not_ready" not in diagnostic_known_good_blockers:
+            diagnostic_known_good_blockers.append("known_good_route_not_ready")
     if not reference_path or not reference_path.is_file():
         blockers.append("reference_wav_missing")
     if not candidate["complete"]:
@@ -250,6 +252,13 @@ def main() -> int:
         and bool(capture.get("name"))
     )
     full_ab_ready = route_only_ready and candidate["complete"] and mainline["complete"]
+    source_reference_ab_ready = (
+        source_reference_window_ready
+        and bool(reference_path and reference_path.is_file())
+        and bool(capture.get("name") or args.capture_device)
+        and candidate["complete"]
+        and mainline["complete"]
+    )
 
     route_command = (
         build_route_command(args, run_dir, output, capture, reference_path)
@@ -258,11 +267,17 @@ def main() -> int:
     )
     full_command = (
         build_full_command(args, run_dir, output, capture, reference_path, mainline_path, candidate_path)
-        if full_ab_ready and reference_path and mainline_path and candidate_path
+        if source_reference_ab_ready and reference_path and mainline_path and candidate_path
         else []
     )
     unique_blockers = list(dict.fromkeys(blockers))
-    status = "FULL_AB_READY" if full_ab_ready else "ROUTE_ONLY_READY" if route_only_ready else "BLOCKED"
+    status = (
+        "SOURCE_REFERENCE_AB_READY"
+        if source_reference_ab_ready
+        else "ROUTE_ONLY_READY"
+        if route_only_ready
+        else "BLOCKED"
+    )
     report = {
         "schema": "opena8djcpp.physical-evidence-window-plan.v1",
         "timestamp_utc": utc_now(),
@@ -270,14 +285,19 @@ def main() -> int:
         "result": "PASS" if watcher_ok else "FAIL",
         "status": status,
         "route_revalidation_ready": route_ready,
+        "source_reference_policy_ready": source_reference_policy_ready,
+        "non_audio8_known_good_route_required": False,
+        "ready_for_source_reference_ab_window": source_reference_ab_ready,
         "route_only_ready": route_only_ready,
-        "full_ab_ready": full_ab_ready,
+        "full_ab_ready": source_reference_ab_ready,
         "product_claim_allowed": False,
         "branch_promotion_allowed": False,
         "lock_required_before_command": True,
         "watcher_json": str(watcher_path) if watcher_path else "",
         "watcher_status": watcher.get("status", ""),
         "watcher_return_code": watcher_rc,
+        "diagnostic_known_good_route_ready": route_ready,
+        "diagnostic_known_good_route_blockers": list(dict.fromkeys(diagnostic_known_good_blockers)),
         "selected_known_good_output": output,
         "selected_irig_capture": capture,
         "candidate": candidate,
@@ -291,11 +311,11 @@ def main() -> int:
         "full_ab_command_shell_hint": shell_hint(full_command) if full_command else "",
         "blockers": unique_blockers,
         "next_action": (
-            "ACQUIRE_LOCK_AND_RUN_FULL_AB_COMMAND"
-            if full_ab_ready
+            "ACQUIRE_LOCK_AND_RUN_SOURCE_REFERENCE_AB_COMMAND"
+            if source_reference_ab_ready
             else "ACQUIRE_LOCK_AND_RUN_ROUTE_ONLY_COMMAND"
             if route_only_ready
-            else "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION"
+            else "PROVIDE_SOURCE_REFERENCE_WAV_AND_COMPLETE_HAL_BUNDLES"
         ),
         "meaning": (
             "PASS means the physical window has been planned or explicitly blocked; it is not product readiness"

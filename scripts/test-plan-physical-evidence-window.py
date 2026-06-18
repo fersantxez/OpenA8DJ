@@ -97,18 +97,24 @@ def main() -> int:
         blocked_rc, blocked = run_plan(temp / "blocked", watcher_payload(False), True)
         route_rc, route_only = run_plan(temp / "route", watcher_payload(True), False)
         full_rc, full = run_plan(temp / "full", watcher_payload(True), True)
-    if blocked_rc != 0 or blocked.get("status") != "BLOCKED":
-        failures.append("blocked watcher did not produce PASS/BLOCKED plan")
+    if blocked_rc != 0 or blocked.get("status") != "SOURCE_REFERENCE_AB_READY":
+        failures.append("blocked watcher did not produce source-reference A/B plan")
     if blocked.get("route_only_ready") is not False:
         failures.append("blocked watcher unexpectedly route-ready")
+    if blocked.get("source_reference_policy_ready") is not True:
+        failures.append("source-reference policy was not marked ready")
+    if blocked.get("non_audio8_known_good_route_required") is not False:
+        failures.append("non-Audio8 known-good route was still required")
+    if blocked.get("ready_for_source_reference_ab_window") is not True:
+        failures.append("source-reference A/B window was not ready")
     if route_rc != 0 or route_only.get("status") != "ROUTE_ONLY_READY":
         failures.append("ready watcher without mainline did not produce ROUTE_ONLY_READY")
     if route_only.get("full_ab_ready") is not False:
         failures.append("missing mainline unexpectedly allowed full A/B")
     if not route_only.get("route_only_command_argv"):
         failures.append("route-only plan did not include command argv")
-    if full_rc != 0 or full.get("status") != "FULL_AB_READY":
-        failures.append("ready watcher with both candidates did not produce FULL_AB_READY")
+    if full_rc != 0 or full.get("status") != "SOURCE_REFERENCE_AB_READY":
+        failures.append("ready watcher with both candidates did not produce SOURCE_REFERENCE_AB_READY")
     if not full.get("full_ab_command_argv"):
         failures.append("full A/B plan did not include command argv")
     report = {

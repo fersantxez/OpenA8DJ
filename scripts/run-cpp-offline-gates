@@ -468,7 +468,7 @@ promotion_window_contract = (evidence / "promotion-window-contract.txt").read_te
 
 promotion_hard_blockers = [
     "single_physical_promotion_evidence_bundle_missing",
-    "same_window_known_good_route_revalidation_missing",
+    "same_window_source_reference_ab_missing",
     "diagnostic_physical_window_not_promotable",
     "same_session_mainline_cpp_physical_ab_missing",
     "valid_irig_loopback_route_not_currently_proven_for_promotion",
@@ -501,8 +501,17 @@ summary = {
     "current_known_good_output_missing": physical_window_readiness_gate.get(
         "current_known_good_output_missing", True
     ),
+    "non_audio8_known_good_route_required": physical_window_readiness_gate.get(
+        "non_audio8_known_good_route_required", False
+    ),
+    "source_reference_policy_ready": physical_window_readiness_gate.get(
+        "source_reference_policy_ready", False
+    ),
     "ready_for_route_revalidation_window": physical_window_readiness_gate.get(
         "ready_for_route_revalidation_window", False
+    ),
+    "ready_for_source_reference_ab_window": physical_window_readiness_gate.get(
+        "ready_for_source_reference_ab_window", False
     ),
     "ready_for_product_physical_ab": physical_window_readiness_gate.get(
         "ready_for_product_physical_ab", False
@@ -1418,8 +1427,17 @@ summary = {
         "current_known_good_output_missing": physical_window_readiness_gate.get(
             "current_known_good_output_missing"
         ),
+        "non_audio8_known_good_route_required": physical_window_readiness_gate.get(
+            "non_audio8_known_good_route_required"
+        ),
+        "source_reference_policy_ready": physical_window_readiness_gate.get(
+            "source_reference_policy_ready"
+        ),
         "ready_for_route_revalidation_window": physical_window_readiness_gate.get(
             "ready_for_route_revalidation_window"
+        ),
+        "ready_for_source_reference_ab_window": physical_window_readiness_gate.get(
+            "ready_for_source_reference_ab_window"
         ),
         "ready_for_product_physical_ab": physical_window_readiness_gate.get(
             "ready_for_product_physical_ab"
@@ -1580,6 +1598,15 @@ summary = {
         "plan_status": physical_evidence_window_plan.get("status"),
         "route_revalidation_ready": physical_evidence_window_plan.get(
             "route_revalidation_ready"
+        ),
+        "source_reference_policy_ready": physical_evidence_window_plan.get(
+            "source_reference_policy_ready"
+        ),
+        "non_audio8_known_good_route_required": physical_evidence_window_plan.get(
+            "non_audio8_known_good_route_required"
+        ),
+        "ready_for_source_reference_ab_window": physical_evidence_window_plan.get(
+            "ready_for_source_reference_ab_window"
         ),
         "route_only_ready": physical_evidence_window_plan.get("route_only_ready"),
         "full_ab_ready": physical_evidence_window_plan.get("full_ab_ready"),
@@ -3139,6 +3166,15 @@ summary["human_test_rc_packet_product_human_test_allowed"] = (
 summary["human_test_rc_packet_objective_achieved"] = (
     packet.get("objective", {}).get("achieved")
 )
+summary["human_test_rc_packet_external_readiness_status"] = (
+    packet.get("external_readiness", {}).get("status")
+)
+summary["human_test_rc_packet_external_objective_ready"] = (
+    packet.get("external_readiness", {}).get("objective_ready")
+)
+summary["human_test_rc_packet_external_promotion_allowed"] = (
+    packet.get("external_readiness", {}).get("promotion_allowed")
+)
 summary["human_test_rc_packet_next_commands"] = [
     command.get("name") for command in packet.get("next_commands", [])
 ]
@@ -3192,6 +3228,19 @@ summary["human_test_rc_packet"] = {
     "driverkit_build_allowed": packet.get("driverkit", {}).get(
         "product_driverkit_build_allowed"
     ),
+    "external_readiness_status": packet.get("external_readiness", {}).get("status"),
+    "external_objective_ready": packet.get("external_readiness", {}).get(
+        "objective_ready"
+    ),
+    "external_promotion_allowed": packet.get("external_readiness", {}).get(
+        "promotion_allowed"
+    ),
+    "external_product_human_audio_allowed": packet.get("external_readiness", {}).get(
+        "product_human_audio_allowed"
+    ),
+    "external_route_revalidation_allowed_now": packet.get(
+        "external_readiness", {}
+    ).get("route_revalidation_allowed_now"),
     "legacy_main_promotion_allowed": packet.get("promotion_policy", {}).get(
         "legacy_main_promotion_allowed"
     ),
@@ -3208,6 +3257,10 @@ summary["objective_external_readiness"] = {
     "product_human_audio_allowed": external.get("product_human_audio_allowed"),
     "driverkit_install_or_build_attempt_allowed_now": external.get(
         "driverkit_install_or_build_attempt_allowed_now"
+    ),
+    "source_reference_policy_ready": external.get("source_reference_policy_ready"),
+    "non_audio8_known_good_route_required": external.get(
+        "non_audio8_known_good_route_required"
     ),
     "route_revalidation_allowed_now": external.get("route_revalidation_allowed_now"),
     "blockers": external.get("blockers", []),

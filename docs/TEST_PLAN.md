@@ -171,15 +171,13 @@ Physical promotion bundle rule:
 
 - A future physical promotion window must produce one coherent bundle under
   `local-analysis/physical-superiority-window/<id>`.
-- That bundle must include same-window `known-good-route/metrics.json` from an
-  explicit wired non-Audio8 output source into the iRig capture route.
-- Built-in/acoustic output, historical route-only evidence, candidate-only
-  runs, and skipped known-good checks are diagnostic only and must not satisfy
-  branch promotion.
-- The standalone known-good route runner must validate the resolved CoreAudio
-  output identity under lock before playback/capture. A requested substring
-  that resolves to OpenA8DJ/Audio 8 is a hard failure, even if the original
-  text did not literally name Audio 8.
+- That bundle must include same-window source-reference analysis: original WAV,
+  music file, or generated tone -> Audio 8 DJ output -> iRig capture.
+- Historical route-only evidence, candidate-only runs, skipped physical
+  comparison, and captures without the original reference are diagnostic only
+  and must not satisfy branch promotion.
+- The old non-Audio8 known-good route runner remains diagnostic. It is no longer
+  the active prerequisite for the human baseline.
 
 ## Baseline Inputs
 
@@ -1900,13 +1898,16 @@ Expected current result:
 - `timecode_vinyl_physical_proven=false`;
 - `branch_promotion_allowed=false`.
 
-15:00 EDT decision rule:
+Near-term human baseline decision rule:
 
-- If no wired non-Audio8 known-good output is validated before the window, ship
-  only the installable diagnostic RC and evidence packet for review.
-- If the route is validated under lock, run the same-window mainline/C++ A/B,
-  CPU/submit comparison, and Timecode Vinyl physical window before any product
-  listening or superiority claim.
+- Ship an installable diagnostic RC plus an operator packet whose first command
+  is the lock-gated source-reference mainline/C++ A/B.
+- The A/B reference is the original file or tone, not a separately recorded
+  non-Audio8 output. The physical path under test is Audio 8 DJ -> iRig.
+- Run CPU/submit comparison in the same window. Run Timecode Vinyl only after
+  the source-reference A/B is captured and analyzable.
+- No product listening, superiority claim, or branch promotion is allowed until
+  source-reference A/B, CPU/resource, and Timecode physical gates pass.
 
 ## Human-Test RC Packet
 
@@ -1932,16 +1933,21 @@ Expected current result:
 - `packet_status=DIAGNOSTIC_RC_PACKET_READY`;
 - `objective.achieved=false`;
 - `human_test.product_human_test_allowed=false`;
-- `route.route_only_ready=false`;
+- `external_readiness.status=BLOCKED`;
+- `external_readiness.promotion_allowed=false`;
+- `route.source_reference_policy_ready=true`;
+- `route.non_audio8_known_good_route_required=false`;
+- `route.full_ab_ready=true` when reference WAV, iRig target, C++ HAL, and
+  mainline HAL are available;
 - `timecode.physical_window_ready=false`;
 - `driverkit.product_driverkit_build_allowed=false`;
-- next command is the read-only known-good route watcher.
+- next command is `lock_gated_source_reference_mainline_cpp_ab`.
 
 PASS/FAIL semantics:
 
 - Packet PASS means the decision packet was built from current evidence.
 - It is not product readiness and does not allow human product listening unless
-  the embedded route, A/B, CPU, and Timecode gates allow it.
+  the embedded route, A/B, CPU, Timecode, and external-readiness gates allow it.
 
 ## Objective External Readiness Audit
 

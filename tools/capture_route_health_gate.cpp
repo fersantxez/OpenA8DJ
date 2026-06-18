@@ -329,10 +329,10 @@ int main(int argc, char** argv) {
   }
 
   std::vector<std::string> required_experiments;
-  required_experiments.push_back("known_good_non_audio8_source_into_same_irig_capture_route");
+  required_experiments.push_back("source_reference_file_or_tone_into_audio8_to_irig_capture_route");
   required_experiments.push_back("audio8_direct_to_irig_without_mixer_or_eq_if_physically_possible");
-  required_experiments.push_back("same_session_mainline_cpp_physical_ab_on_validated_route");
-  required_experiments.push_back("traktor_timecode_vinyl_scope_on_validated_route");
+  required_experiments.push_back("same_session_mainline_cpp_physical_ab_against_source_reference");
+  required_experiments.push_back("traktor_timecode_vinyl_scope_against_source_reference_route");
 
   const bool measurement_valid_for_promotion = blockers.empty();
   const bool product_claim_allowed = measurement_valid_for_promotion;

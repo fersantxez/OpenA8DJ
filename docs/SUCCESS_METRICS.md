@@ -46,9 +46,10 @@ External readiness blocker:
   promotion claim. A `BLOCKED` result is still a successful audit, but it means
   the RC can only be diagnostic.
 - Current expected blockers are dirty mainline reference state, missing full
-  Xcode/DriverKit SDK, insufficient disk for Xcode, no wired non-Audio8
-  known-good route into iRig, no same-session mainline/C++ A/B, no physical
-  Timecode Vinyl window, and no final objective proof.
+  Xcode/DriverKit SDK, insufficient disk for Xcode, no same-session
+  source-reference mainline/C++ A/B, no physical Timecode Vinyl window, and no
+  final objective proof. A separate non-Audio8 known-good output is not required
+  for the current human baseline; the reference is the original file or tone.
 
 This document defines the offline success gates for the C++/DriverKit redesign.
 It is intentionally comparable with the current mainline C/OpenA8DJ reference
@@ -115,9 +116,10 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - While the current route is blocked, `current-offline-gates.json` must expose
   `route_measurement_status=BLOCKED_FOR_PROMOTION`,
   `diagnostic_pass_not_product_readiness=true`,
-  `route_revalidation_plan_ready=true`, and
-  `ready_for_route_revalidation_window=false` whenever physical route inventory
-  lacks a visible wired non-Audio8 known-good output.
+  `source_reference_policy_ready=true`,
+  `non_audio8_known_good_route_required=false`, and
+  `ready_for_source_reference_ab_window=true` when the original WAV/tone,
+  iRig capture target, C++ HAL bundle, and mainline HAL bundle are available.
   `product_claim_allowed=false`, and `branch_promotion_allowed=false` inside
   `capture_route_health_gate`.
 - If a saved soundcheck has `captured.wav` and `fixture/reference.wav`, product
@@ -2680,7 +2682,8 @@ Current implementation:
   - installable artifacts with candidate hashes recorded;
   - DriverKit/deXt runtime readiness or an explicit documented reason why the
     current RC is HAL-only;
-  - validated wired non-Audio8 known-good physical route into iRig;
+  - validated source-reference physical route: original file or tone -> Audio 8
+    DJ output -> iRig capture;
   - same-session C mainline vs C++ quality comparison with C++ strictly better
     or equal where equality is the declared criterion;
   - CPU/resource p95 no worse than mainline and preferably lower under the same

@@ -101,13 +101,19 @@ def main() -> None:
         assert payload["objective_ready"] is False
         assert payload["promotion_allowed"] is False
         assert payload["driverkit_install_or_build_attempt_allowed_now"] is False
+        assert payload["source_reference_policy_ready"] is True
+        assert payload["non_audio8_known_good_route_required"] is False
         assert "PREPARE_CLEAN_MAINLINE_REFERENCE_BEFORE_PROMOTION" in payload[
             "next_required_actions"
         ]
         assert any(
             action.startswith("FREE_AT_LEAST_") for action in payload["next_required_actions"]
         )
-        assert "wired non-Audio8 known-good route is not ready" in payload["blockers"]
+        assert (
+            "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG"
+            in payload["next_required_actions"]
+        )
+        assert "wired non-Audio8 known-good route is not ready" not in payload["blockers"]
     print("objective external readiness fixture PASS")
 
 

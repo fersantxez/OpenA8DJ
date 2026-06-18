@@ -46,17 +46,21 @@ def main() -> None:
                 "objective_achieved": False,
                 "branch_promotion_allowed": False,
                 "blockers": ["same-session physical quality has not beaten mainline"],
-                "next_required_action": "VALIDATE_WIRED_NON_AUDIO8_ROUTE",
+                "next_required_action": "RUN_SOURCE_REFERENCE_MAINLINE_CPP_AB_CPU_TIMECODE",
             },
         )
         write_json(
             evidence / "human-test-rc-status.json",
             {
-                "status": "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED",
-                "allowed_window_types": ["DIAGNOSTIC_PACKAGE_REVIEW_ONLY"],
+                "status": "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED",
+                "allowed_window_types": [
+                    "LOCK_GATED_SOURCE_REFERENCE_AB",
+                    "DIAGNOSTIC_PACKAGE_REVIEW_ONLY",
+                    "NO_PRODUCT_CLAIM_WINDOW",
+                ],
                 "disallowed_claims": ["mainline_superiority"],
-                "blockers": ["known_good_physical_route_not_ready"],
-                "next_action": "validate route",
+                "blockers": ["same_session_source_reference_ab_not_ready"],
+                "next_action": "run source-reference ab",
             },
         )
         write_json(
@@ -71,10 +75,12 @@ def main() -> None:
             evidence / "physical-evidence-window-plan.json",
             {
                 "status": "BLOCKED",
+                "source_reference_policy_ready": True,
+                "non_audio8_known_good_route_required": False,
                 "route_only_ready": False,
                 "full_ab_ready": False,
-                "blockers": ["known_good_route_not_ready"],
-                "next_action": "provision route",
+                "blockers": ["same_session_source_reference_ab_not_ready"],
+                "next_action": "run source-reference ab",
             },
         )
         write_json(
@@ -93,6 +99,26 @@ def main() -> None:
                 "product_driverkit_build_allowed": False,
                 "driverkit_sdk_path": "missing",
                 "next_required_action": "install Xcode",
+            },
+        )
+        write_json(
+            evidence / "objective-external-readiness.json",
+            {
+                "external_readiness_status": "BLOCKED",
+                "objective_ready": False,
+                "promotion_allowed": False,
+                "product_human_audio_allowed": False,
+                "driverkit_install_or_build_attempt_allowed_now": False,
+                "source_reference_policy_ready": True,
+                "non_audio8_known_good_route_required": False,
+                "route_revalidation_allowed_now": True,
+                "blockers": [
+                    "mainline worktree is dirty; use a clean reference before Legacy/main promotion",
+                    "same-session mainline/C++ source-reference A/B window is not ready",
+                ],
+                "next_required_actions": [
+                    "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG"
+                ],
             },
         )
         write_json(
@@ -129,8 +155,19 @@ def main() -> None:
         assert payload["packet_status"] == "DIAGNOSTIC_RC_PACKET_READY"
         assert payload["objective"]["achieved"] is False
         assert payload["human_test"]["product_human_test_allowed"] is False
+        assert payload["external_readiness"]["status"] == "BLOCKED"
+        assert payload["external_readiness"]["objective_ready"] is False
+        assert payload["external_readiness"]["promotion_allowed"] is False
+        assert (
+            payload["external_readiness"]["route_revalidation_allowed_now"] is True
+        )
         assert payload["promotion_policy"]["legacy_main_promotion_allowed"] is False
-        assert payload["next_commands"][0]["name"] == "read_only_route_watcher"
+        assert payload["route"]["source_reference_policy_ready"] is True
+        assert payload["route"]["non_audio8_known_good_route_required"] is False
+        assert (
+            payload["next_commands"][0]["name"]
+            == "lock_gated_source_reference_mainline_cpp_ab"
+        )
         assert out_md.read_text(encoding="utf-8").startswith(
             "# OpenA8DJ C++ Human-Test RC Packet"
         )

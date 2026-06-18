@@ -10,7 +10,7 @@ claim that the C++ line beats mainline. By default this is dry-run only.
 
 Execution sequence when --execute is present:
   1. acquire the global hardware lock for the whole window;
-  2. validate a known-good non-Audio8 source through the iRig capture route;
+  2. validate the chosen reference policy;
   3. install/reload the explicit mainline HAL candidate and run soundcheck;
   4. install/reload the explicit C++ HAL candidate and run soundcheck;
   5. run native C++ WAV quality analysis plus C++/Python audiophile analyzers
@@ -53,6 +53,10 @@ Options:
   --target-peak-db DB               Fixture target peak, default -16
   --run-dir DIR                     Evidence directory
   --skip-build                      Reuse existing built tools
+  --source-reference-promotion      Use the original reference WAV/tone as the
+                                    promotion reference for Audio8 -> iRig;
+                                    no separate non-Audio8 output route is
+                                    required
   --skip-known-good                 Skip route validation; diagnostic only
   --allow-same-device-loopback-diagnostic
                                     Allow output and capture device to be the
@@ -106,6 +110,7 @@ target_peak_db="-16"
 run_dir=""
 skip_build=0
 skip_known_good=0
+source_reference_promotion=0
 allow_same_device_loopback_diagnostic=0
 allow_built_in_output_acoustic_diagnostic=0
 leave_loaded=0
@@ -132,6 +137,7 @@ while [ "$#" -gt 0 ]; do
     --run-dir) run_dir="$2"; shift 2 ;;
     --skip-build) skip_build=1; shift ;;
     --skip-known-good) skip_known_good=1; shift ;;
+    --source-reference-promotion) source_reference_promotion=1; skip_known_good=1; shift ;;
     --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
     --allow-built-in-output-acoustic-diagnostic) allow_built_in_output_acoustic_diagnostic=1; shift ;;
     --leave-loaded) leave_loaded=1; shift ;;
@@ -148,7 +154,12 @@ case "$run_dir" in
 esac
 mkdir -p "$run_dir"
 
-if [ "$skip_known_good" -ne 1 ]; then
+if [ "$source_reference_promotion" -eq 1 ]; then
+  [ -n "$reference_wav" ] || die "--reference-wav is required for --source-reference-promotion"
+  if [ -z "$music_file" ]; then
+    music_file="$reference_wav"
+  fi
+elif [ "$skip_known_good" -ne 1 ]; then
   [ -n "$reference_wav" ] || die "--reference-wav is required unless --skip-known-good is used"
   if [ -z "$known_good_output_device" ] && [ -z "$known_good_output_device_uid" ]; then
     die "--known-good-output-device or --known-good-output-device-uid is required"
@@ -201,6 +212,7 @@ manifest="$run_dir/window-manifest.txt"
   echo "buffer=$buffer"
   echo "target_peak_db=$target_peak_db"
   echo "skip_known_good=$skip_known_good"
+  echo "source_reference_promotion=$source_reference_promotion"
   echo "allow_same_device_loopback_diagnostic=$allow_same_device_loopback_diagnostic"
   echo "allow_built_in_output_acoustic_diagnostic=$allow_built_in_output_acoustic_diagnostic"
   echo "leave_loaded=$leave_loaded"
@@ -212,7 +224,11 @@ if [ "$execute" -ne 1 ]; then
     echo "PHYSICAL_SUPERIORITY_WINDOW: PLAN_ONLY"
     echo "No hardware/audio action was run. Add --execute for a locked physical window."
     echo "Required physical order:"
-    echo "1 known-good non-Audio8 route -> iRig"
+    if [ "$source_reference_promotion" -eq 1 ]; then
+      echo "1 source reference WAV/tone -> Audio 8 DJ -> iRig capture"
+    else
+      echo "1 known-good non-Audio8 route -> iRig"
+    fi
     echo "2 mainline HAL safety install/reload and soundcheck"
     echo "3 C++ HAL safety install/reload and soundcheck"
     echo "4 native C++ WAV quality analysis plus C++/Python audiophile analysis for both runs"
@@ -248,6 +264,9 @@ if [ "$prepared_runtime_candidate" -eq 1 ]; then
 fi
 if [ "$skip_known_good" -eq 1 ]; then
   preflight_args+=(--skip-known-good)
+fi
+if [ "$source_reference_promotion" -eq 1 ]; then
+  preflight_args+=(--source-reference-promotion)
 fi
 if [ "$allow_built_in_output_acoustic_diagnostic" -eq 1 ]; then
   preflight_args+=(--allow-built-in-output-acoustic-diagnostic)
@@ -342,9 +361,15 @@ if [ "$skip_known_good" -ne 1 ]; then
 fi
 known_good_rc=0
 if [ "$skip_known_good" -eq 1 ]; then
-  known_good_rc=1
-  printf '{"schema":"opena8djcpp.known-good-route.v1","result":"FAIL","readiness_claim":"BLOCKED_KNOWN_GOOD_ROUTE_SKIPPED"}\n' \
+  if [ "$source_reference_promotion" -eq 1 ]; then
+    known_good_rc=0
+    printf '{"schema":"opena8djcpp.known-good-route.v1","result":"SKIP","readiness_claim":"SOURCE_REFERENCE_PROMOTION_NO_SEPARATE_KNOWN_GOOD_ROUTE_REQUIRED"}\n' \
+      > "$run_dir/known-good-route-skipped.json"
+  else
+    known_good_rc=1
+    printf '{"schema":"opena8djcpp.known-good-route.v1","result":"FAIL","readiness_claim":"BLOCKED_KNOWN_GOOD_ROUTE_SKIPPED"}\n' \
     > "$run_dir/known-good-route-skipped.json"
+  fi
 fi
 
 if [ "$route_only" -eq 1 ]; then
@@ -535,12 +560,18 @@ else
   same_session_rc=1
 fi
 
+promotion_args=(
+  "$root/scripts/evaluate-promotion-readiness.py"
+  --music "$run_dir/cpp-soundcheck/metrics.json"
+  --cpu "$run_dir/cpp-soundcheck/cpu-profile.tsv"
+  --same-session-compare "$run_dir/same-session-physical-compare.json"
+  --json-out "$run_dir/promotion-readiness.json"
+)
+if [ "$source_reference_promotion" -eq 1 ]; then
+  promotion_args+=(--source-reference-promotion)
+fi
 set +e
-"$root/scripts/evaluate-promotion-readiness.py" \
-  --music "$run_dir/cpp-soundcheck/metrics.json" \
-  --cpu "$run_dir/cpp-soundcheck/cpu-profile.tsv" \
-  --same-session-compare "$run_dir/same-session-physical-compare.json" \
-  --json-out "$run_dir/promotion-readiness.json" \
+"${promotion_args[@]}" \
   > "$run_dir/promotion-readiness.stdout" \
   2> "$run_dir/promotion-readiness.stderr"
 promotion_rc=$?

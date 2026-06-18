@@ -119,7 +119,10 @@ def main() -> int:
     audio8_visible = "open audio 8 dj" in devices_text or "opena8dj" in devices_text
     audio8_8x8 = "in=8 out=8" in devices_text
     package_ready = PKG.is_file() and DMG.is_file() and bundle_info(CANDIDATE)["complete"]
-    route_ready = bool(plan.get("route_only_ready")) or bool(watcher.get("route_revalidation_ready"))
+    source_reference_ready = bool(plan.get("source_reference_policy_ready"))
+    route_ready = source_reference_ready or bool(plan.get("route_only_ready")) or bool(
+        watcher.get("route_revalidation_ready")
+    )
     full_ab_ready = bool(plan.get("full_ab_ready"))
     stack_ok = health.get("audio_stack_health") == "PASS" and health_rc == 0
     route_contaminated = (
@@ -152,7 +155,7 @@ def main() -> int:
     if not stack_ok:
         blockers.append("audio_stack_unhealthy")
     if not route_ready:
-        blockers.append("known_good_physical_route_not_ready")
+        blockers.append("source_reference_physical_window_not_ready")
     if route_contaminated:
         blockers.append("downstream_route_contamination_after_clean_usb")
     if not timecode_physical_ready:
@@ -167,13 +170,21 @@ def main() -> int:
         next_action = "acquire_lock_and_run_route_only_command_from_physical_evidence_window_plan"
         allowed_window_types = ["LOCK_GATED_ROUTE_REVALIDATION_ONLY"]
     elif package_ready and irig_visible and audio8_visible and audio8_8x8 and stack_ok and route_contaminated:
-        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED"
-        next_action = "validate_wired_non_audio8_known_good_route_before_product_listening"
-        allowed_window_types = ["DIAGNOSTIC_PACKAGE_REVIEW_ONLY", "NO_PRODUCT_AUDIO_WINDOW"]
+        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED"
+        next_action = "run_lock_gated_source_reference_mainline_cpp_ab_before_product_listening"
+        allowed_window_types = [
+            "LOCK_GATED_SOURCE_REFERENCE_AB",
+            "DIAGNOSTIC_PACKAGE_REVIEW_ONLY",
+            "NO_PRODUCT_CLAIM_WINDOW",
+        ]
     elif package_ready and irig_visible and audio8_visible and audio8_8x8 and stack_ok:
-        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_BLOCKED"
-        next_action = "provision_wired_non_audio8_non_builtin_output_then_rerun_watcher"
-        allowed_window_types = ["DIAGNOSTIC_PACKAGE_REVIEW_ONLY", "NO_PRODUCT_AUDIO_WINDOW"]
+        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED"
+        next_action = "run_lock_gated_source_reference_mainline_cpp_ab_before_product_listening"
+        allowed_window_types = [
+            "LOCK_GATED_SOURCE_REFERENCE_AB",
+            "DIAGNOSTIC_PACKAGE_REVIEW_ONLY",
+            "NO_PRODUCT_CLAIM_WINDOW",
+        ]
     else:
         status = "BLOCKED"
         next_action = "fix_blockers_before_any_human_test_window"
@@ -208,6 +219,7 @@ def main() -> int:
         "physical_evidence_window_plan_json": str(WINDOW_PLAN_JSON),
         "physical_evidence_window_plan_status": plan.get("status", ""),
         "physical_evidence_window_plan_route_only_ready": bool(plan.get("route_only_ready")),
+        "physical_evidence_window_plan_source_reference_policy_ready": source_reference_ready,
         "physical_evidence_window_plan_full_ab_ready": bool(plan.get("full_ab_ready")),
         "physical_evidence_window_plan_next_action": plan.get("next_action", ""),
         "physical_evidence_window_plan_route_command": plan.get("route_only_command_argv", []),
@@ -246,8 +258,6 @@ def main() -> int:
             "branch_promotion",
         ],
         "required_before_product_human_test": [
-            "wired_non_audio8_non_builtin_known_good_output_visible",
-            "lock_gated_known_good_route_revalidation_pass",
             "same_session_mainline_cpp_physical_ab_pass",
             "runtime_cpu_submit_counter_comparison_pass",
             "timecode_vinyl_physical_window_pass",

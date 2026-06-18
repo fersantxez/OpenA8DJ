@@ -5129,3 +5129,74 @@ Next action:
   `objective_external_readiness_status` as a hard blocker for promotion and
   product human audio. If a wired known-good route becomes available, run only
   the lock-gated route validation first.
+
+## 2026-06-18 Architect Continuation: Human Packet External Gate
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Ensure the operator-facing human-test packet cannot hide external blockers
+  already found by the objective readiness audit.
+
+Findings:
+- `current-offline-gates.json` already had objective external readiness fields,
+  but `human-test-rc-packet.json` did not carry the same hard blocker in its
+  own decision object.
+
+Integrated action:
+- Added an `external_readiness` block to `scripts/build-human-test-rc-packet.py`.
+- The packet promotion label now requires both `objective_achieved=true` and
+  `external_readiness.objective_ready=true`.
+- The summary schema now requires the packet to report
+  `external_readiness_status=BLOCKED` and all external permission booleans
+  false in the current evidence state.
+
+Risks:
+- Without this propagation, an operator could read the packet and miss dirty
+  mainline/toolchain/route blockers that are visible elsewhere.
+
+Next action:
+- Regenerate the full offline bundle and keep the packet as the single handoff
+  for any future lock-gated route validation window.
+
+## 2026-06-18 Architect Continuation: Source-Reference Baseline Pivot
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Apply the operator correction that the baseline reference is the original
+  file or generated tone, not a separately wired non-Audio8 output.
+
+Integrated action:
+- Updated the physical-window planner, RC packet, external readiness audit,
+  final objective evaluator, route-contamination analyzer, and schema checks to
+  use source-reference policy.
+- The next lock-gated human-baseline command is now
+  `lock_gated_source_reference_mainline_cpp_ab`.
+- Active policy: original file/tone -> Audio 8 DJ output -> iRig capture,
+  same-session mainline C vs C++ comparison, with CPU/resource sampling and
+  Timecode Vinyl still required before any product/superiority claim.
+
+Risks:
+- This prepares the baseline window; it does not prove quality, CPU superiority,
+  or Timecode Vinyl readiness.
+- Mainline dirty state and missing full DriverKit SDK remain external blockers
+  for final objective and Legacy/main promotion.
+
+Next action:
+- Run the lock-gated source-reference A/B window when the user opens the
+  hardware window, then evaluate quality/CPU evidence before any claim.

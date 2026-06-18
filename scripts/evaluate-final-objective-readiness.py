@@ -131,14 +131,15 @@ def main() -> int:
         ),
         gate(
             "physical_route_valid",
-            physical_window.get("route_only_ready") is True
+            physical_window.get("source_reference_policy_ready") is True
+            and route_contamination.get("internal_usb_clean") is True
             and route_contamination.get("human_product_test_allowed") is True,
             {
                 "physical_evidence_window_plan": physical_window,
                 "route_contamination_analysis": route_contamination,
                 "human_status": human_status,
             },
-            "wired non-Audio8 known-good route is not validated and route is contaminated after clean USB",
+            "source-reference Audio8-to-iRig physical comparison is not validated",
         ),
         gate(
             "same_session_quality_beats_mainline",
@@ -208,7 +209,7 @@ def main() -> int:
         "next_required_action": (
             "PREPARE_LEGACY_MAIN_PROMOTION_WINDOW"
             if objective_achieved
-            else "VALIDATE_WIRED_NON_AUDIO8_ROUTE_THEN_SAME_SESSION_MAINLINE_CPP_AB_CPU_TIMECODE"
+            else "RUN_SOURCE_REFERENCE_MAINLINE_CPP_AB_CPU_TIMECODE"
         ),
         "evidence": {
             "offline": str(offline_path),

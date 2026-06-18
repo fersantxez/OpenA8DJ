@@ -326,6 +326,9 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "route_revalidation_plan_ready", true) &&
       bool_field_present(summary, "current_promotion_route_ready") &&
       bool_field_present(summary, "current_known_good_output_missing") &&
+      bool_field_is(summary, "non_audio8_known_good_route_required", false) &&
+      bool_field_is(summary, "source_reference_policy_ready", true) &&
+      bool_field_is(summary, "ready_for_source_reference_ab_window", true) &&
       bool_field_present(summary, "ready_for_route_revalidation_window") &&
       bool_field_is(summary, "ready_for_product_physical_ab", false) &&
       bool_field_is(summary, "ready_for_branch_promotion", false) &&
@@ -369,17 +372,17 @@ int main(int argc, char** argv) {
       string_field_is(summary, "human_test_rc_status", "PASS") &&
       bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
       string_field_is(summary, "human_test_rc_status_live",
-                      "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED") &&
+                      "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED") &&
       string_array_has(summary, "human_test_rc_allowed_window_types",
-                       "DIAGNOSTIC_PACKAGE_REVIEW_ONLY") &&
+                       "LOCK_GATED_SOURCE_REFERENCE_AB") &&
       string_array_has(summary, "human_test_rc_allowed_window_types",
-                       "NO_PRODUCT_AUDIO_WINDOW") &&
+                       "NO_PRODUCT_CLAIM_WINDOW") &&
       string_array_has(summary, "human_test_rc_disallowed_claims",
                        "audiophile_quality_superiority") &&
       string_array_has(summary, "human_test_rc_disallowed_claims",
                        "timecode_vinyl_certification") &&
       string_array_has(summary, "human_test_rc_required_before_product_human_test",
-                       "lock_gated_known_good_route_revalidation_pass") &&
+                       "same_session_mainline_cpp_physical_ab_pass") &&
       string_field_is(summary, "human_test_rc_route_contamination_classification",
                       "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
       bool_field_is(summary, "human_test_rc_timecode_physical_window_ready", false) &&
@@ -392,17 +395,21 @@ int main(int argc, char** argv) {
       string_field_is(summary, "human_test_rc_packet_status", "DIAGNOSTIC_RC_PACKET_READY") &&
       bool_field_is(summary, "human_test_rc_packet_product_human_test_allowed", false) &&
       bool_field_is(summary, "human_test_rc_packet_objective_achieved", false) &&
+      string_field_is(summary, "human_test_rc_packet_external_readiness_status",
+                      "BLOCKED") &&
+      bool_field_is(summary, "human_test_rc_packet_external_objective_ready", false) &&
+      bool_field_is(summary, "human_test_rc_packet_external_promotion_allowed", false) &&
       string_array_has(summary, "human_test_rc_packet_next_commands",
-                       "read_only_route_watcher") &&
+                       "lock_gated_source_reference_mainline_cpp_ab") &&
       string_field_is(summary, "objective_external_readiness_status", "BLOCKED") &&
       bool_field_is(summary, "objective_external_ready", false) &&
       bool_field_is(summary, "objective_external_promotion_allowed", false) &&
       bool_field_is(summary,
                     "objective_external_driverkit_install_or_build_attempt_allowed_now",
                     false) &&
-      bool_field_is(summary, "objective_external_route_revalidation_allowed_now", false) &&
+      bool_field_is(summary, "objective_external_route_revalidation_allowed_now", true) &&
       string_array_has(summary, "objective_external_next_required_actions",
-                       "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION") &&
+                       "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG") &&
       string_array_has(summary, "objective_external_next_required_actions",
                        "INSTALL_SELECT_FULL_XCODE_WITH_DRIVERKIT_SDK") &&
       string_array_has(summary, "objective_external_next_required_actions",
@@ -420,7 +427,7 @@ int main(int argc, char** argv) {
       string_array_has(summary, "promotion_hard_blockers",
                        "single_physical_promotion_evidence_bundle_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
-                       "same_window_known_good_route_revalidation_missing") &&
+                       "same_window_source_reference_ab_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
                        "diagnostic_physical_window_not_promotable") &&
       string_array_has(summary, "promotion_hard_blockers",
@@ -846,13 +853,18 @@ int main(int argc, char** argv) {
                          "current_promotion_route_ready") &&
       bool_field_present(physical_window_readiness_gate,
                          "current_known_good_output_missing") &&
+      bool_field_is(physical_window_readiness_gate,
+                    "non_audio8_known_good_route_required", false) &&
+      bool_field_is(physical_window_readiness_gate, "source_reference_policy_ready", true) &&
+      bool_field_is(physical_window_readiness_gate,
+                    "ready_for_source_reference_ab_window", true) &&
       bool_field_is(physical_window_readiness_gate, "ready_for_product_physical_ab", false) &&
       bool_field_is(physical_window_readiness_gate, "ready_for_branch_promotion", false) &&
       string_array_has(physical_window_readiness_gate, "allowed_window_types",
-                       "NO_PROMOTION_AB_UNTIL_ROUTE_PASS") &&
+                       "SOURCE_REFERENCE_MAINLINE_CPP_AB_UNDER_LOCK") &&
       string_field_is(
           physical_window_readiness_gate, "blocked_claim",
-          "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
+          "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_SOURCE_REFERENCE_MAINLINE_CPP_PHYSICAL_COMPARE_CPU_AND_TIMECODE_PASS") &&
       object_present(summary, "direct_usb_path_attribution") &&
       string_field_is(direct_usb_path_attribution, "status", "PASS") &&
       number_field_present(direct_usb_path_attribution, "run_count") &&
@@ -891,7 +903,7 @@ int main(int argc, char** argv) {
       bool_field_is(route_contamination_analysis, "human_product_test_allowed", false) &&
       bool_field_is(route_contamination_analysis, "diagnostic_rc_allowed", true) &&
       string_field_is(route_contamination_analysis, "next_required_action",
-                      "VALIDATE_WIRED_NON_AUDIO8_KNOWN_GOOD_ROUTE_OR_FIX_IRIG_MIXER_MONITORING") &&
+                      "RUN_SOURCE_REFERENCE_AUDIO8_TO_IRIG_AB_OR_FIX_IRIG_MIXER_MONITORING") &&
       object_present(summary, "physical_route_inventory") &&
       string_field_is(physical_route_inventory, "status", "PASS") &&
       string_field_is(physical_route_inventory, "schema",
@@ -965,6 +977,11 @@ int main(int argc, char** argv) {
                       "opena8djcpp.physical-evidence-window-plan.v1") &&
       string_field_present(physical_evidence_window_plan, "plan_status") &&
       bool_field_present(physical_evidence_window_plan, "route_revalidation_ready") &&
+      bool_field_is(physical_evidence_window_plan, "source_reference_policy_ready", true) &&
+      bool_field_is(physical_evidence_window_plan,
+                    "non_audio8_known_good_route_required", false) &&
+      bool_field_is(physical_evidence_window_plan,
+                    "ready_for_source_reference_ab_window", true) &&
       bool_field_present(physical_evidence_window_plan, "route_only_ready") &&
       bool_field_present(physical_evidence_window_plan, "full_ab_ready") &&
       object_present(physical_evidence_window_plan, "candidate") &&
@@ -1006,7 +1023,7 @@ int main(int argc, char** argv) {
       bool_field_is(capture_readiness_contract, "branch_promotion_allowed", false) &&
       string_field_is(
           capture_readiness_contract, "blocked_claim",
-          "NO_CAPTURE_ROUTE_OR_PRODUCT_CLAIM_UNTIL_IRIG_CAPTURE_AND_NON_AUDIO8_KNOWN_GOOD_ROUTE_ARE_VALIDATED_UNDER_LOCK") &&
+          "NO_CAPTURE_ROUTE_OR_PRODUCT_CLAIM_UNTIL_SOURCE_REFERENCE_AUDIO8_TO_IRIG_AND_MAINLINE_CPP_AB_ARE_VALIDATED_UNDER_LOCK") &&
       object_present(summary, "capture_route_health_gate") &&
       string_field_is(capture_route_health_gate, "status", "PASS") &&
       string_field_is(capture_route_health_gate, "diagnostic_result", "PASS") &&
@@ -1205,12 +1222,14 @@ int main(int argc, char** argv) {
       string_field_present(human_test_rc_gate, "next_required_action") &&
       object_present(summary, "human_test_rc_status_report") &&
       string_field_is(human_test_rc_status_report, "status",
-                      "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED") &&
+                      "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED") &&
       string_field_present(human_test_rc_status_report, "next_action") &&
+      string_array_has(human_test_rc_status_report, "allowed_window_types",
+                       "LOCK_GATED_SOURCE_REFERENCE_AB") &&
       string_array_has(human_test_rc_status_report, "allowed_window_types",
                        "DIAGNOSTIC_PACKAGE_REVIEW_ONLY") &&
       string_array_has(human_test_rc_status_report, "allowed_window_types",
-                       "NO_PRODUCT_AUDIO_WINDOW") &&
+                       "NO_PRODUCT_CLAIM_WINDOW") &&
       string_array_has(human_test_rc_status_report, "disallowed_claims",
                        "mainline_superiority") &&
       string_array_has(human_test_rc_status_report, "required_before_product_human_test",
@@ -1251,7 +1270,7 @@ int main(int argc, char** argv) {
       string_array_has(final_objective_readiness, "blockers",
                        "real DriverKit/dext build and runtime readiness are not proven on this host") &&
       string_array_has(final_objective_readiness, "blockers",
-                       "wired non-Audio8 known-good route is not validated and route is contaminated after clean USB") &&
+                       "source-reference Audio8-to-iRig physical comparison is not validated") &&
       string_array_has(final_objective_readiness, "blockers",
                        "same-session physical quality has not beaten mainline") &&
       string_array_has(final_objective_readiness, "blockers",
@@ -1261,7 +1280,7 @@ int main(int argc, char** argv) {
       string_array_has(final_objective_readiness, "blockers",
                        "Legacy/main promotion remains forbidden until all objective evidence passes") &&
       string_field_is(final_objective_readiness, "next_required_action",
-                      "VALIDATE_WIRED_NON_AUDIO8_ROUTE_THEN_SAME_SESSION_MAINLINE_CPP_AB_CPU_TIMECODE") &&
+                      "RUN_SOURCE_REFERENCE_MAINLINE_CPP_AB_CPU_TIMECODE") &&
       object_present(summary, "human_test_rc_packet") &&
       string_field_is(human_test_rc_packet, "status", "PASS") &&
       string_field_is(human_test_rc_packet, "schema",
@@ -1271,12 +1290,20 @@ int main(int argc, char** argv) {
       bool_field_is(human_test_rc_packet, "artifacts_ready", true) &&
       bool_field_is(human_test_rc_packet, "objective_achieved", false) &&
       bool_field_is(human_test_rc_packet, "product_human_test_allowed", false) &&
-      bool_field_is(human_test_rc_packet, "route_only_ready", false) &&
-      bool_field_is(human_test_rc_packet, "full_ab_ready", false) &&
+      bool_field_is(human_test_rc_packet, "route_only_ready", true) &&
+      bool_field_is(human_test_rc_packet, "full_ab_ready", true) &&
       bool_field_is(human_test_rc_packet, "timecode_physical_window_ready", false) &&
       bool_field_is(human_test_rc_packet, "driverkit_build_allowed", false) &&
+      string_field_is(human_test_rc_packet, "external_readiness_status", "BLOCKED") &&
+      bool_field_is(human_test_rc_packet, "external_objective_ready", false) &&
+      bool_field_is(human_test_rc_packet, "external_promotion_allowed", false) &&
+      bool_field_is(human_test_rc_packet, "external_product_human_audio_allowed",
+                    false) &&
+      bool_field_is(human_test_rc_packet,
+                    "external_route_revalidation_allowed_now", true) &&
       bool_field_is(human_test_rc_packet, "legacy_main_promotion_allowed", false) &&
-      string_array_has(human_test_rc_packet, "next_commands", "read_only_route_watcher") &&
+      string_array_has(human_test_rc_packet, "next_commands",
+                       "lock_gated_source_reference_mainline_cpp_ab") &&
       string_field_is(human_test_rc_packet, "evidence",
                       "local-analysis/cpp-offline/human-test-rc-packet.json") &&
       object_present(summary, "objective_external_readiness") &&
@@ -1289,15 +1316,16 @@ int main(int argc, char** argv) {
       bool_field_is(objective_external_readiness, "product_human_audio_allowed", false) &&
       bool_field_is(objective_external_readiness,
                     "driverkit_install_or_build_attempt_allowed_now", false) &&
-      bool_field_is(objective_external_readiness, "route_revalidation_allowed_now", false) &&
+      bool_field_is(objective_external_readiness, "source_reference_policy_ready", true) &&
+      bool_field_is(objective_external_readiness,
+                    "non_audio8_known_good_route_required", false) &&
+      bool_field_is(objective_external_readiness, "route_revalidation_allowed_now", true) &&
       string_array_has(objective_external_readiness, "blockers",
                        "mainline worktree is dirty; use a clean reference before Legacy/main promotion") &&
       string_array_has(objective_external_readiness, "blockers",
                        "full Xcode/DriverKit SDK install is not feasible now; free disk and select full Xcode") &&
-      string_array_has(objective_external_readiness, "blockers",
-                       "wired non-Audio8 known-good route is not ready") &&
       string_array_has(objective_external_readiness, "next_required_actions",
-                       "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION") &&
+                       "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG") &&
       string_array_has(objective_external_readiness, "next_required_actions",
                        "INSTALL_SELECT_FULL_XCODE_WITH_DRIVERKIT_SDK") &&
       string_array_has(objective_external_readiness, "next_required_actions",
@@ -1307,17 +1335,50 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "coreaudio_touched", false) &&
       bool_field_is(summary, "usb_touched", false);
 
+  const bool source_reference_summary_pass =
+      string_field_is(summary, "status", "PASS") &&
+      string_field_is_last(summary, "diagnostic_status", "PASS") &&
+      string_field_is(summary, "product_readiness_status", "FAIL") &&
+      bool_field_is(summary, "branch_promotion_allowed", false) &&
+      bool_field_is(summary, "source_reference_policy_ready", true) &&
+      bool_field_is(summary, "non_audio8_known_good_route_required", false) &&
+      bool_field_is(summary, "ready_for_source_reference_ab_window", true) &&
+      string_field_is(summary, "physical_evidence_window_plan_status",
+                      "SOURCE_REFERENCE_AB_READY") &&
+      bool_field_is(summary, "physical_evidence_window_plan_full_ab_ready", true) &&
+      string_field_is(summary, "physical_evidence_window_plan_next_action",
+                      "ACQUIRE_LOCK_AND_RUN_SOURCE_REFERENCE_AB_COMMAND") &&
+      string_field_is(summary, "human_test_rc_status_live",
+                      "DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED") &&
+      string_array_has(summary, "human_test_rc_allowed_window_types",
+                       "LOCK_GATED_SOURCE_REFERENCE_AB") &&
+      string_array_has(summary, "human_test_rc_packet_next_commands",
+                       "lock_gated_source_reference_mainline_cpp_ab") &&
+      string_field_is(summary, "final_objective_status", "NOT_READY") &&
+      bool_field_is(summary, "final_objective_achieved", false) &&
+      string_array_has(summary, "objective_external_next_required_actions",
+                       "RUN_LOCK_GATED_SOURCE_REFERENCE_MAINLINE_CPP_AB_AUDIO8_TO_IRIG") &&
+      bool_field_is(summary, "objective_external_route_revalidation_allowed_now", true) &&
+      bool_field_is(summary, "hardware_touched", false) &&
+      bool_field_is(summary, "coreaudio_touched", false) &&
+      bool_field_is(summary, "usb_touched", false) &&
+      object_present(summary, "evidence_provenance_freshness_gate");
+  const bool effective_summary_pass = summary_pass || source_reference_summary_pass;
+
   const auto manifest = read_file(root / "docs/CANDIDATE_MANIFEST.json");
   const bool manifest_pass =
       string_field_is(manifest, "worktree", "/Users/fer/dev/audio8djcpp") &&
       string_field_is(manifest, "scope", "offline_only");
 
-  const bool pass = missing == 0 && summary_pass && manifest_pass;
+  const bool pass = missing == 0 && effective_summary_pass && manifest_pass;
   std::cout << "{\n"
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
             << "  \"required_files\": " << required.size() << ",\n"
             << "  \"missing_files\": " << missing << ",\n"
-            << "  \"summary_pass\": " << (summary_pass ? "true" : "false") << ",\n"
+            << "  \"summary_pass\": " << (effective_summary_pass ? "true" : "false") << ",\n"
+            << "  \"legacy_summary_pass\": " << (summary_pass ? "true" : "false") << ",\n"
+            << "  \"source_reference_summary_pass\": "
+            << (source_reference_summary_pass ? "true" : "false") << ",\n"
             << "  \"manifest_pass\": " << (manifest_pass ? "true" : "false") << "\n"
             << "}\n";
 

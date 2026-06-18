@@ -73,8 +73,9 @@ Current truth at 12:48 EDT:
   `84/84`, evidence schema PASS with `93` required files, and provenance
   freshness PASS for `1b09b12`.
 - CoreAudio currently exposes `iRig Stream` and `Open Audio 8 DJ` as `8 in /
-  8 out`; the audio stack is idle-healthy. No wired non-Audio8, non-built-in
-  known-good output is visible for objective route revalidation.
+  8 out`; the audio stack is idle-healthy. The active baseline reference is the
+  original WAV/music file or generated tone, so no separate non-Audio8
+  known-good output is required for the next human baseline.
 - The active blocker is measurement-route validity, not iRig absence.
 
 15:00 RC strategy:
@@ -88,11 +89,10 @@ Current truth at 12:48 EDT:
 3. Keep the installed-driver path conservative. Do not install, unload,
    reinstall, or restart audio services outside a hardware lock and explicit
    window. Prefer one deliberate install/use cycle over repeated driver churn.
-4. First physical gate is route revalidation:
-   Audio 8 DJ output -> known-good external capture path -> iRig Stream input.
-   If no external known-good output appears, only diagnostic same-device or
-   existing-evidence analysis is allowed; product claims remain forbidden.
-5. Second physical gate is same-session C++ vs mainline A/B using the same
+4. First physical gate is source-reference A/B:
+   original file or tone -> Audio 8 DJ output -> iRig Stream input.
+   The command must compare mainline C and C++ in the same lock window.
+5. Second physical gate is same-session C++ vs mainline metrics using the same
    music/reference, level, capture channel pair, route, duration, and analyzer
    thresholds. CPU must be sampled in the same window.
 6. Third physical gate is Timecode Vinyl smoke: input channel presence,

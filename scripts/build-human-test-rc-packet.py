@@ -95,6 +95,7 @@ def build_packet(root: Path, evidence: Path) -> dict[str, Any]:
     timecode_plan = load_json(evidence / "timecode-physical-window-plan.json")
     driverkit = load_json(evidence / "driverkit-sdk-preflight-gate.json")
     route_contamination = load_json(evidence / "route-contamination-analysis.json")
+    external = load_json(evidence / "objective-external-readiness.json")
     watcher = load_json(evidence / "watch-known-good-route-live.json")
     if not watcher:
         watcher = load_json(evidence / "watch-known-good-route.json")
@@ -105,12 +106,16 @@ def build_packet(root: Path, evidence: Path) -> dict[str, Any]:
     artifacts_ready = bool(pkg["exists"] and dmg["exists"] and hal["complete"])
     objective_achieved = final.get("objective_achieved") is True
     product_human_allowed = rc_gate.get("product_human_test_allowed") is True
-    route_ready = route_plan.get("route_only_ready") is True
+    source_reference_ready = route_plan.get("source_reference_policy_ready") is True
+    route_ready = route_plan.get("route_only_ready") is True or source_reference_ready
     full_ab_ready = route_plan.get("full_ab_ready") is True
     timecode_ready = timecode_plan.get("ready_for_lock_gated_timecode_window") is True
+    external_ready = external.get("objective_ready") is True
 
-    if objective_achieved:
+    if objective_achieved and external_ready:
         packet_status = "OBJECTIVE_READY_FOR_PROMOTION_REVIEW"
+    elif objective_achieved:
+        packet_status = "OBJECTIVE_INTERNAL_READY_EXTERNAL_BLOCKED"
     elif artifacts_ready and rc_status.get("status", "").startswith("DIAGNOSTIC_RC_ARTIFACTS_READY"):
         packet_status = "DIAGNOSTIC_RC_PACKET_READY"
     else:
@@ -132,14 +137,63 @@ def build_packet(root: Path, evidence: Path) -> dict[str, Any]:
     if full_ab_ready and full_ab_command:
         next_commands.append(
             {
-                "name": "lock_gated_same_session_mainline_cpp_ab",
+                "name": (
+                    "lock_gated_source_reference_mainline_cpp_ab"
+                    if source_reference_ready
+                    else "lock_gated_same_session_mainline_cpp_ab"
+                ),
                 "requires_lock": True,
                 "allowed_now": True,
                 "argv": full_ab_command,
                 "shell": shell_join(full_ab_command),
             }
         )
-    if not route_ready:
+    if source_reference_ready and not full_ab_ready:
+        next_commands.append(
+            {
+                "name": "lock_gated_source_reference_mainline_cpp_ab",
+                "requires_lock": True,
+                "allowed_now": True,
+                "argv": [
+                    "scripts/run-physical-superiority-window",
+                    "--execute",
+                    "--source-reference-promotion",
+                    "--skip-build",
+                    "--mainline-candidate",
+                    "/Users/fer/dev/opena8dj/build/OpenA8DJ.driver",
+                    "--candidate",
+                    "build/OpenA8DJ.driver",
+                    "--capture-device",
+                    "iRig Stream",
+                    "--capture-channels",
+                    "1,2",
+                    "--reference-wav",
+                    "local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav",
+                    "--pair",
+                    "A",
+                    "--seconds",
+                    "12",
+                    "--rate",
+                    "48000",
+                    "--buffer",
+                    "512",
+                    "--run-dir",
+                    "local-analysis/physical-superiority-window/<timestamp>-source-reference-ab",
+                ],
+                "shell": (
+                    "scripts/run-physical-superiority-window --execute "
+                    "--source-reference-promotion --skip-build "
+                    "--mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver "
+                    "--candidate build/OpenA8DJ.driver --capture-device 'iRig Stream' "
+                    "--capture-channels 1,2 --reference-wav "
+                    "local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav "
+                    "--pair A --seconds 12 --rate 48000 --buffer 512 "
+                    "--run-dir "
+                    "local-analysis/physical-superiority-window/<timestamp>-source-reference-ab"
+                ),
+            }
+        )
+    elif not route_ready:
         next_commands.append(
             {
                 "name": "read_only_route_watcher",
@@ -210,6 +264,10 @@ def build_packet(root: Path, evidence: Path) -> dict[str, Any]:
             "watcher_status": watcher.get("status"),
             "watcher_ready": watcher.get("route_revalidation_ready"),
             "route_plan_status": route_plan.get("status"),
+            "source_reference_policy_ready": source_reference_ready,
+            "non_audio8_known_good_route_required": route_plan.get(
+                "non_audio8_known_good_route_required"
+            ),
             "route_only_ready": route_ready,
             "full_ab_ready": full_ab_ready,
             "contamination_classification": route_contamination.get("classification"),
@@ -232,8 +290,23 @@ def build_packet(root: Path, evidence: Path) -> dict[str, Any]:
             "next_required_action": driverkit.get("next_required_action"),
             "evidence": str(evidence / "driverkit-sdk-preflight-gate.json"),
         },
+        "external_readiness": {
+            "status": external.get("external_readiness_status"),
+            "objective_ready": external_ready,
+            "promotion_allowed": external.get("promotion_allowed") is True,
+            "product_human_audio_allowed": external.get("product_human_audio_allowed") is True,
+            "driverkit_install_or_build_attempt_allowed_now": external.get(
+                "driverkit_install_or_build_attempt_allowed_now"
+            )
+            is True,
+            "route_revalidation_allowed_now": external.get("route_revalidation_allowed_now")
+            is True,
+            "blockers": list_or_empty(external.get("blockers")),
+            "next_required_actions": list_or_empty(external.get("next_required_actions")),
+            "evidence": str(evidence / "objective-external-readiness.json"),
+        },
         "promotion_policy": {
-            "legacy_main_promotion_allowed": objective_achieved,
+            "legacy_main_promotion_allowed": objective_achieved and external_ready,
             "allowed_before_objective_achieved": False,
             "required_before_promotion": [
                 "validated_wired_non_audio8_irig_route",
@@ -272,6 +345,7 @@ def write_markdown(packet: dict[str, Any], path: Path) -> None:
         f"- Route status: `{packet['route']['route_plan_status']}`",
         f"- Timecode physical status: `{packet['timecode']['physical_window_status']}`",
         f"- DriverKit build allowed: `{packet['driverkit']['product_driverkit_build_allowed']}`",
+        f"- External readiness: `{packet['external_readiness']['status']}`",
         "",
         "## Blockers",
         "",
@@ -281,6 +355,7 @@ def write_markdown(packet: dict[str, Any], path: Path) -> None:
         + packet["human_test"]["blockers"]
         + packet["route"]["blockers"]
         + packet["timecode"]["blockers"]
+        + packet["external_readiness"]["blockers"]
     )
     for blocker in dict.fromkeys(str(item) for item in blockers if item):
         lines.append(f"- `{blocker}`")

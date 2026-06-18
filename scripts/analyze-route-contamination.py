@@ -164,13 +164,13 @@ def main():
     )
     if contamination_classified:
         classification = "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB"
-        next_required_action = "VALIDATE_WIRED_NON_AUDIO8_KNOWN_GOOD_ROUTE_OR_FIX_IRIG_MIXER_MONITORING"
+        next_required_action = "RUN_SOURCE_REFERENCE_AUDIO8_TO_IRIG_AB_OR_FIX_IRIG_MIXER_MONITORING"
     elif internal_usb_clean and physical_capture_failed:
         classification = "DOWNSTREAM_CAPTURE_FAILURE_AFTER_CLEAN_USB_IDLE_UNKNOWN"
-        next_required_action = "REPEAT_IDLE_CAPTURE_AND_VALIDATE_KNOWN_GOOD_ROUTE"
+        next_required_action = "REPEAT_IDLE_CAPTURE_AND_SOURCE_REFERENCE_AUDIO8_TO_IRIG_AB"
     elif internal_usb_clean:
         classification = "USB_CLEAN_CAPTURE_NOT_PROVEN_CONTAMINATED"
-        next_required_action = "RUN_SAME_WINDOW_PRODUCT_PHYSICAL_AB_IF_ROUTE_VALIDATED"
+        next_required_action = "RUN_SOURCE_REFERENCE_SAME_WINDOW_PRODUCT_PHYSICAL_AB"
     else:
         classification = "INTERNAL_USB_NOT_PROVEN_CLEAN"
         next_required_action = "FIX_OR_RECHECK_DIRECT_USB_DIAGNOSTICS"

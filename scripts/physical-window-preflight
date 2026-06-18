@@ -322,6 +322,7 @@ def main() -> int:
     parser.add_argument("--route-only", action="store_true")
     parser.add_argument("--candidate-only", action="store_true")
     parser.add_argument("--skip-known-good", action="store_true")
+    parser.add_argument("--source-reference-promotion", action="store_true")
     parser.add_argument("--allow-same-device-loopback-diagnostic", action="store_true")
     parser.add_argument("--allow-built-in-output-acoustic-diagnostic", action="store_true")
     parser.add_argument("--audio-list-file", default="")
@@ -369,7 +370,8 @@ def main() -> int:
 
     requires_candidates = not args.route_only
     requires_mainline = requires_candidates and not args.candidate_only
-    requires_known_good = not args.skip_known_good
+    requires_known_good = not args.skip_known_good and not args.source_reference_promotion
+    requires_source_reference = requires_known_good or args.source_reference_promotion
     same_known_good_capture_device = (
         requires_known_good
         and capture is not None
@@ -427,7 +429,7 @@ def main() -> int:
         gate("mainline_candidate_complete", not requires_mainline or hal_bundle_ready(mainline_candidate), mainline_candidate_metrics, "mainline HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
         gate("cpp_candidate_complete", not requires_candidates or hal_bundle_ready(candidate), candidate_metrics, "C++ HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
         gate("prepared_runtime_candidate_evidence_bound", not args.prepared_runtime_candidate or not requires_candidates or prepared_runtime_report.get("result") == "PASS", prepared_runtime_report, "prepared runtime physical windows must match the offline prepared artifact and dispatch contract"),
-        gate("reference_wav_exists", not requires_known_good or (reference_wav is not None and reference_wav.is_file()), {"path": str(reference_wav) if reference_wav else ""}, "known-good route reference WAV is required"),
+        gate("reference_wav_exists", not requires_source_reference or (reference_wav is not None and reference_wav.is_file()), {"path": str(reference_wav) if reference_wav else "", "source_reference_promotion": args.source_reference_promotion}, "source reference WAV is required"),
         gate("music_file_exists_if_supplied", music_file is None or music_file.is_file(), {"path": str(music_file) if music_file else ""}, "music fixture must exist when supplied"),
         gate("known_good_output_specified", not requires_known_good or bool(args.known_good_output_device or args.known_good_output_device_uid), {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid}, "explicit non-Audio8 output source is required"),
         gate(
@@ -452,6 +454,8 @@ def main() -> int:
         "route_only": args.route_only,
         "candidate_only": args.candidate_only,
         "skip_known_good": args.skip_known_good,
+        "source_reference_promotion": args.source_reference_promotion,
+        "non_audio8_known_good_route_required": requires_known_good,
         "prepared_runtime_candidate": args.prepared_runtime_candidate,
         "prepared_runtime_candidate_report": prepared_runtime_report,
         "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic,
