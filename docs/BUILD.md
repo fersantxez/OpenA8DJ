@@ -976,6 +976,16 @@ scripts/analyze-audiophile-wav.py \
   --json-out local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json
 ```
 
+Compiled C++ cross-check:
+
+```sh
+cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cpp-release --target opena8djcpp_audiophile_wav_analysis
+./build/cpp-release/opena8djcpp_audiophile_wav_analysis \
+  --self-test \
+  --json-out local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json
+```
+
 Analyze an existing physical run without touching hardware:
 
 ```sh
@@ -987,8 +997,10 @@ scripts/analyze-audiophile-wav.py \
   --json-out local-analysis/physical-superiority-window/<run>/<leg>/audiophile-wav-analysis.json
 ```
 
-This tool is read-only with respect to audio hardware. It only reads WAV files
-and writes JSON evidence.
+The C++ analyzer accepts the same `--reference`, `--capture`,
+`--reference-channels`, `--capture-channels`, `--seconds`, and threshold
+arguments. Both tools are read-only with respect to audio hardware. They only
+read WAV files and write JSON evidence.
 
 ## Opt-In Capture USB Batching Candidate
 

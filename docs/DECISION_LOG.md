@@ -7248,3 +7248,44 @@ Next implication:
 - No branch promotion, mainline replacement, or audiophile superiority claim is
   allowed until current same-session mainline/C++ evidence passes this analyzer
   plus the existing route, CPU, DVS/timecode, and readiness gates.
+
+## 2026-06-18: Add Compiled C++ Audiophile WAV Analyzer
+
+Decision:
+- Added `tools/audiophile_wav_analysis.cpp` as a compiled, offline WAV analyzer
+  with the same claim-blocking semantics as the Python/SciPy analyzer.
+- Integrated it into CMake, CTest, `scripts/run-cpp-offline-gates`,
+  `current-offline-gates.json`, and `opena8djcpp_evidence_schema_check`.
+- Kept the Python/SciPy analyzer as a richer oracle instead of replacing it.
+
+Reason:
+- Audiophile readiness cannot depend on one implementation of the measurement
+  path. A compiled C++ analyzer gives us a reproducible, dependency-light check
+  for alignment, SNR, active-band coherence, delay-window stability, clipping,
+  DC, and stereo matrix leakage.
+- Python/SciPy remains valuable for Welch/coherence/CSD-style analysis; C++ is
+  now the independent gate that prevents a single runtime/library stack from
+  being the only judge.
+
+Evidence:
+- `opena8djcpp_audiophile_wav_analysis_self_test` PASS.
+- C++ self-test metrics in `local-analysis/cpp-offline/current-offline-gates.json`:
+  alignment score `0.999999995907`, left/right SNR `81.0840107264` /
+  `81.4529542213 dB`, active mid coherence `0.999999994231` /
+  `0.999999994944`, delay p95 `0`, evaluable stereo matrix, and worst
+  off-diagonal leakage `-89.700983159 dB`.
+- Full offline gates before commit passed functional/schema coverage: Debug
+  CTest `64/64`, Release CTest `65/65`, evidence schema `68` required files,
+  missing `0`. The provenance gate correctly remained FAIL because the worktree
+  had uncommitted analyzer changes.
+
+Alternatives discarded:
+- Replace Python with C++ completely: rejected because SciPy still provides a
+  stronger high-precision oracle for deeper spectral analysis.
+- Treat analyzer self-test as product proof: rejected. Both analyzers explicitly
+  emit `product_claim_allowed=false`; they validate measurement math only.
+
+Next implication:
+- A physical promotion window must pass both the compiled C++ analyzer and the
+  Python/SciPy analyzer on current same-session evidence before any sound
+  quality claim can move forward.

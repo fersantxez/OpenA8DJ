@@ -1483,8 +1483,19 @@ Use the decorrelated fixture, not normal stereo music, for any no-leakage claim.
 If `stereo_matrix.leakage_evaluable=false`, the run cannot clear deck/channel
 leakage readiness even if the music subjectively sounds acceptable.
 
-The analyzer is offline-only. It does not install, unload, reload, or touch any
-driver, USB device, CoreAudio state, default device, sample rate, or buffer size.
+The compiled C++ cross-check must also pass on the same WAV pair:
+
+```sh
+./build/cpp-release/opena8djcpp_audiophile_wav_analysis \
+  --reference local-analysis/physical-superiority-window/<run>/<leg>/fixture/reference.wav \
+  --capture local-analysis/physical-superiority-window/<run>/<leg>/captured.wav \
+  --seconds 12 \
+  --json-out local-analysis/physical-superiority-window/<run>/<leg>/audiophile-wav-analysis-cpp.json
+```
+
+Both analyzers are offline-only. They do not install, unload, reload, or touch
+any driver, USB device, CoreAudio state, default device, sample rate, or buffer
+size.
 
 PASS/FAIL semantics:
 

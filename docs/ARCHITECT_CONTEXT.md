@@ -2626,10 +2626,17 @@ Current implication:
     ripple, delay-window drift, clipping/DC checks, and stereo leakage when the
     reference is decorrelated enough to make leakage evaluable.
   - The offline gate runner now executes
-    `audiophile-wav-analysis-self-test.json`. Current self-test evidence is
-    PASS with alignment score `0.999868`, left/right SNR about `67.97/67.95 dB`,
-    active mid-band coherence about `0.9999999`, delay p95 `0` frames, and
-    worst off-diagonal leakage `-116.678 dB`.
+    both `audiophile-wav-analysis-cpp-self-test.json` and
+    `audiophile-wav-analysis-self-test.json`.
+    - The compiled C++ self-test is PASS with alignment score
+      `0.999999995907`, left/right SNR `81.0840107264` /
+      `81.4529542213 dB`, active mid-band coherence about `0.99999999`,
+      delay p95 `0` frames, and worst off-diagonal leakage `-89.700983159 dB`.
+    - The Python/SciPy self-test is PASS with alignment score `0.999868`,
+      left/right SNR about `67.97/67.95 dB`, active mid-band coherence about
+      `0.9999999`, delay p95 `0` frames, and worst off-diagonal leakage
+      `-116.678 dB`.
+    Both analyzers explicitly keep `product_claim_allowed=false`.
   - Reanalysis of existing 2026-06-17 physical mainline/C++ captures with their
     own saved reference WAVs still FAILS. The captures show low residual SNR,
     low mid-band coherence, delay-window instability, and the selected music

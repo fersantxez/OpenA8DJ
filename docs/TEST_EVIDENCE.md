@@ -10917,3 +10917,49 @@ Full offline gate rerun:
 - Interpretation:
   - This is an analyzer/gate quality improvement, not a driver-readiness result.
   - Current product readiness remains FAIL and branch promotion remains blocked.
+
+## 2026-06-18 Compiled C++ Audiophile WAV Analyzer
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `tools/audiophile_wav_analysis.cpp`.
+  - Wired it into CMake, CTest, `scripts/run-cpp-offline-gates`, evidence
+    schema, and `current-offline-gates.json`.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this step.
+- Commands:
+  - `cmake -S . -B build/cpp-offline`
+  - `cmake --build build/cpp-offline --target opena8djcpp_audiophile_wav_analysis opena8djcpp_evidence_schema_check`
+  - `./build/cpp-offline/opena8djcpp_audiophile_wav_analysis --self-test --json-out local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json`
+  - `ctest --test-dir build/cpp-offline -R opena8djcpp_audiophile_wav_analysis_self_test --output-on-failure`
+  - `scripts/run-cpp-offline-gates`
+- Results before commit:
+  - Focused C++ analyzer self-test: PASS.
+  - C++ self-test alignment score: `0.999999995907`.
+  - C++ self-test left/right SNR: `81.0840107264` /
+    `81.4529542213 dB`.
+  - C++ self-test active mid-band coherence:
+    `0.999999994231` / `0.999999994944`.
+  - C++ self-test delay p95: `0` frames.
+  - C++ self-test stereo leakage evaluable: `true`.
+  - C++ self-test worst off-diagonal leakage:
+    `-89.700983159 dB`.
+  - Full offline gates: Debug CTest `64/64` PASS, Release CTest `65/65`
+    PASS, evidence schema required files `68`, missing `0`.
+  - Provenance/freshness was expected FAIL before commit because
+    `working_tree_clean_for_claim=false`.
+- Evidence:
+  - `local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json`
+  - `local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-schema.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+- Interpretation:
+  - The compiled analyzer is now an independent cross-check for physical WAV
+    evidence. It does not replace Python/SciPy; both must agree for future
+    physical promotion evidence.
+  - This is still not an audiophile quality claim, not timecode-vinyl physical
+    readiness, and not branch promotion support.

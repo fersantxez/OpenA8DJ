@@ -2302,7 +2302,16 @@ Current implementation:
   dependency chain and synthetic broadband measurement math. PASS means the
   analyzer can measure a known clean fixture; it never means the driver is
   better than mainline.
+- `local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json` must
+  be present and PASS. This validates the compiled C++ analyzer path
+  independently from Python/SciPy. Current self-test evidence requires:
+  alignment score present and high, left/right SNR above the `45 dB` floor,
+  active mid-band coherence above `0.90`, delay p95 `<= 2` frames, stereo
+  leakage evaluable, and worst off-diagonal leakage `<= -70 dB` relative to the
+  active diagonal. PASS here is analyzer self-test coverage only; it never
+  allows a product claim.
 - Physical WAV evidence intended for an audiophile claim must be analyzable by
+  both `./build/cpp-release/opena8djcpp_audiophile_wav_analysis` and
   `scripts/analyze-audiophile-wav.py` using the exact saved reference WAV from
   the same run. Minimum per-run expectations before comparison:
   - no clipping;

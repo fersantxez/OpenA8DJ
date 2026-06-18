@@ -326,6 +326,9 @@ add_executable(opena8djcpp_audiophile_tone_gate
 add_executable(opena8djcpp_audiophile_precision_claim_gate
   tools/audiophile_precision_claim_gate.cpp)
 
+add_executable(opena8djcpp_audiophile_wav_analysis
+  tools/audiophile_wav_analysis.cpp)
+
 add_executable(opena8djcpp_physical_run_compare
   tools/physical_run_compare.cpp)
 
@@ -433,6 +436,7 @@ add_test(NAME opena8djcpp_soundcheck_wav_quality COMMAND opena8djcpp_soundcheck_
 add_test(NAME opena8djcpp_channel_leakage_tone_contract COMMAND opena8djcpp_channel_leakage_tone_contract)
 add_test(NAME opena8djcpp_audiophile_tone_gate COMMAND opena8djcpp_audiophile_tone_gate)
 add_test(NAME opena8djcpp_audiophile_precision_claim_gate COMMAND opena8djcpp_audiophile_precision_claim_gate)
+add_test(NAME opena8djcpp_audiophile_wav_analysis_self_test COMMAND opena8djcpp_audiophile_wav_analysis --self-test)
 add_test(NAME opena8djcpp_physical_run_compare COMMAND opena8djcpp_physical_run_compare)
 add_test(NAME opena8djcpp_physical_submit_comparison_contract COMMAND opena8djcpp_physical_submit_comparison_contract)
 add_test(NAME opena8djcpp_physical_evidence_frontier COMMAND opena8djcpp_physical_evidence_frontier)
