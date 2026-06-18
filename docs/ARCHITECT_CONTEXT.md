@@ -2763,3 +2763,22 @@ Current implication:
     completion handlers, first-frame scheduling, and success-only submit
     counters. Focused offline gates pass. Physical CPU/resource and
     audio-quality claims remain blocked.
+  - Current committed candidate `6357798` binds the opt-in prepared HAL runtime
+    through a C ABI / Obj-C++ bridge while keeping the default HAL unchanged.
+    Offline gates pass and `hal-prepared-runtime-candidate` builds a local
+    bundle only. No install/load or physical quality claim has been made.
+  - Latest lock-gated iRig same-device diagnostic:
+    `local-analysis/known-good-route/20260618T070644Z-irig-same-device-diagnostic-6357798`.
+    It failed as a route-quality check with `quality_alignment_score=0.019519`,
+    SNR floor about `-37.91 dB`, `click_outliers=4`, and near-zero playback
+    gain into capture. The iRig remains visible and captures non-clipped audio,
+    but this path is not valid for promotion evidence.
+  - Post-diagnostic inventory:
+    `local-analysis/cpp-offline/physical-route-inventory-post-irig-20260618T070746Z.json`.
+    Audio 8 DJ remains visible on USB, iRig remains visible to CoreAudio, no
+    active OpenA8DJ HAL is installed, and the hardware lock is free.
+  - Do not infer product quality from iRig visibility alone. The next physical
+    action must either validate the documented Audio 8 DJ -> mixer REC OUT ->
+    iRig capture path during a HAL candidate window, or provide another
+    non-Audio8 known-good route into the iRig before branch-promotion evidence
+    can be accepted.

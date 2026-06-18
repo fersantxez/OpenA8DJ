@@ -11760,3 +11760,41 @@ Full offline gate after commit:
   - This is still offline/build evidence. Product quality, CPU superiority,
     timecode vinyl readiness, and branch promotion remain blocked by missing
     same-session physical A/B and the latest failed HAL safety window.
+
+## 2026-06-18 iRig Same-Device Route Diagnostic
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+  - Commit: `6357798`
+- Scope:
+  - Acquired the global hardware/audio lock through the route script.
+  - Played a 48 kHz stereo WAV through `iRig Stream` and recorded `iRig Stream`
+    inputs 1/2 for a same-device loopback diagnostic.
+  - Did not install or load a HAL driver, did not change defaults, did not
+    restart CoreAudio/USB services, and did not reset USB.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-known-good-route-soundcheck --run-dir local-analysis/known-good-route/20260618T070644Z-irig-same-device-diagnostic-6357798 --output-device "iRig Stream" --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav local-analysis/cpu-sample/20260617-current-default-driver-process-sample/soundcheck/fixture/reference.wav --seconds 6 --allow-same-device-loopback-diagnostic --skip-build`
+- Result:
+  - `KNOWN_GOOD_ROUTE: FAIL`
+  - `analysis_rc=1`
+  - `native_rc=0`
+  - `quality_alignment_score=0.019519498858657922`
+  - `left_gain=0.00014619525217077355`
+  - `right_gain=0.0001461886405893534`
+  - `left_snr_db=-37.7777786903231`
+  - `right_snr_db=-37.907036448184584`
+  - `click_outliers=4`
+  - `capture_clipped_frames=0`
+- Evidence:
+  - `local-analysis/known-good-route/20260618T070644Z-irig-same-device-diagnostic-6357798/summary.txt`
+  - `local-analysis/known-good-route/20260618T070644Z-irig-same-device-diagnostic-6357798/metrics.json`
+  - `local-analysis/known-good-route/20260618T070644Z-irig-same-device-diagnostic-6357798/native-quality.json`
+  - `local-analysis/cpp-offline/physical-route-inventory-post-irig-20260618T070746Z.json`
+- Interpretation:
+  - The iRig is visible and capture works at a low noise/signal level, but this
+    same-device path does not carry the playback reference into capture with
+    usable alignment or SNR.
+  - This is diagnostic-only evidence and is invalid for product promotion.
+  - The hardware lock was released and the post-run inventory confirms no active
+    OpenA8DJ HAL install.
