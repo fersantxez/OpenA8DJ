@@ -376,6 +376,14 @@ int main(int argc, char** argv) {
       number_field_is(prepared_usb_runtime_submit_contract, "capture_logical_slots", 264.0) &&
       number_field_is(prepared_usb_runtime_submit_contract, "playback_logical_slots", 264.0) &&
       number_field_is(prepared_usb_runtime_submit_contract, "usb_submit_calls", 66.0) &&
+      number_field_is(prepared_usb_runtime_submit_contract,
+                      "first_descriptor_snapshot_logical_slots", 8.0) &&
+      number_field_is(prepared_usb_runtime_submit_contract,
+                      "first_descriptor_snapshot_usb_submit_calls", 1.0) &&
+      number_field_is(prepared_usb_runtime_submit_contract,
+                      "first_descriptor_snapshot_request_submit_calls", 1.0) &&
+      number_field_is(prepared_usb_runtime_submit_contract,
+                      "first_descriptor_snapshot_max_live_requests", 1.0) &&
       number_field_is(prepared_usb_runtime_submit_contract, "partial_submit_calls", 0.0) &&
       number_field_is(prepared_usb_runtime_submit_contract, "descriptors", 66.0) &&
       number_field_is(prepared_usb_runtime_submit_contract, "capture_descriptors", 33.0) &&
@@ -575,6 +583,18 @@ int main(int argc, char** argv) {
       number_field_present(audiophile_wav_analysis_cpp_self_test, "right_snr_db") &&
       number_field_present(audiophile_wav_analysis_cpp_self_test, "left_mid_active_coherence") &&
       number_field_present(audiophile_wav_analysis_cpp_self_test, "right_mid_active_coherence") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "left_residual_burst_p95_to_median_db") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "right_residual_burst_p95_to_median_db") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "left_residual_signal_abs_correlation") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "right_residual_signal_abs_correlation") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "left_residual_peak_to_rms_db") &&
+      number_field_present(audiophile_wav_analysis_cpp_self_test,
+                           "right_residual_peak_to_rms_db") &&
       number_field_present(audiophile_wav_analysis_cpp_self_test, "delay_p95_frames") &&
       number_field_present(audiophile_wav_analysis_cpp_self_test,
                            "worst_offdiag_db_relative") &&

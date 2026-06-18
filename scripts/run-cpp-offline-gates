@@ -840,6 +840,24 @@ summary = {
         "right_mid_active_coherence": audiophile_wav_analysis_cpp_self_test.get("right", {}).get(
             "coherence_mid_active_mean"
         ),
+        "left_residual_burst_p95_to_median_db": audiophile_wav_analysis_cpp_self_test.get("left", {}).get(
+            "residual_burst_p95_to_median_db"
+        ),
+        "right_residual_burst_p95_to_median_db": audiophile_wav_analysis_cpp_self_test.get("right", {}).get(
+            "residual_burst_p95_to_median_db"
+        ),
+        "left_residual_signal_abs_correlation": audiophile_wav_analysis_cpp_self_test.get("left", {}).get(
+            "residual_signal_abs_correlation"
+        ),
+        "right_residual_signal_abs_correlation": audiophile_wav_analysis_cpp_self_test.get("right", {}).get(
+            "residual_signal_abs_correlation"
+        ),
+        "left_residual_peak_to_rms_db": audiophile_wav_analysis_cpp_self_test.get("left", {}).get(
+            "residual_peak_to_rms_db"
+        ),
+        "right_residual_peak_to_rms_db": audiophile_wav_analysis_cpp_self_test.get("right", {}).get(
+            "residual_peak_to_rms_db"
+        ),
         "delay_p95_frames": audiophile_wav_analysis_cpp_self_test.get("delay_windows", {}).get(
             "p95_abs_frames"
         ),
@@ -2110,6 +2128,18 @@ summary = {
         "capture_logical_slots": prepared_usb_runtime_submit.get("capture_logical_slots"),
         "playback_logical_slots": prepared_usb_runtime_submit.get("playback_logical_slots"),
         "usb_submit_calls": prepared_usb_runtime_submit.get("usb_submit_calls"),
+        "first_descriptor_snapshot_logical_slots": prepared_usb_runtime_submit.get(
+            "first_descriptor_snapshot_logical_slots"
+        ),
+        "first_descriptor_snapshot_usb_submit_calls": prepared_usb_runtime_submit.get(
+            "first_descriptor_snapshot_usb_submit_calls"
+        ),
+        "first_descriptor_snapshot_request_submit_calls": prepared_usb_runtime_submit.get(
+            "first_descriptor_snapshot_request_submit_calls"
+        ),
+        "first_descriptor_snapshot_max_live_requests": prepared_usb_runtime_submit.get(
+            "first_descriptor_snapshot_max_live_requests"
+        ),
         "partial_submit_calls": prepared_usb_runtime_submit.get("partial_submit_calls"),
         "usb_submit_reduction_ratio": prepared_usb_runtime_submit.get(
             "usb_submit_reduction_ratio"

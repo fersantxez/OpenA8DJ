@@ -26,7 +26,6 @@ bool PreparedUsbRuntimeSubmitter::start(const PreparedUsbRuntimeSubmitterConfig&
   retained_descriptor_count_ = 0;
   counters_ = {};
   started_ = true;
-  refresh_counters();
   return true;
 }
 
@@ -38,7 +37,6 @@ void PreparedUsbRuntimeSubmitter::stop() {
   request_pool_.stop();
   planner_.stop();
   started_ = false;
-  refresh_counters();
 }
 
 bool PreparedUsbRuntimeSubmitter::queue_slot(UsbSlotDirection direction,
@@ -70,7 +68,6 @@ void PreparedUsbRuntimeSubmitter::finish() {
   planner_.finish();
   drain_pending_submits();
   complete_all();
-  refresh_counters();
 }
 
 void PreparedUsbRuntimeSubmitter::drain_pending_submits() {
@@ -80,7 +77,6 @@ void PreparedUsbRuntimeSubmitter::drain_pending_submits() {
 
   const auto descriptors = planner_.descriptors();
   if (descriptors.empty()) {
-    refresh_counters();
     return;
   }
 
@@ -90,14 +86,16 @@ void PreparedUsbRuntimeSubmitter::drain_pending_submits() {
     (void)submit_descriptor(descriptor);
   }
   planner_.clear_descriptors();
-  refresh_counters();
 }
 
 void PreparedUsbRuntimeSubmitter::complete_all() {
   while (live_count_ > 0) {
     complete_oldest();
   }
-  refresh_counters();
+}
+
+PreparedUsbRuntimeSubmitterCounters PreparedUsbRuntimeSubmitter::counters() const {
+  return snapshot_counters();
 }
 
 std::span<const UsbSubmitDescriptor> PreparedUsbRuntimeSubmitter::submitted_descriptors() const {
@@ -108,16 +106,17 @@ std::span<const UsbSubmitDescriptor> PreparedUsbRuntimeSubmitter::submitted_desc
 PreparedUsbRuntimeSubmitterSafety PreparedUsbRuntimeSubmitter::safety() const {
   const auto planner_safety = planner_.safety();
   const auto request_safety = request_pool_.safety();
+  const auto counters = snapshot_counters();
   PreparedUsbRuntimeSubmitterSafety out{};
   out.planner_safe = planner_safety.product_safe;
   out.request_pool_safe = request_safety.product_safe;
-  out.bounded_live_requests = counters_.max_live_requests <= config_.max_live_requests;
+  out.bounded_live_requests = counters.max_live_requests <= config_.max_live_requests;
   out.descriptors_retained_if_requested =
       !config_.retain_submitted_descriptors ||
-      (counters_.retained_descriptor_overflows == 0 &&
-       retained_descriptor_count_ == counters_.descriptors_submitted);
+      (counters.retained_descriptor_overflows == 0 &&
+       retained_descriptor_count_ == counters.descriptors_submitted);
   out.no_submit_failures =
-      counters_.submit_failures == 0 && counters_.fallback_allocations == 0;
+      counters.submit_failures == 0 && counters.fallback_allocations == 0;
   out.product_safe = out.planner_safe && out.request_pool_safe &&
                      out.bounded_live_requests &&
                      out.descriptors_retained_if_requested && out.no_submit_failures;
@@ -157,7 +156,6 @@ bool PreparedUsbRuntimeSubmitter::submit_descriptor(const UsbSubmitDescriptor& d
   const auto handle = request_pool_.submit(descriptor);
   if (!handle.valid()) {
     counters_.submit_failures += 1;
-    refresh_counters();
     return false;
   }
 
@@ -171,29 +169,30 @@ bool PreparedUsbRuntimeSubmitter::submit_descriptor(const UsbSubmitDescriptor& d
   } else {
     counters_.playback_descriptors_submitted += 1;
   }
-  refresh_counters();
   return true;
 }
 
-void PreparedUsbRuntimeSubmitter::refresh_counters() {
+PreparedUsbRuntimeSubmitterCounters PreparedUsbRuntimeSubmitter::snapshot_counters() const {
+  auto counters = counters_;
   const auto planner_counters = planner_.counters();
   const auto request_counters = request_pool_.counters();
-  counters_.logical_slots = planner_counters.logical_slots;
-  counters_.capture_logical_slots = planner_counters.capture_logical_slots;
-  counters_.playback_logical_slots = planner_counters.playback_logical_slots;
-  counters_.usb_submit_calls = planner_counters.usb_submit_calls;
-  counters_.capture_usb_submit_calls = planner_counters.capture_usb_submit_calls;
-  counters_.playback_usb_submit_calls = planner_counters.playback_usb_submit_calls;
-  counters_.partial_submit_calls = planner_counters.partial_submit_calls;
-  counters_.total_frames = planner_counters.total_frames;
-  counters_.total_bytes = planner_counters.total_bytes;
-  counters_.usb_submit_reduction_ratio = planner_counters.usb_submit_reduction_ratio;
-  counters_.request_submit_calls = request_counters.submit_calls;
-  counters_.request_completion_calls = request_counters.completion_calls;
-  counters_.request_recycle_calls = request_counters.recycle_calls;
-  counters_.max_live_requests =
-      std::max(counters_.max_live_requests, request_counters.max_live_requests);
-  counters_.fallback_allocations = request_counters.fallback_allocations;
+  counters.logical_slots = planner_counters.logical_slots;
+  counters.capture_logical_slots = planner_counters.capture_logical_slots;
+  counters.playback_logical_slots = planner_counters.playback_logical_slots;
+  counters.usb_submit_calls = planner_counters.usb_submit_calls;
+  counters.capture_usb_submit_calls = planner_counters.capture_usb_submit_calls;
+  counters.playback_usb_submit_calls = planner_counters.playback_usb_submit_calls;
+  counters.partial_submit_calls = planner_counters.partial_submit_calls;
+  counters.total_frames = planner_counters.total_frames;
+  counters.total_bytes = planner_counters.total_bytes;
+  counters.usb_submit_reduction_ratio = planner_counters.usb_submit_reduction_ratio;
+  counters.request_submit_calls = request_counters.submit_calls;
+  counters.request_completion_calls = request_counters.completion_calls;
+  counters.request_recycle_calls = request_counters.recycle_calls;
+  counters.max_live_requests =
+      std::max(counters.max_live_requests, request_counters.max_live_requests);
+  counters.fallback_allocations = request_counters.fallback_allocations;
+  return counters;
 }
 
 }  // namespace opena8djcpp

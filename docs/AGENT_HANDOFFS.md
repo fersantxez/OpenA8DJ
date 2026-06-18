@@ -4601,3 +4601,70 @@ Risks:
 Next action:
 - Keep C++ DVS/timecode physical readiness blocked until Traktor/vinyl
   evidence exists under the hardware lock after route validation.
+
+## 2026-06-18 Aristotle: ISO8-Preserving CPU Optimization Review
+
+Subagent:
+- `019edb01-22a4-7552-8e27-77ebdd089788` (`Aristotle`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Identify the next CPU optimization with the lowest risk after physical
+  rejection of capture batching above ISO8 and input decode batch publication.
+
+Findings:
+- Recommended optimizing prepared runtime observability/lifecycle overhead:
+  avoid refreshing/copying merged request-pool counters on every
+  submit/completion, and instead materialize snapshots on demand.
+- Explicitly rejected reopening capture batching or input decode publication.
+- Recommended preserving ISO8/ISO8/coalesce1, per-frame timing, packet bytes,
+  input ring publication timing, and Timecode Vinyl semantics.
+
+Integrated action:
+- Implemented lazy counter snapshots in `PreparedUsbAsyncRuntime` and
+  `PreparedUsbRuntimeSubmitter`.
+- Extended offline contracts to prove snapshots still report in-flight and
+  final counters correctly.
+
+Risks:
+- Expected CPU benefit is moderate and offline-only until the prepared runtime
+  path is bound to real HAL/USB and measured. It is not a superiority claim.
+
+Next action:
+- Keep future CPU work in the same class: fixed lifecycle/observability
+  reductions that do not perturb audio cadence or ring publication timing.
+
+## 2026-06-18 Godel: Human-Test Release Path Review
+
+Subagent:
+- `019edb07-908e-75d3-848c-96c8c66065bc` (`Godel`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Identify the installable path for a first human-test candidate under the
+  15:00 America/New_York milestone.
+
+Findings:
+- The viable path today is HAL bundle / PKG / DMG, not DriverKit/dext.
+- DriverKit real install is blocked by missing full Xcode, missing DriverKit
+  SDK, missing `iig`, insufficient free disk space, and missing real
+  entitlements/provisioning.
+- Existing build path is `make dist`; existing install paths mutate the system
+  and must be lock-gated.
+
+Integrated action:
+- Added `docs/HUMAN_TEST_CANDIDATE_2026-06-18.md` with HAL candidate build,
+  lock-gated install/smoke, rollback, stop conditions, and allowed claims.
+
+Risks:
+- The package version remains `0.3.25`; the human-test candidate must be
+  identified by commit/hash/evidence, not public semantic version.
+- A HAL candidate can be human-tested today, but it is not DriverKit readiness.
+
+Next action:
+- Build `make dist`, hash artifacts, then run lock-gated safety/quality smoke
+  before any human listening.

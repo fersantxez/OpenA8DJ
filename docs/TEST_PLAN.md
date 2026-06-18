@@ -18,6 +18,60 @@ activation, or human listening work.
 - All PASS claims require machine-readable evidence plus a human-readable
   summary.
 
+## 2026-06-18 Human-Test Candidate Plan
+
+Target time: by 15:00 America/New_York.
+
+Purpose:
+
+- produce one stable candidate that a human can try end-to-end;
+- collect the best available same-day quality and CPU/resource metrics;
+- keep superiority/branch-promotion claims blocked unless the evidence truly
+  supports them.
+
+Phase 1 - Freeze candidate shape:
+
+- preserve default HAL geometry at ISO8/ISO8/coalesce1;
+- keep rejected capture batching and rejected input decode batch inactive;
+- avoid additional timing/ring publication experiments before the human-test
+  build unless a full offline and physical diagnostic cycle remains feasible.
+
+Phase 2 - Build and offline proof:
+
+- run full offline gates on the exact commit;
+- require CTest, evidence schema, freshness/provenance, routing, DVS/timecode,
+  channel leakage, analysis stack, and rejected-candidate guards to pass;
+- preserve all evidence under `local-analysis/cpp-offline`.
+
+Phase 3 - Installable candidate:
+
+- if DriverKit SDK remains unavailable, package the HAL candidate and document
+  DriverKit as blocked;
+- prepare install, unload, recovery, and rollback commands;
+- do not install/load without the global hardware/audio lock.
+
+Phase 4 - Lock-gated physical smoke:
+
+- acquire `$HOME/.opena8dj/hardware-gate.lock`;
+- confirm iRig Stream and Audio 8 DJ visibility;
+- safety-load the candidate and verify 8 inputs / 8 outputs;
+- run short real-music soundcheck with stream stats and CPU profile;
+- run capture/quality analyzers and save evidence;
+- unload/recover and verify audio stack health.
+
+Phase 5 - Human-test handoff:
+
+- provide candidate path, commit hash, evidence directory, measured quality and
+  CPU/resource values, known failures, rollback path, and exact human listening
+  instructions.
+
+Exit rule:
+
+- a human-test candidate can be handed off with known blockers;
+- product superiority and branch promotion remain blocked unless same-session
+  mainline comparison, route validity, CPU/resource, quality, and Timecode
+  Vinyl evidence all pass.
+
 ## Test Lanes
 
 | Lane | Name | Default status offline | Purpose |

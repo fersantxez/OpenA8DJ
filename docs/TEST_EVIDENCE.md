@@ -1,5 +1,48 @@
 # Test Evidence
 
+## 2026-06-18: Human-Test Milestone And Low-Risk Offline Hardening
+
+- Scope:
+  - Reframed the next delivery target as a first stable human-test candidate by
+    15:00 America/New_York, while keeping mainline-superiority and branch
+    promotion claims blocked until measured.
+  - Confirmed DriverKit SDK/dext build is blocked on this host: Command Line
+    Tools selected, DriverKit SDK missing, `iig` absent, and only about `7 GiB`
+    free on the data volume.
+  - Implemented lazy prepared-runtime counter snapshots so merged
+    pool/planner observability is materialized on demand rather than on every
+    submit/completion event.
+  - Extended the C++ audiophile WAV analyzer with residual burst,
+    residual-signal correlation, and residual peak/RMS metrics.
+  - No hardware, playback, recording, driver install/load, default-device
+    change, USB reset, or CoreAudio restart was performed for this offline
+    hardening.
+- Focused commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_prepared_usb_runtime_submit_contract opena8djcpp_prepared_usb_async_runtime_contract opena8djcpp_evidence_schema_check opena8djcpp_audiophile_wav_analysis opena8djcpp_audiophile_analysis_stack_contract -j`
+  - `./build/cpp-release/opena8djcpp_prepared_usb_runtime_submit_contract`
+  - `./build/cpp-release/opena8djcpp_prepared_usb_async_runtime_contract`
+  - `./build/cpp-release/opena8djcpp_audiophile_wav_analysis --self-test`
+  - `./build/cpp-release/opena8djcpp_audiophile_wav_analysis --self-test-degraded`
+  - `./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract`
+- Focused result:
+  - Runtime submit contract: PASS with `66` USB submits, `185856` bytes,
+    `5808` frames, `0` fallback allocations, `0` submit failures, payload
+    equivalent, and first lazy snapshot showing `8` logical slots / `1` submit.
+  - Async runtime contract: PASS with `live_snapshot_live_requests=4`,
+    final `live_requests=0`, `max_live_requests_observed=4`, and product-safe
+    offline lifecycle.
+  - C++ audiophile WAV self-test: PASS. Clean fixture residual metrics include
+    burst p95-to-median around `0.296 dB`, residual-signal correlation near
+    zero, and residual peak/RMS below `8 dB`.
+  - C++ degraded audiophile WAV self-test: rejected with exit code `1`.
+  - Audiophile analysis stack contract: PASS, with new C++ residual metrics
+    required.
+- Interpretation:
+  - This work improves offline measurement integrity and removes avoidable
+    observability copies from prepared core models. It does not prove lower CPU
+    on the active HAL path, audiophile sound quality, Timecode Vinyl readiness,
+    or branch promotion.
+
 ## 2026-06-18: Timing Instability Blocks Quality Claims
 
 - Scope:

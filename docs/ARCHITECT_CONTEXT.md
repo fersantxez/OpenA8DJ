@@ -4,6 +4,28 @@ Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
 
+## 2026-06-18 Human-Test Milestone
+
+- Near-term target: produce a stable, complete first human-test candidate by
+  15:00 America/New_York. This is not the same as proving superiority over
+  mainline or authorizing branch promotion.
+- Current time snapshot: 09:58 EDT, leaving roughly five hours.
+- Realistic installable path today: conservative HAL candidate plus
+  install/uninstall/runbook and lock-gated quality/CPU evidence.
+- DriverKit/dext blocker on this host: Command Line Tools are selected,
+  `xcrun --sdk driverkit` cannot locate the DriverKit SDK, `iig` is absent,
+  and only about `7 GiB` is free on the data volume. Full DriverKit remains a
+  product direction, but a real dext build is blocked unless those prerequisites
+  change.
+- Low-risk CPU work just landed in core models: prepared USB runtime and
+  submitter counters now materialize merged pool/planner fields as snapshots
+  instead of refreshing them on every submit/completion event. This does not
+  change packet bytes, ISO8 cadence, input ring publication timing, routing, or
+  Timecode Vinyl semantics.
+- Audiophile analyzer hardening just landed: the C++ WAV analyzer now emits
+  residual burst, residual-signal correlation, and residual peak/RMS metrics to
+  catch texture/transient/modulated residuals that broad SNR/alignment can hide.
+
 ## Current State
 
 - This is a separate C++/DriverKit redesign line for Native Instruments Audio 8 DJ.

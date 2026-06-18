@@ -71,9 +71,7 @@ class PreparedUsbRuntimeSubmitter {
     return config_;
   }
 
-  [[nodiscard]] const PreparedUsbRuntimeSubmitterCounters& counters() const {
-    return counters_;
-  }
+  [[nodiscard]] PreparedUsbRuntimeSubmitterCounters counters() const;
 
   [[nodiscard]] const PreparedUsbSubmitPlannerCounters& planner_counters() const {
     return planner_.counters();
@@ -90,7 +88,7 @@ class PreparedUsbRuntimeSubmitter {
   void complete_oldest();
   [[nodiscard]] bool remember_descriptor(const UsbSubmitDescriptor& descriptor);
   [[nodiscard]] bool submit_descriptor(const UsbSubmitDescriptor& descriptor);
-  void refresh_counters();
+  [[nodiscard]] PreparedUsbRuntimeSubmitterCounters snapshot_counters() const;
 
   PreparedUsbRuntimeSubmitterConfig config_{};
   PreparedUsbSubmitPlanner planner_{};

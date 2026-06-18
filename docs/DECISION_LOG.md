@@ -9165,3 +9165,56 @@ Next implication:
   branch-promotion claim is allowed from input decode batching. Future CPU work
   should focus on fixed transfer lifecycle, packer efficiency, or stats
   publication without changing input ring publication timing.
+
+## 2026-06-18 - Lazy Prepared Runtime Counter Snapshots
+
+- Decision: move prepared USB runtime/submitter counter materialization to
+  snapshot points instead of refreshing merged pool counters on every
+  submit/completion event.
+- Reason: after physical rejection of capture batching and input decode batch
+  publication, the next lowest-risk CPU work is observability/lifecycle
+  overhead that does not alter ISO8 cadence, packet bytes, frame timestamps,
+  input ring publication timing, routing, or Timecode Vinyl semantics.
+- Implementation:
+  - `PreparedUsbAsyncRuntime::counters()` now returns a snapshot by value.
+  - `PreparedUsbRuntimeSubmitter::counters()` now returns a snapshot by value.
+  - Hot events keep only local counters; derived pool/planner fields are
+    merged on `counters()`/`safety()`.
+- Evidence:
+  - Focused runtime-submit contract passed with `66` USB submits, `185856`
+    bytes, `5808` frames, `0` fallback allocations, `0` submit failures, and
+    payload equivalence.
+  - Focused async-runtime contract passed with live snapshot fields proving
+    `live_snapshot_live_requests=4`, final `live_requests=0`, and
+    `max_live_requests_observed=4`.
+- Alternatives rejected:
+  - Reopen capture batching or input decode batching: rejected by lock-gated
+    physical failures.
+  - Packer rewrite/unrolled output as the next step: deferred because prior
+    physical evidence points more strongly at IOUSBHost submit/lifecycle and
+    route/timing instability.
+- Readiness impact: this is an offline low-risk CPU-pressure improvement only.
+  It does not prove runtime CPU superiority, audiophile quality, routing,
+  Timecode Vinyl readiness, or branch promotion until bound to real HAL/USB and
+  measured in a same-session lock-gated physical A/B against mainline.
+
+## 2026-06-18 - Residual Texture Metrics Added To C++ Audiophile WAV Analyzer
+
+- Decision: extend the C++ audiophile WAV analyzer with residual burst,
+  residual-signal correlation, and residual peak/RMS metrics.
+- Reason: quality gates must catch noise texture, signal-modulated residual,
+  and transient residual behavior that broad alignment/SNR can hide. This
+  gives a more objective basis for rejecting candidates that technically route
+  audio but sound or measure wrong.
+- New metrics:
+  - `residual_burst_p95_to_median_db`;
+  - `residual_signal_abs_correlation`;
+  - `residual_peak_to_rms_db`.
+- Evidence:
+  - Clean synthetic C++ self-test passes.
+  - Degraded synthetic C++ self-test is rejected.
+  - `opena8djcpp_audiophile_analysis_stack_contract` requires the new fields.
+- Readiness impact: measurement integrity improves, but no product claim is
+  enabled. Physical route validity, same-session mainline/C++ comparison,
+  CPU/resource superiority, and Traktor/timecode vinyl evidence are still
+  required.

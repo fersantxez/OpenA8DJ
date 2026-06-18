@@ -32,6 +32,9 @@ struct Thresholds {
   double min_mid_coherence = 0.90;
   double max_delay_p95_frames = 2.0;
   double max_leakage_db = -70.0;
+  double max_residual_burst_p95_to_median_db = 12.0;
+  double max_residual_signal_abs_correlation = 0.10;
+  double max_residual_peak_to_rms_db = 24.0;
 };
 
 struct Cli {
@@ -75,6 +78,9 @@ struct ChannelMetrics {
   double transfer_ripple_high_db = 0.0;
   double residual_ratio_mid_mean = 0.0;
   double residual_ratio_high_mean = 0.0;
+  double residual_burst_p95_to_median_db = 0.0;
+  double residual_signal_abs_correlation = 0.0;
+  double residual_peak_to_rms_db = 0.0;
 };
 
 struct StereoMatrix {
@@ -491,6 +497,59 @@ double percentile(std::vector<double> values, double p) {
   return values[lo] * (1.0 - frac) + values[hi] * frac;
 }
 
+double pearson_abs(std::span<const double> a, std::span<const double> b) {
+  if (a.size() != b.size() || a.empty()) {
+    return 0.0;
+  }
+  long double mean_a = 0.0;
+  long double mean_b = 0.0;
+  for (std::size_t index = 0; index < a.size(); ++index) {
+    mean_a += a[index];
+    mean_b += b[index];
+  }
+  mean_a /= a.size();
+  mean_b /= b.size();
+  long double dot = 0.0;
+  long double aa = 0.0;
+  long double bb = 0.0;
+  for (std::size_t index = 0; index < a.size(); ++index) {
+    const double da = a[index] - static_cast<double>(mean_a);
+    const double db = b[index] - static_cast<double>(mean_b);
+    dot += static_cast<long double>(da) * db;
+    aa += static_cast<long double>(da) * da;
+    bb += static_cast<long double>(db) * db;
+  }
+  return std::abs(static_cast<double>(dot / (std::sqrt(aa * bb) + kEpsilon)));
+}
+
+double peak_to_rms_db(std::span<const double> values) {
+  if (values.empty()) {
+    return 0.0;
+  }
+  double peak = 0.0;
+  for (const double value : values) {
+    peak = std::max(peak, std::abs(value));
+  }
+  return 20.0 * std::log10((peak + kEpsilon) / (rms(values) + kEpsilon));
+}
+
+double residual_burst_p95_to_median_db(std::span<const double> residual,
+                                       std::uint32_t sample_rate) {
+  const auto window = std::max<std::size_t>(64U, sample_rate / 100U);
+  const auto hop = std::max<std::size_t>(1U, window / 2U);
+  if (residual.size() < window * 4U) {
+    return 0.0;
+  }
+  std::vector<double> window_db;
+  for (std::size_t start = 0; start + window <= residual.size(); start += hop) {
+    window_db.push_back(db20(rms(residual.subspan(start, window))));
+  }
+  if (window_db.size() < 4U) {
+    return 0.0;
+  }
+  return percentile(window_db, 95.0) - percentile(window_db, 50.0);
+}
+
 double gain_ripple_db(std::span<const double> reference, std::span<const double> capture) {
   constexpr std::size_t kWindows = 16U;
   if (reference.size() < kWindows * 64U) {
@@ -559,6 +618,10 @@ ChannelMetrics channel_metrics(std::span<const double> reference,
   out.transfer_ripple_high_db = gain_ripple_db(high_ref, high_cap);
   out.residual_ratio_mid_mean = residual_ratio(mid_ref, mid_cap);
   out.residual_ratio_high_mean = residual_ratio(high_ref, high_cap);
+  out.residual_burst_p95_to_median_db =
+      residual_burst_p95_to_median_db(residual, sample_rate);
+  out.residual_signal_abs_correlation = pearson_abs(fitted, residual);
+  out.residual_peak_to_rms_db = peak_to_rms_db(residual);
   return out;
 }
 
@@ -738,6 +801,20 @@ Analysis analyze_buffers(const StereoBuffer& reference_in,
   } else if (out.stereo_matrix.worst_offdiag_db_relative > cli.thresholds.max_leakage_db) {
     out.blockers.push_back("stereo_leakage_above_threshold");
   }
+  if (std::max(out.left.residual_burst_p95_to_median_db,
+               out.right.residual_burst_p95_to_median_db) >
+      cli.thresholds.max_residual_burst_p95_to_median_db) {
+    out.blockers.push_back("residual_burst_above_threshold");
+  }
+  if (std::max(out.left.residual_signal_abs_correlation,
+               out.right.residual_signal_abs_correlation) >
+      cli.thresholds.max_residual_signal_abs_correlation) {
+    out.blockers.push_back("residual_signal_correlation_above_threshold");
+  }
+  if (std::max(out.left.residual_peak_to_rms_db, out.right.residual_peak_to_rms_db) >
+      cli.thresholds.max_residual_peak_to_rms_db) {
+    out.blockers.push_back("residual_peak_to_rms_above_threshold");
+  }
   return out;
 }
 
@@ -851,7 +928,12 @@ void print_channel(std::ostream& out, std::string_view key, const ChannelMetrics
   print_number(out, "transfer_ripple_mid_db", metrics.transfer_ripple_mid_db);
   print_number(out, "transfer_ripple_high_db", metrics.transfer_ripple_high_db);
   print_number(out, "residual_ratio_mid_mean", metrics.residual_ratio_mid_mean);
-  print_number(out, "residual_ratio_high_mean", metrics.residual_ratio_high_mean, false);
+  print_number(out, "residual_ratio_high_mean", metrics.residual_ratio_high_mean);
+  print_number(out, "residual_burst_p95_to_median_db",
+               metrics.residual_burst_p95_to_median_db);
+  print_number(out, "residual_signal_abs_correlation",
+               metrics.residual_signal_abs_correlation);
+  print_number(out, "residual_peak_to_rms_db", metrics.residual_peak_to_rms_db, false);
   out << "  }" << (comma ? "," : "") << "\n";
 }
 
@@ -905,7 +987,13 @@ std::string to_json(const Analysis& analysis) {
   print_number(out, "min_snr_db", analysis.thresholds.min_snr_db);
   print_number(out, "min_mid_coherence", analysis.thresholds.min_mid_coherence);
   print_number(out, "max_delay_p95_frames", analysis.thresholds.max_delay_p95_frames);
-  print_number(out, "max_leakage_db", analysis.thresholds.max_leakage_db, false);
+  print_number(out, "max_leakage_db", analysis.thresholds.max_leakage_db);
+  print_number(out, "max_residual_burst_p95_to_median_db",
+               analysis.thresholds.max_residual_burst_p95_to_median_db);
+  print_number(out, "max_residual_signal_abs_correlation",
+               analysis.thresholds.max_residual_signal_abs_correlation);
+  print_number(out, "max_residual_peak_to_rms_db",
+               analysis.thresholds.max_residual_peak_to_rms_db, false);
   out << "  },\n";
   out << "  \"result\": \"" << (analysis.blockers.empty() ? "PASS" : "FAIL") << "\",\n";
   out << "  \"blockers\": [";
@@ -957,6 +1045,14 @@ Cli parse_cli(int argc, char** argv) {
       cli.thresholds.max_delay_p95_frames = std::stod(std::string(next(index)));
     } else if (arg == "--max-leakage-db") {
       cli.thresholds.max_leakage_db = std::stod(std::string(next(index)));
+    } else if (arg == "--max-residual-burst-p95-to-median-db") {
+      cli.thresholds.max_residual_burst_p95_to_median_db =
+          std::stod(std::string(next(index)));
+    } else if (arg == "--max-residual-signal-abs-correlation") {
+      cli.thresholds.max_residual_signal_abs_correlation =
+          std::stod(std::string(next(index)));
+    } else if (arg == "--max-residual-peak-to-rms-db") {
+      cli.thresholds.max_residual_peak_to_rms_db = std::stod(std::string(next(index)));
     } else if (arg == "--label") {
       cli.label = std::string(next(index));
     } else if (arg == "--json-out") {

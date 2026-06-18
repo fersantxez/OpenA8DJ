@@ -158,6 +158,7 @@ int main() {
   for (std::uint64_t sequence = 0; sequence < kInitialSlots; ++sequence) {
     (void)submitter.queue_slot(UsbSlotDirection::Capture, (sequence + 1U) * 8U);
   }
+  const auto first_descriptor_snapshot = submitter.counters();
   for (std::uint64_t sequence = 0; sequence < kInitialSlots; ++sequence) {
     (void)submitter.queue_slot(UsbSlotDirection::Playback, (sequence + 1U) * 8U);
   }
@@ -179,6 +180,10 @@ int main() {
   const auto counters = submitter.counters();
   result.runtime_safe = submitter.safety().product_safe;
   result.pass = result.runtime_safe && result.payload_equivalent &&
+                first_descriptor_snapshot.logical_slots == 8 &&
+                first_descriptor_snapshot.usb_submit_calls == 1 &&
+                first_descriptor_snapshot.request_submit_calls == 1 &&
+                first_descriptor_snapshot.max_live_requests == 1 &&
                 counters.logical_slots == 528 && counters.capture_logical_slots == 264 &&
                 counters.playback_logical_slots == 264 && counters.usb_submit_calls == 66 &&
                 counters.partial_submit_calls == 0 &&
@@ -206,6 +211,14 @@ int main() {
             << "  \"capture_logical_slots\": " << counters.capture_logical_slots << ",\n"
             << "  \"playback_logical_slots\": " << counters.playback_logical_slots << ",\n"
             << "  \"usb_submit_calls\": " << counters.usb_submit_calls << ",\n"
+            << "  \"first_descriptor_snapshot_logical_slots\": "
+            << first_descriptor_snapshot.logical_slots << ",\n"
+            << "  \"first_descriptor_snapshot_usb_submit_calls\": "
+            << first_descriptor_snapshot.usb_submit_calls << ",\n"
+            << "  \"first_descriptor_snapshot_request_submit_calls\": "
+            << first_descriptor_snapshot.request_submit_calls << ",\n"
+            << "  \"first_descriptor_snapshot_max_live_requests\": "
+            << first_descriptor_snapshot.max_live_requests << ",\n"
             << "  \"partial_submit_calls\": " << counters.partial_submit_calls << ",\n"
             << "  \"usb_submit_reduction_ratio\": " << counters.usb_submit_reduction_ratio << ",\n"
             << "  \"descriptors\": " << result.descriptors << ",\n"

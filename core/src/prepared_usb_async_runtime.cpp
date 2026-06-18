@@ -22,7 +22,6 @@ bool PreparedUsbAsyncRuntime::start(const PreparedUsbAsyncRuntimeConfig& config)
   request_pool_ = request_pool;
   counters_ = {};
   started_ = true;
-  refresh_counters();
   return true;
 }
 
@@ -33,7 +32,6 @@ void PreparedUsbAsyncRuntime::stop() {
   (void)cancel_all();
   request_pool_.stop();
   started_ = false;
-  refresh_counters();
 }
 
 PreparedUsbAsyncSubmit PreparedUsbAsyncRuntime::submit(
@@ -46,7 +44,6 @@ PreparedUsbAsyncSubmit PreparedUsbAsyncRuntime::submit(
   PreparedUsbAsyncSubmit out{};
   if (!started_) {
     counters_.submit_failures += 1;
-    refresh_counters();
     return out;
   }
 
@@ -62,7 +59,6 @@ PreparedUsbAsyncSubmit PreparedUsbAsyncRuntime::submit(
   if (!descriptor_matches_config(out.descriptor)) {
     counters_.descriptor_mismatches += 1;
     counters_.submit_failures += 1;
-    refresh_counters();
     return out;
   }
 
@@ -70,14 +66,12 @@ PreparedUsbAsyncSubmit PreparedUsbAsyncRuntime::submit(
   if (pool_counters.live_requests >= config_.max_live_requests) {
     counters_.live_limit_failures += 1;
     counters_.submit_failures += 1;
-    refresh_counters();
     return out;
   }
 
   out.handle = request_pool_.submit(out.descriptor);
   if (!out.handle.valid()) {
     counters_.submit_failures += 1;
-    refresh_counters();
     return out;
   }
 
@@ -87,21 +81,18 @@ PreparedUsbAsyncSubmit PreparedUsbAsyncRuntime::submit(
   } else {
     counters_.playback_submit_calls += 1;
   }
-  refresh_counters();
   return out;
 }
 
 bool PreparedUsbAsyncRuntime::complete(PreparedUsbRequestHandle handle) {
   if (!started_) {
     counters_.invalid_completions += 1;
-    refresh_counters();
     return false;
   }
   const bool completed = request_pool_.complete(handle);
   if (completed) {
     counters_.completion_calls += 1;
   }
-  refresh_counters();
   return completed;
 }
 
@@ -111,21 +102,25 @@ std::uint64_t PreparedUsbAsyncRuntime::cancel_all() {
   }
   const auto cancelled = request_pool_.cancel_all();
   counters_.cancel_calls += cancelled;
-  refresh_counters();
   return cancelled;
+}
+
+PreparedUsbAsyncRuntimeCounters PreparedUsbAsyncRuntime::counters() const {
+  return snapshot_counters();
 }
 
 PreparedUsbAsyncRuntimeSafety PreparedUsbAsyncRuntime::safety() const {
   const auto pool_safety = request_pool_.safety();
+  const auto counters = snapshot_counters();
   PreparedUsbAsyncRuntimeSafety out{};
   out.preallocated_only = pool_safety.preallocated_only;
-  out.bounded_live_requests = counters_.max_live_requests <= config_.max_live_requests;
+  out.bounded_live_requests = counters.max_live_requests <= config_.max_live_requests;
   out.completion_owned_lifecycle =
-      counters_.completion_calls + counters_.cancel_calls == counters_.submit_calls;
-  out.descriptor_shape_safe = counters_.descriptor_mismatches == 0;
+      counters.completion_calls + counters.cancel_calls == counters.submit_calls;
+  out.descriptor_shape_safe = counters.descriptor_mismatches == 0;
   out.no_fallback_allocations =
-      counters_.fallback_allocations == 0 && counters_.submit_failures == 0;
-  out.drained = counters_.live_requests == 0;
+      counters.fallback_allocations == 0 && counters.submit_failures == 0;
+  out.drained = counters.live_requests == 0;
   out.product_safe = out.preallocated_only && out.bounded_live_requests &&
                      out.completion_owned_lifecycle && out.descriptor_shape_safe &&
                      out.no_fallback_allocations && out.drained;
@@ -146,24 +141,26 @@ std::uint32_t PreparedUsbAsyncRuntime::bytes_per_slot_for(
                                                 : config_.playback_bytes_per_slot;
 }
 
-void PreparedUsbAsyncRuntime::refresh_counters() {
+PreparedUsbAsyncRuntimeCounters PreparedUsbAsyncRuntime::snapshot_counters() const {
+  auto counters = counters_;
   const auto pool = request_pool_.counters();
-  counters_.fallback_allocations = pool.fallback_allocations;
-  counters_.invalid_completions = std::max(counters_.invalid_completions,
-                                           pool.invalid_completions);
-  counters_.stale_completions = pool.stale_completions;
-  counters_.late_completions_after_cancel = pool.late_completions_after_cancel;
-  counters_.live_requests = pool.live_requests;
-  counters_.max_live_requests = std::max(counters_.max_live_requests,
-                                         pool.max_live_requests);
-  counters_.submitted_frames = pool.submitted_frames;
-  counters_.completed_frames = pool.completed_frames;
-  counters_.cancelled_frames = pool.cancelled_frames;
-  counters_.submitted_bytes = pool.submitted_bytes;
-  counters_.completed_bytes = pool.completed_bytes;
-  counters_.cancelled_bytes = pool.cancelled_bytes;
-  counters_.capture_completion_calls = pool.capture_completion_calls;
-  counters_.playback_completion_calls = pool.playback_completion_calls;
+  counters.fallback_allocations = pool.fallback_allocations;
+  counters.invalid_completions = std::max(counters.invalid_completions,
+                                          pool.invalid_completions);
+  counters.stale_completions = pool.stale_completions;
+  counters.late_completions_after_cancel = pool.late_completions_after_cancel;
+  counters.live_requests = pool.live_requests;
+  counters.max_live_requests = std::max(counters.max_live_requests,
+                                        pool.max_live_requests);
+  counters.submitted_frames = pool.submitted_frames;
+  counters.completed_frames = pool.completed_frames;
+  counters.cancelled_frames = pool.cancelled_frames;
+  counters.submitted_bytes = pool.submitted_bytes;
+  counters.completed_bytes = pool.completed_bytes;
+  counters.cancelled_bytes = pool.cancelled_bytes;
+  counters.capture_completion_calls = pool.capture_completion_calls;
+  counters.playback_completion_calls = pool.playback_completion_calls;
+  return counters;
 }
 
 }  // namespace opena8djcpp

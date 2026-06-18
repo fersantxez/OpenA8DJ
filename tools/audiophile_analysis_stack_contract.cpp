@@ -74,6 +74,9 @@ int main(int argc, char** argv) {
       contains(cpp_analyzer, "coherence_mid_active_mean") &&
       contains(cpp_analyzer, "delay_windows") &&
       contains(cpp_analyzer, "worst_offdiag_db_relative") &&
+      contains(cpp_analyzer, "residual_burst_p95_to_median_db") &&
+      contains(cpp_analyzer, "residual_signal_abs_correlation") &&
+      contains(cpp_analyzer, "residual_peak_to_rms_db") &&
       contains(cpp_analyzer, "product_claim_allowed") &&
       contains(cpp_analyzer, "false");
   if (!cpp_analyzer_native) {

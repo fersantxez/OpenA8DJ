@@ -1,5 +1,43 @@
 # Audio8DJ C++/DriverKit Success Metrics
 
+## Human-Test Candidate Milestone For 2026-06-18 15:00 EDT
+
+This milestone is a controlled first human-test target, not a product
+superiority claim.
+
+Minimum for a human-test candidate:
+
+- installable and uninstallable candidate path documented;
+- driver/HAL candidate enumerates Audio 8 DJ as 8 inputs / 8 outputs;
+- routing A/B/C/D and channel-leakage offline gates pass;
+- Timecode Vinyl/DVS offline gates pass and physical Timecode Vinyl remains
+  explicitly unclaimed until tested;
+- no known physically rejected timing/cadence experiment active in the default
+  candidate;
+- offline gates pass on the exact commit to be tested;
+- lock-gated safety load/unload passes before human listening;
+- iRig capture route is visible and verified immediately before any capture;
+- quality and CPU/resource metrics are saved even if they fail product
+  thresholds;
+- rollback/unload command is written and verified after the test window.
+
+Still required before any "better than mainline" claim:
+
+- same-session mainline C vs C++ physical comparison on a promotion-valid
+  capture route;
+- C++ physical quality at least equal to or better than mainline;
+- C++ driver/coreaudiod CPU p95 and jitter less than or equal to mainline;
+- physical Timecode Vinyl/Traktor validation;
+- no recovery debt after unload/reload;
+- branch promotion explicitly approved after evidence review.
+
+Current DriverKit blocker:
+
+- full DriverKit/dext build is blocked on this host because only Command Line
+  Tools are selected, DriverKit SDK is missing, `iig` is absent, and free space
+  is about `7 GiB`. Until that changes, the human-test path is the HAL
+  candidate, not a real AudioDriverKit dext.
+
 This document defines the offline success gates for the C++/DriverKit redesign.
 It is intentionally comparable with the current mainline C/OpenA8DJ reference
 and the Rust oracle contract, while keeping physical hardware, Core Audio,

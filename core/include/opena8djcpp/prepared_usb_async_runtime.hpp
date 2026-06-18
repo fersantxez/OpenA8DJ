@@ -77,16 +77,14 @@ class PreparedUsbAsyncRuntime {
     return config_;
   }
 
-  [[nodiscard]] const PreparedUsbAsyncRuntimeCounters& counters() const {
-    return counters_;
-  }
+  [[nodiscard]] PreparedUsbAsyncRuntimeCounters counters() const;
 
   [[nodiscard]] PreparedUsbAsyncRuntimeSafety safety() const;
 
  private:
   [[nodiscard]] bool descriptor_matches_config(const UsbSubmitDescriptor& descriptor) const;
   [[nodiscard]] std::uint32_t bytes_per_slot_for(UsbSlotDirection direction) const;
-  void refresh_counters();
+  [[nodiscard]] PreparedUsbAsyncRuntimeCounters snapshot_counters() const;
 
   PreparedUsbAsyncRuntimeConfig config_{};
   PreparedUsbRequestPool request_pool_{};

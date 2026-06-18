@@ -58,6 +58,7 @@ int main() {
     submissions_ok = submissions_ok && submit.handle.valid();
     handles.push_back(submit.handle);
   }
+  const auto live_snapshot = runtime.counters();
 
   bool completions_ok = true;
   for (const auto& handle : handles) {
@@ -136,6 +137,10 @@ int main() {
   if (!rejected_bad_shape) blockers.push_back("descriptor_shape_not_enforced");
   if (!capture_physical_shape_ok) blockers.push_back("capture_physical_shape_rejected");
   if (!playback_physical_shape_ok) blockers.push_back("playback_physical_shape_rejected");
+  if (live_snapshot.live_requests != 4) blockers.push_back("lazy_snapshot_missed_live_requests");
+  if (live_snapshot.max_live_requests != 4) {
+    blockers.push_back("lazy_snapshot_missed_max_live_requests");
+  }
   if (counters.submit_calls != 4) blockers.push_back("unexpected_submit_count");
   if (counters.completion_calls != 4) blockers.push_back("unexpected_completion_count");
   if (negative_counters.live_limit_failures != 1) {
@@ -164,6 +169,8 @@ int main() {
   print_number("request_slots", config.request_pool.request_slots);
   print_number("max_live_requests", config.max_live_requests);
   print_number("submit_calls", counters.submit_calls);
+  print_number("live_snapshot_live_requests", live_snapshot.live_requests);
+  print_number("live_snapshot_max_live_requests", live_snapshot.max_live_requests);
   print_number("capture_submit_calls", counters.capture_submit_calls);
   print_number("playback_submit_calls", counters.playback_submit_calls);
   print_number("completion_calls", counters.completion_calls);
