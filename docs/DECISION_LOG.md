@@ -9047,3 +9047,26 @@ Next implication:
 - Readiness impact: stricter route identity only. It does not validate the
   iRig signal, run hardware, prove sound quality, clear CPU/resource gates, or
   authorize branch promotion.
+
+## 2026-06-18 - Add Capture-Batch v2 Diagnostic Profile
+
+- Decision: add an opt-in `hal-capture-batch-v2-diagnostic` build profile with
+  `HAL_CAPTURE_ISO_FRAMES=16`, `HAL_PLAYBACK_ISO_FRAMES=8`,
+  `HAL_PLAYBACK_COALESCE_TRANSFERS=1`, `HAL_OUTPUT_STREAMS=1`, and
+  `HAL_STREAM_USAGE=0`.
+- Reason: physical profiling shows USB async enqueue cadence is the dominant
+  driver CPU cost. The earlier capture-batch diagnostic at 64 capture frames
+  reduced CPU but failed audio quality badly because playback timing became
+  bursty. The v2 probe keeps the same one-stream output surface and playback
+  ISO8/coalesce1 cadence while testing a smaller capture-side submit reduction.
+- Alternatives rejected:
+  - Promote `HAL_CAPTURE_ISO_FRAMES=64`: rejected by lock-gated iRig evidence
+    with catastrophic quality loss.
+  - Use prepared runtime as the next default: rejected because current physical
+    evidence shows severe quality failure.
+  - Coalesce playback: rejected by prior physical runs.
+- Evidence required before any claim: offline contract/build gates first, then
+  a lock-gated diagnostic window with iRig capture, runtime geometry snapshots,
+  submit-rate evidence, CPU metrics, and cleanup. This profile cannot support a
+  product, CPU, Timecode Vinyl, or branch-promotion claim until same-session
+  physical A/B beats mainline on a validated route.

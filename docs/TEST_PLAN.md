@@ -1692,3 +1692,34 @@ PASS/FAIL semantics:
   capture devices that do not resolve to the iRig/IK Multimedia route.
 - PASS is still not product readiness. It only proves those escape hatches
   cannot be promoted.
+
+## Capture-Batch v2 Diagnostic
+
+Purpose:
+
+- test whether a smaller capture-side submit reduction can lower driver CPU
+  without repeating the physical quality collapse seen with 64-frame capture
+  batching;
+- preserve the current one-stream output surface and playback ISO8/coalesce1
+  cadence;
+- keep the profile diagnostic-only until same-session physical A/B evidence
+  beats mainline on a validated iRig route.
+
+Command shape:
+
+```sh
+make -B hal-capture-batch-v2-diagnostic
+cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_evidence_schema_check
+./scripts/run-cpp-offline-gates
+```
+
+Physical diagnostic requirements:
+
+- global hardware lock acquired and released;
+- iRig visible before playback and capture;
+- runtime geometry snapshots show `captureIsoFramesPerTransfer=16`,
+  `playbackIsoFramesPerTransfer=8`, and `playbackCoalesceTransfers=1`;
+- submit counters, CPU samples, WAV analyzers, and cleanup evidence recorded;
+- no product, CPU, Timecode Vinyl, or branch-promotion claim unless the same
+  lock-gated window also includes a validated known-good route and mainline
+  comparison.

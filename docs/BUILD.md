@@ -1227,6 +1227,17 @@ This build keeps the logical playback/audio cadence at ISO8 while requesting
 larger physical capture transfers. It is intended to test lower capture enqueue
 cadence without making global ISO64 the default.
 
+Smaller v2 diagnostic build:
+
+```sh
+make -B hal-capture-batch-v2-diagnostic
+```
+
+This keeps playback at ISO8/coalesce1 and the one 8-channel output stream while
+testing `HAL_CAPTURE_ISO_FRAMES=16`. It is diagnostic only; it must not be
+installed or used for claims without a lock-gated iRig window and same-session
+mainline comparison.
+
 Guard:
 
 ```sh

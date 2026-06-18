@@ -13101,3 +13101,58 @@ Full offline gate after commit:
   - The promotion-valid route remains a same-window wired non-Audio8
     known-good output captured by the physical iRig path, followed by
     same-session mainline/C++ A/B comparison.
+
+## 2026-06-18 - Capture-Batch v2 Diagnostic Offline Build
+
+- Commit context: before commit, after `1f9db29`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build/source/evidence checks only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or service mutation.
+  - Mainline and Rust remained read-only.
+- Rationale:
+  - Current best C++ direction improves physical music quality versus the
+    same-session mainline reference but fails CPU/resource gates.
+  - Prior `HAL_CAPTURE_ISO_FRAMES=64` reduced capture submit cadence but
+    physically failed quality, so the next candidate must use a smaller
+    capture batch while preserving playback ISO8/coalesce1.
+- Source/build changes:
+  - Added `make hal-capture-batch-v2-diagnostic`.
+  - Build geometry: `HAL_CAPTURE_ISO_FRAMES=16`,
+    `HAL_PLAYBACK_ISO_FRAMES=8`, `HAL_PLAYBACK_COALESCE_TRANSFERS=1`,
+    `HAL_OUTPUT_STREAMS=1`, `HAL_STREAM_USAGE=0`.
+  - `opena8djcpp_hal_logical_capture_batching_contract` now requires the v2
+    diagnostic target and emits the expected geometry.
+  - `opena8djcpp_evidence_schema_check` now requires those v2 contract fields.
+- Commands:
+  - `git diff --check`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_evidence_schema_check`
+  - `make -B hal-capture-batch-v2-diagnostic`
+  - `cp -R build/OpenA8DJ.driver build/OpenA8DJ-capture-batch-v2.driver`
+  - `./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract`
+  - `./scripts/run-cpp-offline-gates`
+- Results:
+  - Diff whitespace check: PASS.
+  - Focused contract/schema build: PASS.
+  - v2 HAL build: PASS.
+  - v2 candidate hash:
+    `e7ba1bad0295dc956885448e107e80d338bf5cf2c7e309e130a569e73de6ed0c`.
+  - Logical capture batching contract: PASS, with
+    `makefile_exposes_capture_batch_v2_diagnostic=true`,
+    `capture_batch_v2_capture_iso_frames=16`,
+    `capture_batch_v2_playback_iso_frames=8`, and
+    `capture_batch_v2_playback_coalesce_transfers=1`.
+  - Full offline gates: Debug CTest `80/80` PASS, Release CTest `81/81`
+    PASS, but final script result FAIL because the freshness gate correctly
+    rejected the uncommitted dirty worktree:
+    `working_tree_clean_for_claim=false`, `claimable_current_candidate=false`.
+- Readiness impact:
+  - No sound-quality, CPU/resource, Timecode Vinyl, product-readiness, or
+    branch-promotion claim is allowed from this evidence.
+  - After commit and fresh offline gates, the next allowed hardware step is a
+    short lock-gated diagnostic of `build/OpenA8DJ-capture-batch-v2.driver`
+    with iRig capture, runtime geometry snapshots, submit counters, CPU
+    samples, WAV analysis, and forced HAL unload/recovery afterward.

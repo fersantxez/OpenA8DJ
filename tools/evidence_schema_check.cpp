@@ -870,6 +870,16 @@ int main(int argc, char** argv) {
                     "capture_paced_playback_accepts_full_batch", true) &&
       bool_field_is(hal_logical_capture_batching_contract, "playback_logical_batcher_still_chunks",
                     true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "makefile_exposes_capture_batch_v2_diagnostic", true) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_capture_iso_frames", 16.0) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_playback_iso_frames", 8.0) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_playback_coalesce_transfers", 1.0) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "capture_batch_v2_preserves_one_stream_output_surface", true) &&
       string_field_is(
           hal_logical_capture_batching_contract, "blocked_claim",
           "NO_RUNTIME_CPU_SUPERIORITY_CLAIM_UNTIL_OPT_IN_CAPTURE_BATCHING_HAS_SAME_WINDOW_PHYSICAL_AB_METRICS") &&

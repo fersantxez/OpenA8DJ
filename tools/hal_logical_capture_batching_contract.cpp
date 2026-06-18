@@ -98,6 +98,14 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_PLAYBACK_ISO_FRAMES=8") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS=1") &&
       contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME=0");
+  const bool makefile_exposes_capture_batch_v2_diagnostic =
+      contains(makefile, "hal-capture-batch-v2-diagnostic:") &&
+      contains(makefile, "HAL_CAPTURE_ISO_FRAMES=16") &&
+      contains(makefile, "HAL_PLAYBACK_ISO_FRAMES=8") &&
+      contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS=1") &&
+      contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME=0") &&
+      contains(makefile, "HAL_OUTPUT_STREAMS=1") &&
+      contains(makefile, "HAL_STREAM_USAGE=0");
 
   std::vector<std::string> failures;
   if (!source_present) failures.push_back("hal_source_missing");
@@ -117,6 +125,9 @@ int main(int argc, char** argv) {
   }
   if (!makefile_exposes_capture_batch_diagnostic) {
     failures.push_back("capture_batch_diagnostic_target_missing");
+  }
+  if (!makefile_exposes_capture_batch_v2_diagnostic) {
+    failures.push_back("capture_batch_v2_diagnostic_target_missing");
   }
 
   const bool pass = failures.empty();
@@ -146,11 +157,20 @@ int main(int argc, char** argv) {
   std::cout
       << "  \"makefile_exposes_capture_batch_diagnostic\": "
       << (makefile_exposes_capture_batch_diagnostic ? "true" : "false") << ",\n";
+  std::cout
+      << "  \"makefile_exposes_capture_batch_v2_diagnostic\": "
+      << (makefile_exposes_capture_batch_v2_diagnostic ? "true" : "false") << ",\n"
+      << "  \"capture_batch_v2_capture_iso_frames\": 16,\n"
+      << "  \"capture_batch_v2_playback_iso_frames\": 8,\n"
+      << "  \"capture_batch_v2_playback_coalesce_transfers\": 1,\n"
+      << "  \"capture_batch_v2_preserves_one_stream_output_surface\": true,\n";
   print_string_array("failures", failures);
   std::cout
       << ",\n"
       << "  \"candidate_build_flags\": "
          "\"HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=64 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8\",\n"
+      << "  \"candidate_v2_build_flags\": "
+         "\"HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=16 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_PLAYBACK_COALESCE_TRANSFERS=1 HAL_OUTPUT_STREAMS=1 HAL_STREAM_USAGE=0\",\n"
       << "  \"blocked_claim\": "
          "\"NO_RUNTIME_CPU_SUPERIORITY_CLAIM_UNTIL_OPT_IN_CAPTURE_BATCHING_HAS_SAME_WINDOW_PHYSICAL_AB_METRICS\"\n"
       << "}\n";
