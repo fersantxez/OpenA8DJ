@@ -13448,3 +13448,52 @@ Full offline gate after commit:
     fails quality gates and consumes too much CPU for the final direction.
   - Mainline failing in the same session means the current route/capture state
     must be separated from candidate quality before any honest C++ vs C claim.
+
+## 2026-06-18 - Input Ring SPSC Diagnostic Offline Evidence
+
+- Commit context: after `42f272e`, before commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline source/build/CTest only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Rationale:
+  - Physical evidence rejected capture batching above ISO8 and decoded input
+    batch publication.
+  - The next CPU-pressure candidate must preserve ISO8 capture/playback
+    cadence, output packet bytes, output timeline semantics, routing, and
+    Timecode policy.
+- Source/build changes:
+  - Added `HAL_INPUT_SPSC_RING ?= 0`.
+  - Added `hal-input-spsc-diagnostic`, preserving ISO8/coalesce1 geometry and
+    one-stream output surface.
+  - Added an opt-in SPSC branch to the HAL input `FloatRing`; the default
+    mutex path remains active.
+  - Added `tools/hal_input_spsc_ring_contract.cpp` and wired it into CMake,
+    CTest, static policy, and `scripts/run-cpp-offline-gates`.
+- Commands:
+  - `make -B hal`
+  - `make -B hal-input-spsc-diagnostic`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_input_spsc_ring_contract opena8djcpp_static_policy_check opena8djcpp_dvs_packet_input_decode opena8djcpp_timecode_readiness_gate opena8djcpp_prepared_transport_routing_timecode_contract opena8djcpp_evidence_schema_check`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_hal_input_spsc_ring_contract|opena8djcpp_static_policy_check|opena8djcpp_dvs_packet_input_decode|opena8djcpp_timecode_readiness_gate|opena8djcpp_prepared_transport_routing_timecode_contract' --output-on-failure`
+  - `git diff --check`
+- Results:
+  - Default HAL build: PASS.
+  - Input SPSC diagnostic HAL build: PASS.
+  - `opena8djcpp_hal_input_spsc_ring_contract`: PASS.
+  - Focused CTest: `5/5` PASS.
+  - Diff whitespace check: PASS.
+- Readiness impact:
+  - The diagnostic candidate is not default and is not product-ready.
+  - No CPU/resource, sound-quality, routing, Timecode Vinyl, human-test, or
+    branch-promotion claim is allowed from this offline evidence.
+  - Next allowed physical use is a short lock-gated diagnostic only: load the
+    SPSC candidate, verify 8x8 enumeration, run input/DVS/timecode-safe smoke
+    with iRig capture if the route is valid, then force-unload and record
+    cleanup.

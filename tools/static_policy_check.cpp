@@ -136,6 +136,7 @@ int main(int argc, char** argv) {
       root / "tools/soundcheck_wav_quality.cpp",
       root / "tools/audiophile_precision_claim_gate.cpp",
       root / "tools/hal_logical_capture_batching_contract.cpp",
+      root / "tools/hal_input_spsc_ring_contract.cpp",
       root / "tools/hal_runtime_geometry_observability_contract.cpp",
       root / "tools/driverkit_surface_model.cpp",
       root / "tools/evidence_schema_check.cpp",

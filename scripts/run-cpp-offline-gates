@@ -252,6 +252,7 @@ fi
 ./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee "$EVIDENCE_DIR/product-quality-claim-gate.json"
 ./build/cpp-release/opena8djcpp_hal_transport_runtime_gate | tee "$EVIDENCE_DIR/hal-transport-runtime-gate.json"
 ./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract | tee "$EVIDENCE_DIR/hal-logical-capture-batching-contract.json"
+./build/cpp-release/opena8djcpp_hal_input_spsc_ring_contract | tee "$EVIDENCE_DIR/hal-input-spsc-ring-contract.json"
 ./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract | tee "$EVIDENCE_DIR/hal-runtime-geometry-observability-contract.json"
 ./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee "$EVIDENCE_DIR/physical-submit-comparison-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_runtime_physical_window_contract | tee "$EVIDENCE_DIR/prepared-runtime-physical-window-contract.json"

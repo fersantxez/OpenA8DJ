@@ -4668,3 +4668,40 @@ Risks:
 Next action:
 - Build `make dist`, hash artifacts, then run lock-gated safety/quality smoke
   before any human listening.
+
+## 2026-06-18 Kierkegaard: Input/Output Ring SPSC Review
+
+Subagent:
+- `019edb27-8f80-7071-86f0-6949e21a6e29` (`Kierkegaard`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Review whether the HAL input/output rings can migrate to SPSC/bulk without
+  changing packet format, routing, sample rate, USB cadence, or Timecode
+  semantics.
+
+Findings:
+- Input ring is the safer first migration target: producer/consumer shape is
+  simple and the relevant functions are `RingWrite`, `RingRead`, `RingClear`,
+  `appendInputByte`, `readInput`, and input-decode toggles.
+- Output timeline must not be replaced by a generic FIFO. It preserves
+  `sampleTime`, preroll, late writes, high-water drops, startup silence, and
+  elastic playback behavior.
+- Any SPSC migration must preserve the 8-channel frame shape, input
+  transforms, Mode2 packing, sample-rate policy, and ISO8 cadence.
+
+Integrated action:
+- Added an opt-in `HAL_INPUT_SPSC_RING=1` diagnostic build path and an offline
+  contract.
+- Kept the output timeline and default input ring unchanged.
+
+Risks:
+- The input SPSC path is physically untested and must not become default until
+  input routing, DVS/timecode behavior, latency, and quality are verified under
+  lock.
+
+Next action:
+- Run full offline gates after commit; if clean, only then consider a short
+  lock-gated SPSC diagnostic smoke with strict unload/recovery.

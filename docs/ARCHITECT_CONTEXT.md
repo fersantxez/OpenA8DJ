@@ -55,6 +55,12 @@ Branch: `driverkit/cpp-redesign`
   Timecode Vinyl, or mainline-superiority candidate yet. ISO5 is the best
   current diagnostic fallback, not a final product path. The next work must
   separate current route/capture validity from HAL transport continuity.
+- Current CPU-direction update: an opt-in input-ring SPSC diagnostic candidate
+  now exists (`HAL_INPUT_SPSC_RING=1`) and builds offline while the default HAL
+  remains on the legacy mutex input ring. This attacks real-time lock pressure
+  without changing USB cadence or the output timeline, but it is explicitly
+  untested physically and cannot support CPU, Timecode Vinyl, quality, or
+  promotion claims until a lock-gated input/DVS physical smoke passes.
 
 ## Current State
 

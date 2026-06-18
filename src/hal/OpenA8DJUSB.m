@@ -62,6 +62,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ENABLE_INPUT_DECODE 1
 #endif
 
+#ifndef OPENA8DJ_INPUT_SPSC_RING
+#define OPENA8DJ_INPUT_SPSC_RING 0
+#endif
+
 #ifndef OPENA8DJ_ENABLE_INPUT_CHECKS
 #define OPENA8DJ_ENABLE_INPUT_CHECKS 1
 #endif
@@ -865,6 +869,10 @@ typedef struct FloatRing {
     uint32_t readFrame;
     uint32_t writeFrame;
     uint32_t availableFrames;
+#if OPENA8DJ_INPUT_SPSC_RING
+    atomic_uint_fast64_t readCounter;
+    atomic_uint_fast64_t writeCounter;
+#endif
 } FloatRing;
 
 typedef struct OutputTimelineRing {
@@ -1298,6 +1306,10 @@ static void RingInit(FloatRing *ring, uint32_t capacityFrames, uint32_t channels
     ring->capacityFrames = capacityFrames;
     ring->channels = channels;
     ring->data = calloc((size_t)capacityFrames * channels, sizeof(float));
+#if OPENA8DJ_INPUT_SPSC_RING
+    atomic_init(&ring->readCounter, 0);
+    atomic_init(&ring->writeCounter, 0);
+#endif
 }
 
 static void RingDestroy(FloatRing *ring)
@@ -1309,6 +1321,16 @@ static void RingDestroy(FloatRing *ring)
 
 static void RingClear(FloatRing *ring)
 {
+#if OPENA8DJ_INPUT_SPSC_RING
+    uint_fast64_t write = atomic_load_explicit(&ring->writeCounter, memory_order_acquire);
+    atomic_store_explicit(&ring->readCounter, write, memory_order_release);
+    ring->readFrame = (uint32_t)(write % ring->capacityFrames);
+    ring->writeFrame = (uint32_t)(write % ring->capacityFrames);
+    ring->availableFrames = 0;
+    if (ring->data != NULL) {
+        memset(ring->data, 0, (size_t)ring->capacityFrames * ring->channels * sizeof(float));
+    }
+#else
     pthread_mutex_lock(&ring->mutex);
     ring->readFrame = 0;
     ring->writeFrame = 0;
@@ -1317,6 +1339,7 @@ static void RingClear(FloatRing *ring)
         memset(ring->data, 0, (size_t)ring->capacityFrames * ring->channels * sizeof(float));
     }
     pthread_mutex_unlock(&ring->mutex);
+#endif
 }
 
 #if !OPENA8DJ_ENABLE_ELASTIC_OUTPUT
@@ -1340,6 +1363,35 @@ static uint32_t RingWriteWithDropped(FloatRing *ring,
     if (ring->data == NULL || frames == NULL || frameCount == 0) {
         return 0;
     }
+#if OPENA8DJ_INPUT_SPSC_RING
+    uint_fast64_t read = atomic_load_explicit(&ring->readCounter, memory_order_acquire);
+    uint_fast64_t write = atomic_load_explicit(&ring->writeCounter, memory_order_relaxed);
+    uint_fast64_t available = write >= read ? write - read : 0;
+    if (available > ring->capacityFrames) {
+        available = ring->capacityFrames;
+    }
+    uint32_t writable = ring->capacityFrames - (uint32_t)available;
+    uint32_t written = frameCount < writable ? frameCount : writable;
+    uint32_t dropped = frameCount - written;
+    for (uint32_t frame = 0; frame < written; frame++) {
+        uint32_t index = (uint32_t)((write + frame) % ring->capacityFrames);
+        memcpy(&ring->data[(size_t)index * ring->channels],
+               &frames[(size_t)frame * ring->channels],
+               (size_t)ring->channels * sizeof(float));
+    }
+    if (written > 0) {
+        write += written;
+        atomic_store_explicit(&ring->writeCounter, write, memory_order_release);
+        ring->writeFrame = (uint32_t)(write % ring->capacityFrames);
+    }
+    ring->availableFrames = (uint32_t)((write >= read ? write - read : 0) > ring->capacityFrames
+                                           ? ring->capacityFrames
+                                           : (write >= read ? write - read : 0));
+    if (droppedFrames != NULL) {
+        *droppedFrames = dropped;
+    }
+    return written;
+#else
     pthread_mutex_lock(&ring->mutex);
     uint32_t written = 0;
     uint32_t dropped = 0;
@@ -1360,6 +1412,7 @@ static uint32_t RingWriteWithDropped(FloatRing *ring,
         *droppedFrames = dropped;
     }
     return written;
+#endif
 }
 
 static uint32_t RingWrite(FloatRing *ring, const float *frames, uint32_t frameCount)
@@ -1373,6 +1426,32 @@ static uint32_t RingRead(FloatRing *ring, float *frames, uint32_t frameCount, bo
         return 0;
     }
     uint32_t read = 0;
+#if OPENA8DJ_INPUT_SPSC_RING
+    uint_fast64_t readCounter = atomic_load_explicit(&ring->readCounter, memory_order_relaxed);
+    uint_fast64_t writeCounter = atomic_load_explicit(&ring->writeCounter, memory_order_acquire);
+    uint_fast64_t available = writeCounter >= readCounter ? writeCounter - readCounter : 0;
+    uint_fast64_t trimmed = 0;
+    if (available > ring->capacityFrames) {
+        trimmed = available - ring->capacityFrames;
+        readCounter += trimmed;
+        available = ring->capacityFrames;
+    }
+    read = frameCount < (uint32_t)available ? frameCount : (uint32_t)available;
+    for (uint32_t frame = 0; frame < read; frame++) {
+        uint32_t index = (uint32_t)((readCounter + frame) % ring->capacityFrames);
+        memcpy(&frames[(size_t)frame * ring->channels],
+               &ring->data[(size_t)index * ring->channels],
+               (size_t)ring->channels * sizeof(float));
+    }
+    if (read > 0 || trimmed > 0) {
+        readCounter += read;
+        atomic_store_explicit(&ring->readCounter, readCounter, memory_order_release);
+        ring->readFrame = (uint32_t)(readCounter % ring->capacityFrames);
+    }
+    ring->availableFrames = (uint32_t)(writeCounter >= readCounter
+                                           ? writeCounter - readCounter
+                                           : 0);
+#else
     pthread_mutex_lock(&ring->mutex);
     for (; read < frameCount && ring->availableFrames > 0; read++) {
         memcpy(&frames[(size_t)read * ring->channels],
@@ -1382,6 +1461,7 @@ static uint32_t RingRead(FloatRing *ring, float *frames, uint32_t frameCount, bo
         ring->availableFrames--;
     }
     pthread_mutex_unlock(&ring->mutex);
+#endif
     if (zeroFill && read < frameCount) {
         memset(&frames[(size_t)read * ring->channels],
                0,

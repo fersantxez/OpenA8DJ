@@ -9241,3 +9241,47 @@ Next implication:
     the HAL candidate still receives the explicit release macro set.
 - Readiness impact: improves release reproducibility only. It does not change
   physical quality, CPU, routing, Timecode Vinyl, or superiority claims.
+
+## 2026-06-18 - Input Ring SPSC Diagnostic Candidate
+
+- Decision: add an opt-in HAL input-ring SPSC diagnostic path behind
+  `HAL_INPUT_SPSC_RING=1`, while keeping the default HAL on the existing
+  mutex-backed input ring.
+- Reason: after physical rejection of capture batching above ISO8 and decoded
+  input batch publication, the next aligned CPU work must reduce real-time
+  locking/coordination pressure without changing USB cadence, packet bytes,
+  output timeline behavior, routing, or sample-rate policy. The input ring has
+  a simpler producer/consumer shape than the output timeline; the output
+  timeline remains unchanged because it encodes `sampleTime`, preroll, late
+  write, and elastic-drop semantics.
+- Implementation:
+  - `Makefile` now exposes `HAL_INPUT_SPSC_RING ?= 0` and a
+    `hal-input-spsc-diagnostic` build target.
+  - `OpenA8DJUSB.m` has a source-level default of `0` and an opt-in SPSC
+    branch for `RingWriteWithDropped`, `RingRead`, and `RingClear`.
+  - The SPSC branch drops new input frames if the ring is full instead of
+    overwriting unread frames; that avoids a concurrent reader/writer slot
+    race, at the cost of keeping overflow behavior different from the default
+    mutex path until physical input evidence exists.
+  - Added `opena8djcpp_hal_input_spsc_ring_contract` to prove the diagnostic
+    flag, default-off behavior, preserved legacy path, and unchanged output
+    timeline.
+- Evidence:
+  - `make -B hal`: PASS with `OPENA8DJ_INPUT_SPSC_RING=0`.
+  - `make -B hal-input-spsc-diagnostic`: PASS with
+    `OPENA8DJ_INPUT_SPSC_RING=1`.
+  - Focused CTest passed for
+    `opena8djcpp_hal_input_spsc_ring_contract`,
+    `opena8djcpp_static_policy_check`,
+    `opena8djcpp_dvs_packet_input_decode`,
+    `opena8djcpp_timecode_readiness_gate`, and
+    `opena8djcpp_prepared_transport_routing_timecode_contract`.
+- Alternatives rejected:
+  - Replace the output timeline with a generic FIFO: rejected because it would
+    discard timing semantics that are critical for stable playback and Traktor.
+  - Make the SPSC input ring default immediately: rejected until a lock-gated
+    physical input/Timecode smoke proves no routing, phase, latency, or
+    quality regression.
+- Readiness impact: this is a CPU-pressure diagnostic candidate only. No
+  product quality, lower CPU/resource, Timecode Vinyl, or branch-promotion
+  claim is allowed until physical evidence passes.
