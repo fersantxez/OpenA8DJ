@@ -161,8 +161,15 @@ int main(int argc, char** argv) {
       bool_field_is(hal_safety, "branch_promotion_allowed", false) &&
       string_field_is(hal_safety, "readiness_claim",
                       "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+  const bool hal_safety_blocks_claims =
+      !hal_safety.empty() &&
+      bool_field_is(hal_safety, "product_claim_allowed", false) &&
+      bool_field_is(hal_safety, "branch_promotion_allowed", false) &&
+      string_field_is(hal_safety, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
   const bool hal_safety_precondition_ready =
-      hal_safety_is_only_precondition || diagnostic_hal_active_precondition;
+      hal_safety_is_only_precondition || diagnostic_hal_active_precondition ||
+      hal_safety_blocks_claims;
   const bool no_product_candidate_runs =
       string_field_is(physical_frontier, "result", "PASS") &&
       number_field_is(physical_frontier, "product_candidate_runs", 0.0) &&

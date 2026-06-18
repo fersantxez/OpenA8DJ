@@ -253,6 +253,12 @@ int main(int argc, char** argv) {
       string_field_is(hal_safety, "result", "PASS") &&
       string_field_is(hal_safety, "readiness_claim",
                       "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+  const bool hal_safety_blocks_claims =
+      !hal_safety.empty() &&
+      bool_field_is(hal_safety, "product_claim_allowed", false) &&
+      bool_field_is(hal_safety, "branch_promotion_allowed", false) &&
+      string_field_is(hal_safety, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
 
   const bool runtime_reduction_missing =
       hal_has_direct_usb_enqueue && hal_default_capture_paced &&
@@ -261,7 +267,7 @@ int main(int argc, char** argv) {
       runtime_reduction_missing && offline_prepared_model_supported &&
       hal_prepared_runtime_source_contract_pass && hal_prepared_runtime_binding_contract_pass &&
       current_quality_blocked && physical_ab_blocked &&
-      hal_load_is_only_safety;
+      hal_safety_blocks_claims;
 
   std::vector<std::string> blockers;
   if (!evidence_present) {
@@ -294,8 +300,8 @@ int main(int argc, char** argv) {
   if (physical_ab_blocked) {
     blockers.push_back("same_session_product_ab_blocked");
   }
-  if (hal_load_is_only_safety) {
-    blockers.push_back("hal_load_evidence_is_safety_only");
+  if (hal_safety_blocks_claims) {
+    blockers.push_back("hal_safety_evidence_blocks_product_claims");
   }
 
   const bool pass = evidence_present && runtime_submit_observability_present && product_claim_blocked;
