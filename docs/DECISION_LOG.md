@@ -8200,3 +8200,10 @@ Next implication:
   - Keep CTest judging archived WAV evidence by default: rejected because stale physical evidence can fail for correct reasons and should not make binary health checks flaky.
 - Evidence: `./scripts/run-cpp-offline-gates` passed after the gate update, while product quality and branch promotion remained blocked.
 - Readiness impact: analyzer health can pass independently, but WAV evidence must pass dual analyzer/parity requirements before any quality claim.
+
+## 2026-06-18 - Post-Commit Physical A/B Is Diagnostic Only
+
+- Decision: do not use `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928` for promotion or superiority claims.
+- Reason: the window intentionally used `--skip-known-good` because current CoreAudio inventory exposed no separate wired non-Audio8 output device for same-window iRig route validation. That violates the promotion requirement even though the A/B itself was useful.
+- Evidence summary: C++ beat the same-session dirty mainline bundle on several relative music metrics (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`) but still failed absolute quality (`0.98` alignment and `35 dB` SNR required), lag-jump (`24`), quiet-noise, dual audiophile analyzer pass, and CPU/resource gates (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`).
+- Readiness impact: keep C++ as the active development candidate, but no branch promotion, no hardware readiness claim, and no timecode-vinyl claim until a validated same-window route plus physical Traktor/timecode and CPU/resource gates pass.

@@ -11941,3 +11941,18 @@ Full offline gate after commit:
   - The soundcheck WAV analyzer now separates executable health check from WAV evidence judgment. WAV parity disagreements return `FAIL`; health-check mode returns `PASS` only as analyzer availability, not product readiness.
   - Provenance freshness still reported `result=FAIL` before commit because the worktree contained this local patch set. This blocks current-candidate claims until the patch is committed and the gate is rerun on the new HEAD.
   - Product quality remains blocked by current physical evidence: no archived run meets the audiophile SNR, click, lag-jump, route-validity, same-session mainline/C++ comparison, CPU, or timecode-vinyl promotion requirements.
+- Post-commit offline gate:
+  - Commit: `98ef928`.
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Result: script exited `0`; Debug CTest passed `77/77`, Release CTest passed `78/78`, and `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json` reported `result=PASS`, `head_commit=98ef928`, `working_tree_clean_for_claim=true`.
+  - Readiness impact: offline provenance is clean for `98ef928`, but product readiness remains blocked by physical evidence.
+- Post-commit same-session physical diagnostic:
+  - Commit under test: `98ef928`.
+  - Command: `./scripts/run-physical-superiority-window --execute --skip-known-good --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --capture-device "iRig Stream" --capture-channels 1,2 --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --seconds 8 --rate 48000 --buffer 512 --target-peak-db -16 --run-dir local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928`
+  - Safety: lock-gated physical window; no default device change; HALs were unloaded at the end; post-run CoreAudio inventory showed only `iRig Stream`, internal microphone, and internal speakers.
+  - Evidence: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928`.
+  - Route status: diagnostic only. The same-window known-good non-Audio8 wired route was skipped because the current CoreAudio inventory did not expose a separate wired output device other than Audio 8 DJ/iRig; therefore this window cannot support promotion.
+  - Mainline result: `quality_alignment_score=0.630447`, `snr_floor_db=-2.770955`, `lag_jumps_gt_2_frames=24`, `driver_cpu_p95=5.7`, `coreaudiod_cpu_p95=5.1`, no clipping.
+  - C++ result: `quality_alignment_score=0.932726`, `snr_floor_db=5.004064`, `lag_jumps_gt_2_frames=24`, `driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`, no clipping.
+  - Same-session comparison: `same-session-physical-compare.json` reported `result=FAIL`, `branch_promotion_supported=false`. C++ improved alignment/SNR/residual ratios over this mainline run, but failed quiet-noise, CPU/resource, submit-rate observability, and both C++/Python audiophile WAV pass requirements.
+  - Promotion readiness: `promotion-readiness.json` reported `result=FAIL`; blockers included skipped same-window known-good route, unvalidated capture route, physical music quality below thresholds, runtime CPU above threshold, same-session compare failure, and no physical Traktor/timecode-vinyl evidence.
