@@ -4478,3 +4478,81 @@ Next action:
   submit ratios, hot-path timing, and mainline CPU budgets, while still
   blocking final CPU/resource claims until lock-gated same-session physical A/B
   evidence exists.
+
+## 2026-06-18 Pauli: Mainline Metrics Archaeology Refresh
+
+Subagent:
+- `019eda9d-29ff-7902-88da-741f3b9a4c30` (`Pauli`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Read `/Users/fer/dev/opena8dj` in read-only mode and extract current
+  objective baselines for sound quality, routing, Timecode Vinyl, CPU/resource
+  use, and iRig route evidence.
+
+Findings:
+- Mainline `0.3.135` remains the primary no-iRig/digital CPU baseline:
+  simulated SNR `75.22 dB`, residual `0.000669`, click outliers `0`, and
+  driver CPU p95 around `6.6-6.8%`.
+- Mainline `0.3.25` remains the functional/timecode topology baseline:
+  8 inputs, 8 outputs, A/B/C/D surface, and `timecode-vinyl` profile behavior.
+- The actual `scripts/physical-music-quality-gate` defaults are stricter than
+  older prose docs: alignment `>=0.970`, lag jumps `<=3`, CPU/noise
+  correlation `<=0.08`, mid residual `<=1.38`, high residual `<=1.32`.
+- Known physical route remains `Open Audio 8 DJ -> external mixer -> mixer REC
+  OUT -> iRig Stream -> macOS capture`; software loopback is not promotion
+  evidence.
+
+Integrated action:
+- Updated `docs/MAINLINE_BASELINE_METRICS.md` to make the script defaults
+  authoritative over looser historical prose.
+- Hardened tone-quality claim gates so saved-tone PASS does not imply
+  historical physical-tone superiority.
+
+Risks:
+- Existing C++ physical evidence still does not beat mainline on strict
+  physical quality, CPU/resource use, route validity, or Timecode Vinyl.
+
+Next action:
+- Keep hardware work focused on same-window route validation with a separate
+  wired non-Audio8 known-good source before any C++ vs mainline A/B claim.
+
+## 2026-06-18 Fermat: Rust Oracle Refresh
+
+Subagent:
+- `019eda9d-4142-7b53-969d-adc1659d637b` (`Fermat`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Read `/Users/fer/dev/audio8djrust` in read-only mode and extract reusable
+  gates, analyzers, thresholds, and DVS/timecode oracle behavior for C++.
+
+Findings:
+- Rust no-iRig gates remain the best immediate software oracle: mode-2
+  pack/unpack, simulated A/B/C/D output, routing matrix, DVS matrix, and
+  synthetic timecode analysis.
+- Rust thresholds to preserve include pack throughput `>=100 MiB/s`,
+  `>=1,000,000 frames/s`, `check_errors=0`, `panic_flags=0`, timecode RMS
+  `>=0.05`, balance `<=1 dB`, frequency error `<=50 ppm`, jitter p95
+  `<=2 frames`, abs correlation `>=0.95`, clips `0`, and DVS C/D leakage
+  `<=0.0001 RMS`.
+- Rust PM schema keeps `PASS`, `FAIL`, `NOT_READY`, and `BLOCKED_*` distinct;
+  C++ must preserve this semantic split so diagnostic gates cannot become
+  readiness claims.
+
+Integrated action:
+- Existing C++ offline gates already cover most Rust no-iRig oracle families.
+- Added this refresh to the living handoff and Rust learning docs as the
+  oracle checklist for remaining gaps.
+
+Risks:
+- Rust no-iRig PASS still does not prove DAC quality, iRig route validity,
+  Traktor scope, physical vinyl/CD-line behavior, or human listening.
+
+Next action:
+- Keep C++ DVS/timecode physical readiness blocked until Traktor/vinyl
+  evidence exists under the hardware lock after route validation.

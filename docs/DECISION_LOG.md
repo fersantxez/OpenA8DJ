@@ -8916,3 +8916,30 @@ Next implication:
 - Readiness impact: this sharpens the physical blocker. It does not make the
   route valid, and it does not support any quality, CPU, Timecode Vinyl, or
   branch-promotion claim.
+
+## 2026-06-18 - Require Historical Tone Superiority Before Quality Claims
+
+- Decision: product quality claims now require explicit physical-tone
+  superiority flags against the documented 0.3.24 mainline tone floors, not
+  just a generic saved-tone analyzer PASS.
+- Reason: an analyzer PASS can prove the measurement code is healthy while the
+  archived candidate still fails to beat the historical physical sideband
+  floor. That is not enough for an objective audiophile-quality claim.
+- Alternatives rejected:
+  - Treat tone PASS as enough: rejected because the current archived C++ tone
+    passes analyzer thresholds but does not beat the documented mainline floor.
+  - Defer the rule to hardware-window scripts only: rejected because the
+    offline product claim gate can already prevent misleading readiness claims.
+- Evidence:
+  - `opena8djcpp_audiophile_tone_gate` now emits `thdn_ratio`, `thdn_db`,
+    `candidate_meets_minimum_historical_tone_floor`, and
+    `candidate_meets_preferred_historical_tone_floor`.
+  - Focused run: analyzer `result=PASS`, but both historical tone-floor flags
+    are `false` for the current archived C++ tone.
+  - `opena8djcpp_product_quality_claim_gate` now reports
+    `audiophile_tone_historical_floor_met=false`,
+    `audiophile_tone_preferred_floor_met=false`, and keeps
+    `quality_claim_allowed=false`.
+- Readiness impact: stricter claim safety only. This does not validate the
+  route, prove CPU/resource superiority, clear Timecode Vinyl, or authorize
+  branch promotion.

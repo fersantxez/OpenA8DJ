@@ -106,6 +106,10 @@ int main(int argc, char** argv) {
                        "direct_usb_capture_failed_after_clean_payload");
   const bool tone_pass = string_field_is(tone, "result", "PASS");
   const bool tone_current_valid = bool_field_is(tone, "physical_measurement_valid_for_promotion", true);
+  const bool tone_historical_floor_met =
+      bool_field_present_and_is(tone, "candidate_meets_minimum_historical_tone_floor", true);
+  const bool tone_preferred_floor_met =
+      bool_field_present_and_is(tone, "candidate_meets_preferred_historical_tone_floor", true);
   const bool promotion_allowed = last_string_field_is(promotion, "result", "PASS") &&
                                  bool_field_is(promotion, "branch_promotion_allowed", true);
   const std::string residual_classification =
@@ -129,7 +133,8 @@ int main(int argc, char** argv) {
 
   const bool quality_claim_allowed = evidence_present && real_music_superiority &&
                                      audiophile_analyzers_pass && route_valid && tone_pass &&
-                                     tone_current_valid && promotion_allowed &&
+                                     tone_current_valid && tone_historical_floor_met &&
+                                     tone_preferred_floor_met && promotion_allowed &&
                                      !soundcheck_analyzer_only &&
                                      !timing_instability_blocks_quality_claim;
 
@@ -157,6 +162,12 @@ int main(int argc, char** argv) {
   }
   if (!tone_current_valid) {
     blockers.push_back("audiophile_tone_not_current_promotion_measurement");
+  }
+  if (!tone_historical_floor_met) {
+    blockers.push_back("audiophile_tone_historical_floor_not_met");
+  }
+  if (!tone_preferred_floor_met) {
+    blockers.push_back("audiophile_tone_preferred_floor_not_met");
   }
   if (!promotion_allowed) {
     blockers.push_back("branch_promotion_not_allowed");
@@ -189,6 +200,10 @@ int main(int argc, char** argv) {
             << "  \"audiophile_tone_pass\": " << (tone_pass ? "true" : "false") << ",\n"
             << "  \"audiophile_tone_current_promotion_measurement\": "
             << (tone_current_valid ? "true" : "false") << ",\n"
+            << "  \"audiophile_tone_historical_floor_met\": "
+            << (tone_historical_floor_met ? "true" : "false") << ",\n"
+            << "  \"audiophile_tone_preferred_floor_met\": "
+            << (tone_preferred_floor_met ? "true" : "false") << ",\n"
             << "  \"branch_promotion_allowed\": " << (promotion_allowed ? "true" : "false")
             << ",\n"
             << "  \"timing_instability_blocks_quality_claim\": "

@@ -222,3 +222,39 @@ Baseline findings:
 4. Keep profile-driven input decode: playback/output-only decode off; timecode/vinyl/CD/phono decode on with control-state compatibility.
 5. Build metrics before behavior changes. Cadence diagnostics should be preallocated, aggregate, and free of per-transfer logging, allocation, broad locks, or file I/O in streaming paths (`docs/MACOS_USB_CADENCE_IMPLEMENTATION_PLAN_2026-06-12.md:117-127`).
 6. Never label a C++ candidate as better than 0.3.135 unless it beats the baseline through the same ladder, including physical iRig gates when hardware is available.
+
+## 2026-06-18 Metrics Archaeology Refresh
+
+Read-only subagent `019eda9d-29ff-7902-88da-741f3b9a4c30` confirmed that the
+mainline script implementation is stricter than some older documentation.
+For C++ promotion, use the executable gate defaults from
+`/Users/fer/dev/opena8dj/scripts/physical-music-quality-gate:428-459` when
+they are stricter:
+
+- alignment `>=0.970`;
+- capture peak `0.020..0.920`;
+- capture RMS `-28..-10 dBFS`;
+- clipped frames `0`;
+- mid residual `<=1.38`, p95 `<=1.40`, max `<=1.46`;
+- mid spread p95/median `<=1.03`, max/median `<=1.06`;
+- high residual `<=1.32`;
+- metallic coloration `<=6 dB`;
+- quiet mid residual `<=-32.5 dBFS`;
+- click outliers/window clicks/clicks per second `0`;
+- lag jumps over 2 frames `<=3`;
+- time-warp lag drift `<=8.0` and score `>=0.85`;
+- CPU/noise correlation `<=0.08`;
+- driver CPU avg/p95 `<=8/12%`, coreaudiod p95 `<=8%`.
+
+The older prose in `docs/PHYSICAL_MUSIC_QUALITY_GATE.md` uses looser values
+such as alignment `0.925`, lag jumps `45`, and CPU correlation `0.16`. Those
+values are useful history, not promotion thresholds for the C++ line.
+
+The same read-only pass reaffirmed the baseline split:
+
+- `0.3.135` for digital/no-iRig quality and CPU/resource comparison;
+- `0.3.25` for 8-in/8-out and Traktor/timecode topology;
+- `0.3.24` for historical physical tone floor;
+- physical route proof still requires the external route
+  `Open Audio 8 DJ -> external mixer -> mixer REC OUT -> iRig Stream -> macOS
+  capture`.

@@ -2987,3 +2987,14 @@ Current implication:
   (`quality_alignment_score=-0.004744726624127731`, SNR floor about `-45.83 dB`,
   zero clicks). This means the current iRig route is not physically proving a
   usable loopback, independent of Audio 8 DJ behavior.
+- Metrics refresh update: read-only mainline archaeology confirmed the
+  executable mainline physical gate is stricter than older prose docs
+  (alignment `>=0.970`, lag jumps `<=3`, CPU/noise correlation `<=0.08`).
+  C++ promotion must use the stricter gate and the current C++ evaluator is
+  already at least that strict for promotion. Rust oracle refresh confirmed
+  the no-iRig/software gates are useful only as pre-DAC evidence; physical DAC,
+  iRig route, Traktor scope, CPU/resource, and human listening remain blocked.
+- Tone-claim hardening update: the saved C++ tone analyzer now emits THD+N and
+  explicit historical tone-floor booleans. Current archived C++ tone analysis
+  still passes as an analyzer check but fails both minimum and preferred
+  historical tone floors, so product quality claims remain blocked.

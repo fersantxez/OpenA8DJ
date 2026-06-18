@@ -12949,3 +12949,45 @@ Full offline gate after commit:
     `physical_window_not_diagnostic`, even if route files and analyzers pass.
   - This advances recovery diagnostics without weakening the product-quality,
     CPU/resource, Timecode Vinyl, or branch-promotion bar.
+
+## 2026-06-18 - Historical Tone Floor And Mainline Threshold Hardening
+
+- Commit context: after `ec42150`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline code, documentation, saved-WAV analysis, and existing-evidence
+    gates only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_audiophile_tone_gate opena8djcpp_product_quality_claim_gate`
+  - `./build/cpp-release/opena8djcpp_audiophile_tone_gate > local-analysis/cpp-offline/audiophile-tone-gate.json`
+  - `./build/cpp-release/opena8djcpp_product_quality_claim_gate > local-analysis/cpp-offline/product-quality-claim-gate.json`
+  - `cmake --build build/cpp-release --target opena8djcpp_audiophile_tone_gate opena8djcpp_product_quality_claim_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_evidence_schema_check`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Focused tone gate: PASS as analyzer health.
+  - New tone metrics: `thdn_ratio` and `thdn_db` emitted.
+  - Current archived C++ tone does not meet the historical physical tone
+    floors:
+    `candidate_meets_minimum_historical_tone_floor=false` and
+    `candidate_meets_preferred_historical_tone_floor=false`.
+  - Product claim gate: PASS as guard health, with
+    `quality_claim_allowed=false`,
+    `audiophile_tone_historical_floor_met=false`, and
+    `audiophile_tone_preferred_floor_met=false`.
+  - Full offline gates completed: Debug CTest `79/79` PASS, Release CTest
+    `80/80` PASS.
+  - Evidence freshness correctly failed before commit because the worktree was
+    dirty; no current-candidate claim is allowed from that pre-commit run.
+- Interpretation:
+  - Saved-tone analyzer PASS no longer implies audiophile tone superiority.
+  - The C++ branch now explicitly blocks product quality claims unless the
+    candidate beats the documented 0.3.24 physical tone floors.
+  - Mainline threshold docs were corrected to use the stricter executable
+    `physical-music-quality-gate` defaults where they differ from older prose.
+  - This strengthens objective comparison only; it does not prove hardware
+    readiness, CPU/resource superiority, Timecode Vinyl readiness, or branch
+    promotion.

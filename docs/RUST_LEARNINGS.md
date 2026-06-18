@@ -595,3 +595,40 @@ extracts reusable design and QA learnings from the Rust worktree. The Rust
 source itself says no-iRig PASS is not analog DAC quality, physical output
 quality, cable route validation, iRig capture, Traktor scope validation, or
 human listening (`RUST_NO_IRIG_AUDIO_QUALITY.md:68-87`).
+
+## 2026-06-18 Rust Oracle Refresh
+
+Read-only subagent `019eda9d-4142-7b53-969d-adc1659d637b` reconfirmed these
+Rust oracle items for C++:
+
+- PM metric states must stay semantically distinct:
+  `PASS`, `FAIL`, `NOT_READY`, `BLOCKED_*`, and `SKIPPED_BUSY`.
+- Mode-2 packet tests must cover `STREAMS=4`, `GROUP_BYTES=16`,
+  `CHECK_OFFSET=8`, `DEFAULT_START_BYTE=4`, `DEFAULT_TRANSFER_BYTES=352`,
+  start bytes `0..5`, native/big endian, gains `1.0/0.5`, `check_errors=0`,
+  `panic_flags=0`, and mismatches `0`.
+- Pack/route performance floors remain `>=100 MiB/s` and
+  `>=1,000,000 frames/s`, with a checksum or equivalent sink so the benchmark
+  cannot optimize the work away.
+- Input profiles to preserve are `playback`, `timecode_vinyl`,
+  `timecode_cd_line`, and `phono`. Playback keeps input decode off; the three
+  timecode/input profiles enable decode, software lock, and the expected input
+  mode/ground-lift policy.
+- Routing fixtures should include identity, remap, mute, L/R swap, and invert.
+- Synthetic timecode thresholds: RMS `>=0.05`, balance `<=1 dB`, frequency
+  error `<=50 ppm`, jitter p95 `<=2 frames`, abs correlation `>=0.95`, and
+  clipped samples `0`.
+- DVS smoke should keep Deck A on Input A at `1000 Hz`, Deck B on Input B at
+  `1200 Hz`, rates `44.1/48 kHz`, and C/D leakage `<=0.0001 RMS`.
+- The simulated-output soundcheck remains useful as a software-only pre-DAC
+  oracle, never as physical DAC/iRig/Traktor proof.
+
+Remaining C++ gaps after this refresh:
+
+- no runtime/hardware claim until separate route validation and same-session
+  mainline comparison exist;
+- capture readiness should eventually expose iRig USB/CoreAudio visibility,
+  ready streak, failed ports, and next recovery action in the same style as
+  the Rust PM schema;
+- physical Traktor/timecode vinyl still needs real scope/operator evidence,
+  not synthetic DVS alone.

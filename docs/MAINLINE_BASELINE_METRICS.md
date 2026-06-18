@@ -45,26 +45,33 @@ Do not use `0.3.135` alone as physical readiness proof:
 
 ## Practical Thresholds To Carry Forward
 
-Physical music absolute PASS/FAIL thresholds from mainline:
+Physical music absolute PASS/FAIL thresholds from the current mainline gate
+implementation are authoritative when they are stricter than older docs:
 
-- alignment after time-warp `>= 0.925`
+- alignment after time-warp `>= 0.970`
 - capture peak between `0.020` and `0.920`
+- capture RMS between `-28.0` and `-10.0 dBFS`
 - clipped frames `0`
-- 1-5 kHz residual ratio `<= 1.45`
-- 1-5 kHz p95 residual ratio `<= 1.48`
-- 1-5 kHz max residual ratio `<= 1.55`
-- 1-5 kHz p95/median spread `<= 1.05`
-- 1-5 kHz max/median spread `<= 1.10`
-- 5-12 kHz residual ratio `<= 1.355`
+- 1-5 kHz residual ratio `<= 1.38`
+- 1-5 kHz p95 residual ratio `<= 1.40`
+- 1-5 kHz max residual ratio `<= 1.46`
+- 1-5 kHz p95/median spread `<= 1.03`
+- 1-5 kHz max/median spread `<= 1.06`
+- 5-12 kHz residual ratio `<= 1.32`
 - metallic coloration score `<= 6 dB`
 - quiet 1-5 kHz residual `<= -32.5 dBFS`
 - click outliers `0`
-- lag jumps over 2 frames `<= 45`
-- CPU/residual correlation `<= 0.16` when CPU profile exists
+- lag jumps over 2 frames `<= 3`
+- time-warp lag drift `<= 8.0`
+- time-warp score `>= 0.85`
+- CPU/residual correlation `<= 0.08` when CPU profile exists
 - OpenA8DJ driver CPU avg `< 8%`, p95 `< 12%`
 - coreaudiod p95 `< 8%`
 
-Source: `/Users/fer/dev/opena8dj/docs/PHYSICAL_MUSIC_QUALITY_GATE.md:48-69`.
+Source: `/Users/fer/dev/opena8dj/scripts/physical-music-quality-gate:428-459`.
+The older prose in `/Users/fer/dev/opena8dj/docs/PHYSICAL_MUSIC_QUALITY_GATE.md:48-69`
+is looser on alignment, residual ratios, lag jumps, and CPU/noise correlation;
+do not use those looser values for C++ promotion.
 
 Relative-to-baseline thresholds:
 
@@ -91,7 +98,7 @@ C++ cannot be promoted over C/mainline until it has reproducible evidence for al
 2. Digital/stability parity or better than `0.3.135`: A/B/C/D alignment `1.000000`, simulated SNR at least `75.22 dB`, mid-band residual ratio no worse than `0.000669`, click outliers `0`, no timeline resets, no active underruns, no elastic drops/replays, no late writes, no completion outliers.
 3. CPU better than `0.3.135`: driver p95 must be materially below `6.5-6.8%` in the same playback CPU gate, coreaudiod p95 below `1.7-1.8%`, and stress driver p95 below `5.7-6.0%`, without higher start latency or hidden service CPU.
 4. Physical tone better than `0.3.24`: sideband ratio below `0.004942` preferred, at minimum below final `0.008407`; strongest sideband more suppressed than `-48.74 dB` preferred, at minimum more suppressed than `-43.70 dB`; no clipping and no new click bursts.
-5. Physical music better than the strict gate and the historical floor: PASS under current `physical-music-quality-gate`, no click outliers, lag jumps `<= 45` and preferably materially below the `41-42` seen in the 0.3.24 final summaries, residual/coloration no worse than baseline-relative limits, and CPU/noise correlation below threshold.
+5. Physical music better than the strict gate and the historical floor: PASS under current `physical-music-quality-gate`, no click outliers, lag jumps `<= 3`, residual/coloration no worse than baseline-relative limits, and CPU/noise correlation `<= 0.08`.
 
 ## Readiness Conclusion
 

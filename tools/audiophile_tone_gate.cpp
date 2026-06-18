@@ -36,6 +36,8 @@ struct ToneMetrics {
   double fundamental_dbfs = -240.0;
   double thd_ratio = 0.0;
   double thd_db = -240.0;
+  double thdn_ratio = 0.0;
+  double thdn_db = -240.0;
   double sideband_ratio = 0.0;
   double sideband_db = -240.0;
   double strongest_sideband_hz = 0.0;
@@ -300,6 +302,8 @@ ToneMetrics analyze_tone(const std::filesystem::path& path, double fundamental_h
       std::sqrt(std::max(0.0, metrics.rms * metrics.rms - fundamental_rms * fundamental_rms));
   metrics.residual_ratio = fundamental_rms > 0.0 ? residual_rms / fundamental_rms : 0.0;
   metrics.residual_db = db(metrics.residual_ratio);
+  metrics.thdn_ratio = metrics.residual_ratio;
+  metrics.thdn_db = metrics.residual_db;
   metrics.pass = metrics.sample_rate >= 44100 && metrics.analyzed_frames > wav.sample_rate &&
                  metrics.fundamental_amp > 0.01 &&
                  metrics.clipped_frames == 0 && metrics.thd_ratio <= 0.035 &&
@@ -324,6 +328,8 @@ void print_metrics(const char* label, const ToneMetrics& metrics) {
             << "\"fundamental_dbfs\": " << metrics.fundamental_dbfs << ", "
             << "\"thd_ratio\": " << metrics.thd_ratio << ", "
             << "\"thd_db\": " << metrics.thd_db << ", "
+            << "\"thdn_ratio\": " << metrics.thdn_ratio << ", "
+            << "\"thdn_db\": " << metrics.thdn_db << ", "
             << "\"sideband_ratio\": " << metrics.sideband_ratio << ", "
             << "\"sideband_db\": " << metrics.sideband_db << ", "
             << "\"strongest_sideband_hz\": " << metrics.strongest_sideband_hz << ", "
@@ -364,6 +370,17 @@ int main(int argc, char** argv) {
     const bool candidate_not_worse_than_baseline =
         candidate_metrics.sideband_ratio <= baseline_metrics.sideband_ratio * 1.05 &&
         candidate_metrics.thd_ratio <= baseline_metrics.thd_ratio * 1.10 &&
+        candidate_metrics.thdn_ratio <= baseline_metrics.thdn_ratio * 1.03 &&
+        candidate_metrics.strongest_sideband_relative_db <=
+            baseline_metrics.strongest_sideband_relative_db + 0.75 &&
+        candidate_metrics.clipped_frames == 0;
+    const bool candidate_meets_minimum_historical_tone_floor =
+        candidate_metrics.sideband_ratio <= 0.008407 &&
+        candidate_metrics.strongest_sideband_relative_db <= -43.70 &&
+        candidate_metrics.clipped_frames == 0;
+    const bool candidate_meets_preferred_historical_tone_floor =
+        candidate_metrics.sideband_ratio <= 0.004942 &&
+        candidate_metrics.strongest_sideband_relative_db <= -48.74 &&
         candidate_metrics.clipped_frames == 0;
     const bool pass = candidate_metrics.pass && candidate_not_worse_than_baseline;
 
@@ -379,7 +396,12 @@ int main(int argc, char** argv) {
               << "  \"baseline_threshold_pass\": " << (baseline_metrics.pass ? "true" : "false")
               << ",\n"
               << "  \"candidate_not_worse_than_baseline\": "
-              << (candidate_not_worse_than_baseline ? "true" : "false") << ",\n";
+              << (candidate_not_worse_than_baseline ? "true" : "false") << ",\n"
+              << "  \"candidate_meets_minimum_historical_tone_floor\": "
+              << (candidate_meets_minimum_historical_tone_floor ? "true" : "false") << ",\n"
+              << "  \"candidate_meets_preferred_historical_tone_floor\": "
+              << (candidate_meets_preferred_historical_tone_floor ? "true" : "false") << ",\n"
+              << "  \"promotion_tone_superiority_required\": true,\n";
     print_metrics("candidate", candidate_metrics);
     std::cout << ",\n";
     print_metrics("baseline", baseline_metrics);

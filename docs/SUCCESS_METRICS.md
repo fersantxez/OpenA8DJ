@@ -102,6 +102,16 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
   promotion. If `allow_same_device_loopback_diagnostic=true` or
   `known_good_output_same_as_capture=true`, `physical_window_not_diagnostic`
   must fail and `branch_promotion_allowed` must remain `false`.
+- Physical tone superiority is required separately from generic tone-analysis
+  health. `opena8djcpp_audiophile_tone_gate` must report explicit THD+N
+  (`thdn_ratio` / `thdn_db`) and must expose
+  `candidate_meets_minimum_historical_tone_floor=true` before any quality
+  claim can proceed. The minimum floor is the documented 0.3.24 final physical
+  tone reference: `sideband_ratio<=0.008407`, strongest sideband
+  `<= -43.70 dB`, and `clipped_frames=0`. The preferred floor is the best
+  same-build historical tone: `sideband_ratio<=0.004942`, strongest sideband
+  `<= -48.74 dB`, and `clipped_frames=0`. `product_quality_claim_gate` must
+  block promotion when either floor is missing or false.
 - `opena8djcpp_hal_prepared_submit_adapter_contract` must pass before any
   default-off runtime prepared-submit candidate is allowed. Required values:
   `logical_slots=528`, `usb_submit_calls=66`, `total_bytes=185856`,
