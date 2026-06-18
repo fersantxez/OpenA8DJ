@@ -3121,3 +3121,21 @@ Current implication:
   `Open Audio 8 DJ` as 8x8, preserved iRig, showed zero watched audio-stack CPU,
   and unloaded cleanly. Product listening still requires route validation and
   same-session mainline/C++ comparison.
+- Diagnostic active-install update: the current frozen HAL candidate has now
+  passed a lock-gated diagnostic `--leave-loaded` install smoke and is
+  intentionally active at `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`.
+  Evidence lives under
+  `local-analysis/human-test-candidate/20260618T155444Z-diagnostic-install-leave-loaded`.
+  The installed HAL hash matched the candidate hash
+  `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`,
+  `Open Audio 8 DJ` enumerated as `8 in / 8 out`, iRig Stream stayed visible
+  as `2 in / 2 out`, and the watched audio stack was stable at `0.0%` in the
+  smoke plus `0.5%` in the immediate post-check. This is diagnostic readiness
+  only. Product-quality human listening, Timecode Vinyl physical readiness,
+  CPU superiority, and branch promotion remain blocked by missing validated
+  non-Audio8 known-good route and missing same-window comparison evidence.
+- Physical-window gate update: active diagnostic HAL is now treated as a valid
+  safety precondition only when the installed hash matches the candidate and
+  product/promotion claims remain closed. Full offline regeneration passed
+  Debug `83/83`, Release `84/84`, and schema checks; provenance was expectedly
+  non-claimable until the active-install classification changes are committed.

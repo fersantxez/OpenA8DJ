@@ -13805,3 +13805,71 @@ Full offline gate after commit:
     known-good route, failed Audio8 route matrix, missing same-session
     mainline/C++ A/B, missing CPU superiority, and missing physical
     Timecode Vinyl evidence.
+
+## 2026-06-18 - Diagnostic HAL Install Left Active
+
+- Commit context: diagnostic install after `4a90142`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Evidence path:
+  `local-analysis/human-test-candidate/20260618T155444Z-diagnostic-install-leave-loaded`.
+- Safety:
+  - Global hardware lock acquired by `scripts/test-hal-candidate-safety`.
+  - HAL bundle installed/reloaded and intentionally left active for diagnostic
+    use.
+  - No audio playback, recording, default-device change, sample-rate change,
+    buffer change, USB reset, Traktor/VLC/Spotify automation, service restart,
+    or reboot.
+  - Hardware lock was released after the smoke.
+- Command:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T155444Z-diagnostic-install-leave-loaded`
+- Result:
+  - PASS.
+  - Installed HAL intentionally present at
+    `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`.
+  - Installed hash matched candidate hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `Open Audio 8 DJ` enumerated as `8 in / 8 out`.
+  - iRig Stream visible as `2 in / 2 out`.
+  - Smoke health: `audio_stack_health=PASS`,
+    `core_audio_enumeration=PASS`, `coreaudiod=0.0%`,
+    `opena8dj_driver=0.0%`, total watched CPU `0.0%`.
+  - Immediate post-check health PASS with total watched CPU about `0.5%`.
+- Readiness impact:
+  - Diagnostic install state is now active and stable.
+  - Product-quality human listening, Timecode Vinyl physical readiness,
+    CPU/resource superiority, and branch promotion remain blocked until a
+    valid non-Audio8 known-good route and same-session comparison evidence
+    exist.
+
+## 2026-06-18 - Active Diagnostic HAL Offline Gate Regeneration
+
+- Commit context: local changes after `4a90142`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline evidence regeneration only.
+  - No hardware lock acquired by the offline script.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Debug/default CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS, `required_files=87`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Provenance freshness: FAIL only because `working_tree_clean_for_claim=false`
+    while these source and doc changes were still uncommitted.
+  - `opena8djcpp_physical_window_readiness_gate`: PASS with
+    `diagnostic_hal_active_precondition=true`,
+    `hal_safety_precondition_ready=true`,
+    `current_known_good_output_missing=true`,
+    `ready_for_product_physical_ab=false`, and
+    `ready_for_branch_promotion=false`.
+- Readiness impact:
+  - The active diagnostic HAL state is now correctly represented in offline
+    gates.
+  - Product readiness remains blocked pending route validation and same-session
+    C++/mainline physical comparison.

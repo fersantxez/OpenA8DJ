@@ -135,6 +135,9 @@ int main(int argc, char** argv) {
                        "scripts/run-known-good-route-soundcheck");
   const bool safety_smoke_required =
       !string_field_is(hal_safety, "safety_window_status", "PASS");
+  const bool diagnostic_hal_installed_now =
+      bool_field_is(hal_safety, "diagnostic_install_active", true) &&
+      bool_field_is(hal_safety, "driver_installed_or_activated_now", true);
   const bool safety_external_recovery_seen =
       string_array_has(hal_safety, "promotion_blockers", "safety_run_required_external_recovery");
   const bool capture_visible =
@@ -179,9 +182,9 @@ int main(int argc, char** argv) {
       timecode_offline_pass_physical_blocked && promotion_blocked &&
       prepared_window_ready_for_controlled_experiment;
   const bool diagnostic_install_smoke_allowed_after_lock =
-      diagnostic_rc_artifacts_ready && safety_smoke_required;
+      diagnostic_rc_artifacts_ready && safety_smoke_required && !diagnostic_hal_installed_now;
   const bool diagnostic_install_allowed_after_lock =
-      diagnostic_rc_artifacts_ready && !safety_smoke_required;
+      diagnostic_rc_artifacts_ready && !safety_smoke_required && !diagnostic_hal_installed_now;
   const bool route_revalidation_allowed_after_lock =
       diagnostic_rc_artifacts_ready && route_ready && !safety_smoke_required;
   const bool product_human_test_allowed =
@@ -251,6 +254,7 @@ int main(int argc, char** argv) {
   print_bool("prepared_window_ready_for_controlled_experiment",
              prepared_window_ready_for_controlled_experiment);
   print_bool("diagnostic_rc_artifacts_ready", diagnostic_rc_artifacts_ready);
+  print_bool("diagnostic_hal_installed_now", diagnostic_hal_installed_now);
   print_bool("diagnostic_install_smoke_allowed_after_lock",
              diagnostic_install_smoke_allowed_after_lock);
   print_bool("diagnostic_install_allowed_after_lock", diagnostic_install_allowed_after_lock);
@@ -276,6 +280,8 @@ int main(int argc, char** argv) {
   } else if (!route_ready) {
     next_required_action =
         "PROVISION_WIRED_NON_AUDIO8_KNOWN_GOOD_OUTPUT_THEN_LOCK_GATED_ROUTE_REVALIDATION";
+  } else if (diagnostic_hal_installed_now) {
+    next_required_action = "LOCK_GATED_KNOWN_GOOD_ROUTE_REVALIDATION_WITH_ACTIVE_DIAGNOSTIC_HAL";
   }
   print_string("next_required_action", next_required_action, false);
   std::cout << "}\n";

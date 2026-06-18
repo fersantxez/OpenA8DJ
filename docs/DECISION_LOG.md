@@ -9476,3 +9476,60 @@ Next implication:
   perspective. Product human listening, Timecode Vinyl physical readiness, CPU
   superiority, and branch promotion remain blocked by route and comparison
   evidence.
+
+## 2026-06-18 - Intentional Diagnostic HAL Install Is A Valid Safety State
+
+- Decision: classify a lock-gated `--leave-loaded` HAL install as a valid
+  diagnostic active state when the installed hash matches the frozen candidate,
+  CoreAudio enumeration passes, Audio 8 DJ exposes 8 inputs / 8 outputs, iRig
+  remains visible, and watched audio-stack CPU stays under threshold.
+- Reason: the human-test path needs the driver installed for controlled
+  diagnostics, but the evidence gate must distinguish intentional diagnostic
+  activation from stale cleanup debt or product readiness.
+- Evidence:
+  - Diagnostic install run:
+    `local-analysis/human-test-candidate/20260618T155444Z-diagnostic-install-leave-loaded`
+    passed with `leave_loaded=1`.
+  - Installed HAL hash matched candidate hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - `Open Audio 8 DJ` enumerated as `8 in / 8 out`.
+  - iRig Stream remained visible as `2 in / 2 out`.
+  - Smoke health showed watched audio-stack CPU at `0.0%`; immediate
+    post-check showed total watched CPU around `0.5%`.
+- Alternatives rejected:
+  - Treat any active HAL as a failure: rejected because this would block the
+    explicitly authorized diagnostic install state.
+  - Treat active HAL as product readiness: rejected because route validation,
+    same-session C++/mainline A/B, CPU superiority, and Timecode Vinyl physical
+    evidence are still missing.
+- Readiness impact: diagnostic HAL activation is allowed and auditable. Product
+  listening, superiority claims, Timecode Vinyl readiness, and branch promotion
+  remain fail-closed.
+
+## 2026-06-18 - Physical Window Gate Accepts Active Diagnostic HAL Precondition
+
+- Decision: update `opena8djcpp_physical_window_readiness_gate` so the physical
+  window plan can pass when HAL safety is either unloaded after smoke or
+  intentionally active in a verified diagnostic state.
+- Reason: after an authorized `--leave-loaded` diagnostic install, an active HAL
+  with matching candidate hash, iRig preservation, 8x8 Audio 8 enumeration, and
+  closed product/promotion claims is a valid precondition for route
+  revalidation. It should not be reported as stale cleanup debt.
+- Evidence:
+  - Focused physical-window gate passed with
+    `diagnostic_hal_active_precondition=true`,
+    `hal_safety_precondition_ready=true`,
+    `current_known_good_output_missing=true`, and
+    `ready_for_product_physical_ab=false`.
+  - Full offline gates passed Debug `83/83` and Release `84/84`; provenance
+    failed only because the worktree had uncommitted changes during the run.
+- Alternatives rejected:
+  - Require HAL to be unloaded before planning any next window: rejected because
+    it conflicts with the active diagnostic install that is already hash-checked
+    and CPU-stable.
+  - Treat active HAL as route/product approval: rejected because the known-good
+    route, same-session A/B, CPU superiority, and Timecode Vinyl physical gates
+    are still missing.
+- Readiness impact: route revalidation planning is no longer blocked by the
+  intentional diagnostic install. Product human listening and branch promotion
+  remain blocked.

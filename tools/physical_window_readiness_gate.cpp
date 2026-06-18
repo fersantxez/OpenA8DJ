@@ -150,6 +150,18 @@ int main(int argc, char** argv) {
       bool_field_is(hal_safety, "driver_installed_or_activated_now", false) &&
       string_field_is(hal_safety, "readiness_claim",
                       "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+  const bool diagnostic_hal_active_precondition =
+      string_field_is(hal_safety, "result", "PASS") &&
+      bool_field_is(hal_safety, "diagnostic_install_active", true) &&
+      bool_field_is(hal_safety, "active_hal_installed_now", true) &&
+      bool_field_is(hal_safety, "installed_hash_matches_candidate", true) &&
+      bool_field_is(hal_safety, "driver_installed_or_activated_now", true) &&
+      bool_field_is(hal_safety, "product_claim_allowed", false) &&
+      bool_field_is(hal_safety, "branch_promotion_allowed", false) &&
+      string_field_is(hal_safety, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+  const bool hal_safety_precondition_ready =
+      hal_safety_is_only_precondition || diagnostic_hal_active_precondition;
   const bool no_product_candidate_runs =
       string_field_is(physical_frontier, "result", "PASS") &&
       number_field_is(physical_frontier, "product_candidate_runs", 0.0) &&
@@ -197,7 +209,7 @@ int main(int argc, char** argv) {
 
   const bool route_revalidation_plan_ready =
       evidence_present && offline_clean && scripts_present && lock_policy_covers_window &&
-      route_inventory_clean && migration_ready_only_offline && hal_safety_is_only_precondition &&
+      route_inventory_clean && migration_ready_only_offline && hal_safety_precondition_ready &&
       product_blocked && route_not_valid_for_promotion && direct_usb_blocks_route_claim &&
       historical_route_not_current && no_product_candidate_runs;
   const bool ready_for_route_revalidation_window =
@@ -209,7 +221,7 @@ int main(int argc, char** argv) {
   const bool pass =
       evidence_present && offline_clean && product_blocked && route_not_valid_for_promotion &&
       direct_usb_blocks_route_claim && historical_route_not_current &&
-      hal_safety_is_only_precondition && no_product_candidate_runs &&
+      hal_safety_precondition_ready && no_product_candidate_runs &&
       migration_ready_only_offline && route_inventory_clean && scripts_present &&
       lock_policy_covers_window && route_revalidation_plan_ready &&
       !ready_for_product_physical_ab &&
@@ -231,6 +243,10 @@ int main(int argc, char** argv) {
             << (historical_route_not_current ? "true" : "false") << ",\n"
             << "  \"hal_safety_is_only_precondition\": "
             << (hal_safety_is_only_precondition ? "true" : "false") << ",\n"
+            << "  \"diagnostic_hal_active_precondition\": "
+            << (diagnostic_hal_active_precondition ? "true" : "false") << ",\n"
+            << "  \"hal_safety_precondition_ready\": "
+            << (hal_safety_precondition_ready ? "true" : "false") << ",\n"
             << "  \"no_product_candidate_runs\": "
             << (no_product_candidate_runs ? "true" : "false") << ",\n"
             << "  \"migration_ready_only_offline\": "

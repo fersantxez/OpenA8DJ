@@ -232,11 +232,23 @@ int main(int argc, char** argv) {
   const auto leave_loaded = manifest_value(manifest, "leave_loaded").value_or("missing");
   const auto candidate_hash = manifest_value(manifest, "candidate_hash").value_or("missing");
   const auto cycles = manifest_value(manifest, "cycles").value_or("missing");
+  const auto installed_hal = std::filesystem::path("/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver");
+  const bool active_hal_installed_now = std::filesystem::is_directory(installed_hal);
+  const std::string installed_hash_text =
+      latest ? read_file(run_dir / "cycle-1/installed-hash.txt") : std::string{};
+  const bool installed_hash_matches_candidate =
+      active_hal_installed_now && candidate_hash != "missing" &&
+      contains(installed_hash_text, candidate_hash);
   const bool unloaded_by_design = leave_loaded == "0";
+  const bool leave_loaded_by_design = leave_loaded == "1";
   const bool recovered_after_leave_loaded = external_recovery.has_value() && recovery_unloaded &&
                                             recovery_irig_visible &&
                                             recovery_coreaudio_enumeration_pass;
-  const bool active_hal_left_loaded = !post_unload_coreaudio_clean;
+  const bool diagnostic_install_active =
+      leave_loaded_by_design && active_hal_installed_now && installed_hash_matches_candidate &&
+      guard_health_pass && guard_coreaudio_enumeration_pass && required_device_pass &&
+      audio8_enumerated && irig_preserved_during_guard;
+  const bool active_hal_left_loaded = diagnostic_install_active || !post_unload_coreaudio_clean;
   const double guard_coreaudiod_cpu_pct =
       key_number(guard_summary, "process.coreaudiod.cpu_pct");
   const double guard_opena8dj_driver_cpu_pct =
@@ -245,9 +257,10 @@ int main(int argc, char** argv) {
   const auto guard_max_label = key_value(guard_summary, "max_label").value_or("missing");
   const double recovery_max_label_cpu_pct = key_number(recovery_summary, "max_label_cpu_pct");
   const auto recovery_max_label = key_value(recovery_summary, "max_label").value_or("missing");
-  const bool safety_window_pass = summary_pass && required_device_pass && audio8_enumerated &&
-                                  irig_preserved_during_guard && unloaded_by_design &&
-                                  post_unload_coreaudio_clean && guard_health_pass;
+  const bool safety_window_pass =
+      summary_pass && required_device_pass && audio8_enumerated && irig_preserved_during_guard &&
+      guard_health_pass &&
+      ((unloaded_by_design && post_unload_coreaudio_clean) || diagnostic_install_active);
 
   std::vector<std::string> blockers;
   if (!latest) {
@@ -271,12 +284,12 @@ int main(int argc, char** argv) {
   if (!irig_preserved_during_guard) {
     blockers.push_back("irig_not_visible_during_hal_guard");
   }
-  if (!unloaded_by_design && !recovered_after_leave_loaded) {
+  if (!unloaded_by_design && !diagnostic_install_active && !recovered_after_leave_loaded) {
     blockers.push_back("safety_run_left_hal_loaded");
   } else if (!unloaded_by_design && recovered_after_leave_loaded) {
     blockers.push_back("safety_run_required_external_recovery");
   }
-  if (!post_unload_coreaudio_clean) {
+  if (!post_unload_coreaudio_clean && !diagnostic_install_active) {
     blockers.push_back("post_unload_coreaudio_not_clean");
   }
   if (recovery_present && !recovery_unloaded) {
@@ -325,12 +338,21 @@ int main(int argc, char** argv) {
             << "  \"recovery_max_label_cpu_pct\": " << recovery_max_label_cpu_pct << ",\n"
             << "  \"post_unload_guard_present\": "
             << (post_unload_guard_pass ? "true" : "false") << ",\n"
+            << "  \"diagnostic_install_active\": "
+            << (diagnostic_install_active ? "true" : "false") << ",\n"
+            << "  \"active_hal_installed_now\": "
+            << (active_hal_installed_now ? "true" : "false") << ",\n"
+            << "  \"installed_hash_matches_candidate\": "
+            << (installed_hash_matches_candidate ? "true" : "false") << ",\n"
             << "  \"leave_loaded\": \"" << json_escape(leave_loaded) << "\",\n"
             << "  \"cycles\": \"" << json_escape(cycles) << "\",\n"
             << "  \"candidate_hash\": \"" << json_escape(candidate_hash) << "\",\n";
   print_string_array("promotion_blockers", blockers);
   std::cout << "  \"hardware_window_evidence\": true,\n"
-            << "  \"driver_installed_or_activated_now\": false,\n"
+            << "  \"driver_installed_or_activated_now\": "
+            << (diagnostic_install_active ? "true" : "false") << ",\n"
+            << "  \"product_claim_allowed\": false,\n"
+            << "  \"branch_promotion_allowed\": false,\n"
             << "  \"next_required_action\": \"LOCK_GATED_ROUTE_VALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE\",\n"
             << "  \"readiness_claim\": \"DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY\"\n"
             << "}\n";

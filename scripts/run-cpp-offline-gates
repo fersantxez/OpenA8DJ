@@ -2630,6 +2630,9 @@ summary = {
         "diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
             "diagnostic_rc_artifacts_ready"
         ),
+        "diagnostic_hal_installed_now": human_test_rc_gate.get(
+            "diagnostic_hal_installed_now"
+        ),
         "diagnostic_install_smoke_allowed_after_lock": human_test_rc_gate.get(
             "diagnostic_install_smoke_allowed_after_lock"
         ),

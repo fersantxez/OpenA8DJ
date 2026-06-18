@@ -256,6 +256,15 @@ passed. Product human listening remains blocked with
 `cpu_superiority_claim_allowed=false`, and
 `branch_promotion_allowed=false`.
 
+11:58 EDT update: the frozen HAL has passed a lock-gated diagnostic
+`--leave-loaded` install smoke and is intentionally active. `Open Audio 8 DJ`
+is visible as `8 in / 8 out`, iRig Stream is visible as `2 in / 2 out`, and
+the installed hash matches the frozen candidate. The immediate CPU/health
+checks are stable. This upgrades the 15:00 packet from "installable artifact"
+to "installed diagnostic RC", but it does not unlock product listening because
+the known-good route remains missing and the latest Audio 8 route matrix still
+does not prove useful correlated capture.
+
 ### Phase 1 - 11:06-11:45 EDT: Evidence Board Consistency
 
 - Regenerate offline evidence so current direct USB diagnostics under
