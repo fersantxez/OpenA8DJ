@@ -8457,3 +8457,37 @@ Next implication:
   promotion claim can cite capture-route `PASS` unless
   `measurement_valid_for_promotion=true` and the same-session physical bundle
   also passes.
+
+## 2026-06-18 - Reconfirm Direct USB Clean / Physical Route Failing After d696aa8
+
+- Decision: continue blocking product A/B, CPU-superiority, Timecode Vinyl, and
+  branch-promotion claims; the next physical work must remain route/timebase
+  isolation or provision of a real wired non-Audio8 known-good output.
+- Reason: a fresh lock-gated Direct USB Pair A run after commit `d696aa8`
+  reproduced the split:
+  - internal written/consumed/packed USB alignment `1.000000`;
+  - internal USB SNR `999`;
+  - zero USB check errors and zero USB panic flags;
+  - physical iRig capture quality `0.928508`;
+  - physical SNR floor `5.280257 dB`;
+  - audiophile alignment `0.798421`;
+  - audiophile mid coherence floor `0.631541`;
+  - estimated drift `-165.649 ppm`.
+- iRig preservation evidence: the immediate post-run idle capture passed:
+  max RMS `-63.654750 dBFS`, max peak `-37.322302 dBFS`, max diff RMS
+  `-68.441012 dBFS`, `idle_capture_unhealthy=false`.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/irig-capture-isolation/20260618T101224Z-irig-idle-after-direct-usb-d696aa8`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/capture-route-health-gate.json`
+- Alternatives rejected:
+  - Install/load HAL immediately to chase CPU: rejected for product claims
+    because the route is not valid for promotion.
+  - Blame a dead iRig: rejected because the post-run idle capture is clean and
+    the device records signal.
+  - Treat Direct USB as hardware readiness: rejected because the signal-bearing
+    physical capture still fails strict metrics despite clean internal payload.
+- Readiness impact: C++ remains not ready to replace mainline. Objective
+  readiness still requires validated route, same-session mainline/C++ A/B,
+  runtime CPU superiority, and physical Traktor/timecode-vinyl evidence.

@@ -15,6 +15,16 @@ Branch: `driverkit/cpp-redesign`
   directory. The physical window/promotion evaluator treats these files as
   required same-window artifacts. This prepares a safer route-only hardware
   window; it is still not product readiness or branch-promotion evidence.
+- 2026-06-18 post-commit Direct USB route status: the lock-gated
+  `20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s` run again proves
+  the internal USB payload path is clean (`written/consumed/packed`
+  alignment `1.000000`, SNR `999`, zero USB check errors) while the physical
+  iRig capture fails (`quality_alignment_score=0.928508`, SNR floor
+  `5.280257 dB`, audiophile alignment `0.798421`, mid coherence floor
+  `0.631541`). A post-run iRig idle capture passed with max RMS
+  `-63.654750 dBFS` and max peak `-37.322302 dBFS`. Current attribution
+  remains `post_usb_device_analog_or_capture_route_dominant`; this blocks
+  product quality, CPU/resource, Timecode Vinyl, and branch-promotion claims.
 - 2026-06-18 capture route diagnostic semantics status:
   `capture_route_health_gate.result=PASS` now means only that the offline
   diagnostic ran over existing evidence. The same artifact and the top-level

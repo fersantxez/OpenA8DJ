@@ -1,5 +1,66 @@
 # Test Evidence
 
+## 2026-06-18: Post-Commit Direct USB Recheck Still Blocks Route
+
+- Scope:
+  - Ran a lock-gated Direct USB Pair A soundcheck after commit `d696aa8`,
+    with HAL not installed/active, capturing Audio 8 DJ analog output through
+    `iRig Stream`.
+  - Ran a lock-gated iRig idle capture immediately afterward to verify the
+    iRig was still alive and quiet at rest.
+  - Updated offline direct-USB attribution, capture-route health, product
+    quality claim, and iRig idle gates from the saved evidence.
+  - No driver install/load, CoreAudio restart, USB reset, default-device
+    change, or service restart was performed.
+- Commands:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-direct-usb-soundcheck --skip-build --capture-device "iRig Stream" --capture-channels 1,2 --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --seconds 12 --mode dense --target-peak-db -16 --collect-usb-diagnostics --run-dir local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" ./build/audio-record 6 local-analysis/irig-capture-isolation/20260618T101224Z-irig-idle-after-direct-usb-d696aa8/captured.wav "iRig Stream" 1,2 0.0003`
+  - `./build/cpp-release/opena8djcpp_direct_usb_path_attribution | tee local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `./build/cpp-release/opena8djcpp_capture_route_health_gate | tee local-analysis/cpp-offline/capture-route-health-gate.json`
+  - `./build/cpp-release/opena8djcpp_product_quality_claim_gate | tee local-analysis/cpp-offline/product-quality-claim-gate.json`
+  - `./build/cpp-release/opena8djcpp_irig_idle_capture_gate | tee local-analysis/cpp-offline/irig-idle-capture-gate.json`
+- Result:
+  - Direct USB physical capture: FAIL. Legacy metrics:
+    `quality_alignment_score=0.928508`, SNR floor `5.280257 dB`,
+    mid-band residual ratio `1.558058`, high-band residual ratio `1.465283`,
+    `lag_jumps_gt_2_frames=0`, and no clipping.
+  - Corrected audiophile WAV analysis: FAIL. Alignment score `0.798421`,
+    SNR floor `5.335220 dB`, mid active coherence floor `0.631541`, and delay
+    p95 `12.4` frames.
+  - Internal USB diagnostics: PASS/perfect. Written, consumed,
+    written-vs-consumed, and decoded packed USB all aligned at `1.000000` with
+    SNR `999`, zero USB check errors, and zero USB panic flags.
+  - Failure classifier: `timebase_or_alignment_instability`,
+    `window_alignment_is_unstable_for_music`,
+    `static_lr_mix_or_polarity_not_sufficient`, and
+    `simple_memoryless_nonlinearity_not_sufficient`; estimated drift
+    `-165.649 ppm`.
+  - iRig post-run idle capture: PASS. Max RMS `-63.654750 dBFS`, max peak
+    `-37.322302 dBFS`, max first-difference RMS `-68.441012 dBFS`,
+    `idle_capture_unhealthy=false`.
+  - Updated `direct-usb-path-attribution` latest run reports
+    `attribution=post_usb_device_analog_or_capture_route_dominant`,
+    `internal_clean=true`, `capture_failed=true`, and
+    `physical_routing_pass=false`.
+  - Updated `capture-route-health-gate` remains
+    `route_measurement_status=BLOCKED_FOR_PROMOTION`,
+    `measurement_valid_for_promotion=false`,
+    `product_claim_allowed=false`, and `branch_promotion_allowed=false`.
+- Evidence:
+  - `local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`
+  - `local-analysis/irig-capture-isolation/20260618T101224Z-irig-idle-after-direct-usb-d696aa8`
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `local-analysis/cpp-offline/capture-route-health-gate.json`
+  - `local-analysis/cpp-offline/product-quality-claim-gate.json`
+  - `local-analysis/cpp-offline/irig-idle-capture-gate.json`
+- Interpretation:
+  - The failure is reproduced after a clean commit and a clean lock release.
+    The Audio 8 DJ Direct USB payload is objectively correct before the device
+    analog/capture boundary, while the iRig signal-bearing capture remains
+    unstable and low-SNR. Idle iRig is not dead or noisy enough to explain it.
+    This blocks audiophile quality, CPU/resource superiority, Timecode Vinyl
+    readiness, and branch promotion.
+
 ## 2026-06-18: Capture Route Diagnostic PASS Semantics Hardened
 
 - Scope:
