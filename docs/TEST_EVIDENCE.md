@@ -12475,3 +12475,36 @@ Full offline gate after commit:
     should be a route/timebase isolation window that preserves iRig: idle iRig
     capture, direct USB diagnostic on the same pair, and default HAL diagnostic
     with dense stream stats/ledger, all unloaded afterward.
+
+## 2026-06-18 - Wide-Lag Alignment Guard Offline Gate
+
+- Commit context: `e91629f` plus uncommitted analyzer hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Focused self-test:
+  - Command:
+    `/usr/bin/python3 scripts/analyze-soundcheck-capture.py --self-test-alignment-guard`.
+  - Result: `alignment_guard_self_test=PASS`.
+- Focused CTest:
+  - Command:
+    `ctest --test-dir build/cpp-release -R opena8djcpp_soundcheck_alignment_guard --output-on-failure`.
+  - Result: `1/1` PASS.
+- Full offline gates:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Debug CTest result: `78/78` PASS.
+  - Release CTest result: `79/79` PASS.
+  - Evidence schema result: PASS.
+  - Evidence freshness result: FAIL only because the change was intentionally
+    uncommitted during the run; `summary_matches_head=true`,
+    `offline_summary_pass=true`, and `working_tree_clean_for_claim=false`.
+- Interpretation:
+  - The Python analyzer now marks conflicting wide-lag alignment as
+    `alignment_ambiguous=1` and the verdict fails closed.
+  - This improves measurement reliability only. It does not clear current
+    physical route, SNR/delay, CPU/resource, Traktor/timecode, or branch
+    promotion blockers.

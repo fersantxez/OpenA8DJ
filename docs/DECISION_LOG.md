@@ -8616,3 +8616,29 @@ Next implication:
 - Readiness impact: C++ remains not ready to replace mainline. Objective
   readiness still requires validated route, same-session mainline/C++ A/B,
   runtime CPU superiority, and physical Traktor/timecode-vinyl evidence.
+
+## 2026-06-18 - Fail Closed On Wide-Lag Alignment Ambiguity
+
+- Decision: harden `scripts/analyze-soundcheck-capture.py` so a wide alignment
+  window cannot silently choose a later repeated music segment when a bounded
+  one-second search finds a stronger or more complete alignment.
+- Reason: physical runs with real music exposed that a very wide lag search can
+  produce misleading quality metrics. Product decisions require analyzer
+  agreement; if the wide search and bounded search materially disagree, the
+  run must be considered ambiguous and fail closed.
+- Implementation:
+  - emit `alignment_ambiguous`, `alignment_ambiguity_reason`, bounded lag,
+    bounded score, bounded compared frames, and lag disagreement;
+  - make `verdict()` fail when `alignment_ambiguous=1`;
+  - add `--self-test-alignment-guard` and CTest coverage with a deterministic
+    repeated-music fixture.
+- Alternatives rejected:
+  - Rely only on the C++ analyzer parity gate: rejected because the Python
+    analyzer still produces `metrics.json` for existing physical scripts.
+  - Clamp every script to a small max lag: rejected because route diagnostics
+    may legitimately need a wider search; the correct behavior is to permit it
+    only when it does not contradict bounded evidence.
+- Readiness impact: this improves measurement truthfulness only. It does not
+  make the current C++ candidate ready, does not validate the iRig route, and
+  does not prove quality, CPU/resource, Timecode Vinyl, or branch-promotion
+  superiority.

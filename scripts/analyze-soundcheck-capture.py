@@ -10,6 +10,10 @@ DEFAULT_NOISE_BAND_LOW_HZ = 1000.0
 DEFAULT_NOISE_BAND_HIGH_HZ = 5000.0
 DEFAULT_HIGH_BAND_LOW_HZ = 5000.0
 DEFAULT_HIGH_BAND_HIGH_HZ = 12000.0
+ALIGNMENT_GUARD_MAX_LAG_SECONDS = 1.0
+ALIGNMENT_GUARD_GOOD_SCORE = 0.90
+ALIGNMENT_GUARD_SCORE_MARGIN = 0.10
+ALIGNMENT_GUARD_USABLE_RATIO = 0.75
 
 
 def decode_sample(raw, width):
@@ -706,7 +710,8 @@ def compare_pair(ref,
                  high_band_high,
                  cpu_rows,
                  cpu_columns):
-    ref_start = first_signal_index(ref)
+    original_ref_start = first_signal_index(ref)
+    ref_start = original_ref_start
     got_rough_start = first_signal_index(got)
     fit_frames = min(len(ref) - ref_start,
                      int(max_seconds * rate) if max_seconds > 0 else len(ref),
@@ -720,13 +725,25 @@ def compare_pair(ref,
         raise SystemExit("capture audio is too short for alignment")
     ref_mono = pair_to_mono(ref)
     got_mono = pair_to_mono(got)
-    local_lag, _local_score = find_best_lag(ref_mono,
-                                            got_mono,
-                                            ref_start,
-                                            got_rough_start,
-                                            max_lag,
-                                            fit_frames,
-                                            max(1, fit_frames // 512))
+    lag_step = max(1, fit_frames // 512)
+    local_lag, local_score = find_best_lag(ref_mono,
+                                           got_mono,
+                                           ref_start,
+                                           got_rough_start,
+                                           max_lag,
+                                           fit_frames,
+                                           lag_step)
+    guard_max_lag = min(max_lag, max(1024, int(rate * ALIGNMENT_GUARD_MAX_LAG_SECONDS)))
+    bounded_lag = local_lag
+    bounded_coarse_score = local_score
+    if max_lag > guard_max_lag:
+        bounded_lag, bounded_coarse_score = find_best_lag(ref_mono,
+                                                          got_mono,
+                                                          original_ref_start,
+                                                          got_rough_start,
+                                                          guard_max_lag,
+                                                          fit_frames,
+                                                          lag_step)
     got_start = got_rough_start + local_lag
     alignment_lag = got_start - ref_start
     ref_start, got_start = normalize_starts(ref_start, got_start)
@@ -735,6 +752,39 @@ def compare_pair(ref,
     if usable <= max(1, rate // 2):
         raise SystemExit(f"not enough aligned audio: usable={usable}")
     alignment_score = correlation(ref_mono, got_mono, ref_start, got_start, min(usable, rate))
+    bounded_got_start = got_rough_start + bounded_lag
+    bounded_alignment_lag = bounded_got_start - original_ref_start
+    bounded_ref_start, bounded_got_start = normalize_starts(original_ref_start, bounded_got_start)
+    bounded_usable = min(len(ref) - bounded_ref_start,
+                         len(got) - bounded_got_start,
+                         max_frames)
+    bounded_alignment_score = 0.0
+    if bounded_usable > max(1, rate // 2):
+        bounded_alignment_score = correlation(ref_mono,
+                                              got_mono,
+                                              bounded_ref_start,
+                                              bounded_got_start,
+                                              min(bounded_usable, rate))
+    lag_disagreement = abs(alignment_lag - bounded_alignment_lag)
+    score_conflict = (
+        bounded_alignment_score >= ALIGNMENT_GUARD_GOOD_SCORE and
+        bounded_alignment_score >= alignment_score + ALIGNMENT_GUARD_SCORE_MARGIN and
+        lag_disagreement > guard_max_lag
+    )
+    usable_conflict = (
+        bounded_alignment_score >= ALIGNMENT_GUARD_GOOD_SCORE and
+        bounded_usable > 0 and
+        usable < int(bounded_usable * ALIGNMENT_GUARD_USABLE_RATIO) and
+        lag_disagreement > guard_max_lag
+    )
+    alignment_ambiguous = 1 if max_lag > guard_max_lag and (score_conflict or usable_conflict) else 0
+    alignment_ambiguity_reason = ""
+    if score_conflict and usable_conflict:
+        alignment_ambiguity_reason = "wide_lag_conflicts_with_bounded_alignment_score_and_usable_audio"
+    elif score_conflict:
+        alignment_ambiguity_reason = "wide_lag_conflicts_with_bounded_alignment_score"
+    elif usable_conflict:
+        alignment_ambiguity_reason = "wide_lag_leaves_too_little_audio_vs_bounded_alignment"
 
     lag_points = lag_profile(ref,
                              got,
@@ -800,6 +850,14 @@ def compare_pair(ref,
         "capture_start": got_start,
         "alignment_lag": alignment_lag,
         "alignment_score": alignment_score,
+        "alignment_ambiguous": alignment_ambiguous,
+        "alignment_ambiguity_reason": alignment_ambiguity_reason,
+        "alignment_guard_max_lag": guard_max_lag,
+        "alignment_guard_bounded_lag": bounded_alignment_lag,
+        "alignment_guard_bounded_coarse_score": bounded_coarse_score,
+        "alignment_guard_bounded_score": bounded_alignment_score,
+        "alignment_guard_bounded_compared_frames": bounded_usable,
+        "alignment_guard_lag_disagreement": lag_disagreement,
         "quality_alignment_score": quality_alignment_score,
         "compared_frames": usable,
         "compared_seconds": usable / rate,
@@ -861,6 +919,9 @@ def verdict(metrics,
             max_mid_band_cpu_corr,
             min_mid_band_ratio_for_cpu_corr):
     errors = []
+    if int(metrics.get("alignment_ambiguous", 0)) != 0:
+        reason = metrics.get("alignment_ambiguity_reason", "wide_lag_alignment_ambiguous")
+        errors.append(f"alignment_ambiguous=1 reason={reason}")
     alignment_metric = metrics.get("quality_alignment_score", metrics["alignment_score"])
     aligned = alignment_metric >= min_alignment
     metrics["mid_band_gate_evaluated"] = 1 if aligned else 0
@@ -898,6 +959,60 @@ def verdict(metrics,
     return not errors, errors
 
 
+def run_alignment_guard_self_test():
+    rate = 48000
+    seconds = 3.0
+    frames = int(rate * seconds)
+    ref = []
+    for index in range(frames):
+        t = index / rate
+        value = 0.42 * math.sin(2.0 * math.pi * (220.0 + 55.0 * t) * t)
+        value += 0.21 * math.sin(2.0 * math.pi * 871.0 * t)
+        value += 0.09 * math.sin(2.0 * math.pi * 1777.0 * t)
+        ref.append((value, value * 0.83))
+
+    got = [(0.0, 0.0)] * int(rate * 0.20)
+    for index, (left, right) in enumerate(ref):
+        deterministic_noise = 0.12 * math.sin(2.0 * math.pi * 3973.0 * (index / rate))
+        got.append((left + deterministic_noise, right + deterministic_noise))
+    got.extend([(0.0, 0.0)] * int(rate * 3.20))
+    got.extend(ref[:int(rate * 1.15)])
+
+    result, _coupling = compare_pair(ref,
+                                     got,
+                                     rate,
+                                     seconds,
+                                     int(rate * 5.0),
+                                     False,
+                                     128,
+                                     0.5,
+                                     0.25,
+                                     False,
+                                     0.5,
+                                     0.25,
+                                     DEFAULT_NOISE_BAND_LOW_HZ,
+                                     DEFAULT_NOISE_BAND_HIGH_HZ,
+                                     DEFAULT_HIGH_BAND_LOW_HZ,
+                                     DEFAULT_HIGH_BAND_HIGH_HZ,
+                                     [],
+                                     [])
+    if int(result.get("alignment_ambiguous", 0)) != 1:
+        raise SystemExit(f"alignment guard self-test did not flag ambiguity: {result}")
+    if result.get("alignment_guard_bounded_score", 0.0) < ALIGNMENT_GUARD_GOOD_SCORE:
+        raise SystemExit(f"bounded alignment was not a strong reference: {result}")
+    score_conflict = (
+        result.get("alignment_guard_bounded_score", 0.0) >=
+        result.get("alignment_score", 0.0) + ALIGNMENT_GUARD_SCORE_MARGIN
+    )
+    usable_conflict = (
+        result.get("compared_frames", 0) <
+        int(result.get("alignment_guard_bounded_compared_frames", 0) * ALIGNMENT_GUARD_USABLE_RATIO)
+    )
+    if not score_conflict and not usable_conflict:
+        raise SystemExit(f"wide alignment did not produce a guarded conflict: {result}")
+    print("alignment_guard_self_test=PASS")
+
+
 def print_metrics(metrics):
     for key in sorted(metrics):
         value = metrics[key]
@@ -909,8 +1024,9 @@ def print_metrics(metrics):
 
 def main():
     parser = argparse.ArgumentParser(description="Compare a soundcheck reference WAV with an analog capture WAV.")
-    parser.add_argument("reference_wav")
-    parser.add_argument("capture_wav")
+    parser.add_argument("reference_wav", nargs="?")
+    parser.add_argument("capture_wav", nargs="?")
+    parser.add_argument("--self-test-alignment-guard", action="store_true")
     parser.add_argument("--max-seconds", type=float, default=20.0)
     parser.add_argument("--max-lag", type=int, default=1024)
     parser.add_argument("--time-warp", action="store_true")
@@ -938,6 +1054,11 @@ def main():
     parser.add_argument("--min-mid-band-ratio-for-cpu-corr", type=float, default=0.02)
     parser.add_argument("--json-out")
     args = parser.parse_args()
+    if args.self_test_alignment_guard:
+        run_alignment_guard_self_test()
+        return 0
+    if not args.reference_wav or not args.capture_wav:
+        parser.error("reference_wav and capture_wav are required unless --self-test-alignment-guard is used")
 
     ref_rate, ref = read_wav_pair(args.reference_wav)
     got_rate, got = read_wav_pair(args.capture_wav)

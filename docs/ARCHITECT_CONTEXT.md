@@ -2915,3 +2915,10 @@ Current implication:
   enough for audiophile quality, CPU/resource superiority, Timecode Vinyl, or
   branch promotion while analog iRig capture fails.
 - Post-commit diagnostic A/B on `98ef928`: `/Users/fer/dev/audio8djcpp/local-analysis/physical-superiority-window/20260618T-postcommit-same-session-diagnostic-98ef928` used real music and same-session mainline/C++ HAL runs. C++ improved relative music metrics over the dirty mainline bundle in that run (`quality_alignment_score=0.932726` vs `0.630447`, SNR `5.00 dB` vs `-2.77 dB`), but still failed product thresholds and used `--skip-known-good` because no separate wired non-Audio8 output was available for same-window iRig route validation. CPU was also worse for C++ (`driver_cpu_p95=24.5`, `coreaudiod_cpu_p95=28.7`). Treat this as diagnostic learning only, not superiority evidence.
+- Analyzer hardening update: the Python soundcheck analyzer now compares wide
+  lag results against a bounded one-second alignment and fails with
+  `alignment_ambiguous=1` when the two materially disagree. This prevents a
+  repeated section of real music from becoming false quality evidence. It
+  improves measurement safety only; current product readiness remains blocked
+  by route validity, strict SNR/delay thresholds, CPU/resource evidence,
+  physical Traktor/timecode evidence, and same-session mainline/C++ comparison.

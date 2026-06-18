@@ -4321,3 +4321,37 @@ Integrated action:
 Next action:
 - Keep physical work limited to route revalidation until the blocker is cleared
   by fresh evidence, not by code changes alone.
+
+## 2026-06-18 Hypatia: Wide-Lag Analyzer Disagreement
+
+Subagent:
+- `019ed9e0-3d8f-7840-8562-fbb4ccb034bf` (`Hypatia`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Inspect why legacy `metrics.json` quality could disagree with the native C++
+  and audiophile WAV analyzers on saved physical music runs.
+
+Findings:
+- A very wide `--max-lag` could let the Python analyzer lock onto a later
+  repeated segment of music, producing misleading metrics.
+- Bounded alignment and the C++/audiophile analyzers agreed on a more plausible
+  lag in the saved run family.
+- Product decisions should fail closed on analyzer disagreement.
+
+Integrated action:
+- Confirmed `run-physical-superiority-window` now uses bounded `--max-lag
+  48000`.
+- Hardened `scripts/analyze-soundcheck-capture.py` to emit and fail on
+  `alignment_ambiguous=1` when a wide search conflicts with bounded alignment.
+- Added `opena8djcpp_soundcheck_alignment_guard` CTest coverage.
+
+Risks:
+- This improves analyzer truthfulness but does not fix the physical route/SNR
+  problem or prove the C++ driver is better than mainline.
+
+Next action:
+- Rerun full offline gates and keep all product claims blocked until route
+  validity, same-session A/B, CPU/resource, and Timecode Vinyl gates pass.

@@ -2506,3 +2506,22 @@ Current implementation:
   include `prepared_runtime_dispatch_path_present=true`. This proves the HAL
   candidate has an explicit opt-in submit dispatch path. It does not prove CPU
   superiority; physical submit counters must show the reduction on hardware.
+
+## Soundcheck Analyzer Ambiguity Guard
+
+- The Python soundcheck analyzer must fail closed when a wide-lag alignment
+  conflicts with a bounded one-second alignment.
+- Required CTest:
+  - `opena8djcpp_soundcheck_alignment_guard`.
+- Required machine-readable fields when ambiguity is detected:
+  - `alignment_ambiguous=1`;
+  - `alignment_ambiguity_reason` non-empty;
+  - `alignment_guard_bounded_score`;
+  - `alignment_guard_bounded_lag`;
+  - `alignment_guard_bounded_compared_frames`;
+  - `alignment_guard_lag_disagreement`.
+- Any physical run with `alignment_ambiguous=1` is FAIL for product readiness,
+  branch promotion, audio-quality superiority, CPU/resource superiority, and
+  Timecode Vinyl readiness.
+- Passing this guard only means the analyzer is less likely to overstate
+  quality. It is not evidence that the current candidate beats mainline.

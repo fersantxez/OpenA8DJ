@@ -1600,3 +1600,30 @@ PASS/FAIL semantics:
 - PASS does not mean Traktor/timecode vinyl readiness. Product timecode remains
   blocked until real scope lock, physical deck validation, route validity, and
   same-session mainline/C++ comparison exist.
+
+## Soundcheck Alignment Guard
+
+Purpose:
+
+- prevent the Python soundcheck analyzer from accepting a false alignment when
+  a very wide lag search locks onto a later repeated music segment;
+- preserve wide-lag diagnostics while failing closed if a bounded one-second
+  search finds a materially stronger or more complete alignment;
+- keep `metrics.json` from becoming weaker evidence than the C++ and
+  audiophile WAV analyzers.
+
+Command shape:
+
+```sh
+/usr/bin/python3 scripts/analyze-soundcheck-capture.py --self-test-alignment-guard
+ctest --test-dir build/cpp-release -R opena8djcpp_soundcheck_alignment_guard --output-on-failure
+```
+
+PASS/FAIL semantics:
+
+- PASS means the deterministic repeated-music fixture is flagged as ambiguous
+  when the wide-lag result conflicts with bounded alignment.
+- FAIL means physical soundcheck metrics are not trustworthy enough for any
+  product or branch-promotion claim.
+- This is analyzer safety only; it never clears physical route, CPU/resource,
+  Traktor/timecode, or audiophile quality gates.
