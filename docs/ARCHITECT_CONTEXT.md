@@ -3462,3 +3462,14 @@ Current implication:
   `product_human_test_allowed=false`,
   `timecode_vinyl_human_test_allowed=false`, final objective status
   `NOT_READY`, and branch promotion forbidden.
+- 17:18 EDT DriverKit USB deadline model: added a pure C++
+  `UsbIsochronousSchedule` and the
+  `opena8djcpp_driverkit_usb_isochronous_schedule_contract` gate. This closes a
+  gap in the prepared DriverKit/USB path: descriptors are no longer only
+  batched and recycled, they must also be scheduled before their sample
+  deadline, preserve descriptor shape, and reject timestamp/sequence
+  regressions. The stable offline model schedules 66 descriptors, 33 capture
+  and 33 playback, with zero late submits, zero shape errors, zero timestamp
+  regressions, 5808 frames, 185856 bytes, and 8-frame minimum lead. The prepared
+  migration gate now requires this schedule contract. This still does not
+  prove physical CPU, quality, or Timecode Vinyl readiness.

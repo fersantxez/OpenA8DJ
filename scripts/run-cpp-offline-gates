@@ -36,6 +36,7 @@ python3 scripts/check-hal-bundle-complete \
 ./build/cpp-offline/opena8djcpp_driverkit_usb_submit_binding_contract > "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_request_lifecycle_contract > "$EVIDENCE_DIR/driverkit-usb-request-lifecycle-contract.json"
 ./build/cpp-offline/opena8djcpp_driverkit_usb_request_shutdown_contract > "$EVIDENCE_DIR/driverkit-usb-request-shutdown-contract.json"
+./build/cpp-offline/opena8djcpp_driverkit_usb_isochronous_schedule_contract > "$EVIDENCE_DIR/driverkit-usb-isochronous-schedule-contract.json"
 ctest --test-dir build/cpp-offline -E opena8djcpp_evidence_schema_check --output-on-failure | tee "$EVIDENCE_DIR/ctest-default.txt"
 
 cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
@@ -74,6 +75,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_driverkit_usb_submit_binding_contract | tee "$EVIDENCE_DIR/driverkit-usb-submit-binding-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_usb_request_lifecycle_contract | tee "$EVIDENCE_DIR/driverkit-usb-request-lifecycle-contract.json"
 ./build/cpp-release/opena8djcpp_driverkit_usb_request_shutdown_contract | tee "$EVIDENCE_DIR/driverkit-usb-request-shutdown-contract.json"
+./build/cpp-release/opena8djcpp_driverkit_usb_isochronous_schedule_contract | tee "$EVIDENCE_DIR/driverkit-usb-isochronous-schedule-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_packet_contract | tee "$EVIDENCE_DIR/prepared-transport-packet-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract | tee "$EVIDENCE_DIR/prepared-transport-routing-timecode-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_transport_recovery_contract | tee "$EVIDENCE_DIR/prepared-transport-recovery-contract.json"
@@ -446,6 +448,7 @@ driverkit_prepared_hotpath = load_json("driverkit-prepared-hotpath-contract.json
 driverkit_usb_submit_binding = load_json("driverkit-usb-submit-binding-contract.json")
 driverkit_usb_request_lifecycle = load_json("driverkit-usb-request-lifecycle-contract.json")
 driverkit_usb_request_shutdown = load_json("driverkit-usb-request-shutdown-contract.json")
+driverkit_usb_isochronous_schedule = load_json("driverkit-usb-isochronous-schedule-contract.json")
 prepared_transport_packet = load_json("prepared-transport-packet-contract.json")
 prepared_transport_routing_timecode = load_json("prepared-transport-routing-timecode-contract.json")
 prepared_transport_recovery = load_json("prepared-transport-recovery-contract.json")
@@ -2482,6 +2485,56 @@ summary = {
         "cancelled_frames": driverkit_usb_request_shutdown.get("cancelled_frames"),
         "evidence": "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
     },
+    "driverkit_usb_isochronous_schedule_contract": {
+        "status": driverkit_usb_isochronous_schedule.get("result"),
+        "schema": driverkit_usb_isochronous_schedule.get("schema"),
+        "source_descriptors": driverkit_usb_isochronous_schedule.get("source_descriptors"),
+        "slots_per_submit": driverkit_usb_isochronous_schedule.get("slots_per_submit"),
+        "min_submit_lead_frames": driverkit_usb_isochronous_schedule.get(
+            "min_submit_lead_frames"
+        ),
+        "stable_scheduled_descriptors": driverkit_usb_isochronous_schedule.get(
+            "stable_scheduled_descriptors"
+        ),
+        "stable_capture_descriptors": driverkit_usb_isochronous_schedule.get(
+            "stable_capture_descriptors"
+        ),
+        "stable_playback_descriptors": driverkit_usb_isochronous_schedule.get(
+            "stable_playback_descriptors"
+        ),
+        "stable_late_submits": driverkit_usb_isochronous_schedule.get(
+            "stable_late_submits"
+        ),
+        "stable_descriptor_shape_errors": driverkit_usb_isochronous_schedule.get(
+            "stable_descriptor_shape_errors"
+        ),
+        "stable_timestamp_regressions": driverkit_usb_isochronous_schedule.get(
+            "stable_timestamp_regressions"
+        ),
+        "stable_sequence_regressions": driverkit_usb_isochronous_schedule.get(
+            "stable_sequence_regressions"
+        ),
+        "stable_total_frames": driverkit_usb_isochronous_schedule.get(
+            "stable_total_frames"
+        ),
+        "stable_total_bytes": driverkit_usb_isochronous_schedule.get("stable_total_bytes"),
+        "stable_min_submit_lead_frames": driverkit_usb_isochronous_schedule.get(
+            "stable_min_submit_lead_frames"
+        ),
+        "stable_product_safe": driverkit_usb_isochronous_schedule.get(
+            "stable_product_safe"
+        ),
+        "late_submit_rejected_result": driverkit_usb_isochronous_schedule.get(
+            "late_submit_rejected_result"
+        ),
+        "timestamp_regression_rejected_result": driverkit_usb_isochronous_schedule.get(
+            "timestamp_regression_rejected_result"
+        ),
+        "bad_shape_rejected_result": driverkit_usb_isochronous_schedule.get(
+            "bad_shape_rejected_result"
+        ),
+        "evidence": "local-analysis/cpp-offline/driverkit-usb-isochronous-schedule-contract.json",
+    },
     "prepared_transport_packet_contract": {
         "status": prepared_transport_packet.get("result"),
         "schema": prepared_transport_packet.get("schema"),
@@ -2917,6 +2970,24 @@ summary = {
         ),
         "driverkit_usb_request_shutdown_live_requests_after_stop": prepared_transport_migration.get(
             "driverkit_usb_request_shutdown_live_requests_after_stop"
+        ),
+        "driverkit_usb_isochronous_schedule_descriptors": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_descriptors"
+        ),
+        "driverkit_usb_isochronous_schedule_capture_descriptors": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_capture_descriptors"
+        ),
+        "driverkit_usb_isochronous_schedule_playback_descriptors": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_playback_descriptors"
+        ),
+        "driverkit_usb_isochronous_schedule_total_bytes": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_total_bytes"
+        ),
+        "driverkit_usb_isochronous_schedule_total_frames": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_total_frames"
+        ),
+        "driverkit_usb_isochronous_schedule_min_submit_lead_frames": prepared_transport_migration.get(
+            "driverkit_usb_isochronous_schedule_min_submit_lead_frames"
         ),
         "failing_gates": [
             gate.get("name")

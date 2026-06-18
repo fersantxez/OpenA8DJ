@@ -23,6 +23,7 @@ add_library(opena8djcpp_core
   core/src/runtime_adapter.cpp
   core/src/usb_submit_plan.cpp
   core/src/usb_request_pool.cpp
+  core/src/usb_isochronous_schedule.cpp
   core/src/prepared_usb_runtime_submit.cpp
   core/src/prepared_usb_async_runtime.cpp
   core/src/timecode.cpp
@@ -223,6 +224,13 @@ add_executable(opena8djcpp_driverkit_usb_request_shutdown_contract
   tools/driverkit_usb_request_shutdown_contract.cpp)
 
 target_link_libraries(opena8djcpp_driverkit_usb_request_shutdown_contract
+  PRIVATE
+    opena8djcpp_driverkit_shell)
+
+add_executable(opena8djcpp_driverkit_usb_isochronous_schedule_contract
+  tools/driverkit_usb_isochronous_schedule_contract.cpp)
+
+target_link_libraries(opena8djcpp_driverkit_usb_isochronous_schedule_contract
   PRIVATE
     opena8djcpp_driverkit_shell)
 
@@ -509,6 +517,7 @@ add_test(NAME opena8djcpp_driverkit_prepared_hotpath_contract COMMAND opena8djcp
 add_test(NAME opena8djcpp_driverkit_usb_submit_binding_contract COMMAND opena8djcpp_driverkit_usb_submit_binding_contract)
 add_test(NAME opena8djcpp_driverkit_usb_request_lifecycle_contract COMMAND opena8djcpp_driverkit_usb_request_lifecycle_contract)
 add_test(NAME opena8djcpp_driverkit_usb_request_shutdown_contract COMMAND opena8djcpp_driverkit_usb_request_shutdown_contract)
+add_test(NAME opena8djcpp_driverkit_usb_isochronous_schedule_contract COMMAND opena8djcpp_driverkit_usb_isochronous_schedule_contract)
 add_test(NAME opena8djcpp_prepared_transport_packet_contract COMMAND opena8djcpp_prepared_transport_packet_contract)
 add_test(NAME opena8djcpp_prepared_transport_routing_timecode_contract COMMAND opena8djcpp_prepared_transport_routing_timecode_contract)
 add_test(NAME opena8djcpp_prepared_transport_recovery_contract COMMAND opena8djcpp_prepared_transport_recovery_contract)

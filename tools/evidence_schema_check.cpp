@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-usb-submit-binding-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-request-lifecycle-contract.json",
       root / "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
+      root / "local-analysis/cpp-offline/driverkit-usb-isochronous-schedule-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/playback-scheduler-contract.json",
       root / "local-analysis/cpp-offline/playback-scheduler-runtime-contract.json",
@@ -233,6 +234,10 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto driverkit_usb_request_shutdown_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_shutdown_contract")
+          .value_or("");
+  const auto driverkit_usb_isochronous_schedule_contract =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "driverkit_usb_isochronous_schedule_contract")
           .value_or("");
   const auto audiophile_precision_claim_gate =
       opena8djcpp::evidence_json::json_object(summary, "audiophile_precision_claim_gate")
@@ -745,6 +750,35 @@ int main(int argc, char** argv) {
       object_present(summary, "driverkit_usb_request_shutdown_contract") &&
       number_field_is(driverkit_usb_request_shutdown_contract, "cancelled_requests", 3.0) &&
       number_field_is(driverkit_usb_request_shutdown_contract, "live_requests_after_stop", 0.0) &&
+      object_present(summary, "driverkit_usb_isochronous_schedule_contract") &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_scheduled_descriptors", 66.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_capture_descriptors", 33.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_playback_descriptors", 33.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_late_submits", 0.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_descriptor_shape_errors", 0.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_timestamp_regressions", 0.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_sequence_regressions", 0.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_total_frames", 5808.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_total_bytes", 185856.0) &&
+      number_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "stable_min_submit_lead_frames", 8.0) &&
+      bool_field_is(driverkit_usb_isochronous_schedule_contract,
+                    "stable_product_safe", true) &&
+      string_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "late_submit_rejected_result", "PASS") &&
+      string_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "timestamp_regression_rejected_result", "PASS") &&
+      string_field_is(driverkit_usb_isochronous_schedule_contract,
+                      "bad_shape_rejected_result", "PASS") &&
       object_present(summary, "audiophile_precision_claim_gate") &&
       string_field_is(audiophile_precision_claim_gate, "status", "PASS") &&
       bool_field_is(audiophile_precision_claim_gate,

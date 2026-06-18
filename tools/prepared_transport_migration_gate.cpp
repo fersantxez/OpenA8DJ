@@ -243,6 +243,8 @@ int main(int argc, char** argv) {
       read_file(base / "driverkit-usb-request-lifecycle-contract.json");
   const auto driverkit_usb_request_shutdown =
       read_file(base / "driverkit-usb-request-shutdown-contract.json");
+  const auto driverkit_usb_isochronous_schedule =
+      read_file(base / "driverkit-usb-isochronous-schedule-contract.json");
   const auto packet = read_file(base / "prepared-transport-packet-contract.json");
   const auto routing_timecode =
       read_file(base / "prepared-transport-routing-timecode-contract.json");
@@ -359,6 +361,22 @@ int main(int argc, char** argv) {
       number_or_nan(json_number(driverkit_usb_request_shutdown, "cancelled_requests"));
   const double driverkit_usb_request_shutdown_live_after =
       number_or_nan(json_number(driverkit_usb_request_shutdown, "live_requests_after_stop"));
+  const double driverkit_usb_iso_schedule_descriptors =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule,
+                                "stable_scheduled_descriptors"));
+  const double driverkit_usb_iso_schedule_capture_descriptors =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule,
+                                "stable_capture_descriptors"));
+  const double driverkit_usb_iso_schedule_playback_descriptors =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule,
+                                "stable_playback_descriptors"));
+  const double driverkit_usb_iso_schedule_total_bytes =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule, "stable_total_bytes"));
+  const double driverkit_usb_iso_schedule_total_frames =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule, "stable_total_frames"));
+  const double driverkit_usb_iso_schedule_min_lead =
+      number_or_nan(json_number(driverkit_usb_isochronous_schedule,
+                                "stable_min_submit_lead_frames"));
 
   const bool prepared_contracts_pass =
       result_pass(driverkit_prepared) && result_pass(driverkit_hotpath) && result_pass(packet) &&
@@ -619,6 +637,31 @@ int main(int argc, char** argv) {
       number_is_zero(driverkit_usb_request_shutdown, "invalid_completions") &&
       number_is_zero(driverkit_usb_request_shutdown, "stale_completions") &&
       number_is_zero(driverkit_usb_request_shutdown, "late_completions_after_cancel");
+  const bool driverkit_usb_isochronous_schedule_safe =
+      result_pass(driverkit_usb_isochronous_schedule) &&
+      json_bool(driverkit_usb_isochronous_schedule, "stable_product_safe").value_or(false) &&
+      finite(driverkit_usb_iso_schedule_descriptors) &&
+      driverkit_usb_iso_schedule_descriptors == 66.0 &&
+      finite(driverkit_usb_iso_schedule_capture_descriptors) &&
+      driverkit_usb_iso_schedule_capture_descriptors == 33.0 &&
+      finite(driverkit_usb_iso_schedule_playback_descriptors) &&
+      driverkit_usb_iso_schedule_playback_descriptors == 33.0 &&
+      finite(driverkit_usb_iso_schedule_total_bytes) &&
+      driverkit_usb_iso_schedule_total_bytes == 185856.0 &&
+      finite(driverkit_usb_iso_schedule_total_frames) &&
+      driverkit_usb_iso_schedule_total_frames == 5808.0 &&
+      finite(driverkit_usb_iso_schedule_min_lead) &&
+      driverkit_usb_iso_schedule_min_lead >= 8.0 &&
+      number_is_zero(driverkit_usb_isochronous_schedule, "stable_late_submits") &&
+      number_is_zero(driverkit_usb_isochronous_schedule, "stable_descriptor_shape_errors") &&
+      number_is_zero(driverkit_usb_isochronous_schedule, "stable_timestamp_regressions") &&
+      number_is_zero(driverkit_usb_isochronous_schedule, "stable_sequence_regressions") &&
+      json_string(driverkit_usb_isochronous_schedule, "late_submit_rejected_result")
+              .value_or("") == "PASS" &&
+      json_string(driverkit_usb_isochronous_schedule, "timestamp_regression_rejected_result")
+              .value_or("") == "PASS" &&
+      json_string(driverkit_usb_isochronous_schedule, "bad_shape_rejected_result")
+              .value_or("") == "PASS";
   const bool performance_hypothesis_supported =
       result_pass(hot_path) &&
       json_string(hot_path, "attribution").value_or("") ==
@@ -655,6 +698,7 @@ int main(int argc, char** argv) {
       {"driverkit_usb_submit_binding_safe", driverkit_usb_submit_binding_safe},
       {"driverkit_usb_request_lifecycle_safe", driverkit_usb_request_lifecycle_safe},
       {"driverkit_usb_request_shutdown_safe", driverkit_usb_request_shutdown_safe},
+      {"driverkit_usb_isochronous_schedule_safe", driverkit_usb_isochronous_schedule_safe},
       {"performance_hypothesis_supported_by_hot_path_timing", performance_hypothesis_supported},
       {"product_promotion_still_blocked", product_promotion_blocked},
       {"quality_claim_still_blocked", quality_claim_blocked},
@@ -755,6 +799,18 @@ int main(int argc, char** argv) {
                driverkit_usb_request_shutdown_cancelled);
   print_number("driverkit_usb_request_shutdown_live_requests_after_stop",
                driverkit_usb_request_shutdown_live_after);
+  print_number("driverkit_usb_isochronous_schedule_descriptors",
+               driverkit_usb_iso_schedule_descriptors);
+  print_number("driverkit_usb_isochronous_schedule_capture_descriptors",
+               driverkit_usb_iso_schedule_capture_descriptors);
+  print_number("driverkit_usb_isochronous_schedule_playback_descriptors",
+               driverkit_usb_iso_schedule_playback_descriptors);
+  print_number("driverkit_usb_isochronous_schedule_total_bytes",
+               driverkit_usb_iso_schedule_total_bytes);
+  print_number("driverkit_usb_isochronous_schedule_total_frames",
+               driverkit_usb_iso_schedule_total_frames);
+  print_number("driverkit_usb_isochronous_schedule_min_submit_lead_frames",
+               driverkit_usb_iso_schedule_min_lead);
   print_number("driverkit_prepared_hotpath_max_ring_publications_per_period",
                hotpath_max_publications);
   print_number("driverkit_prepared_hotpath_min_publication_reduction_ratio",

@@ -10087,3 +10087,34 @@ Next implication:
 - Readiness impact: operationally stable diagnostic load is preserved; the
   next action is clean-commit plus offline rerun, then optional lock-gated
   safety smoke for the observability candidate.
+
+## 2026-06-18 - Add DriverKit USB Isochronous Deadline Contract
+
+- Decision: add a pure C++ `UsbIsochronousSchedule` model and make the prepared
+  migration gate require `driverkit-usb-isochronous-schedule-contract`.
+- Reason: the DriverKit/USB path already modeled descriptor batching,
+  preallocated requests, completion-owned lifecycle, and shutdown. It did not
+  explicitly prove that a batched descriptor is submitted before the sample
+  deadline. A CPU-saving transport that submits late would be worse audio, even
+  if it has fewer calls.
+- Evidence:
+  - `opena8djcpp_driverkit_usb_isochronous_schedule_contract`: PASS.
+  - Stable schedule: 66 descriptors, 33 capture, 33 playback, zero late
+    submits, zero descriptor-shape errors, zero timestamp regressions, zero
+    sequence regressions, 5808 frames, 185856 bytes, and 8-frame minimum submit
+    lead.
+  - Negative checks reject late submit, timestamp/sequence regression, and bad
+    descriptor shape.
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS with
+    `driverkit_usb_isochronous_schedule_safe`.
+- Alternatives rejected:
+  - Treat request-pool lifecycle as sufficient: rejected because lifecycle says
+    a request was recycled, not that it was scheduled before the audio
+    deadline.
+  - Use logical ISO8 frames as physical descriptor frame count: rejected after
+    the first contract run exposed the Mode2 physical payload shape. The
+    scheduler now separates logical `frames_per_slot=8` from physical
+    `bytes_per_slot=352`.
+- Readiness impact: this tightens the DriverKit/USB transport path before any
+  future physical candidate. It is not physical evidence, not a CPU superiority
+  claim, and not product readiness.

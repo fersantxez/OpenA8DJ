@@ -15388,3 +15388,50 @@ Follow-up correction:
     `LOCK_GATED_FRESH_HAL_SAFETY_SMOKE_BEFORE_HUMAN_DIAGNOSTIC_INSTALL`,
     followed by source-reference mainline/C++ A/B, CPU/resource comparison, and
     physical Timecode Vinyl certification.
+
+## 2026-06-18 - DriverKit USB Isochronous Deadline Contract
+
+- Scope:
+  - Added a pure C++ USB isochronous schedule model for prepared DriverKit/USB
+    descriptors.
+  - Integrated the model into CMake, `scripts/run-cpp-offline-gates`,
+    `opena8djcpp_prepared_transport_migration_gate`, and
+    `opena8djcpp_evidence_schema_check`.
+  - No install, unload/reload, playback, recording, CoreAudio restart, USB
+    reset, default-device change, mainline write, or Rust write occurred.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_usb_isochronous_schedule_contract opena8djcpp_prepared_transport_migration_gate opena8djcpp_evidence_schema_check -j`
+  - `./build/cpp-release/opena8djcpp_driverkit_usb_isochronous_schedule_contract | tee local-analysis/cpp-offline/driverkit-usb-isochronous-schedule-contract.json`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_migration_gate | tee local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+- Result:
+  - Build: PASS.
+  - `opena8djcpp_driverkit_usb_isochronous_schedule_contract`: PASS.
+  - Stable schedule:
+    - `source_descriptors=66`;
+    - `stable_capture_descriptors=33`;
+    - `stable_playback_descriptors=33`;
+    - `stable_late_submits=0`;
+    - `stable_descriptor_shape_errors=0`;
+    - `stable_timestamp_regressions=0`;
+    - `stable_sequence_regressions=0`;
+    - `stable_total_frames=5808`;
+    - `stable_total_bytes=185856`;
+    - `stable_min_submit_lead_frames=8`;
+    - `stable_product_safe=true`.
+  - Negative checks:
+    - `late_submit_rejected_result=PASS`;
+    - `timestamp_regression_rejected_result=PASS`;
+    - `bad_shape_rejected_result=PASS`.
+  - `opena8djcpp_prepared_transport_migration_gate`: PASS with
+    `driverkit_usb_isochronous_schedule_safe`.
+- Interpretation:
+  - The DriverKit/USB path now has an offline deadline contract in addition to
+    batching and request lifecycle contracts.
+  - The first draft incorrectly treated logical ISO8 as the physical descriptor
+    frame count. The final contract separates logical timing
+    (`frames_per_slot=8`) from physical Mode2 payload shape
+    (`bytes_per_slot=352`).
+  - This is not hardware validation, not a DriverKit dext readiness claim, and
+    not evidence that C++ beats mainline. It reduces the risk of the next
+    transport candidate buying lower CPU at the cost of late audio.
