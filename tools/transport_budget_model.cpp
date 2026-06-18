@@ -1,8 +1,13 @@
+#include "evidence_json.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -34,6 +39,37 @@ struct FamilyBudget {
   bool product_candidate = false;
   const char* verdict = "";
 };
+
+std::string read_file(const std::filesystem::path& path) {
+  std::ifstream input(path);
+  if (!input) {
+    return {};
+  }
+  return std::string(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
+}
+
+std::filesystem::path repo_root(char** argv) {
+  auto root = std::filesystem::absolute(argv[0]).parent_path();
+  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
+    root = root.parent_path();
+  }
+  if (root.empty() || root.filename() != "audio8djcpp") {
+    return "/Users/fer/dev/audio8djcpp";
+  }
+  return root;
+}
+
+bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
+}
+
+bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
+  return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
+}
+
+double number_or(std::string_view json, std::string_view key, double fallback) {
+  return opena8djcpp::evidence_json::json_number(json, key).value_or(fallback);
+}
 
 FamilyBudget budget_for(const FamilyEvidence& family) {
   FamilyBudget out{};
@@ -90,7 +126,14 @@ void print_family(const FamilyEvidence& family, const FamilyBudget& budget, bool
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+  (void)argc;
+  const auto evidence = repo_root(argv) / "local-analysis/cpp-offline";
+  const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
+  const auto hot_path = read_file(evidence / "hot-path-timing-analysis.json");
+  const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
+  const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
+
   const std::vector<FamilyEvidence> families = {
       {
           .name = "iso5_q64",
@@ -171,10 +214,60 @@ int main() {
   }
 
   const bool model_passes = product_candidates == 0 && quality_passes == 0 && cpu_passes >= 1;
+  const bool prepared_contracts_present =
+      !migration.empty() && string_field_is(migration, "result", "PASS") &&
+      bool_field_is(migration, "migration_candidate_supported", true) &&
+      bool_field_is(migration, "product_ready", false) &&
+      bool_field_is(migration, "branch_promotion_supported", false);
+  const double prepared_submit_reduction =
+      number_or(migration, "runtime_adapter_stable_usb_submit_reduction_ratio", 0.0);
+  const double prepared_usb_submit_calls =
+      number_or(migration, "runtime_adapter_stable_usb_submit_calls", 0.0);
+  const double prepared_logical_periods =
+      number_or(migration, "runtime_adapter_stable_logical_audio_periods", 0.0);
+  const double prepared_max_gap_ratio =
+      number_or(migration, "prepared_slot_scheduler_max_completion_gap_ratio", 999.0);
+  const double prepared_safe_logical_gap =
+      number_or(migration, "prepared_slot_scheduler_max_safe_logical_audio_gap_ratio", 999.0);
+  const bool hot_path_present = !hot_path.empty() && string_field_is(hot_path, "result", "PASS");
+  const double fixed_queue_to_playback_fill_ratio =
+      number_or(hot_path, "fixed_queue_to_playback_fill_ratio", -1.0);
+  const bool quality_claim_blocked =
+      !product_quality.empty() && string_field_is(product_quality, "result", "PASS") &&
+      bool_field_is(product_quality, "quality_claim_allowed", false);
+  const bool physical_ab_blocked =
+      !physical_window.empty() && string_field_is(physical_window, "result", "PASS") &&
+      bool_field_is(physical_window, "ready_for_product_physical_ab", false);
+  const bool prepared_model_sufficient_for_physical_window =
+      prepared_contracts_present && prepared_submit_reduction >= 8.0 &&
+      prepared_usb_submit_calls > 0.0 && prepared_logical_periods > 0.0 &&
+      prepared_max_gap_ratio <= 1.25 && prepared_safe_logical_gap <= 1.0 &&
+      hot_path_present && fixed_queue_to_playback_fill_ratio > 1.0;
+  const bool runtime_cpu_superiority_claim_allowed = false;
+
   std::cout << "{\n"
             << "  \"schema\": \"opena8djcpp.transport-budget-model.v1\",\n"
             << "  \"result\": \"" << (model_passes ? "PASS" : "FAIL") << "\",\n"
             << "  \"meaning\": \"offline frontier diagnostic; PASS does not mean product readiness\",\n"
+            << "  \"prepared_runtime_model\": {"
+            << "\"contracts_present\": " << (prepared_contracts_present ? "true" : "false")
+            << ", \"submit_reduction_ratio\": " << prepared_submit_reduction
+            << ", \"usb_submit_calls\": " << prepared_usb_submit_calls
+            << ", \"logical_audio_periods\": " << prepared_logical_periods
+            << ", \"max_completion_gap_ratio\": " << prepared_max_gap_ratio
+            << ", \"max_safe_logical_audio_gap_ratio\": " << prepared_safe_logical_gap
+            << ", \"hot_path_present\": " << (hot_path_present ? "true" : "false")
+            << ", \"fixed_queue_to_playback_fill_ratio\": "
+            << fixed_queue_to_playback_fill_ratio
+            << ", \"sufficient_for_physical_window\": "
+            << (prepared_model_sufficient_for_physical_window ? "true" : "false")
+            << ", \"runtime_cpu_superiority_claim_allowed\": "
+            << (runtime_cpu_superiority_claim_allowed ? "true" : "false")
+            << ", \"quality_claim_blocked\": " << (quality_claim_blocked ? "true" : "false")
+            << ", \"physical_ab_blocked\": " << (physical_ab_blocked ? "true" : "false")
+            << ", \"claim_blockers\": [\"same_session_physical_cpu_ab_missing\", "
+               "\"prepared_runtime_not_physically_validated\", "
+               "\"route_or_product_quality_claim_blocked\"]},\n"
             << "  \"thresholds\": {\"quality_alignment_score\": " << kQualityGate
             << ", \"driver_cpu_p95\": " << kDriverCpuP95Gate
             << ", \"lag_jumps_gt_2_frames\": " << kLagJumpGate << "},\n"

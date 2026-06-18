@@ -12625,3 +12625,31 @@ Full offline gate after commit:
     agreement before it can support a claim.
   - The current candidate remains blocked; this is a measurement-integrity
     hardening, not a readiness improvement.
+
+## 2026-06-18 - Prepared Runtime Resource Model Focused Gate
+
+- Commit context: `56d99d0` plus uncommitted transport-budget hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Focused build:
+  - Command: `cmake --build build/cpp-release --target opena8djcpp_transport_budget_model`
+  - Result: PASS.
+- Focused gate:
+  - Command:
+    `./build/cpp-release/opena8djcpp_transport_budget_model | tee local-analysis/cpp-offline/transport-budget-model-focused.json`
+  - Result: PASS.
+  - Prepared runtime model:
+    `sufficient_for_physical_window=true`, `submit_reduction_ratio=8`,
+    `usb_submit_calls=66`, `logical_audio_periods=256`,
+    `fixed_queue_to_playback_fill_ratio=17.9146`,
+    `runtime_cpu_superiority_claim_allowed=false`.
+- Interpretation:
+  - The prepared runtime model is strong enough to justify a future physical
+    CPU/submit-cadence window after route validation.
+  - It does not prove lower CPU or jitter than mainline. Same-session physical
+    A/B with submit counters and CPU p95 remains mandatory.

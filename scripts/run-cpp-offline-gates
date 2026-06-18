@@ -571,6 +571,11 @@ summary = {
         "best_quality_alignment_score": transport_budget.get("summary", {}).get("best_quality_alignment_score"),
         "lowest_median_driver_cpu_p95": transport_budget.get("summary", {}).get("lowest_median_driver_cpu_p95"),
         "lowest_estimated_usb_enqueue_calls_per_second": transport_budget.get("summary", {}).get("lowest_estimated_usb_enqueue_calls_per_second"),
+        "prepared_runtime_model_sufficient_for_physical_window": transport_budget.get("prepared_runtime_model", {}).get("sufficient_for_physical_window"),
+        "prepared_runtime_submit_reduction_ratio": transport_budget.get("prepared_runtime_model", {}).get("submit_reduction_ratio"),
+        "prepared_runtime_fixed_queue_to_playback_fill_ratio": transport_budget.get("prepared_runtime_model", {}).get("fixed_queue_to_playback_fill_ratio"),
+        "runtime_cpu_superiority_claim_allowed": transport_budget.get("prepared_runtime_model", {}).get("runtime_cpu_superiority_claim_allowed"),
+        "resource_claim_blockers": transport_budget.get("prepared_runtime_model", {}).get("claim_blockers", []),
         "evidence": "local-analysis/cpp-offline/transport-budget-model.json",
     },
     "hot_path_timing_analysis": {

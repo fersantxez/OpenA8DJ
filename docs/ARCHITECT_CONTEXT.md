@@ -2930,3 +2930,7 @@ Current implication:
   on alignment, lag, SNR floor, and delay p95. Current evidence still fails,
   including a large dual-oracle delay disagreement, so no product claim is
   allowed.
+- Resource-model update: `transport-budget-model` now consumes prepared runtime
+  evidence and reports `sufficient_for_physical_window=true` with an 8:1 submit
+  reduction model, but keeps `runtime_cpu_superiority_claim_allowed=false`
+  until same-session physical CPU/submit-cadence A/B beats mainline.

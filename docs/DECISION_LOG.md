@@ -8702,3 +8702,23 @@ Next implication:
 - Readiness impact: stricter evidence only. This makes product and branch
   promotion harder, not easier, and does not clear the current iRig route,
   CPU/resource, or Timecode Vinyl blockers.
+
+## 2026-06-18 - Add Prepared Runtime Resource Model To Transport Budget
+
+- Decision: `opena8djcpp_transport_budget_model` now consumes current prepared
+  runtime evidence and reports whether the model is sufficient to justify a
+  physical prepared-runtime window, while still blocking CPU/resource
+  superiority claims.
+- Reason: historical ISO-family budgets showed the quality/CPU frontier, but
+  did not connect the prepared runtime submit-reduction contracts to an
+  explicit resource decision. The model now records submit reduction, logical
+  periods, completion-gap limits, hot-path ratio, and claim blockers.
+- Evidence:
+  - Focused `opena8djcpp_transport_budget_model`: PASS.
+  - `prepared_runtime_model.sufficient_for_physical_window=true`.
+  - `prepared_runtime_model.submit_reduction_ratio=8`.
+  - `prepared_runtime_model.fixed_queue_to_playback_fill_ratio=17.9146`.
+  - `prepared_runtime_model.runtime_cpu_superiority_claim_allowed=false`.
+- Readiness impact: this supports planning a lock-gated prepared-runtime CPU
+  window after route validation. It does not prove lower CPU, lower jitter, or
+  better sound quality than mainline.
