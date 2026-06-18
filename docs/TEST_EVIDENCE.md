@@ -14968,3 +14968,30 @@ Follow-up correction:
   - This is the next measurable CPU/performance hypothesis.
   - It does not authorize a hardware install, a product claim, Timecode Vinyl
     readiness, or branch promotion.
+
+## 2026-06-18 - Offline Playback Scheduler Runtime Binding
+
+- Scope:
+  - Added a pure C++ runtime-binding model that joins the playback lead
+    scheduler to a preallocated request pool.
+  - No hardware, playback, recording, install/load, default-device change, USB
+    reset, CoreAudio restart, or service mutation occurred.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_playback_scheduler_runtime_contract opena8djcpp_transport_budget_model opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check -j`
+  - `./build/cpp-release/opena8djcpp_playback_scheduler_runtime_contract | tee local-analysis/cpp-offline/playback-scheduler-runtime-contract.json`
+  - `./build/cpp-release/opena8djcpp_transport_budget_model | tee local-analysis/cpp-offline/transport-budget-model.json`
+- Result:
+  - Focused playback scheduler runtime contract: PASS.
+  - Stable runtime row: `256` capture runtime submits, `33` playback runtime
+    submits, `264` playback logical slots, playback submit reduction ratio `8`,
+    total submit reduction ratio about `1.79931`, submitted/completed frames
+    `4160/4160`, submitted/completed bytes `1141504/1141504`, zero runtime
+    submit failures, zero completion failures, zero fallback allocations, zero
+    invalid/stale completions, zero live requests.
+- Interpretation:
+  - This is a stronger offline CPU-path contract than the scheduler model
+    alone.
+  - It only authorizes implementing a default-off HAL playback scheduler
+    candidate. It does not authorize a hardware install, product claim, Timecode
+    Vinyl readiness, or branch promotion.

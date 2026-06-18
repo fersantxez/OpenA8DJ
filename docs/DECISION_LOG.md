@@ -9804,3 +9804,33 @@ Next implication:
   It does not authorize hardware readiness, CPU superiority, audiophile
   superiority, Timecode Vinyl readiness, or branch promotion until an opt-in
   runtime binding passes lock-gated physical A/B.
+
+## 2026-06-18 - Add Playback Scheduler Runtime Binding Model
+
+- Decision: bind the ISO8 playback lead scheduler to a preallocated request
+  pool in pure C++ before exposing any new HAL candidate.
+- Reason: the scheduler model alone proved desired pacing, but not whether a
+  runtime boundary can preserve capture continuity, request lifecycle, and
+  accounting. The binding now verifies that capture remains one submit per
+  period while playback batches only when the scheduler requests more lead.
+- Evidence:
+  - `opena8djcpp_playback_scheduler_runtime_contract` stable row reports
+    `stable_capture_runtime_submit_calls=256`,
+    `stable_playback_runtime_submit_calls=33`,
+    `stable_playback_logical_slots_submitted=264`,
+    playback submit reduction ratio `8`, total submit reduction ratio about
+    `1.79931`, submitted/completed frames `4160/4160`, submitted/completed
+    bytes `1141504/1141504`, and zero runtime submit/completion/pool failures.
+  - Negative rows reject suppressed refill underflow, capture gaps, non-ISO8
+    runtime start, and invalid request-pool configuration.
+  - `transport-budget-model` and `hal-transport-runtime-gate` now require this
+    runtime binding before the next CPU direction can advance.
+- Alternatives rejected:
+  - Reuse the existing prepared runtime as-is: rejected because it batches
+    capture and playback symmetrically, while current evidence says capture
+    cadence changes are risky.
+  - Patch HAL first: rejected because the stable 15:00 load must remain closed
+    until the runtime boundary is objectively modeled.
+- Readiness impact: this authorizes only a future default-off HAL candidate
+  implementation. It still does not authorize physical readiness, quality
+  superiority, CPU superiority, Timecode Vinyl readiness, or branch promotion.

@@ -3353,3 +3353,10 @@ Current implication:
   is not a hardware claim; the next allowed performance work is an opt-in
   runtime binding plus lock-gated source-reference A/B after offline gates pass
   from a clean commit.
+- 15:45 EDT runtime-binding update: the scheduler now has a pure C++ runtime
+  binding to a preallocated request pool. The stable binding keeps capture at
+  `256` runtime submits while batching playback to `33` runtime submits for
+  `264` logical playback slots. The next CPU step is no longer model design; it
+  is a default-off HAL playback scheduler candidate around capture-paced
+  playback refill, followed by lock-gated source-reference A/B. No product
+  claim is allowed from this offline binding.

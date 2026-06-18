@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/driverkit-usb-request-shutdown-contract.json",
       root / "local-analysis/cpp-offline/prepared-slot-scheduler-contract.json",
       root / "local-analysis/cpp-offline/playback-scheduler-contract.json",
+      root / "local-analysis/cpp-offline/playback-scheduler-runtime-contract.json",
       root / "local-analysis/cpp-offline/runtime-adapter-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-plan-contract.json",
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
@@ -291,6 +292,9 @@ int main(int argc, char** argv) {
   const auto playback_scheduler_contract =
       opena8djcpp::evidence_json::json_object(summary, "playback_scheduler_contract")
           .value_or("");
+  const auto playback_scheduler_runtime_contract =
+      opena8djcpp::evidence_json::json_object(summary, "playback_scheduler_runtime_contract")
+          .value_or("");
   const auto hal_transport_runtime_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
   const auto hal_logical_capture_batching_contract =
@@ -473,6 +477,18 @@ int main(int argc, char** argv) {
                       "stable_playback_submit_reduction_ratio", 8.0) &&
       bool_field_is(playback_scheduler_contract, "physical_evidence_present", false) &&
       bool_field_is(playback_scheduler_contract, "product_claim_allowed", false) &&
+      object_present(summary, "playback_scheduler_runtime_contract") &&
+      string_field_is(playback_scheduler_runtime_contract, "status", "PASS") &&
+      number_field_is(playback_scheduler_runtime_contract,
+                      "stable_capture_runtime_submit_calls", 256.0) &&
+      number_field_is(playback_scheduler_runtime_contract,
+                      "stable_playback_runtime_submit_calls", 33.0) &&
+      number_field_is(playback_scheduler_runtime_contract,
+                      "stable_playback_logical_slots_submitted", 264.0) &&
+      number_field_is(playback_scheduler_runtime_contract,
+                      "stable_playback_submit_reduction_ratio", 8.0) &&
+      bool_field_is(playback_scheduler_runtime_contract, "physical_evidence_present", false) &&
+      bool_field_is(playback_scheduler_runtime_contract, "product_claim_allowed", false) &&
       string_array_has(summary, "promotion_hard_blockers",
                        "real_driverkit_sdk_and_selected_xcode_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
@@ -1103,13 +1119,21 @@ int main(int argc, char** argv) {
                     "rejected_transport_variants_default_off", true) &&
       bool_field_is(hal_transport_runtime_gate, "observability_defaults_preserved", true) &&
       bool_field_is(hal_transport_runtime_gate, "prepared_runtime_not_next_default", true) &&
+      bool_field_is(hal_transport_runtime_gate,
+                    "playback_scheduler_runtime_contract_pass", true) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "playback_scheduler_runtime_capture_submits", 256.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "playback_scheduler_runtime_playback_submits", 33.0) &&
+      number_field_is(hal_transport_runtime_gate,
+                      "playback_scheduler_runtime_reduction_ratio", 8.0) &&
       bool_field_is(hal_transport_runtime_gate, "product_claim_blocked", true) &&
       string_field_is(
           hal_transport_runtime_gate, "next_cpu_direction",
-          "OFFLINE_DELIBERATE_PLAYBACK_SCHEDULER_MODEL_PRESERVE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB") &&
+          "OPT_IN_HAL_PLAYBACK_SCHEDULER_BINDING_PRESERVE_CAPTURE_ISO8_THEN_LOCK_GATED_SOURCE_REFERENCE_AB") &&
       string_field_is(
           hal_transport_runtime_gate, "next_required_action",
-          "KEEP_DEFAULT_STABLE_LOAD_AND_DESIGN_OFFLINE_PLAYBACK_SCHEDULER_MODEL_BEFORE_ANY_NEW_HARDWARE_CANDIDATE") &&
+          "KEEP_DEFAULT_STABLE_LOAD_AND_IMPLEMENT_OPT_IN_HAL_PLAYBACK_SCHEDULER_CANDIDATE_BEFORE_HARDWARE_AB") &&
       string_field_is(
           hal_transport_runtime_gate, "blocked_claim",
           "NO_CPU_OR_AUDIOPHILE_SUPERIORITY_CLAIM_UNTIL_DEFAULT_OR_NEW_SCHEDULER_CANDIDATE_PASSES_LOCK_GATED_SAME_SESSION_SOURCE_REFERENCE_AB") &&

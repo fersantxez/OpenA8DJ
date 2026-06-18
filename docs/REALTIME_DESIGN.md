@@ -635,3 +635,25 @@ Offline gate:
 This is still an offline model. A real HAL or DriverKit binding must keep all
 buffers and request objects preallocated, must not allocate or log in the audio
 callback, and must not hide a playback gap by sacrificing capture continuity.
+
+## Playback Scheduler Runtime Boundary
+
+The runtime binding model turns the scheduler decision into request lifecycle
+accounting without changing the stable HAL default.
+
+Offline gate:
+
+- `opena8djcpp_playback_scheduler_runtime_contract`.
+- Required stable row keeps capture at `256` runtime submit calls.
+- Required stable row batches playback to `33` runtime submit calls for `264`
+  logical playback slots.
+- Required playback submit reduction ratio is at least `8`.
+- Required total submit reduction ratio is greater than `1.5`.
+- Submitted and completed frame/byte accounting must match exactly.
+- Runtime submit failures, completion failures, fallback allocations, invalid
+  completions, stale completions, and live requests at snapshot must all be
+  zero.
+
+This binding is the contract for the next HAL opt-in candidate. It must be
+inserted before the real submit boundary, around the playback refill decision,
+while `submitPlaybackTransfer` remains the submit/observability boundary.

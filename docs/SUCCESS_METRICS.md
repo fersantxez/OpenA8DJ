@@ -2717,3 +2717,22 @@ Current implementation:
   candidate. It does not prove CPU/resource superiority or product audio
   quality until a lock-gated physical A/B beats mainline under the same source
   reference and workload.
+
+## Playback Scheduler Runtime Metric
+
+- `local-analysis/cpp-offline/playback-scheduler-runtime-contract.json` must
+  report `result=PASS` before any HAL playback scheduler candidate can be
+  built.
+- Minimum offline thresholds:
+  - `stable_capture_runtime_submit_calls=256`;
+  - `stable_playback_runtime_submit_calls<=33`;
+  - `stable_playback_logical_slots_submitted=264`;
+  - `stable_playback_submit_reduction_ratio>=8`;
+  - `stable_total_submit_reduction_ratio>1.5`;
+  - submitted frames equal completed frames;
+  - submitted bytes equal completed bytes;
+  - zero runtime submit failures, completion failures, fallback allocations,
+    invalid completions, stale completions, and live requests.
+- PASS only authorizes a default-off HAL binding candidate. It does not prove
+  CPU/resource superiority until a lock-gated physical A/B beats mainline under
+  the same source reference and workload.

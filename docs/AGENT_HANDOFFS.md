@@ -5376,3 +5376,46 @@ Risks:
 Next action:
 - Use the updated physical window runner for the next candidate; do not accept
   CPU/performance claims from windows missing `stream-stats-summary.json`.
+
+## 2026-06-18 Explorer: Playback Scheduler HAL Insertion Point
+
+Subagent:
+- James.
+
+Required warning:
+- The subagent received: "PROHIBIDO tocar, editar, formatear, generar
+  archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+  /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son
+  READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar
+  hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana."
+
+Mission:
+- Inspect `/Users/fer/dev/audio8djcpp` read-only and identify the safest
+  insertion point for an opt-in playback scheduler runtime path without
+  changing defaults or touching hardware.
+
+Findings:
+- The stable default remains guarded by `HAL_PREPARED_USB_SUBMIT_RUNTIME ?= 0`.
+- The safest HAL hook is not `submitPlaybackTransfer`; that is already the
+  submit/observability boundary. The safer future hook is the capture-paced
+  playback refill path before `queuePlaybackWithRequests`, with all real submit
+  work still flowing through the existing prepared-runtime bridge.
+- A new scheduler path must stay default-off, preserve capture ISO8 continuity,
+  keep completion ownership unchanged, and block all claims until lock-gated
+  physical A/B.
+
+Integrated action:
+- Added a pure C++ runtime-binding model before touching HAL. It joins the
+  playback lead scheduler to a preallocated request pool and proves capture
+  stays single-period while playback batches to `33` runtime submits for `264`
+  logical slots.
+
+Risks:
+- This is still not installed or physically measured.
+- The next implementation step must expose the binding as an opt-in HAL
+  candidate only, not as the stable default.
+
+Next action:
+- Implement `HAL_PLAYBACK_LEAD_SCHEDULER` or equivalent default-off HAL binding
+  around capture-paced playback refill, then run lock-gated source-reference
+  A/B before any CPU or quality claim.

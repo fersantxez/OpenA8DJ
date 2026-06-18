@@ -132,6 +132,8 @@ int main(int argc, char** argv) {
   const auto migration = read_file(evidence / "prepared-transport-migration-gate.json");
   const auto hot_path = read_file(evidence / "hot-path-timing-analysis.json");
   const auto playback_scheduler = read_file(evidence / "playback-scheduler-contract.json");
+  const auto playback_scheduler_runtime =
+      read_file(evidence / "playback-scheduler-runtime-contract.json");
   const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
 
@@ -265,6 +267,20 @@ int main(int argc, char** argv) {
       number_or(playback_scheduler, "stable_total_submit_reduction_ratio", 0.0) > 1.5 &&
       number_or(playback_scheduler, "stable_min_playback_lead_slots", 0.0) >= 4.0 &&
       number_or(playback_scheduler, "stable_max_playback_lead_slots", 999.0) <= 12.0;
+  const bool playback_scheduler_runtime_pass =
+      !playback_scheduler_runtime.empty() &&
+      string_field_is(playback_scheduler_runtime, "result", "PASS") &&
+      bool_field_is(playback_scheduler_runtime, "physical_evidence_present", false) &&
+      bool_field_is(playback_scheduler_runtime, "product_claim_allowed", false) &&
+      number_or(playback_scheduler_runtime, "stable_capture_runtime_submit_calls", 0.0) ==
+          256.0 &&
+      number_or(playback_scheduler_runtime, "stable_playback_runtime_submit_calls", 999.0) <=
+          33.0 &&
+      number_or(playback_scheduler_runtime, "stable_playback_logical_slots_submitted", 0.0) ==
+          264.0 &&
+      number_or(playback_scheduler_runtime, "stable_playback_submit_reduction_ratio", 0.0) >=
+          8.0 &&
+      number_or(playback_scheduler_runtime, "stable_total_submit_reduction_ratio", 0.0) > 1.5;
   const bool quality_claim_blocked =
       !product_quality.empty() && string_field_is(product_quality, "result", "PASS") &&
       bool_field_is(product_quality, "quality_claim_allowed", false);
@@ -279,7 +295,7 @@ int main(int argc, char** argv) {
   const bool runtime_cpu_superiority_claim_allowed = false;
   const bool model_passes =
       product_candidates == 0 && quality_passes == 0 && cpu_passes >= 1 &&
-      playback_scheduler_model_pass;
+      playback_scheduler_model_pass && playback_scheduler_runtime_pass;
   const bool playback_scheduler_physical_evidence_present =
       !bool_field_is(playback_scheduler, "physical_evidence_present", false);
   const bool playback_scheduler_product_claim_allowed =
@@ -335,12 +351,18 @@ int main(int argc, char** argv) {
             << number_or(playback_scheduler, "stable_min_playback_lead_slots", -1.0)
             << ", \"stable_max_playback_lead_slots\": "
             << number_or(playback_scheduler, "stable_max_playback_lead_slots", -1.0)
+            << ", \"runtime_binding_pass\": "
+            << (playback_scheduler_runtime_pass ? "true" : "false")
+            << ", \"runtime_capture_submit_calls\": "
+            << number_or(playback_scheduler_runtime, "stable_capture_runtime_submit_calls", -1.0)
+            << ", \"runtime_playback_submit_calls\": "
+            << number_or(playback_scheduler_runtime, "stable_playback_runtime_submit_calls", -1.0)
             << ", \"physical_evidence_present\": "
             << (playback_scheduler_physical_evidence_present ? "true" : "false")
             << ", \"product_claim_allowed\": "
             << (playback_scheduler_product_claim_allowed ? "true" : "false")
             << ", \"next_required_action\": "
-               "\"IMPLEMENT_OPT_IN_PLAYBACK_LEAD_SCHEDULER_RUNTIME_BINDING_THEN_SOURCE_REFERENCE_AB\"},\n"
+               "\"IMPLEMENT_OPT_IN_HAL_PLAYBACK_SCHEDULER_BINDING_THEN_SOURCE_REFERENCE_AB\"},\n"
             << "  \"thresholds\": {\"quality_alignment_score\": " << kQualityGate
             << ", \"driver_cpu_p95\": " << kDriverCpuP95Gate
             << ", \"lag_jumps_gt_2_frames\": " << kLagJumpGate << "},\n"

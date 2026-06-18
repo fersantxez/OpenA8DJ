@@ -19,6 +19,7 @@ add_library(opena8djcpp_core
   core/src/metrics.cpp
   core/src/prepared_transport.cpp
   core/src/playback_scheduler.cpp
+  core/src/playback_scheduler_runtime.cpp
   core/src/runtime_adapter.cpp
   core/src/usb_submit_plan.cpp
   core/src/usb_request_pool.cpp
@@ -257,6 +258,13 @@ add_executable(opena8djcpp_playback_scheduler_contract
   tools/playback_scheduler_contract.cpp)
 
 target_link_libraries(opena8djcpp_playback_scheduler_contract
+  PRIVATE
+    opena8djcpp_core)
+
+add_executable(opena8djcpp_playback_scheduler_runtime_contract
+  tools/playback_scheduler_runtime_contract.cpp)
+
+target_link_libraries(opena8djcpp_playback_scheduler_runtime_contract
   PRIVATE
     opena8djcpp_core)
 
@@ -506,6 +514,7 @@ add_test(NAME opena8djcpp_prepared_transport_routing_timecode_contract COMMAND o
 add_test(NAME opena8djcpp_prepared_transport_recovery_contract COMMAND opena8djcpp_prepared_transport_recovery_contract)
 add_test(NAME opena8djcpp_prepared_slot_scheduler_contract COMMAND opena8djcpp_prepared_slot_scheduler_contract)
 add_test(NAME opena8djcpp_playback_scheduler_contract COMMAND opena8djcpp_playback_scheduler_contract)
+add_test(NAME opena8djcpp_playback_scheduler_runtime_contract COMMAND opena8djcpp_playback_scheduler_runtime_contract)
 add_test(NAME opena8djcpp_runtime_adapter_contract COMMAND opena8djcpp_runtime_adapter_contract)
 add_test(NAME opena8djcpp_usb_submit_plan_contract COMMAND opena8djcpp_usb_submit_plan_contract)
 add_test(NAME opena8djcpp_usb_submit_payload_contract COMMAND opena8djcpp_usb_submit_payload_contract)
