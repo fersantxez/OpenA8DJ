@@ -9218,3 +9218,26 @@ Next implication:
   enabled. Physical route validity, same-session mainline/C++ comparison,
   CPU/resource superiority, and Traktor/timecode vinyl evidence are still
   required.
+
+## 2026-06-18 - Human-Test Package Build Must Use Source-Level Safe Defaults
+
+- Decision: add a source-level default for
+  `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1`.
+- Reason: the HAL bundle build passes this macro explicitly, but the
+  `opena8dj-usb-input-meter` diagnostic tool compiles `OpenA8DJUSB.m` without
+  the full HAL macro set. A human-test candidate cannot depend on every helper
+  target mirroring the driver CFLAGS exactly.
+- Evidence:
+  - `make dist` failed before the default with an undeclared identifier in
+    `OpenA8DJUSB.m`.
+  - After the default, `make dist` produced
+    `build/OpenA8DJ-0.3.25.pkg`,
+    `build/OpenA8DJ-0.3.25.dmg`, and
+    `build/OpenA8DJ.driver`.
+- Alternatives rejected:
+  - Only add the macro to one Makefile target: rejected because future helper
+    targets could hit the same compile-time gap.
+  - Change the default HAL behavior: rejected. The source default is `0`, and
+    the HAL candidate still receives the explicit release macro set.
+- Readiness impact: improves release reproducibility only. It does not change
+  physical quality, CPU, routing, Timecode Vinyl, or superiority claims.

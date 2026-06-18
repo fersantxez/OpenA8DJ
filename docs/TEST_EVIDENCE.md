@@ -13345,3 +13345,41 @@ Full offline gate after commit:
     offline contract now preserves this rejection.
 - Evidence:
   - `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/input-batch-20260618T134511Z`.
+
+## 2026-06-18 - Human-Test Package Build Reproducibility Fix
+
+- Commit context: after `fdcf57a`, before the package-fix commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - No driver was installed.
+  - No CoreAudio service was restarted.
+  - No default device, sample rate, buffer size, USB state, Audio 8 DJ state,
+    or iRig state was changed.
+  - No mainline or Rust files were changed.
+- Issue:
+  - `make dist` failed while compiling `build/opena8dj-usb-input-meter`
+    because `OpenA8DJUSB.m` referenced
+    `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1` outside the full HAL CFLAGS path.
+- Fix:
+  - Added a source-level default of `0` for
+    `OPENA8DJ_SELECT_ALT0_BEFORE_ALT1`.
+  - The HAL release build still passes the explicit macro set.
+- Command:
+  - `make dist`
+- Result:
+  - PASS.
+  - Produced `build/OpenA8DJ-0.3.25.pkg`.
+  - Produced `build/OpenA8DJ-0.3.25.dmg`.
+  - Produced `build/OpenA8DJ.driver`.
+- Pre-commit artifact hashes:
+  - `build/OpenA8DJ-0.3.25.pkg`:
+    `ab2685bdb45b1d8c945f963371bd0595bf9e507463fd90d28b7e79e9ea782c6e`.
+  - `build/OpenA8DJ-0.3.25.dmg`:
+    `bbcf96a31de757af73b2389d20102d12072dcb04ee6fe0006b482e48e5bec433`.
+  - `build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL`:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+- Readiness impact:
+  - The installable HAL package path is now viable for the 15:00 NY human-test
+    milestone, pending post-commit offline gates, package hash capture, and
+    lock-gated install/smoke/soundcheck.

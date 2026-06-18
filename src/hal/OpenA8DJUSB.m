@@ -261,6 +261,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ENABLE_PLAYBACK_PAYLOAD_GUARD 0
 #endif
 
+#ifndef OPENA8DJ_SELECT_ALT0_BEFORE_ALT1
+#define OPENA8DJ_SELECT_ALT0_BEFORE_ALT1 0
+#endif
+
 static const uint16_t kVendorID = 0x17cc;
 static const uint16_t kProductID = 0x1978;
 static const uint8_t kEndpointControlOut = 0x01;
