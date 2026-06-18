@@ -34,6 +34,29 @@
     diagnostic package. It still cannot claim audiophile quality, CPU/resource
     superiority, physical Timecode Vinyl readiness, or mainline replacement.
 
+## 2026-06-18: RC Package Identity
+
+- Scope:
+  - Regenerated the local distribution package with `make dist` after the RC
+    closure plan was committed.
+  - This wrote only local build/package artifacts under
+    `/Users/fer/dev/audio8djcpp/build`; it did not install, load, unload,
+    activate DriverKit, restart CoreAudio, reset USB, change defaults, play, or
+    record audio.
+- Result:
+  - HAL executable SHA-256:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`
+  - PKG SHA-256:
+    `801319d9ea5b019153dd55ce879430c07652f241998772faa2a2a715a31c5a2a`
+  - DMG SHA-256:
+    `647c03c4315609b2957e137ea8a0138a7fe26fd2825a70bf6596522a1caffcd6`
+  - Checksum file:
+    `build/OpenA8DJ-0.3.25-checksums.txt`
+- Interpretation:
+  - These artifacts are suitable for a lock-gated diagnostic install window if
+    the hardware preflight allows it. They still do not prove product quality,
+    CPU/resource superiority, or Timecode Vinyl physical readiness.
+
 ## 2026-06-18: Human-Test Milestone And Low-Risk Offline Hardening
 
 - Scope:
