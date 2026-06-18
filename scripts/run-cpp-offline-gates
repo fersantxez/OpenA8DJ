@@ -73,6 +73,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_soundcheck_wav_quality | tee "$EVIDENCE_DIR/soundcheck-wav-quality.json"
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_audiophile_tone_gate | tee "$EVIDENCE_DIR/audiophile-tone-gate.json"
+./build/cpp-release/opena8djcpp_audiophile_precision_claim_gate | tee "$EVIDENCE_DIR/audiophile-precision-claim-gate.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -167,6 +168,7 @@ capture_route_health = load_json("capture-route-health-gate.json")
 soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 audiophile_tone = load_json("audiophile-tone-gate.json")
+audiophile_precision_claim_gate = load_json("audiophile-precision-claim-gate.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -512,6 +514,46 @@ summary = {
         "baseline_sideband_ratio": audiophile_tone.get("baseline", {}).get("sideband_ratio"),
         "baseline_thd_ratio": audiophile_tone.get("baseline", {}).get("thd_ratio"),
         "evidence": "local-analysis/cpp-offline/audiophile-tone-gate.json",
+    },
+    "audiophile_precision_claim_gate": {
+        "status": audiophile_precision_claim_gate.get("result"),
+        "audiophile_precision_claim_allowed": audiophile_precision_claim_gate.get(
+            "audiophile_precision_claim_allowed"
+        ),
+        "candidate_lti_pass": audiophile_precision_claim_gate.get("candidate_lti_pass"),
+        "candidate_timewarp_pass": audiophile_precision_claim_gate.get(
+            "candidate_timewarp_pass"
+        ),
+        "runtime_correlation_pass": audiophile_precision_claim_gate.get(
+            "runtime_correlation_pass"
+        ),
+        "same_window_runs": audiophile_precision_claim_gate.get("same_window_runs"),
+        "enough_same_window_runs": audiophile_precision_claim_gate.get(
+            "enough_same_window_runs"
+        ),
+        "candidate_min_mid_coherence": audiophile_precision_claim_gate.get(
+            "candidate_min_mid_coherence"
+        ),
+        "candidate_min_high_coherence": audiophile_precision_claim_gate.get(
+            "candidate_min_high_coherence"
+        ),
+        "candidate_min_lti_snr_delta_db": audiophile_precision_claim_gate.get(
+            "candidate_min_lti_snr_delta_db"
+        ),
+        "candidate_delay_p95_frames": audiophile_precision_claim_gate.get(
+            "candidate_delay_p95_frames"
+        ),
+        "candidate_delay_range_frames": audiophile_precision_claim_gate.get(
+            "candidate_delay_range_frames"
+        ),
+        "max_runtime_residual_correlation": audiophile_precision_claim_gate.get(
+            "max_runtime_residual_correlation"
+        ),
+        "precision_claim_blockers": audiophile_precision_claim_gate.get(
+            "precision_claim_blockers"
+        ),
+        "blocked_claim": audiophile_precision_claim_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/audiophile-precision-claim-gate.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

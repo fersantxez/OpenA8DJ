@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/soundcheck-wav-quality.json",
       root / "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
       root / "local-analysis/cpp-offline/audiophile-tone-gate.json",
+      root / "local-analysis/cpp-offline/audiophile-precision-claim-gate.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -156,6 +157,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto driverkit_usb_request_shutdown_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_request_shutdown_contract")
+          .value_or("");
+  const auto audiophile_precision_claim_gate =
+      opena8djcpp::evidence_json::json_object(summary, "audiophile_precision_claim_gate")
           .value_or("");
   const auto physical_window_readiness_gate =
       opena8djcpp::evidence_json::json_object(summary, "physical_window_readiness_gate").value_or("");
@@ -274,6 +278,26 @@ int main(int argc, char** argv) {
       object_present(summary, "driverkit_usb_request_shutdown_contract") &&
       number_field_is(driverkit_usb_request_shutdown_contract, "cancelled_requests", 3.0) &&
       number_field_is(driverkit_usb_request_shutdown_contract, "live_requests_after_stop", 0.0) &&
+      object_present(summary, "audiophile_precision_claim_gate") &&
+      string_field_is(audiophile_precision_claim_gate, "status", "PASS") &&
+      bool_field_is(audiophile_precision_claim_gate,
+                    "audiophile_precision_claim_allowed", false) &&
+      bool_field_is(audiophile_precision_claim_gate, "candidate_lti_pass", false) &&
+      bool_field_is(audiophile_precision_claim_gate, "candidate_timewarp_pass", false) &&
+      bool_field_is(audiophile_precision_claim_gate, "runtime_correlation_pass", false) &&
+      bool_field_is(audiophile_precision_claim_gate, "enough_same_window_runs", false) &&
+      number_field_is(audiophile_precision_claim_gate, "same_window_runs", 1.0) &&
+      string_array_has(audiophile_precision_claim_gate, "precision_claim_blockers",
+                       "candidate_lti_precision_thresholds_not_met") &&
+      string_array_has(audiophile_precision_claim_gate, "precision_claim_blockers",
+                       "candidate_timewarp_stability_thresholds_not_met") &&
+      string_array_has(audiophile_precision_claim_gate, "precision_claim_blockers",
+                       "runtime_residual_correlation_above_threshold_or_missing") &&
+      string_array_has(audiophile_precision_claim_gate, "precision_claim_blockers",
+                       "same_window_statistical_sample_too_small") &&
+      string_field_is(
+          audiophile_precision_claim_gate, "blocked_claim",
+          "NO_AUDIOPHILE_PRECISION_OR_SUPERIORITY_CLAIM_WITHOUT_LTI_TIMEWARP_RUNTIME_AND_STATISTICAL_SAME_WINDOW_PASS") &&
       object_present(summary, "physical_window_readiness_gate") &&
       bool_field_is(physical_window_readiness_gate, "ready_for_route_revalidation_window", true) &&
       bool_field_is(physical_window_readiness_gate, "ready_for_product_physical_ab", false) &&

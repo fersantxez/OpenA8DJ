@@ -2291,3 +2291,21 @@ The next offline quality-analysis package should add formal PASS/FAIL gates for:
   not just point estimates.
 - DVS/timecode stress margin: PASS requires no false accepts, no deck swaps,
   strong correlation, low frequency error, low jitter, and no channel leakage.
+
+Current implementation:
+
+- `local-analysis/cpp-offline/audiophile-precision-claim-gate.json` must be
+  present and PASS as a guard. PASS means the guard is active; it does not mean
+  audiophile superiority.
+- The gate can only allow a precision/superiority claim when:
+  - candidate LTI coherence/residual thresholds pass;
+  - candidate time-warp stability thresholds pass;
+  - runtime residual correlation is below threshold;
+  - at least three same-window runs exist;
+  - mainline reference evidence is also valid enough for comparison.
+- Current evidence blocks the claim with:
+  - candidate LTI thresholds not met;
+  - candidate time-warp stability thresholds not met;
+  - mainline reference precision thresholds not met;
+  - runtime residual correlation above threshold;
+  - same-window statistical sample too small.

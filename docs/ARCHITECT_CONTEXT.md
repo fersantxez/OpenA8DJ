@@ -2591,3 +2591,11 @@ Current implication:
     compiled against the DriverKit SDK, the placeholder timestamp model must be
     replaced by the AudioDriverKit timing binding, and physical validation
     remains lock-gated.
+  - Audiophile precision claims now have a dedicated guard:
+    `opena8djcpp_audiophile_precision_claim_gate`. It reads existing
+    same-window LTI/time-warp and runtime-discontinuity evidence, enforces
+    coherence, residual-ratio, timebase, runtime-correlation, and sample-count
+    thresholds, and currently blocks superiority claims. Current evidence shows
+    candidate mid/high coherence far below threshold, delay p95 around 66
+    frames, runtime residual correlation above threshold, and only one
+    same-window sample versus the minimum three.

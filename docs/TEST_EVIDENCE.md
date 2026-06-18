@@ -10772,3 +10772,44 @@ Full offline gate rerun:
   - This is still not a runnable or installable DriverKit driver. Real readiness
     remains blocked until a DriverKit SDK build replaces placeholder timing with
     real AudioDriverKit timestamps and lock-gated physical validation passes.
+
+## 2026-06-18 Audiophile Precision Claim Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_audiophile_precision_claim_gate`.
+  - Wired it into CMake, CTest, `scripts/run-cpp-offline-gates`, evidence schema,
+    and static policy.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `git diff --check`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_audiophile_precision_claim_gate opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_audiophile_precision_claim_gate`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_(audiophile_precision_claim_gate|audiophile_tone_gate|product_quality_claim_gate|physical_window_readiness_gate)' --output-on-failure`
+- Focused result:
+  - `opena8djcpp_audiophile_precision_claim_gate`: PASS as guard.
+  - `audiophile_precision_claim_allowed=false`.
+  - `candidate_lti_pass=false`.
+  - `candidate_timewarp_pass=false`.
+  - `runtime_correlation_pass=false`.
+  - `same_window_runs=1`.
+  - `enough_same_window_runs=false`.
+  - `candidate_min_mid_coherence=0.102145`.
+  - `candidate_min_high_coherence=0.0398416`.
+  - `candidate_min_lti_snr_delta_db=-1.12498`.
+  - `candidate_delay_p95_frames=66`.
+  - `candidate_delay_range_frames=132`.
+  - `max_runtime_residual_correlation=0.463763`.
+  - Static policy: PASS, `forbidden_hits=0`.
+  - Focused CTest subset: `4/4` PASS.
+- Interpretation:
+  - This is a stronger objective barrier against premature audiophile
+    superiority claims.
+  - Current evidence remains unsuitable for claiming better sound quality,
+    timebase stability, runtime resource use, or branch promotion.

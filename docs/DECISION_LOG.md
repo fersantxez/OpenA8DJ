@@ -7110,3 +7110,41 @@ Next implication:
 - Build the extension on a full Xcode/DriverKit SDK host, replace placeholder
   timestamps with the real AudioDriverKit timing source, then validate physical
   quality/performance only under the hardware lock.
+
+## 2026-06-18: Add Audiophile Precision Claim Gate
+
+Decision:
+- Added `opena8djcpp_audiophile_precision_claim_gate`.
+- The gate reads existing offline evidence from the latest same-window
+  `physical-superiority-window` bundle and latest `route-validation-offline`
+  runtime-discontinuity bundle.
+
+Reason:
+- Quality claims need objective barriers beyond packet correctness, tone gates,
+  or single-run soundcheck metrics. LTI coherence, residual ratios, time-warp
+  stability, runtime correlation, and repeated same-window samples separate a
+  real driver improvement from a broken capture route or unstable timebase.
+
+Evidence:
+- Focused gate PASS with claim blocked:
+  - candidate `min_mid_coherence=0.102145` versus threshold `0.80`;
+  - candidate `min_high_coherence=0.0398416` versus threshold `0.65`;
+  - candidate `min_lti_snr_delta_db=-1.12498` versus threshold `6.0`;
+  - candidate `max_lti_mid_ratio=2.4614` and `max_lti_high_ratio=5.37161`
+    versus threshold `1.15`;
+  - candidate `delay_p95_frames=66` and `delay_range_frames=132`;
+  - max runtime residual correlation `0.463763` versus threshold `0.16`;
+  - same-window runs `1` versus required `3`.
+
+Alternatives discarded:
+- Install more analysis libraries first: rejected because existing `numpy` and
+  `scipy` are sufficient for this gate, and the missing piece was formal
+  PASS/FAIL semantics in the C++ evidence chain.
+- Treat diagnostic LTI/time-warp scripts as sufficient: rejected because loose
+  analyzer output does not block product claims unless it is integrated into
+  CTest, the offline summary, and evidence schema.
+
+Next implication:
+- Future physical windows must produce repeated same-window mainline/C++ runs
+  that pass LTI, time-warp, runtime-correlation, and statistical sample gates
+  before any audiophile superiority claim.

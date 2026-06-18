@@ -129,6 +129,7 @@ int main(int argc, char** argv) {
       root / "tools/irig_idle_capture_gate.cpp",
       root / "tools/physical_window_readiness_gate.cpp",
       root / "tools/soundcheck_wav_quality.cpp",
+      root / "tools/audiophile_precision_claim_gate.cpp",
       root / "tools/hal_logical_capture_batching_contract.cpp",
       root / "tools/hal_runtime_geometry_observability_contract.cpp",
       root / "tools/driverkit_surface_model.cpp",
