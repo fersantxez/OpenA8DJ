@@ -1,5 +1,60 @@
 # Decision Log
 
+## 2026-06-17/18: Reject Current C++ HAL Physical Candidate Again
+
+Decision:
+- Do not claim physical readiness, audiophile quality, lower CPU, or branch
+  promotion for the current C++ HAL candidate.
+- Keep the loaded candidate as diagnostic-only evidence and unload it after the
+  failed physical window.
+- Continue toward a prepared transport / DriverKit timing model rather than
+  random HAL queue/coalescing toggles.
+
+Reason:
+- The candidate can enumerate `Open Audio 8 DJ` as `8 in / 8 out`, but current
+  locked physical soundchecks still fail strict quality by a wide margin.
+- The controlled fixture run eliminates automatic music selection as the main
+  explanation and still fails with low correlation, bad SNR, and lag jumps.
+- The fresh idle iRig capture is clean, so idle capture noise alone does not
+  explain the playback failure.
+- Process sampling again shows driver CPU dominated by IOUSBHost async enqueue
+  paths rather than audio packing/routing.
+
+Evidence:
+- HAL safety run:
+  `local-analysis/hal-candidate-safety/20260618T003723Z-cpp-candidate-leave-loaded`.
+- Real-music soundcheck:
+  `local-analysis/soundcheck/20260618T003816Z-cpp-hal-irig-pairA-12s`,
+  `quality_alignment_score=0.136314`, SNR `-23.07 dB`,
+  `lag_jumps_gt_2_frames=39`.
+- Controlled fixture soundcheck:
+  `local-analysis/soundcheck/20260618T004016Z-cpp-hal-irig-pairA-fixture-12s-threshold70`,
+  `quality_alignment_score=0.603070`, SNR `-5.81 dB`,
+  `lag_jumps_gt_2_frames=18`, `opena8dj_driver` CPU around `21-22%`.
+- Driver-sampled fixture soundcheck:
+  `local-analysis/soundcheck/20260618T004250Z-cpp-hal-irig-pairA-fixture-6s-driver-sample`,
+  `dominant_interpretation=usbhost_async_enqueue_from_capture_and_playback_paths`.
+- iRig idle capture:
+  `local-analysis/irig-capture-isolation/20260618T004203Z-irig-idle-after-cpp-hal-fail`,
+  max RMS `-62.350199 dBFS`, max peak `-41.031139 dBFS`,
+  `idle_capture_unhealthy=false`.
+- Final unload guard:
+  `local-analysis/audio-stack-guard/20260618T004407Z-unload-after-failed-cpp-physical`,
+  `opena8dj_state=unloaded`, audio stack health PASS.
+
+Alternatives discarded:
+- Treat HAL enumeration as readiness: rejected because quality and CPU failed.
+- Blame iRig idle noise: rejected by the fresh locked idle capture.
+- Keep probing simple playback coalescing/refill variants: rejected because
+  prior probes reduced CPU by breaking quality, and the current sample points
+  to the broader USB enqueue cadence/timing model.
+
+Next implication:
+- The next implementation step should move the runtime path toward the prepared
+  transport/DriverKit request model already covered by offline contracts, then
+  re-enter HAL/DriverKit hardware testing only when it predicts lower enqueue
+  cadence without changing the validated packet/layout timing.
+
 ## 2026-06-17: Require Same-Window Known-Good Route Evidence For Promotion
 
 Decision:

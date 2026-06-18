@@ -3514,3 +3514,37 @@ Risk:
     missing physical evidence; the next real step remains a locked known-good
     wired non-Audio8 route revalidation followed by same-session mainline/C++
     physical A/B.
+
+## 2026-06-17/18 Subagent: Raman Physical Window Auditor
+
+- Agent:
+  - Raman (`019ed827-dc26-7693-a8a3-60ddb566472a`)
+- Mission:
+  - Read-only audit of the safest next physical command for closing
+    `same_window_known_good_route_revalidation_missing`.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Finding:
+  - The promotable route-only command is
+    `scripts/run-physical-superiority-window --execute --route-only`, but only
+    with an explicit wired non-Audio8 output that is not `iRig Stream` and not
+    built-in speakers.
+  - Expected route:
+    `<wired non-Audio8 CoreAudio output> -> mixer/REC OUT route -> iRig Stream`.
+  - Abort if the lock is busy, iRig is not visible with 2 inputs, the known-good
+    output is missing, resolves to Audio 8, is built-in/acoustic, is the same
+    device as capture, or capture appears virtual.
+- Integrated action:
+  - Current CoreAudio enumeration exposed no promotable known-good output:
+    `iRig Stream`, `MacBook Air Speakers`, and, while loaded, `Open Audio 8 DJ`
+    only.
+  - Because route revalidation could not be promotion-valid, the architect ran
+    diagnostic C++ HAL soundchecks instead, documented the negative quality/CPU
+    evidence, and unloaded the failed candidate.
+- Risk:
+  - A real non-Audio8 wired output is still required before a promotion-valid
+    known-good route or same-session mainline/C++ A/B can be run.

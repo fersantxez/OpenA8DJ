@@ -1,5 +1,59 @@
 # Test Evidence
 
+## 2026-06-17/18: Current C++ HAL Physical Diagnostic Fails Quality And CPU
+
+- Scope:
+  - Loaded `/Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver` under the global
+    hardware lock with `scripts/test-hal-candidate-safety --leave-loaded`.
+  - Verified `Open Audio 8 DJ` enumerated as `8 in / 8 out` and `iRig Stream`
+    stayed visible.
+  - Ran locked physical C++ HAL soundchecks through Audio 8 pair A into
+    `iRig Stream` capture.
+  - Captured an iRig idle run after the failures, then unloaded the candidate
+    with `scripts/audio-stack-guard --force-unload-opena8dj`.
+- Commands:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 2 --enumeration-timeout 8 --min-idle-pct 10 --run-dir local-analysis/hal-candidate-safety/20260618T003723Z-cpp-candidate-leave-loaded`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260618T003816Z-cpp-hal-irig-pairA-12s --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -16 --max-lag 360000 --stream-stats-snapshots --audio-stack-min-idle-pct 10 --skip-build`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260618T004016Z-cpp-hal-irig-pairA-fixture-12s-threshold70 --music-file local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 12 --mode start --target-peak-db -16 --max-lag 360000 --stream-stats-snapshots --audio-stack-threshold 70 --audio-stack-total-threshold 160 --audio-stack-min-idle-pct 10 --skip-build`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-soundcheck --run-dir local-analysis/soundcheck/20260618T004250Z-cpp-hal-irig-pairA-fixture-6s-driver-sample --music-file local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 6 --mode start --target-peak-db -16 --max-lag 360000 --stream-stats-snapshots --sample-driver-process --sample-driver-delay 2 --sample-driver-seconds 4 --audio-stack-threshold 70 --audio-stack-total-threshold 160 --audio-stack-min-idle-pct 10 --skip-build`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" ./build/audio-record 12 local-analysis/irig-capture-isolation/20260618T004203Z-irig-idle-after-cpp-hal-fail/captured.wav "iRig Stream" 1,2 0.0003`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 2 --enumeration-timeout 8 --min-idle-pct 10 --run-dir local-analysis/audio-stack-guard/20260618T004407Z-unload-after-failed-cpp-physical/guard`
+- Results:
+  - HAL safety: PASS. `Open Audio 8 DJ` appeared as `8 in / 8 out`; `iRig
+    Stream` remained visible.
+  - Real-music soundcheck: FAIL. `quality_alignment_score=0.136314`, SNR
+    `-23.07 dB`, `lag_jumps_gt_2_frames=39`, no clipping.
+  - Controlled fixture soundcheck: FAIL. `quality_alignment_score=0.603070`,
+    SNR `-5.81 dB`, `lag_jumps_gt_2_frames=18`, no clipping.
+  - Driver sampled fixture soundcheck: FAIL. `quality_alignment_score=0.495184`,
+    SNR `-12.28 dB`, `lag_jumps_gt_2_frames=14`, no clipping.
+  - Driver CPU during controlled fixture remained too high:
+    `opena8dj_driver` median about `21.4%`, p95 about `22.1%`, max about
+    `22.2%`.
+  - Process sample passed as diagnostic evidence and again attributed active
+    driver cost to IOUSBHost async enqueue from capture/playback paths:
+    `dominant_interpretation=usbhost_async_enqueue_from_capture_and_playback_paths`.
+  - Current iRig idle capture remained clean: max RMS `-62.350199 dBFS`, max
+    peak `-41.031139 dBFS`, `idle_capture_unhealthy=false`.
+  - Final guard unloaded the candidate: `opena8dj_state=unloaded`,
+    `opena8dj_driver_pids=none`, audio stack health PASS, iRig still visible.
+- Evidence:
+  - `local-analysis/hal-candidate-safety/20260618T003723Z-cpp-candidate-leave-loaded`
+  - `local-analysis/soundcheck/20260618T003816Z-cpp-hal-irig-pairA-12s`
+  - `local-analysis/soundcheck/20260618T004016Z-cpp-hal-irig-pairA-fixture-12s-threshold70`
+  - `local-analysis/soundcheck/20260618T004250Z-cpp-hal-irig-pairA-fixture-6s-driver-sample`
+  - `local-analysis/irig-capture-isolation/20260618T004203Z-irig-idle-after-cpp-hal-fail`
+  - `local-analysis/audio-stack-guard/20260618T004407Z-unload-after-failed-cpp-physical`
+- Interpretation:
+  - This is negative product evidence. The current C++ HAL candidate is not
+    better than mainline on quality or CPU.
+  - The iRig idle path is quiet, so idle noise alone does not explain the
+    failures. The bad signal appears under Audio 8 playback.
+  - More random HAL coalescing/timing toggles are not justified by the current
+    evidence; the next useful implementation work must reduce IOUSBHost enqueue
+    cadence through a deliberate prepared transport/DriverKit timing model
+    without breaking physical quality.
+
 ## 2026-06-17: Same-Window Known-Good Route Promotion Contract
 
 - Scope:

@@ -16,6 +16,17 @@ Branch: `driverkit/cpp-redesign`
   collapse physical quality. The raw/reused completion-handler probe reduced
   driver CPU only slightly while still failing physical quality, so it remains
   rejected as a default. Runtime isolation after cleanup is clean.
+- 2026-06-17/18 current hardware state: Audio 8 DJ is visible on USB and the
+  C++ HAL candidate can be loaded safely enough to enumerate `Open Audio 8 DJ`
+  as `8 in / 8 out`, but the candidate still fails physical quality and CPU.
+  Locked pair-A soundchecks through iRig failed with quality scores
+  `0.136314`, `0.603070`, and `0.495184` across real-music, controlled fixture,
+  and driver-sampled fixture runs. The controlled run showed driver CPU around
+  `21-22%`. A fresh iRig idle capture stayed clean at max RMS `-62.350199 dBFS`
+  and max peak `-41.031139 dBFS`, so idle capture noise alone is not the
+  explanation. The active driver sample again points to IOUSBHost async enqueue
+  from capture/playback paths as the CPU blocker. The candidate was unloaded
+  after diagnostics and audio-stack health passed.
 - The archived iRig WAV frontier now has a C++ forensic gate. It found `61`
   physical runs with WAV evidence, deeply analyzed `12`, and found `0` strict
   audiophile/product candidates. The best analyzed run is
