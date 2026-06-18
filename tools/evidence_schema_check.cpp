@@ -110,6 +110,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/lti-transfer-quality-parity-gate.json",
       root / "local-analysis/cpp-offline/fractional-time-warp-cpp-self-test.json",
       root / "local-analysis/cpp-offline/fractional-time-warp-parity-gate.json",
+      root / "local-analysis/cpp-offline/runtime-discontinuity-analysis-cpp-self-test.json",
+      root / "local-analysis/cpp-offline/runtime-discontinuity-parity-gate.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -189,6 +191,13 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto fractional_time_warp_parity_gate =
       opena8djcpp::evidence_json::json_object(summary, "fractional_time_warp_parity_gate")
+          .value_or("");
+  const auto runtime_discontinuity_analysis_cpp_self_test =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "runtime_discontinuity_analysis_cpp_self_test")
+          .value_or("");
+  const auto runtime_discontinuity_parity_gate =
+      opena8djcpp::evidence_json::json_object(summary, "runtime_discontinuity_parity_gate")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -426,6 +435,31 @@ int main(int argc, char** argv) {
       string_field_is(
           fractional_time_warp_parity_gate, "blocked_claim",
           "CPP_FRACTIONAL_TIME_WARP_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM") &&
+      object_present(summary, "runtime_discontinuity_analysis_cpp_self_test") &&
+      string_field_is(runtime_discontinuity_analysis_cpp_self_test, "status", "PASS") &&
+      string_field_is(runtime_discontinuity_analysis_cpp_self_test, "schema",
+                      "opena8djcpp.runtime-discontinuity-analysis-cpp-self-test.v1") &&
+      number_field_present(runtime_discontinuity_analysis_cpp_self_test, "correlation") &&
+      bool_field_is(runtime_discontinuity_analysis_cpp_self_test, "product_claim_allowed",
+                    false) &&
+      object_present(summary, "runtime_discontinuity_parity_gate") &&
+      string_field_is(runtime_discontinuity_parity_gate, "status", "PASS") &&
+      string_field_is(runtime_discontinuity_parity_gate, "schema",
+                      "opena8djcpp.runtime-discontinuity-parity-gate.v1") &&
+      bool_field_is(runtime_discontinuity_parity_gate, "evidence_present", true) &&
+      bool_field_is(runtime_discontinuity_parity_gate,
+                    "runtime_discontinuity_parity_pass", true) &&
+      bool_field_is(runtime_discontinuity_parity_gate,
+                    "cpp_runtime_discontinuity_claim_allowed", true) &&
+      number_field_is(runtime_discontinuity_parity_gate, "python_run_count", 6.0) &&
+      number_field_is(runtime_discontinuity_parity_gate, "cpp_run_count", 6.0) &&
+      number_field_present(runtime_discontinuity_parity_gate,
+                           "max_top_abs_correlation_delta") &&
+      number_field_present(runtime_discontinuity_parity_gate,
+                           "max_residual_median_delta") &&
+      string_field_is(
+          runtime_discontinuity_parity_gate, "blocked_claim",
+          "CPP_RUNTIME_DISCONTINUITY_PARITY_PASSED_FOR_SAVED_EVIDENCE_ONLY_NO_PRODUCT_CLAIM") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&

@@ -7558,3 +7558,50 @@ Next implication:
   parity.
 - Runtime CPU/resource superiority still requires prepared-submit runtime
   evidence and lock-gated physical comparison against mainline.
+
+## 2026-06-18: Add Native C++ Runtime Discontinuity Parity Guard
+
+Decision:
+- Added `opena8djcpp_runtime_discontinuity_analysis` as an offline-only native
+  C++ analyzer for the saved WAV/TSV runtime-correlation diagnostic previously
+  implemented in `scripts/analyze-runtime-discontinuities.py`.
+- Added `opena8djcpp_runtime_discontinuity_parity_gate` to compare C++ output
+  against the saved Python/SciPy oracle bundle
+  `local-analysis/route-validation-offline/20260617-mainline-cpp-route-signature/runtime-discontinuities.json`.
+- Integrated both tools into CMake/CTest and the offline evidence runner.
+
+Reason:
+- The audiophile precision gate blocks product claims when runtime residual
+  correlation is above threshold or missing. That metric must be reproducible
+  by the C++ line before Python can become only an oracle rather than the sole
+  implementation.
+- The C++ analyzer ports the same windowed model: aligned WAV windows, integer
+  lag, scalar residual/SNR, TSV CPU/stream telemetry, offset search, and
+  strongest correlation ranking.
+
+Evidence:
+- Focused Debug and Release CTest subsets pass for:
+  - `opena8djcpp_runtime_discontinuity_analysis_self_test`.
+  - `opena8djcpp_runtime_discontinuity_parity_gate`.
+- Parity guard:
+  - `runtime_discontinuity_parity_pass=true`.
+  - `cpp_runtime_discontinuity_claim_allowed=true`.
+  - `python_run_count=6`.
+  - `cpp_run_count=6`.
+  - max top-correlation delta about `0.00000047`.
+  - max residual median delta about `0.00000004`.
+  - max lag-jump p95 delta about `0`.
+  - max SNR median delta about `0.000031 dB`.
+
+Alternatives discarded:
+- Leave runtime discontinuity as Python-only: rejected for the same reason as
+  LTI and time-warp. Claim-critical analysis needs native reproducibility.
+- Treat parity as performance proof: rejected. It only proves metric parity on
+  saved evidence; it does not reduce real USB submit work or CPU.
+
+Next implication:
+- The native analyzer stack now covers LTI, fractional time-warp, and runtime
+  discontinuity parity.
+- The next engineering blocker is runtime: integrate prepared submit into the
+  actual HAL/DriverKit path and prove lower CPU/resource use without worse
+  physical audio quality.

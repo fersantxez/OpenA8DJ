@@ -2363,6 +2363,18 @@ Current implementation:
   removes the C++/Python time-warp analyzer parity blocker. It does not satisfy
   candidate time-warp stability, physical route validity, CPU/resource
   superiority, or product readiness.
+- `local-analysis/cpp-offline/runtime-discontinuity-analysis-cpp-self-test.json`
+  must be present and PASS. This validates the native C++ correlation engine on
+  a deterministic synthetic fixture and keeps `product_claim_allowed=false`.
+- `local-analysis/cpp-offline/runtime-discontinuity-parity-gate.json` must be
+  present and PASS as a guard. Current expected state is
+  `runtime_discontinuity_parity_pass=true` and
+  `cpp_runtime_discontinuity_claim_allowed=true`; this means the C++ runtime
+  discontinuity analyzer is close enough to the Python/SciPy oracle on the
+  saved route-validation bundle covered by the parity gate. This only removes
+  the C++/Python runtime-discontinuity analyzer parity blocker. It does not
+  prove runtime CPU/resource superiority, because the real runtime still has to
+  reduce USB submit work and pass same-session physical A/B.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

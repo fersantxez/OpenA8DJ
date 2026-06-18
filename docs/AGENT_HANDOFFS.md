@@ -3857,7 +3857,12 @@ Risk:
     CMake/CTest, the offline runner, schema check, and docs.
   - Risk: passing analyzer parity does not prove physical route validity,
     sound quality, CPU/resource superiority, or branch-promotion readiness.
-  - Next action: port runtime discontinuity correlation next.
+  - Follow-up integrated by architect: added
+    `opena8djcpp_runtime_discontinuity_analysis` and
+    `opena8djcpp_runtime_discontinuity_parity_gate`, with Debug/Release
+    focused parity passing against the saved route-validation bundle.
+  - Next action: move from analyzer parity to runtime prepared-submit
+    integration.
 - Planck (`019ed8f6-66de-7a40-bf67-55d91551b70f`):
   - Mission: identify why performance/resource superiority over mainline
     remains blocked.

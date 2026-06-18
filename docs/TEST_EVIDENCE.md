@@ -11217,3 +11217,50 @@ Full offline gate after commit:
   - This removes only the time-warp analyzer parity blocker. Product quality,
     runtime CPU/resource superiority, Traktor/timecode vinyl readiness, and
     branch promotion remain blocked until their physical gates pass.
+
+## 2026-06-18 Native C++ Runtime Discontinuity Parity
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_runtime_discontinuity_analysis` as a native C++ offline
+    analyzer for WAV/TSV runtime residual-correlation diagnostics.
+  - Added `opena8djcpp_runtime_discontinuity_parity_gate` to compare C++ output
+    against saved Python/SciPy runtime-discontinuity evidence.
+  - Integrated both tools into CMake/CTest and `scripts/run-cpp-offline-gates`.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused commands:
+  - `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline --target opena8djcpp_runtime_discontinuity_analysis opena8djcpp_runtime_discontinuity_parity_gate`
+  - `./build/cpp-offline/opena8djcpp_runtime_discontinuity_analysis --self-test`
+  - `./build/cpp-offline/opena8djcpp_runtime_discontinuity_parity_gate`
+  - `ctest --test-dir build/cpp-offline -R 'runtime_discontinuity' --output-on-failure`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release && cmake --build build/cpp-release --target opena8djcpp_runtime_discontinuity_analysis opena8djcpp_runtime_discontinuity_parity_gate opena8djcpp_evidence_schema_check && ctest --test-dir build/cpp-release -R 'runtime_discontinuity' --output-on-failure`
+- Focused result:
+  - Debug runtime-discontinuity CTest: `2/2` PASS.
+  - Release runtime-discontinuity CTest: `2/2` PASS.
+  - Self-test correlation: `1`.
+  - Parity gate: `result=PASS`.
+  - Parity gate: `evidence_present=true`.
+  - Parity gate: `runtime_discontinuity_parity_pass=true`.
+  - Parity gate: `cpp_runtime_discontinuity_claim_allowed=true`.
+  - Parity gate: `python_run_count=6`.
+  - Parity gate: `cpp_run_count=6`.
+  - Parity gate: `blockers=[]`.
+- Key parity deltas:
+  - Max top abs-correlation delta: about `0.00000047`.
+  - Max residual median delta: about `0.00000004`.
+  - Max lag-jump p95 delta: about `0`.
+  - Max SNR median delta: about `0.000031 dB`.
+- Evidence:
+  - `local-analysis/cpp-offline/runtime-discontinuity-analysis-cpp-self-test.json`
+  - `local-analysis/cpp-offline/runtime-discontinuity-parity-gate.json`
+- Interpretation:
+  - C++ runtime-discontinuity parity against the saved Python/SciPy oracle
+    evidence now passes.
+  - This removes only the runtime-discontinuity analyzer parity blocker.
+    Product quality, real runtime CPU/resource superiority, Traktor/timecode
+    vinyl readiness, and branch promotion remain blocked until their physical
+    gates pass.

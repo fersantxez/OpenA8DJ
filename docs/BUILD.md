@@ -1067,6 +1067,27 @@ the native analyzer is numerically close enough to the Python/SciPy oracle for
 the saved evidence covered by the parity gate. It is still not a product
 readiness, sound-quality, CPU, or branch-promotion claim.
 
+The native runtime discontinuity migration is:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_runtime_discontinuity_analysis
+./build/cpp-release/opena8djcpp_runtime_discontinuity_analysis --self-test
+```
+
+The parity guard is:
+
+```sh
+./build/cpp-release/opena8djcpp_runtime_discontinuity_parity_gate
+```
+
+It reruns the C++ WAV/TSV runtime residual-correlation analyzer on the saved
+route-validation bundle and compares it against the existing Python/SciPy JSON.
+The current intended result is `PASS` with
+`runtime_discontinuity_parity_pass=true`; that means the native analyzer is
+numerically close enough to the Python/SciPy oracle for the saved evidence
+covered by the parity gate. It is still not a CPU/resource superiority claim;
+real runtime submit reduction and same-session physical A/B remain required.
+
 `scripts/run-cpp-offline-gates` runs CTest before generating all final JSON
 evidence, so it excludes `opena8djcpp_evidence_schema_check` from those early
 CTest sweeps and runs the schema check explicitly at the end after all evidence

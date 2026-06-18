@@ -2687,3 +2687,14 @@ Current implication:
     but the real runtime still must demonstrate the prepared backend and CPU
     reduction under physical same-session comparison before any claim over
     mainline is valid.
+  - Current in-progress candidate after `ae22403` adds native C++ runtime
+    discontinuity analysis and a parity guard against the saved
+    Python/SciPy route-validation bundle. Focused Debug and Release tests pass.
+    The parity guard reports `runtime_discontinuity_parity_pass=true`,
+    `cpp_runtime_discontinuity_claim_allowed=true`, `python_run_count=6`,
+    `cpp_run_count=6`, zero blockers, and near-zero deltas for top correlation,
+    residual median, lag-jump p95, and SNR median.
+  - The native analyzer stack now has parity coverage for LTI transfer quality,
+    fractional time-warp, and runtime discontinuity correlation. This improves
+    measurement confidence. It still does not prove the driver is better than
+    mainline.

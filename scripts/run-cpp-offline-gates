@@ -98,6 +98,11 @@ fi
   --json-out "$EVIDENCE_DIR/fractional-time-warp-cpp-self-test.json"
 ./build/cpp-release/opena8djcpp_fractional_time_warp_parity_gate \
   | tee "$EVIDENCE_DIR/fractional-time-warp-parity-gate.json"
+./build/cpp-release/opena8djcpp_runtime_discontinuity_analysis \
+  --self-test \
+  --json-out "$EVIDENCE_DIR/runtime-discontinuity-analysis-cpp-self-test.json"
+./build/cpp-release/opena8djcpp_runtime_discontinuity_parity_gate \
+  | tee "$EVIDENCE_DIR/runtime-discontinuity-parity-gate.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -202,6 +207,8 @@ lti_transfer_quality_cpp_self_test = load_json("lti-transfer-quality-cpp-self-te
 lti_transfer_quality_parity_gate = load_json("lti-transfer-quality-parity-gate.json")
 fractional_time_warp_cpp_self_test = load_json("fractional-time-warp-cpp-self-test.json")
 fractional_time_warp_parity_gate = load_json("fractional-time-warp-parity-gate.json")
+runtime_discontinuity_analysis_cpp_self_test = load_json("runtime-discontinuity-analysis-cpp-self-test.json")
+runtime_discontinuity_parity_gate = load_json("runtime-discontinuity-parity-gate.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -775,6 +782,37 @@ summary = {
         "blockers": fractional_time_warp_parity_gate.get("blockers"),
         "blocked_claim": fractional_time_warp_parity_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/fractional-time-warp-parity-gate.json",
+    },
+    "runtime_discontinuity_analysis_cpp_self_test": {
+        "status": runtime_discontinuity_analysis_cpp_self_test.get("result"),
+        "schema": runtime_discontinuity_analysis_cpp_self_test.get("schema"),
+        "correlation": runtime_discontinuity_analysis_cpp_self_test.get("correlation"),
+        "product_claim_allowed": runtime_discontinuity_analysis_cpp_self_test.get(
+            "product_claim_allowed"
+        ),
+        "evidence": "local-analysis/cpp-offline/runtime-discontinuity-analysis-cpp-self-test.json",
+    },
+    "runtime_discontinuity_parity_gate": {
+        "status": runtime_discontinuity_parity_gate.get("result"),
+        "schema": runtime_discontinuity_parity_gate.get("schema"),
+        "evidence_present": runtime_discontinuity_parity_gate.get("evidence_present"),
+        "runtime_discontinuity_parity_pass": runtime_discontinuity_parity_gate.get(
+            "runtime_discontinuity_parity_pass"
+        ),
+        "cpp_runtime_discontinuity_claim_allowed": runtime_discontinuity_parity_gate.get(
+            "cpp_runtime_discontinuity_claim_allowed"
+        ),
+        "python_run_count": runtime_discontinuity_parity_gate.get("python_run_count"),
+        "cpp_run_count": runtime_discontinuity_parity_gate.get("cpp_run_count"),
+        "max_top_abs_correlation_delta": runtime_discontinuity_parity_gate.get(
+            "max_top_abs_correlation_delta"
+        ),
+        "max_residual_median_delta": runtime_discontinuity_parity_gate.get(
+            "max_residual_median_delta"
+        ),
+        "blockers": runtime_discontinuity_parity_gate.get("blockers"),
+        "blocked_claim": runtime_discontinuity_parity_gate.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/runtime-discontinuity-parity-gate.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",
