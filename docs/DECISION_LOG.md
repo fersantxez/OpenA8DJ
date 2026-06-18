@@ -1,5 +1,39 @@
 # Decision Log
 
+## 2026-06-18 - Make Resource Superiority A Fail-Closed Offline Model
+
+Decision:
+- `opena8djcpp_transport_budget_model` now reports an explicit offline
+  resource-superiority model for the prepared runtime path.
+- The model records the prepared 8:1 submit reduction, logical slots per USB
+  submit, observed fixed queue/requeue/enqueue work, and predicted prepared
+  fixed-queue work.
+- `current-offline-gates.json` and `opena8djcpp_evidence_schema_check` require
+  those fields while still keeping
+  `runtime_cpu_superiority_claim_allowed=false`.
+
+Reason:
+- The product goal is lower CPU/jitter than mainline, not just clean pack/decode
+  throughput.
+- Offline evidence can justify spending a controlled physical window, but it
+  cannot prove a lower runtime CPU or jitter result until the prepared path is
+  bound to real USB and measured against mainline in the same session.
+
+Evidence:
+- Prepared runtime contract: 528 logical slots -> 66 USB submit descriptors,
+  8 logical slots per USB submit, zero fallback allocations, zero submit
+  failures.
+- Stored hot-path timing identifies fixed queue/requeue/enqueue work as the
+  dominant cost center.
+- The model predicts fixed-queue work should fall by the 8:1 submit-reduction
+  factor, but leaves physical CPU and jitter superiority blocked.
+
+Next implication:
+- A future physical window must measure actual submit cadence, driver CPU p95,
+  CoreAudio CPU p95, underruns/overruns, and jitter against mainline in the
+  same session before any quality/performance superiority or branch-promotion
+  claim.
+
 ## 2026-06-18 - Make Timing Instability An Explicit Quality Claim Blocker
 
 Decision:

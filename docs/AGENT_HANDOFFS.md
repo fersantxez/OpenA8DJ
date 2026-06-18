@@ -1,5 +1,47 @@
 # Agent Handoffs
 
+## 2026-06-18 - Existing Subagent Results Integrated
+
+Shared warning given/retained:
+- "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+
+Subagents/results used:
+- Resource/performance review: identified that the remaining CPU/jitter gap was
+  not throughput, but a fail-closed resource-superiority model tied to prepared
+  submit reduction and hot-path timing. Integrated into
+  `tools/transport_budget_model.cpp`, `scripts/run-cpp-offline-gates`, and
+  `tools/evidence_schema_check.cpp`.
+- Physical-window review: confirmed the safest next physical sequence remains
+  non-Audio8 wired known-good route revalidation before any product A/B.
+- HAL prepared-runtime review: confirmed default HAL should remain untouched for
+  claims until the prepared path has real submit-cadence evidence.
+- Audiophile-analysis review: confirmed dual C++/Python agreement and degraded
+  analyzer self-tests are already present in the current tree.
+
+Files affected by integration:
+- `tools/transport_budget_model.cpp`
+- `scripts/run-cpp-offline-gates`
+- `tools/evidence_schema_check.cpp`
+- `docs/DECISION_LOG.md`
+- `docs/ARCHITECT_CONTEXT.md`
+- `docs/TEST_EVIDENCE.md`
+- `docs/AGENT_HANDOFFS.md`
+
+Risks:
+- The offline resource model is a hypothesis gate, not physical proof.
+- Branch promotion remains blocked until validated route, same-session mainline
+  vs C++ A/B, CPU/jitter superiority, strict audiophile gates, and
+  Traktor/timecode physical evidence pass.
+
+Recommended next action:
+- Commit this gate hardening, rerun offline gates on clean HEAD, then only use a
+  lock-gated physical window for route revalidation if a separate wired
+  non-Audio8 output is visible.
+
 Date: 2026-06-16
 
 ## Global Warning Given To Agents

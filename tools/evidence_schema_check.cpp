@@ -246,6 +246,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
       opena8djcpp::evidence_json::json_object(summary, "physical_route_inventory").value_or("");
+  const auto transport_budget_model =
+      opena8djcpp::evidence_json::json_object(summary, "transport_budget_model").value_or("");
   const auto hal_transport_runtime_gate =
       opena8djcpp::evidence_json::json_object(summary, "hal_transport_runtime_gate").value_or("");
   const auto hal_logical_capture_batching_contract =
@@ -295,6 +297,24 @@ int main(int argc, char** argv) {
                        "traktor_timecode_vinyl_physical_gate_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
                        "runtime_cpu_superiority_over_mainline_missing") &&
+      object_present(summary, "transport_budget_model") &&
+      string_field_is(transport_budget_model, "status", "PASS") &&
+      bool_field_is(transport_budget_model,
+                    "prepared_runtime_offline_resource_superiority_model_pass", true) &&
+      bool_field_is(transport_budget_model, "prepared_runtime_resource_model_inputs_complete",
+                    true) &&
+      number_field_is(transport_budget_model, "prepared_runtime_submit_reduction_ratio", 8.0) &&
+      number_field_is(transport_budget_model, "prepared_runtime_logical_slots_per_usb_submit",
+                      8.0) &&
+      number_field_present(transport_budget_model,
+                           "prepared_runtime_observed_fixed_queue_ticks_per_second") &&
+      number_field_present(transport_budget_model,
+                           "prepared_runtime_predicted_fixed_queue_ticks_per_second") &&
+      number_field_is(transport_budget_model,
+                      "prepared_runtime_predicted_fixed_queue_work_reduction_ratio", 8.0) &&
+      bool_field_is(transport_budget_model, "runtime_cpu_superiority_claim_allowed", false) &&
+      string_array_has(transport_budget_model, "resource_claim_blockers",
+                       "same_session_physical_cpu_ab_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
                        "real_driverkit_sdk_and_selected_xcode_missing") &&
       string_array_has(summary, "promotion_hard_blockers",

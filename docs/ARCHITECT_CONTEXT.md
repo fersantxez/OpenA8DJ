@@ -2934,6 +2934,12 @@ Current implication:
   evidence and reports `sufficient_for_physical_window=true` with an 8:1 submit
   reduction model, but keeps `runtime_cpu_superiority_claim_allowed=false`
   until same-session physical CPU/submit-cadence A/B beats mainline.
+- Resource-model hardening update: the model now exposes
+  `prepared_runtime_offline_resource_superiority_model_pass=true`, 8 logical
+  slots per USB submit, observed fixed queue/requeue/enqueue work, and predicted
+  prepared fixed-queue work. This is only an objective reason to schedule a
+  controlled prepared-runtime physical A/B; it is not a CPU, jitter, sound
+  quality, Timecode Vinyl, or branch-promotion claim.
 - Audiophile analyzer false-positive hardening update: both C++ and Python WAV
   analyzers now include degraded self-tests, and the offline gate requires
   those degraded fixtures to be rejected. This improves measurement integrity

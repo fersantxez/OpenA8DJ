@@ -12815,3 +12815,41 @@ Full offline gate after commit:
   - It proves the current iRig same-device route is not capturing a correlated
     loopback signal, so it cannot be used to validate product sound quality or
     branch promotion.
+
+## 2026-06-18 - Offline Resource Superiority Model Hardening
+
+- Commit context: `5dbcae0` plus uncommitted resource-model hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build and evidence analysis only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or service mutation.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/transport-budget-model.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Result:
+  - Debug CTest: `79/79` PASS.
+  - Release CTest: `80/80` PASS.
+  - Prepared runtime offline model:
+    `prepared_runtime_offline_resource_superiority_model_pass=true`.
+  - Prepared runtime submit reduction:
+    `prepared_runtime_submit_reduction_ratio=8`.
+  - Logical slots per USB submit:
+    `prepared_runtime_logical_slots_per_usb_submit=8`.
+  - Observed fixed queue/requeue/enqueue work:
+    `prepared_runtime_observed_fixed_queue_ticks_per_second=5183720`.
+  - Predicted prepared fixed queue/requeue/enqueue work:
+    `prepared_runtime_predicted_fixed_queue_ticks_per_second=647966`.
+  - Runtime CPU superiority claim remains blocked:
+    `runtime_cpu_superiority_claim_allowed=false`.
+  - Provenance/freshness gate correctly reported FAIL before commit because the
+    worktree was dirty.
+- Interpretation:
+  - The offline model now gives an objective reason to test the prepared runtime
+    in a controlled physical window.
+  - It still does not prove lower CPU, lower jitter, better sound quality, or
+    Timecode Vinyl readiness. Those claims remain blocked until same-session
+    physical A/B evidence beats mainline on a validated route.

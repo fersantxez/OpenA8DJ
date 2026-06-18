@@ -232,6 +232,29 @@ int main(int argc, char** argv) {
   const bool hot_path_present = !hot_path.empty() && string_field_is(hot_path, "result", "PASS");
   const double fixed_queue_to_playback_fill_ratio =
       number_or(hot_path, "fixed_queue_to_playback_fill_ratio", -1.0);
+  const double fixed_queue_ticks_per_second =
+      number_or(hot_path, "fixed_queue_ticks_per_second", -1.0);
+  const double prepared_runtime_logical_slots =
+      number_or(migration, "prepared_usb_runtime_submit_logical_slots", 0.0);
+  const double prepared_runtime_usb_submit_calls =
+      number_or(migration, "prepared_usb_runtime_submit_usb_submit_calls", 0.0);
+  const double prepared_runtime_slots_per_submit =
+      prepared_runtime_usb_submit_calls > 0.0
+          ? prepared_runtime_logical_slots / prepared_runtime_usb_submit_calls
+          : 0.0;
+  const double predicted_prepared_fixed_queue_ticks_per_second =
+      fixed_queue_ticks_per_second > 0.0 && prepared_submit_reduction > 0.0
+          ? fixed_queue_ticks_per_second / prepared_submit_reduction
+          : -1.0;
+  const bool resource_model_inputs_complete =
+      prepared_contracts_present && hot_path_present && fixed_queue_ticks_per_second > 0.0 &&
+      prepared_runtime_logical_slots > 0.0 && prepared_runtime_usb_submit_calls > 0.0;
+  const bool offline_resource_superiority_model_pass =
+      resource_model_inputs_complete && prepared_submit_reduction >= 8.0 &&
+      prepared_runtime_slots_per_submit >= 8.0 &&
+      predicted_prepared_fixed_queue_ticks_per_second > 0.0 &&
+      predicted_prepared_fixed_queue_ticks_per_second < fixed_queue_ticks_per_second &&
+      prepared_max_gap_ratio <= 1.25 && prepared_safe_logical_gap <= 1.0;
   const bool quality_claim_blocked =
       !product_quality.empty() && string_field_is(product_quality, "result", "PASS") &&
       bool_field_is(product_quality, "quality_claim_allowed", false);
@@ -263,6 +286,19 @@ int main(int argc, char** argv) {
             << (prepared_model_sufficient_for_physical_window ? "true" : "false")
             << ", \"runtime_cpu_superiority_claim_allowed\": "
             << (runtime_cpu_superiority_claim_allowed ? "true" : "false")
+            << ", \"offline_resource_superiority_model_pass\": "
+            << (offline_resource_superiority_model_pass ? "true" : "false")
+            << ", \"resource_model_inputs_complete\": "
+            << (resource_model_inputs_complete ? "true" : "false")
+            << ", \"runtime_logical_slots\": " << prepared_runtime_logical_slots
+            << ", \"runtime_logical_slots_per_usb_submit\": "
+            << prepared_runtime_slots_per_submit
+            << ", \"observed_fixed_queue_ticks_per_second\": "
+            << fixed_queue_ticks_per_second
+            << ", \"predicted_prepared_fixed_queue_ticks_per_second\": "
+            << predicted_prepared_fixed_queue_ticks_per_second
+            << ", \"predicted_fixed_queue_work_reduction_ratio\": "
+            << prepared_submit_reduction
             << ", \"quality_claim_blocked\": " << (quality_claim_blocked ? "true" : "false")
             << ", \"physical_ab_blocked\": " << (physical_ab_blocked ? "true" : "false")
             << ", \"claim_blockers\": [\"same_session_physical_cpu_ab_missing\", "
