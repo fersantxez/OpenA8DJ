@@ -78,9 +78,16 @@ int main(int argc, char** argv) {
       contains(hal_source, "uint32_t playbackRequests[kCaptureIsoFramesPerTransfer]") &&
       contains(hal_source, "playbackRequestCount < kCaptureIsoFramesPerTransfer");
   const bool playback_logical_batcher_still_chunks =
-      contains(hal_source, "if (count >= kPlaybackIsoFramesPerTransfer)") &&
       contains(hal_source, "offset + kPlaybackIsoFramesPerTransfer <= count") &&
-      contains(hal_source, "queuePlaybackWithRequests:&requests[offset] count:kPlaybackIsoFramesPerTransfer");
+      contains(hal_source, "queuePlaybackWithRequests:&requests[offset] count:kPlaybackIsoFramesPerTransfer") &&
+      contains(hal_source,
+               "NSUInteger room = kPlaybackIsoFramesPerTransfer - _pendingPlaybackRequestCount") &&
+      contains(hal_source, "NSUInteger take = count < room ? count : room") &&
+      contains(hal_source,
+               "[self queuePlaybackWithRequests:_pendingPlaybackRequests\n"
+               "                                                    count:kPlaybackIsoFramesPerTransfer]") &&
+      !contains(hal_source,
+                "_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer");
 
   std::vector<std::string> failures;
   if (!source_present) failures.push_back("hal_source_missing");

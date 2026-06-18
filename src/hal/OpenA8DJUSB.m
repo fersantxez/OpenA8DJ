@@ -5943,7 +5943,34 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if (requests == NULL || count == 0) {
         return NO;
     }
-    if (count >= kPlaybackIsoFramesPerTransfer) {
+
+    if (kPlaybackCoalesceTransfers <= 1) {
+        return [self queuePlaybackWithRequests:requests count:count];
+    }
+
+    while (count > 0) {
+        if (_pendingPlaybackRequestCount > 0) {
+            NSUInteger room = kPlaybackIsoFramesPerTransfer - _pendingPlaybackRequestCount;
+            NSUInteger take = count < room ? count : room;
+            memcpy(&_pendingPlaybackRequests[_pendingPlaybackRequestCount],
+                   requests,
+                   take * sizeof(requests[0]));
+            _pendingPlaybackRequestCount += take;
+            requests = &requests[take];
+            count -= take;
+
+            if (_pendingPlaybackRequestCount < kPlaybackIsoFramesPerTransfer) {
+                continue;
+            }
+            BOOL queued = [self queuePlaybackWithRequests:_pendingPlaybackRequests
+                                                    count:kPlaybackIsoFramesPerTransfer];
+            _pendingPlaybackRequestCount = 0;
+            if (!queued) {
+                return NO;
+            }
+            continue;
+        }
+
         NSUInteger offset = 0;
         while (offset + kPlaybackIsoFramesPerTransfer <= count) {
             if (![self queuePlaybackWithRequests:&requests[offset] count:kPlaybackIsoFramesPerTransfer]) {
@@ -5956,31 +5983,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         }
         requests = &requests[offset];
         count -= offset;
-    }
-    if (kPlaybackCoalesceTransfers <= 1) {
-        return [self queuePlaybackWithRequests:requests count:count];
-    }
-    if (count > kPlaybackIsoFramesPerTransfer) {
-        _pendingPlaybackRequestCount = 0;
-        return [self queuePlaybackWithRequests:requests count:count];
-    }
-    if (_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer) {
-        BOOL queued = [self queuePlaybackWithRequests:_pendingPlaybackRequests
-                                                count:_pendingPlaybackRequestCount];
-        _pendingPlaybackRequestCount = 0;
-        if (!queued) {
-            return NO;
-        }
-    }
-    memcpy(&_pendingPlaybackRequests[_pendingPlaybackRequestCount],
-           requests,
-           count * sizeof(requests[0]));
-    _pendingPlaybackRequestCount += count;
-    if (_pendingPlaybackRequestCount >= kPlaybackIsoFramesPerTransfer) {
-        BOOL queued = [self queuePlaybackWithRequests:_pendingPlaybackRequests
-                                                count:_pendingPlaybackRequestCount];
-        _pendingPlaybackRequestCount = 0;
-        return queued;
+        memcpy(_pendingPlaybackRequests, requests, count * sizeof(requests[0]));
+        _pendingPlaybackRequestCount = count;
+        return YES;
     }
     return YES;
 }

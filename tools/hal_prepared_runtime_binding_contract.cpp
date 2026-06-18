@@ -245,9 +245,15 @@ int main(int argc, char** argv) {
       contains(capture_paced_playback,
                "[self queuePlaybackWithRequests:&requests[offset] count:kPlaybackIsoFramesPerTransfer]") &&
       contains(capture_paced_playback,
-               "_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer") &&
+               "NSUInteger room = kPlaybackIsoFramesPerTransfer - _pendingPlaybackRequestCount") &&
+      contains(capture_paced_playback, "NSUInteger take = count < room ? count : room") &&
       contains(capture_paced_playback,
-               "_pendingPlaybackRequestCount >= kPlaybackIsoFramesPerTransfer");
+               "_pendingPlaybackRequestCount < kPlaybackIsoFramesPerTransfer") &&
+      contains(capture_paced_playback,
+               "[self queuePlaybackWithRequests:_pendingPlaybackRequests\n"
+               "                                                    count:kPlaybackIsoFramesPerTransfer]") &&
+      !contains(capture_paced_playback,
+                "_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer");
 
   const bool capture_submit_counter_success_only =
       appears_before(capture_queue,
