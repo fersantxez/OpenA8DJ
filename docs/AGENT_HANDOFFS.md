@@ -5295,3 +5295,46 @@ Next action:
 - After the baseline, run one experimental physical window at a time, starting
   with USB-clock-anchor if timing/quality is the next blocker, or prepared-lite
   if CPU/resource consumption becomes the limiting blocker.
+
+## 2026-06-18 Architect Continuation: USB-Clock Rejection
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Test whether the opt-in USB-clock-anchor candidate improves timing/quality
+  enough to replace or challenge the default diagnostic RC.
+
+Findings:
+- Initial USB-clock physical A/B was blocked by packaging: JSON evidence inside
+  the `.driver` bundle made codesign fail with `unsealed contents present in
+  the bundle root`.
+- Moving candidate JSON to `build/hal-candidates/` fixed safety loading.
+- Same-session A/B then rejected USB-clock: it was worse than mainline C on
+  quality alignment, SNR floor, residuals, lag jumps, driver CPU p95, and
+  CoreAudio CPU p95.
+- Immediate default restore can show a transient `coreaudiod` spike; a `--wait
+  20` restore passed and left the default RC active.
+
+Integrated action:
+- Candidate builders now reject JSON output inside candidate bundles.
+- Makefile targets write JSON under `build/hal-candidates/`.
+- Documented USB-clock as rejected for now.
+
+Risks:
+- The root timing-quality problem is still unsolved.
+- The prepared-lite candidate remains untested physically.
+- Product readiness, Timecode Vinyl certification, CPU superiority, and branch
+  promotion remain blocked.
+
+Next action:
+- Keep the default diagnostic RC active for human baseline.
+- If continuing optimization, prefer prepared-lite only if CPU/resource
+  pressure is the bottleneck; otherwise return to measured timing/root-cause
+  analysis before creating another timing candidate.

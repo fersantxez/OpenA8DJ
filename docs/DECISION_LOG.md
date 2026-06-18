@@ -9644,3 +9644,37 @@ Next implication:
   It does not unblock Timecode Vinyl certification, product quality,
   CPU/resource superiority, or branch promotion until route validation and
   same-session physical evidence pass.
+
+## 2026-06-18 - Reject USB-Clock-Anchor Candidate For Current RC
+
+- Decision: do not promote or human-baseline the USB-clock-anchor HAL
+  candidate. Keep the default diagnostic RC as the active 15:00 candidate.
+- Reason: the candidate first exposed a packaging error because JSON evidence
+  was written into the `.driver` bundle root. After fixing that and proving HAL
+  safety, the same-session physical A/B showed the USB-clock candidate was
+  worse than mainline on quality and resource metrics.
+- Evidence:
+  - Packaging fix: `build/hal-candidates/usb-clock-candidate.json` is outside
+    the bundle and
+    `local-analysis/hal-candidate-safety/20260618T184102Z-usb-clock-codesign-fix`
+    reports `hal_candidate_safety=PASS`.
+  - Physical A/B:
+    `local-analysis/physical-evidence-window/20260618T184221Z-usb-clock-source-reference-ab-codesign-fixed`.
+  - Mainline C: `quality_alignment_score=0.127512`,
+    `snr_floor_db=-26.388778`, `lag_jumps_gt_2_frames=38`,
+    `driver_cpu_p95=4.7`, `coreaudiod_cpu_p95=8.2`.
+  - USB-clock C++: `quality_alignment_score=-0.025789`,
+    `snr_floor_db=-30.477068`, `lag_jumps_gt_2_frames=39`,
+    `driver_cpu_p95=14.9`, `coreaudiod_cpu_p95=86.4`.
+  - Same-session compare reports
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+- Alternatives rejected:
+  - Treat better quiet-mid noise as sufficient: rejected because alignment,
+    SNR, residual ratios, lag jumps, and CPU were worse.
+  - Retry USB-clock immediately with the same parameters: rejected because the
+    failure is broad and not a near-threshold result.
+  - Leave USB-clock active for human listening: rejected because it is
+    objectively worse in the same-session evidence.
+- Readiness impact: narrows the next work. The timing problem remains open, but
+  USB-clock-anchor as currently built is not the path to product readiness or
+  branch promotion.

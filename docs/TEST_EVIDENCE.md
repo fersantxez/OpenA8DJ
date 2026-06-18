@@ -14675,3 +14675,86 @@ Readiness impact:
     perfection candidates only. They have no physical evidence yet and cannot
     support audiophile-quality, Timecode Vinyl, CPU, or mainline-superiority
     claims.
+
+Follow-up correction:
+- This first build-only evidence placed JSON files inside the candidate bundles.
+  That made `codesign` reject `OpenA8DJ-usb-clock.driver` during the next
+  lock-gated safety load with `unsealed contents present in the bundle root`.
+  New candidate targets must write JSON under `build/hal-candidates/` instead.
+
+## 2026-06-18 - 14:41 EDT USB-Clock Candidate Packaging/Safety Fix
+
+- Commit: working tree after `1229a41`.
+- Safety:
+  - Build steps were offline.
+  - HAL safety checks acquired the global hardware lock.
+  - No default-device change, sample-rate change outside the candidate
+    soundcheck, USB reset, system reboot, or Traktor launch was requested.
+- Code fix:
+  - Candidate JSON outputs moved from inside `.driver` bundles to
+    `build/hal-candidates/`.
+  - Candidate builders now reject `--json-out` paths inside the candidate
+    bundle so future opt-in bundles remain codesignable.
+- Commands:
+  - `python3 -m py_compile scripts/build-hal-usb-clock-candidate scripts/build-hal-prepared-runtime-candidate`
+  - `make hal-usb-clock-candidate`
+  - `make hal-prepared-lite-candidate`
+  - `make dist`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ-usb-clock.driver --cycles 1 --wait 8 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/hal-candidate-safety/20260618T184102Z-usb-clock-codesign-fix`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 8 --enumeration-timeout 8 --min-idle-pct 20 --run-dir local-analysis/human-test-candidate/20260618T184102Z-restore-default-after-usb-clock-safety`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/build/hal-candidates/usb-clock-candidate.json`
+  - `/Users/fer/dev/audio8djcpp/build/hal-candidates/prepared-lite-candidate.json`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/hal-candidate-safety/20260618T184102Z-usb-clock-codesign-fix`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T184102Z-restore-default-after-usb-clock-safety`
+- Result:
+  - USB-clock bundle safety after packaging fix: `PASS`.
+  - Default RC restore after safety: `PASS`.
+  - Installed default RC hash after restore:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+
+## 2026-06-18 - 14:42 EDT USB-Clock Same-Session Physical A/B
+
+- Commit: working tree after `1229a41`.
+- Safety:
+  - Global hardware lock acquired by `scripts/run-physical-superiority-window`.
+  - The runner loaded mainline C and the USB-clock C++ candidate in sequence.
+  - The runner did not change default devices, reset USB, reboot, or launch
+    Traktor.
+  - After the A/B, the first default-RC restore attempt with `--wait 8` failed
+    due to a transient `coreaudiod` CPU spike, then recovery unloaded OpenA8DJ.
+    A second restore with `--wait 20` passed and left the default RC active.
+- Commands:
+  - `scripts/run-physical-superiority-window --execute --source-reference-promotion --run-dir local-analysis/physical-evidence-window/20260618T184221Z-usb-clock-source-reference-ab-codesign-fixed --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate build/OpenA8DJ-usb-clock.driver --capture-device 'iRig Stream' --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/cpu-sample/20260617-current-default-driver-hot-sample/soundcheck/fixture/reference.wav --pair A --seconds 12 --rate 48000 --buffer 512`
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 20 --enumeration-timeout 12 --min-idle-pct 20 --run-dir local-analysis/human-test-candidate/20260618T184611Z-restore-default-after-transient-coreaudiod`
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/physical-evidence-window/20260618T184221Z-usb-clock-source-reference-ab-codesign-fixed`
+  - `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T184611Z-restore-default-after-transient-coreaudiod`
+- Result:
+  - Physical A/B result: `FAIL`.
+  - Mainline C soundcheck: `FAIL`,
+    `quality_alignment_score=0.127512`, `snr_floor_db=-26.388778`,
+    `mid_band_residual_ratio=31.476002`,
+    `high_band_residual_ratio=20.050303`, `lag_jumps_gt_2_frames=38`,
+    `driver_cpu_p95=4.7`, `coreaudiod_cpu_p95=8.2`.
+  - USB-clock C++ soundcheck: `FAIL`,
+    `quality_alignment_score=-0.025789`, `snr_floor_db=-30.477068`,
+    `mid_band_residual_ratio=122.128975`,
+    `high_band_residual_ratio=37.991408`, `lag_jumps_gt_2_frames=39`,
+    `driver_cpu_p95=14.9`, `coreaudiod_cpu_p95=86.4`.
+  - Same-session compare:
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`,
+    `branch_promotion_supported=false`.
+  - Restore after transient CPU spike:
+    `hal_candidate_safety=PASS`, `audio_stack_health=PASS`,
+    `Open Audio 8 DJ` visible as `8 in / 8 out`, iRig visible, installed hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+- Decision:
+  - Reject the USB-clock-anchor candidate as a quality/performance improvement
+    path for now. It was worse than same-session mainline on alignment, SNR,
+    residuals, lag jumps, driver CPU p95, and CoreAudio CPU p95.
+  - Keep the default diagnostic RC active; do not promote USB-clock and do not
+    use it for human baseline.
+  - Future restore commands after physical windows should allow longer
+    post-load settling, currently `--wait 20`, before treating a transient
+    `coreaudiod` spike as a candidate failure.

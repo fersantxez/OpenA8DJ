@@ -36,6 +36,14 @@ def require_inside_root(path: Path, label: str) -> None:
         raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
 
 
+def reject_inside_bundle(path: Path, bundle: Path, label: str) -> None:
+    try:
+        path.relative_to(bundle)
+    except ValueError:
+        return
+    raise ValueError(f"{label} must not be written inside the candidate bundle: {path}")
+
+
 def run(argv: list[str]) -> tuple[int, str, str]:
     completed = subprocess.run(
         argv,
@@ -92,6 +100,7 @@ def main() -> int:
     json_out = resolve_path(args.json_out) if args.json_out else None
     if json_out is not None:
         require_inside_root(json_out, "--json-out")
+        reject_inside_bundle(json_out, candidate, "--json-out")
 
     build_rc, build_stdout, build_stderr = run(
         [

@@ -1258,7 +1258,7 @@ make hal-prepared-runtime-candidate
 ```
 
 This produces `build/OpenA8DJ-prepared-runtime.driver`, writes
-`build/OpenA8DJ-prepared-runtime.driver/prepared-runtime-candidate.json`, and
+`build/hal-candidates/prepared-runtime-candidate.json`, and
 then rebuilds the normal `build/OpenA8DJ.driver` bundle so the default local
 artifact is restored.
 
@@ -1352,10 +1352,10 @@ make hal-usb-clock-candidate
 ```
 
 This writes `build/OpenA8DJ-usb-clock.driver` and
-`build/OpenA8DJ-usb-clock.driver/usb-clock-candidate.json`. It enables USB
-clock anchoring and zero HAL timestamps, then rebuilds the normal local HAL
-bundle. It is offline build-only: no install, no CoreAudio reload, no USB
-claiming, no playback, no capture, and no default-device change.
+`build/hal-candidates/usb-clock-candidate.json`. It enables USB clock anchoring
+and zero HAL timestamps, then rebuilds the normal local HAL bundle. It is
+offline build-only: no install, no CoreAudio reload, no USB claiming, no
+playback, no capture, and no default-device change.
 
 Prepared-lite CPU candidate:
 
@@ -1364,11 +1364,15 @@ make hal-prepared-lite-candidate
 ```
 
 This writes `build/OpenA8DJ-prepared-lite.driver` and
-`build/OpenA8DJ-prepared-lite.driver/prepared-lite-candidate.json` with
-prepared-submit runtime enabled at `slots-per-submit=2`, capture queue depth
-`4`, playback queue target `4`, `HAL_CAPTURE_ISO_FRAMES=16`, and playback
-coalesce transfers `2`. It is a lower-risk follow-up to the rejected 8x
-prepared-runtime profile, not a replacement for the active diagnostic RC.
+`build/hal-candidates/prepared-lite-candidate.json` with prepared-submit
+runtime enabled at `slots-per-submit=2`, capture queue depth `4`, playback
+queue target `4`, `HAL_CAPTURE_ISO_FRAMES=16`, and playback coalesce transfers
+`2`. It is a lower-risk follow-up to the rejected 8x prepared-runtime profile,
+not a replacement for the active diagnostic RC.
+
+Candidate evidence JSON must stay outside the `.driver` bundle. Writing extra
+files into the bundle root breaks the seal and can make the lock-gated safety
+installer fail codesign with `unsealed contents present in the bundle root`.
 
 After building either opt-in candidate, regenerate the default distribution
 artifact before packaging or physical testing the RC:

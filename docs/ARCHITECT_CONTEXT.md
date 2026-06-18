@@ -3293,3 +3293,16 @@ Current implication:
   `build/OpenA8DJ-prepared-lite.driver` for lower-risk prepared-submit CPU
   work. Both are build-only artifacts with `product_claim_allowed=false`; they
   must not replace the active RC without fresh physical evidence.
+- 14:42 EDT USB-clock physical A/B update: packaging was fixed so candidate
+  JSON stays outside `.driver` bundles and USB-clock now passes HAL safety, but
+  same-session physical A/B rejected it. Mainline C scored
+  `quality_alignment_score=0.127512`, `snr_floor_db=-26.388778`,
+  `driver_cpu_p95=4.7`; USB-clock scored
+  `quality_alignment_score=-0.025789`, `snr_floor_db=-30.477068`,
+  `driver_cpu_p95=14.9`. Same-session compare reports
+  `BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`. Keep the default diagnostic RC
+  active; USB-clock is not a human-baseline or promotion candidate.
+- Restore-safety note: after one physical window, an immediate default-RC
+  restore with `--wait 8` failed on a transient `coreaudiod` spike
+  (`138.8%`). Retrying with `--wait 20` passed and left Open Audio 8 DJ visible
+  as `8 in / 8 out` with installed hash `23a2d5...`.

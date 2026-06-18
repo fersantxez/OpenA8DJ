@@ -192,7 +192,7 @@ hal: $(HAL_BIN) $(CONTROL_TOOL)
 hal-usb-clock-candidate:
 	python3 scripts/build-hal-usb-clock-candidate \
 		--candidate build/OpenA8DJ-usb-clock.driver \
-		--json-out build/OpenA8DJ-usb-clock.driver/usb-clock-candidate.json
+		--json-out build/hal-candidates/usb-clock-candidate.json
 
 hal-prepared-runtime:
 	$(MAKE) -B hal \
@@ -208,12 +208,12 @@ hal-prepared-runtime:
 hal-prepared-runtime-candidate:
 	python3 scripts/build-hal-prepared-runtime-candidate \
 		--candidate build/OpenA8DJ-prepared-runtime.driver \
-		--json-out build/OpenA8DJ-prepared-runtime.driver/prepared-runtime-candidate.json
+		--json-out build/hal-candidates/prepared-runtime-candidate.json
 
 hal-prepared-lite-candidate:
 	python3 scripts/build-hal-prepared-runtime-candidate \
 		--candidate build/OpenA8DJ-prepared-lite.driver \
-		--json-out build/OpenA8DJ-prepared-lite.driver/prepared-lite-candidate.json \
+		--json-out build/hal-candidates/prepared-lite-candidate.json \
 		--slots-per-submit 2 \
 		--capture-queue 4 \
 		--playback-queue 4
