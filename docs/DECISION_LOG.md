@@ -1,5 +1,45 @@
 # Decision Log
 
+## 2026-06-18: Bind Prepared Runtime Physical Windows to Offline Artifact Hash
+
+Decision:
+- Add `--prepared-runtime-candidate` to the physical superiority runner and
+  read-only preflight.
+- Require prepared-runtime physical windows to verify the candidate executable
+  SHA-256 against `hal-prepared-runtime-candidate.json`, verify bundle
+  completeness evidence, and verify the current offline dispatch contract.
+- Add `opena8djcpp_prepared_runtime_physical_window_contract` and require it
+  from the full offline evidence summary and schema.
+
+Reason:
+- The next useful physical experiment is submit-rate, CPU/resource, and audio
+  quality comparison for the prepared-runtime HAL candidate. That evidence is
+  only defensible if the run proves exactly which bundle was installed.
+- A same-session physical result without candidate hash binding could be real
+  but still unusable for promotion because it would not attribute the measured
+  improvement to the prepared-runtime artifact built by the offline gates.
+
+Evidence:
+- `opena8djcpp_prepared_runtime_physical_window_contract`: PASS.
+- Read-only candidate preflight with `--prepared-runtime-candidate` and
+  `--candidate build/OpenA8DJ-prepared-runtime.driver`: PASS for artifact
+  binding in diagnostic `--candidate-only --skip-known-good` mode.
+- Candidate executable hash matched offline prepared candidate evidence.
+- Route preflight still rejects MacBook Air Speakers as built-in/acoustic
+  output for promotion evidence.
+
+Alternatives discarded:
+- Inferring prepared runtime identity from bundle path alone: rejected because
+  paths are mutable.
+- Letting candidate-only or skip-known-good diagnostics imply product
+  readiness: rejected; same-session route revalidation and mainline/C++ A/B
+  remain mandatory.
+
+Next implication:
+- The prepared-runtime physical A/B command must use
+  `--prepared-runtime-candidate`, a valid non-Audio8 wired known-good output,
+  iRig capture, and the global hardware lock.
+
 ## 2026-06-18: Require HAL Prepared Runtime Binding Contract Before Claims
 
 Decision:

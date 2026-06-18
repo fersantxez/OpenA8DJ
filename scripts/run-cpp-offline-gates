@@ -126,6 +126,7 @@ python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats
 python3 -m py_compile \
   scripts/check-hal-bundle-complete \
   scripts/build-hal-prepared-runtime-candidate \
+  scripts/physical-window-preflight \
   scripts/analyze-soundcheck-window-trace.py \
   scripts/analyze-timebase-family.py \
   scripts/evaluate-promotion-readiness.py \
@@ -153,6 +154,7 @@ fi
 ./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract | tee "$EVIDENCE_DIR/hal-logical-capture-batching-contract.json"
 ./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract | tee "$EVIDENCE_DIR/hal-runtime-geometry-observability-contract.json"
 ./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee "$EVIDENCE_DIR/physical-submit-comparison-contract.json"
+./build/cpp-release/opena8djcpp_prepared_runtime_physical_window_contract | tee "$EVIDENCE_DIR/prepared-runtime-physical-window-contract.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -264,6 +266,9 @@ hal_bundle_complete = load_json("hal-bundle-complete.json")
 hal_prepared_runtime_candidate = load_json("hal-prepared-runtime-candidate.json")
 hal_prepared_runtime_bundle_complete = load_json("hal-prepared-runtime-bundle-complete.json")
 stream_stats_contract = load_json("stream-stats-contract.json")
+prepared_runtime_physical_window_contract = load_json(
+    "prepared-runtime-physical-window-contract.json"
+)
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
@@ -1932,6 +1937,33 @@ summary = {
         "mismatch_count": stream_stats_contract.get("mismatch_count"),
         "last_field": stream_stats_contract.get("last_field"),
         "evidence": "local-analysis/cpp-offline/stream-stats-contract.json",
+    },
+    "prepared_runtime_physical_window_contract": {
+        "status": prepared_runtime_physical_window_contract.get("result"),
+        "schema": prepared_runtime_physical_window_contract.get("schema"),
+        "preflight_has_prepared_flag": prepared_runtime_physical_window_contract.get(
+            "preflight_has_prepared_flag"
+        ),
+        "preflight_hashes_candidate": prepared_runtime_physical_window_contract.get(
+            "preflight_hashes_candidate"
+        ),
+        "preflight_binds_to_offline_candidate": prepared_runtime_physical_window_contract.get(
+            "preflight_binds_to_offline_candidate"
+        ),
+        "preflight_requires_dispatch_contract": prepared_runtime_physical_window_contract.get(
+            "preflight_requires_dispatch_contract"
+        ),
+        "preflight_preserves_claim_block": prepared_runtime_physical_window_contract.get(
+            "preflight_preserves_claim_block"
+        ),
+        "runner_records_manifest_identity": prepared_runtime_physical_window_contract.get(
+            "runner_records_manifest_identity"
+        ),
+        "runner_forwards_prepared_flag_to_preflight": prepared_runtime_physical_window_contract.get(
+            "runner_forwards_prepared_flag_to_preflight"
+        ),
+        "blocked_claim": prepared_runtime_physical_window_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/prepared-runtime-physical-window-contract.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

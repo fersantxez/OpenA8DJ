@@ -132,6 +132,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-logical-capture-batching-contract.json",
       root / "local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json",
       root / "local-analysis/cpp-offline/physical-submit-comparison-contract.json",
+      root / "local-analysis/cpp-offline/prepared-runtime-physical-window-contract.json",
       root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
@@ -235,6 +236,10 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto physical_submit_comparison_contract =
       opena8djcpp::evidence_json::json_object(summary, "physical_submit_comparison_contract")
+          .value_or("");
+  const auto prepared_runtime_physical_window_contract =
+      opena8djcpp::evidence_json::json_object(summary,
+                                              "prepared_runtime_physical_window_contract")
           .value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
@@ -660,6 +665,25 @@ int main(int argc, char** argv) {
       string_field_is(
           physical_submit_comparison_contract, "blocked_claim",
           "NO_RUNTIME_CPU_OR_RESOURCE_SUPERIORITY_CLAIM_WITHOUT_SAME_SESSION_SUBMIT_CADENCE_COMPARISON") &&
+      object_present(summary, "prepared_runtime_physical_window_contract") &&
+      string_field_is(prepared_runtime_physical_window_contract, "status", "PASS") &&
+      bool_field_is(prepared_runtime_physical_window_contract, "preflight_has_prepared_flag",
+                    true) &&
+      bool_field_is(prepared_runtime_physical_window_contract, "preflight_hashes_candidate",
+                    true) &&
+      bool_field_is(prepared_runtime_physical_window_contract,
+                    "preflight_binds_to_offline_candidate", true) &&
+      bool_field_is(prepared_runtime_physical_window_contract,
+                    "preflight_requires_dispatch_contract", true) &&
+      bool_field_is(prepared_runtime_physical_window_contract,
+                    "preflight_preserves_claim_block", true) &&
+      bool_field_is(prepared_runtime_physical_window_contract,
+                    "runner_records_manifest_identity", true) &&
+      bool_field_is(prepared_runtime_physical_window_contract,
+                    "runner_forwards_prepared_flag_to_preflight", true) &&
+      string_field_is(
+          prepared_runtime_physical_window_contract, "blocked_claim",
+          "NO_PREPARED_RUNTIME_PHYSICAL_WINDOW_WITHOUT_OFFLINE_HASH_AND_DISPATCH_EVIDENCE") &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&

@@ -97,7 +97,8 @@ Command shape:
 scripts/run-physical-superiority-window \
   --execute \
   --mainline-candidate /absolute/path/to/mainline/OpenA8DJ.driver \
-  --candidate build/OpenA8DJ.driver \
+  --candidate build/OpenA8DJ-prepared-runtime.driver \
+  --prepared-runtime-candidate \
   --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
   --capture-channels 1,2 \
@@ -107,6 +108,13 @@ scripts/run-physical-superiority-window \
   --seconds 12 \
   --run-dir local-analysis/physical-superiority-window/<timestamp>
 ```
+
+For a prepared-runtime HAL experiment, `--prepared-runtime-candidate` is
+mandatory. The read-only preflight binds the bundle executable hash to
+`local-analysis/cpp-offline/hal-prepared-runtime-candidate.json`, requires
+`hal-prepared-runtime-bundle-complete.json`, and refuses to convert that
+artifact identity into a CPU/resource or audio-quality claim before same-window
+physical evidence exists.
 
 Additional offline analysis after capture:
 

@@ -1199,3 +1199,21 @@ cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_bindin
 The contract must report `prepared_runtime_dispatch_path_present=true`.
 Physical CPU/resource claims still require the global hardware lock and
 same-session comparison against mainline.
+
+Prepared-runtime physical windows must opt in explicitly:
+
+```sh
+scripts/run-physical-superiority-window \
+  --prepared-runtime-candidate \
+  --candidate build/OpenA8DJ-prepared-runtime.driver \
+  ...
+```
+
+The read-only preflight verifies the candidate executable SHA-256 against
+`local-analysis/cpp-offline/hal-prepared-runtime-candidate.json`, requires
+`hal-prepared-runtime-bundle-complete.json`, and requires the current offline
+binding summary to report `prepared_runtime_dispatch_path_present=true`. The
+contract `opena8djcpp_prepared_runtime_physical_window_contract` keeps this
+runner/preflight wiring in the offline gate set. Passing this check only proves
+artifact identity for the physical window; it still does not prove lower CPU,
+better sound, Timecode Vinyl behavior, or branch promotion.

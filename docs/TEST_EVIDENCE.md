@@ -11498,3 +11498,59 @@ Full offline gate after commit:
     still blocks product claims until lock-gated route validation and
     same-session physical A/B demonstrate submit-rate reduction, CPU/resource
     improvement, and no audio-quality regression against mainline.
+
+## 2026-06-18 Prepared Runtime Physical Window Binding
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `--prepared-runtime-candidate` to the physical superiority runner and
+    read-only preflight.
+  - The preflight now records candidate executable SHA-256 and verifies it
+    against `local-analysis/cpp-offline/hal-prepared-runtime-candidate.json`.
+  - Added `opena8djcpp_prepared_runtime_physical_window_contract` so offline
+    gates require the runner/preflight hash and dispatch-evidence binding.
+  - No driver install/reload, playback, capture, USB reset, CoreAudio restart,
+    default-device change, sample-rate change, or buffer-size change was
+    performed.
+- Focused commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_prepared_runtime_physical_window_contract opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_prepared_runtime_physical_window_contract`
+  - `python3 -m py_compile scripts/physical-window-preflight`
+  - `scripts/physical-window-preflight --route-only --capture-device "iRig Stream" --capture-channels 1,2 --known-good-output-device "MacBook Air Speakers" --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --prepared-runtime-candidate --candidate build/OpenA8DJ-prepared-runtime.driver --json-out local-analysis/physical-superiority-window/preflight-prepared-runtime-current-route-block.json`
+  - `scripts/physical-window-preflight --candidate-only --skip-known-good --capture-device "iRig Stream" --capture-channels 1,2 --prepared-runtime-candidate --candidate build/OpenA8DJ-prepared-runtime.driver --json-out local-analysis/physical-superiority-window/preflight-prepared-runtime-candidate-binding.json`
+- Focused result:
+  - Prepared runtime physical window contract: PASS.
+  - Route-only preflight using MacBook Air Speakers: FAIL as expected because
+    built-in/acoustic output is not valid promotion evidence.
+  - Diagnostic prepared-runtime candidate binding preflight: PASS.
+  - Candidate hash:
+    `0bd7831fb654da6592e51c2bd7d8f015b01e715c4231e3b71c20fa53f760fd54`.
+- Evidence:
+  - `local-analysis/physical-superiority-window/preflight-prepared-runtime-current-route-block.json`
+  - `local-analysis/physical-superiority-window/preflight-prepared-runtime-candidate-binding.json`
+- Full offline gate before commit:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Debug CTest: `75/75` PASS.
+  - Release CTest: `76/76` PASS.
+  - Evidence schema: PASS, `required_files=81`, `missing_files=0`.
+  - Product readiness: FAIL.
+  - Branch promotion allowed: `false`.
+  - Provenance: FAIL before commit only, because the current edits were not
+    committed yet.
+- Full offline gate after commit:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Debug CTest: `75/75` PASS.
+  - Release CTest: `76/76` PASS.
+  - Evidence schema: PASS, `required_files=81`, `missing_files=0`.
+  - Provenance: PASS with `claimable_current_candidate=true` for offline
+    evidence.
+  - Product readiness: FAIL.
+  - Branch promotion allowed: `false`.
+- Interpretation:
+  - A future prepared-runtime physical A/B can now prove the exact candidate
+    bundle under test before taking the hardware lock.
+  - This is still not a product claim. Same-session route revalidation,
+    mainline/C++ physical A/B, CPU/resource counters, quality analyzers,
+    routing isolation, and Timecode Vinyl physical evidence remain required.

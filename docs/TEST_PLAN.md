@@ -1330,6 +1330,10 @@ Physical superiority window runner:
   - iRig capture visibility in CoreAudio;
   - Audio 8 DJ visibility on USB;
   - explicit mainline and C++ HAL bundle paths for full A/B execution;
+  - when `--prepared-runtime-candidate` is used, the C++ candidate executable
+    hash matches `hal-prepared-runtime-candidate.json`, the prepared bundle
+    completeness evidence passes, and the current dispatch contract reports
+    `prepared_runtime_dispatch_path_present=true`;
   - reference/music files;
   - explicit non-Audio8 known-good output visibility;
   - hardware lock availability.
@@ -1357,7 +1361,8 @@ Physical superiority window runner:
 scripts/run-physical-superiority-window \
   --execute \
   --mainline-candidate /absolute/path/to/mainline/OpenA8DJ.driver \
-  --candidate build/OpenA8DJ.driver \
+  --candidate build/OpenA8DJ-prepared-runtime.driver \
+  --prepared-runtime-candidate \
   --known-good-output-device "<non-Audio8 output>" \
   --capture-device "iRig Stream" \
   --capture-channels 1,2 \

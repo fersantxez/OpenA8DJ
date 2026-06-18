@@ -10,6 +10,7 @@ is allowed to touch audio under lock.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -162,12 +163,126 @@ def hal_bundle_metrics(path: Path | None) -> dict[str, object]:
         "executable": str(executable) if executable else "",
         "executable_exists": bool(executable and executable.is_file()),
         "executable_bytes": executable.stat().st_size if executable and executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable and executable.is_file() else "",
     }
 
 
 def hal_bundle_ready(path: Path | None) -> bool:
     metrics = hal_bundle_metrics(path)
     return bool(metrics["bundle_exists"] and metrics["executable_exists"] and metrics["executable_bytes"])
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_json(path: Path) -> dict[str, object]:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            parsed = json.load(handle)
+            return parsed if isinstance(parsed, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def nested_dict(value: object) -> dict[str, object]:
+    return value if isinstance(value, dict) else {}
+
+
+def prepared_runtime_candidate_gate(candidate_metrics: dict[str, object]) -> dict[str, object]:
+    candidate_hash = str(candidate_metrics.get("executable_sha256", ""))
+    candidate_path = str(candidate_metrics.get("path", ""))
+    prepared_candidate_path = ROOT / "local-analysis/cpp-offline/hal-prepared-runtime-candidate.json"
+    prepared_bundle_path = ROOT / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json"
+    summary_path = ROOT / "local-analysis/cpp-offline/current-offline-gates.json"
+    prepared = load_json(prepared_candidate_path)
+    bundle = load_json(prepared_bundle_path)
+    summary = load_json(summary_path)
+    prepared_metrics = nested_dict(prepared.get("prepared_candidate"))
+    summary_binding = nested_dict(summary.get("hal_prepared_runtime_binding_contract"))
+    summary_transport = nested_dict(summary.get("hal_transport_runtime_gate"))
+    offline_hash = str(prepared_metrics.get("executable_sha256", ""))
+    offline_candidate = str(prepared.get("candidate", ""))
+    gates = [
+        gate(
+            "prepared_runtime_candidate_requested",
+            True,
+            {"candidate": candidate_path},
+            "prepared runtime candidate validation is explicit",
+        ),
+        gate(
+            "prepared_runtime_candidate_offline_json_pass",
+            prepared.get("result") == "PASS",
+            {"path": str(prepared_candidate_path), "result": prepared.get("result", "")},
+            "prepared-runtime candidate JSON must exist and pass",
+        ),
+        gate(
+            "prepared_runtime_bundle_complete_json_pass",
+            bundle.get("result") == "PASS",
+            {"path": str(prepared_bundle_path), "result": bundle.get("result", "")},
+            "prepared-runtime bundle completeness JSON must exist and pass",
+        ),
+        gate(
+            "prepared_runtime_candidate_hash_matches_offline_artifact",
+            bool(candidate_hash) and candidate_hash == offline_hash,
+            {
+                "candidate_executable_sha256": candidate_hash,
+                "offline_executable_sha256": offline_hash,
+                "offline_candidate": offline_candidate,
+            },
+            "physical window candidate executable must match the prepared offline artifact",
+        ),
+        gate(
+            "prepared_runtime_dispatch_contract_pass",
+            summary_binding.get("status") == "PASS"
+            and summary_binding.get("prepared_runtime_dispatch_path_present") is True,
+            {
+                "summary": str(summary_path),
+                "status": summary_binding.get("status", ""),
+                "prepared_runtime_dispatch_path_present": summary_binding.get(
+                    "prepared_runtime_dispatch_path_present", False
+                ),
+            },
+            "prepared runtime dispatch contract must be present in current offline summary",
+        ),
+        gate(
+            "prepared_runtime_transport_claim_blocked_until_physical",
+            summary_transport.get("status") == "PASS"
+            and summary_transport.get("runtime_reduction_missing") is True
+            and summary_transport.get("hal_prepared_runtime_physical_evidence_present") is False,
+            {
+                "status": summary_transport.get("status", ""),
+                "runtime_reduction_missing": summary_transport.get(
+                    "runtime_reduction_missing", False
+                ),
+                "hal_prepared_runtime_physical_evidence_present": summary_transport.get(
+                    "hal_prepared_runtime_physical_evidence_present", True
+                ),
+            },
+            "prepared candidate can enter a physical window, but cannot claim superiority before physical evidence",
+        ),
+    ]
+    return {
+        "schema": "opena8djcpp.prepared-runtime-physical-window-candidate.v1",
+        "requested": True,
+        "candidate": candidate_path,
+        "candidate_executable_sha256": candidate_hash,
+        "offline_candidate": offline_candidate,
+        "offline_executable_sha256": offline_hash,
+        "evidence": {
+            "prepared_runtime_candidate": str(prepared_candidate_path),
+            "prepared_runtime_bundle_complete": str(prepared_bundle_path),
+            "current_offline_gates": str(summary_path),
+        },
+        "gates": gates,
+        "result": "PASS" if all(item["result"] == "PASS" for item in gates) else "FAIL",
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+    }
 
 
 def main() -> int:
@@ -181,6 +296,7 @@ def main() -> int:
     parser.add_argument("--music-file", default="")
     parser.add_argument("--mainline-candidate", default="")
     parser.add_argument("--candidate", default="")
+    parser.add_argument("--prepared-runtime-candidate", action="store_true")
     parser.add_argument("--route-only", action="store_true")
     parser.add_argument("--candidate-only", action="store_true")
     parser.add_argument("--skip-known-good", action="store_true")
@@ -227,13 +343,26 @@ def main() -> int:
     built_in_known_good_output = requires_known_good and built_in_or_acoustic_output(known_good_identity)
     resolved_known_good_audio8 = requires_known_good and audio8ish(known_good_identity)
 
+    mainline_candidate_metrics = hal_bundle_metrics(mainline_candidate)
+    candidate_metrics = hal_bundle_metrics(candidate)
+    prepared_runtime_report = (
+        prepared_runtime_candidate_gate(candidate_metrics)
+        if args.prepared_runtime_candidate and requires_candidates
+        else {
+            "schema": "opena8djcpp.prepared-runtime-physical-window-candidate.v1",
+            "requested": False,
+            "result": "SKIP",
+        }
+    )
+
     gates = [
         gate("audio_list_available", audio_rc == 0 and bool(devices), {"return_code": audio_rc, "device_count": len(devices)}, audio_stderr.strip()),
         gate("irig_capture_visible", capture is not None and int(capture.get("inputs", 0)) >= 2, {"device": capture or {}, "requested": args.capture_device}, "capture device must be visible with at least two inputs"),
         gate("audio8_usb_visible", args.route_only or usb_present, usb_metrics, "Audio 8 DJ must be visible on USB before HAL install/reload"),
         gate("opena8dj_coreaudio_absent_or_valid", open_audio8 is None or (int(open_audio8.get("inputs", 0)) == 8 and int(open_audio8.get("outputs", 0)) == 8), {"device": open_audio8 or {}}, "if already loaded, Open Audio 8 DJ must expose 8 in / 8 out"),
-        gate("mainline_candidate_complete", not requires_mainline or hal_bundle_ready(mainline_candidate), hal_bundle_metrics(mainline_candidate), "mainline HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
-        gate("cpp_candidate_complete", not requires_candidates or hal_bundle_ready(candidate), hal_bundle_metrics(candidate), "C++ HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
+        gate("mainline_candidate_complete", not requires_mainline or hal_bundle_ready(mainline_candidate), mainline_candidate_metrics, "mainline HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
+        gate("cpp_candidate_complete", not requires_candidates or hal_bundle_ready(candidate), candidate_metrics, "C++ HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
+        gate("prepared_runtime_candidate_evidence_bound", not args.prepared_runtime_candidate or not requires_candidates or prepared_runtime_report.get("result") == "PASS", prepared_runtime_report, "prepared runtime physical windows must match the offline prepared artifact and dispatch contract"),
         gate("reference_wav_exists", not requires_known_good or (reference_wav is not None and reference_wav.is_file()), {"path": str(reference_wav) if reference_wav else ""}, "known-good route reference WAV is required"),
         gate("music_file_exists_if_supplied", music_file is None or music_file.is_file(), {"path": str(music_file) if music_file else ""}, "music fixture must exist when supplied"),
         gate("known_good_output_specified", not requires_known_good or bool(args.known_good_output_device or args.known_good_output_device_uid), {"name": args.known_good_output_device, "uid": args.known_good_output_device_uid}, "explicit non-Audio8 output source is required"),
@@ -253,6 +382,8 @@ def main() -> int:
         "route_only": args.route_only,
         "candidate_only": args.candidate_only,
         "skip_known_good": args.skip_known_good,
+        "prepared_runtime_candidate": args.prepared_runtime_candidate,
+        "prepared_runtime_candidate_report": prepared_runtime_report,
         "allow_same_device_loopback_diagnostic": args.allow_same_device_loopback_diagnostic,
         "allow_built_in_output_acoustic_diagnostic": args.allow_built_in_output_acoustic_diagnostic,
         "known_good_output_builtin_or_acoustic": built_in_known_good_output,
