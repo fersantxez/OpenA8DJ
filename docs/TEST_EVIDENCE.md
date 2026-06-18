@@ -15117,3 +15117,44 @@ Follow-up correction:
 - Interpretation:
   - This does not improve readiness; it improves metric truthfulness.
   - CPU and quality gates still fail, so superiority remains blocked.
+
+## 2026-06-18 - Stable Diagnostic Load Closed After 16:10 Evidence
+
+- Scope:
+  - Froze the immediate stable load on the default C++ HAL at
+    `build/OpenA8DJ.driver`.
+  - Ran fresh offline gates and one lock-gated HAL safety load with
+    `--leave-loaded`.
+  - Did not run playback, recording, Traktor, USB reset, default-device
+    changes, or service restarts.
+- Commands:
+  - `scripts/run-cpp-offline-gates`
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/test-hal-candidate-safety --candidate build/OpenA8DJ.driver --cycles 1 --leave-loaded --wait 15 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/human-test-candidate/20260618T2013Z-stable-default-load-close`
+  - `python3 scripts/human-test-rc-status > local-analysis/cpp-offline/human-test-rc-status-stable-load-close.json`
+- Result:
+  - Offline gates: Debug CTest `85/85` PASS, Release CTest `86/86` PASS.
+  - HAL safety load: PASS.
+  - Evidence path:
+    `/Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T2013Z-stable-default-load-close`.
+  - Installed HAL hash matches the build artifact:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Final RC status:
+    `DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED`.
+  - Audio 8 inventory after load: visible as `8 in / 8 out`.
+  - iRig inventory after load: visible.
+  - Audio stack health after load: PASS; `coreaudiod=1.5%`,
+    `opena8dj_driver=0.0%`, total watched CPU `2.3%`.
+  - Hardware lock final state: free.
+  - Final installable artifact hashes:
+    - `build/OpenA8DJ-0.3.25.pkg`:
+      `f2f555524f7c78fec63c2833616cb5b3dea9861a9725e249374a41792f6331f7`.
+    - `build/OpenA8DJ-0.3.25.dmg`:
+      `2a28ddfb305dcf7901cdbead2577163ca8a84c38e89a55801b387a410310095c`.
+- Interpretation:
+  - This closes a stable diagnostic load suitable for controlled engineering
+    review.
+  - It is not product readiness, not audiophile superiority, not CPU/resource
+    superiority, not Timecode Vinyl certification, and not branch-promotion
+    evidence.
+  - Required next product evidence remains same-session source-reference A/B,
+    runtime CPU/resource superiority, and Timecode Vinyl physical validation.

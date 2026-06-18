@@ -9911,3 +9911,35 @@ Next implication:
   - Drop submit-rate output entirely: rejected because C++ default vs
     playback-scheduler submit cadence is still useful evidence.
 - Readiness impact: metric truth improved; readiness remains blocked.
+
+## 2026-06-18 - Close Default HAL As Stable Diagnostic Load
+
+- Decision: close the immediate 15:00/16:10 human-window artifact on the
+  default C++ HAL, installed and left loaded, while explicitly keeping it as a
+  diagnostic RC only.
+- Reason: the default C++ HAL has the best current stability/load evidence and
+  better same-session physical quality metrics than the playback-scheduler
+  variant, while the playback-scheduler and lite variants remain default-off
+  because they failed strict physical quality and/or CPU gates.
+- Evidence:
+  - Fresh offline gates passed Debug `85/85` and Release `86/86`.
+  - Lock-gated safety load passed:
+    `local-analysis/human-test-candidate/20260618T2013Z-stable-default-load-close`.
+  - Installed HAL hash matches build artifact:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Final RC status:
+    `DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED`.
+  - Audio 8 is visible as 8-in/8-out, iRig is visible, audio stack health is
+    PASS, and the lock is free.
+- Alternatives rejected:
+  - Promote playback-scheduler as the stable load: rejected because physical
+    quality still failed and CPU remained above mainline.
+  - Reopen transport optimization before closing a load: rejected because the
+    immediate need is a stable diagnostic artifact, and more tuning risks
+    invalidating a usable baseline.
+  - Declare product readiness from this load: rejected because same-session
+    source-reference A/B, CPU/resource superiority, and Timecode Vinyl physical
+    gates remain missing or failing.
+- Readiness impact: a stable diagnostic load is closed for controlled review.
+  Product readiness, audiophile superiority, Timecode Vinyl certification, CPU
+  superiority, and branch promotion remain blocked.

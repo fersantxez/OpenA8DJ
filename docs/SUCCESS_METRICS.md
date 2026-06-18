@@ -2776,3 +2776,29 @@ Current implementation:
 - PASS for this metric does not prove CPU/resource superiority. CPU p95,
   quality, click, lag, underrun/overrun, and Timecode Vinyl gates still decide
   product readiness.
+
+## Stable Diagnostic Load Closure
+
+- A stable diagnostic load may be closed only when all of the following are
+  true:
+  - fresh offline gates pass in Debug and Release;
+  - a lock-gated HAL safety load passes;
+  - the installed HAL executable hash matches the build artifact hash;
+  - Audio 8 DJ enumerates as 8-in/8-out after load;
+  - iRig is visible if capture evidence or later source-reference A/B is
+    planned;
+  - audio stack health is PASS after load;
+  - hardware lock is released after the window;
+  - the RC status still blocks product claims unless same-session product gates
+    pass.
+- Current stable diagnostic load:
+  - candidate: `build/OpenA8DJ.driver`;
+  - installed/load evidence:
+    `local-analysis/human-test-candidate/20260618T2013Z-stable-default-load-close`;
+  - HAL hash:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`;
+  - RC status:
+    `DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED`.
+- PASS for this metric permits controlled diagnostic review only. It does not
+  satisfy audiophile sound quality, CPU/resource superiority, Timecode Vinyl
+  certification, or branch-promotion requirements.

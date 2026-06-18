@@ -3386,3 +3386,15 @@ Current implication:
   as comparable only when both sides expose credible counters. Mainline
   playback submit counters in these windows report `0` while completions are
   present, so they are no longer used as a false zero-submit baseline.
+- 16:14 EDT stable-load close: the default C++ HAL is installed and left
+  loaded as the diagnostic RC. Fresh offline gates passed Debug `85/85` and
+  Release `86/86`; the lock-gated HAL safety load passed at
+  `local-analysis/human-test-candidate/20260618T2013Z-stable-default-load-close`.
+  The installed HAL hash matches `build/OpenA8DJ.driver`
+  (`23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`).
+  Current RC status is
+  `DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED`: Audio 8 is
+  visible as 8-in/8-out, iRig is visible, audio stack health is PASS, and the
+  hardware lock is free. This is a stable diagnostic load only; product human
+  listening, Timecode Vinyl certification, CPU/resource superiority, and branch
+  promotion remain blocked.
