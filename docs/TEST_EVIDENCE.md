@@ -13600,3 +13600,41 @@ Full offline gate after commit:
   - Product-quality, low-CPU superiority, Timecode Vinyl physical readiness,
     DriverKit/dext readiness, and branch promotion remain blocked by the
     explicit gates.
+
+## 2026-06-18 - Physical Route Matrix Contract Added
+
+- Commit context: local changes after `68f4108`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Time: `2026-06-18 11:21 EDT`.
+- Safety:
+  - Offline existing channel-matrix evidence only.
+  - No hardware lock acquired by the contract.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Source/build changes:
+  - Added `tools/physical_route_matrix_contract.cpp`.
+  - Added CMake target/test `opena8djcpp_physical_route_matrix_contract`.
+  - Added the contract to `scripts/run-cpp-offline-gates` and
+    `current-offline-gates.json`.
+- Command:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_physical_route_matrix_contract`
+  - `./build/cpp-release/opena8djcpp_physical_route_matrix_contract`
+- Result:
+  - Build: PASS.
+  - Contract: PASS as classification, not readiness.
+  - Classification: `all_audio8_pairs_no_useful_correlated_capture`.
+  - A/B/C/D all present, all `result=FAIL`, all `capture_clipped_frames=0`.
+  - Maximum expected correlated amplitude by pair:
+    A `5.69042e-05`, B `5.14322e-05`, C `6.16116e-05`,
+    D `6.22614e-05`, all below the `0.005` threshold.
+- Readiness impact:
+  - Blocks product human listening on the current iRig route.
+  - Blocks further driver tuning against this capture route until a known
+    non-Audio8 wired source validates iRig capture, or a new A/B/C/D matrix
+    shows useful correlated Audio 8 signal.
+  - Does not block packaging an installable diagnostic candidate.

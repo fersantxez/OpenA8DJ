@@ -8,6 +8,12 @@ the C++ line beats mainline C.
 ## Decision
 
 - Use the HAL bundle / PKG path for the first human-test candidate.
+- 11:21 EDT status: the A/B/C/D physical channel-matrix sweep is now a hard
+  route/capture blocker for product human testing. All four output pairs were
+  present in evidence but failed with expected correlated amplitudes around
+  `0.00004-0.00006`, far below the `0.005` minimum, and no clipping. This
+  means the current iRig capture route is not receiving a useful Audio 8
+  signal on any pair; do not keep optimizing the HAL against this capture path.
 - 11:06 EDT status: the target remains a first installable human-test build by
   15:00 America/New_York, but the evidence only supports a limited diagnostic
   human window unless the capture route is revalidated first. The direct USB
@@ -232,6 +238,12 @@ Not allowed without further evidence:
 Goal: produce one conservative installable HAL/PKG candidate and a bounded
 human-test decision packet. This is not a promise of superiority over mainline.
 
+11:21 EDT update: the plan is now fail-closed on route validation. A human
+product-quality test can start only if the iRig route is validated with a
+known wired non-Audio8 source first, or if a new A/B/C/D matrix shows useful
+correlated signal above threshold. Otherwise the 15:00 output is an installable
+diagnostic candidate plus a blocked decision packet, not a listening approval.
+
 ### Phase 1 - 11:06-11:45 EDT: Evidence Board Consistency
 
 - Regenerate offline evidence so current direct USB diagnostics under
@@ -259,6 +271,9 @@ human-test decision packet. This is not a promise of superiority over mainline.
 - Under lock, verify iRig and Audio 8 DJ visibility.
 - If no known-good external route is available, run only diagnostic smoke and
   keep claims blocked.
+- If A/B/C/D all remain in the `all_audio8_pairs_no_useful_correlated_capture`
+  class, stop driver tuning and validate cable/iRig/capture routing before any
+  human product listen.
 - PASS criteria for continuing to human listening:
   - iRig remains visible;
   - Audio 8 DJ enumerates 8 inputs / 8 outputs;

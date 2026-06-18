@@ -3082,3 +3082,11 @@ Current implication:
   quality, mainline-superiority, Timecode Vinyl physical readiness, and branch
   promotion claims remain blocked unless the route is revalidated and the
   frozen candidate passes same-session comparison.
+- 11:21 EDT route-matrix hardening update: a dedicated offline contract now
+  classifies the final physical A/B/C/D sweep. Current classification is
+  `all_audio8_pairs_no_useful_correlated_capture`: pairs A/B/C/D all have
+  `tone-matrix.json`, all failed, all have `capture_clipped_frames=0`, and all
+  expected amplitudes are around `4e-05-6e-05` against the `0.005` minimum.
+  This blocks product human listening and further HAL tuning against the iRig
+  route until the route is validated with a known non-Audio8 wired source or a
+  new matrix shows useful correlated signal.

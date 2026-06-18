@@ -222,6 +222,7 @@ fi
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
 ./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
+./build/cpp-release/opena8djcpp_physical_route_matrix_contract | tee "$EVIDENCE_DIR/physical-route-matrix-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 python3 -m py_compile \
   scripts/check-hal-bundle-complete \
@@ -355,6 +356,7 @@ hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 physical_route_inventory = load_json("physical-route-inventory.json")
 capture_readiness_contract = load_json("capture-readiness-contract.json")
+physical_route_matrix_contract = load_json("physical-route-matrix-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
@@ -468,6 +470,10 @@ summary = {
     "capture_route_status": capture_readiness_contract.get("route_status"),
     "capture_diagnostic_status": capture_readiness_contract.get("diagnostic_status"),
     "capture_next_recovery_action": capture_readiness_contract.get("next_recovery_action"),
+    "physical_route_matrix_status": physical_route_matrix_contract.get("classification"),
+    "physical_route_matrix_all_pairs_no_useful_correlated_capture": physical_route_matrix_contract.get(
+        "all_pairs_no_useful_correlated_capture"
+    ),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -1369,6 +1375,30 @@ summary = {
         ),
         "blocked_claim": capture_readiness_contract.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/capture-readiness-contract.json",
+    },
+    "physical_route_matrix_contract": {
+        "status": physical_route_matrix_contract.get("result"),
+        "schema": physical_route_matrix_contract.get("schema"),
+        "classification": physical_route_matrix_contract.get("classification"),
+        "all_pairs_present": physical_route_matrix_contract.get("all_pairs_present"),
+        "all_pairs_no_useful_correlated_capture": physical_route_matrix_contract.get(
+            "all_pairs_no_useful_correlated_capture"
+        ),
+        "any_pair_has_correlated_capture": physical_route_matrix_contract.get(
+            "any_pair_has_correlated_capture"
+        ),
+        "expected_floor_amplitude_min": physical_route_matrix_contract.get(
+            "expected_floor_amplitude_min"
+        ),
+        "human_product_test_allowed": physical_route_matrix_contract.get(
+            "human_product_test_allowed"
+        ),
+        "product_claim_allowed": physical_route_matrix_contract.get("product_claim_allowed"),
+        "branch_promotion_allowed": physical_route_matrix_contract.get(
+            "branch_promotion_allowed"
+        ),
+        "next_lock_gated_action": physical_route_matrix_contract.get("next_lock_gated_action"),
+        "evidence": "local-analysis/cpp-offline/physical-route-matrix-contract.json",
     },
     "diagnostic_pass_semantics_gate": {
         "status": diagnostic_pass_semantics_gate.get("result"),

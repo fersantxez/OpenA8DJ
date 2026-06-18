@@ -4745,3 +4745,42 @@ Risks:
 Next action:
 - Freeze a reproducible candidate with offline gates and package hashes, then
   only run lock-gated hardware smoke if the route and rollback preflights pass.
+
+## 2026-06-18 Mill: iRig Route Recovery / Driver-vs-Route Split
+
+Subagent:
+- `019edb50-7899-7f42-87a2-7f4bada77505` (`Mill`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Read-only route diagnosis and minimum plan to separate iRig/cable/capture
+  failure from Audio 8 driver failure.
+
+Findings:
+- Best separator is `scripts/run-known-good-route-soundcheck` with an explicit
+  wired non-Audio8 output into iRig capture; same-device Audio 8 loopback is
+  diagnostic only and not valid for promotion.
+- Existing evidence already points at route/capture as suspect: mainline also
+  failed in the same session, direct USB internals were clean, and physical
+  iRig capture failed after the clean payload.
+- Recommended order:
+  1. Validate iRig route with known non-Audio8 wired source.
+  2. Repeat direct USB Audio 8 without HAL and keep USB-internal vs iRig
+     capture separated.
+  3. Sweep A/B/C/D matrix to detect wrong physical pair or no-signal route.
+  4. Only then classify timebase/no-signal failure modes.
+
+Integrated action:
+- Added `opena8djcpp_physical_route_matrix_contract`, which consumes the final
+  A/B/C/D sweep and classifies the current route as
+  `all_audio8_pairs_no_useful_correlated_capture`.
+
+Risks:
+- Without a non-Audio8 wired known-good output, the iRig route cannot support
+  product-quality, CPU/resource, Timecode Vinyl, or branch-promotion claims.
+
+Next action:
+- Use the hardware lock only for route validation with a known non-Audio8 wired
+  source, or keep the 15:00 candidate explicitly diagnostic-only.

@@ -9318,3 +9318,38 @@ Next implication:
 - Readiness impact: first human-test candidate may proceed only as a limited
   controlled test if safety and smoke gates pass. Mainline replacement remains
   blocked.
+
+## 2026-06-18 - A/B/C/D Matrix Route Failure Blocks Product Human Test
+
+- Decision: add `opena8djcpp_physical_route_matrix_contract` and treat the
+  latest A/B/C/D physical channel-matrix sweep as a fail-closed route/capture
+  gate before any product human listening.
+- Reason: the latest sweep fails on all four physical output pairs with no
+  clipping and expected correlated amplitudes around `4e-05-6e-05`, far below
+  the `0.005` minimum. That pattern is not a single wrong-pair routing error;
+  it means the current capture route is not carrying useful correlated Audio 8
+  signal for measurement.
+- Evidence:
+  - Pair A:
+    `local-analysis/channel-matrix/20260618T151925Z-final-matrix-pairA/tone-matrix.json`,
+    `expected_floor_amplitude=5.29766e-05`.
+  - Pair B:
+    `local-analysis/channel-matrix/20260618T151939Z-final-matrix-pairB/tone-matrix.json`,
+    `expected_floor_amplitude=5.07960e-05`.
+  - Pair C:
+    `local-analysis/channel-matrix/20260618T151951Z-final-matrix-pairC/tone-matrix.json`,
+    `expected_floor_amplitude=4.08573e-05`.
+  - Pair D:
+    `local-analysis/channel-matrix/20260618T152002Z-final-matrix-pairD/tone-matrix.json`,
+    `expected_floor_amplitude=4.82457e-05`.
+  - New contract output:
+    `local-analysis/cpp-offline/physical-route-matrix-contract.json`.
+- Alternatives rejected:
+  - Keep optimizing HAL transport against the current iRig capture: rejected
+    because the measurement path is not proving useful signal on any pair.
+  - Approve human product listening based on installability or direct USB
+    payload cleanliness: rejected because audible quality requires a valid
+    physical route or explicit diagnostic-only framing.
+- Readiness impact: installable diagnostic candidate can still be packaged,
+  but product-quality human testing, mainline superiority, Timecode Vinyl
+  physical readiness, and branch promotion remain blocked.
