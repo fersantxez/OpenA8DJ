@@ -2758,3 +2758,21 @@ Current implementation:
 - PASS only authorizes a lock-gated source-reference physical A/B. It does not
   prove lower CPU, better sound quality, Timecode Vinyl function, or branch
   promotion.
+
+## Physical Submit Counter Comparability
+
+- Same-session physical submit-rate comparisons must not treat a missing or
+  internally inconsistent baseline counter as a measured zero.
+- A submit counter is comparable only when:
+  - submitted-per-second is finite; and
+  - if completions-per-second are present and above `1.0`, submitted-per-second
+    is also above `0.0`.
+- If either side is not comparable, the compare tool must still print the raw
+  values and comparability booleans, but it must not emit a PASS/FAIL
+  superiority gate for that submit direction.
+- This rule preserves useful C++-to-C++ evidence, such as default C++ playback
+  submits versus playback-scheduler submits, without inventing a false mainline
+  zero-submit baseline.
+- PASS for this metric does not prove CPU/resource superiority. CPU p95,
+  quality, click, lag, underrun/overrun, and Timecode Vinyl gates still decide
+  product readiness.

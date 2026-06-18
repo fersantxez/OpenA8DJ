@@ -3370,3 +3370,19 @@ Current implication:
   the offline scheduler model; it is still untested physically and must not
   replace the diagnostic RC without lock-gated source-reference A/B, CPU
   comparison, and Timecode Vinyl evidence.
+- 16:10 EDT physical A/B update: two lock-gated 8 s source-reference windows
+  ran against Audio 8 pair A -> iRig Stream. Preflight confirmed `iRig Stream`
+  visible as physical 2-in/2-out and `Open Audio 8 DJ` as 8-in/8-out. The
+  default C++ HAL improved quality metrics versus same-session mainline
+  (`quality_alignment_score 0.839707` vs `0.622433`, SNR `2.263183 dB` vs
+  `-2.867828 dB`) but failed absolute quality and used worse CPU
+  (`driver_cpu_p95 18.0` vs `6.6`). The playback-scheduler HAL passed safety
+  and reduced C++ playback submit cadence to about `68.14/s` versus default
+  C++ `545.56/s`, but physical quality still failed and CPU remained worse
+  than mainline (`driver_cpu_p95 14.3` vs `6.8`). Both windows ended with final
+  unload guard PASS and no active OpenA8DJ process. No product/human readiness,
+  Timecode Vinyl readiness, CPU superiority, or branch promotion is allowed.
+- Metric correction: physical same-session comparisons now mark submit counters
+  as comparable only when both sides expose credible counters. Mainline
+  playback submit counters in these windows report `0` while completions are
+  present, so they are no longer used as a false zero-submit baseline.

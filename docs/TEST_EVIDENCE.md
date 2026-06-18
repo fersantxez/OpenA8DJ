@@ -15024,3 +15024,96 @@ Follow-up correction:
     hypothesis.
   - It still does not authorize hardware install, product claim, Timecode Vinyl
     readiness, CPU superiority, or branch promotion.
+
+## 2026-06-18 - Stable Default Source-Reference Physical A/B, 8 Seconds
+
+- Scope:
+  - Ran a lock-gated source-reference physical A/B:
+    original 8 s reference WAV -> Audio 8 DJ pair A -> iRig Stream capture.
+  - Compared mainline C HAL against the default C++ HAL.
+  - The runner installed/reloaded each explicit HAL candidate and unloaded at
+    the end. It did not change default devices, reset USB, reboot, or launch
+    Traktor.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T1959Z-stable-source-reference-ab-8s --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 8 --rate 48000 --buffer 512`
+- Result:
+  - Preflight: PASS. `iRig Stream` visible as physical 2-in/2-out at 48 kHz;
+    `Open Audio 8 DJ` visible as 8-in/8-out at 48 kHz.
+  - Mainline HAL safety: PASS.
+  - C++ HAL safety: PASS.
+  - Final unload guard: PASS; OpenA8DJ HAL unloaded and audio stack idle.
+  - Same-session compare: FAIL,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Mainline quality: `quality_alignment_score=0.622433`,
+    `snr_floor_db=-2.867828`, `lag_jumps_gt_2_frames=26`,
+    `driver_cpu_p95=6.6`, `coreaudiod_cpu_p95=7.8`.
+  - C++ default quality: `quality_alignment_score=0.839707`,
+    `snr_floor_db=2.263183`, `lag_jumps_gt_2_frames=21`,
+    `driver_cpu_p95=18.0`, `coreaudiod_cpu_p95=15.6`.
+- Interpretation:
+  - C++ default improved alignment, SNR, mid/high residuals, and lag jumps
+    against this same-session mainline run, but both paths failed absolute
+    audiophile quality gates.
+  - C++ default used materially more driver/CoreAudio CPU than mainline in this
+    window, so it is not a CPU/resource superiority candidate.
+  - This evidence supports continuing optimization and route/reference
+    diagnosis. It does not authorize product readiness, human baseline,
+    Timecode Vinyl readiness, CPU superiority, or branch promotion.
+
+## 2026-06-18 - Playback-Scheduler Source-Reference Physical A/B, 8 Seconds
+
+- Scope:
+  - Ran a lock-gated source-reference physical A/B using
+    `build/OpenA8DJ-playback-scheduler.driver` as the C++ candidate.
+  - The runner installed/reloaded each explicit HAL candidate and unloaded at
+    the end. It did not change default devices, reset USB, reboot, or launch
+    Traktor.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --skip-build --run-dir local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ-playback-scheduler.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 8 --rate 48000 --buffer 512`
+- Result:
+  - Mainline HAL safety: PASS.
+  - Playback-scheduler HAL safety: PASS.
+  - Final unload guard: PASS; OpenA8DJ HAL unloaded and audio stack idle.
+  - Same-session compare: FAIL,
+    `readiness_claim=BLOCKED_NOT_BETTER_THAN_MAINLINE_REFERENCE`.
+  - Mainline quality in this window was unstable:
+    `quality_alignment_score=0.008474`, `snr_floor_db=-35.132224`,
+    `lag_jumps_gt_2_frames=22`.
+  - Playback-scheduler quality also failed:
+    `quality_alignment_score=0.396583`, `snr_floor_db=-7.248548`,
+    `lag_jumps_gt_2_frames=25`.
+  - Playback-scheduler CPU remained worse than mainline:
+    `driver_cpu_p95=14.3` vs `6.8`,
+    `coreaudiod_cpu_p95=22.3` vs `5.3`.
+  - Playback-scheduler did reduce physical playback submit cadence compared
+    with default C++ evidence: about `68.14` playback submit calls/s here vs
+    `545.56` calls/s in the default C++ 8 s window, but this is not comparable
+    against mainline because mainline does not expose a valid playback submit
+    counter in these runs.
+- Interpretation:
+  - The playback scheduler passes HAL load safety and materially lowers C++
+    playback submit cadence versus default C++.
+  - It does not fix physical quality, and CPU remains above mainline in the
+    measured window.
+  - Keep it default-off; do not use it as the stable human-test load yet.
+
+## 2026-06-18 - Submit Counter Comparability Correction
+
+- Scope:
+  - Corrected `opena8djcpp_physical_run_compare` so submit-rate gates are only
+    emitted when both baseline and candidate counters are comparable.
+  - No hardware, playback, recording, install/load, default-device change, USB
+    reset, CoreAudio restart, or service mutation occurred.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_physical_run_compare opena8djcpp_physical_submit_comparison_contract -j`
+  - `./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee local-analysis/cpp-offline/physical-submit-comparison-contract.json`
+  - `./build/cpp-release/opena8djcpp_physical_run_compare --candidate local-analysis/physical-evidence-window/20260618T1959Z-stable-source-reference-ab-8s/cpp-soundcheck --baseline local-analysis/physical-evidence-window/20260618T1959Z-stable-source-reference-ab-8s/mainline-soundcheck > local-analysis/physical-evidence-window/20260618T1959Z-stable-source-reference-ab-8s/same-session-physical-compare.recomputed.json`
+  - `./build/cpp-release/opena8djcpp_physical_run_compare --candidate local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s/cpp-soundcheck --baseline local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s/mainline-soundcheck > local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s/same-session-physical-compare.recomputed.json`
+- Result:
+  - Contract: PASS.
+  - Recomputed default and playback-scheduler comparisons now mark
+    `baseline.playback_submit_counter_comparable=false` and do not fail the
+    candidate against a mainline playback submit baseline of `0`.
+- Interpretation:
+  - This does not improve readiness; it improves metric truthfulness.
+  - CPU and quality gates still fail, so superiority remains blocked.

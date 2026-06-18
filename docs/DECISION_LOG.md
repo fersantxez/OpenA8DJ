@@ -9862,3 +9862,52 @@ Next implication:
 - Readiness impact: this authorizes only a future lock-gated measurement
   window. It does not authorize product readiness, audiophile superiority, CPU
   superiority, Timecode Vinyl readiness, or branch promotion.
+
+## 2026-06-18 - Keep Stable Load Closed After 8 s Physical A/B
+
+- Decision: keep the default C++ HAL as an engineering diagnostic RC only, and
+  keep the playback-scheduler HAL default-off.
+- Reason: both 8 s source-reference physical A/B windows failed product
+  readiness. The default C++ HAL improved several same-session quality metrics
+  versus mainline but used materially more CPU. The playback scheduler lowered
+  C++ playback submit cadence versus default C++, but did not pass physical
+  quality and still used more CPU than mainline.
+- Evidence:
+  - Default C++ A/B:
+    `local-analysis/physical-evidence-window/20260618T1959Z-stable-source-reference-ab-8s`.
+    Mainline: quality `0.622433`, SNR `-2.867828 dB`, driver CPU p95 `6.6`.
+    C++ default: quality `0.839707`, SNR `2.263183 dB`, driver CPU p95 `18.0`.
+  - Playback-scheduler A/B:
+    `local-analysis/physical-evidence-window/20260618T2002Z-playback-scheduler-source-reference-ab-8s`.
+    Playback-scheduler: quality `0.396583`, SNR `-7.248548 dB`,
+    driver CPU p95 `14.3`, playback submits about `68.14/s`.
+  - Both runs ended with final unload guards PASS and no active OpenA8DJ driver.
+- Alternatives rejected:
+  - Promote default C++ for human/product testing: rejected because CPU is worse
+    than mainline and absolute quality gates fail.
+  - Promote playback-scheduler for human/product testing: rejected because
+    quality still fails and CPU remains above mainline despite lower playback
+    submit cadence.
+- Readiness impact: stable engineering load exists, but product/human
+  readiness, CPU superiority, Timecode Vinyl readiness, and branch promotion
+  remain blocked.
+
+## 2026-06-18 - Require Comparable Submit Counters
+
+- Decision: same-session submit-rate gates now run only when both baseline and
+  candidate expose comparable submit counters.
+- Reason: mainline physical runs can report playback completions while
+  `playback_transfers_submitted_per_second=0`. Treating that as a real zero
+  submit baseline creates a false failure and corrupts resource metrics.
+- Evidence:
+  - `opena8djcpp_physical_submit_comparison_contract` now requires a submit
+    comparability guard and passes.
+  - Recomputed comparisons for both 8 s windows mark
+    `baseline.playback_submit_counter_comparable=false`, remove the false
+    playback-submit gate, and still fail on true quality/CPU gates.
+- Alternatives rejected:
+  - Leave the gate as-is: rejected because it compares C++ observability
+    against a non-observable mainline value.
+  - Drop submit-rate output entirely: rejected because C++ default vs
+    playback-scheduler submit cadence is still useful evidence.
+- Readiness impact: metric truth improved; readiness remains blocked.

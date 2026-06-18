@@ -77,6 +77,8 @@ struct RunStats {
   double playback_submit_attempts_per_second = std::numeric_limits<double>::quiet_NaN();
   double capture_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_submit_calls_per_second = std::numeric_limits<double>::quiet_NaN();
+  bool capture_submit_counter_comparable = false;
+  bool playback_submit_counter_comparable = false;
   double capture_submit_failures = std::numeric_limits<double>::quiet_NaN();
   double playback_submit_failures = std::numeric_limits<double>::quiet_NaN();
   double capture_transfers_sampled_per_second = std::numeric_limits<double>::quiet_NaN();
@@ -423,6 +425,19 @@ bool stream_summary_has_hot_path_timing(const std::string& json) {
   return false;
 }
 
+bool submit_counter_comparable(double submitted_per_second, double completed_per_second) {
+  if (!std::isfinite(submitted_per_second)) {
+    return false;
+  }
+  if (!std::isfinite(completed_per_second)) {
+    return submitted_per_second > 0.0;
+  }
+  if (completed_per_second > 1.0 && submitted_per_second <= 0.0) {
+    return false;
+  }
+  return true;
+}
+
 std::filesystem::path normalized_path(const std::filesystem::path& path) {
   try {
     return std::filesystem::weakly_canonical(path);
@@ -544,6 +559,12 @@ RunStats read_run(const std::filesystem::path& path, const std::filesystem::path
       number_or_nan(json_number(stream_summary, "capture_submit_failures"));
   run.playback_submit_failures =
       number_or_nan(json_number(stream_summary, "playback_submit_failures"));
+  run.capture_submit_counter_comparable =
+      submit_counter_comparable(run.capture_submit_calls_per_second,
+                                run.capture_transfers_per_second);
+  run.playback_submit_counter_comparable =
+      submit_counter_comparable(run.playback_submit_calls_per_second,
+                                run.playback_transfers_per_second);
   run.capture_transfers_sampled_per_second =
       number_or_nan(json_number(stream_summary, "capture_transfers_sampled_per_second"));
   run.playback_transfers_sampled_per_second =
@@ -761,10 +782,6 @@ std::vector<GateResult> run_to_run_gates(const RunStats& candidate, const RunSta
       {"driver_cpu_p95", Direction::LessOrEqual, candidate.driver.p95, baseline.driver.p95},
       {"coreaudiod_cpu_p95", Direction::LessOrEqual, candidate.coreaudiod.p95,
        baseline.coreaudiod.p95},
-      {"capture_submit_calls_per_second", Direction::LessOrEqual,
-       candidate.capture_submit_calls_per_second, baseline.capture_submit_calls_per_second},
-      {"playback_submit_calls_per_second", Direction::LessOrEqual,
-       candidate.playback_submit_calls_per_second, baseline.playback_submit_calls_per_second},
       {"candidate_audiophile_cpp_wav_analysis_pass", Direction::GreaterOrEqual,
        candidate.audiophile_cpp.pass ? 1.0 : 0.0, 1.0},
       {"candidate_audiophile_python_wav_analysis_pass", Direction::GreaterOrEqual,
@@ -774,6 +791,18 @@ std::vector<GateResult> run_to_run_gates(const RunStats& candidate, const RunSta
       {"baseline_audiophile_python_wav_analysis_pass", Direction::GreaterOrEqual,
        baseline.audiophile_python.pass ? 1.0 : 0.0, 1.0},
   };
+  if (candidate.capture_submit_counter_comparable &&
+      baseline.capture_submit_counter_comparable) {
+    gates.push_back({"capture_submit_calls_per_second", Direction::LessOrEqual,
+                     candidate.capture_submit_calls_per_second,
+                     baseline.capture_submit_calls_per_second});
+  }
+  if (candidate.playback_submit_counter_comparable &&
+      baseline.playback_submit_counter_comparable) {
+    gates.push_back({"playback_submit_calls_per_second", Direction::LessOrEqual,
+                     candidate.playback_submit_calls_per_second,
+                     baseline.playback_submit_calls_per_second});
+  }
   append_audiophile_dual_oracle_gates(gates,
                                       "candidate",
                                       candidate.audiophile_cpp,
@@ -896,6 +925,10 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"playback_submit_calls_per_second\": ";
   print_json_number(run.playback_submit_calls_per_second);
   std::cout << ",\n";
+  std::cout << indent << "  \"capture_submit_counter_comparable\": "
+            << (run.capture_submit_counter_comparable ? "true" : "false") << ",\n";
+  std::cout << indent << "  \"playback_submit_counter_comparable\": "
+            << (run.playback_submit_counter_comparable ? "true" : "false") << ",\n";
   std::cout << indent << "  \"capture_submit_failures\": ";
   print_json_number(run.capture_submit_failures);
   std::cout << ",\n";

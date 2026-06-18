@@ -122,9 +122,20 @@ int main(int argc, char** argv) {
       contains(compare_source, "run.playback_submit_calls_per_second = run.playback_transfers_per_second");
   if (!compare_has_legacy_fallback) failures.push_back("legacy_submit_fallback_missing");
 
+  const bool compare_has_submit_comparability_guard =
+      contains(compare_source, "submit_counter_comparable(") &&
+      contains(compare_source, "capture_submit_counter_comparable") &&
+      contains(compare_source, "playback_submit_counter_comparable") &&
+      contains(compare_source, "completed_per_second > 1.0 && submitted_per_second <= 0.0");
+  if (!compare_has_submit_comparability_guard) {
+    failures.push_back("submit_comparability_guard_missing");
+  }
+
   const bool same_session_gates_include_submit_rates =
-      contains(compare_source, "{\"capture_submit_calls_per_second\", Direction::LessOrEqual") &&
-      contains(compare_source, "{\"playback_submit_calls_per_second\", Direction::LessOrEqual");
+      contains(compare_source, "gates.push_back({\"capture_submit_calls_per_second\"") &&
+      contains(compare_source, "gates.push_back({\"playback_submit_calls_per_second\"") &&
+      contains(compare_source, "candidate.capture_submit_counter_comparable") &&
+      contains(compare_source, "baseline.playback_submit_counter_comparable");
   if (!same_session_gates_include_submit_rates) {
     failures.push_back("same_session_submit_gates_missing");
   }
@@ -134,6 +145,8 @@ int main(int argc, char** argv) {
       contains(compare_source, "\"playback_submit_attempts_per_second\"") &&
       contains(compare_source, "\"capture_submit_calls_per_second\"") &&
       contains(compare_source, "\"playback_submit_calls_per_second\"") &&
+      contains(compare_source, "capture_submit_counter_comparable") &&
+      contains(compare_source, "playback_submit_counter_comparable") &&
       contains(compare_source, "\"capture_submit_failures\"") &&
       contains(compare_source, "\"playback_submit_failures\"") &&
       contains(compare_source, "\"capture_submit_rate_ratio_to_expected\"") &&
@@ -167,6 +180,8 @@ int main(int argc, char** argv) {
       << (compare_reads_submit_rates ? "true" : "false") << ",\n"
       << "  \"compare_has_legacy_fallback\": "
       << (compare_has_legacy_fallback ? "true" : "false") << ",\n"
+      << "  \"compare_has_submit_comparability_guard\": "
+      << (compare_has_submit_comparability_guard ? "true" : "false") << ",\n"
       << "  \"same_session_gates_include_submit_rates\": "
       << (same_session_gates_include_submit_rates ? "true" : "false") << ",\n"
       << "  \"compare_prints_submit_rates\": "
