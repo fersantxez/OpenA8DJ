@@ -2338,6 +2338,11 @@ Current implementation:
   oracle dependencies, the native C++ analyzer metrics, automatic dual-analyzer
   execution in physical windows, physical comparator enforcement for both
   baseline and candidate legs, and fail-closed product-claim semantics.
+- `local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json` must be
+  present and `PASS_DIAGNOSTIC`. This validates the first native C++ migration
+  of the LTI transfer-quality analysis on a generated broadband fixture. It is
+  diagnostic only until a parity gate compares C++ against the existing
+  Python/SciPy output on saved physical evidence.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

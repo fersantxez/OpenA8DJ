@@ -11054,3 +11054,29 @@ Full offline gate rerun:
   - PASS means the analysis stack is fail-closed around dual C++ and
     Python/SciPy WAV analyzers.
   - PASS does not mean product quality, branch promotion, or physical readiness.
+
+## 2026-06-18 C++ LTI Transfer-Quality Self-Test
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_lti_transfer_quality`.
+  - Integrated the self-test into CMake, CTest, `scripts/run-cpp-offline-gates`,
+    and the evidence schema.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Focused command:
+  - `./build/cpp-offline/opena8djcpp_lti_transfer_quality --self-test --json-out local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json`
+- Focused result:
+  - `PASS_DIAGNOSTIC`
+  - self-test alignment lag `137`
+  - min mid coherence `1`
+  - min LTI SNR delta about `2.7557 dB`
+- Evidence:
+  - `local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json`
+- Interpretation:
+  - The native C++ LTI analyzer can measure a generated broadband fixture.
+  - It is not yet a replacement for Python/SciPy in product claims; parity on
+    saved physical evidence is still required.

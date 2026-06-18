@@ -7388,3 +7388,32 @@ Next implication:
 - Offline PASS now includes proof that analyzer evidence cannot be silently
   skipped. Physical quality, performance, routing, and timecode claims remain
   blocked until current lock-gated same-session evidence exists and passes.
+
+## 2026-06-18: Add Native C++ LTI Transfer-Quality Analyzer Self-Test
+
+Decision:
+- Added `opena8djcpp_lti_transfer_quality`, a native C++ diagnostic analyzer
+  for LTI transfer quality.
+- Integrated its self-test into CMake/CTest, `scripts/run-cpp-offline-gates`,
+  and the evidence schema as
+  `local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json`.
+
+Reason:
+- LTI transfer quality is the highest-impact remaining Python/SciPy dependency
+  for audiophile superiority evidence. It distinguishes route coloration that a
+  linear transfer can explain from residual distortion or time instability.
+- The first step is not to remove Python. The safe step is a C++ analyzer with
+  schema-compatible fields and a deterministic self-test, followed by a parity
+  gate against existing Python evidence.
+
+Alternatives discarded:
+- Replace the Python LTI analyzer immediately: rejected because numeric parity
+  against SciPy/Welch/CSD evidence is not proven yet.
+- Leave LTI entirely in Python: rejected because C++ is the candidate line and
+  final evidence should not depend on a fragile analysis environment where a
+  compiled deterministic path is feasible.
+
+Next implication:
+- Add a parity gate that runs the C++ LTI analyzer on saved physical runs and
+  compares core fields against `scripts/analyze-lti-transfer-quality.py` before
+  using the C++ output for claim-critical gates.

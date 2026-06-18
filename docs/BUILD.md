@@ -1021,6 +1021,19 @@ product-claim gate all require dual analyzer evidence. PASS here is not a
 quality claim; it only proves the measurement stack is wired so missing analyzer
 evidence cannot be ignored.
 
+The first C++ migration of the LTI transfer-quality analysis is:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_lti_transfer_quality
+./build/cpp-release/opena8djcpp_lti_transfer_quality --self-test
+```
+
+It emits `opena8djcpp.lti-transfer-quality-cpp.v1` JSON with the same core
+fields used by the Python/SciPy LTI evidence: scalar and LTI residual ratios,
+coherence by band, transfer magnitude by band, and LTI SNR delta. It is not yet
+a replacement for Python in product claims; the next required step is a parity
+gate against saved physical evidence.
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

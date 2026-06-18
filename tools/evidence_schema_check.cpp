@@ -106,6 +106,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json",
       root / "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
       root / "local-analysis/cpp-offline/audiophile-analysis-stack-contract.json",
+      root / "local-analysis/cpp-offline/lti-transfer-quality-cpp-self-test.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -173,6 +174,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto audiophile_analysis_stack_contract =
       opena8djcpp::evidence_json::json_object(summary, "audiophile_analysis_stack_contract")
+          .value_or("");
+  const auto lti_transfer_quality_cpp_self_test =
+      opena8djcpp::evidence_json::json_object(summary, "lti_transfer_quality_cpp_self_test")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -363,6 +367,18 @@ int main(int argc, char** argv) {
       string_field_is(
           audiophile_analysis_stack_contract, "blocked_claim",
           "NO_AUDIOPHILE_OR_BRANCH_PROMOTION_CLAIM_WITHOUT_DUAL_CPP_AND_PYTHON_WAV_ANALYZERS_PASSING_ON_SAME_SESSION_MAINLINE_AND_CPP_CAPTURE") &&
+      object_present(summary, "lti_transfer_quality_cpp_self_test") &&
+      string_field_is(lti_transfer_quality_cpp_self_test, "status", "PASS_DIAGNOSTIC") &&
+      string_field_is(lti_transfer_quality_cpp_self_test, "schema",
+                      "opena8djcpp.lti-transfer-quality-cpp.v1") &&
+      bool_field_is(lti_transfer_quality_cpp_self_test, "self_test", true) &&
+      bool_field_is(lti_transfer_quality_cpp_self_test, "product_claim_allowed", false) &&
+      number_field_is(lti_transfer_quality_cpp_self_test, "row_count", 1.0) &&
+      number_field_present(lti_transfer_quality_cpp_self_test, "min_mid_coherence") &&
+      number_field_present(lti_transfer_quality_cpp_self_test, "min_lti_snr_delta_db") &&
+      string_field_is(
+          lti_transfer_quality_cpp_self_test, "blocked_claim",
+          "CPP_LTI_TRANSFER_ANALYSIS_IS_DIAGNOSTIC_UNTIL_PARITY_WITH_PYTHON_AND_SAME_SESSION_PHYSICAL_EVIDENCE_PASS") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&
