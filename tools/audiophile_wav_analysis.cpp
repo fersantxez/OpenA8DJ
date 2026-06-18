@@ -27,6 +27,7 @@ struct StereoBuffer {
 };
 
 struct Thresholds {
+  double min_alignment_score = 0.98;
   double min_snr_db = 45.0;
   double min_mid_coherence = 0.90;
   double max_delay_p95_frames = 2.0;
@@ -717,6 +718,9 @@ Analysis analyze_buffers(const StereoBuffer& reference_in,
   if (out.left.clipped_frames != 0U || out.right.clipped_frames != 0U) {
     out.blockers.push_back("capture_clipping_present");
   }
+  if (std::abs(out.alignment.score) < cli.thresholds.min_alignment_score) {
+    out.blockers.push_back("alignment_score_below_threshold");
+  }
   if (std::min(out.left.snr_db, out.right.snr_db) < cli.thresholds.min_snr_db) {
     out.blockers.push_back("snr_below_threshold");
   }
@@ -883,6 +887,7 @@ std::string to_json(const Analysis& analysis) {
   out << "    \"lag_jumps_gt_2_frames\": " << analysis.delay_windows.lag_jumps_gt_2_frames << "\n";
   out << "  },\n";
   out << "  \"thresholds\": {\n";
+  print_number(out, "min_alignment_score", analysis.thresholds.min_alignment_score);
   print_number(out, "min_snr_db", analysis.thresholds.min_snr_db);
   print_number(out, "min_mid_coherence", analysis.thresholds.min_mid_coherence);
   print_number(out, "max_delay_p95_frames", analysis.thresholds.max_delay_p95_frames);
@@ -928,6 +933,8 @@ Cli parse_cli(int argc, char** argv) {
       cli.delay_window_seconds = std::stod(std::string(next(index)));
     } else if (arg == "--delay-search-ms") {
       cli.delay_search_ms = std::stod(std::string(next(index)));
+    } else if (arg == "--min-alignment-score") {
+      cli.thresholds.min_alignment_score = std::stod(std::string(next(index)));
     } else if (arg == "--min-snr-db") {
       cli.thresholds.min_snr_db = std::stod(std::string(next(index)));
     } else if (arg == "--min-mid-coherence") {

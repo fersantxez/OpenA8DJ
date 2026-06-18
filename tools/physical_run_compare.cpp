@@ -55,6 +55,7 @@ struct AudiophileWavStats {
   bool product_claim_allowed = true;
   std::string schema;
   std::string result;
+  double lag_frames = std::numeric_limits<double>::quiet_NaN();
   double alignment_score = std::numeric_limits<double>::quiet_NaN();
   double snr_floor_db = std::numeric_limits<double>::quiet_NaN();
   double mid_active_coherence_floor = std::numeric_limits<double>::quiet_NaN();
@@ -484,6 +485,7 @@ AudiophileWavStats read_audiophile_wav_stats(const std::filesystem::path& path,
   stats.schema = json_string(json, "schema").value_or("");
   stats.result = json_string(json, "result").value_or("FAIL");
   stats.product_claim_allowed = json_bool(json, "product_claim_allowed").value_or(true);
+  stats.lag_frames = number_or_nan(json_number(json, "lag_frames"));
   stats.alignment_score = number_or_nan(json_number(json, "score"));
   const auto snrs = json_numbers(json, "snr_db");
   if (!snrs.empty()) {
@@ -636,6 +638,35 @@ bool compare_value(double candidate, Direction direction, double required) {
   return candidate <= required;
 }
 
+double abs_delta(double left, double right) {
+  if (!std::isfinite(left) || !std::isfinite(right)) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  return std::abs(left - right);
+}
+
+void append_audiophile_dual_oracle_gates(std::vector<GateResult>& gates,
+                                         const std::string& prefix,
+                                         const AudiophileWavStats& cpp,
+                                         const AudiophileWavStats& python) {
+  gates.push_back({prefix + "_audiophile_dual_oracle_alignment_delta",
+                   Direction::LessOrEqual,
+                   abs_delta(cpp.alignment_score, python.alignment_score),
+                   0.01});
+  gates.push_back({prefix + "_audiophile_dual_oracle_lag_delta_frames",
+                   Direction::LessOrEqual,
+                   abs_delta(cpp.lag_frames, python.lag_frames),
+                   8.0});
+  gates.push_back({prefix + "_audiophile_dual_oracle_snr_floor_delta_db",
+                   Direction::LessOrEqual,
+                   abs_delta(cpp.snr_floor_db, python.snr_floor_db),
+                   1.0});
+  gates.push_back({prefix + "_audiophile_dual_oracle_delay_p95_delta_frames",
+                   Direction::LessOrEqual,
+                   abs_delta(cpp.delay_p95_frames, python.delay_p95_frames),
+                   4.0});
+}
+
 std::vector<GateResult> fixed_baseline_gates(const RunStats& candidate,
                                              const FixedBaseline& baseline) {
   std::vector<GateResult> gates = {
@@ -702,6 +733,10 @@ std::vector<GateResult> fixed_baseline_gates(const RunStats& candidate,
                      Direction::GreaterOrEqual,
                      candidate.audiophile_python.pass ? 1.0 : 0.0,
                      1.0});
+    append_audiophile_dual_oracle_gates(gates,
+                                        "candidate",
+                                        candidate.audiophile_cpp,
+                                        candidate.audiophile_python);
   }
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
@@ -739,6 +774,14 @@ std::vector<GateResult> run_to_run_gates(const RunStats& candidate, const RunSta
       {"baseline_audiophile_python_wav_analysis_pass", Direction::GreaterOrEqual,
        baseline.audiophile_python.pass ? 1.0 : 0.0, 1.0},
   };
+  append_audiophile_dual_oracle_gates(gates,
+                                      "candidate",
+                                      candidate.audiophile_cpp,
+                                      candidate.audiophile_python);
+  append_audiophile_dual_oracle_gates(gates,
+                                      "baseline",
+                                      baseline.audiophile_cpp,
+                                      baseline.audiophile_python);
   for (auto& gate : gates) {
     gate.pass = compare_value(gate.candidate, gate.direction, gate.required);
   }
@@ -810,12 +853,18 @@ void print_run(const RunStats& run, const std::string& indent) {
   std::cout << indent << "  \"audiophile_cpp_wav_analysis_schema\": ";
   print_json_string(run.audiophile_cpp.schema);
   std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_cpp_lag_frames\": ";
+  print_json_number(run.audiophile_cpp.lag_frames);
+  std::cout << ",\n";
   std::cout << indent << "  \"audiophile_python_wav_analysis_present\": "
             << (run.audiophile_python.evidence_present ? "true" : "false") << ",\n";
   std::cout << indent << "  \"audiophile_python_wav_analysis_pass\": "
             << (run.audiophile_python.pass ? "true" : "false") << ",\n";
   std::cout << indent << "  \"audiophile_python_wav_analysis_schema\": ";
   print_json_string(run.audiophile_python.schema);
+  std::cout << ",\n";
+  std::cout << indent << "  \"audiophile_python_lag_frames\": ";
+  print_json_number(run.audiophile_python.lag_frames);
   std::cout << ",\n";
   std::cout << indent << "  \"stream_summary_present\": "
             << (run.stream_summary_present ? "true" : "false") << ",\n";

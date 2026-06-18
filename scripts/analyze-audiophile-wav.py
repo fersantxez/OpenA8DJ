@@ -245,6 +245,8 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
     blockers = []
     if left["clipped_frames"] or right["clipped_frames"]:
         blockers.append("capture_clipping_present")
+    if abs(float(align["score"])) < args.min_alignment_score:
+        blockers.append("alignment_score_below_threshold")
     if min(left["snr_db"], right["snr_db"]) < args.min_snr_db:
         blockers.append("snr_below_threshold")
     if min(left["coherence_mid_active_mean"] or 0.0, right["coherence_mid_active_mean"] or 0.0) < args.min_mid_coherence:
@@ -269,6 +271,7 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         "stereo_matrix": matrix,
         "delay_windows": delay,
         "thresholds": {
+            "min_alignment_score": args.min_alignment_score,
             "min_snr_db": args.min_snr_db,
             "min_mid_coherence": args.min_mid_coherence,
             "max_delay_p95_frames": args.max_delay_p95_frames,
@@ -324,6 +327,7 @@ def main() -> int:
     parser.add_argument("--max-lag-seconds", type=float, default=1.0)
     parser.add_argument("--delay-window-seconds", type=float, default=1.0)
     parser.add_argument("--delay-search-ms", type=float, default=8.0)
+    parser.add_argument("--min-alignment-score", type=float, default=0.98)
     parser.add_argument("--min-snr-db", type=float, default=45.0)
     parser.add_argument("--min-mid-coherence", type=float, default=0.90)
     parser.add_argument("--max-delay-p95-frames", type=float, default=2.0)

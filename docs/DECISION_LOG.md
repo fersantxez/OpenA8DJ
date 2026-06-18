@@ -8680,3 +8680,25 @@ Next implication:
 - Readiness impact: measurement/reporting safety only. This does not validate
   the route, prove CPU/resource superiority, clear Timecode Vinyl, or authorize
   branch promotion.
+
+## 2026-06-18 - Require Audiophile Analyzer Alignment And Dual-Oracle Agreement
+
+- Decision: both audiophile WAV analyzers now require `min_alignment_score`
+  before reporting PASS, and `physical_run_compare` requires C++/Python
+  agreement on alignment score, lag, SNR floor, and delay p95 before any
+  physical comparison can support a claim.
+- Reason: a dual-analyzer stack is not enough if the two analyzers pass while
+  disagreeing numerically. Product promotion needs independent analyzers that
+  also agree on the same physical reality.
+- Evidence:
+  - Focused C++ analyzer self-test passed with `alignment.score=0.999999995907`.
+  - Focused Python analyzer self-test passed with
+    `alignment.score=0.9998681605804012`.
+  - Focused stack contract passed and reports
+    `comparator_requires_dual_oracle_agreement=true`.
+  - Current physical comparison remains FAIL and now exposes
+    `candidate_audiophile_dual_oracle_delay_p95_delta_frames=2426`, so the
+    claim is blocked on analyzer disagreement as well as route/product gates.
+- Readiness impact: stricter evidence only. This makes product and branch
+  promotion harder, not easier, and does not clear the current iRig route,
+  CPU/resource, or Timecode Vinyl blockers.

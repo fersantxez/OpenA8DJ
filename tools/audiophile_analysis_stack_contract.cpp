@@ -69,6 +69,8 @@ int main(int argc, char** argv) {
 
   const bool cpp_analyzer_native =
       contains(cpp_analyzer, "opena8djcpp.audiophile-wav-analysis-cpp.v1") &&
+      contains(cpp_analyzer, "min_alignment_score") &&
+      contains(cpp_analyzer, "alignment_score_below_threshold") &&
       contains(cpp_analyzer, "coherence_mid_active_mean") &&
       contains(cpp_analyzer, "delay_windows") &&
       contains(cpp_analyzer, "worst_offdiag_db_relative") &&
@@ -81,6 +83,8 @@ int main(int argc, char** argv) {
   const bool python_oracle_retained =
       contains(python_analyzer, "import numpy as np") &&
       contains(python_analyzer, "import scipy.signal") &&
+      contains(python_analyzer, "min_alignment_score") &&
+      contains(python_analyzer, "alignment_score_below_threshold") &&
       contains(python_analyzer, "import soundfile as sf") &&
       contains(python_analyzer, "scipy.signal.coherence") &&
       contains(python_analyzer, "scipy.signal.csd") &&
@@ -122,9 +126,14 @@ int main(int argc, char** argv) {
       contains(physical_compare, "candidate_audiophile_python_wav_analysis_pass") &&
       contains(physical_compare, "baseline_audiophile_cpp_wav_analysis_pass") &&
       contains(physical_compare, "baseline_audiophile_python_wav_analysis_pass") &&
+      contains(physical_compare, "append_audiophile_dual_oracle_gates") &&
+      contains(physical_compare, "audiophile_dual_oracle_alignment_delta") &&
+      contains(physical_compare, "audiophile_dual_oracle_lag_delta_frames") &&
+      contains(physical_compare, "audiophile_dual_oracle_snr_floor_delta_db") &&
+      contains(physical_compare, "audiophile_dual_oracle_delay_p95_delta_frames") &&
       contains(physical_compare, "audiophile_wav_analysis_required_before_promotion");
   if (!comparator_requires_both) {
-    blockers.push_back("physical_comparator_does_not_require_dual_analyzer_pass");
+    blockers.push_back("physical_comparator_does_not_require_dual_analyzer_pass_and_agreement");
   }
 
   const bool product_claim_blocks_without_both =
@@ -173,6 +182,8 @@ int main(int argc, char** argv) {
             << "  \"known_good_route_runs_both\": "
             << (known_good_runs_both ? "true" : "false") << ",\n"
             << "  \"comparator_requires_both\": "
+            << (comparator_requires_both ? "true" : "false") << ",\n"
+            << "  \"comparator_requires_dual_oracle_agreement\": "
             << (comparator_requires_both ? "true" : "false") << ",\n"
             << "  \"product_claim_blocks_without_both\": "
             << (product_claim_blocks_without_both ? "true" : "false") << ",\n"

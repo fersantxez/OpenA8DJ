@@ -2925,3 +2925,8 @@ Current implication:
 - Evidence-summary hardening update: `current-offline-gates.json` now exposes
   top-level product decision fields so a diagnostic offline PASS cannot be
   confused with a quality, hardware, or branch-promotion claim.
+- Audiophile dual-oracle hardening update: both WAV analyzers now gate on
+  `min_alignment_score`, and physical comparison requires C++/Python agreement
+  on alignment, lag, SNR floor, and delay p95. Current evidence still fails,
+  including a large dual-oracle delay disagreement, so no product claim is
+  allowed.

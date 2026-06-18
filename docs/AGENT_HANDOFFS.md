@@ -4355,3 +4355,39 @@ Risks:
 Next action:
 - Rerun full offline gates and keep all product claims blocked until route
   validity, same-session A/B, CPU/resource, and Timecode Vinyl gates pass.
+
+## 2026-06-18 Reused Subagents: Claim/Resource Gap Review
+
+Subagents:
+- `019ed9e0-3d8f-7840-8562-fbb4ccb034bf` (`Hypatia`)
+- `019ed9f8-58e6-7711-9740-eeb62e7da36c` (`Bohr`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Missions:
+- Hypatia: read-only review of audiophile/quality gates for false-positive
+  claim risk.
+- Bohr: read-only review of offline performance/resource gates for the gap that
+  still prevents objective CPU/jitter superiority over mainline.
+
+Findings:
+- Hypatia found that both audiophile analyzers could pass without explicit
+  alignment-score gating and that the physical comparator required both JSONs
+  but not numerical agreement between C++ and Python.
+- Bohr found that offline performance gates model submit reduction and hot-path
+  shape, but still do not provide a calibrated CPU/jitter superiority model
+  against the mainline p95 budgets; physical same-session evidence remains
+  mandatory.
+
+Integrated action:
+- Added `min_alignment_score` to both audiophile WAV analyzers.
+- Added C++/Python dual-oracle agreement gates for alignment score, lag, SNR
+  floor, and delay p95 in `physical_run_compare`.
+- Hardened `audiophile_analysis_stack_contract` so those checks stay required.
+
+Next action:
+- Add a separate resource-superiority model gate that consumes prepared-runtime
+  submit ratios, hot-path timing, and mainline CPU budgets, while still
+  blocking final CPU/resource claims until lock-gated same-session physical A/B
+  evidence exists.

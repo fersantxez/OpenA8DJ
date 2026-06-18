@@ -12590,3 +12590,38 @@ Full offline gate after commit:
   - Offline `status=PASS` remains diagnostic only.
   - Product readiness must remain blocked unless the top-level claim fields and
     promotion evaluator both allow it.
+
+## 2026-06-18 - Audiophile Dual-Oracle Agreement Hardening
+
+- Commit context: `e3d602f` plus uncommitted audiophile analyzer hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Focused build:
+  - Command:
+    `cmake --build build/cpp-release --target opena8djcpp_audiophile_wav_analysis opena8djcpp_audiophile_analysis_stack_contract opena8djcpp_physical_run_compare`
+  - Result: PASS.
+- Focused Python syntax:
+  - Command: `python3 -m py_compile scripts/analyze-audiophile-wav.py`
+  - Result: PASS.
+- Focused analyzer self-tests:
+  - C++ analyzer: PASS; `alignment.score=0.999999995907`;
+    `thresholds.min_alignment_score=0.98`.
+  - Python analyzer: PASS; `alignment.score=0.9998681605804012`;
+    `thresholds.min_alignment_score=0.98`.
+- Focused stack/comparator:
+  - `opena8djcpp_audiophile_analysis_stack_contract`: PASS;
+    `comparator_requires_dual_oracle_agreement=true`.
+  - `opena8djcpp_physical_run_compare`: FAIL as expected for current evidence;
+    `branch_promotion_supported=false`;
+    `candidate_audiophile_dual_oracle_delay_p95_delta_frames=2426`.
+- Interpretation:
+  - Both analyzers now fail if global alignment is below threshold.
+  - Same-session physical comparison now requires C++/Python numerical
+    agreement before it can support a claim.
+  - The current candidate remains blocked; this is a measurement-integrity
+    hardening, not a readiness improvement.
