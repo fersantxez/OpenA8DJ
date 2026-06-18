@@ -101,6 +101,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/product-quality-claim-gate.json",
+      root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
       root / "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
@@ -180,6 +181,7 @@ int main(int argc, char** argv) {
           "NO_PRODUCT_AB_OR_BRANCH_PROMOTION_UNTIL_ROUTE_REVALIDATION_AND_SAME_SESSION_MAINLINE_CPP_PHYSICAL_COMPARE_PASS") &&
       object_present(summary, "diagnostic_pass_semantics_gate") &&
       object_present(summary, "product_quality_claim_gate") &&
+      object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&
       bool_field_is(summary, "usb_touched", false);

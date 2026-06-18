@@ -10067,3 +10067,35 @@ Full offline gate rerun:
   - Tone evidence alone can no longer be read as an audiophile quality claim.
   - Product quality remains blocked until physical same-session evidence closes
     the route, music, CPU, routing, and timecode gaps.
+
+## 2026-06-17 Evidence Provenance Freshness Gate
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_evidence_provenance_freshness_gate`.
+  - The full offline runner now writes `working_tree_dirty` into
+    `current-offline-gates.json`, validates the summary against current HEAD,
+    and then records the provenance result back into the summary.
+  - The runner reruns promotion evaluation after provenance insertion so
+    `candidate_evidence_matches_claimed_commit` reflects the final summary.
+  - `scripts/evaluate-promotion-readiness.py` now includes
+    `candidate_evidence_matches_claimed_commit`.
+  - No hardware, USB, CoreAudio, HAL install/activation, driver install,
+    service restart, default-device change, sample-rate change, or buffer-size
+    change was performed.
+- Results:
+  - Full offline Debug CTest: `54/54` passed.
+  - Full offline Release CTest: `55/55` passed.
+  - Evidence schema: PASS with `required_files=56`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Provenance gate: PASS with `summary_matches_head=true`,
+    `working_tree_clean_for_claim=true`, and
+    `claimable_current_candidate=true`.
+- Evidence:
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - A clean compile or stale offline PASS is not enough. Evidence must be
+    attributable to the exact C++ candidate commit being discussed.

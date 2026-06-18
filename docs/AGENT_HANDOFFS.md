@@ -3447,3 +3447,29 @@ Risk:
 - Risk:
   - This is still an offline evidence guard, not proof of sound quality. It
     prevents false claims until a valid lock-gated physical bundle exists.
+
+## 2026-06-17 Subagent: Boyle Evidence Provenance Audit
+
+- Agent:
+  - Boyle (`019ed80d-16f5-73e0-a042-9be1a78ca39a`)
+- Mission:
+  - Read-only audit of the next objective blocker that could allow a false
+    quality/performance/readiness claim.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Finding:
+  - `current-offline-gates.json` could report PASS for an older `base_commit`
+    than HEAD, so stale evidence could be attributed to the current candidate.
+- Integrated action:
+  - Added `opena8djcpp_evidence_provenance_freshness_gate`.
+  - Added `candidate_evidence_matches_claimed_commit` to promotion evaluation.
+  - The full offline runner now records worktree dirtiness and embeds
+    provenance status into `current-offline-gates.json`.
+- Risk:
+  - Historical physical artifacts still may not carry per-artifact commit IDs.
+    The next physical promotion bundle should stamp candidate commit/build ID
+    into every generated artifact.

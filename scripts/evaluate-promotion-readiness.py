@@ -10,6 +10,7 @@ import argparse
 import csv
 import json
 import math
+import subprocess
 from pathlib import Path
 
 
@@ -193,6 +194,16 @@ def gate(name, passed, metrics=None, reason=""):
     }
 
 
+def current_head_short():
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+            text=True,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
 def check_file(path, name):
     exists = path.is_file()
     return gate(name, exists, {"path": str(path)}, "" if exists else "required evidence file is missing")
@@ -285,6 +296,8 @@ def evaluate(args):
     direct_usb_attribution = load_json_or_empty(paths["direct_usb_attribution"])
     hal_candidate_safety = load_json_or_empty(paths["hal_candidate_safety"])
     cpu = cpu_profile(paths["cpu"])
+    head_commit = current_head_short()
+    provenance = offline.get("evidence_provenance_freshness_gate", {})
     simulated_snr = min(as_float(simulated, "left_snr_db"), as_float(simulated, "right_snr_db"))
     music_snr = min(as_float(music, "left_snr_db"), as_float(music, "right_snr_db"))
     music_clicks = as_float(music, "click_outliers",
@@ -310,6 +323,15 @@ def evaluate(args):
               "hardware_touched": offline.get("hardware_touched"),
               "coreaudio_touched": offline.get("coreaudio_touched"),
               "usb_touched": offline.get("usb_touched")}),
+        gate("candidate_evidence_matches_claimed_commit",
+             offline.get("base_commit") == head_commit and
+             provenance.get("claimable_current_candidate") is True,
+             {"offline_base_commit": offline.get("base_commit"),
+              "head_commit": head_commit,
+              "provenance_status": provenance.get("status"),
+              "claimable_current_candidate": provenance.get("claimable_current_candidate"),
+              "working_tree_clean_for_claim": provenance.get("working_tree_clean_for_claim")},
+             "offline evidence must be freshly attributable to the current HEAD before promotion"),
         gate("offline_timecode_signal_analysis",
              offline.get("timecode_signal_analysis", {}).get("status") == "PASS" and
              offline.get("timecode_signal_analysis", {}).get("rows", 0) >= 8 and

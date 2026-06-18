@@ -6639,3 +6639,39 @@ Alternatives discarded:
 Next implication:
 - Future physical windows must make `quality_claim_allowed=true` before any
   statement that C++ has better audiophile quality than mainline.
+
+## 2026-06-17: Evidence Must Match Current Candidate Commit
+
+Decision:
+- Added `opena8djcpp_evidence_provenance_freshness_gate`.
+- Added a promotion evaluator gate named
+  `candidate_evidence_matches_claimed_commit`.
+- The full offline runner now records worktree dirtiness, runs the provenance
+  gate after writing `current-offline-gates.json`, and embeds the result back
+  into the summary.
+- The runner then reruns promotion evaluation and updates
+  `promotion_readiness_evaluator` so the final summary does not preserve a
+  stale pre-provenance promotion result.
+
+Reason:
+- A subagent audit found that schema PASS could remain attached to a stale
+  `base_commit`. That would allow a false claim that the current C++ candidate
+  has evidence generated for a previous commit.
+
+Evidence:
+- Focused build of `opena8djcpp_evidence_provenance_freshness_gate`: PASS.
+- Full offline gates after integration: Debug CTest `54/54`, Release CTest
+  `55/55`, evidence schema `required_files=56`, `missing_files=0`,
+  `summary_pass=true`, `manifest_pass=true`.
+- Provenance gate reports `summary_matches_head=true`,
+  `working_tree_clean_for_claim=true`, and `claimable_current_candidate=true`.
+
+Alternatives discarded:
+- Trust commit hashes in prose: rejected because readiness claims must be
+  machine-checkable.
+- Require every historical artifact to carry a candidate commit immediately:
+  deferred because many old physical artifacts predate this contract; the
+  current offline summary and promotion evaluator are the first hard boundary.
+
+Next implication:
+- Promotion is impossible unless the offline evidence bundle is fresh for HEAD.

@@ -2459,6 +2459,10 @@ Current implication:
     allowance before any quality claim can be allowed. Current full offline
     evidence: Debug CTest `54/54`, Release CTest `55/55`, evidence schema
     `required_files=55`, `missing_files=0`; `quality_claim_allowed=false`.
+  - Evidence freshness is now a readiness concern. A subagent audit found that
+    a stale `base_commit` could leave schema PASS attached to an older commit.
+    The new provenance gate requires `current-offline-gates.json` to match HEAD
+    and a clean claimable worktree before current-candidate claims are allowed.
 - Operational blocker:
   - Post-reboot automatic recovery/login back into Codex did not work in the
     earlier reboot attempt and must be fixed separately before relying on

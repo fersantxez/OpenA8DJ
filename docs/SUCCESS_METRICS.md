@@ -2190,6 +2190,12 @@ Prepared transport migration metric:
   superiority PASS, capture route valid for promotion, audiophile tone PASS
   from a current promotion-valid measurement, and branch promotion allowed.
   Current expected state is PASS as a guard with `quality_claim_allowed=false`.
+- Current-candidate claims must be protected by
+  `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`.
+  Minimum expectations: `current-offline-gates.json base_commit` equals current
+  Git HEAD, offline summary status is PASS, worktree is clean for claims, and
+  no hardware/CoreAudio/USB touch flags are set. Promotion evaluation must fail
+  `candidate_evidence_matches_claimed_commit` when this is absent or stale.
 - A known-good route source must be a wired non-Audio8 output into the shared
   capture chain. Built-in speakers / acoustic paths are not valid promotion
   evidence and must be rejected unless explicitly marked diagnostic-only.

@@ -332,6 +332,9 @@ add_executable(opena8djcpp_diagnostic_pass_semantics_gate
 add_executable(opena8djcpp_product_quality_claim_gate
   tools/product_quality_claim_gate.cpp)
 
+add_executable(opena8djcpp_evidence_provenance_freshness_gate
+  tools/evidence_provenance_freshness_gate.cpp)
+
 add_executable(opena8djcpp_hal_candidate_safety_gate
   tools/hal_candidate_safety_gate.cpp)
 

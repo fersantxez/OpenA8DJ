@@ -1458,3 +1458,32 @@ PASS/FAIL semantics:
 - A future quality claim requires `quality_claim_allowed=true`, which demands
   same-session real-music superiority, route-valid tone evidence, route
   promotion validity, and branch-promotion allowance.
+
+## Evidence Provenance Freshness Gate
+
+Purpose:
+
+- prevent offline PASS evidence from being attributed to a different C++
+  candidate commit;
+- block branch-promotion evaluation when evidence was generated for an older
+  HEAD or a non-claimable worktree.
+
+Command shape:
+
+```sh
+cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cpp-release --target opena8djcpp_evidence_provenance_freshness_gate
+./build/cpp-release/opena8djcpp_evidence_provenance_freshness_gate
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`.
+
+PASS/FAIL semantics:
+
+- PASS requires `current-offline-gates.json base_commit` to match current HEAD,
+  offline summary PASS, clean claimable worktree, and no hardware/CoreAudio/USB
+  touch flags.
+- FAIL means no current-candidate quality, performance, timecode, routing, or
+  branch-promotion claim is allowed from that evidence bundle.

@@ -133,6 +133,10 @@ def git_text(*args):
     return subprocess.check_output(["git", *args], text=True).strip()
 
 
+def git_worktree_dirty():
+    return bool(subprocess.check_output(["git", "status", "--porcelain"], text=True).strip())
+
+
 packet = load_json("packet-matrix.json")
 mode2_cross_oracle = load_json("mode2-cross-oracle-parity.json")
 protocol = load_json("protocol-contract.json")
@@ -194,6 +198,7 @@ summary = {
     "worktree": str(root),
     "branch": git_text("branch", "--show-current"),
     "base_commit": git_text("rev-parse", "--short", "HEAD"),
+    "working_tree_dirty": git_worktree_dirty(),
     "command": "scripts/run-cpp-offline-gates",
     "status": "PASS",
     "diagnostic_status": "PASS",
@@ -1170,5 +1175,66 @@ summary = {
     json.dumps(summary, indent=2, sort_keys=True) + "\n",
     encoding="utf-8",
 )
+PY
+./build/cpp-release/opena8djcpp_evidence_provenance_freshness_gate | tee "$EVIDENCE_DIR/evidence-provenance-freshness-gate.json"
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+root = Path.cwd()
+evidence = root / "local-analysis/cpp-offline"
+summary_path = evidence / "current-offline-gates.json"
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+provenance = json.loads((evidence / "evidence-provenance-freshness-gate.json").read_text(encoding="utf-8"))
+summary["evidence_provenance_freshness_gate"] = {
+    "status": provenance.get("result"),
+    "head_commit": provenance.get("head_commit"),
+    "summary_base_commit": provenance.get("summary_base_commit"),
+    "summary_matches_head": provenance.get("summary_matches_head"),
+    "working_tree_clean_for_claim": provenance.get("working_tree_clean_for_claim"),
+    "claimable_current_candidate": provenance.get("claimable_current_candidate"),
+    "blocked_claim": provenance.get("blocked_claim"),
+    "evidence": "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
+}
+summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+set +e
+python3 scripts/evaluate-promotion-readiness.py \
+  --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
+  > "$EVIDENCE_DIR/promotion-readiness-offline-check.stdout"
+PROMOTION_EVALUATOR_RC=$?
+set -e
+if [[ "$PROMOTION_EVALUATOR_RC" -ne 0 && "$PROMOTION_EVALUATOR_RC" -ne 1 ]]; then
+  exit "$PROMOTION_EVALUATOR_RC"
+fi
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+root = Path.cwd()
+evidence = root / "local-analysis/cpp-offline"
+summary_path = evidence / "current-offline-gates.json"
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+promotion_evaluator = json.loads(
+    (evidence / "promotion-readiness-offline-check.json").read_text(encoding="utf-8")
+)
+summary["product_readiness_status"] = promotion_evaluator.get("result", "NOT_READY")
+summary["branch_promotion_allowed"] = promotion_evaluator.get("branch_promotion_allowed", False)
+summary["promotion_readiness_evaluator"] = {
+    "status": "PASS" if promotion_evaluator.get("result") in ("PASS", "FAIL") else "FAIL",
+    "promotion_result": promotion_evaluator.get("result"),
+    "branch_promotion_allowed": promotion_evaluator.get("branch_promotion_allowed"),
+    "product_run": promotion_evaluator.get("evidence_selection", {}).get("product_run"),
+    "physical_promotion_bundle": promotion_evaluator.get("evidence_selection", {}).get(
+        "physical_promotion_bundle"
+    ),
+    "failing_gates": [
+        gate.get("name")
+        for gate in promotion_evaluator.get("gates", [])
+        if gate.get("result") != "PASS"
+    ],
+    "evidence": "local-analysis/cpp-offline/promotion-readiness-offline-check.json",
+}
+summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 ./build/cpp-release/opena8djcpp_evidence_schema_check | tee "$EVIDENCE_DIR/evidence-schema.json"
