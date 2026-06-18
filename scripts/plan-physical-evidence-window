@@ -15,6 +15,7 @@ import json
 import re
 import subprocess
 import sys
+import wave
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,37 @@ def shell_hint(argv: list[str]) -> str:
     return " ".join(quote(item) for item in argv)
 
 
+def format_seconds(value: float) -> str:
+    rounded = round(value)
+    if abs(value - rounded) < 1e-9:
+        return str(int(rounded))
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def wav_duration_seconds(path: Path | None) -> float | None:
+    if path is None or not path.is_file():
+        return None
+    try:
+        with wave.open(str(path), "rb") as handle:
+            rate = handle.getframerate()
+            if rate <= 0:
+                return None
+            return handle.getnframes() / float(rate)
+    except (OSError, EOFError, wave.Error):
+        return None
+
+
+def effective_seconds(requested: str, reference: Path | None) -> tuple[str, float | None, bool]:
+    try:
+        requested_value = float(requested)
+    except ValueError:
+        return requested, wav_duration_seconds(reference), False
+    duration = wav_duration_seconds(reference)
+    if duration is None or duration <= 0.0 or requested_value <= duration:
+        return format_seconds(requested_value), duration, False
+    return format_seconds(duration), duration, True
+
+
 def run_watcher(args: argparse.Namespace, output: Path) -> tuple[int, dict[str, Any]]:
     command = [
         sys.executable,
@@ -118,6 +150,7 @@ def build_route_command(
     output: dict[str, Any],
     capture: dict[str, Any],
     reference: Path,
+    seconds: str,
 ) -> list[str]:
     return [
         "scripts/run-physical-superiority-window",
@@ -135,7 +168,7 @@ def build_route_command(
         "--reference-wav",
         str(reference),
         "--seconds",
-        str(args.seconds),
+        seconds,
     ]
 
 
@@ -147,6 +180,7 @@ def build_full_command(
     reference: Path,
     mainline: Path,
     candidate: Path,
+    seconds: str,
 ) -> list[str]:
     command = [
         "scripts/run-physical-superiority-window",
@@ -168,7 +202,7 @@ def build_full_command(
         "--pair",
         args.pair,
         "--seconds",
-        str(args.seconds),
+        seconds,
         "--rate",
         str(args.rate),
         "--buffer",
@@ -221,6 +255,7 @@ def main() -> int:
     candidate = hal_bundle(candidate_path)
     mainline = hal_bundle(mainline_path)
     run_dir = args.run_dir.replace("<timestamp>", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    planned_seconds, reference_duration, seconds_was_clamped = effective_seconds(args.seconds, reference_path)
 
     blockers: list[str] = []
     diagnostic_known_good_blockers: list[str] = []
@@ -261,12 +296,12 @@ def main() -> int:
     )
 
     route_command = (
-        build_route_command(args, run_dir, output, capture, reference_path)
+        build_route_command(args, run_dir, output, capture, reference_path, planned_seconds)
         if route_only_ready and reference_path
         else []
     )
     full_command = (
-        build_full_command(args, run_dir, output, capture, reference_path, mainline_path, candidate_path)
+        build_full_command(args, run_dir, output, capture, reference_path, mainline_path, candidate_path, planned_seconds)
         if source_reference_ab_ready and reference_path and mainline_path and candidate_path
         else []
     )
@@ -303,6 +338,10 @@ def main() -> int:
         "candidate": candidate,
         "mainline_candidate": mainline,
         "reference_wav": str(reference_path) if reference_path else "",
+        "reference_wav_seconds": reference_duration,
+        "requested_seconds": args.seconds,
+        "planned_seconds": planned_seconds,
+        "planned_seconds_clamped_to_reference": seconds_was_clamped,
         "music_file": str(resolve_path(args.music_file)) if args.music_file else "",
         "run_dir": run_dir,
         "route_only_command_argv": route_command,

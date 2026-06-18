@@ -15218,3 +15218,39 @@ Follow-up correction:
     to a different transport architecture that reduces enqueue overhead with
     new offline and physical evidence. No superiority or promotion claim is
     allowed from this run.
+
+## 2026-06-18 - 15:10 Stable Load Closure Packet
+
+- Scope:
+  - Closed the current state as a stable diagnostic load for controlled human
+    review, without declaring product readiness or superiority.
+  - Corrected the physical-window planner so it clamps the planned A/B duration
+    to the actual reference WAV duration when the requested window is longer
+    than the source.
+  - No playback, recording, driver install/uninstall, CoreAudio restart, USB
+    reset, default-device change, mainline write, or Rust write occurred in
+    this closure pass.
+- Commands:
+  - `python3 scripts/test-plan-physical-evidence-window.py`
+  - `python3 scripts/plan-physical-evidence-window --watcher-json local-analysis/cpp-offline/watch-known-good-route.json --json-out local-analysis/cpp-offline/physical-evidence-window-plan.json --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --candidate build/OpenA8DJ.driver --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver --run-dir 'local-analysis/physical-evidence-window/<timestamp>'`
+  - `python3 scripts/human-test-rc-status > local-analysis/cpp-offline/human-test-rc-status-stable-close-1510-fixed.json`
+- Result:
+  - Planner test: PASS.
+  - Physical window plan now reports `requested_seconds=12`,
+    `reference_wav_seconds=8.0`, `planned_seconds=8`, and
+    `planned_seconds_clamped_to_reference=true`.
+  - The generated source-reference A/B command now uses `--seconds 8`, matching
+    the current reference WAV and avoiding the earlier invalid 12 s attempt.
+  - RC status remains
+    `DIAGNOSTIC_RC_ARTIFACTS_READY_SOURCE_REFERENCE_AB_REQUIRED`.
+  - Audio 8 is visible as 8-in/8-out; iRig Stream is visible; audio stack
+    health is PASS.
+  - Idle process snapshot: `opena8dj_driver=0.0%`, `coreaudiod=0.3%`, total
+    watched CPU `0.4%`.
+  - Installed HAL hash still matches `build/OpenA8DJ.driver`:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+- Interpretation:
+  - This is the most stable load to leave installed right now.
+  - It is suitable for controlled diagnostic review only. Product listening,
+    Timecode Vinyl certification, mainline superiority, CPU superiority, and
+    branch promotion remain blocked by the latest physical evidence.

@@ -9980,3 +9980,26 @@ Next implication:
 - Readiness impact: product readiness remains blocked. This narrows the next
   work to a measurable transport redesign rather than more low-impact HAL
   flags.
+
+## 2026-06-18 - Clamp Physical Window Duration To Reference Duration
+
+- Decision: physical evidence plans must clamp requested playback/capture
+  duration to the actual reference WAV duration when the reference is shorter.
+- Reason: the 15:10 closure path must not emit a lock-gated command that is
+  known to fail before evidence collection. The previous plan requested 12 s
+  against an 8 s fixture, which caused an avoidable failed window.
+- Evidence:
+  - `scripts/test-plan-physical-evidence-window.py` PASS.
+  - Regenerated plan reports `requested_seconds=12`,
+    `reference_wav_seconds=8.0`, `planned_seconds=8`, and
+    `planned_seconds_clamped_to_reference=true`.
+  - Current RC status now exposes a source-reference A/B command using
+    `--seconds 8`.
+- Alternatives rejected:
+  - Keep documenting the manual override only: rejected because the automated
+    status packet is what should guide the next operator action.
+  - Require a longer fixture immediately: rejected for the stable-load close;
+    a longer fixture may be useful later, but the current artifact should not
+    propose an impossible command.
+- Readiness impact: operational stability improves; product readiness and
+  superiority claims remain blocked.

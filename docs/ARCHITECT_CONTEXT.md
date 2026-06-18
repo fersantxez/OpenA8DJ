@@ -3413,3 +3413,14 @@ Current implication:
   coalescing, and capture batching above ISO8. Next performance work should
   either preserve the current ISO8 quality family while reducing true enqueue
   overhead, or move the improvement into the DriverKit/USB transport plan.
+- 16:25 EDT stable-load closure packet: the installed default C++ HAL remains
+  the stable diagnostic load, with Audio 8 visible as 8-in/8-out, iRig Stream
+  visible, audio stack health PASS, `opena8dj_driver=0.0%`, and installed hash
+  still matching `build/OpenA8DJ.driver`
+  (`23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`).
+  The physical-window planner now clamps requested duration to the actual
+  reference WAV duration, so the current generated A/B command uses
+  `--seconds 8` for the 8 s fixture instead of repeating the invalid 12 s
+  window. This closes the operational load, not the product goal: product
+  listening, Timecode Vinyl certification, CPU superiority, mainline
+  superiority, and branch promotion remain blocked.
