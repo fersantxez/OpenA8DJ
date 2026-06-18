@@ -8766,3 +8766,27 @@ Next implication:
 - Readiness impact: reporting safety only. This does not authorize playback,
   recording, driver install/load, physical A/B, Timecode Vinyl, CPU claims, or
   branch promotion.
+
+## 2026-06-18 - Classify Same-Device iRig Diagnostic Failure Mode
+
+- Decision: `scripts/physical-route-inventory` now classifies the latest
+  known-good/iRig diagnostic and reports whether a correlated loopback signal
+  was detected. The offline summary and evidence schema now expose and require
+  that classification.
+- Reason: `latest_same_device_irig_diagnostic_failed` was true but too vague.
+  The next engineering action differs depending on whether the route has
+  clicks, low SNR, timing drift, or no correlated signal at all.
+- Evidence:
+  - Lock-gated iRig same-device diagnostic:
+    `/Users/fer/dev/audio8djcpp/local-analysis/known-good-route/20260618T112926Z-irig-same-device-diagnostic-d45f2e7`.
+  - Runner result: FAIL; diagnostic only, not promotion evidence.
+  - Capture was not clipped and had no click outliers, but correlation and SNR
+    failed: `quality_alignment_score=-0.004744726624127731`,
+    `snr_floor_db=-45.82972747973393`.
+  - Classified inventory:
+    `/Users/fer/dev/audio8djcpp/local-analysis/cpp-offline/physical-route-inventory-20260618T113112Z-post-irig-diagnostic-classified.json`.
+  - Classification: `no_correlated_loopback_signal_detected`;
+    `correlated_loopback_signal_detected=false`.
+- Readiness impact: this sharpens the physical blocker. It does not make the
+  route valid, and it does not support any quality, CPU, Timecode Vinyl, or
+  branch-promotion claim.

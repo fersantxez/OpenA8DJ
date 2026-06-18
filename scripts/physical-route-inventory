@@ -212,6 +212,54 @@ def parse_summary_txt(path: Path) -> dict[str, str]:
     return values
 
 
+def as_float(value: Any, default: float | None = None) -> float | None:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def as_int(value: Any, default: int | None = None) -> int | None:
+    try:
+        if value is None:
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def classify_route_diagnostic(
+    route_result: str,
+    output_same_as_capture: bool,
+    quality_alignment_score: float | None,
+    snr_floor_db: float | None,
+    click_outliers: int | None,
+    analysis_rc: int,
+    native_rc: int,
+) -> str:
+    if route_result == "PASS":
+        return (
+            "same_device_diagnostic_pass_not_promotion"
+            if output_same_as_capture
+            else "promotion_route_pass"
+        )
+    if quality_alignment_score is None or snr_floor_db is None:
+        return "route_metrics_missing_or_unreadable"
+    if quality_alignment_score < 0.20 and snr_floor_db < 0.0:
+        return "no_correlated_loopback_signal_detected"
+    if click_outliers and click_outliers > 0:
+        return "clicks_detected_on_route"
+    if quality_alignment_score < 0.98:
+        return "alignment_below_route_threshold"
+    if snr_floor_db < 35.0:
+        return "snr_below_route_threshold"
+    if analysis_rc != 0 or native_rc != 0:
+        return "analyzer_rejected_route"
+    return "route_failed_unknown"
+
+
 def latest_known_good_route_diagnostic() -> dict[str, Any]:
     root = ROOT / "local-analysis/known-good-route"
     candidates = [path for path in root.iterdir() if path.is_dir()] if root.is_dir() else []
@@ -230,7 +278,7 @@ def latest_known_good_route_diagnostic() -> dict[str, Any]:
     route_result = summary.get("route_result", "UNKNOWN")
     output_same_as_capture = bool(request.get("output_same_as_capture", False))
     valid_for_promotion = bool(request.get("valid_for_promotion", False))
-    quality_alignment_score = metrics.get("quality_alignment_score")
+    quality_alignment_score = as_float(metrics.get("quality_alignment_score"))
     snr_floor_db = min(
         float(metrics.get("left_snr_db", 0.0)),
         float(metrics.get("right_snr_db", 0.0)),
@@ -241,13 +289,28 @@ def latest_known_good_route_diagnostic() -> dict[str, Any]:
         if metrics
         else None
     )
+    analysis_rc = as_int(summary.get("analysis_rc"), 999) or 999
+    native_rc = as_int(summary.get("native_rc"), 999) or 999
+    failure_classification = classify_route_diagnostic(
+        route_result,
+        output_same_as_capture,
+        quality_alignment_score,
+        snr_floor_db,
+        click_outliers,
+        analysis_rc,
+        native_rc,
+    )
     return {
         "present": True,
         "path": str(latest),
         "result": route_result,
-        "analysis_rc": int(summary.get("analysis_rc", "999") or "999"),
-        "native_rc": int(summary.get("native_rc", "999") or "999"),
+        "analysis_rc": analysis_rc,
+        "native_rc": native_rc,
         "valid_for_promotion": valid_for_promotion,
+        "diagnostic_only": output_same_as_capture or not valid_for_promotion,
+        "failure_classification": failure_classification,
+        "correlated_loopback_signal_detected": failure_classification
+        not in ("no_correlated_loopback_signal_detected", "route_metrics_missing_or_unreadable"),
         "same_device_loopback_diagnostic": output_same_as_capture,
         "output_device": summary.get("output_device", ""),
         "capture_device": summary.get("capture_device", ""),

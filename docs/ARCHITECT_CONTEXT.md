@@ -2944,3 +2944,8 @@ Current implication:
   blocked because no separate wired non-Audio8/non-built-in known-good output
   is visible; only same-device iRig diagnostics are currently possible, and
   those are not valid superiority evidence.
+- Same-device iRig diagnostic update: a 6-second lock-gated iRig output to iRig
+  capture diagnostic failed with no correlated loopback signal detected
+  (`quality_alignment_score=-0.004744726624127731`, SNR floor about `-45.83 dB`,
+  zero clicks). This means the current iRig route is not physically proving a
+  usable loopback, independent of Audio 8 DJ behavior.

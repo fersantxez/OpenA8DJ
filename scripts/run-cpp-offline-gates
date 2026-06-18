@@ -455,6 +455,12 @@ summary = {
     "current_route_next_lock_gated_action": physical_route_inventory.get("decision", {}).get(
         "next_lock_gated_action"
     ),
+    "current_route_latest_diagnostic_classification": physical_route_inventory.get(
+        "latest_known_good_route_diagnostic", {}
+    ).get("failure_classification"),
+    "current_route_latest_correlated_loopback_signal_detected": physical_route_inventory.get(
+        "latest_known_good_route_diagnostic", {}
+    ).get("correlated_loopback_signal_detected"),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -1239,6 +1245,15 @@ summary = {
         "latest_known_good_route_valid_for_promotion": physical_route_inventory.get(
             "latest_known_good_route_diagnostic", {}
         ).get("valid_for_promotion"),
+        "latest_known_good_route_diagnostic_only": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("diagnostic_only"),
+        "latest_known_good_route_failure_classification": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("failure_classification"),
+        "latest_known_good_route_correlated_loopback_signal_detected": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("correlated_loopback_signal_detected"),
         "latest_known_good_route_quality_alignment_score": physical_route_inventory.get(
             "latest_known_good_route_diagnostic", {}
         ).get("quality_alignment_score"),

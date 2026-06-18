@@ -12775,3 +12775,43 @@ Full offline gate after commit:
     wired non-Audio8/non-built-in known-good output visible.
   - Same-device iRig diagnostics may help troubleshoot, but cannot prove
     superiority over mainline.
+
+## 2026-06-18 - Same-Device iRig Diagnostic And Failure Classification
+
+- Commit context: `d45f2e7` plus uncommitted route-classification hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Hardware lock acquired and released by
+    `scripts/run-known-good-route-soundcheck`.
+  - Played and recorded through `iRig Stream` only.
+  - Did not touch Audio 8 DJ.
+  - No driver install/load/unload, CoreAudio restart, USB reset, default-device
+    change, or service mutation.
+- Command:
+  - `scripts/run-known-good-route-soundcheck --skip-build --run-dir local-analysis/known-good-route/20260618T112926Z-irig-same-device-diagnostic-d45f2e7 --output-device "iRig Stream" --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 6 --postroll-seconds 2 --audiophile-max-lag-seconds 6 --allow-same-device-loopback-diagnostic`
+- Evidence:
+  - Run directory:
+    `local-analysis/known-good-route/20260618T112926Z-irig-same-device-diagnostic-d45f2e7`.
+  - Classified inventory:
+    `local-analysis/cpp-offline/physical-route-inventory-20260618T113112Z-post-irig-diagnostic-classified.json`.
+- Result:
+  - Runner rc: 1.
+  - `KNOWN_GOOD_ROUTE: FAIL`.
+  - Request validation PASS but `valid_for_promotion=false` because output and
+    capture are both iRig Stream.
+  - Python analyzer: `quality_alignment_score=-0.004744726624127731`,
+    `left_snr_db=-45.82972747973393`, `right_snr_db=-43.74858634310729`,
+    zero click outliers.
+  - Native analyzer: FAIL with `quality_alignment_score=0.004897` and
+    SNR around `-46/-44 dB`.
+  - C++ and Python audiophile analyzers both failed with alignment, SNR,
+    coherence, delay, and leakage blockers.
+  - Route classifier:
+    `failure_classification=no_correlated_loopback_signal_detected`,
+    `correlated_loopback_signal_detected=false`.
+- Interpretation:
+  - This is not proof against the C++ driver; Audio 8 DJ was not involved.
+  - It proves the current iRig same-device route is not capturing a correlated
+    loopback signal, so it cannot be used to validate product sound quality or
+    branch promotion.

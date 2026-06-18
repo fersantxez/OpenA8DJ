@@ -277,6 +277,9 @@ int main(int argc, char** argv) {
       bool_field_is(summary, "ready_for_product_physical_ab", false) &&
       bool_field_is(summary, "ready_for_branch_promotion", false) &&
       string_field_present(summary, "current_route_next_lock_gated_action") &&
+      string_field_present(summary, "current_route_latest_diagnostic_classification") &&
+      bool_field_present(summary,
+                         "current_route_latest_correlated_loopback_signal_detected") &&
       string_array_has(summary, "current_route_inventory_blockers",
                        "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
@@ -693,6 +696,12 @@ int main(int argc, char** argv) {
                            "latest_same_device_irig_diagnostic_result") &&
       bool_field_present(physical_route_inventory,
                          "latest_known_good_route_valid_for_promotion") &&
+      bool_field_present(physical_route_inventory,
+                         "latest_known_good_route_diagnostic_only") &&
+      string_field_present(physical_route_inventory,
+                           "latest_known_good_route_failure_classification") &&
+      bool_field_present(physical_route_inventory,
+                         "latest_known_good_route_correlated_loopback_signal_detected") &&
       number_field_present(physical_route_inventory,
                            "latest_known_good_route_click_outliers") &&
       number_field_present(physical_route_inventory,
