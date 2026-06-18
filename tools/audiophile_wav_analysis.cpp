@@ -46,6 +46,7 @@ struct Cli {
   std::string label;
   std::filesystem::path json_out;
   bool self_test = false;
+  bool self_test_degraded = false;
   Thresholds thresholds;
 };
 
@@ -790,6 +791,19 @@ StereoBuffer make_self_capture(const StereoBuffer& reference) {
   return out;
 }
 
+StereoBuffer make_self_degraded_capture(const StereoBuffer& reference) {
+  StereoBuffer out{};
+  out.sample_rate = reference.sample_rate;
+  out.frames.reserve(reference.frames.size());
+  std::uint64_t state = 99;
+  for (std::size_t index = 0; index < reference.frames.size(); ++index) {
+    const double left = 0.10 * noise(state);
+    const double right = 0.10 * noise(state);
+    out.frames.push_back({left, right});
+  }
+  return out;
+}
+
 std::string json_escape(std::string_view value) {
   std::string out;
   for (const char c : value) {
@@ -949,6 +963,8 @@ Cli parse_cli(int argc, char** argv) {
       cli.json_out = std::string(next(index));
     } else if (arg == "--self-test") {
       cli.self_test = true;
+    } else if (arg == "--self-test-degraded") {
+      cli.self_test_degraded = true;
     } else {
       throw std::runtime_error("unknown_argument:" + std::string(arg));
     }
@@ -962,11 +978,14 @@ int main(int argc, char** argv) {
   try {
     auto cli = parse_cli(argc, argv);
     Analysis analysis;
-    if (cli.self_test) {
+    if (cli.self_test || cli.self_test_degraded) {
       cli.seconds = 3.0;
-      cli.label = cli.label.empty() ? "self-test-cpp" : cli.label;
+      cli.label = cli.label.empty()
+                      ? (cli.self_test_degraded ? "self-test-degraded-cpp" : "self-test-cpp")
+                      : cli.label;
       const auto reference = make_self_reference(48000U, 3.0);
-      const auto capture = make_self_capture(reference);
+      const auto capture =
+          cli.self_test_degraded ? make_self_degraded_capture(reference) : make_self_capture(reference);
       analysis = analyze_buffers(reference, capture, cli);
     } else {
       if (cli.reference.empty() || cli.capture.empty()) {

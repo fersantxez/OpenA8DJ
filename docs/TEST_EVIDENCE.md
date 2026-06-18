@@ -12653,3 +12653,44 @@ Full offline gate after commit:
     CPU/submit-cadence window after route validation.
   - It does not prove lower CPU or jitter than mainline. Same-session physical
     A/B with submit counters and CPU p95 remains mandatory.
+
+## 2026-06-18 - Degraded Audiophile Analyzer Self-Tests
+
+- Commit context: `8906ee8` plus uncommitted degraded analyzer hardening.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline only.
+  - No hardware lock acquired.
+  - No CoreAudio, USB, driver install/load/unload, playback, recording, default
+    device, or service restart.
+- Focused build:
+  - Command:
+    `cmake --build build/cpp-release --target opena8djcpp_audiophile_wav_analysis opena8djcpp_audiophile_analysis_stack_contract`
+  - Result: PASS.
+- Syntax checks:
+  - Command: `bash -n scripts/run-cpp-offline-gates`
+  - Result: PASS.
+  - Command: `python3 -m py_compile scripts/analyze-audiophile-wav.py`
+  - Result: PASS.
+- Focused CTest:
+  - Command:
+    `ctest --test-dir build/cpp-release -R 'opena8djcpp_audiophile_wav_analysis_(self_test|degraded_self_test)|opena8djcpp_audiophile_analysis_stack_contract' --output-on-failure`
+  - Result: PASS; 3/3 tests passed. The degraded C++ analyzer test is a
+    `WILL_FAIL` test, so PASS means the analyzer rejected the degraded fixture.
+- Focused degraded fixtures:
+  - C++ analyzer degraded self-test:
+    `local-analysis/cpp-offline/audiophile-wav-analysis-cpp-degraded-self-test-focused.json`.
+    It exited nonzero as expected with `result=FAIL`,
+    `alignment.score=-0.00242805267685`, and blockers for alignment, SNR,
+    coherence, delay, and leakage.
+  - Python analyzer degraded self-test:
+    `local-analysis/cpp-offline/audiophile-wav-analysis-python-degraded-self-test-focused.json`.
+    It exited nonzero as expected with `result=FAIL`,
+    `alignment.score=0.011263478504197618`, and blockers for alignment, SNR,
+    coherence, delay, and leakage.
+- Interpretation:
+  - The dual analyzer stack now proves both acceptance of clean synthetic WAVs
+    and rejection of unrelated/noisy captures.
+  - This reduces false-positive risk for future physical windows, but does not
+    prove product sound quality or superiority over mainline.

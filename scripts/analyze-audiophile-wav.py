@@ -291,7 +291,7 @@ def write_json(payload: dict[str, Any], path: pathlib.Path | None) -> None:
     print(text, end="")
 
 
-def self_test(args: argparse.Namespace) -> dict[str, Any]:
+def self_test(args: argparse.Namespace, degraded: bool = False) -> dict[str, Any]:
     sample_rate = 48_000
     seconds = 3.0
     rng = np.random.default_rng(8)
@@ -301,10 +301,13 @@ def self_test(args: argparse.Namespace) -> dict[str, Any]:
     reference = np.column_stack([left, right])
     reference *= 0.20 / np.max(np.abs(reference))
     delay = 37
-    capture = np.pad(reference * 0.92, ((delay, 0), (0, 0)), mode="constant")[: reference.shape[0]]
-    capture[:, 0] += 0.00003 * reference[:, 1]
-    capture[:, 1] += 0.00002 * reference[:, 0]
-    capture += 1.0e-5 * rng.standard_normal(capture.shape)
+    if degraded:
+        capture = 0.10 * rng.standard_normal(reference.shape)
+    else:
+        capture = np.pad(reference * 0.92, ((delay, 0), (0, 0)), mode="constant")[: reference.shape[0]]
+        capture[:, 0] += 0.00003 * reference[:, 1]
+        capture[:, 1] += 0.00002 * reference[:, 0]
+        capture += 1.0e-5 * rng.standard_normal(capture.shape)
     with tempfile.TemporaryDirectory() as tmp:
         ref = pathlib.Path(tmp) / "reference.wav"
         cap = pathlib.Path(tmp) / "capture.wav"
@@ -313,7 +316,7 @@ def self_test(args: argparse.Namespace) -> dict[str, Any]:
         args.reference = ref
         args.capture = cap
         args.seconds = seconds
-        args.label = "self-test"
+        args.label = "self-test-degraded" if degraded else "self-test"
         return analyze(args)
 
 
@@ -335,9 +338,10 @@ def main() -> int:
     parser.add_argument("--label", default="")
     parser.add_argument("--json-out", type=pathlib.Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--self-test-degraded", action="store_true")
     args = parser.parse_args()
-    if args.self_test:
-        payload = self_test(args)
+    if args.self_test or args.self_test_degraded:
+        payload = self_test(args, degraded=args.self_test_degraded)
     else:
         if args.reference is None or args.capture is None:
             parser.error("--reference and --capture are required unless --self-test is used")

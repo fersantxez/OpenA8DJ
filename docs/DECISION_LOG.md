@@ -8722,3 +8722,24 @@ Next implication:
 - Readiness impact: this supports planning a lock-gated prepared-runtime CPU
   window after route validation. It does not prove lower CPU, lower jitter, or
   better sound quality than mainline.
+
+## 2026-06-18 - Add Degraded Audiophile Analyzer Self-Tests
+
+- Decision: both audiophile WAV analyzers now include a deliberately degraded
+  self-test, and `scripts/run-cpp-offline-gates` treats rejection of that
+  fixture as a required PASS condition.
+- Reason: a positive synthetic self-test only proves the analyzers can accept a
+  clean fixture. The promotion path also needs evidence that the analyzers fail
+  closed when a capture is unrelated/noisy, otherwise a route/timebase failure
+  could be misread as an acceptable audio-quality result.
+- Evidence:
+  - Focused CTest subset passed, including the C++ degraded test marked
+    `WILL_FAIL`.
+  - Focused C++ degraded self-test returned nonzero with
+    `result=FAIL`, `alignment.score=-0.00242805267685`, and blockers for
+    alignment, SNR, coherence, delay, and leakage.
+  - Focused Python degraded self-test returned nonzero with `result=FAIL`,
+    `alignment.score=0.011263478504197618`, and the same blocker families.
+- Readiness impact: measurement-integrity hardening only. It does not clear
+  the physical route, SNR/delay, CPU/resource, Timecode Vinyl, or branch
+  promotion blockers.

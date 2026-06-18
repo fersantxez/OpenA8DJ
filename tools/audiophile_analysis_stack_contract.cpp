@@ -80,6 +80,14 @@ int main(int argc, char** argv) {
     blockers.push_back("compiled_cpp_audiophile_analyzer_missing_required_metrics");
   }
 
+  const bool cpp_analyzer_rejects_degraded_self_test =
+      contains(cpp_analyzer, "self_test_degraded") &&
+      contains(cpp_analyzer, "--self-test-degraded") &&
+      contains(cpp_analyzer, "make_self_degraded_capture");
+  if (!cpp_analyzer_rejects_degraded_self_test) {
+    blockers.push_back("compiled_cpp_audiophile_analyzer_missing_degraded_rejection_self_test");
+  }
+
   const bool python_oracle_retained =
       contains(python_analyzer, "import numpy as np") &&
       contains(python_analyzer, "import scipy.signal") &&
@@ -91,6 +99,14 @@ int main(int argc, char** argv) {
       contains(python_analyzer, "scipy.signal.welch");
   if (!python_oracle_retained) {
     blockers.push_back("python_scipy_oracle_missing_required_spectral_checks");
+  }
+
+  const bool python_oracle_rejects_degraded_self_test =
+      contains(python_analyzer, "self-test-degraded") &&
+      contains(python_analyzer, "degraded") &&
+      contains(python_analyzer, "standard_normal");
+  if (!python_oracle_rejects_degraded_self_test) {
+    blockers.push_back("python_scipy_oracle_missing_degraded_rejection_self_test");
   }
 
   const bool physical_window_runs_both =
@@ -156,6 +172,16 @@ int main(int argc, char** argv) {
     blockers.push_back("offline_runner_does_not_self_test_both_analyzers");
   }
 
+  const bool offline_runner_self_tests_degraded =
+      contains(offline_runner, "audiophile-wav-analysis-cpp-degraded-self-test.json") &&
+      contains(offline_runner, "audiophile-wav-analysis-python-degraded-self-test.json") &&
+      contains(offline_runner, "audiophile_wav_analysis_cpp_degraded_self_test") &&
+      contains(offline_runner, "audiophile_wav_analysis_python_degraded_self_test") &&
+      contains(offline_runner, "degraded_self_test_summary");
+  if (!offline_runner_self_tests_degraded) {
+    blockers.push_back("offline_runner_does_not_reject_degraded_audiophile_self_tests");
+  }
+
   const bool pass = blockers.empty();
   std::vector<std::string> required_runtime_artifacts{
       "candidate/audiophile-wav-analysis-cpp.json",
@@ -173,8 +199,12 @@ int main(int argc, char** argv) {
             << ",\n"
             << "  \"cpp_analyzer_native\": " << (cpp_analyzer_native ? "true" : "false")
             << ",\n"
+            << "  \"cpp_analyzer_rejects_degraded_self_test\": "
+            << (cpp_analyzer_rejects_degraded_self_test ? "true" : "false") << ",\n"
             << "  \"python_oracle_retained\": " << (python_oracle_retained ? "true" : "false")
             << ",\n"
+            << "  \"python_oracle_rejects_degraded_self_test\": "
+            << (python_oracle_rejects_degraded_self_test ? "true" : "false") << ",\n"
             << "  \"physical_window_runs_both\": "
             << (physical_window_runs_both ? "true" : "false") << ",\n"
             << "  \"direct_usb_runs_wide_lag_audiophile\": "
@@ -189,6 +219,8 @@ int main(int argc, char** argv) {
             << (product_claim_blocks_without_both ? "true" : "false") << ",\n"
             << "  \"offline_runner_self_tests_both\": "
             << (offline_runner_self_tests_both ? "true" : "false") << ",\n"
+            << "  \"offline_runner_self_tests_degraded\": "
+            << (offline_runner_self_tests_degraded ? "true" : "false") << ",\n"
             << "  \"product_claim_allowed\": false,\n";
   print_string_array("required_same_session_artifacts", required_runtime_artifacts);
   print_string_array("blockers", blockers);

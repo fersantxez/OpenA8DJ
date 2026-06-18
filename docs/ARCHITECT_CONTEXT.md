@@ -2934,3 +2934,8 @@ Current implication:
   evidence and reports `sufficient_for_physical_window=true` with an 8:1 submit
   reduction model, but keeps `runtime_cpu_superiority_claim_allowed=false`
   until same-session physical CPU/submit-cadence A/B beats mainline.
+- Audiophile analyzer false-positive hardening update: both C++ and Python WAV
+  analyzers now include degraded self-tests, and the offline gate requires
+  those degraded fixtures to be rejected. This improves measurement integrity
+  only; physical route validity, strict SNR/delay, CPU/resource superiority,
+  Timecode Vinyl, and branch promotion remain blocked.
