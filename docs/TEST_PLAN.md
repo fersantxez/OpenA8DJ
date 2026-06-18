@@ -1723,3 +1723,49 @@ Physical diagnostic requirements:
 - no product, CPU, Timecode Vinyl, or branch-promotion claim unless the same
   lock-gated window also includes a validated known-good route and mainline
   comparison.
+
+Rejected-candidate regression guard:
+
+- `local-analysis/cpp-offline/hal-logical-capture-batching-contract.json` must
+  preserve the physical rejection of `hal-capture-batch-v2-diagnostic`.
+- Required fields:
+  - `capture_batch_v2_physical_status=REJECTED`;
+  - `capture_batch_v2_product_candidate_allowed=false`;
+  - `capture_batching_above_iso8_product_blocked=true`;
+  - `capture_batch_v2_rejected_capture_zero_complete_transactions=43172`;
+  - `capture_batch_v2_rejected_playback_completion_delta_outliers=2505`.
+- This does not forbid future diagnostics, but future diagnostics must beat
+  this evidence before any capture cadence above ISO8 can support a
+  CPU/resource or product-readiness claim.
+
+## ISO8 Input Decode Batch Publication
+
+Purpose:
+
+- reduce input/capture CPU without changing USB cadence, packet layout,
+  playback timing, channel routing, or observable diagnostics;
+- preserve Timecode Vinyl safety by keeping decoded frame order and A/B/C/D
+  routing unchanged.
+
+Command shape:
+
+```sh
+make -B hal
+cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_evidence_schema_check
+./scripts/run-cpp-offline-gates
+```
+
+Required contract fields:
+
+- `input_decode_batch_capacity_present=true`;
+- `input_decode_batches_before_ring_write=true`;
+- `input_decode_preserves_overflow_fallback=true`;
+- `input_decode_preserves_per_frame_diagnostic=true`;
+- `input_decode_ring_write_reduction_model=ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME`.
+
+PASS/FAIL semantics:
+
+- PASS means the source and evidence summary preserve the intended ISO8
+  hot-path optimization.
+- PASS does not mean CPU/resource superiority. That requires physical
+  same-session mainline/C++ evidence on the validated iRig route.

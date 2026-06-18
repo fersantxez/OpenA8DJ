@@ -13156,3 +13156,105 @@ Full offline gate after commit:
     short lock-gated diagnostic of `build/OpenA8DJ-capture-batch-v2.driver`
     with iRig capture, runtime geometry snapshots, submit counters, CPU
     samples, WAV analysis, and forced HAL unload/recovery afterward.
+
+## 2026-06-18 - Capture-Batch v2 Physical Rejection
+
+- Commit context: after `50fb8dd`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Hardware lock was used for candidate load/playback/capture.
+  - No mainline or Rust files were changed.
+  - Final cleanup force-unloaded OpenA8DJ and confirmed CoreAudio/iRig health.
+- Candidate:
+  - `build/OpenA8DJ-capture-batch-v2.driver`.
+  - SHA256:
+    `e7ba1bad0295dc956885448e107e80d338bf5cf2c7e309e130a569e73de6ed0c`.
+  - Build profile:
+    `HAL_CAPTURE_ISO_FRAMES=16`,
+    `HAL_PLAYBACK_ISO_FRAMES=8`,
+    `HAL_PLAYBACK_COALESCE_TRANSFERS=1`,
+    `HAL_OUTPUT_STREAMS=1`, `HAL_STREAM_USAGE=0`.
+- Commands:
+  - `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ-capture-batch-v2.driver --cycles 1 --leave-loaded --wait 10 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z/hal-candidate-safety`
+  - `scripts/run-soundcheck --skip-build --music-file "/Users/fer/Music/DJ/20250915_santxez_bangers/Guy J - Fixation (Original Mix) [Sanchez].mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --target-peak-db -24 --capture-device "iRig Stream" --capture-channels 1,2 --stream-stats-snapshots --run-dir local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z/soundcheck-irig-pairA-minus24`
+  - `python3 scripts/analyze-stream-stats.py local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z/soundcheck-irig-pairA-minus24/stream-stats-during.tsv`
+  - `scripts/audio-stack-guard --force-unload-opena8dj --recover --unload-opena8dj --wait 8 --enumeration-timeout 12 --min-idle-pct 10 --run-dir local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z/final-clean-unload-guard`
+- Result:
+  - Safety load: PASS; candidate enumerated as Open Audio 8 DJ.
+  - Soundcheck: FAIL.
+  - `quality_alignment_score=0.115437`.
+  - `analog_snr_db=-18.27`.
+  - `lag_jumps_gt_2_frames=45`.
+  - `click_outliers=0`.
+  - Runtime geometry confirmed active:
+    `captureIsoFramesPerTransfer=16`,
+    `playbackIsoFramesPerTransfer=8`,
+    `playbackCoalesceTransfers=1`.
+  - Capture submit reduction was real:
+    `capture_submit_reduction_ratio_vs_logical=2.0`.
+  - Failure signature:
+    `captureZeroCompleteTransactions=43172`,
+    `captureTransactionErrors=43172`,
+    `playbackCompletionDeltaOutliers=2505`.
+  - Final cleanup: PASS; OpenA8DJ unloaded and iRig Stream still visible.
+- Interpretation:
+  - ISO16 capture batching is physically rejected. The problem is not just
+    quality threshold strictness; the USB/capture transaction pattern becomes
+    bursty and playback timing degrades.
+  - Do not use capture batching above ISO8 as a CPU/resource improvement
+    argument. The next CPU work must preserve ISO8 capture/playback cadence.
+- Evidence:
+  - `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z`.
+
+## 2026-06-18 - ISO8 Input Decode Batch Publication
+
+- Commit context: before commit, after `50fb8dd`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Source/docs/offline-gate change only at implementation time.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+  - Mainline and Rust remained read-only.
+- Change:
+  - `decodeCaptureBytes` now accumulates decoded/routed input frames in a
+    stack batch for the current ISO transaction and publishes them to
+    `_inputRing` with one bulk `RingWrite`.
+  - The fallback single-frame `RingWrite` remains if the stack batch ever fills.
+  - Diagnostic capture frames and input stats remain per-frame.
+  - USB cadence, playback ISO8/coalesce1, packet layout, and channel mapping
+    are unchanged.
+- Expected evidence:
+  - `opena8djcpp_hal_logical_capture_batching_contract` must emit
+    `input_decode_batches_before_ring_write=true`.
+  - `opena8djcpp_evidence_schema_check` must require that field in the current
+    offline summary.
+- Commands:
+  - `make -B hal`
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_evidence_schema_check opena8djcpp_dvs_packet_input_decode opena8djcpp_timecode_readiness_gate opena8djcpp_prepared_transport_routing_timecode_contract`
+  - `./build/cpp-release/opena8djcpp_hal_logical_capture_batching_contract`
+  - `./build/cpp-release/opena8djcpp_dvs_packet_input_decode`
+  - `./build/cpp-release/opena8djcpp_timecode_readiness_gate`
+  - `./build/cpp-release/opena8djcpp_prepared_transport_routing_timecode_contract`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - HAL build: PASS.
+  - Logical capture/input batch contract: PASS with
+    `input_decode_batches_before_ring_write=true` and
+    `input_decode_ring_write_reduction_model=ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME`.
+  - DVS packet input decode: PASS, `24` rows, `0` failures.
+  - Timecode readiness gate: PASS for offline coverage; physical
+    Traktor/timecode remains blocked by required hardware gates.
+  - Prepared transport routing/timecode contract: PASS, `12` rows, `0`
+    failures.
+  - Full offline gates: Debug CTest `80/80` PASS, Release CTest `81/81` PASS,
+    evidence schema PASS.
+  - Provenance freshness correctly failed before commit because the worktree
+    was dirty: `working_tree_clean_for_claim=false`,
+    `claimable_current_candidate=false`.
+- Readiness impact:
+  - This is a CPU-pressure reduction candidate on the already preferred ISO8
+    path. It is not a CPU superiority claim until same-session physical A/B
+    proves it beats mainline without quality, routing, or Timecode Vinyl
+    regression.

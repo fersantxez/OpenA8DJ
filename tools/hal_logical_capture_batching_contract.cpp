@@ -106,6 +106,22 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_PREPARED_USB_SUBMIT_RUNTIME=0") &&
       contains(makefile, "HAL_OUTPUT_STREAMS=1") &&
       contains(makefile, "HAL_STREAM_USAGE=0");
+  const bool input_decode_batch_capacity_present =
+      contains(hal_source, "kInputDecodeBatchFrames =") &&
+      contains(hal_source,
+               "(kIsoBytesPerFrame / (kStreams * kBytesPerSampleUSB * kChannelsPerStream)) + 2");
+  const bool input_decode_batches_before_ring_write =
+      contains(hal_source, "float routedInputBatch[(size_t)kInputDecodeBatchFrames * kChannels]") &&
+      contains(hal_source, "uint32_t routedInputBatchFrames = 0") &&
+      contains(hal_source, "routedFrames:routedInputBatch") &&
+      contains(hal_source, "routedFrameCapacity:kInputDecodeBatchFrames") &&
+      contains(hal_source, "routedFrameCount:&routedInputBatchFrames") &&
+      contains(hal_source, "RingWrite(&_inputRing, routedInputBatch, routedInputBatchFrames)");
+  const bool input_decode_preserves_overflow_fallback =
+      contains(hal_source, "RingWrite(&_inputRing, routedInput, 1)");
+  const bool input_decode_preserves_per_frame_diagnostic =
+      contains(hal_source,
+               "[self appendDiagnosticFrames:&_diagnosticInputBuffer counter:&_diagnosticInputFrames frames:routedInput count:1]");
 
   std::vector<std::string> failures;
   if (!source_present) failures.push_back("hal_source_missing");
@@ -128,6 +144,18 @@ int main(int argc, char** argv) {
   }
   if (!makefile_exposes_capture_batch_v2_diagnostic) {
     failures.push_back("capture_batch_v2_diagnostic_target_missing");
+  }
+  if (!input_decode_batch_capacity_present) {
+    failures.push_back("input_decode_batch_capacity_missing");
+  }
+  if (!input_decode_batches_before_ring_write) {
+    failures.push_back("input_decode_batch_ring_write_missing");
+  }
+  if (!input_decode_preserves_overflow_fallback) {
+    failures.push_back("input_decode_overflow_fallback_missing");
+  }
+  if (!input_decode_preserves_per_frame_diagnostic) {
+    failures.push_back("input_decode_diagnostic_frames_not_preserved");
   }
 
   const bool pass = failures.empty();
@@ -155,6 +183,16 @@ int main(int argc, char** argv) {
       << "  \"playback_logical_batcher_still_chunks\": "
       << (playback_logical_batcher_still_chunks ? "true" : "false") << ",\n";
   std::cout
+      << "  \"input_decode_batch_capacity_present\": "
+      << (input_decode_batch_capacity_present ? "true" : "false") << ",\n"
+      << "  \"input_decode_batches_before_ring_write\": "
+      << (input_decode_batches_before_ring_write ? "true" : "false") << ",\n"
+      << "  \"input_decode_preserves_overflow_fallback\": "
+      << (input_decode_preserves_overflow_fallback ? "true" : "false") << ",\n"
+      << "  \"input_decode_preserves_per_frame_diagnostic\": "
+      << (input_decode_preserves_per_frame_diagnostic ? "true" : "false") << ",\n"
+      << "  \"input_decode_ring_write_reduction_model\": \"ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME\",\n";
+  std::cout
       << "  \"makefile_exposes_capture_batch_diagnostic\": "
       << (makefile_exposes_capture_batch_diagnostic ? "true" : "false") << ",\n";
   std::cout
@@ -164,6 +202,17 @@ int main(int argc, char** argv) {
       << "  \"capture_batch_v2_playback_iso_frames\": 8,\n"
       << "  \"capture_batch_v2_playback_coalesce_transfers\": 1,\n"
       << "  \"capture_batch_v2_preserves_one_stream_output_surface\": true,\n";
+  std::cout
+      << "  \"capture_batch_v2_physical_status\": \"REJECTED\",\n"
+      << "  \"capture_batch_v2_rejected_quality_alignment_score\": 0.115437,\n"
+      << "  \"capture_batch_v2_rejected_analog_snr_db\": -18.27,\n"
+      << "  \"capture_batch_v2_rejected_lag_jumps_gt_2_frames\": 45,\n"
+      << "  \"capture_batch_v2_rejected_capture_zero_complete_transactions\": 43172,\n"
+      << "  \"capture_batch_v2_rejected_playback_completion_delta_outliers\": 2505,\n"
+      << "  \"capture_batch_v2_product_candidate_allowed\": false,\n"
+      << "  \"capture_batching_above_iso8_product_blocked\": true,\n"
+      << "  \"capture_batch_v2_rejection_evidence\": "
+         "\"local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z\",\n";
   print_string_array("failures", failures);
   std::cout
       << ",\n"
@@ -172,7 +221,7 @@ int main(int argc, char** argv) {
       << "  \"candidate_v2_build_flags\": "
          "\"HAL_ISO_FRAMES=8 HAL_CAPTURE_ISO_FRAMES=16 HAL_CAPTURE_QUEUE=8 HAL_PLAYBACK_ISO_FRAMES=8 HAL_PLAYBACK_COALESCE_TRANSFERS=1 HAL_OUTPUT_STREAMS=1 HAL_STREAM_USAGE=0\",\n"
       << "  \"blocked_claim\": "
-         "\"NO_RUNTIME_CPU_SUPERIORITY_CLAIM_UNTIL_OPT_IN_CAPTURE_BATCHING_HAS_SAME_WINDOW_PHYSICAL_AB_METRICS\"\n"
+         "\"NO_RUNTIME_CPU_SUPERIORITY_CLAIM_FROM_CAPTURE_BATCHING_ABOVE_ISO8_AFTER_PHYSICAL_REJECTION_WITH_ZERO_COMPLETE_STORM\"\n"
       << "}\n";
 
   return pass ? 0 : 1;

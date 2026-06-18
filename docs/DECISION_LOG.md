@@ -9070,3 +9070,65 @@ Next implication:
   submit-rate evidence, CPU metrics, and cleanup. This profile cannot support a
   product, CPU, Timecode Vinyl, or branch-promotion claim until same-session
   physical A/B beats mainline on a validated route.
+
+## 2026-06-18 - Reject Capture-Batch v2 As Product Candidate
+
+- Decision: reject `hal-capture-batch-v2-diagnostic` as a product, CPU-win,
+  Timecode Vinyl, or branch-promotion candidate. Keep it only as diagnostic
+  evidence that capture batching above ISO8 is unsafe on the current Audio 8
+  DJ / IOUSBHost path.
+- Reason: the profile did reduce capture submit cadence, but the lock-gated
+  iRig run showed a zero-complete capture transaction storm and severe playback
+  completion outliers. The result is not a near miss; it is a timing failure
+  that corrupts audio quality.
+- Evidence:
+  - Candidate hash:
+    `e7ba1bad0295dc956885448e107e80d338bf5cf2c7e309e130a569e73de6ed0c`.
+  - Evidence root:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/capture-batch-v2-20260618T132933Z`.
+  - Runtime geometry confirmed:
+    `captureIsoFramesPerTransfer=16`,
+    `playbackIsoFramesPerTransfer=8`,
+    `playbackCoalesceTransfers=1`, one output stream.
+  - Soundcheck failed: `quality_alignment_score=0.115437`,
+    `analog_snr_db=-18.27`, `lag_jumps_gt_2_frames=45`,
+    `click_outliers=0`, no clipping.
+  - Stream stats: `captureZeroCompleteTransactions=43172`,
+    `captureTransactionErrors=43172`, and
+    `playbackCompletionDeltaOutliers=2505`.
+  - Final cleanup unloaded the HAL and restored CoreAudio/iRig visibility.
+- Alternatives rejected:
+  - Increase capture batch size: already rejected by the earlier ISO64
+    capture-batch run.
+  - Treat reduced capture submit cadence as a CPU win: rejected because sound
+    quality, timing, and timecode safety are primary gates.
+- Readiness impact: CPU optimization must stay on the ISO8 capture/playback
+  cadence unless future lock-gated evidence proves otherwise. No readiness,
+  product-quality, CPU/resource, Timecode Vinyl, or branch-promotion claim is
+  allowed from capture batching above ISO8.
+
+## 2026-06-18 - Batch Input Decode Ring Publication On ISO8 Path
+
+- Decision: keep the USB cadence at ISO8 and reduce input hot-path CPU by
+  batching decoded capture frames before publishing them to the input ring.
+- Reason: the previous implementation called `RingWrite` once per decoded
+  input frame, taking the ring mutex repeatedly inside each capture completion.
+  The new path accumulates decoded/routed frames in a stack buffer for the
+  current ISO transaction and performs one bulk `RingWrite` at the end.
+- Alternatives rejected:
+  - Change capture transfer size: rejected by ISO64 and ISO16 physical
+    evidence.
+  - Disable stats/observability: rejected because prior `stats-off` evidence
+    failed physically and also hides critical timing evidence.
+  - Rewrite the whole ring to lock-free SPSC in one step: deferred because it
+    has higher ordering/lifecycle risk for Timecode Vinyl; batch publication is
+    the smaller first move.
+- Evidence required:
+  - HAL build must pass.
+  - Offline contracts must prove the batch buffer, fallback single-frame write,
+    diagnostic-frame preservation, routing/timecode gates, and evidence schema.
+  - Physical claim still requires lock-gated iRig route validation and
+    same-session mainline/C++ CPU and quality A/B.
+- Readiness impact: this is an ISO8-preserving CPU candidate only. It does not
+  prove product quality, CPU superiority, Timecode Vinyl readiness, or branch
+  promotion until measured.

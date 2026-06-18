@@ -3003,3 +3003,10 @@ Current implication:
   visible, Audio 8 DJ USB visible, promotion route not ready, known-good
   non-Audio8 output missing, and latest same-device iRig diagnostic failed with
   no correlated loopback signal. This is a blocking state, not readiness.
+- Capture-batch v2 physical rejection: the ISO16 capture / ISO8 playback
+  diagnostic loaded safely and exposed the intended geometry, but failed iRig
+  quality (`quality_alignment_score=0.115437`, `analog_snr_db=-18.27`,
+  `lag_jumps_gt_2_frames=45`) and showed `43172` zero-complete capture
+  transactions plus `2505` playback completion delta outliers. Treat capture
+  batching above ISO8 as rejected for product candidates; CPU work must improve
+  the ISO8 path instead of changing the USB cadence.

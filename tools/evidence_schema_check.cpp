@@ -871,6 +871,17 @@ int main(int argc, char** argv) {
       bool_field_is(hal_logical_capture_batching_contract, "playback_logical_batcher_still_chunks",
                     true) &&
       bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_batch_capacity_present", true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_batches_before_ring_write", true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_preserves_overflow_fallback", true) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "input_decode_preserves_per_frame_diagnostic", true) &&
+      string_field_is(hal_logical_capture_batching_contract,
+                      "input_decode_ring_write_reduction_model",
+                      "ONE_RING_WRITE_PER_ISO_TRANSACTION_INSTEAD_OF_ONE_PER_DECODED_FRAME") &&
+      bool_field_is(hal_logical_capture_batching_contract,
                     "makefile_exposes_capture_batch_v2_diagnostic", true) &&
       number_field_is(hal_logical_capture_batching_contract,
                       "capture_batch_v2_capture_iso_frames", 16.0) &&
@@ -880,9 +891,29 @@ int main(int argc, char** argv) {
                       "capture_batch_v2_playback_coalesce_transfers", 1.0) &&
       bool_field_is(hal_logical_capture_batching_contract,
                     "capture_batch_v2_preserves_one_stream_output_surface", true) &&
+      string_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_physical_status", "REJECTED") &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_rejected_quality_alignment_score", 0.115437) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_rejected_analog_snr_db", -18.27) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_rejected_lag_jumps_gt_2_frames", 45.0) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_rejected_capture_zero_complete_transactions",
+                      43172.0) &&
+      number_field_is(hal_logical_capture_batching_contract,
+                      "capture_batch_v2_rejected_playback_completion_delta_outliers",
+                      2505.0) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "capture_batch_v2_product_candidate_allowed", false) &&
+      bool_field_is(hal_logical_capture_batching_contract,
+                    "capture_batching_above_iso8_product_blocked", true) &&
+      string_field_present(hal_logical_capture_batching_contract,
+                           "capture_batch_v2_rejection_evidence") &&
       string_field_is(
           hal_logical_capture_batching_contract, "blocked_claim",
-          "NO_RUNTIME_CPU_SUPERIORITY_CLAIM_UNTIL_OPT_IN_CAPTURE_BATCHING_HAS_SAME_WINDOW_PHYSICAL_AB_METRICS") &&
+          "NO_RUNTIME_CPU_SUPERIORITY_CLAIM_FROM_CAPTURE_BATCHING_ABOVE_ISO8_AFTER_PHYSICAL_REJECTION_WITH_ZERO_COMPLETE_STORM") &&
       object_present(summary, "hal_runtime_geometry_observability_contract") &&
       bool_field_is(hal_runtime_geometry_observability_contract, "build_exposes_capture_iso",
                     true) &&

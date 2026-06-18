@@ -1480,6 +1480,21 @@ summary = {
         "playback_logical_batcher_still_chunks": hal_logical_capture_batching_contract.get(
             "playback_logical_batcher_still_chunks"
         ),
+        "input_decode_batch_capacity_present": hal_logical_capture_batching_contract.get(
+            "input_decode_batch_capacity_present"
+        ),
+        "input_decode_batches_before_ring_write": hal_logical_capture_batching_contract.get(
+            "input_decode_batches_before_ring_write"
+        ),
+        "input_decode_preserves_overflow_fallback": hal_logical_capture_batching_contract.get(
+            "input_decode_preserves_overflow_fallback"
+        ),
+        "input_decode_preserves_per_frame_diagnostic": hal_logical_capture_batching_contract.get(
+            "input_decode_preserves_per_frame_diagnostic"
+        ),
+        "input_decode_ring_write_reduction_model": hal_logical_capture_batching_contract.get(
+            "input_decode_ring_write_reduction_model"
+        ),
         "makefile_exposes_capture_batch_v2_diagnostic": hal_logical_capture_batching_contract.get(
             "makefile_exposes_capture_batch_v2_diagnostic"
         ),
@@ -1494,6 +1509,33 @@ summary = {
         ),
         "capture_batch_v2_preserves_one_stream_output_surface": hal_logical_capture_batching_contract.get(
             "capture_batch_v2_preserves_one_stream_output_surface"
+        ),
+        "capture_batch_v2_physical_status": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_physical_status"
+        ),
+        "capture_batch_v2_rejected_quality_alignment_score": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejected_quality_alignment_score"
+        ),
+        "capture_batch_v2_rejected_analog_snr_db": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejected_analog_snr_db"
+        ),
+        "capture_batch_v2_rejected_lag_jumps_gt_2_frames": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejected_lag_jumps_gt_2_frames"
+        ),
+        "capture_batch_v2_rejected_capture_zero_complete_transactions": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejected_capture_zero_complete_transactions"
+        ),
+        "capture_batch_v2_rejected_playback_completion_delta_outliers": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejected_playback_completion_delta_outliers"
+        ),
+        "capture_batch_v2_product_candidate_allowed": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_product_candidate_allowed"
+        ),
+        "capture_batching_above_iso8_product_blocked": hal_logical_capture_batching_contract.get(
+            "capture_batching_above_iso8_product_blocked"
+        ),
+        "capture_batch_v2_rejection_evidence": hal_logical_capture_batching_contract.get(
+            "capture_batch_v2_rejection_evidence"
         ),
         "candidate_build_flags": hal_logical_capture_batching_contract.get(
             "candidate_build_flags"

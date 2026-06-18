@@ -1,5 +1,46 @@
 # Agent Handoffs
 
+## 2026-06-18 - Archimedes - ISO8 CPU Hot-Path Scout
+
+Mission:
+- Read `/Users/fer/dev/audio8djcpp` only.
+- Do not modify files.
+- Do not touch hardware, CoreAudio, USB, drivers, or system services.
+- Identify CPU reduction options that preserve ISO8 capture/playback cadence,
+  playback coalesce=1, and observable stream stats.
+
+Required warning given:
+- "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+  instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+  /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+  escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+  sin lock global y sin autorización de ventana."
+
+Findings:
+- Best next CPU direction is not more capture batching or prepared runtime.
+- Top candidates are:
+  1. batch capture decode before publishing to rings;
+  2. replace mutex-backed rings with true SPSC/bulk-copy rings;
+  3. preconfigure fixed ISO8 transfer/callback slots without per-submit ObjC
+     work;
+  4. rewrite playback packer as byte-exact ISO8 batch packer;
+  5. keep observability but move hot stats to local counters / seqlock-style
+     snapshots.
+- `stats-off` is risky because it changes timing and also hides/breaks
+  evidence; disabling output write stats can leave `_outputFramesWrittenAtomic`
+  stale while snapshots still publish it.
+
+Files affected by subagent: none.
+
+Risks:
+- Ring/batch decode changes can affect input ordering, timecode latency, and
+  capture routing.
+- Fixed transfer slots can introduce stale completion/lifecycle bugs.
+
+Recommended next action:
+- Start with ISO8-preserving ring/bulk decode work and require offline
+  routing/timecode/packet parity before any physical diagnostic.
+
 ## 2026-06-18 - Existing Subagent Results Integrated
 
 Shared warning given/retained:

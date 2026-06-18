@@ -2573,6 +2573,26 @@ Current implementation:
   a separate known-good output into iRig capture and then compares mainline C
   against C++ on that same route.
 
+## Capture Cadence Product Rule
+
+- Default/product HAL candidates must keep capture and playback USB cadence at
+  ISO8 until contrary physical evidence exists.
+- `HAL_CAPTURE_ISO_FRAMES > 8` is rejected for product claims by current
+  hardware evidence:
+  - ISO64 capture batch failed quality and playback timing.
+  - ISO16 capture-batch v2 failed with `quality_alignment_score=0.115437`,
+    `analog_snr_db=-18.27`, `lag_jumps_gt_2_frames=45`,
+    `captureZeroCompleteTransactions=43172`, and
+    `playbackCompletionDeltaOutliers=2505`.
+- PASS for any future cadence change requires a lock-gated same-session run
+  proving:
+  - no capture zero-complete storm;
+  - zero playback completion outliers under the product window;
+  - physical iRig quality thresholds pass;
+  - CPU/resource p95 is less than or equal to mainline;
+  - timecode/DVS offline gates still pass and physical Traktor/timecode remains
+    unblocked.
+
 ## Promotion Window Contract
 
 - `local-analysis/cpp-offline/promotion-window-contract.txt` must report:
