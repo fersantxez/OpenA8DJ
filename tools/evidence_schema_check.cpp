@@ -298,6 +298,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto human_test_rc_gate =
       opena8djcpp::evidence_json::json_object(summary, "human_test_rc_gate").value_or("");
+  const auto human_test_rc_status_report =
+      opena8djcpp::evidence_json::json_object(summary, "human_test_rc_status_report")
+          .value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const auto product_quality_claim_gate =
@@ -351,6 +354,21 @@ int main(int argc, char** argv) {
                        "validated_route_and_full_ab_window_not_ready") &&
       string_field_is(summary, "human_test_rc_status", "PASS") &&
       bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
+      string_field_is(summary, "human_test_rc_status_live",
+                      "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED") &&
+      string_array_has(summary, "human_test_rc_allowed_window_types",
+                       "DIAGNOSTIC_PACKAGE_REVIEW_ONLY") &&
+      string_array_has(summary, "human_test_rc_allowed_window_types",
+                       "NO_PRODUCT_AUDIO_WINDOW") &&
+      string_array_has(summary, "human_test_rc_disallowed_claims",
+                       "audiophile_quality_superiority") &&
+      string_array_has(summary, "human_test_rc_disallowed_claims",
+                       "timecode_vinyl_certification") &&
+      string_array_has(summary, "human_test_rc_required_before_product_human_test",
+                       "lock_gated_known_good_route_revalidation_pass") &&
+      string_field_is(summary, "human_test_rc_route_contamination_classification",
+                      "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
+      bool_field_is(summary, "human_test_rc_timecode_physical_window_ready", false) &&
       bool_field_is(summary, "human_test_product_allowed", false) &&
       string_field_present(summary, "human_test_next_required_action") &&
       string_field_is(summary, "route_contamination_status", "PASS") &&
@@ -1149,6 +1167,25 @@ int main(int argc, char** argv) {
       bool_field_is(human_test_rc_gate, "no_more_transport_tuning_until_route_validated",
                     true) &&
       string_field_present(human_test_rc_gate, "next_required_action") &&
+      object_present(summary, "human_test_rc_status_report") &&
+      string_field_is(human_test_rc_status_report, "status",
+                      "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED") &&
+      string_field_present(human_test_rc_status_report, "next_action") &&
+      string_array_has(human_test_rc_status_report, "allowed_window_types",
+                       "DIAGNOSTIC_PACKAGE_REVIEW_ONLY") &&
+      string_array_has(human_test_rc_status_report, "allowed_window_types",
+                       "NO_PRODUCT_AUDIO_WINDOW") &&
+      string_array_has(human_test_rc_status_report, "disallowed_claims",
+                       "mainline_superiority") &&
+      string_array_has(human_test_rc_status_report, "required_before_product_human_test",
+                       "same_session_mainline_cpp_physical_ab_pass") &&
+      string_field_is(human_test_rc_status_report, "route_contamination_classification",
+                      "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB") &&
+      bool_field_is(human_test_rc_status_report,
+                    "route_contamination_human_product_test_allowed", false) &&
+      string_field_is(human_test_rc_status_report, "timecode_physical_window_status",
+                      "BLOCKED") &&
+      bool_field_is(human_test_rc_status_report, "timecode_physical_window_ready", false) &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&

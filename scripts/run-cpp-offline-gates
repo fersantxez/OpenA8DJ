@@ -553,6 +553,21 @@ summary = {
     "human_test_rc_status_live": human_test_rc_status.get("status"),
     "human_test_rc_status_next_action": human_test_rc_status.get("next_action"),
     "human_test_rc_status_blockers": human_test_rc_status.get("blockers", []),
+    "human_test_rc_allowed_window_types": human_test_rc_status.get(
+        "allowed_window_types", []
+    ),
+    "human_test_rc_disallowed_claims": human_test_rc_status.get(
+        "disallowed_claims", []
+    ),
+    "human_test_rc_required_before_product_human_test": human_test_rc_status.get(
+        "required_before_product_human_test", []
+    ),
+    "human_test_rc_route_contamination_classification": human_test_rc_status.get(
+        "route_contamination_classification"
+    ),
+    "human_test_rc_timecode_physical_window_ready": human_test_rc_status.get(
+        "timecode_physical_window_ready"
+    ),
     "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
         "diagnostic_rc_artifacts_ready"
     ),
@@ -2868,6 +2883,29 @@ summary = {
         "next_lock_gated_actions": human_test_rc_gate.get("next_lock_gated_actions"),
         "next_required_action": human_test_rc_gate.get("next_required_action"),
         "evidence": "local-analysis/cpp-offline/human-test-rc-gate.json",
+    },
+    "human_test_rc_status_report": {
+        "status": human_test_rc_status.get("status"),
+        "next_action": human_test_rc_status.get("next_action"),
+        "allowed_window_types": human_test_rc_status.get("allowed_window_types", []),
+        "disallowed_claims": human_test_rc_status.get("disallowed_claims", []),
+        "required_before_product_human_test": human_test_rc_status.get(
+            "required_before_product_human_test", []
+        ),
+        "route_contamination_classification": human_test_rc_status.get(
+            "route_contamination_classification"
+        ),
+        "route_contamination_human_product_test_allowed": human_test_rc_status.get(
+            "route_contamination_human_product_test_allowed"
+        ),
+        "timecode_physical_window_status": human_test_rc_status.get(
+            "timecode_physical_window_status"
+        ),
+        "timecode_physical_window_ready": human_test_rc_status.get(
+            "timecode_physical_window_ready"
+        ),
+        "blockers": human_test_rc_status.get("blockers", []),
+        "evidence": "local-analysis/cpp-offline/human-test-rc-status.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

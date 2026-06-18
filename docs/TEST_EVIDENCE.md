@@ -14315,3 +14315,35 @@ Readiness impact:
 - Human product listening, Timecode Vinyl certification, CPU superiority, and
   branch promotion remain blocked until a wired non-Audio8 known-good output is
   validated into the iRig route and same-session physical A/B passes.
+
+## 2026-06-18 - Human RC Status Uses Route Contamination
+
+Commit context:
+- Local changes after `9b05fe3`; expected dirty-worktree blocker until commit.
+
+Safety:
+- Read-only status generation and static validation.
+- No hardware lock acquired.
+- No playback, recording, driver install/reload, CoreAudio restart, USB reset,
+  default-device change, Traktor launch, or external worktree mutation.
+
+Commands:
+- `python3 -m py_compile scripts/human-test-rc-status`
+- `python3 scripts/human-test-rc-status > local-analysis/cpp-offline/human-test-rc-status.json`
+- `git diff --check`
+
+Result:
+- Live RC status:
+  `DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED`.
+- Allowed window types:
+  `DIAGNOSTIC_PACKAGE_REVIEW_ONLY`, `NO_PRODUCT_AUDIO_WINDOW`.
+- Route contamination classification:
+  `DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB`.
+- `route_contamination_human_product_test_allowed=false`.
+- Timecode physical window remains `BLOCKED`.
+
+Readiness impact:
+- This turns the 15:00 decision from a generic route-blocked RC into a precise
+  fail-closed decision: package/diagnostic review is allowed, but product audio
+  listening is explicitly forbidden while the measured route is contaminated
+  after a clean USB boundary.

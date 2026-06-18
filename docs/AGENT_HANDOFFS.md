@@ -4984,3 +4984,37 @@ Next action:
 - Keep the 15:00 decision taxonomy explicit: diagnostic RC if route remains
   blocked; limited product human test only after a wired non-Audio8 known-good
   source validates the iRig route under lock.
+
+## 2026-06-18 Architect Continuation: Fail-Closed Human RC Status
+
+Subagent:
+- Main architect, no new subagent.
+
+Required warning:
+- Continued under the standing project rule: `/Users/fer/dev/opena8dj` and
+  `/Users/fer/dev/audio8djrust` are read-only; only
+  `/Users/fer/dev/audio8djcpp` is writable; no hardware/audio/CoreAudio/USB
+  action without lock and window authorization.
+
+Mission:
+- Continue toward objective superiority without pretending the diagnostic RC is
+  product-ready.
+
+Findings:
+- Live inventory still shows iRig and Audio 8, but no non-Audio8/non-built-in
+  known-good output. The blocker is route/capture validation, not compilation.
+
+Integrated action:
+- Updated `scripts/human-test-rc-status` to consume route-contamination and
+  Timecode physical-window evidence and return
+  `DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED` with product audio windows
+  explicitly disallowed.
+
+Risks:
+- Human listening through the current route is likely non-attributable because
+  the route is contaminated after a clean USB boundary.
+
+Next action:
+- Do not run product listening or Timecode Vinyl. First validate a wired
+  non-Audio8 known-good output into iRig under lock; only then run same-session
+  mainline/C++ A/B and CPU/submit comparison.

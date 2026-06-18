@@ -56,6 +56,14 @@ Branch: `driverkit/cpp-redesign`
   allows only a diagnostic RC and blocks human product testing, Timecode Vinyl
   certification, quality claims, CPU superiority claims, and branch promotion
   until a wired non-Audio8 known-good route is validated.
+- 13:13 EDT continuation update: `scripts/human-test-rc-status` now consumes
+  the route-contamination and Timecode physical-window gates directly. The live
+  RC status is no longer a generic route block; it is
+  `DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED`, with allowed windows
+  limited to package/diagnostic review and `NO_PRODUCT_AUDIO_WINDOW`.
+  Product listening remains closed until known-good route validation, same
+  session mainline/C++ A/B, runtime CPU/submit comparison, and Timecode Vinyl
+  physical validation all pass.
 - Earlier time snapshot: 09:58 EDT left roughly five hours; at 12:34 EDT the
   remaining runway to 15:00 EDT is roughly 2.5 hours.
 - Realistic installable path today: conservative HAL candidate plus

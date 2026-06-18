@@ -24,6 +24,9 @@ CANDIDATE = ROOT / "build/OpenA8DJ.driver"
 CPP_OFFLINE = ROOT / "local-analysis/cpp-offline"
 WATCHER_JSON = CPP_OFFLINE / "watch-known-good-route.json"
 WINDOW_PLAN_JSON = CPP_OFFLINE / "physical-evidence-window-plan.json"
+CURRENT_OFFLINE_JSON = CPP_OFFLINE / "current-offline-gates.json"
+ROUTE_CONTAMINATION_JSON = CPP_OFFLINE / "route-contamination-analysis.json"
+TIMECODE_WINDOW_JSON = CPP_OFFLINE / "timecode-physical-window-plan.json"
 
 
 def utc_now() -> str:
@@ -106,6 +109,9 @@ def main() -> int:
 
     watcher = load_json(WATCHER_JSON)
     plan = load_json(WINDOW_PLAN_JSON)
+    current_offline = load_json(CURRENT_OFFLINE_JSON)
+    route_contamination = load_json(ROUTE_CONTAMINATION_JSON)
+    timecode_window = load_json(TIMECODE_WINDOW_JSON)
     health = parse_audio_stack_health(health_out)
 
     devices_text = audio_out.lower()
@@ -116,6 +122,15 @@ def main() -> int:
     route_ready = bool(plan.get("route_only_ready")) or bool(watcher.get("route_revalidation_ready"))
     full_ab_ready = bool(plan.get("full_ab_ready"))
     stack_ok = health.get("audio_stack_health") == "PASS" and health_rc == 0
+    route_contaminated = (
+        route_contamination.get("result") == "PASS"
+        and route_contamination.get("classification")
+        == "DOWNSTREAM_ROUTE_CONTAMINATION_OR_MONITORING_AFTER_CLEAN_USB"
+        and route_contamination.get("human_product_test_allowed") is False
+    )
+    timecode_physical_ready = bool(
+        timecode_window.get("ready_for_lock_gated_timecode_window")
+    )
 
     blockers: list[str] = []
     if git_rc != 0:
@@ -138,19 +153,31 @@ def main() -> int:
         blockers.append("audio_stack_unhealthy")
     if not route_ready:
         blockers.append("known_good_physical_route_not_ready")
+    if route_contaminated:
+        blockers.append("downstream_route_contamination_after_clean_usb")
+    if not timecode_physical_ready:
+        blockers.append("timecode_physical_window_not_ready")
 
     if full_ab_ready and not blockers:
         status = "LOCK_GATED_FULL_AB_READY"
         next_action = "acquire_lock_and_run_full_ab_command_from_physical_evidence_window_plan"
+        allowed_window_types = ["LOCK_GATED_FULL_AB"]
     elif route_ready and not blockers:
         status = "LOCK_GATED_ROUTE_ONLY_READY"
         next_action = "acquire_lock_and_run_route_only_command_from_physical_evidence_window_plan"
+        allowed_window_types = ["LOCK_GATED_ROUTE_REVALIDATION_ONLY"]
+    elif package_ready and irig_visible and audio8_visible and audio8_8x8 and stack_ok and route_contaminated:
+        status = "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_CONTAMINATED"
+        next_action = "validate_wired_non_audio8_known_good_route_before_product_listening"
+        allowed_window_types = ["DIAGNOSTIC_PACKAGE_REVIEW_ONLY", "NO_PRODUCT_AUDIO_WINDOW"]
     elif package_ready and irig_visible and audio8_visible and audio8_8x8 and stack_ok:
         status = "DIAGNOSTIC_RC_ARTIFACTS_READY_ROUTE_BLOCKED"
         next_action = "provision_wired_non_audio8_non_builtin_output_then_rerun_watcher"
+        allowed_window_types = ["DIAGNOSTIC_PACKAGE_REVIEW_ONLY", "NO_PRODUCT_AUDIO_WINDOW"]
     else:
         status = "BLOCKED"
         next_action = "fix_blockers_before_any_human_test_window"
+        allowed_window_types = ["NO_AUDIO_WINDOW"]
 
     report = {
         "schema": "opena8djcpp.human-test-rc-status.v1",
@@ -185,6 +212,46 @@ def main() -> int:
         "physical_evidence_window_plan_next_action": plan.get("next_action", ""),
         "physical_evidence_window_plan_route_command": plan.get("route_only_command_argv", []),
         "physical_evidence_window_plan_full_ab_command": plan.get("full_ab_command_argv", []),
+        "current_offline_gates_json": str(CURRENT_OFFLINE_JSON),
+        "current_offline_status": current_offline.get("status", ""),
+        "current_offline_diagnostic_status": current_offline.get("diagnostic_status", ""),
+        "current_offline_product_readiness_status": current_offline.get(
+            "product_readiness_status", ""
+        ),
+        "route_contamination_json": str(ROUTE_CONTAMINATION_JSON),
+        "route_contamination_status": route_contamination.get("result", ""),
+        "route_contamination_classification": route_contamination.get("classification", ""),
+        "route_contamination_internal_usb_clean": route_contamination.get(
+            "internal_usb_clean"
+        ),
+        "route_contamination_idle_capture_non_silent": route_contamination.get(
+            "idle_capture_non_silent"
+        ),
+        "route_contamination_human_product_test_allowed": route_contamination.get(
+            "human_product_test_allowed"
+        ),
+        "route_contamination_next_required_action": route_contamination.get(
+            "next_required_action", ""
+        ),
+        "timecode_physical_window_json": str(TIMECODE_WINDOW_JSON),
+        "timecode_physical_window_status": timecode_window.get("status", ""),
+        "timecode_physical_window_ready": timecode_physical_ready,
+        "timecode_physical_window_next_action": timecode_window.get("next_action", ""),
+        "allowed_window_types": allowed_window_types,
+        "disallowed_claims": [
+            "audiophile_quality_superiority",
+            "mainline_superiority",
+            "cpu_resource_superiority",
+            "timecode_vinyl_certification",
+            "branch_promotion",
+        ],
+        "required_before_product_human_test": [
+            "wired_non_audio8_non_builtin_known_good_output_visible",
+            "lock_gated_known_good_route_revalidation_pass",
+            "same_session_mainline_cpp_physical_ab_pass",
+            "runtime_cpu_submit_counter_comparison_pass",
+            "timecode_vinyl_physical_window_pass",
+        ],
         "blockers": list(dict.fromkeys(blockers)),
         "product_claim_allowed": False,
         "mainline_superiority_claim_allowed": False,
