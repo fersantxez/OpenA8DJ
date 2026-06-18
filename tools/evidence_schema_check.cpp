@@ -42,6 +42,10 @@ bool number_field_present(std::string_view json, std::string_view key) {
   return opena8djcpp::evidence_json::json_number(json, key).has_value();
 }
 
+bool string_field_present(std::string_view json, std::string_view key) {
+  return opena8djcpp::evidence_json::json_string(json, key).has_value();
+}
+
 bool string_array_has(std::string_view json, std::string_view key, std::string_view expected) {
   return opena8djcpp::evidence_json::json_string_array_contains(json, key, expected);
 }
@@ -600,6 +604,10 @@ int main(int argc, char** argv) {
       bool_field_present(physical_route_inventory, "promotion_route_ready") &&
       bool_field_present(physical_route_inventory,
                          "same_device_irig_diagnostic_possible") &&
+      string_field_present(physical_route_inventory,
+                           "latest_same_device_irig_diagnostic_result") &&
+      bool_field_present(physical_route_inventory,
+                         "latest_known_good_route_valid_for_promotion") &&
       bool_field_present(physical_route_inventory,
                          "candidate_hal_window_possible_after_lock") &&
       bool_field_is(physical_route_inventory, "product_promotion_measurement_possible_now",

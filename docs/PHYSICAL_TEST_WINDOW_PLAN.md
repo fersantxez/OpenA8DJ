@@ -1,6 +1,8 @@
 # Physical Test Window Plan
 
-Status: not requested, not executed.
+Status: product/superiority window not executed. A lock-gated iRig
+same-device diagnostic was executed on 2026-06-18 and failed route-quality
+validation; see `docs/TEST_EVIDENCE.md`.
 
 This plan is the earliest safe path to physical validation after offline gates
 pass. It does not authorize hardware use by itself.
@@ -73,9 +75,11 @@ Current route-inventory interpretation on 2026-06-18:
 - `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` is not currently active.
 - No non-Audio8, non-built-in known-good output is currently visible for a
   promotable wired route revalidation.
-- The only currently classified lock-gated action is
-  `LOCK_GATED_SAME_DEVICE_IRIG_DIAGNOSTIC_ONLY`, which can diagnose iRig
-  liveness but cannot support product or promotion claims.
+- The latest same-device iRig diagnostic failed with alignment
+  `0.009115610530373885`, SNR floor `-43.31856306497336 dB`, and `22` click
+  outliers. It confirms that this same-device path cannot validate the route.
+- The current lock-gated route action remains diagnostic only and cannot
+  support product or promotion claims.
 
 Purpose:
 

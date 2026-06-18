@@ -11607,3 +11607,40 @@ Full offline gate after commit:
   - It cannot produce promotable Audio 8 DJ quality/performance evidence until
     a valid known-good non-Audio8 route and a same-session mainline/C++ window
     exist.
+
+## 2026-06-18 iRig Same-Device Route Diagnostic
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Ran a lock-gated same-device iRig diagnostic using iRig Stream as both
+    explicit output and explicit capture device.
+  - This was diagnostic only. It cannot support product, quality, CPU/resource,
+    timecode, or branch-promotion claims.
+  - No driver install/reload, USB reset, CoreAudio restart, default-device
+    change, sample-rate change, or buffer-size change was performed.
+- Command:
+  - `scripts/run-known-good-route-soundcheck --output-device "iRig Stream" --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav local-analysis/fixtures/decorrelated-direct-usb/reference-12s-peak030.wav --seconds 6 --allow-same-device-loopback-diagnostic --run-dir local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic`
+- Result:
+  - Script exit: FAIL.
+  - Request validation: PASS.
+  - Request `valid_for_promotion`: `false`.
+  - Python route analyzer: FAIL.
+  - Native analyzer: PASS as analyzer-only, not route/product readiness.
+  - `quality_alignment_score`: `0.009115610530373885`.
+  - SNR floor: `-43.31856306497336 dB`.
+  - Click outliers: `22`.
+  - Capture clipped frames: `0`.
+- Evidence:
+  - `local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic/summary.txt`
+  - `local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic/metrics.json`
+  - `local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic/native-quality.json`
+  - `local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic/captured.wav`
+- Interpretation:
+  - iRig is visible and can capture audio, but the same-device diagnostic did
+    not reproduce the reference through the capture path.
+  - This does not validate the external analog route and does not unblock
+    mainline/C++ physical comparison.
+  - The route inventory now records this latest diagnostic failure as
+    `latest_same_device_irig_diagnostic_failed`.

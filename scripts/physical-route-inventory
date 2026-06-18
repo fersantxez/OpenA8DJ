@@ -178,6 +178,82 @@ def load_offline_summary() -> dict[str, Any]:
     return {}
 
 
+def load_json_file(path: Path) -> dict[str, Any]:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(parsed, dict):
+            return parsed
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {}
+
+
+def parse_summary_txt(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("KNOWN_GOOD_ROUTE:"):
+                values["route_result"] = line.split(":", 1)[1].strip()
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+
+def latest_known_good_route_diagnostic() -> dict[str, Any]:
+    root = ROOT / "local-analysis/known-good-route"
+    candidates = [path for path in root.iterdir() if path.is_dir()] if root.is_dir() else []
+    if not candidates:
+        return {
+            "present": False,
+            "result": "MISSING",
+            "valid_for_promotion": False,
+            "product_claim_allowed": False,
+        }
+    latest = max(candidates, key=lambda path: path.stat().st_mtime)
+    request = load_json_file(latest / "known-good-route-request.json")
+    metrics = load_json_file(latest / "metrics.json")
+    native = load_json_file(latest / "native-quality.json")
+    summary = parse_summary_txt(latest / "summary.txt")
+    route_result = summary.get("route_result", "UNKNOWN")
+    output_same_as_capture = bool(request.get("output_same_as_capture", False))
+    valid_for_promotion = bool(request.get("valid_for_promotion", False))
+    quality_alignment_score = metrics.get("quality_alignment_score")
+    snr_floor_db = min(
+        float(metrics.get("left_snr_db", 0.0)),
+        float(metrics.get("right_snr_db", 0.0)),
+    ) if metrics else None
+    click_outliers = (
+        int(metrics.get("left_click_outliers", 0))
+        + int(metrics.get("right_click_outliers", 0))
+        if metrics
+        else None
+    )
+    return {
+        "present": True,
+        "path": str(latest),
+        "result": route_result,
+        "analysis_rc": int(summary.get("analysis_rc", "999") or "999"),
+        "native_rc": int(summary.get("native_rc", "999") or "999"),
+        "valid_for_promotion": valid_for_promotion,
+        "same_device_loopback_diagnostic": output_same_as_capture,
+        "output_device": summary.get("output_device", ""),
+        "capture_device": summary.get("capture_device", ""),
+        "capture_path": summary.get("capture", ""),
+        "metrics_path": summary.get("metrics", ""),
+        "native_metrics_path": summary.get("native_metrics", ""),
+        "quality_alignment_score": quality_alignment_score,
+        "snr_floor_db": snr_floor_db,
+        "click_outliers": click_outliers,
+        "native_result": native.get("result", ""),
+        "native_readiness_claim": native.get("readiness_claim", ""),
+        "product_claim_allowed": False,
+    }
+
+
 def device_identity(device: dict[str, Any]) -> str:
     return str(device.get("name", "")) + " " + str(device.get("uid", ""))
 
@@ -187,6 +263,7 @@ def classify(
     usb: dict[str, Any],
     hal: dict[str, Any],
     lock: dict[str, Any],
+    latest_route: dict[str, Any],
 ) -> dict[str, Any]:
     irig_inputs = [
         device
@@ -239,6 +316,13 @@ def classify(
         blockers.append("non_audio8_non_builtin_known_good_output_not_visible")
     if not lock.get("available_for_new_window"):
         blockers.append("hardware_lock_not_available")
+    latest_same_device_failed = (
+        latest_route.get("present") is True
+        and latest_route.get("same_device_loopback_diagnostic") is True
+        and latest_route.get("result") != "PASS"
+    )
+    if latest_same_device_failed:
+        blockers.append("latest_same_device_irig_diagnostic_failed")
     return {
         "irig_capture_visible": bool(irig_inputs),
         "irig_output_visible": bool(irig_outputs),
@@ -249,6 +333,10 @@ def classify(
         "built_in_or_acoustic_outputs": acoustic_outputs,
         "promotion_route_ready": promotion_route_ready,
         "same_device_irig_diagnostic_possible": same_device_irig_diagnostic_possible,
+        "latest_same_device_irig_diagnostic_result": latest_route.get("result", "MISSING")
+        if latest_route.get("same_device_loopback_diagnostic") is True
+        else "NOT_APPLICABLE",
+        "latest_same_device_irig_diagnostic_path": latest_route.get("path", ""),
         "candidate_hal_window_possible_after_lock": candidate_hal_window_possible_after_lock,
         "product_promotion_measurement_possible_now": False,
         "next_lock_gated_action": next_action,
@@ -271,7 +359,8 @@ def main() -> int:
     hal = hal_inventory()
     lock = lock_inventory()
     offline = load_offline_summary()
-    decision = classify(devices, usb, hal, lock)
+    latest_route = latest_known_good_route_diagnostic()
+    decision = classify(devices, usb, hal, lock, latest_route)
     report = {
         "schema": "opena8djcpp.physical-route-inventory.v1",
         "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -292,6 +381,7 @@ def main() -> int:
         "usb": usb,
         "hal": hal,
         "lock": lock,
+        "latest_known_good_route_diagnostic": latest_route,
         "offline_candidate": {
             "summary_present": bool(offline),
             "base_commit": offline.get("base_commit", ""),

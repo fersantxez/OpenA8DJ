@@ -7897,3 +7897,44 @@ Next implication:
 - If only the same-device iRig diagnostic is available, it may be run as a
   diagnostic under lock, but the result must remain blocked for product,
   quality, CPU/resource, timecode, and branch-promotion claims.
+
+## 2026-06-18: Record Latest iRig Same-Device Diagnostic In Inventory
+
+Decision:
+- Extended `scripts/physical-route-inventory` to read the latest
+  `local-analysis/known-good-route/*` diagnostic evidence.
+- The offline summary now records the latest known-good-route result, whether
+  it was valid for promotion, the same-device diagnostic result, alignment, and
+  SNR floor.
+- The schema gate now requires these fields to exist.
+
+Reason:
+- The lock-gated iRig same-device diagnostic produced real physical evidence,
+  but local WAV/JSON evidence is ignored by git. The current offline summary
+  must still expose the outcome so later runs cannot accidentally treat iRig
+  visibility as route validity.
+
+Evidence:
+- Latest diagnostic:
+  `local-analysis/known-good-route/20260618T061314Z-irig-same-device-diagnostic`.
+- Request validation: PASS, but `valid_for_promotion=false`.
+- Route summary: FAIL.
+- Alignment score: `0.009115610530373885`.
+- SNR floor: `-43.31856306497336 dB`.
+- Click outliers: `22`.
+- No driver install/reload, USB reset, CoreAudio restart, default-device
+  change, sample-rate change, or buffer-size change was performed.
+
+Alternatives discarded:
+- Leave the diagnostic only in ignored `local-analysis`: rejected because the
+  next gate run would not expose the physical route failure.
+- Treat native analyzer `PASS` as route success: rejected because that result
+  is analyzer-only and explicitly not product readiness; the Python route
+  analyzer and summary correctly failed the route.
+
+Next implication:
+- Product and branch-promotion claims remain blocked.
+- Next useful physical route action is to restore a real non-Audio8 wired
+  source into the iRig capture chain or run a HAL-candidate visibility/safety
+  window under lock; same-device iRig output/capture has now failed as route
+  evidence.

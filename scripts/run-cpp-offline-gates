@@ -1011,6 +1011,24 @@ summary = {
         "same_device_irig_diagnostic_possible": physical_route_inventory.get(
             "decision", {}
         ).get("same_device_irig_diagnostic_possible"),
+        "latest_same_device_irig_diagnostic_result": physical_route_inventory.get(
+            "decision", {}
+        ).get("latest_same_device_irig_diagnostic_result"),
+        "latest_same_device_irig_diagnostic_path": physical_route_inventory.get(
+            "decision", {}
+        ).get("latest_same_device_irig_diagnostic_path"),
+        "latest_known_good_route_result": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("result"),
+        "latest_known_good_route_valid_for_promotion": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("valid_for_promotion"),
+        "latest_known_good_route_quality_alignment_score": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("quality_alignment_score"),
+        "latest_known_good_route_snr_floor_db": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("snr_floor_db"),
         "candidate_hal_window_possible_after_lock": physical_route_inventory.get(
             "decision", {}
         ).get("candidate_hal_window_possible_after_lock"),
