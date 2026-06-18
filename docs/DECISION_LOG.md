@@ -9387,3 +9387,28 @@ Next implication:
 - Readiness impact: improves speed and safety of the next physical window.
   It does not validate the route, improve audio quality, prove CPU/resource
   superiority, or unblock branch promotion.
+
+## 2026-06-18 - Known-Good Route Selector Is Required Evidence
+
+- Decision: require `known-good-route-selector.json` and the
+  `known_good_route_selector` summary object in
+  `opena8djcpp_evidence_schema_check`.
+- Reason: the selector now defines whether the next physical window can safely
+  validate the iRig route using a non-Audio8, non-built-in wired source. If the
+  selector evidence is missing, a green offline run would be incomplete and
+  could lead to a bad human-test or promotion window.
+- Evidence:
+  - Focused schema run after the change:
+    `result=PASS`, `required_files=86`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Current selector state remains blocked:
+    `route_revalidation_ready=false`,
+    `valid_known_good_output_count=0`, `irig_capture_count=1`.
+- Alternatives rejected:
+  - Leave the selector as informational only: rejected because route
+    validation is now a hard prerequisite for product-quality measurement.
+  - Hard-code the current blocker into the schema: rejected because the schema
+    should also pass when a valid known-good output appears, while the product
+    gates continue to block claims until physical A/B evidence exists.
+- Readiness impact: improves evidence integrity. It does not itself validate
+  audio quality, Timecode Vinyl, CPU superiority, or branch promotion.

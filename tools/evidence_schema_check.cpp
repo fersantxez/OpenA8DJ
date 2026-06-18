@@ -138,6 +138,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
       root / "local-analysis/cpp-offline/physical-route-inventory.json",
+      root / "local-analysis/cpp-offline/known-good-route-selector.json",
       root / "local-analysis/cpp-offline/capture-readiness-contract.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
@@ -253,6 +254,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
       opena8djcpp::evidence_json::json_object(summary, "physical_route_inventory").value_or("");
+  const auto known_good_route_selector =
+      opena8djcpp::evidence_json::json_object(summary, "known_good_route_selector").value_or("");
   const auto capture_readiness_contract =
       opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
@@ -295,6 +298,8 @@ int main(int argc, char** argv) {
       string_field_present(summary, "capture_route_status") &&
       string_field_present(summary, "capture_diagnostic_status") &&
       string_field_present(summary, "capture_next_recovery_action") &&
+      bool_field_present(summary, "known_good_route_selector_ready") &&
+      string_field_present(summary, "known_good_route_selector_next_action") &&
       string_array_has(summary, "current_route_inventory_blockers",
                        "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
@@ -789,6 +794,20 @@ int main(int argc, char** argv) {
       bool_field_is(physical_route_inventory, "audio_played", false) &&
       bool_field_is(physical_route_inventory, "audio_recorded", false) &&
       bool_field_is(physical_route_inventory, "driver_installed_or_activated", false) &&
+      object_present(summary, "known_good_route_selector") &&
+      string_field_is(known_good_route_selector, "status", "PASS") &&
+      string_field_is(known_good_route_selector, "schema",
+                      "opena8djcpp.known-good-route-selector.v1") &&
+      bool_field_present(known_good_route_selector, "route_revalidation_ready") &&
+      number_field_present(known_good_route_selector, "valid_known_good_output_count") &&
+      number_field_present(known_good_route_selector, "irig_capture_count") &&
+      object_present(known_good_route_selector, "selected_known_good_output") &&
+      object_present(known_good_route_selector, "selected_irig_capture") &&
+      string_field_present(known_good_route_selector, "next_action") &&
+      string_field_present(known_good_route_selector, "evidence") &&
+      bool_field_is(known_good_route_selector, "lock_required_before_command", true) &&
+      bool_field_is(known_good_route_selector, "product_claim_allowed", false) &&
+      bool_field_is(known_good_route_selector, "branch_promotion_allowed", false) &&
       object_present(summary, "capture_readiness_contract") &&
       string_field_is(capture_readiness_contract, "status", "PASS") &&
       string_field_is(capture_readiness_contract, "capture_status", "VISIBLE") &&

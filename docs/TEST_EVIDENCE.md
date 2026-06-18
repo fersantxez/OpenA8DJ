@@ -13672,3 +13672,40 @@ Full offline gate after commit:
     a valid wired non-Audio8 output appears.
   - Current product-quality, Timecode Vinyl physical, CPU/resource superiority,
     and branch-promotion claims remain blocked.
+
+## 2026-06-18 - Evidence Schema Requires Known-Good Route Selector
+
+- Commit context: local changes after `1cb93ce`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Time: `2026-06-18T15:37:39Z`.
+- Safety:
+  - Offline schema validation only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Source/build changes:
+  - `tools/evidence_schema_check.cpp` now requires
+    `local-analysis/cpp-offline/known-good-route-selector.json`.
+  - The same schema check now requires the summary object
+    `known_good_route_selector` with status/schema, route readiness count
+    fields, selected-device objects, lock requirement, and product/promotion
+    blockers.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_evidence_schema_check`
+- Results:
+  - Build: PASS.
+  - Schema check: PASS.
+  - `required_files=86`.
+  - `missing_files=0`.
+  - `summary_pass=true`.
+  - `manifest_pass=true`.
+- Readiness impact:
+  - Future green offline evidence cannot omit the route selector.
+  - Current product-quality, Timecode Vinyl physical, CPU/resource superiority,
+    and branch-promotion claims remain blocked until valid physical route and
+    same-window comparison evidence exist.

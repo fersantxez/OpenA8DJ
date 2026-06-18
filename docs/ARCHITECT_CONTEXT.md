@@ -3097,3 +3097,15 @@ Current implication:
   visible, but `valid_known_good_output_count=0`, so the next action remains
   provisioning a wired non-Audio8/non-built-in output before more driver
   tuning or product listening.
+- Evidence-schema hardening update: `opena8djcpp_evidence_schema_check` now
+  requires `local-analysis/cpp-offline/known-good-route-selector.json` and the
+  embedded `known_good_route_selector` summary object. The schema requires
+  selector status, UID-safe selection fields, lock requirement, and
+  claim/promotion blockers, so a future green offline run cannot omit the
+  route selector while still appearing physically actionable.
+- Six-hour human-test guidance: the 15:00 EDT target should be treated as a
+  frozen installable diagnostic/human-smoke candidate plus evidence packet,
+  not an automatic superiority milestone. A product-quality human test or
+  mainline replacement still needs a valid wired known-good route, same-window
+  C++/mainline physical A/B, CPU/resource evidence, and Timecode Vinyl
+  physical validation.
