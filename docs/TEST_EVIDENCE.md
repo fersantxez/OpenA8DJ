@@ -11427,3 +11427,40 @@ Full offline gate after commit:
     DriverKit readiness, hardware readiness, or branch promotion. Those remain
     blocked until the adapter is bound to real HAL/DriverKit USB and wins
     lock-gated same-session physical A/B after route revalidation.
+
+## 2026-06-18 Route Preflight and Prepared Runtime Artifact
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Route-only preflight:
+  - Evidence:
+    `local-analysis/physical-superiority-window/20260618T053046Z-route-preflight-current/preflight-macbook-speakers.json`
+  - Result: FAIL.
+  - Interpretation: `iRig Stream` is visible as the capture device and
+    `Audio 8 DJ` is visible on USB, but the Audio 8 DJ is not a current
+    CoreAudio output and MacBook Air Speakers are rejected as a built-in
+    acoustic known-good output. `ready_to_execute_physical_window=false`.
+  - Safety: read-only enumeration/preflight only; no playback, capture, driver
+    install/reload, CoreAudio restart, USB reset, default-device change,
+    sample-rate change, or buffer-size change.
+- Prepared runtime artifact:
+  - Command: `make hal-prepared-runtime-candidate`.
+  - Candidate: `build/OpenA8DJ-prepared-runtime.driver`.
+  - Focused result: PASS.
+  - Bundle check: PASS.
+  - Expected submit reduction ratio: `8`.
+  - Physical evidence present: `false`.
+  - Product claim allowed: `false`.
+- Full offline gates before commit:
+  - Command: `./scripts/run-cpp-offline-gates`.
+  - Debug CTest: `74/74` PASS.
+  - Release CTest: `75/75` PASS.
+  - Evidence schema: PASS, `required_files=80`, `missing_files=0`.
+  - Provenance: FAIL before commit only, because the new files were not yet
+    committed.
+- Interpretation:
+  - The separate prepared-runtime candidate is now reproducible offline and the
+    normal HAL bundle is restored after candidate creation.
+  - This is not a sound-quality, CPU/resource, Timecode Vinyl, DriverKit,
+    hardware-readiness, or branch-promotion claim.

@@ -1166,3 +1166,23 @@ Passing this guard only proves the source/build contract. It does not prove
 sound quality, CPU superiority, Traktor/timecode behavior, routing safety, or
 branch-promotion readiness. Any physical run still requires the global hardware
 lock and same-window route revalidation plus mainline/C++ comparison.
+
+## Separate Prepared Runtime Candidate
+
+Build a separated, default-off HAL prepared-runtime candidate:
+
+```sh
+make hal-prepared-runtime-candidate
+```
+
+This produces `build/OpenA8DJ-prepared-runtime.driver`, writes
+`build/OpenA8DJ-prepared-runtime.driver/prepared-runtime-candidate.json`, and
+then rebuilds the normal `build/OpenA8DJ.driver` bundle so the default local
+artifact is restored.
+
+The script refuses output paths outside `/Users/fer/dev/audio8djcpp`. It does
+not install, load, unload, activate, deactivate, restart CoreAudio, touch USB,
+change defaults, play audio, or record audio. Passing this build only proves
+that the candidate artifact is reproducible and bundle-complete. It does not
+prove lower CPU, audiophile quality, Timecode Vinyl behavior, or branch
+promotion readiness.

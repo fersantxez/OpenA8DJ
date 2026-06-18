@@ -163,7 +163,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-prepared-runtime hal-cadence-diagnostic hal-hotpath-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist FORCE
+.PHONY: all clean probe claim hal hal-prepared-runtime hal-prepared-runtime-candidate hal-cadence-diagnostic hal-hotpath-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -183,6 +183,11 @@ hal-prepared-runtime:
 		HAL_PLAYBACK_COALESCE_TRANSFERS=8 \
 		HAL_CAPTURE_QUEUE=8 \
 		HAL_PLAYBACK_QUEUE=8
+
+hal-prepared-runtime-candidate:
+	python3 scripts/build-hal-prepared-runtime-candidate \
+		--candidate build/OpenA8DJ-prepared-runtime.driver \
+		--json-out build/OpenA8DJ-prepared-runtime.driver/prepared-runtime-candidate.json
 
 hal-cadence-diagnostic:
 	$(MAKE) -B hal \

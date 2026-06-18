@@ -2727,3 +2727,22 @@ Current implication:
     fractional time-warp, and runtime discontinuity correlation. This improves
     measurement confidence. It still does not prove the driver is better than
     mainline.
+  - Current in-progress candidate after `5d41d2b` adds an explicit
+    `hal-prepared-runtime-candidate` build artifact. The script builds the
+    opt-in HAL prepared runtime geometry, copies it to
+    `build/OpenA8DJ-prepared-runtime.driver`, then rebuilds the default HAL so
+    `build/OpenA8DJ.driver` is restored to the normal non-prepared artifact.
+    This separates the next low-CPU runtime experiment from the default bundle
+    and keeps `product_claim_allowed=false`.
+  - Current route preflight evidence:
+    `local-analysis/physical-superiority-window/20260618T053046Z-route-preflight-current/preflight-macbook-speakers.json`.
+    The iRig Stream is visible to CoreAudio as a 2-in/2-out USB device and the
+    Audio 8 DJ is visible on USB, but the Audio 8 DJ is not currently a
+    CoreAudio device and there is no valid wired known-good non-Audio8 output
+    into the iRig. The preflight rejected MacBook Air Speakers as built-in
+    acoustic output and reported `ready_to_execute_physical_window=false`.
+  - Hardware/product state remains blocked. Do not run mainline-vs-C++ A/B,
+    prepared-runtime physical tests, Traktor/timecode vinyl validation, branch
+    promotion, driver installation, device defaults changes, CoreAudio restarts,
+    USB resets, playback, or recording until a lock-gated route-only
+    revalidation passes first.

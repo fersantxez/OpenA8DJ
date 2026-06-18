@@ -2447,3 +2447,29 @@ Current implementation:
   false accepts, zero deck swaps, and minimum active/inactive tonal gap
   `82.7135 dB`. This is offline evidence only and cannot clear physical
   Traktor/timecode readiness.
+
+## Prepared Runtime Candidate Gate
+
+- `local-analysis/cpp-offline/hal-prepared-runtime-candidate.json` must be
+  present and PASS before any prepared-runtime physical window can be requested.
+- Required fields:
+  - `prepared_runtime_enabled=true`;
+  - `logical_iso_frames=8`;
+  - `capture_iso_frames=64`;
+  - `playback_base_iso_frames=8`;
+  - `playback_coalesce_transfers=8`;
+  - `expected_submit_reduction_ratio=8`;
+  - `default_hal_restored=true`;
+  - `prepared_hash_differs_from_default=true`;
+  - `physical_evidence_present=false`;
+  - `product_claim_allowed=false`.
+- `local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json` must
+  also be PASS.
+- This gate is only a reproducibility prerequisite. Product superiority still
+  requires a lock-gated, same-session physical bundle with:
+  - route-only revalidation PASS first;
+  - candidate and mainline audio quality PASS on the same capture route;
+  - candidate CPU/resource p95 and jitter less than or equal to mainline;
+  - no regressions in routing, 8-in/8-out representation, or timecode/DVS
+    offline gates;
+  - no CoreAudio/USB recovery debt after the run.

@@ -64,6 +64,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/current-offline-gates.json",
       root / "local-analysis/cpp-offline/ctest-default.txt",
       root / "local-analysis/cpp-offline/ctest-release.txt",
+      root / "local-analysis/cpp-offline/hal-prepared-runtime-candidate.json",
+      root / "local-analysis/cpp-offline/hal-prepared-runtime-bundle-complete.json",
       root / "local-analysis/cpp-offline/packet-matrix.json",
       root / "local-analysis/cpp-offline/protocol-contract.json",
       root / "local-analysis/cpp-offline/simulated-output-matrix.json",
@@ -163,6 +165,12 @@ int main(int argc, char** argv) {
   const auto hal_prepared_runtime_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_binding_contract")
           .value_or("");
+  const auto hal_prepared_runtime_candidate =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_candidate")
+          .value_or("");
+  const auto hal_prepared_runtime_bundle_complete =
+      opena8djcpp::evidence_json::json_object(summary, "hal_prepared_runtime_bundle_complete")
+          .value_or("");
   const auto driverkit_usb_submit_binding_contract =
       opena8djcpp::evidence_json::json_object(summary, "driverkit_usb_submit_binding_contract")
           .value_or("");
@@ -252,7 +260,21 @@ int main(int argc, char** argv) {
       string_array_has(summary, "promotion_hard_blockers",
                        "real_driverkit_sdk_and_selected_xcode_missing") &&
       string_array_has(summary, "promotion_hard_blockers",
-                       "post_reboot_autologin_codex_resume_unfixed") &&
+                      "post_reboot_autologin_codex_resume_unfixed") &&
+      object_present(summary, "hal_prepared_runtime_candidate") &&
+      string_field_is(hal_prepared_runtime_candidate, "status", "PASS") &&
+      bool_field_is(hal_prepared_runtime_candidate, "prepared_runtime_enabled", true) &&
+      number_field_is(hal_prepared_runtime_candidate, "logical_iso_frames", 8.0) &&
+      number_field_is(hal_prepared_runtime_candidate, "capture_iso_frames", 64.0) &&
+      number_field_is(hal_prepared_runtime_candidate, "playback_base_iso_frames", 8.0) &&
+      number_field_is(hal_prepared_runtime_candidate, "playback_coalesce_transfers", 8.0) &&
+      number_field_is(hal_prepared_runtime_candidate, "expected_submit_reduction_ratio", 8.0) &&
+      bool_field_is(hal_prepared_runtime_candidate, "default_hal_restored", true) &&
+      bool_field_is(hal_prepared_runtime_candidate, "prepared_hash_differs_from_default", true) &&
+      bool_field_is(hal_prepared_runtime_candidate, "physical_evidence_present", false) &&
+      bool_field_is(hal_prepared_runtime_candidate, "product_claim_allowed", false) &&
+      object_present(summary, "hal_prepared_runtime_bundle_complete") &&
+      string_field_is(hal_prepared_runtime_bundle_complete, "status", "PASS") &&
       object_present(summary, "runtime_adapter_contract") &&
       number_field_is(runtime_adapter_contract, "stable_usb_submit_reduction_ratio", 8.0) &&
       object_present(summary, "usb_submit_plan_contract") &&

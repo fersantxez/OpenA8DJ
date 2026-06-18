@@ -7732,3 +7732,42 @@ Next implication:
 - The next engineering blocker is runtime: integrate prepared submit into the
   actual HAL/DriverKit path and prove lower CPU/resource use without worse
   physical audio quality.
+
+## 2026-06-18: Build Separate HAL Prepared-Runtime Candidate Artifact
+
+Decision:
+- Added `scripts/build-hal-prepared-runtime-candidate` and the
+  `make hal-prepared-runtime-candidate` target.
+- The script builds the opt-in prepared runtime HAL geometry, copies it to
+  `build/OpenA8DJ-prepared-runtime.driver`, rebuilds the normal HAL bundle, and
+  writes JSON evidence. It refuses candidate and JSON output paths outside the
+  C++ worktree.
+- The offline gate runner now validates both the default HAL bundle and the
+  separated prepared-runtime candidate bundle.
+
+Reason:
+- Lower CPU/resource use needs a prepared-runtime artifact that is explicit,
+  reproducible, and impossible to confuse with the default HAL bundle.
+- Keeping the artifact separate lets us prepare a physical comparison window
+  without silently replacing the default local build.
+
+Evidence:
+- Focused `make hal-prepared-runtime-candidate`: PASS.
+- Focused bundle check for `build/OpenA8DJ-prepared-runtime.driver`: PASS.
+- Full offline runner before commit: PASS for Debug CTest `74/74`, Release
+  CTest `75/75`, evidence schema `required_files=80`, `missing_files=0`.
+  Provenance correctly remained FAIL before commit because the worktree was
+  dirty.
+
+Alternatives discarded:
+- Treat `make hal-prepared-runtime` alone as the physical-test candidate:
+  rejected because it leaves `build/OpenA8DJ.driver` in opt-in geometry and can
+  blur evidence.
+- Claim CPU superiority from the separate bundle: rejected. A build artifact
+  proves only reproducibility and bundle completeness; real CPU/resource
+  superiority requires same-session physical comparison against mainline.
+
+Next implication:
+- After commit, rerun full offline gates so provenance is clean.
+- Next physical action is route-only revalidation under the global lock, not a
+  product A/B.

@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Build a separate default-off HAL prepared-runtime candidate bundle.
+
+This script is intentionally offline-only: it builds local bundles under
+build/, copies the prepared-runtime bundle to an explicit candidate path, then
+rebuilds the normal HAL bundle so build/OpenA8DJ.driver does not silently keep
+the opt-in runtime geometry.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def run(argv: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        argv,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    info = path / "Contents/Info.plist"
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    metrics: dict[str, object] = {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+    }
+    return metrics
+
+
+def write_json(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ-prepared-runtime.driver")
+    parser.add_argument("--json-out", default="")
+    args = parser.parse_args()
+
+    candidate = resolve_path(args.candidate)
+    require_inside_root(candidate, "--candidate")
+    if candidate == ROOT or candidate == DEFAULT_HAL:
+        raise ValueError("--candidate must be a separate bundle path, not the worktree or default HAL bundle")
+    json_out = resolve_path(args.json_out) if args.json_out else None
+    if json_out is not None:
+        require_inside_root(json_out, "--json-out")
+
+    prepared_rc, prepared_stdout, prepared_stderr = run(["make", "-B", "hal-prepared-runtime"])
+    copied = False
+    if prepared_rc == 0 and DEFAULT_HAL_BIN.is_file():
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+        copied = True
+
+    prepared_metrics = bundle_metrics(candidate)
+
+    restore_rc, restore_stdout, restore_stderr = run(["make", "-B", "hal"])
+    default_metrics = bundle_metrics(DEFAULT_HAL)
+
+    prepared_hash = str(prepared_metrics.get("executable_sha256", ""))
+    default_hash = str(default_metrics.get("executable_sha256", ""))
+    gates = [
+        {
+            "name": "prepared_runtime_build",
+            "result": "PASS" if prepared_rc == 0 else "FAIL",
+            "return_code": prepared_rc,
+        },
+        {
+            "name": "prepared_candidate_copied",
+            "result": "PASS" if copied else "FAIL",
+        },
+        {
+            "name": "prepared_candidate_complete",
+            "result": "PASS"
+            if prepared_metrics["bundle_exists"]
+            and prepared_metrics["info_plist_exists"]
+            and prepared_metrics["executable_exists"]
+            and int(prepared_metrics["executable_bytes"]) > 0
+            else "FAIL",
+        },
+        {
+            "name": "default_hal_restored",
+            "result": "PASS"
+            if restore_rc == 0
+            and default_metrics["bundle_exists"]
+            and default_metrics["info_plist_exists"]
+            and default_metrics["executable_exists"]
+            and int(default_metrics["executable_bytes"]) > 0
+            else "FAIL",
+            "return_code": restore_rc,
+        },
+        {
+            "name": "prepared_hash_differs_from_default",
+            "result": "PASS" if prepared_hash and default_hash and prepared_hash != default_hash else "FAIL",
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.hal-prepared-runtime-candidate.v1",
+        "safety": "offline_local_build_only_no_install_load_coreaudio_usb_hardware_or_default_device_touch",
+        "result": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "prepared_runtime_enabled": True,
+        "prepared_runtime_slots_per_submit": 8,
+        "logical_iso_frames": 8,
+        "capture_iso_frames": 64,
+        "playback_base_iso_frames": 8,
+        "playback_coalesce_transfers": 8,
+        "expected_submit_reduction_ratio": 8,
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "prepared_candidate": prepared_metrics,
+        "default_hal_after_restore": default_metrics,
+        "default_hal_restored": restore_rc == 0 and default_metrics["executable_exists"],
+        "prepared_hash_differs_from_default": prepared_hash != "" and default_hash != "" and prepared_hash != default_hash,
+        "gates": gates,
+        "blocked_claim": "NO_CPU_AUDIOPHILE_OR_TIMECODE_SUPERIORITY_CLAIM_FROM_BUILD_ARTIFACT_WITHOUT_LOCK_GATED_PHYSICAL_EVIDENCE",
+    }
+    if prepared_rc != 0:
+        report["prepared_build_stderr"] = prepared_stderr[-4000:]
+        report["prepared_build_stdout"] = prepared_stdout[-4000:]
+    if restore_rc != 0:
+        report["restore_build_stderr"] = restore_stderr[-4000:]
+        report["restore_build_stdout"] = restore_stdout[-4000:]
+
+    text = json.dumps(report, indent=2, sort_keys=True)
+    print(text)
+    if json_out is not None:
+        write_json(json_out, report)
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

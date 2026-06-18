@@ -3978,3 +3978,36 @@ Risk:
     fresh, bind the adapter default-off to real HAL or DriverKit USB submit
     paths, then request a route-revalidation-only lock window before product
     A/B.
+
+## 2026-06-18 Architect Integration: Prepared Runtime Candidate Artifact
+
+- Safety:
+  - Subagents used only read-only/codebase analysis. Mainline
+    `/Users/fer/dev/opena8dj` and Rust `/Users/fer/dev/audio8djrust` remained
+    read-only.
+  - No hardware, audio playback, recording, CoreAudio mutation, USB reset,
+    driver install/reload, default-device change, sample-rate change, or
+    buffer-size change was performed.
+- Planck (`019ed8f6-66de-7a40-bf67-55d91551b70f`):
+  - Finding: performance superiority remains blocked until prepared submit is
+    integrated into a real runtime path and measured physically.
+  - Integrated action: created a separated prepared-runtime HAL artifact so the
+    next physical comparison can use an explicit candidate instead of a silently
+    mutated default build.
+- Avicenna (`019ed8f6-406c-79e1-b2e0-bf28b50a5b02`):
+  - Finding: analyzer precision is strong enough to keep migrating Python
+    oracles to native C++, but physical claims still require valid same-session
+    WAV evidence.
+  - Integrated action: kept this pass focused on runtime-candidate
+    reproducibility, not analyzer threshold changes.
+- Mendel (`019ed926-b245-7521-8e39-319e9f7810bd`):
+  - Finding: changing the HAL hot path directly is high risk until lifetime,
+    completion, timestamp, and request-pool behavior are modeled.
+  - Integrated action: the prepared-runtime candidate remains opt-in and
+    default-off; the normal HAL bundle is rebuilt after candidate creation.
+- Architect route check:
+  - Current route-only preflight rejected the available MacBook speaker path as
+    built-in/acoustic output. The iRig Stream is visible, but there is no valid
+    wired known-good non-Audio8 output into it yet.
+  - Next action: acquire the global hardware lock for route-only revalidation
+    after a valid wired output route is available. Product A/B remains blocked.
