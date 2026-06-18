@@ -13709,3 +13709,47 @@ Full offline gate after commit:
   - Current product-quality, Timecode Vinyl physical, CPU/resource superiority,
     and branch-promotion claims remain blocked until valid physical route and
     same-window comparison evidence exist.
+
+## 2026-06-18 - Human-Test RC Gate Added
+
+- Commit context: local changes after `fa748b0`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline existing evidence and package-file classification only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Source/build changes:
+  - Added `tools/human_test_rc_gate.cpp`.
+  - Added CMake target/test `opena8djcpp_human_test_rc_gate`.
+  - Added `human-test-rc-gate.json` to `scripts/run-cpp-offline-gates` and
+    the current offline summary.
+  - Extended `opena8djcpp_evidence_schema_check` to require the new summary
+    object and claim-blocking fields.
+- Focused commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_human_test_rc_gate opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_human_test_rc_gate`
+- Focused result:
+  - Build: PASS.
+  - RC classifier: PASS.
+  - `classifier_safe=true`.
+  - `bundle_ready=true`.
+  - `package_present=true`.
+  - `diagnostic_rc_artifacts_ready=true`.
+  - `diagnostic_install_smoke_allowed_after_lock=true`.
+  - `fresh_hal_safety_smoke_required=true`.
+  - `route_revalidation_ready=false`.
+  - `product_human_test_allowed=false`.
+  - `timecode_vinyl_human_test_allowed=false`.
+  - `cpu_superiority_claim_allowed=false`.
+  - `branch_promotion_allowed=false`.
+- Readiness impact:
+  - The candidate can be treated as an installable diagnostic RC only after a
+    fresh lock-gated HAL safety smoke.
+  - Product human listening, Timecode Vinyl physical readiness, CPU/resource
+    superiority, and branch promotion remain blocked.

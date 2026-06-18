@@ -9412,3 +9412,36 @@ Next implication:
     gates continue to block claims until physical A/B evidence exists.
 - Readiness impact: improves evidence integrity. It does not itself validate
   audio quality, Timecode Vinyl, CPU superiority, or branch promotion.
+
+## 2026-06-18 - Human-Test RC Must Classify Diagnostic vs Product Readiness
+
+- Decision: add `opena8djcpp_human_test_rc_gate` and wire it into the offline
+  gate summary as the single 15:00 EDT RC decision point.
+- Reason: the project needs a practical human-test target within hours, but
+  the target must not blur artifact readiness with product superiority. The
+  gate separates package/bundle presence, lock-gated diagnostic smoke, route
+  validation, product listening, Timecode Vinyl physical readiness, CPU
+  superiority, and branch promotion.
+- Evidence:
+  - Focused run:
+    `result=PASS`, `classifier_safe=true`,
+    `diagnostic_rc_artifacts_ready=true`,
+    `diagnostic_install_smoke_allowed_after_lock=true`.
+  - Current blockers:
+    `fresh_hal_safety_smoke_required=true`,
+    `route_revalidation_ready=false`,
+    `product_human_test_allowed=false`,
+    `timecode_vinyl_human_test_allowed=false`,
+    `cpu_superiority_claim_allowed=false`,
+    `branch_promotion_allowed=false`.
+- Alternatives rejected:
+  - Treat the package as a product human-test approval: rejected because the
+    latest route matrix has no useful correlated Audio 8 capture and the HAL
+    safety evidence required external recovery.
+  - Keep optimizing transport before route validation: rejected because recent
+    physical attempts show route/capture failure dominates and transport
+    geometry changes have already degraded physical quality.
+- Readiness impact: this creates a disciplined RC funnel. The next allowed
+  lock-gated action is fresh HAL safety smoke before diagnostic install; the
+  next product action remains known-good route validation followed by
+  same-session mainline/C++ A/B, CPU, and Timecode Vinyl evidence.

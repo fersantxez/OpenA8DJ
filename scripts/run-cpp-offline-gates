@@ -261,6 +261,7 @@ fi
 ./build/cpp-release/opena8djcpp_hal_runtime_geometry_observability_contract | tee "$EVIDENCE_DIR/hal-runtime-geometry-observability-contract.json"
 ./build/cpp-release/opena8djcpp_physical_submit_comparison_contract | tee "$EVIDENCE_DIR/physical-submit-comparison-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_runtime_physical_window_contract | tee "$EVIDENCE_DIR/prepared-runtime-physical-window-contract.json"
+./build/cpp-release/opena8djcpp_human_test_rc_gate | tee "$EVIDENCE_DIR/human-test-rc-gate.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
 python3 - <<'PY'
 import json
@@ -403,6 +404,7 @@ stream_stats_contract = load_json("stream-stats-contract.json")
 prepared_runtime_physical_window_contract = load_json(
     "prepared-runtime-physical-window-contract.json"
 )
+human_test_rc_gate = load_json("human-test-rc-gate.json")
 bench = load_json("offline-bench-release.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
@@ -483,6 +485,12 @@ summary = {
         "route_revalidation_ready"
     ),
     "known_good_route_selector_next_action": known_good_route_selector.get("next_action"),
+    "human_test_rc_status": human_test_rc_gate.get("result"),
+    "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
+        "diagnostic_rc_artifacts_ready"
+    ),
+    "human_test_product_allowed": human_test_rc_gate.get("product_human_test_allowed"),
+    "human_test_next_required_action": human_test_rc_gate.get("next_required_action"),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -2611,6 +2619,42 @@ summary = {
         ),
         "blocked_claim": prepared_runtime_physical_window_contract.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/prepared-runtime-physical-window-contract.json",
+    },
+    "human_test_rc_gate": {
+        "status": human_test_rc_gate.get("result"),
+        "schema": human_test_rc_gate.get("schema"),
+        "bundle_ready": human_test_rc_gate.get("bundle_ready"),
+        "package_present": human_test_rc_gate.get("package_present"),
+        "lock_policy_ready": human_test_rc_gate.get("lock_policy_ready"),
+        "capture_visible": human_test_rc_gate.get("capture_visible"),
+        "diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
+            "diagnostic_rc_artifacts_ready"
+        ),
+        "diagnostic_install_smoke_allowed_after_lock": human_test_rc_gate.get(
+            "diagnostic_install_smoke_allowed_after_lock"
+        ),
+        "fresh_hal_safety_smoke_required": human_test_rc_gate.get(
+            "fresh_hal_safety_smoke_required"
+        ),
+        "route_revalidation_allowed_after_lock": human_test_rc_gate.get(
+            "route_revalidation_allowed_after_lock"
+        ),
+        "route_revalidation_ready": human_test_rc_gate.get("route_revalidation_ready"),
+        "product_human_test_allowed": human_test_rc_gate.get("product_human_test_allowed"),
+        "timecode_vinyl_human_test_allowed": human_test_rc_gate.get(
+            "timecode_vinyl_human_test_allowed"
+        ),
+        "cpu_superiority_claim_allowed": human_test_rc_gate.get(
+            "cpu_superiority_claim_allowed"
+        ),
+        "branch_promotion_allowed": human_test_rc_gate.get("branch_promotion_allowed"),
+        "no_more_transport_tuning_until_route_validated": human_test_rc_gate.get(
+            "no_more_transport_tuning_until_route_validated"
+        ),
+        "blockers": human_test_rc_gate.get("blockers"),
+        "next_lock_gated_actions": human_test_rc_gate.get("next_lock_gated_actions"),
+        "next_required_action": human_test_rc_gate.get("next_required_action"),
+        "evidence": "local-analysis/cpp-offline/human-test-rc-gate.json",
     },
     "release_benchmark": {
         "status": bench.get("result"),

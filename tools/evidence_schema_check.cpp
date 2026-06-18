@@ -148,6 +148,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-runtime-geometry-observability-contract.json",
       root / "local-analysis/cpp-offline/physical-submit-comparison-contract.json",
       root / "local-analysis/cpp-offline/prepared-runtime-physical-window-contract.json",
+      root / "local-analysis/cpp-offline/human-test-rc-gate.json",
       root / "local-analysis/cpp-offline/evidence-provenance-freshness-gate.json",
       root / "local-analysis/cpp-offline/static-policy.json",
       root / "local-analysis/cpp-offline/hardware-lock-policy.json",
@@ -276,6 +277,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary,
                                               "prepared_runtime_physical_window_contract")
           .value_or("");
+  const auto human_test_rc_gate =
+      opena8djcpp::evidence_json::json_object(summary, "human_test_rc_gate").value_or("");
   const auto promotion_window_contract =
       opena8djcpp::evidence_json::json_object(summary, "promotion_window_contract").value_or("");
   const auto product_quality_claim_gate =
@@ -300,6 +303,10 @@ int main(int argc, char** argv) {
       string_field_present(summary, "capture_next_recovery_action") &&
       bool_field_present(summary, "known_good_route_selector_ready") &&
       string_field_present(summary, "known_good_route_selector_next_action") &&
+      string_field_is(summary, "human_test_rc_status", "PASS") &&
+      bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
+      bool_field_is(summary, "human_test_product_allowed", false) &&
+      string_field_present(summary, "human_test_next_required_action") &&
       string_array_has(summary, "current_route_inventory_blockers",
                        "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
@@ -1016,6 +1023,25 @@ int main(int argc, char** argv) {
       string_field_is(
           prepared_runtime_physical_window_contract, "blocked_claim",
           "NO_PREPARED_RUNTIME_PHYSICAL_WINDOW_WITHOUT_OFFLINE_HASH_AND_DISPATCH_EVIDENCE") &&
+      object_present(summary, "human_test_rc_gate") &&
+      string_field_is(human_test_rc_gate, "status", "PASS") &&
+      string_field_is(human_test_rc_gate, "schema", "opena8djcpp.human-test-rc-gate.v1") &&
+      bool_field_is(human_test_rc_gate, "bundle_ready", true) &&
+      bool_field_present(human_test_rc_gate, "package_present") &&
+      bool_field_is(human_test_rc_gate, "lock_policy_ready", true) &&
+      bool_field_is(human_test_rc_gate, "capture_visible", true) &&
+      bool_field_present(human_test_rc_gate, "diagnostic_rc_artifacts_ready") &&
+      bool_field_present(human_test_rc_gate, "diagnostic_install_smoke_allowed_after_lock") &&
+      bool_field_present(human_test_rc_gate, "fresh_hal_safety_smoke_required") &&
+      bool_field_present(human_test_rc_gate, "route_revalidation_allowed_after_lock") &&
+      bool_field_present(human_test_rc_gate, "route_revalidation_ready") &&
+      bool_field_is(human_test_rc_gate, "product_human_test_allowed", false) &&
+      bool_field_is(human_test_rc_gate, "timecode_vinyl_human_test_allowed", false) &&
+      bool_field_is(human_test_rc_gate, "cpu_superiority_claim_allowed", false) &&
+      bool_field_is(human_test_rc_gate, "branch_promotion_allowed", false) &&
+      bool_field_is(human_test_rc_gate, "no_more_transport_tuning_until_route_validated",
+                    true) &&
+      string_field_present(human_test_rc_gate, "next_required_action") &&
       object_present(summary, "promotion_window_contract") &&
       string_field_is(promotion_window_contract, "status", "PASS") &&
       bool_field_is(promotion_window_contract, "same_window_known_good_route_required", true) &&
