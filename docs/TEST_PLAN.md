@@ -1627,3 +1627,35 @@ PASS/FAIL semantics:
   product or branch-promotion claim.
 - This is analyzer safety only; it never clears physical route, CPU/resource,
   Traktor/timecode, or audiophile quality gates.
+
+## Capture Readiness Contract
+
+Purpose:
+
+- expose the current capture and known-good route state as a required offline
+  gate;
+- keep iRig/CoreAudio visibility separate from promotion-valid route evidence;
+- fail closed for product and branch claims while only same-device diagnostic
+  evidence exists.
+
+Command shape:
+
+```sh
+cmake --build build/cpp-release --target opena8djcpp_capture_readiness_contract
+./build/cpp-release/opena8djcpp_capture_readiness_contract
+./scripts/run-cpp-offline-gates
+```
+
+Expected artifact:
+
+- `local-analysis/cpp-offline/capture-readiness-contract.json`.
+
+PASS/FAIL semantics:
+
+- PASS means the existing route inventory is internally coherent and the
+  current blocked state is explicit.
+- FAIL means the evidence bundle cannot be used even for safe route-planning
+  decisions.
+- PASS never authorizes playback, recording, driver install/load, CoreAudio
+  restart, USB reset, default-device changes, Timecode Vinyl claims, CPU
+  superiority claims, or branch promotion.

@@ -2998,3 +2998,8 @@ Current implication:
   explicit historical tone-floor booleans. Current archived C++ tone analysis
   still passes as an analyzer check but fails both minimum and preferred
   historical tone floors, so product quality claims remain blocked.
+- Capture-readiness hardening update: offline gates now require a dedicated
+  capture readiness contract. Current expected classification is iRig capture
+  visible, Audio 8 DJ USB visible, promotion route not ready, known-good
+  non-Audio8 output missing, and latest same-device iRig diagnostic failed with
+  no correlated loopback signal. This is a blocking state, not readiness.

@@ -2547,3 +2547,28 @@ Current implementation:
   Timecode Vinyl readiness.
 - Passing this guard only means the analyzer is less likely to overstate
   quality. It is not evidence that the current candidate beats mainline.
+
+## Capture Readiness Contract
+
+- `local-analysis/cpp-offline/capture-readiness-contract.json` must be present
+  and PASS in every offline evidence bundle.
+- PASS means the capture/route state is explicitly classified from existing
+  route inventory without touching audio, CoreAudio, USB, drivers, defaults, or
+  hardware. It does not mean product readiness.
+- Required current fields:
+  - `capture_status=VISIBLE`;
+  - `route_status=BLOCKED_KNOWN_GOOD_OUTPUT_MISSING`;
+  - `diagnostic_status=DIAGNOSTIC_NO_CORRELATED_LOOPBACK_SIGNAL`;
+  - `irig_usb_visible=true`;
+  - `irig_coreaudio_capture_visible=true`;
+  - `audio8_usb_visible=true`;
+  - `promotion_route_ready=false`;
+  - `known_good_output_missing=true`;
+  - `product_claim_allowed=false`;
+  - `branch_promotion_allowed=false`.
+- Required next action while blocked:
+  `PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_SAME_WINDOW_ROUTE_VALIDATION`.
+- Product quality, CPU/resource, Timecode Vinyl, and branch-promotion claims
+  remain forbidden until a lock-gated same-window route-validation bundle proves
+  a separate known-good output into iRig capture and then compares mainline C
+  against C++ on that same route.

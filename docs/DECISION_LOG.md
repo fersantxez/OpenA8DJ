@@ -8943,3 +8943,34 @@ Next implication:
 - Readiness impact: stricter claim safety only. This does not validate the
   route, prove CPU/resource superiority, clear Timecode Vinyl, or authorize
   branch promotion.
+
+## 2026-06-18 - Add Capture Readiness Contract To Offline Gates
+
+- Decision: add `opena8djcpp_capture_readiness_contract` and require its JSON
+  artifact from the main offline gate summary and evidence schema.
+- Reason: the current physical path has two separate truths that must stay
+  visible together: iRig capture is visible, but the route is not promotion
+  valid because there is no separate wired non-Audio8/non-built-in known-good
+  output and the latest same-device iRig diagnostic detected no correlated
+  loopback signal. A single machine-readable contract prevents offline PASS
+  from being misread as product, sound-quality, CPU, Timecode Vinyl, or branch
+  promotion readiness.
+- Alternatives rejected:
+  - Leave the state nested only inside `physical-route-inventory.json`:
+    rejected because critical route blockers were too easy to miss from the
+    top-level summary.
+  - Treat same-device iRig output/capture as known-good route proof: rejected
+    because it is diagnostic-only and explicitly invalid for promotion.
+- Evidence:
+  - Focused contract build and run emitted
+    `opena8djcpp.capture-readiness-contract.v1` with
+    `capture_status=VISIBLE`,
+    `route_status=BLOCKED_KNOWN_GOOD_OUTPUT_MISSING`,
+    `diagnostic_status=DIAGNOSTIC_NO_CORRELATED_LOOPBACK_SIGNAL`,
+    `promotion_route_ready=false`,
+    `known_good_output_missing=true`, and
+    `product_claim_allowed=false`.
+- Readiness impact: claim safety and routing clarity only. It authorizes no
+  playback, recording, driver install/load, CoreAudio restart, USB reset,
+  default-device change, physical A/B, Timecode Vinyl claim, CPU claim, or
+  branch promotion.

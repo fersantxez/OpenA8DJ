@@ -221,6 +221,7 @@ fi
 ./build/cpp-release/opena8djcpp_static_policy_check | tee "$EVIDENCE_DIR/static-policy.json"
 ./build/cpp-release/opena8djcpp_hardware_lock_policy_check | tee "$EVIDENCE_DIR/hardware-lock-policy.json"
 python3 scripts/physical-route-inventory --json-out "$EVIDENCE_DIR/physical-route-inventory.json" >/dev/null
+./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
 python3 -m py_compile \
   scripts/check-hal-bundle-complete \
@@ -352,6 +353,7 @@ historical_route_reference_gate = load_json("historical-route-reference-gate.jso
 hal_candidate_safety_gate = load_json("hal-candidate-safety-gate.json")
 physical_window_readiness_gate = load_json("physical-window-readiness-gate.json")
 physical_route_inventory = load_json("physical-route-inventory.json")
+capture_readiness_contract = load_json("capture-readiness-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
 product_quality_claim_gate = load_json("product-quality-claim-gate.json")
 hal_transport_runtime_gate = load_json("hal-transport-runtime-gate.json")
@@ -461,6 +463,10 @@ summary = {
     "current_route_latest_correlated_loopback_signal_detected": physical_route_inventory.get(
         "latest_known_good_route_diagnostic", {}
     ).get("correlated_loopback_signal_detected"),
+    "capture_readiness_status": capture_readiness_contract.get("capture_status"),
+    "capture_route_status": capture_readiness_contract.get("route_status"),
+    "capture_diagnostic_status": capture_readiness_contract.get("diagnostic_status"),
+    "capture_next_recovery_action": capture_readiness_contract.get("next_recovery_action"),
     "current_route_non_audio8_non_builtin_known_good_outputs": physical_route_inventory.get(
         "decision", {}
     ).get("non_audio8_non_builtin_known_good_outputs", []),
@@ -1295,6 +1301,55 @@ summary = {
             "driver_installed_or_activated"
         ),
         "evidence": "local-analysis/cpp-offline/physical-route-inventory.json",
+    },
+    "capture_readiness_contract": {
+        "status": capture_readiness_contract.get("result"),
+        "capture_status": capture_readiness_contract.get("capture_status"),
+        "route_status": capture_readiness_contract.get("route_status"),
+        "diagnostic_status": capture_readiness_contract.get("diagnostic_status"),
+        "inventory_clean": capture_readiness_contract.get("inventory_clean"),
+        "irig_usb_visible": capture_readiness_contract.get("irig_usb_visible"),
+        "irig_coreaudio_capture_visible": capture_readiness_contract.get(
+            "irig_coreaudio_capture_visible"
+        ),
+        "audio8_usb_visible": capture_readiness_contract.get("audio8_usb_visible"),
+        "audio8_coreaudio_visible": capture_readiness_contract.get(
+            "audio8_coreaudio_visible"
+        ),
+        "hardware_lock_available_for_current_window": capture_readiness_contract.get(
+            "hardware_lock_available_for_current_window"
+        ),
+        "promotion_route_ready": capture_readiness_contract.get("promotion_route_ready"),
+        "same_device_irig_diagnostic_possible": capture_readiness_contract.get(
+            "same_device_irig_diagnostic_possible"
+        ),
+        "known_good_output_missing": capture_readiness_contract.get(
+            "known_good_output_missing"
+        ),
+        "product_promotion_measurement_possible_now": capture_readiness_contract.get(
+            "product_promotion_measurement_possible_now"
+        ),
+        "latest_route_failure_classification": capture_readiness_contract.get(
+            "latest_route_failure_classification"
+        ),
+        "latest_route_correlated_loopback_signal_detected": capture_readiness_contract.get(
+            "latest_route_correlated_loopback_signal_detected"
+        ),
+        "ready_streak": capture_readiness_contract.get("ready_streak"),
+        "promotion_ready_streak": capture_readiness_contract.get(
+            "promotion_ready_streak"
+        ),
+        "failed_usb_ports_known": capture_readiness_contract.get(
+            "failed_usb_ports_known"
+        ),
+        "next_recovery_action": capture_readiness_contract.get("next_recovery_action"),
+        "readiness_blockers": capture_readiness_contract.get("readiness_blockers"),
+        "product_claim_allowed": capture_readiness_contract.get("product_claim_allowed"),
+        "branch_promotion_allowed": capture_readiness_contract.get(
+            "branch_promotion_allowed"
+        ),
+        "blocked_claim": capture_readiness_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/capture-readiness-contract.json",
     },
     "diagnostic_pass_semantics_gate": {
         "status": diagnostic_pass_semantics_gate.get("result"),

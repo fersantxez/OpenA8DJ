@@ -12991,3 +12991,37 @@ Full offline gate after commit:
   - This strengthens objective comparison only; it does not prove hardware
     readiness, CPU/resource superiority, Timecode Vinyl readiness, or branch
     promotion.
+
+## 2026-06-18 - Capture Readiness Contract
+
+- Commit context: before commit, after `7a97c27`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline C++ contract and existing route-inventory evidence only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_capture_readiness_contract`
+  - `./build/cpp-release/opena8djcpp_capture_readiness_contract`
+- Result:
+  - Focused contract: PASS.
+  - `capture_status=VISIBLE`.
+  - `route_status=BLOCKED_KNOWN_GOOD_OUTPUT_MISSING`.
+  - `diagnostic_status=DIAGNOSTIC_NO_CORRELATED_LOOPBACK_SIGNAL`.
+  - `irig_usb_visible=true`.
+  - `irig_coreaudio_capture_visible=true`.
+  - `audio8_usb_visible=true`.
+  - `audio8_coreaudio_visible=false`.
+  - `promotion_route_ready=false`.
+  - `known_good_output_missing=true`.
+  - `product_claim_allowed=false`.
+  - `branch_promotion_allowed=false`.
+- Interpretation:
+  - The iRig capture path is visible enough to plan the next window, but it is
+    not a promotion route.
+  - The next required physical action remains a lock-gated validation of a
+    separate wired non-Audio8/non-built-in known-good output into iRig capture.
+  - No sound-quality, CPU/resource, Timecode Vinyl, product-readiness, or
+    branch-promotion claim is allowed from this evidence.

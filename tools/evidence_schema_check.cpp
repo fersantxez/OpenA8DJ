@@ -22,6 +22,12 @@ bool string_field_is(std::string_view json, std::string_view key, std::string_vi
   return opena8djcpp::evidence_json::json_string(json, key).value_or("") == expected;
 }
 
+bool string_field_is_last(std::string_view json,
+                          std::string_view key,
+                          std::string_view expected) {
+  return opena8djcpp::evidence_json::json_string_last(json, key).value_or("") == expected;
+}
+
 bool bool_field_is(std::string_view json, std::string_view key, bool expected) {
   return opena8djcpp::evidence_json::json_bool(json, key).value_or(!expected) == expected;
 }
@@ -132,6 +138,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/hal-candidate-safety-gate.json",
       root / "local-analysis/cpp-offline/physical-window-readiness-gate.json",
       root / "local-analysis/cpp-offline/physical-route-inventory.json",
+      root / "local-analysis/cpp-offline/capture-readiness-contract.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
       root / "local-analysis/cpp-offline/product-quality-claim-gate.json",
@@ -246,6 +253,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "hal_candidate_safety_gate").value_or("");
   const auto physical_route_inventory =
       opena8djcpp::evidence_json::json_object(summary, "physical_route_inventory").value_or("");
+  const auto capture_readiness_contract =
+      opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
       opena8djcpp::evidence_json::json_object(summary, "transport_budget_model").value_or("");
   const auto hal_transport_runtime_gate =
@@ -270,7 +279,7 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "product_quality_claim_gate").value_or("");
   const bool summary_pass =
       string_field_is(summary, "status", "PASS") &&
-      string_field_is(summary, "diagnostic_status", "PASS") &&
+      string_field_is_last(summary, "diagnostic_status", "PASS") &&
       bool_field_is(summary, "branch_promotion_allowed", false) &&
       bool_field_is(summary, "route_revalidation_plan_ready", true) &&
       bool_field_present(summary, "current_promotion_route_ready") &&
@@ -282,6 +291,10 @@ int main(int argc, char** argv) {
       string_field_present(summary, "current_route_latest_diagnostic_classification") &&
       bool_field_present(summary,
                          "current_route_latest_correlated_loopback_signal_detected") &&
+      string_field_present(summary, "capture_readiness_status") &&
+      string_field_present(summary, "capture_route_status") &&
+      string_field_present(summary, "capture_diagnostic_status") &&
+      string_field_present(summary, "capture_next_recovery_action") &&
       string_array_has(summary, "current_route_inventory_blockers",
                        "non_audio8_non_builtin_known_good_output_not_visible") &&
       bool_field_is(summary, "physical_measurement_valid_for_promotion", false) &&
@@ -756,6 +769,39 @@ int main(int argc, char** argv) {
       bool_field_is(physical_route_inventory, "audio_played", false) &&
       bool_field_is(physical_route_inventory, "audio_recorded", false) &&
       bool_field_is(physical_route_inventory, "driver_installed_or_activated", false) &&
+      object_present(summary, "capture_readiness_contract") &&
+      string_field_is(capture_readiness_contract, "status", "PASS") &&
+      string_field_is(capture_readiness_contract, "capture_status", "VISIBLE") &&
+      string_field_present(capture_readiness_contract, "route_status") &&
+      string_field_present(capture_readiness_contract, "diagnostic_status") &&
+      bool_field_is(capture_readiness_contract, "inventory_clean", true) &&
+      bool_field_is(capture_readiness_contract, "irig_usb_visible", true) &&
+      bool_field_is(capture_readiness_contract, "irig_coreaudio_capture_visible", true) &&
+      bool_field_is(capture_readiness_contract, "audio8_usb_visible", true) &&
+      bool_field_present(capture_readiness_contract, "audio8_coreaudio_visible") &&
+      bool_field_is(capture_readiness_contract,
+                    "hardware_lock_available_for_current_window", true) &&
+      bool_field_present(capture_readiness_contract, "promotion_route_ready") &&
+      bool_field_present(capture_readiness_contract,
+                         "same_device_irig_diagnostic_possible") &&
+      bool_field_present(capture_readiness_contract, "known_good_output_missing") &&
+      bool_field_is(capture_readiness_contract,
+                    "product_promotion_measurement_possible_now", false) &&
+      string_field_present(capture_readiness_contract,
+                           "latest_route_failure_classification") &&
+      bool_field_present(capture_readiness_contract,
+                         "latest_route_correlated_loopback_signal_detected") &&
+      number_field_present(capture_readiness_contract, "ready_streak") &&
+      number_field_present(capture_readiness_contract, "promotion_ready_streak") &&
+      bool_field_is(capture_readiness_contract, "failed_usb_ports_known", false) &&
+      string_field_present(capture_readiness_contract, "next_recovery_action") &&
+      string_array_has(capture_readiness_contract, "readiness_blockers",
+                       "non_audio8_non_builtin_known_good_output_missing") &&
+      bool_field_is(capture_readiness_contract, "product_claim_allowed", false) &&
+      bool_field_is(capture_readiness_contract, "branch_promotion_allowed", false) &&
+      string_field_is(
+          capture_readiness_contract, "blocked_claim",
+          "NO_CAPTURE_ROUTE_OR_PRODUCT_CLAIM_UNTIL_IRIG_CAPTURE_AND_NON_AUDIO8_KNOWN_GOOD_ROUTE_ARE_VALIDATED_UNDER_LOCK") &&
       object_present(summary, "capture_route_health_gate") &&
       string_field_is(capture_route_health_gate, "status", "PASS") &&
       string_field_is(capture_route_health_gate, "diagnostic_result", "PASS") &&
