@@ -97,10 +97,41 @@ int main(int argc, char** argv) {
       !contains(device_cpp, "GetCurrentZeroTimestamp(");
   const bool driver_start_device_uses_default_config =
       contains(driver_cpp, "const opena8djcpp::driverkit::AudioStreamConfig config{};");
+  const bool source_binding_present =
+      contains(driver_cpp, "AudioDeviceRuntimeBinding") &&
+      contains(driver_cpp, "g_device_binding");
+  const bool driver_start_device_configures_binding =
+      contains(driver_cpp, "OpenA8DJAudioDriver::StartDevice") &&
+      contains(driver_cpp, "extension_bridge::ConfigureDevice()");
+  const bool driver_stop_device_bridged =
+      contains(driver_cpp, "OpenA8DJAudioDriver::StopDevice") &&
+      contains(driver_cpp, "extension_bridge::StopIO(flags)");
+  const bool device_start_io_bridged =
+      contains(device_cpp, "OpenA8DJAudioDevice::StartIO") &&
+      contains(device_cpp, "extension_bridge::StartIO(flags)");
+  const bool device_stop_io_bridged =
+      contains(device_cpp, "OpenA8DJAudioDevice::StopIO") &&
+      contains(device_cpp, "extension_bridge::StopIO(flags)");
+  const bool configuration_change_bridged =
+      contains(device_cpp, "extension_bridge::PerformDeviceConfigurationChange(action") &&
+      contains(driver_cpp, "g_device_binding.request_configuration_change");
+  const bool configuration_abort_bridged =
+      contains(device_cpp, "extension_bridge::AbortDeviceConfigurationChange(action") &&
+      contains(driver_cpp, "g_device_binding.abort_configuration_change()");
+  const bool source_stream_memory_model_present =
+      contains(driver_cpp, "stream_memory_bound()") &&
+      contains(driver_cpp, "g_device_binding.configure_device");
+  const bool source_zero_timestamp_model_present =
+      contains(driver_cpp, "g_next_placeholder_sample_time") &&
+      contains(driver_cpp, "g_next_placeholder_host_time") &&
+      contains(driver_cpp, "g_device_binding.start_io(sample_time, host_time)");
+  const bool placeholder_zero_timestamp_model =
+      contains(driver_cpp, "g_next_placeholder_host_time += 1");
   const bool driver_has_skeleton_start_stop =
       contains(driver_cpp, "g_driver.start_driver()") &&
-      contains(driver_cpp, "g_driver.stop_driver()") && contains(driver_cpp, "g_driver.start_stream()") &&
-      contains(driver_cpp, "g_driver.stop_stream()");
+      contains(driver_cpp, "g_device_binding.shutdown_driver()") &&
+      contains(driver_cpp, "g_device_binding.start_io") &&
+      contains(driver_cpp, "g_device_binding.stop_io()");
   const bool skeleton_has_prepared_transport =
       contains(skeleton_hpp, "PreparedTransportBackend transport_{};") &&
       contains(prepared_transport_hpp, "class PreparedTransportBackend") &&
@@ -116,46 +147,57 @@ int main(int argc, char** argv) {
   if (!device_source_present || !driver_source_present || !skeleton_source_present || !iig_present) {
     blockers.push_back("driverkit_extension_sources_missing");
   }
-  if (device_start_io_passthrough) {
-    blockers.push_back("device_start_io_passthrough");
+  if (!source_binding_present) {
+    blockers.push_back("audio_device_runtime_binding_missing");
   }
-  if (device_stop_io_passthrough) {
-    blockers.push_back("device_stop_io_passthrough");
+  if (device_start_io_passthrough || !device_start_io_bridged) {
+    blockers.push_back("device_start_io_not_bound_to_runtime");
   }
-  if (device_configuration_change_unsupported) {
-    blockers.push_back("device_configuration_change_unsupported");
+  if (device_stop_io_passthrough || !device_stop_io_bridged) {
+    blockers.push_back("device_stop_io_not_bound_to_runtime");
   }
-  if (device_abort_configuration_change_stub) {
-    blockers.push_back("device_abort_configuration_change_stub");
+  if (device_configuration_change_unsupported || !configuration_change_bridged) {
+    blockers.push_back("device_configuration_change_not_bound_to_runtime");
   }
-  if (stream_memory_binding_missing) {
-    blockers.push_back("stream_memory_binding_missing");
+  if (device_abort_configuration_change_stub || !configuration_abort_bridged) {
+    blockers.push_back("device_abort_configuration_change_not_bound_to_runtime");
   }
-  if (zero_timestamp_binding_missing) {
-    blockers.push_back("zero_timestamp_binding_missing");
+  if (stream_memory_binding_missing && !source_stream_memory_model_present) {
+    blockers.push_back("stream_memory_model_missing");
   }
-  if (driver_start_device_uses_default_config) {
-    blockers.push_back("driver_start_device_uses_default_config");
+  if (zero_timestamp_binding_missing && !source_zero_timestamp_model_present) {
+    blockers.push_back("zero_timestamp_source_model_missing");
+  }
+  if (driver_start_device_uses_default_config || !driver_start_device_configures_binding) {
+    blockers.push_back("driver_start_device_not_bound_to_runtime");
+  }
+  if (!driver_stop_device_bridged) {
+    blockers.push_back("driver_stop_device_not_bound_to_runtime");
   }
 
   const bool prepared_backend_available =
       skeleton_has_prepared_transport && skeleton_has_usb_submit_planner &&
       skeleton_has_usb_request_pool;
-  const bool runtime_binding_blocked =
-      device_start_io_passthrough && device_stop_io_passthrough &&
-      device_configuration_change_unsupported && device_abort_configuration_change_stub &&
-      stream_memory_binding_missing && zero_timestamp_binding_missing &&
-      driver_start_device_uses_default_config;
+  const bool source_binding_complete =
+      source_binding_present && driver_start_device_configures_binding &&
+      driver_stop_device_bridged && device_start_io_bridged && device_stop_io_bridged &&
+      configuration_change_bridged && configuration_abort_bridged &&
+      source_stream_memory_model_present && source_zero_timestamp_model_present &&
+      !device_start_io_passthrough && !device_stop_io_passthrough &&
+      !device_configuration_change_unsupported && !device_abort_configuration_change_stub &&
+      !driver_start_device_uses_default_config;
+  const bool runtime_binding_blocked = false;
+  const bool real_driverkit_sdk_runtime_blocked = true;
   const bool pass = device_source_present && driver_source_present && skeleton_source_present &&
                     iig_present && device_declares_runtime_hooks &&
                     driver_has_skeleton_start_stop && prepared_backend_available &&
-                    runtime_binding_blocked;
+                    source_binding_complete && real_driverkit_sdk_runtime_blocked;
 
   std::cout
       << "{\n"
-      << "  \"schema\": \"opena8djcpp.driverkit-runtime-binding-gap-gate.v1\",\n"
+      << "  \"schema\": \"opena8djcpp.driverkit-runtime-binding-gap-gate.v2\",\n"
       << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-      << "  \"meaning\": \"offline source gate; PASS means DriverKit runtime binding stubs are explicitly detected and block dext readiness\",\n"
+      << "  \"meaning\": \"offline source gate; PASS means DriverKit extension hooks are bound to the C++ runtime model while real dext readiness remains blocked\",\n"
       << "  \"safety\": \"offline_source_contract_only_no_driverkit_install_or_hardware_touch\",\n";
   print_bool("device_source_present", device_source_present);
   print_bool("driver_source_present", driver_source_present);
@@ -169,17 +211,29 @@ int main(int argc, char** argv) {
   print_bool("stream_memory_binding_missing", stream_memory_binding_missing);
   print_bool("zero_timestamp_binding_missing", zero_timestamp_binding_missing);
   print_bool("driver_start_device_uses_default_config", driver_start_device_uses_default_config);
+  print_bool("source_binding_present", source_binding_present);
+  print_bool("driver_start_device_configures_binding", driver_start_device_configures_binding);
+  print_bool("driver_stop_device_bridged", driver_stop_device_bridged);
+  print_bool("device_start_io_bridged", device_start_io_bridged);
+  print_bool("device_stop_io_bridged", device_stop_io_bridged);
+  print_bool("configuration_change_bridged", configuration_change_bridged);
+  print_bool("configuration_abort_bridged", configuration_abort_bridged);
+  print_bool("source_stream_memory_model_present", source_stream_memory_model_present);
+  print_bool("source_zero_timestamp_model_present", source_zero_timestamp_model_present);
+  print_bool("placeholder_zero_timestamp_model", placeholder_zero_timestamp_model);
   print_bool("driver_has_skeleton_start_stop", driver_has_skeleton_start_stop);
   print_bool("skeleton_has_prepared_transport", skeleton_has_prepared_transport);
   print_bool("skeleton_has_usb_submit_planner", skeleton_has_usb_submit_planner);
   print_bool("skeleton_has_usb_request_pool", skeleton_has_usb_request_pool);
   print_bool("prepared_backend_available", prepared_backend_available);
+  print_bool("source_binding_complete", source_binding_complete);
   print_bool("runtime_binding_blocked", runtime_binding_blocked);
+  print_bool("real_driverkit_sdk_runtime_blocked", real_driverkit_sdk_runtime_blocked);
   print_bool("product_driverkit_runtime_ready", false);
   print_blockers(blockers);
   std::cout
-      << "  \"next_required_action\": \"IMPLEMENT_DRIVERKIT_DEVICE_BINDING_TO_AUDIO_DRIVER_SKELETON_AND_USB_REQUEST_ADAPTER\",\n"
-      << "  \"blocked_claim\": \"NO_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_WHILE_IOUSERAUDIODEVICE_PATHS_ARE_STUBS\"\n"
+      << "  \"next_required_action\": \"BUILD_EXTENSION_WITH_REAL_DRIVERKIT_SDK_AND_REPLACE_PLACEHOLDER_TIMESTAMP_WITH_ADK_CLOCK_BINDING\",\n"
+      << "  \"blocked_claim\": \"NO_REAL_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_UNTIL_SOURCE_BINDING_BUILDS_WITH_DRIVERKIT_SDK_AND_PHYSICAL_VALIDATION\"\n"
       << "}\n";
 
   return pass ? 0 : 1;

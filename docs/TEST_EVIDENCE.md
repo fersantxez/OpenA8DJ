@@ -10715,3 +10715,60 @@ Full offline gate rerun:
   - The device-facing lifecycle policy is now executable offline.
   - The real extension source still needs to call the binding and build with a
     real DriverKit SDK before any dext runtime or physical readiness claim.
+
+## 2026-06-18 DriverKit Extension Source Binding
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Bound the DriverKit extension source to `AudioDeviceRuntimeBinding` through
+    a source-only `extension_bridge`.
+  - `OpenA8DJAudioDevice::StartIO`, `StopIO`,
+    `PerformDeviceConfigurationChange`, and
+    `AbortDeviceConfigurationChange` no longer pass through or return stubs.
+  - `OpenA8DJAudioDriver::StartDevice`, `StopDevice`, and `Stop` now route
+    through the binding path.
+  - Upgraded the runtime-binding source gate to schema v2 and updated the
+    scaffold/evidence schema contracts.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this offline step.
+- Commands:
+  - `git diff --check`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `cmake -S . -B build/cpp-release -DCMAKE_BUILD_TYPE=Release`
+  - `cmake --build build/cpp-release --target opena8djcpp_driverkit_runtime_binding_gap_gate opena8djcpp_driverkit_extension_scaffold_contract opena8djcpp_evidence_schema_check opena8djcpp_static_policy_check`
+  - `./build/cpp-release/opena8djcpp_driverkit_runtime_binding_gap_gate`
+  - `./build/cpp-release/opena8djcpp_driverkit_extension_scaffold_contract`
+  - `./build/cpp-release/opena8djcpp_static_policy_check`
+  - `ctest --test-dir build/cpp-release -R 'opena8djcpp_driverkit_(extension_scaffold_contract|runtime_binding_gap_gate|device_binding_contract|runtime_contract)' --output-on-failure`
+  - `./scripts/run-cpp-offline-gates`
+- Focused result before full gates:
+  - `opena8djcpp_driverkit_runtime_binding_gap_gate`: PASS.
+  - `schema=opena8djcpp.driverkit-runtime-binding-gap-gate.v2`.
+  - `device_start_io_passthrough=false`.
+  - `device_stop_io_passthrough=false`.
+  - `device_configuration_change_unsupported=false`.
+  - `source_binding_present=true`.
+  - `source_binding_complete=true`.
+  - `placeholder_zero_timestamp_model=true`.
+  - `real_driverkit_sdk_runtime_blocked=true`.
+  - `product_driverkit_runtime_ready=false`.
+  - Focused DriverKit CTest subset: `4/4` PASS.
+  - Static policy: PASS, `forbidden_hits=0`.
+- Full dirty offline result:
+  - Debug CTest `61/61` PASS.
+  - Release CTest `62/62` PASS.
+  - Evidence schema PASS with `required_files=64`, `missing_files=0`.
+  - `current-offline-gates.json`: `status=PASS`,
+    `diagnostic_status=PASS`, `branch_promotion_allowed=false`, and
+    `physical_measurement_valid_for_promotion=false`.
+  - Provenance freshness correctly reported FAIL with
+    `working_tree_clean_for_claim=false` because this was pre-commit dirty
+    evidence.
+- Interpretation:
+  - The DriverKit source is no longer just a stub scaffold.
+  - This is still not a runnable or installable DriverKit driver. Real readiness
+    remains blocked until a DriverKit SDK build replaces placeholder timing with
+    real AudioDriverKit timestamps and lock-gated physical validation passes.

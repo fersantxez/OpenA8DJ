@@ -2578,3 +2578,16 @@ Current implication:
     configuration changes, and stop IO before shutdown. This is not dext
     readiness; the extension source still needs to call the binding and build
     with DriverKit SDK.
+  - The DriverKit extension source now calls that pure C++ binding through a
+    source-only `extension_bridge`. `StartDevice`, `StopDevice`,
+    `OpenA8DJAudioDevice::StartIO`, `StopIO`,
+    `PerformDeviceConfigurationChange`, and
+    `AbortDeviceConfigurationChange` no longer pass through or return stubs.
+    `opena8djcpp_driverkit_runtime_binding_gap_gate` is now schema v2 and
+    requires `source_binding_complete=true` while still requiring
+    `product_driverkit_runtime_ready=false`.
+  - The remaining DriverKit blocker is real runtime integration, not source
+    wiring alone: stream memory and zero timestamp calls still need to be
+    compiled against the DriverKit SDK, the placeholder timestamp model must be
+    replaced by the AudioDriverKit timing binding, and physical validation
+    remains lock-gated.

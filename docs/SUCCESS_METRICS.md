@@ -2260,11 +2260,12 @@ Prepared transport migration metric:
   music soundcheck, route health, CPU, routing, or Traktor/timecode gates.
 - `local-analysis/cpp-offline/driverkit-runtime-binding-gap-gate.json` must be
   present. Current expected state is diagnostic PASS with
-  `runtime_binding_blocked=true` and `product_driverkit_runtime_ready=false`.
-  Physical or DriverKit runtime readiness cannot be claimed until this gate is
-  replaced by real binding evidence for `IOUserAudioDevice::StartIO`,
-  `StopIO`, stream memory descriptors, monotonic zero timestamps,
-  configuration-change sequencing, and the USB request adapter.
+  `source_binding_complete=true`, `real_driverkit_sdk_runtime_blocked=true`,
+  and `product_driverkit_runtime_ready=false`. Physical or DriverKit runtime
+  readiness cannot be claimed until the source-level binding is compiled with a
+  real DriverKit SDK, stream memory and zero timestamps are wired to real
+  AudioDriverKit calls, placeholder timing is removed, and lock-gated physical
+  validation passes.
 - `local-analysis/cpp-offline/driverkit-device-binding-contract.json` must be
   present. Minimum expectations: zero lifecycle/memory/timestamp/config/shutdown
   failures, five initial IO memory descriptors, 4096 bytes for the 64-frame
@@ -2273,3 +2274,20 @@ Prepared transport migration metric:
   configuration change accepted, one running configuration change rejected, and
   `product_driverkit_runtime_ready=false` until the binding is compiled into a
   real dext and physically validated.
+
+## Next Audiophile Analysis Gates
+
+The next offline quality-analysis package should add formal PASS/FAIL gates for:
+
+- LTI residual by band: PASS requires stable mid/high coherence and post-LTI
+  residual ratios low enough to separate capture-route EQ from nonlinear
+  distortion.
+- Fractional time-warp/wow/flutter: PASS requires bounded delay p95/range and
+  drift so analysis does not hide real timing instability.
+- Runtime pressure by event: PASS requires low predicted CPU p95, bounded queue
+  fill pressure, and weak residual/telemetry correlation.
+- Statistical baseline comparison: PASS requires same-window repeated runs and
+  confidence intervals proving quality and CPU superiority against mainline,
+  not just point estimates.
+- DVS/timecode stress margin: PASS requires no false accepts, no deck swaps,
+  strong correlation, low frequency error, low jitter, and no channel leakage.

@@ -7067,3 +7067,46 @@ Next implication:
 - Replace the extension `StartIO`/`StopIO`/configuration stubs with calls into
   this binding, then build on a DriverKit SDK host and keep hardware validation
   lock-gated.
+
+## 2026-06-18: Bind DriverKit Extension Source to Runtime Model
+
+Decision:
+- Replaced the source-level `IOUserAudioDevice` pass-through/stub hooks with
+  calls into a small `extension_bridge` backed by `AudioDeviceRuntimeBinding`.
+- Upgraded `opena8djcpp_driverkit_runtime_binding_gap_gate` to schema v2 so it
+  requires source binding completeness instead of requiring stubs to exist.
+
+Reason:
+- The previous gate was useful while the scaffold was a documented blocker, but
+  it had become the next implementation obstacle: PASS meant "the stubs are
+  truthfully detected." The safer next state is PASS meaning "the extension
+  source is wired to the tested C++ binding while real dext readiness remains
+  blocked."
+
+Evidence:
+- Focused DriverKit CTest subset PASS:
+  - `opena8djcpp_driverkit_runtime_contract`;
+  - `opena8djcpp_driverkit_extension_scaffold_contract`;
+  - `opena8djcpp_driverkit_runtime_binding_gap_gate`;
+  - `opena8djcpp_driverkit_device_binding_contract`.
+- The runtime-binding gate now requires:
+  - `device_start_io_passthrough=false`;
+  - `device_stop_io_passthrough=false`;
+  - `device_configuration_change_unsupported=false`;
+  - `source_binding_present=true`;
+  - `source_binding_complete=true`;
+  - `real_driverkit_sdk_runtime_blocked=true`;
+  - `product_driverkit_runtime_ready=false`.
+
+Alternatives discarded:
+- Claim DriverKit runtime readiness after source wiring: rejected because the
+  extension still has not been built with the DriverKit SDK, stream-memory
+  publication is only modeled by source contracts, and timestamp handling still
+  uses a placeholder monotonic model.
+- Install or activate a dext now: rejected because the work remains offline and
+  there is no signed DriverKit artifact with lock-gated validation evidence.
+
+Next implication:
+- Build the extension on a full Xcode/DriverKit SDK host, replace placeholder
+  timestamps with the real AudioDriverKit timing source, then validate physical
+  quality/performance only under the hardware lock.

@@ -218,22 +218,38 @@ int main(int argc, char** argv) {
           driverkit_sdk_preflight_gate, "blocked_claim",
           "NO_REAL_DRIVERKIT_DEXT_BUILD_OR_READINESS_CLAIM_WITHOUT_DRIVERKIT_SDK_AND_SELECTED_FULL_XCODE") &&
       object_present(summary, "driverkit_runtime_binding_gap_gate") &&
-      bool_field_is(driverkit_runtime_binding_gap_gate, "device_start_io_passthrough", true) &&
-      bool_field_is(driverkit_runtime_binding_gap_gate, "device_stop_io_passthrough", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_start_io_passthrough", false) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_stop_io_passthrough", false) &&
       bool_field_is(driverkit_runtime_binding_gap_gate,
-                    "device_configuration_change_unsupported", true) &&
+                    "device_configuration_change_unsupported", false) &&
       bool_field_is(driverkit_runtime_binding_gap_gate,
-                    "device_abort_configuration_change_stub", true) &&
+                    "device_abort_configuration_change_stub", false) &&
       bool_field_is(driverkit_runtime_binding_gap_gate, "stream_memory_binding_missing", true) &&
       bool_field_is(driverkit_runtime_binding_gap_gate, "zero_timestamp_binding_missing", true) &&
       bool_field_is(driverkit_runtime_binding_gap_gate,
-                    "driver_start_device_uses_default_config", true) &&
+                    "driver_start_device_uses_default_config", false) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "source_binding_present", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "driver_start_device_configures_binding", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "driver_stop_device_bridged", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_start_io_bridged", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "device_stop_io_bridged", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "configuration_change_bridged", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "configuration_abort_bridged", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "source_stream_memory_model_present", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "source_zero_timestamp_model_present", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "placeholder_zero_timestamp_model", true) &&
       bool_field_is(driverkit_runtime_binding_gap_gate, "prepared_backend_available", true) &&
-      bool_field_is(driverkit_runtime_binding_gap_gate, "runtime_binding_blocked", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "source_binding_complete", true) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate, "runtime_binding_blocked", false) &&
+      bool_field_is(driverkit_runtime_binding_gap_gate,
+                    "real_driverkit_sdk_runtime_blocked", true) &&
       bool_field_is(driverkit_runtime_binding_gap_gate, "product_driverkit_runtime_ready", false) &&
       string_field_is(
           driverkit_runtime_binding_gap_gate, "blocked_claim",
-          "NO_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_WHILE_IOUSERAUDIODEVICE_PATHS_ARE_STUBS") &&
+          "NO_REAL_DRIVERKIT_RUNTIME_OR_HARDWARE_READINESS_UNTIL_SOURCE_BINDING_BUILDS_WITH_DRIVERKIT_SDK_AND_PHYSICAL_VALIDATION") &&
       object_present(summary, "driverkit_device_binding_contract") &&
       number_field_is(driverkit_device_binding_contract, "lifecycle_failures", 0.0) &&
       number_field_is(driverkit_device_binding_contract, "memory_failures", 0.0) &&

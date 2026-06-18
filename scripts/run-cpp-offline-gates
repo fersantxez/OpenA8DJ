@@ -900,11 +900,47 @@ summary = {
         "driver_start_device_uses_default_config": driverkit_runtime_binding_gap.get(
             "driver_start_device_uses_default_config"
         ),
+        "source_binding_present": driverkit_runtime_binding_gap.get(
+            "source_binding_present"
+        ),
+        "driver_start_device_configures_binding": driverkit_runtime_binding_gap.get(
+            "driver_start_device_configures_binding"
+        ),
+        "driver_stop_device_bridged": driverkit_runtime_binding_gap.get(
+            "driver_stop_device_bridged"
+        ),
+        "device_start_io_bridged": driverkit_runtime_binding_gap.get(
+            "device_start_io_bridged"
+        ),
+        "device_stop_io_bridged": driverkit_runtime_binding_gap.get(
+            "device_stop_io_bridged"
+        ),
+        "configuration_change_bridged": driverkit_runtime_binding_gap.get(
+            "configuration_change_bridged"
+        ),
+        "configuration_abort_bridged": driverkit_runtime_binding_gap.get(
+            "configuration_abort_bridged"
+        ),
+        "source_stream_memory_model_present": driverkit_runtime_binding_gap.get(
+            "source_stream_memory_model_present"
+        ),
+        "source_zero_timestamp_model_present": driverkit_runtime_binding_gap.get(
+            "source_zero_timestamp_model_present"
+        ),
+        "placeholder_zero_timestamp_model": driverkit_runtime_binding_gap.get(
+            "placeholder_zero_timestamp_model"
+        ),
         "prepared_backend_available": driverkit_runtime_binding_gap.get(
             "prepared_backend_available"
         ),
+        "source_binding_complete": driverkit_runtime_binding_gap.get(
+            "source_binding_complete"
+        ),
         "runtime_binding_blocked": driverkit_runtime_binding_gap.get(
             "runtime_binding_blocked"
+        ),
+        "real_driverkit_sdk_runtime_blocked": driverkit_runtime_binding_gap.get(
+            "real_driverkit_sdk_runtime_blocked"
         ),
         "product_driverkit_runtime_ready": driverkit_runtime_binding_gap.get(
             "product_driverkit_runtime_ready"

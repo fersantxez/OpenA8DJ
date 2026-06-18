@@ -174,28 +174,30 @@ Interpretation:
   configuration contracts, but it does not solve the current physical
   quality/USB enqueue bottleneck by itself.
 
-## Runtime Binding Gap Gate
+## Runtime Binding Source Gate
 
-Added on 2026-06-18:
+Added on 2026-06-18, upgraded later the same day:
 
 - `opena8djcpp_driverkit_runtime_binding_gap_gate` reads the DriverKit extension
   source and the prepared C++ backend source.
-- It requires the prepared backend to be present while explicitly detecting that
-  the extension-facing runtime hooks remain stubs:
-  - `StartIO` passes through to `IOUserAudioDevice::StartIO`;
-  - `StopIO` passes through to `IOUserAudioDevice::StopIO`;
-  - `PerformDeviceConfigurationChange` returns `kIOReturnUnsupported`;
-  - `AbortDeviceConfigurationChange` returns success without real recovery;
-  - stream memory and zero timestamp bindings are absent;
-  - `StartDevice` still uses default `AudioStreamConfig{}`.
+- Schema v1 required the prepared backend to be present while truthfully
+  detecting that extension-facing runtime hooks remained stubs.
+- Schema v2 requires the source-level bridge to be present:
+  - `StartDevice` configures `AudioDeviceRuntimeBinding`;
+  - `StopDevice` routes through the binding stop-IO path;
+  - `OpenA8DJAudioDevice::StartIO` and `StopIO` forward into the bridge;
+  - configuration-change and abort paths forward into the binding;
+  - source-level stream-memory and zero-timestamp models are present;
+  - pass-through/stub hooks are absent.
 
 Interpretation:
 
-- PASS means the blocker is correctly exposed in offline evidence.
+- PASS means the source-level binding is wired to executable C++ policy.
 - PASS does not mean the DriverKit extension is runnable, signed, installed, or
   ready for hardware.
-- The next implementation step is to bind `IOUserAudioDevice` to the skeleton's
-  stream memory, timestamps, configuration policy, and USB request adapter.
+- The gate still requires `real_driverkit_sdk_runtime_blocked=true` and
+  `product_driverkit_runtime_ready=false` because the extension is not compiled
+  with the DriverKit SDK and still uses a placeholder monotonic timestamp model.
 
 ## Audio Device Runtime Binding Model
 
@@ -222,3 +224,28 @@ Interpretation:
 - PASS does not replace the runtime binding gap gate. The extension source still
   needs to call this binding and then be built with a real DriverKit SDK before
   any runnable dext claim.
+
+## Extension Source Binding
+
+Added on 2026-06-18:
+
+- `OpenA8DJAudioDriver.cpp` now owns a source-only bridge from the DriverKit
+  entry points into `AudioDeviceRuntimeBinding`.
+- `OpenA8DJAudioDevice.cpp` now forwards:
+  - `StartIO`;
+  - `StopIO`;
+  - `PerformDeviceConfigurationChange`;
+  - `AbortDeviceConfigurationChange`.
+- `StartDevice` configures the runtime binding instead of creating a default
+  stream config and starting the skeleton stream directly.
+- `StopDevice` routes through the binding's stop-IO path.
+- `Stop` routes through binding shutdown so stream stop precedes driver stop.
+
+Interpretation:
+
+- The extension source is no longer a pure stub/pass-through for the device IO
+  lifecycle.
+- This is still not a runnable DriverKit claim. The default CMake build still
+  excludes the extension source, no System Extension is installed or activated,
+  and the source-level zero timestamp path intentionally remains a placeholder
+  until the real AudioDriverKit timing API is wired under a DriverKit SDK build.

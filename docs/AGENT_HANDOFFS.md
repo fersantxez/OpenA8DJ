@@ -3651,3 +3651,37 @@ Risk:
     `OpenA8DJAudioDevice` remains pass-through/stub, then add a fake
     USBDriverKit async request interface with late-callback/cancel/restart race
     coverage before any prepared transport hardware window.
+
+## 2026-06-18 Subagent: Banach Offline Analysis Precision
+
+- Agent:
+  - Banach (`019ed889-50ec-71b0-aafc-0fc936e5ac36`)
+- Mission:
+  - Inspect the C++ worktree and recommend the next minimal offline analysis
+    package that improves objective audiophile-quality and performance
+    precision without hardware.
+- Safety warning supplied:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings:
+  - The current offline gates are broad, but they do not yet separate linear
+    route coloration, nonlinear distortion, timing instability, statistical
+    confidence, and cost per runtime event with enough precision for a
+    superiority claim.
+  - No new dependency is needed for the first analysis package because the
+    current Python stack already has `numpy` and `scipy`.
+  - Useful optional installs later: `soundfile`/`libsndfile` for problematic
+    24-bit/float/BWF WAV IO, and `soxr` only for mixed-sample-rate comparisons.
+- Recommended next metrics:
+  - LTI residual by band with coherence and post-correction residual thresholds.
+  - Fractional time-warp/wow/flutter bounds.
+  - Runtime pressure by event and residual/telemetry correlation.
+  - Same-window bootstrap confidence intervals against mainline and known-good.
+  - DVS/timecode stress margin with crosstalk, imbalance, drift, and dropout
+    cases.
+- Integrated action:
+  - Recorded the metric package in `docs/SUCCESS_METRICS.md` as the next
+    analysis-gate direction.
