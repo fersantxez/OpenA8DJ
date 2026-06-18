@@ -936,11 +936,18 @@ summary = {
         "selected_run": hot_path_timing.get("selected_run"),
         "capture_transfers_per_second": hot_path_timing.get("capture_transfers_per_second"),
         "playback_transfers_per_second": hot_path_timing.get("playback_transfers_per_second"),
+        "capture_zero_complete_per_capture_transfer": hot_path_timing.get(
+            "capture_zero_complete_per_capture_transfer"
+        ),
+        "capture_transaction_errors_per_capture_transfer": hot_path_timing.get(
+            "capture_transaction_errors_per_capture_transfer"
+        ),
         "dominant_subsegment": hot_path_timing.get("dominant_subsegment"),
         "attribution": hot_path_timing.get("attribution"),
         "fixed_queue_to_playback_fill_ratio": hot_path_timing.get("fixed_queue_to_playback_fill_ratio"),
         "nested_sum_to_capture_handler_ratio": hot_path_timing.get("nested_sum_to_capture_handler_ratio"),
         "nested_timing_policy": hot_path_timing.get("nested_timing_policy"),
+        "readiness_claim": hot_path_timing.get("readiness_claim"),
         "evidence": "local-analysis/cpp-offline/hot-path-timing-analysis.json",
     },
     "quality_root_cause_analysis": {

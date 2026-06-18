@@ -3500,3 +3500,22 @@ Current implication:
   clean direct USB payload evidence. The next stable action is offline gate
   regeneration and, only if we choose a new physical window, a lock-gated
   diagnostic run that measures hot-path timing before any product claim.
+- 17:10-17:20 EDT hot-path diagnostic physical window: ran
+  `build/OpenA8DJ-hotpath-diagnostic.driver` under the hardware lock in
+  candidate-only source-reference mode at
+  `local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only`.
+  The window was diagnostic and failed product quality, then cleanup left no
+  active `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver`; final guard health
+  passed and the hardware lock was released. The useful result is CPU
+  attribution: capture decode is negligible (`5.878` average ticks), while
+  fixed queue/requeue/enqueue work dominates (`capture_requeue=2032.635`,
+  `capture_enqueue=1932.841`, `playback_queue=1705.731`,
+  `playback_enqueue=1268.106`). The offline hot-path gate now consumes this
+  evidence and reports
+  `fixed_queue_to_playback_fill_ratio=18.463729`,
+  `capture_zero_complete_per_capture_transfer=3.635914`, and
+  `capture_transaction_errors_per_capture_transfer=3.635914`. This points the
+  next CPU work at true IOUSBHost enqueue/requeue/request lifecycle reduction
+  or DriverKit USB runtime, not sample packing/decode. Product readiness,
+  human product test, Timecode Vinyl physical certification, CPU superiority,
+  and branch promotion remain blocked.

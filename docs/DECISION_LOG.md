@@ -10186,3 +10186,36 @@ Next implication:
 - Readiness impact: this improves the next diagnostic window, not product
   readiness. Quality, CPU superiority, Timecode Vinyl physical validation, and
   branch promotion remain blocked.
+
+## 2026-06-18 - Use Hot-Path Physical Evidence As A Stable Gate, Not A Claim
+
+- Decision: integrate the lock-gated hot-path diagnostic window into the
+  offline evidence schema and keep it explicitly diagnostic-only.
+- Reason: the stable load needs an objective CPU direction before more tuning.
+  The new evidence shows that sample decode is not the meaningful cost center;
+  fixed capture/playback queue, requeue, and enqueue work dominates the measured
+  hot path.
+- Evidence:
+  - Evidence path:
+    `local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only`.
+  - Selected stream stats:
+    `cpp-soundcheck/stream-stats-summary.json`.
+  - `capture_decode=5.878472` average ticks.
+  - `capture_requeue=2032.634774`, `capture_enqueue=1932.840831`,
+    `playback_queue=1705.731010`, `playback_enqueue=1268.105923`.
+  - `fixed_queue_to_playback_fill_ratio=18.463729`.
+  - `capture_zero_complete_per_capture_transfer=3.635914`.
+  - `capture_transaction_errors_per_capture_transfer=3.635914`.
+  - Analyzer readiness claim:
+    `DIAGNOSTIC_ONLY_NOT_PRODUCT_READINESS`.
+- Alternatives rejected:
+  - Optimize pack/decode first: rejected because decode is tiny relative to
+    queue/requeue/enqueue timing.
+  - Treat the hot-path diagnostic as a stable product load: rejected because the
+    same window failed absolute quality gates and the build exists to measure,
+    not to ship.
+  - Promote on lower submit cadence alone: rejected because CPU superiority and
+    quality superiority still require same-session physical A/B proof.
+- Readiness impact: next CPU work should target true IOUSBHost enqueue/requeue
+  cost, request lifecycle, or a DriverKit/USB prepared runtime. No product,
+  human, Timecode Vinyl, CPU superiority, or branch promotion claim is allowed.

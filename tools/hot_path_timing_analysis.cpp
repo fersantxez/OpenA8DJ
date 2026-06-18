@@ -15,11 +15,15 @@ namespace {
 
 struct HotPathEvidence {
   std::filesystem::path path;
+  std::filesystem::file_time_type evidence_time{};
   double capture_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
   double playback_transfers_per_second = std::numeric_limits<double>::quiet_NaN();
+  double capture_zero_complete_per_capture_transfer = std::numeric_limits<double>::quiet_NaN();
+  double capture_transaction_errors_per_capture_transfer = std::numeric_limits<double>::quiet_NaN();
   double capture_handler = std::numeric_limits<double>::quiet_NaN();
   double capture_decode = std::numeric_limits<double>::quiet_NaN();
   double capture_requeue = std::numeric_limits<double>::quiet_NaN();
+  double capture_enqueue = std::numeric_limits<double>::quiet_NaN();
   double playback_queue = std::numeric_limits<double>::quiet_NaN();
   double playback_fill = std::numeric_limits<double>::quiet_NaN();
   double playback_enqueue = std::numeric_limits<double>::quiet_NaN();
@@ -94,13 +98,20 @@ HotPathEvidence read_evidence(const std::filesystem::path& path) {
   const auto json = read_file(path);
   HotPathEvidence evidence{};
   evidence.path = path;
+  std::error_code ec;
+  evidence.evidence_time = std::filesystem::last_write_time(path, ec);
   evidence.capture_transfers_per_second =
       number_or_nan(json_number(json, "capture_transfers_per_second"));
   evidence.playback_transfers_per_second =
       number_or_nan(json_number(json, "playback_transfers_completed_per_second"));
+  evidence.capture_zero_complete_per_capture_transfer =
+      number_or_nan(json_number(json, "capture_zero_complete_per_capture_transfer"));
+  evidence.capture_transaction_errors_per_capture_transfer =
+      number_or_nan(json_number(json, "capture_transaction_errors_per_capture_transfer"));
   evidence.capture_handler = number_or_nan(json_number(json, "capture_handler"));
   evidence.capture_decode = number_or_nan(json_number(json, "capture_decode"));
   evidence.capture_requeue = number_or_nan(json_number(json, "capture_requeue"));
+  evidence.capture_enqueue = number_or_nan(json_number(json, "capture_enqueue"));
   evidence.playback_queue = number_or_nan(json_number(json, "playback_queue"));
   evidence.playback_fill = number_or_nan(json_number(json, "playback_fill"));
   evidence.playback_enqueue = number_or_nan(json_number(json, "playback_enqueue"));
@@ -110,30 +121,52 @@ HotPathEvidence read_evidence(const std::filesystem::path& path) {
 
 bool has_hot_path_ticks(const HotPathEvidence& evidence) {
   return finite_positive(evidence.capture_handler) && finite_positive(evidence.capture_requeue) &&
-         finite_positive(evidence.playback_queue) && finite_positive(evidence.playback_enqueue) &&
-         finite_positive(evidence.playback_fill);
+         finite_positive(evidence.capture_enqueue) && finite_positive(evidence.playback_queue) &&
+         finite_positive(evidence.playback_enqueue) && finite_positive(evidence.playback_fill);
+}
+
+void maybe_add_hot_path_run(std::vector<HotPathEvidence>& runs, const std::filesystem::path& path) {
+  if (!std::filesystem::is_regular_file(path)) {
+    return;
+  }
+  auto evidence = read_evidence(path);
+  if (has_hot_path_ticks(evidence)) {
+    runs.push_back(evidence);
+  }
 }
 
 std::vector<HotPathEvidence> load_hot_path_runs(const std::filesystem::path& root) {
   std::vector<HotPathEvidence> runs;
   const auto base = root / "local-analysis/hot-path-timing";
-  if (!std::filesystem::is_directory(base)) {
-    return runs;
-  }
-  for (const auto& entry : std::filesystem::directory_iterator(base)) {
-    if (!entry.is_directory()) {
-      continue;
-    }
-    const auto summary = entry.path() / "stream-stats-summary.json";
-    if (!std::filesystem::is_regular_file(summary)) {
-      continue;
-    }
-    auto evidence = read_evidence(summary);
-    if (has_hot_path_ticks(evidence)) {
-      runs.push_back(evidence);
+  if (std::filesystem::is_directory(base)) {
+    for (const auto& entry : std::filesystem::directory_iterator(base)) {
+      if (!entry.is_directory()) {
+        continue;
+      }
+      maybe_add_hot_path_run(runs, entry.path() / "stream-stats-summary.json");
+      maybe_add_hot_path_run(runs, entry.path() / "soundcheck/stream-stats-summary.json");
     }
   }
+
+  const auto physical_base = root / "local-analysis/physical-evidence-window";
+  if (std::filesystem::is_directory(physical_base)) {
+    for (const auto& entry : std::filesystem::directory_iterator(physical_base)) {
+      if (!entry.is_directory()) {
+        continue;
+      }
+      const auto name = entry.path().filename().string();
+      if (name.find("hotpath") == std::string::npos &&
+          name.find("hot-path") == std::string::npos) {
+        continue;
+      }
+      maybe_add_hot_path_run(runs, entry.path() / "cpp-soundcheck/stream-stats-summary.json");
+    }
+  }
+
   std::sort(runs.begin(), runs.end(), [](const auto& lhs, const auto& rhs) {
+    if (lhs.evidence_time != rhs.evidence_time) {
+      return lhs.evidence_time < rhs.evidence_time;
+    }
     return lhs.path.string() < rhs.path.string();
   });
   return runs;
@@ -168,6 +201,7 @@ std::string dominant_subsegment(const HotPathEvidence& evidence) {
     double value;
   };
   std::vector<Segment> segments = {
+      {"capture_enqueue", evidence.capture_enqueue},
       {"capture_requeue", evidence.capture_requeue},
       {"playback_queue", evidence.playback_queue},
       {"playback_enqueue", evidence.playback_enqueue},
@@ -183,7 +217,8 @@ std::string dominant_subsegment(const HotPathEvidence& evidence) {
 
 std::string attribution(const HotPathEvidence& evidence) {
   const double fixed_queue =
-      evidence.capture_requeue + evidence.playback_queue + evidence.playback_enqueue;
+      evidence.capture_enqueue + evidence.capture_requeue + evidence.playback_queue +
+      evidence.playback_enqueue;
   if (std::isfinite(fixed_queue) && std::isfinite(evidence.playback_fill) &&
       fixed_queue > evidence.playback_fill * 6.0) {
     return "fixed_queue_requeue_enqueue_dominant";
@@ -225,9 +260,9 @@ int main(int argc, char** argv) {
   }
 
   const auto& selected = runs.back();
-  const double fixed_queue =
-      selected.capture_requeue + selected.playback_queue + selected.playback_enqueue;
-  const double nested_sum = selected.capture_decode + selected.capture_requeue +
+  const double fixed_queue = selected.capture_enqueue + selected.capture_requeue +
+                             selected.playback_queue + selected.playback_enqueue;
+  const double nested_sum = selected.capture_decode + selected.capture_requeue + selected.capture_enqueue +
                             selected.playback_queue + selected.playback_fill +
                             selected.playback_enqueue + selected.playback_completion;
   const double nested_to_handler =
@@ -252,10 +287,17 @@ int main(int argc, char** argv) {
   std::cout << "  \"playback_transfers_per_second\": ";
   print_json_number(selected.playback_transfers_per_second);
   std::cout << ",\n";
+  std::cout << "  \"capture_zero_complete_per_capture_transfer\": ";
+  print_json_number(selected.capture_zero_complete_per_capture_transfer);
+  std::cout << ",\n";
+  std::cout << "  \"capture_transaction_errors_per_capture_transfer\": ";
+  print_json_number(selected.capture_transaction_errors_per_capture_transfer);
+  std::cout << ",\n";
   std::cout << "  \"hot_path_average_ticks\": {\n"
             << "    \"capture_handler\": " << selected.capture_handler << ",\n"
             << "    \"capture_decode\": " << selected.capture_decode << ",\n"
             << "    \"capture_requeue\": " << selected.capture_requeue << ",\n"
+            << "    \"capture_enqueue\": " << selected.capture_enqueue << ",\n"
             << "    \"playback_queue\": " << selected.playback_queue << ",\n"
             << "    \"playback_fill\": " << selected.playback_fill << ",\n"
             << "    \"playback_enqueue\": " << selected.playback_enqueue << ",\n"

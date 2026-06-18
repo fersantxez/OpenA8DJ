@@ -312,6 +312,8 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
       opena8djcpp::evidence_json::json_object(summary, "transport_budget_model").value_or("");
+  const auto hot_path_timing_analysis =
+      opena8djcpp::evidence_json::json_object(summary, "hot_path_timing_analysis").value_or("");
   const auto playback_scheduler_contract =
       opena8djcpp::evidence_json::json_object(summary, "playback_scheduler_contract")
           .value_or("");
@@ -490,6 +492,24 @@ int main(int argc, char** argv) {
       bool_field_is(transport_budget_model, "runtime_cpu_superiority_claim_allowed", false) &&
       string_array_has(transport_budget_model, "resource_claim_blockers",
                        "same_session_physical_cpu_ab_missing") &&
+      object_present(summary, "hot_path_timing_analysis") &&
+      string_field_is(hot_path_timing_analysis, "status", "PASS") &&
+      string_field_is(hot_path_timing_analysis, "mode", "stored_hot_path_timing_evidence") &&
+      string_field_present(hot_path_timing_analysis, "selected_run") &&
+      number_field_present(hot_path_timing_analysis, "capture_transfers_per_second") &&
+      number_field_present(hot_path_timing_analysis, "playback_transfers_per_second") &&
+      number_field_present(hot_path_timing_analysis,
+                           "capture_zero_complete_per_capture_transfer") &&
+      number_field_present(hot_path_timing_analysis,
+                           "capture_transaction_errors_per_capture_transfer") &&
+      string_field_is(hot_path_timing_analysis, "attribution",
+                      "fixed_queue_requeue_enqueue_dominant") &&
+      number_field_present(hot_path_timing_analysis,
+                           "fixed_queue_to_playback_fill_ratio") &&
+      number_field_present(hot_path_timing_analysis,
+                           "nested_sum_to_capture_handler_ratio") &&
+      string_field_is(hot_path_timing_analysis, "readiness_claim",
+                      "DIAGNOSTIC_ONLY_NOT_PRODUCT_READINESS") &&
       object_present(summary, "playback_scheduler_contract") &&
       string_field_is(playback_scheduler_contract, "status", "PASS") &&
       number_field_is(playback_scheduler_contract,

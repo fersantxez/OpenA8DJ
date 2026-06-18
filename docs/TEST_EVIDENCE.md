@@ -15544,3 +15544,69 @@ Follow-up correction:
   - The stable load is reproducible as an offline diagnostic RC state.
   - It is still blocked for product quality, CPU superiority, Timecode Vinyl
     physical validation, and branch promotion.
+
+## 2026-06-18 - Hot-Path Diagnostic Physical Window
+
+- Scope:
+  - Ran the opt-in hot-path timing HAL candidate under the hardware lock.
+  - Candidate-only source-reference window; no product or promotion claim.
+  - Cleanup unloaded the HAL and released the lock.
+- Command:
+  - `AUDIO_GATE_LOCK_ROOT="$HOME/.opena8dj/hardware-gate.lock" scripts/run-physical-superiority-window --execute --source-reference-promotion --candidate-only --skip-build --run-dir local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only --candidate /Users/fer/dev/audio8djcpp/build/OpenA8DJ-hotpath-diagnostic.driver --capture-device "iRig Stream" --capture-channels 1,2 --reference-wav /Users/fer/dev/audio8djcpp/local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s/fixture/reference.wav --pair A --seconds 8 --rate 48000 --buffer 512`
+- Evidence:
+  - `local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only`
+  - `local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only/cpp-soundcheck/stream-stats-summary.json`
+  - `local-analysis/physical-evidence-window/20260618T211000Z-hotpath-diagnostic-candidate-only/final-unload-guard/summary.txt`
+- Result:
+  - HAL safety: PASS.
+  - Soundcheck/product quality: FAIL.
+  - Final unload/cleanup: PASS; no active OpenA8DJ HAL left installed.
+  - `quality_alignment_score=0.840403`; native analyzer
+    `quality_alignment_score=0.843034`.
+  - Analog SNR printed `-7.63 dB`; `lag_jumps_gt_2_frames=23`;
+    `click_outliers=0`; `capture_clipped_frames=0`.
+  - Hot-path ticks:
+    `capture_handler=3032.716386`, `capture_decode=5.878472`,
+    `capture_requeue=2032.634774`, `capture_enqueue=1932.840831`,
+    `playback_queue=1705.731010`, `playback_fill=375.834843`,
+    `playback_enqueue=1268.105923`, `playback_completion=18.832017`.
+  - Capture health warning:
+    `capture_zero_complete_per_capture_transfer=3.635914` and
+    `capture_transaction_errors_per_capture_transfer=3.635914`.
+- Interpretation:
+  - The window is valuable for CPU attribution only.
+  - Decode is not the next bottleneck; fixed queue/requeue/enqueue and
+    IOUSBHost request lifecycle are the next target.
+  - Capture zero-complete/transaction error rate remains a blocker for product
+    quality claims.
+  - Product/human readiness, CPU superiority, Timecode Vinyl physical
+    validation, and branch promotion remain blocked.
+
+## 2026-06-18 - Stable Load Hot-Path Evidence Schema Gate
+
+- Scope:
+  - Integrated the hot-path physical evidence into the offline summary and
+    schema checker.
+  - No hardware, CoreAudio, USB, driver install, driver unload, playback, or
+    recording was touched in this offline consolidation step.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hot_path_timing_analysis opena8djcpp_evidence_schema_check -j`
+  - `./build/cpp-release/opena8djcpp_hot_path_timing_analysis | tee local-analysis/cpp-offline/hot-path-timing-analysis.json`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/hot-path-timing-analysis.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json`
+- Result:
+  - Hot-path analysis: PASS.
+  - Debug CTest: `86/86` PASS.
+  - Release CTest: `87/87` PASS.
+  - Evidence schema: PASS with `required_files=109`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Provenance freshness before commit: FAIL as expected because the worktree
+    contains the schema/analyzer changes.
+- Interpretation:
+  - The stable gate now requires the hot-path physical conclusion to be present
+    and labeled diagnostic-only.
+  - A post-commit gate rerun is required before any clean stable-load claim.
