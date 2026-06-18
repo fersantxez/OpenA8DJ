@@ -1009,6 +1009,18 @@ exist:
 - `audiophile-wav-analysis-cpp.json`
 - `audiophile-wav-analysis.json`
 
+The offline gate runner also executes a compiled analysis-stack contract:
+
+```sh
+./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract
+```
+
+This is a static fail-closed check. It verifies that the C++ analyzer, the
+Python/SciPy oracle, physical-window execution, same-session comparison, and
+product-claim gate all require dual analyzer evidence. PASS here is not a
+quality claim; it only proves the measurement stack is wired so missing analyzer
+evidence cannot be ignored.
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

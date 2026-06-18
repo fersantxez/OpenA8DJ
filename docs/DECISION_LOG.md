@@ -7358,3 +7358,33 @@ Next implication:
 - Even if future route/CPU/tone metrics improve, branch promotion remains
   blocked unless the same-session physical comparator sees both analyzer JSONs
   passing for both mainline and C++ legs.
+
+## 2026-06-18: Add Compiled Audiophile Analysis Stack Contract
+
+Decision:
+- Added `opena8djcpp_audiophile_analysis_stack_contract`.
+- The new gate makes dual-path WAV analysis a build-time contract:
+  - native C++ analyzer is present and exposes the audiophile metrics;
+  - Python/SciPy remains pinned as an independent oracle;
+  - physical windows run both analyzers per leg;
+  - same-session comparison requires both analyzers for mainline and C++;
+  - product quality claims fail closed if either analyzer is missing or failing.
+
+Reason:
+- The project goal is objective audiophile quality, not a clean compile or a
+  single metric. Keeping C++ as the native analyzer lowers runtime dependency
+  risk, while retaining Python/SciPy as an oracle catches implementation drift.
+- This also answers the current analysis direction: install or use external
+  tools only when they improve evidence. Here, the better move is a compiled
+  contract that makes the existing high-precision stack non-optional.
+
+Alternatives discarded:
+- Remove Python/SciPy now: rejected because it is still a useful independent
+  spectral oracle for physical captures.
+- Rely on documentation saying both analyzers should run: rejected because
+  promotion safety needs executable evidence.
+
+Next implication:
+- Offline PASS now includes proof that analyzer evidence cannot be silently
+  skipped. Physical quality, performance, routing, and timecode claims remain
+  blocked until current lock-gated same-session evidence exists and passes.

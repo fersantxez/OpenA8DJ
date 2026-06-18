@@ -2332,6 +2332,12 @@ Current implementation:
 - `opena8djcpp_product_quality_claim_gate` must report
   `same_session_audiophile_wav_analyzers_pass=true` before
   `quality_claim_allowed=true` is possible.
+- `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json` must be
+  present and PASS. This compiled contract prevents regression to Python-only
+  measurement or a single-analyzer product claim. It requires pinned Python
+  oracle dependencies, the native C++ analyzer metrics, automatic dual-analyzer
+  execution in physical windows, physical comparator enforcement for both
+  baseline and candidate legs, and fail-closed product-claim semantics.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

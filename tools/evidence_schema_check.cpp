@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/audiophile-precision-claim-gate.json",
       root / "local-analysis/cpp-offline/audiophile-wav-analysis-cpp-self-test.json",
       root / "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
+      root / "local-analysis/cpp-offline/audiophile-analysis-stack-contract.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -169,6 +170,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto audiophile_wav_analysis_python_self_test =
       opena8djcpp::evidence_json::json_object(summary, "audiophile_wav_analysis_python_self_test")
+          .value_or("");
+  const auto audiophile_analysis_stack_contract =
+      opena8djcpp::evidence_json::json_object(summary, "audiophile_analysis_stack_contract")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -340,6 +344,25 @@ int main(int argc, char** argv) {
       number_field_present(audiophile_wav_analysis_python_self_test, "delay_p95_frames") &&
       number_field_present(audiophile_wav_analysis_python_self_test,
                            "worst_offdiag_db_relative") &&
+      object_present(summary, "audiophile_analysis_stack_contract") &&
+      string_field_is(audiophile_analysis_stack_contract, "status", "PASS") &&
+      bool_field_is(audiophile_analysis_stack_contract, "dependencies_pinned", true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "cpp_analyzer_native", true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "python_oracle_retained", true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "physical_window_runs_both", true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "comparator_requires_both", true) &&
+      bool_field_is(audiophile_analysis_stack_contract,
+                    "product_claim_blocks_without_both", true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "offline_runner_self_tests_both",
+                    true) &&
+      bool_field_is(audiophile_analysis_stack_contract, "product_claim_allowed", false) &&
+      string_array_has(audiophile_analysis_stack_contract, "required_same_session_artifacts",
+                       "candidate/audiophile-wav-analysis-cpp.json") &&
+      string_array_has(audiophile_analysis_stack_contract, "required_same_session_artifacts",
+                       "baseline/audiophile-wav-analysis.json") &&
+      string_field_is(
+          audiophile_analysis_stack_contract, "blocked_claim",
+          "NO_AUDIOPHILE_OR_BRANCH_PROMOTION_CLAIM_WITHOUT_DUAL_CPP_AND_PYTHON_WAV_ANALYZERS_PASSING_ON_SAME_SESSION_MAINLINE_AND_CPP_CAPTURE") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&

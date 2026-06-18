@@ -86,6 +86,8 @@ fi
 "$ANALYSIS_PY" scripts/analyze-audiophile-wav.py \
   --self-test \
   --json-out "$EVIDENCE_DIR/audiophile-wav-analysis-self-test.json"
+./build/cpp-release/opena8djcpp_audiophile_analysis_stack_contract \
+  | tee "$EVIDENCE_DIR/audiophile-analysis-stack-contract.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -185,6 +187,7 @@ audiophile_tone = load_json("audiophile-tone-gate.json")
 audiophile_precision_claim_gate = load_json("audiophile-precision-claim-gate.json")
 audiophile_wav_analysis_cpp_self_test = load_json("audiophile-wav-analysis-cpp-self-test.json")
 audiophile_wav_analysis_python_self_test = load_json("audiophile-wav-analysis-self-test.json")
+audiophile_analysis_stack_contract = load_json("audiophile-analysis-stack-contract.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -647,6 +650,20 @@ summary = {
             "product_claim_allowed"
         ),
         "evidence": "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
+    },
+    "audiophile_analysis_stack_contract": {
+        "status": audiophile_analysis_stack_contract.get("result"),
+        "dependencies_pinned": audiophile_analysis_stack_contract.get("dependencies_pinned"),
+        "cpp_analyzer_native": audiophile_analysis_stack_contract.get("cpp_analyzer_native"),
+        "python_oracle_retained": audiophile_analysis_stack_contract.get("python_oracle_retained"),
+        "physical_window_runs_both": audiophile_analysis_stack_contract.get("physical_window_runs_both"),
+        "comparator_requires_both": audiophile_analysis_stack_contract.get("comparator_requires_both"),
+        "product_claim_blocks_without_both": audiophile_analysis_stack_contract.get("product_claim_blocks_without_both"),
+        "offline_runner_self_tests_both": audiophile_analysis_stack_contract.get("offline_runner_self_tests_both"),
+        "product_claim_allowed": audiophile_analysis_stack_contract.get("product_claim_allowed"),
+        "required_same_session_artifacts": audiophile_analysis_stack_contract.get("required_same_session_artifacts"),
+        "blocked_claim": audiophile_analysis_stack_contract.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/audiophile-analysis-stack-contract.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

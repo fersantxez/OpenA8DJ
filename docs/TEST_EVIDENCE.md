@@ -11035,3 +11035,22 @@ Full offline gate rerun:
   - This tightens promotion semantics. Existing physical evidence remains
     invalid for audiophile superiority and now fails for missing/failing
     analyzer requirements as well as route/quality/CPU blockers.
+
+## 2026-06-18 Audiophile Analysis Stack Contract
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Added `opena8djcpp_audiophile_analysis_stack_contract`.
+  - Integrated the gate into CMake, CTest, `scripts/run-cpp-offline-gates`, and
+    the evidence schema.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed.
+- Expected evidence after full gate rerun:
+  - `local-analysis/cpp-offline/audiophile-analysis-stack-contract.json`
+- Interpretation:
+  - PASS means the analysis stack is fail-closed around dual C++ and
+    Python/SciPy WAV analyzers.
+  - PASS does not mean product quality, branch promotion, or physical readiness.

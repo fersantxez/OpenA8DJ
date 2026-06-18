@@ -2649,3 +2649,8 @@ Current implication:
     quality claim gate exposes this as
     `same_session_audiophile_wav_analyzers_pass=false` until those artifacts
     exist and pass.
+  - `opena8djcpp_audiophile_analysis_stack_contract` now freezes that analysis
+    stack as an offline C++ contract. It confirms the native analyzer, pinned
+    Python/SciPy oracle, physical-window wiring, comparator requirements, and
+    product-claim blocker all remain present. This does not prove sound quality;
+    it prevents missing analyzer evidence from being treated as good enough.
