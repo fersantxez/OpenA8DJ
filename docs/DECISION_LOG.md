@@ -7938,3 +7938,27 @@ Next implication:
   source into the iRig capture chain or run a HAL-candidate visibility/safety
   window under lock; same-device iRig output/capture has now failed as route
   evidence.
+
+## 2026-06-18: Preserve Route Failure Details In Offline Summary
+
+Decision:
+- The offline gate summary must expose the latest route diagnostic's click
+  outliers, Python analyzer return code, native analyzer return code, and
+  native readiness claim.
+- The schema gate now requires those fields.
+
+Reason:
+- A route failure is not actionable enough when summarized only as alignment
+  and SNR. For audiophile-quality work, the summary must distinguish a failed
+  physical route analyzer from an analyzer-only native PASS, and must preserve
+  click evidence.
+
+Evidence:
+- The latest iRig same-device diagnostic had `analysis_rc=1`, `native_rc=0`,
+  `click_outliers=22`, and native readiness
+  `ANALYZER_ONLY_NOT_PRODUCT_READINESS`.
+
+Next implication:
+- Future offline evidence cannot silently hide why a physical capture route
+  failed. Product claims remain blocked until a promotable route passes in the
+  same session as the mainline/C++ comparison.

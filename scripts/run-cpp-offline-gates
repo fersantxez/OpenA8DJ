@@ -1029,6 +1029,18 @@ summary = {
         "latest_known_good_route_snr_floor_db": physical_route_inventory.get(
             "latest_known_good_route_diagnostic", {}
         ).get("snr_floor_db"),
+        "latest_known_good_route_click_outliers": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("click_outliers"),
+        "latest_known_good_route_analysis_rc": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("analysis_rc"),
+        "latest_known_good_route_native_rc": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("native_rc"),
+        "latest_known_good_route_native_readiness_claim": physical_route_inventory.get(
+            "latest_known_good_route_diagnostic", {}
+        ).get("native_readiness_claim"),
         "candidate_hal_window_possible_after_lock": physical_route_inventory.get(
             "decision", {}
         ).get("candidate_hal_window_possible_after_lock"),

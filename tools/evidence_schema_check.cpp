@@ -608,6 +608,14 @@ int main(int argc, char** argv) {
                            "latest_same_device_irig_diagnostic_result") &&
       bool_field_present(physical_route_inventory,
                          "latest_known_good_route_valid_for_promotion") &&
+      number_field_present(physical_route_inventory,
+                           "latest_known_good_route_click_outliers") &&
+      number_field_present(physical_route_inventory,
+                           "latest_known_good_route_analysis_rc") &&
+      number_field_present(physical_route_inventory,
+                           "latest_known_good_route_native_rc") &&
+      string_field_present(physical_route_inventory,
+                           "latest_known_good_route_native_readiness_claim") &&
       bool_field_present(physical_route_inventory,
                          "candidate_hal_window_possible_after_lock") &&
       bool_field_is(physical_route_inventory, "product_promotion_measurement_possible_now",
