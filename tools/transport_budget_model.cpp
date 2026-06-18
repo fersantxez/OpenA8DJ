@@ -134,6 +134,8 @@ int main(int argc, char** argv) {
   const auto playback_scheduler = read_file(evidence / "playback-scheduler-contract.json");
   const auto playback_scheduler_runtime =
       read_file(evidence / "playback-scheduler-runtime-contract.json");
+  const auto persistent_usb_transport =
+      read_file(evidence / "persistent-usb-transport-contract.json");
   const auto product_quality = read_file(evidence / "product-quality-claim-gate.json");
   const auto physical_window = read_file(evidence / "physical-window-readiness-gate.json");
 
@@ -281,6 +283,23 @@ int main(int argc, char** argv) {
       number_or(playback_scheduler_runtime, "stable_playback_submit_reduction_ratio", 0.0) >=
           8.0 &&
       number_or(playback_scheduler_runtime, "stable_total_submit_reduction_ratio", 0.0) > 1.5;
+  const bool persistent_transport_model_pass =
+      !persistent_usb_transport.empty() &&
+      string_field_is(persistent_usb_transport, "status", "PASS") &&
+      bool_field_is(persistent_usb_transport, "preallocated_only", true) &&
+      bool_field_is(persistent_usb_transport, "bounded_live_requests", true) &&
+      bool_field_is(persistent_usb_transport, "stable_queue_depth", true) &&
+      bool_field_is(persistent_usb_transport, "continuous_sequences", true) &&
+      bool_field_is(persistent_usb_transport, "timestamp_continuity", true) &&
+      bool_field_is(persistent_usb_transport, "persistent_slot_identity", true) &&
+      bool_field_is(persistent_usb_transport, "completion_owned_lifecycle", true) &&
+      bool_field_is(persistent_usb_transport, "physical_evidence_present", false) &&
+      bool_field_is(persistent_usb_transport, "hal_binding_present", false) &&
+      bool_field_is(persistent_usb_transport, "product_claim_allowed", false) &&
+      number_or(persistent_usb_transport, "slot_identity_mismatches", 1.0) == 0.0 &&
+      number_or(persistent_usb_transport, "persistent_slot_reuses", 0.0) >= 256.0 &&
+      number_or(persistent_usb_transport, "steady_live_requests_before_drain", 0.0) == 8.0 &&
+      number_or(persistent_usb_transport, "max_live_requests", 999.0) == 8.0;
   const bool quality_claim_blocked =
       !product_quality.empty() && string_field_is(product_quality, "result", "PASS") &&
       bool_field_is(product_quality, "quality_claim_allowed", false);
@@ -295,7 +314,8 @@ int main(int argc, char** argv) {
   const bool runtime_cpu_superiority_claim_allowed = false;
   const bool model_passes =
       product_candidates == 0 && quality_passes == 0 && cpu_passes >= 1 &&
-      playback_scheduler_model_pass && playback_scheduler_runtime_pass;
+      playback_scheduler_model_pass && playback_scheduler_runtime_pass &&
+      persistent_transport_model_pass;
   const bool playback_scheduler_physical_evidence_present =
       !bool_field_is(playback_scheduler, "physical_evidence_present", false);
   const bool playback_scheduler_product_claim_allowed =
@@ -363,6 +383,36 @@ int main(int argc, char** argv) {
             << (playback_scheduler_product_claim_allowed ? "true" : "false")
             << ", \"next_required_action\": "
                "\"IMPLEMENT_OPT_IN_HAL_PLAYBACK_SCHEDULER_BINDING_THEN_SOURCE_REFERENCE_AB\"},\n"
+            << "  \"persistent_usb_transport_model\": {"
+            << "\"model_pass\": " << (persistent_transport_model_pass ? "true" : "false")
+            << ", \"steady_live_requests_before_drain\": "
+            << number_or(persistent_usb_transport, "steady_live_requests_before_drain", -1.0)
+            << ", \"max_live_requests\": "
+            << number_or(persistent_usb_transport, "max_live_requests", -1.0)
+            << ", \"max_capture_lead_frames\": "
+            << number_or(persistent_usb_transport, "max_capture_lead_frames", -1.0)
+            << ", \"max_playback_lead_frames\": "
+            << number_or(persistent_usb_transport, "max_playback_lead_frames", -1.0)
+            << ", \"slot_identity_mismatches\": "
+            << number_or(persistent_usb_transport, "slot_identity_mismatches", -1.0)
+            << ", \"persistent_slot_reuses\": "
+            << number_or(persistent_usb_transport, "persistent_slot_reuses", -1.0)
+            << ", \"sequence_gap_errors\": "
+            << number_or(persistent_usb_transport, "sequence_gap_errors", -1.0)
+            << ", \"timestamp_gap_errors\": "
+            << number_or(persistent_usb_transport, "timestamp_gap_errors", -1.0)
+            << ", \"physical_evidence_present\": "
+            << (bool_field_is(persistent_usb_transport, "physical_evidence_present", true)
+                    ? "true"
+                    : "false")
+            << ", \"hal_binding_present\": "
+            << (bool_field_is(persistent_usb_transport, "hal_binding_present", true) ? "true"
+                                                                                    : "false")
+            << ", \"product_claim_allowed\": "
+            << (bool_field_is(persistent_usb_transport, "product_claim_allowed", true) ? "true"
+                                                                                       : "false")
+            << ", \"next_required_action\": "
+               "\"BIND_PERSISTENT_USB_TRANSPORT_TO_HAL_CANDIDATE_THEN_SOURCE_REFERENCE_AB\"},\n"
             << "  \"thresholds\": {\"quality_alignment_score\": " << kQualityGate
             << ", \"driver_cpu_p95\": " << kDriverCpuP95Gate
             << ", \"lag_jumps_gt_2_frames\": " << kLagJumpGate << "},\n"

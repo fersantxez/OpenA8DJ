@@ -46,6 +46,7 @@ python3 scripts/check-hal-bundle-complete \
 ./build/cpp-offline/opena8djcpp_usb_submit_payload_contract > "$EVIDENCE_DIR/usb-submit-payload-contract.json"
 ./build/cpp-offline/opena8djcpp_prepared_usb_runtime_submit_contract > "$EVIDENCE_DIR/prepared-usb-runtime-submit-contract.json"
 ./build/cpp-offline/opena8djcpp_prepared_usb_async_runtime_contract > "$EVIDENCE_DIR/prepared-usb-async-runtime-contract.json"
+./build/cpp-offline/opena8djcpp_persistent_usb_transport_contract > "$EVIDENCE_DIR/persistent-usb-transport-contract.json"
 ./build/cpp-offline/opena8djcpp_hal_prepared_submit_adapter_contract > "$EVIDENCE_DIR/hal-prepared-submit-adapter-contract.json"
 ./build/cpp-offline/opena8djcpp_hal_prepared_runtime_source_contract > "$EVIDENCE_DIR/hal-prepared-runtime-source-contract.json"
 ./build/cpp-offline/opena8djcpp_hal_prepared_runtime_binding_contract > "$EVIDENCE_DIR/hal-prepared-runtime-binding-contract.json"
@@ -103,6 +104,7 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_usb_submit_payload_contract | tee "$EVIDENCE_DIR/usb-submit-payload-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_usb_runtime_submit_contract | tee "$EVIDENCE_DIR/prepared-usb-runtime-submit-contract.json"
 ./build/cpp-release/opena8djcpp_prepared_usb_async_runtime_contract | tee "$EVIDENCE_DIR/prepared-usb-async-runtime-contract.json"
+./build/cpp-release/opena8djcpp_persistent_usb_transport_contract | tee "$EVIDENCE_DIR/persistent-usb-transport-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_submit_adapter_contract | tee "$EVIDENCE_DIR/hal-prepared-submit-adapter-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_runtime_source_contract | tee "$EVIDENCE_DIR/hal-prepared-runtime-source-contract.json"
 ./build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract | tee "$EVIDENCE_DIR/hal-prepared-runtime-binding-contract.json"
@@ -476,6 +478,7 @@ runtime_adapter = load_json("runtime-adapter-contract.json")
 usb_submit_plan = load_json("usb-submit-plan-contract.json")
 usb_submit_payload = load_json("usb-submit-payload-contract.json")
 prepared_usb_runtime_submit = load_json("prepared-usb-runtime-submit-contract.json")
+persistent_usb_transport = load_json("persistent-usb-transport-contract.json")
 hal_prepared_submit_adapter = load_json("hal-prepared-submit-adapter-contract.json")
 hal_prepared_runtime_source_contract = load_json("hal-prepared-runtime-source-contract.json")
 hal_prepared_runtime_binding_contract = load_json("hal-prepared-runtime-binding-contract.json")
@@ -881,6 +884,18 @@ summary = {
         "playback_scheduler_model_pass": transport_budget.get("playback_scheduler_model", {}).get("model_pass"),
         "playback_scheduler_stable_playback_submit_reduction_ratio": transport_budget.get("playback_scheduler_model", {}).get("stable_playback_submit_reduction_ratio"),
         "playback_scheduler_stable_total_submit_reduction_ratio": transport_budget.get("playback_scheduler_model", {}).get("stable_total_submit_reduction_ratio"),
+        "persistent_usb_transport_model_pass": transport_budget.get("persistent_usb_transport_model", {}).get("model_pass"),
+        "persistent_usb_transport_steady_live_requests_before_drain": transport_budget.get("persistent_usb_transport_model", {}).get("steady_live_requests_before_drain"),
+        "persistent_usb_transport_max_live_requests": transport_budget.get("persistent_usb_transport_model", {}).get("max_live_requests"),
+        "persistent_usb_transport_max_capture_lead_frames": transport_budget.get("persistent_usb_transport_model", {}).get("max_capture_lead_frames"),
+        "persistent_usb_transport_max_playback_lead_frames": transport_budget.get("persistent_usb_transport_model", {}).get("max_playback_lead_frames"),
+        "persistent_usb_transport_slot_identity_mismatches": transport_budget.get("persistent_usb_transport_model", {}).get("slot_identity_mismatches"),
+        "persistent_usb_transport_persistent_slot_reuses": transport_budget.get("persistent_usb_transport_model", {}).get("persistent_slot_reuses"),
+        "persistent_usb_transport_sequence_gap_errors": transport_budget.get("persistent_usb_transport_model", {}).get("sequence_gap_errors"),
+        "persistent_usb_transport_timestamp_gap_errors": transport_budget.get("persistent_usb_transport_model", {}).get("timestamp_gap_errors"),
+        "persistent_usb_transport_physical_evidence_present": transport_budget.get("persistent_usb_transport_model", {}).get("physical_evidence_present"),
+        "persistent_usb_transport_hal_binding_present": transport_budget.get("persistent_usb_transport_model", {}).get("hal_binding_present"),
+        "persistent_usb_transport_product_claim_allowed": transport_budget.get("persistent_usb_transport_model", {}).get("product_claim_allowed"),
         "runtime_cpu_superiority_claim_allowed": transport_budget.get("prepared_runtime_model", {}).get("runtime_cpu_superiority_claim_allowed"),
         "resource_claim_blockers": transport_budget.get("prepared_runtime_model", {}).get("claim_blockers", []),
         "evidence": "local-analysis/cpp-offline/transport-budget-model.json",
@@ -2763,6 +2778,70 @@ summary = {
         "payload_equivalent": prepared_usb_runtime_submit.get("payload_equivalent"),
         "blocked_claim": prepared_usb_runtime_submit.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json",
+    },
+    "persistent_usb_transport_contract": {
+        "status": persistent_usb_transport.get("status"),
+        "schema": persistent_usb_transport.get("schema"),
+        "slots_per_submit": persistent_usb_transport.get("slots_per_submit"),
+        "frames_per_slot": persistent_usb_transport.get("frames_per_slot"),
+        "capture_queue_depth": persistent_usb_transport.get("capture_queue_depth"),
+        "playback_queue_depth": persistent_usb_transport.get("playback_queue_depth"),
+        "request_slots": persistent_usb_transport.get("request_slots"),
+        "steady_completions_per_direction": persistent_usb_transport.get(
+            "steady_completions_per_direction"
+        ),
+        "prime_submit_calls": persistent_usb_transport.get("prime_submit_calls"),
+        "steady_submit_calls": persistent_usb_transport.get("steady_submit_calls"),
+        "completion_calls": persistent_usb_transport.get("completion_calls"),
+        "steady_live_requests_before_drain": persistent_usb_transport.get(
+            "steady_live_requests_before_drain"
+        ),
+        "max_live_requests": persistent_usb_transport.get("max_live_requests"),
+        "max_capture_live_requests": persistent_usb_transport.get(
+            "max_capture_live_requests"
+        ),
+        "max_playback_live_requests": persistent_usb_transport.get(
+            "max_playback_live_requests"
+        ),
+        "max_capture_lead_frames": persistent_usb_transport.get(
+            "max_capture_lead_frames"
+        ),
+        "max_playback_lead_frames": persistent_usb_transport.get(
+            "max_playback_lead_frames"
+        ),
+        "sequence_gap_errors": persistent_usb_transport.get("sequence_gap_errors"),
+        "timestamp_gap_errors": persistent_usb_transport.get("timestamp_gap_errors"),
+        "depth_drift_errors": persistent_usb_transport.get("depth_drift_errors"),
+        "slot_identity_mismatches": persistent_usb_transport.get(
+            "slot_identity_mismatches"
+        ),
+        "persistent_slot_reuses": persistent_usb_transport.get("persistent_slot_reuses"),
+        "fallback_allocations": persistent_usb_transport.get("fallback_allocations"),
+        "completed_frames": persistent_usb_transport.get("completed_frames"),
+        "submitted_frames": persistent_usb_transport.get("submitted_frames"),
+        "cancelled_requests": persistent_usb_transport.get("cancelled_requests"),
+        "preallocated_only": persistent_usb_transport.get("preallocated_only"),
+        "bounded_live_requests": persistent_usb_transport.get("bounded_live_requests"),
+        "stable_queue_depth": persistent_usb_transport.get("stable_queue_depth"),
+        "continuous_sequences": persistent_usb_transport.get("continuous_sequences"),
+        "timestamp_continuity": persistent_usb_transport.get("timestamp_continuity"),
+        "descriptor_shape_safe": persistent_usb_transport.get("descriptor_shape_safe"),
+        "persistent_slot_identity": persistent_usb_transport.get(
+            "persistent_slot_identity"
+        ),
+        "completion_owned_lifecycle": persistent_usb_transport.get(
+            "completion_owned_lifecycle"
+        ),
+        "drained": persistent_usb_transport.get("drained"),
+        "product_safe": persistent_usb_transport.get("product_safe"),
+        "physical_evidence_present": persistent_usb_transport.get(
+            "physical_evidence_present"
+        ),
+        "hal_binding_present": persistent_usb_transport.get("hal_binding_present"),
+        "product_claim_allowed": persistent_usb_transport.get("product_claim_allowed"),
+        "next_required_action": persistent_usb_transport.get("next_required_action"),
+        "blocked_claim": persistent_usb_transport.get("blocked_claim"),
+        "evidence": "local-analysis/cpp-offline/persistent-usb-transport-contract.json",
     },
     "hal_prepared_submit_adapter_contract": {
         "status": hal_prepared_submit_adapter.get("result"),

@@ -15722,3 +15722,41 @@ Follow-up correction:
   - It is physically rejected as a product/human-test candidate until a new
     transport/runtime design can preserve the submit reduction without CPU
     spikes, timing instability, and absolute quality failure.
+
+## 2026-06-18 - Persistent USB Transport Offline Gate Pre-Commit
+
+- Scope:
+  - Added a C++ core model and offline contract for persistent USB request
+    slots.
+  - Integrated the contract into CMake, CTest, `scripts/run-cpp-offline-gates`,
+    `transport-budget-model`, and the evidence schema.
+  - Did not install, unload, reload, play audio, record audio, change
+    CoreAudio, change USB, change defaults, or touch hardware.
+- Commands:
+  - `cmake -S . -B build/cpp-offline && cmake --build build/cpp-offline --target opena8djcpp_persistent_usb_transport_contract opena8djcpp_evidence_schema_check && ./build/cpp-offline/opena8djcpp_persistent_usb_transport_contract`
+  - `scripts/run-cpp-offline-gates`
+- Evidence:
+  - `local-analysis/cpp-offline/persistent-usb-transport-contract.json`
+  - `local-analysis/cpp-offline/transport-budget-model.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/cpp-offline/ctest-default.txt`
+  - `local-analysis/cpp-offline/ctest-release.txt`
+- Result:
+  - Focused persistent transport contract: PASS.
+  - Debug CTest: `87/87` PASS.
+  - Release CTest: `88/88` PASS.
+  - Evidence schema: PASS with `required_files=113`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Persistent model: `steady_live_requests_before_drain=8`,
+    `max_live_requests=8`, `persistent_slot_reuses=256`,
+    `slot_identity_mismatches=0`, `sequence_gap_errors=0`,
+    `timestamp_gap_errors=0`, and `fallback_allocations=0`.
+  - The model explicitly records `physical_evidence_present=false`,
+    `hal_binding_present=false`, and `product_claim_allowed=false`.
+  - Provenance freshness before commit: FAIL as expected because the worktree
+    contains the persistent transport code/schema changes.
+- Interpretation:
+  - This is concrete progress toward the next transport candidate after
+    prepared-lite rejection.
+  - It does not prove physical quality, CPU superiority, Timecode Vinyl, or
+    readiness to promote. A post-commit freshness rerun is required.

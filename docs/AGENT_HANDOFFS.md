@@ -5548,3 +5548,36 @@ Next action:
   - Revalidate the physical route under lock before using any human/product
     listening result for promotion. Treat current route-based audio quality
     measurements as diagnostic unless the route is revalidated.
+
+## 2026-06-18 Euler: Persistent USB Slot Runtime Map
+
+- Mission:
+  - Read-only inspection of current transport/gate code after prepared-lite was
+    physically rejected.
+  - Required warning given: PROHIBIDO tocar, editar, formatear, generar
+    archivos, limpiar, resetear, instalar o mutar cualquier cosa en
+    `/Users/fer/dev/opena8dj` o `/Users/fer/dev/audio8djrust`; esos worktrees
+    son READ ONLY; solo escribir en `/Users/fer/dev/audio8djcpp`; no tocar
+    hardware/audio/CoreAudio/USB sin lock global y ventana autorizada.
+- Findings:
+  - The best next core boundary is beside `PreparedUsbAsyncRuntime`, not in
+    `OpenA8DJUSB.m` or DriverKit runtime first.
+  - Existing `UsbSubmitDescriptor` and `PreparedUsbRequestPool` should be
+    reused, but the next model must prove persistent request/slot identity,
+    stable per-direction arrays, complete-owned lifecycle, zero fallback
+    allocation, stale completion rejection, and bounded live requests.
+  - Reducing submit count without slot identity and quality/CPU proof risks
+    repeating prepared-lite.
+- Files affected by architect after handoff:
+  - `core/include/opena8djcpp/persistent_usb_transport.hpp`
+  - `core/src/persistent_usb_transport.cpp`
+  - `tools/persistent_usb_transport_contract.cpp`
+  - `CMakeLists.txt`
+  - `scripts/run-cpp-offline-gates`
+  - `tools/transport_budget_model.cpp`
+  - `tools/evidence_schema_check.cpp`
+  - Docs and evidence entries.
+- Next action recommended:
+  - Bind the persistent transport model to an opt-in HAL/DriverKit candidate
+    only after the offline contract remains clean post-commit; then run a
+    lock-gated source-reference A/B before any product claim.

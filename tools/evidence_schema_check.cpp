@@ -117,6 +117,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/usb-submit-payload-contract.json",
       root / "local-analysis/cpp-offline/prepared-usb-runtime-submit-contract.json",
       root / "local-analysis/cpp-offline/prepared-usb-async-runtime-contract.json",
+      root / "local-analysis/cpp-offline/persistent-usb-transport-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-submit-adapter-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-source-contract.json",
       root / "local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json",
@@ -202,6 +203,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "usb_submit_payload_contract").value_or("");
   const auto prepared_usb_runtime_submit_contract =
       opena8djcpp::evidence_json::json_object(summary, "prepared_usb_runtime_submit_contract")
+          .value_or("");
+  const auto persistent_usb_transport_contract =
+      opena8djcpp::evidence_json::json_object(summary, "persistent_usb_transport_contract")
           .value_or("");
   const auto hal_prepared_submit_adapter_contract =
       opena8djcpp::evidence_json::json_object(summary, "hal_prepared_submit_adapter_contract")
@@ -501,6 +505,29 @@ int main(int argc, char** argv) {
                       "playback_scheduler_stable_playback_submit_reduction_ratio", 8.0) &&
       number_field_present(transport_budget_model,
                            "playback_scheduler_stable_total_submit_reduction_ratio") &&
+      bool_field_is(transport_budget_model, "persistent_usb_transport_model_pass", true) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_steady_live_requests_before_drain", 8.0) &&
+      number_field_is(transport_budget_model, "persistent_usb_transport_max_live_requests",
+                      8.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_max_capture_lead_frames", 256.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_max_playback_lead_frames", 256.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_slot_identity_mismatches", 0.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_persistent_slot_reuses", 256.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_sequence_gap_errors", 0.0) &&
+      number_field_is(transport_budget_model,
+                      "persistent_usb_transport_timestamp_gap_errors", 0.0) &&
+      bool_field_is(transport_budget_model,
+                    "persistent_usb_transport_physical_evidence_present", false) &&
+      bool_field_is(transport_budget_model,
+                    "persistent_usb_transport_hal_binding_present", false) &&
+      bool_field_is(transport_budget_model,
+                    "persistent_usb_transport_product_claim_allowed", false) &&
       bool_field_is(transport_budget_model, "runtime_cpu_superiority_claim_allowed", false) &&
       string_array_has(transport_budget_model, "resource_claim_blockers",
                        "same_session_physical_cpu_ab_missing") &&
@@ -680,6 +707,54 @@ int main(int argc, char** argv) {
                       "retained_descriptor_overflows", 0.0) &&
       bool_field_is(prepared_usb_runtime_submit_contract, "runtime_safe", true) &&
       bool_field_is(prepared_usb_runtime_submit_contract, "payload_equivalent", true) &&
+      object_present(summary, "persistent_usb_transport_contract") &&
+      string_field_is(persistent_usb_transport_contract, "status", "PASS") &&
+      string_field_is(persistent_usb_transport_contract, "schema",
+                      "opena8djcpp.persistent-usb-transport-contract.v1") &&
+      number_field_is(persistent_usb_transport_contract, "slots_per_submit", 8.0) &&
+      number_field_is(persistent_usb_transport_contract, "frames_per_slot", 8.0) &&
+      number_field_is(persistent_usb_transport_contract, "capture_queue_depth", 4.0) &&
+      number_field_is(persistent_usb_transport_contract, "playback_queue_depth", 4.0) &&
+      number_field_is(persistent_usb_transport_contract, "request_slots", 8.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "steady_completions_per_direction", 128.0) &&
+      number_field_is(persistent_usb_transport_contract, "prime_submit_calls", 8.0) &&
+      number_field_is(persistent_usb_transport_contract, "steady_submit_calls", 256.0) &&
+      number_field_is(persistent_usb_transport_contract, "completion_calls", 256.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "steady_live_requests_before_drain", 8.0) &&
+      number_field_is(persistent_usb_transport_contract, "max_live_requests", 8.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "max_capture_live_requests", 4.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "max_playback_live_requests", 4.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "max_capture_lead_frames", 256.0) &&
+      number_field_is(persistent_usb_transport_contract,
+                      "max_playback_lead_frames", 256.0) &&
+      number_field_is(persistent_usb_transport_contract, "sequence_gap_errors", 0.0) &&
+      number_field_is(persistent_usb_transport_contract, "timestamp_gap_errors", 0.0) &&
+      number_field_is(persistent_usb_transport_contract, "depth_drift_errors", 0.0) &&
+      number_field_is(persistent_usb_transport_contract, "slot_identity_mismatches", 0.0) &&
+      number_field_is(persistent_usb_transport_contract, "persistent_slot_reuses", 256.0) &&
+      number_field_is(persistent_usb_transport_contract, "fallback_allocations", 0.0) &&
+      number_field_is(persistent_usb_transport_contract, "cancelled_requests", 8.0) &&
+      bool_field_is(persistent_usb_transport_contract, "preallocated_only", true) &&
+      bool_field_is(persistent_usb_transport_contract, "bounded_live_requests", true) &&
+      bool_field_is(persistent_usb_transport_contract, "stable_queue_depth", true) &&
+      bool_field_is(persistent_usb_transport_contract, "continuous_sequences", true) &&
+      bool_field_is(persistent_usb_transport_contract, "timestamp_continuity", true) &&
+      bool_field_is(persistent_usb_transport_contract, "descriptor_shape_safe", true) &&
+      bool_field_is(persistent_usb_transport_contract, "persistent_slot_identity", true) &&
+      bool_field_is(persistent_usb_transport_contract, "completion_owned_lifecycle", true) &&
+      bool_field_is(persistent_usb_transport_contract, "drained", true) &&
+      bool_field_is(persistent_usb_transport_contract, "product_safe", true) &&
+      bool_field_is(persistent_usb_transport_contract, "physical_evidence_present", false) &&
+      bool_field_is(persistent_usb_transport_contract, "hal_binding_present", false) &&
+      bool_field_is(persistent_usb_transport_contract, "product_claim_allowed", false) &&
+      string_field_is(
+          persistent_usb_transport_contract, "blocked_claim",
+          "NO_CPU_AUDIOPHILE_TIMECODE_OR_MAINLINE_SUPERIORITY_CLAIM_FROM_OFFLINE_PERSISTENT_TRANSPORT_MODEL") &&
       object_present(summary, "hal_prepared_submit_adapter_contract") &&
       number_field_is(hal_prepared_submit_adapter_contract, "logical_slots", 528.0) &&
       number_field_is(hal_prepared_submit_adapter_contract, "capture_logical_slots", 264.0) &&

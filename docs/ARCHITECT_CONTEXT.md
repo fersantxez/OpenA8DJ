@@ -3545,3 +3545,18 @@ Current implication:
   Prepared-lite is now physically rejected as a product candidate; its useful
   learning is that lower submit cadence alone is not enough and the next work
   must solve quality/timing and CPU spikes together.
+- 17:48 EDT persistent USB transport offline model: added a new C++ core
+  transport model and contract for a fixed preallocated USB request window with
+  persistent slot identity. The contract primes 4 capture and 4 playback
+  requests, runs 128 steady completions per direction, preserves 8 live
+  requests before drain, reuses the expected persistent slot for all 256
+  steady requeues, and records zero sequence gaps, timestamp gaps, depth drift,
+  slot identity mismatches, descriptor shape errors, and fallback allocations.
+  This is the next architecture direction after prepared-lite rejection because
+  it models stable URB/request identity and lifecycle, not just lower submit
+  count. It is still offline only: `hal_binding_present=false`,
+  `physical_evidence_present=false`, and `product_claim_allowed=false`.
+  Product readiness, human product test, Timecode Vinyl physical
+  certification, runtime CPU superiority, and branch promotion remain blocked
+  until this model is bound to a HAL/DriverKit candidate and beats mainline in a
+  lock-gated same-session source-reference A/B.

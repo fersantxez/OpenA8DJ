@@ -10284,3 +10284,38 @@ Next implication:
   is possible, but it is not the next product candidate. The next architecture
   step must reduce IOUSBHost/request lifecycle cost without increasing CPU
   spikes or capture timing/quality failures.
+
+## 2026-06-18 - Make Persistent USB Slot Identity The Next Offline Transport Direction
+
+- Decision: add a new offline C++ transport model that requires a fixed
+  preallocated request window and persistent slot identity before another HAL
+  transport candidate can be justified.
+- Reason: prepared-lite proved that lower submit cadence alone is insufficient.
+  The next design must also prove completion-owned lifecycle, stable live depth,
+  monotonic sequence/timestamp continuity, and deterministic slot reuse so the
+  physical candidate has a stronger chance of reducing IOUSBHost/request churn
+  without introducing timing instability.
+- Evidence:
+  - `local-analysis/cpp-offline/persistent-usb-transport-contract.json`.
+  - `prime_submit_calls=8`, `steady_submit_calls=256`,
+    `completion_calls=256`, and
+    `steady_live_requests_before_drain=8`.
+  - `max_capture_live_requests=4`, `max_playback_live_requests=4`,
+    `max_capture_lead_frames=256`, and
+    `max_playback_lead_frames=256`.
+  - `sequence_gap_errors=0`, `timestamp_gap_errors=0`,
+    `depth_drift_errors=0`, `slot_identity_mismatches=0`,
+    `persistent_slot_reuses=256`, and `fallback_allocations=0`.
+  - `transport-budget-model` now consumes this evidence as
+    `persistent_usb_transport_model_pass=true`.
+- Alternatives rejected:
+  - Re-run prepared-lite or playback scheduler: rejected because both are
+    already physically rejected for product readiness.
+  - Treat `PreparedUsbAsyncRuntime` as enough: rejected because it proves
+    bounded async lifecycle but not persistent request/slot identity.
+  - Bind directly to HAL before the offline model: rejected because that would
+    risk another physical window without stronger lifecycle guarantees.
+- Readiness impact: this is the next implementation direction only. It does
+  not allow any claim of better audio quality, Timecode Vinyl readiness, lower
+  CPU, human product test, or branch promotion until HAL/DriverKit binding and
+  lock-gated same-session physical A/B pass.
