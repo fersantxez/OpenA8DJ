@@ -13055,3 +13055,26 @@ Full offline gate after commit:
     Timecode Vinyl, product-readiness, or branch-promotion superiority until a
     lock-gated same-window wired non-Audio8 known-good route and same-session
     mainline/C++ comparison pass.
+
+## 2026-06-18 - Promotion Window Virtual Capture Blocker
+
+- Commit context: before commit, after `3a793f6`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline preflight fixture and summary/schema wiring only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `python3 scripts/test-promotion-window-contract.py`
+  - `python3 -m py_compile scripts/test-promotion-window-contract.py scripts/physical-window-preflight scripts/validate-known-good-route-request.py`
+  - `git diff --check`
+- Focused result:
+  - `promotion_window_contract=PASS`.
+  - `virtual_capture_window_blocked=true`.
+- Interpretation:
+  - Physical-promotion preflight must reject virtual/pre-device capture
+    selectors such as BlackHole/Soundflower-style routes.
+  - The only promotion-valid capture path remains the physical wired route into
+    the iRig capture device, validated in the same lock-gated window before
+    mainline/C++ A/B comparison.

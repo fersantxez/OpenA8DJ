@@ -931,6 +931,7 @@ int main(int argc, char** argv) {
                     true) &&
       bool_field_is(promotion_window_contract, "audio8_known_good_output_rejected", true) &&
       bool_field_is(promotion_window_contract, "ambiguous_known_good_output_rejected", true) &&
+      bool_field_is(promotion_window_contract, "virtual_capture_window_blocked", true) &&
       object_present(summary, "evidence_provenance_freshness_gate") &&
       bool_field_is(summary, "hardware_touched", false) &&
       bool_field_is(summary, "coreaudio_touched", false) &&

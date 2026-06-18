@@ -2494,6 +2494,7 @@ summary = {
         "built_in_acoustic_diagnostic_window_blocked": "built_in_acoustic_diagnostic_window_blocked=true" in promotion_window_contract,
         "audio8_known_good_output_rejected": "audio8_known_good_output_rejected=true" in promotion_window_contract,
         "ambiguous_known_good_output_rejected": "ambiguous_known_good_output_rejected=true" in promotion_window_contract,
+        "virtual_capture_window_blocked": "virtual_capture_window_blocked=true" in promotion_window_contract,
         "evidence": "local-analysis/cpp-offline/promotion-window-contract.txt",
     },
     "not_ready": [

@@ -1668,7 +1668,8 @@ Purpose:
   route step;
 - preserve the distinction between route diagnostics and product A/B evidence;
 - reject built-in/acoustic, same-device loopback, Audio 8, ambiguous, missing,
-  or skipped known-good routes for promotion.
+  skipped known-good routes, or virtual/pre-device capture selectors for
+  promotion.
 
 Command shape:
 
@@ -1686,6 +1687,7 @@ PASS/FAIL semantics:
 - PASS means the promotion evaluator and route-request checks fail closed for
   missing known-good route evidence, `--skip-known-good`, same-device iRig
   diagnostics, built-in/acoustic routes, Audio 8 as the known-good source, and
-  ambiguous selectors.
+  ambiguous selectors. It also means physical-window preflight rejects virtual
+  capture devices such as BlackHole/Soundflower-style routes.
 - PASS is still not product readiness. It only proves those escape hatches
   cannot be promoted.

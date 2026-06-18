@@ -8994,3 +8994,28 @@ Next implication:
   - Offline summary now exposes `skip_known_good_window_blocked=true`.
 - Readiness impact: stronger claim safety only. This does not validate the
   current iRig route or prove C++ superiority over mainline.
+
+## 2026-06-18 - Reject Virtual Capture In Physical Window Preflight
+
+- Decision: `scripts/physical-window-preflight` now rejects virtual or
+  pre-device capture selectors such as BlackHole, Soundflower, VB-Cable,
+  Background Music, or Loopback-style devices. The contract test now exercises
+  a synthetic BlackHole fixture and the offline summary/schema require
+  `virtual_capture_window_blocked=true`.
+- Reason: a physical superiority window must measure the real wired route into
+  the iRig capture path. A virtual or pre-device capture can make routing and
+  quality evidence look coherent while bypassing the analog path that actually
+  determines audible quality, leakage, noise, and timecode behavior.
+- Alternatives rejected:
+  - Rely only on `run-known-good-route-soundcheck`: rejected because the
+    broader window preflight should fail before any route run is attempted.
+  - Allow virtual capture as diagnostic promotion evidence: rejected because it
+    cannot prove the external analog route, iRig capture health, Audio 8 output
+    quality, CPU behavior under real capture, or Timecode Vinyl readiness.
+- Evidence:
+  - `scripts/physical-window-preflight` accepts `--audio-list-file` for
+    offline fixtures and emits `capture_device_virtual`.
+  - `scripts/test-promotion-window-contract.py` now verifies that a BlackHole
+    capture fixture fails `capture_not_virtual` and is not ready to execute.
+- Readiness impact: stricter physical evidence hygiene only. It does not touch
+  hardware, validate the current route, or allow any product/superiority claim.
