@@ -4705,3 +4705,43 @@ Risks:
 Next action:
 - Run full offline gates after commit; if clean, only then consider a short
   lock-gated SPSC diagnostic smoke with strict unload/recovery.
+
+## 2026-06-18 Bernoulli: 15:00 EDT Human-Test Readiness Review
+
+Subagent:
+- `019edb43-5f35-7610-a38a-9a61ce0dcfc9` (`Bernoulli`)
+
+Required warning given:
+- `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear, instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB sin lock global y sin autorización de ventana.`
+
+Mission:
+- Review, read-only, the blockers and minimum gates for a first human-test
+  candidate by 15:00 America/New_York.
+
+Findings:
+- Recommended a controlled HAL/PKG diagnostic path for today, not DriverKit/dext
+  and not a product-quality claim.
+- Identified reproducible identity as the first blocker: current source,
+  evidence, package hashes, and commit must match.
+- DriverKit remains blocked by tooling, SDK, `iig`, disk, and
+  entitlements/provisioning.
+- Current iRig route is not promotable: no known-good non-Audio8 route is
+  available, same-device iRig diagnostics fail, and physical music metrics fail
+  for current C++, ISO5 diagnostic, and same-session mainline.
+- CPU/resource, Traktor/timecode physical lock, full A/B/C/D physical routing,
+  and same-session mainline comparison remain gaps.
+
+Integrated action:
+- Updated the human-test candidate runbook with a 11:06-15:00 EDT
+  stabilization plan.
+- Updated direct USB and capture-forensics tools so evidence under
+  `local-analysis/human-test-candidate` participates in offline claim gates.
+- Regenerated offline diagnostic evidence under `local-analysis/cpp-offline`.
+
+Risks:
+- A human diagnostic listen may still be useful, but it must not be labeled as
+  product readiness or superiority while capture-route metrics are blocked.
+
+Next action:
+- Freeze a reproducible candidate with offline gates and package hashes, then
+  only run lock-gated hardware smoke if the route and rollback preflights pass.

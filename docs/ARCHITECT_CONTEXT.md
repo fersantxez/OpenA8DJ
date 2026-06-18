@@ -3073,3 +3073,12 @@ Current implication:
   quality collapsed (`quality_alignment_score=0.112023`, `analog_snr_db=-20.50`,
   `lag_jumps_gt_2_frames=45`) and driver CPU still sampled near `18.8%`.
   The default HAL has been returned to per-frame input ring publication.
+- 15:00 EDT human-test guidance update: by 11:06 EDT, the actionable target is
+  one frozen installable HAL/PKG candidate plus a limited human-test decision
+  packet. Current direct USB evidence is internally clean
+  (`usb_alignment_score=1.000000`, `usb_snr_floor_db=999.000000`) but the
+  latest iRig physical capture still fails strict quality metrics
+  (`quality_alignment_score=0.829634`, SNR floor `2.582235 dB`), so product
+  quality, mainline-superiority, Timecode Vinyl physical readiness, and branch
+  promotion claims remain blocked unless the route is revalidated and the
+  frozen candidate passes same-session comparison.

@@ -439,9 +439,15 @@ const DirectRun* latest_attribution_run(const std::vector<DirectRun>& runs) {
 
 int main(int argc, char** argv) {
   const auto root = repo_root(argv);
-  const auto direct_root = root / "local-analysis/direct-usb-soundcheck";
+  const std::vector<std::filesystem::path> direct_roots = {
+      root / "local-analysis/direct-usb-soundcheck",
+      root / "local-analysis/human-test-candidate",
+  };
   std::vector<DirectRun> runs;
-  if (std::filesystem::is_directory(direct_root)) {
+  for (const auto& direct_root : direct_roots) {
+    if (!std::filesystem::is_directory(direct_root)) {
+      continue;
+    }
     for (const auto& entry : std::filesystem::recursive_directory_iterator(direct_root)) {
       if (!entry.is_regular_file() || entry.path().filename() != "driver-diagnostics-analysis.txt") {
         continue;

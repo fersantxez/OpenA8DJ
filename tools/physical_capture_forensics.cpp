@@ -516,6 +516,7 @@ int main(int argc, char** argv) {
     const std::vector<ScanRoot> scan_roots = {
         {root / "local-analysis/soundcheck", "hal_soundcheck"},
         {root / "local-analysis/direct-usb-soundcheck", "direct_usb_soundcheck"},
+        {root / "local-analysis/human-test-candidate", "human_test_candidate"},
         {root / "local-analysis/physical-superiority-window", "physical_superiority_window"},
     };
     std::vector<RunMeta> candidates;

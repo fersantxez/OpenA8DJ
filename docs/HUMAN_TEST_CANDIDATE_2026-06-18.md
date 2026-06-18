@@ -8,6 +8,11 @@ the C++ line beats mainline C.
 ## Decision
 
 - Use the HAL bundle / PKG path for the first human-test candidate.
+- 11:06 EDT status: the target remains a first installable human-test build by
+  15:00 America/New_York, but the evidence only supports a limited diagnostic
+  human window unless the capture route is revalidated first. The direct USB
+  diagnostic path is internally clean, while the physical iRig capture route
+  remains invalid for product-quality claims.
 - 10:27 EDT status: installable packaging is ready, but product human-test
   readiness is blocked by physical quality evidence. Do not start human
   listening from the current candidates except as an explicitly diagnostic,
@@ -189,3 +194,57 @@ Not allowed without further evidence:
 - "Timecode Vinyl physically ready."
 - "Ready for branch promotion."
 - "DriverKit/dext ready."
+
+## 11:06 EDT Stabilization Plan To 15:00 EDT
+
+Goal: produce one conservative installable HAL/PKG candidate and a bounded
+human-test decision packet. This is not a promise of superiority over mainline.
+
+### Phase 1 - 11:06-11:45 EDT: Evidence Board Consistency
+
+- Regenerate offline evidence so current direct USB diagnostics under
+  `local-analysis/human-test-candidate` are visible to the same claim gates as
+  older `local-analysis/direct-usb-soundcheck` runs.
+- PASS criteria:
+  - direct USB attribution sees the latest diagnostic run;
+  - capture route health blocks product claims when physical capture still
+    fails after clean USB payload;
+  - evidence schema remains PASS.
+
+### Phase 2 - 11:45-12:45 EDT: Freeze Candidate
+
+- Freeze the default HAL candidate unless a change has objective CPU/resource
+  upside without altering ISO8 USB cadence, packet bytes, routing, or output
+  timeline semantics.
+- Rebuild `make dist` and record commit/hash/package identity.
+- PASS criteria:
+  - offline gates PASS;
+  - packaging artifacts exist;
+  - no unreviewed diagnostic variant becomes default.
+
+### Phase 3 - 12:45-13:45 EDT: Minimal Hardware Smoke Only If Route Is Valid
+
+- Under lock, verify iRig and Audio 8 DJ visibility.
+- If no known-good external route is available, run only diagnostic smoke and
+  keep claims blocked.
+- PASS criteria for continuing to human listening:
+  - iRig remains visible;
+  - Audio 8 DJ enumerates 8 inputs / 8 outputs;
+  - no runaway CPU;
+  - physical smoke is not in the current failed capture class.
+
+### Phase 4 - 13:45-14:45 EDT: Human Listening Window
+
+- Only if Phase 3 passes, run a short human listening test on the frozen
+  candidate with rollback ready.
+- Collect CPU, driver, CoreAudio, and capture evidence in the same run folder.
+- Stop immediately on severe noise, pops, clicks, device loss, or CPU runaway.
+
+### Phase 5 - 14:45-15:00 EDT: Decision Packet
+
+- Final decision must be one of:
+  - `DIAGNOSTIC_HUMAN_TEST_COMPLETED_NOT_SUPERIOR`;
+  - `HUMAN_TEST_BLOCKED_BY_CAPTURE_ROUTE`;
+  - `LIMITED_HUMAN_TEST_PASS_NEEDS_MAINLINE_AB`;
+  - `PRODUCT_CLAIM_ALLOWED` only if all strict quality, CPU, routing, and
+    same-session comparison gates pass.

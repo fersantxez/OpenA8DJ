@@ -9285,3 +9285,36 @@ Next implication:
 - Readiness impact: this is a CPU-pressure diagnostic candidate only. No
   product quality, lower CPU/resource, Timecode Vinyl, or branch-promotion
   claim is allowed until physical evidence passes.
+
+## 2026-06-18 - Six-Hour Human-Test Target Is A Stabilization Target, Not A Superiority Claim
+
+- Decision: treat the 15:00 America/New_York target as a deadline for a frozen
+  installable HAL/PKG candidate and human-test decision packet, not as a
+  guaranteed product-readiness or branch-promotion deadline.
+- Reason: the latest direct USB diagnostic run proves the internal payload path
+  is clean, but the external iRig capture path still fails strict audio-quality
+  metrics after clean USB payload. A human can still run a controlled
+  diagnostic listen if safety gates pass, but superiority over mainline requires
+  a validated route and same-session A/B evidence.
+- Evidence:
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json` sees the
+    latest run under `local-analysis/human-test-candidate`.
+  - Latest direct USB internals: `usb_alignment_score=1.000000`,
+    `usb_snr_floor_db=999.000000`, `usb_check_errors=0`,
+    `usb_panic_flags=0`.
+  - Latest physical capture: `quality_alignment_score=0.829634`,
+    `capture_snr_floor_db=2.582235`, `audiophile_alignment_score=0.828914`,
+    `audiophile_snr_floor_db=2.574629`.
+  - `capture-route-health.json` reports
+    `measurement_valid_for_promotion=false`, `product_claim_allowed=false`, and
+    `branch_promotion_allowed=false`.
+- Alternatives rejected:
+  - Declare readiness based on clean USB internals: rejected because the user
+    specifically requires audiófilo physical quality, functionality, Timecode
+    Vinyl, performance, and low resource consumption.
+  - Continue changing transport geometry blindly: rejected because recent
+    capture/input batching variants degraded quality and did not prove CPU
+    superiority.
+- Readiness impact: first human-test candidate may proceed only as a limited
+  controlled test if safety and smoke gates pass. Mainline replacement remains
+  blocked.

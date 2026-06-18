@@ -13497,3 +13497,63 @@ Full offline gate after commit:
     SPSC candidate, verify 8x8 enumeration, run input/DVS/timecode-safe smoke
     with iRig capture if the route is valid, then force-unload and record
     cleanup.
+
+## 2026-06-18 - Human-Test Evidence Board Refresh
+
+- Commit context: `cba51e1` plus local evidence-gate scan-root update.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Time: `2026-06-18T15:06:07Z` / `2026-06-18 11:06:07 EDT`.
+- Safety:
+  - Offline existing evidence only.
+  - No hardware lock acquired.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, Traktor/VLC/Spotify automation, or service
+    mutation.
+  - `/Users/fer/dev/opena8dj` and `/Users/fer/dev/audio8djrust` remained
+    read-only.
+- Source/build changes:
+  - `tools/direct_usb_path_attribution.cpp` now scans both
+    `local-analysis/direct-usb-soundcheck` and
+    `local-analysis/human-test-candidate`.
+  - `tools/physical_capture_forensics.cpp` now includes
+    `local-analysis/human-test-candidate` in its offline capture classifier.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_direct_usb_path_attribution opena8djcpp_capture_route_health_gate opena8djcpp_physical_capture_forensics opena8djcpp_evidence_schema_check`
+  - `./build/cpp-release/opena8djcpp_direct_usb_path_attribution > local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `./build/cpp-release/opena8djcpp_capture_route_health_gate > local-analysis/cpp-offline/capture-route-health.json`
+  - `./build/cpp-release/opena8djcpp_physical_capture_forensics > local-analysis/cpp-offline/physical-capture-forensics.json`
+  - `./build/cpp-release/opena8djcpp_evidence_schema_check > local-analysis/cpp-offline/evidence-schema-check.json`
+  - `ctest --test-dir build/cpp-release -R 'direct_usb_path_attribution|capture_route_health|physical_capture_forensics|evidence_schema_check' --output-on-failure`
+- Results:
+  - Focused build: PASS.
+  - Focused CTest: `3/3` PASS.
+  - `direct-usb-path-attribution.json`: PASS as diagnostic, `run_count=15`,
+    `product_candidate_runs=0`.
+  - Latest direct USB run:
+    `local-analysis/human-test-candidate/20260618T150110Z-direct-usb-diag-irig-pairA-8s`.
+  - Latest direct USB internals: `usb_alignment_score=1.000000`,
+    `usb_snr_floor_db=999.000000`, `usb_check_errors=0`,
+    `usb_panic_flags=0`.
+  - Latest physical capture still fails: `quality_alignment_score=0.829634`,
+    `capture_snr_floor_db=2.582235`, `audiophile_alignment_score=0.828914`,
+    `audiophile_snr_floor_db=2.574629`.
+  - `capture-route-health.json`: PASS as diagnostic,
+    `measurement_valid_for_promotion=false`,
+    `product_claim_allowed=false`, `branch_promotion_allowed=false`.
+  - Promotion blockers:
+    `shared_capture_route_unhealthy`,
+    `candidate_not_better_than_mainline_reference`,
+    `direct_usb_capture_failed_after_clean_payload`.
+  - `physical-capture-forensics.json`: PASS as analyzer health,
+    `strict_quality_candidates=0`, `candidate_runs_with_wav=130`,
+    `direct_usb_runs_with_wav=21`.
+  - `evidence-schema-check.json`: PASS, `required_files=85`,
+    `missing_files=0`.
+- Readiness impact:
+  - This improves evidence visibility for the 15:00 EDT human-test decision.
+  - It does not make the current physical route valid for product-quality
+    claims.
+  - It blocks any honest claim that the C++ line is already audibly superior to
+    mainline while the latest clean USB payload still produces failed iRig
+    capture metrics.
