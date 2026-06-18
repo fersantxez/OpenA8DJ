@@ -2583,11 +2583,12 @@ Current implementation:
   - `built_in_acoustic_diagnostic_window_blocked=true`;
   - `audio8_known_good_output_rejected=true`;
   - `ambiguous_known_good_output_rejected=true`;
-  - `virtual_capture_window_blocked=true`.
+  - `virtual_capture_window_blocked=true`;
+  - `non_irig_capture_window_blocked=true`.
 - `current-offline-gates.json` must expose the same booleans under
   `promotion_window_contract`, and `opena8djcpp_evidence_schema_check` must
   require them.
 - Product superiority remains impossible while the current physical route uses
   `--skip-known-good`, same-device iRig loopback, built-in/acoustic output, or
-  any virtual/pre-device capture or route that is not a same-window wired
-  non-Audio8 known-good source into the same physical iRig capture path.
+  any virtual/pre-device or non-iRig capture route that is not a same-window
+  wired non-Audio8 known-good source into the same physical iRig capture path.

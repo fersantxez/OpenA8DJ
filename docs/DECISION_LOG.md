@@ -9019,3 +9019,31 @@ Next implication:
     capture fixture fails `capture_not_virtual` and is not ready to execute.
 - Readiness impact: stricter physical evidence hygiene only. It does not touch
   hardware, validate the current route, or allow any product/superiority claim.
+
+## 2026-06-18 - Require iRig Capture For Promotion Windows
+
+- Decision: `scripts/physical-window-preflight`,
+  `scripts/validate-known-good-route-request.py`, and
+  `scripts/run-known-good-route-soundcheck` now require the capture selector to
+  look like the physical iRig/IK Multimedia route. The promotion-window
+  contract now requires `non_irig_capture_window_blocked=true`.
+- Reason: the current physical comparison plan is explicitly
+  `known-good output -> wired analog route -> iRig capture`. A different
+  two-channel input, even if physical and non-virtual, does not prove that the
+  iRig path is alive, wired correctly, clean enough for audiophile metrics, or
+  comparable with the existing mainline evidence.
+- Alternatives rejected:
+  - Allow any physical two-channel capture: rejected because it would weaken
+    the evidence contract and could make a non-iRig ADC masquerade as the
+    validated route.
+  - Rely on operator discipline: rejected because route mistakes have already
+    been a major source of false progress and hardware confusion.
+- Evidence:
+  - `scripts/test-promotion-window-contract.py` now includes synthetic
+    `USB Audio CODEC` fixtures for both physical-window preflight and
+    known-good route request validation.
+  - The fixtures must fail `capture_is_irig`, remain not ready to execute, and
+    keep `valid_for_promotion=false`.
+- Readiness impact: stricter route identity only. It does not validate the
+  iRig signal, run hardware, prove sound quality, clear CPU/resource gates, or
+  authorize branch promotion.

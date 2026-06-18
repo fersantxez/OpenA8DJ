@@ -92,6 +92,11 @@ def looks_virtual_capture(value: str) -> bool:
     )
 
 
+def looks_irig_capture(value: str) -> bool:
+    lowered = value.lower()
+    return "irig" in lowered or "ik multimedia" in lowered
+
+
 def parse_audio_list(text: str) -> list[dict[str, object]]:
     devices: list[dict[str, object]] = []
     pattern = re.compile(
@@ -392,6 +397,7 @@ def main() -> int:
     built_in_known_good_output = requires_known_good and built_in_or_acoustic_output(known_good_identity)
     resolved_known_good_audio8 = requires_known_good and audio8ish(known_good_identity)
     virtual_capture = looks_virtual_capture(capture_identity)
+    irig_capture = looks_irig_capture(capture_identity)
 
     mainline_candidate_metrics = hal_bundle_metrics(mainline_candidate)
     candidate_metrics = hal_bundle_metrics(candidate)
@@ -415,6 +421,7 @@ def main() -> int:
         ),
         gate("irig_capture_visible", capture is not None and int(capture.get("inputs", 0)) >= 2, {"device": capture or {}, "requested": args.capture_device}, "capture device must be visible with at least two inputs"),
         gate("capture_not_virtual", not virtual_capture, {"identity": capture_identity, "device": capture or {}}, "capture must be the physical iRig path, not a virtual/pre-device loopback"),
+        gate("capture_is_irig", irig_capture, {"identity": capture_identity, "device": capture or {}}, "physical promotion capture must be the iRig/IK Multimedia route"),
         gate("audio8_usb_visible", args.route_only or usb_present, usb_metrics, "Audio 8 DJ must be visible on USB before HAL install/reload"),
         gate("opena8dj_coreaudio_absent_or_valid", open_audio8 is None or (int(open_audio8.get("inputs", 0)) == 8 and int(open_audio8.get("outputs", 0)) == 8), {"device": open_audio8 or {}}, "if already loaded, Open Audio 8 DJ must expose 8 in / 8 out"),
         gate("mainline_candidate_complete", not requires_mainline or hal_bundle_ready(mainline_candidate), mainline_candidate_metrics, "mainline HAL bundle must include Contents/MacOS/OpenA8DJHAL"),
@@ -452,6 +459,7 @@ def main() -> int:
         "known_good_output_same_as_capture": same_known_good_capture_device,
         "known_good_output_builtin_or_acoustic": built_in_known_good_output,
         "capture_device_virtual": virtual_capture,
+        "capture_device_is_irig": irig_capture,
         "known_good_output_match_count": len(known_good_matches),
         "capture_device_match_count": len(capture_matches),
         "devices": devices,

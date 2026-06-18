@@ -274,6 +274,89 @@ def run_virtual_capture_preflight_fixture(root: Path) -> dict:
     return json.loads(output.read_text(encoding="utf-8"))
 
 
+def run_non_irig_capture_preflight_fixture(root: Path) -> dict:
+    root.mkdir(parents=True, exist_ok=True)
+    audio_list = root / "audio-list.txt"
+    audio_list.write_text(
+        "\n".join(
+            [
+                "Dispositivos Core Audio: 2",
+                "  1  id=81  Wired Test Output  uid=ExternalWiredOutput  in=0 out=2 rate=48000",
+                "  2  id=82  USB Audio CODEC  uid=USBExternalCapture  in=2 out=0 rate=48000",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    reference = root / "reference.wav"
+    reference.write_bytes(b"fixture")
+    output = root / "physical-window-preflight.json"
+    completed = subprocess.run(
+        [
+            "python3",
+            str(ROOT / "scripts/physical-window-preflight"),
+            "--route-only",
+            "--audio-list-file",
+            str(audio_list),
+            "--known-good-output-device",
+            "Wired Test Output",
+            "--capture-device",
+            "USB Audio CODEC",
+            "--reference-wav",
+            str(reference),
+            "--json-out",
+            str(output),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 1:
+        raise AssertionError("non-iRig capture preflight did not fail")
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
+def run_non_irig_known_good_request_fixture(root: Path) -> dict:
+    root.mkdir(parents=True, exist_ok=True)
+    audio_list = root / "audio-list.txt"
+    audio_list.write_text(
+        "\n".join(
+            [
+                "Dispositivos Core Audio: 2",
+                "  1  id=81  Wired Test Output  uid=ExternalWiredOutput  in=0 out=2 rate=48000",
+                "  2  id=82  USB Audio CODEC  uid=USBExternalCapture  in=2 out=0 rate=48000",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    output = root / "known-good-request.json"
+    completed = subprocess.run(
+        [
+            "python3",
+            str(ROOT / "scripts/validate-known-good-route-request.py"),
+            "--audio-list-file",
+            str(audio_list),
+            "--output-device",
+            "Wired Test Output",
+            "--capture-device",
+            "USB Audio CODEC",
+            "--json-out",
+            str(output),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 1:
+        raise AssertionError("non-iRig known-good route request did not fail")
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="opena8djcpp-promotion-contract-") as temp:
         root = Path(temp)
@@ -339,6 +422,20 @@ def main() -> int:
         if virtual_capture.get("capture_device_virtual") is not True:
             raise AssertionError("virtual capture flag was not preserved")
 
+        non_irig_preflight = run_non_irig_capture_preflight_fixture(root / "non-irig-capture-preflight")
+        if gate(non_irig_preflight, "capture_is_irig")["result"] != "FAIL":
+            raise AssertionError("non-iRig capture preflight was not rejected")
+        if non_irig_preflight.get("ready_to_execute_physical_window") is not False:
+            raise AssertionError("non-iRig capture preflight was considered ready")
+        if non_irig_preflight.get("capture_device_is_irig") is not False:
+            raise AssertionError("non-iRig capture flag was not preserved")
+
+        non_irig_request = run_non_irig_known_good_request_fixture(root / "non-irig-known-good-request")
+        if gate(non_irig_request, "capture_is_irig")["result"] != "FAIL":
+            raise AssertionError("non-iRig known-good route request was not rejected")
+        if non_irig_request["valid_for_promotion"] is not False:
+            raise AssertionError("non-iRig capture route was considered valid")
+
     print("promotion_window_contract=PASS")
     print("missing_known_good_route_blocked=true")
     print("skip_known_good_window_blocked=true")
@@ -347,6 +444,7 @@ def main() -> int:
     print("audio8_known_good_output_rejected=true")
     print("ambiguous_known_good_output_rejected=true")
     print("virtual_capture_window_blocked=true")
+    print("non_irig_capture_window_blocked=true")
     return 0
 
 

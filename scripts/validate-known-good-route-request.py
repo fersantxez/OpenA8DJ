@@ -62,6 +62,11 @@ def looks_virtual_capture(value: str) -> bool:
     )
 
 
+def looks_irig_capture(value: str) -> bool:
+    lowered = value.lower()
+    return "irig" in lowered or "ik multimedia" in lowered
+
+
 def parse_audio_list(text: str) -> list[dict[str, object]]:
     devices: list[dict[str, object]] = []
     pattern = re.compile(
@@ -172,6 +177,7 @@ def main() -> int:
     resolved_audio8 = audio8ish(output_identity)
     built_in_output = built_in_or_acoustic_output(output_identity)
     virtual_capture = looks_virtual_capture(capture_identity)
+    irig_capture = looks_irig_capture(capture_identity)
 
     gates = [
         pass_gate("audio_list_available", {"return_code": audio_rc, "device_count": len(devices)})
@@ -212,6 +218,9 @@ def main() -> int:
         pass_gate("capture_not_virtual", {"identity": capture_identity})
         if not virtual_capture
         else fail_gate("capture_not_virtual", {"identity": capture_identity}, "capture appears virtual or pre-device"),
+        pass_gate("capture_is_irig", {"identity": capture_identity})
+        if irig_capture
+        else fail_gate("capture_is_irig", {"identity": capture_identity}, "capture must resolve to the physical iRig/IK Multimedia route"),
     ]
     passed = all(gate["result"] == "PASS" for gate in gates)
     report = {
@@ -231,6 +240,7 @@ def main() -> int:
         "output_builtin_or_acoustic": built_in_output,
         "output_same_as_capture": same_device,
         "capture_virtual": virtual_capture,
+        "capture_is_irig": irig_capture,
         "devices": devices,
         "gates": gates,
     }

@@ -1668,8 +1668,8 @@ Purpose:
   route step;
 - preserve the distinction between route diagnostics and product A/B evidence;
 - reject built-in/acoustic, same-device loopback, Audio 8, ambiguous, missing,
-  skipped known-good routes, or virtual/pre-device capture selectors for
-  promotion.
+  skipped known-good routes, virtual/pre-device capture selectors, or non-iRig
+  capture selectors for promotion.
 
 Command shape:
 
@@ -1688,6 +1688,7 @@ PASS/FAIL semantics:
   missing known-good route evidence, `--skip-known-good`, same-device iRig
   diagnostics, built-in/acoustic routes, Audio 8 as the known-good source, and
   ambiguous selectors. It also means physical-window preflight rejects virtual
-  capture devices such as BlackHole/Soundflower-style routes.
+  capture devices such as BlackHole/Soundflower-style routes and physical
+  capture devices that do not resolve to the iRig/IK Multimedia route.
 - PASS is still not product readiness. It only proves those escape hatches
   cannot be promoted.

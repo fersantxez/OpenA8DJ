@@ -13078,3 +13078,26 @@ Full offline gate after commit:
   - The only promotion-valid capture path remains the physical wired route into
     the iRig capture device, validated in the same lock-gated window before
     mainline/C++ A/B comparison.
+
+## 2026-06-18 - Promotion Window iRig Capture Identity Blocker
+
+- Commit context: before commit, after `581af6a`.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline preflight and route-request fixtures only.
+  - No playback, recording, driver install/load/unload, CoreAudio restart, USB
+    reset, default-device change, or hardware access.
+- Commands:
+  - `python3 scripts/test-promotion-window-contract.py`
+  - `python3 -m py_compile scripts/test-promotion-window-contract.py scripts/physical-window-preflight scripts/validate-known-good-route-request.py`
+  - `git diff --check`
+- Focused result:
+  - `promotion_window_contract=PASS`.
+  - `non_irig_capture_window_blocked=true`.
+- Interpretation:
+  - A physical two-channel input that is not iRig/IK Multimedia cannot be used
+    as promotion evidence for this project.
+  - The promotion-valid route remains a same-window wired non-Audio8
+    known-good output captured by the physical iRig path, followed by
+    same-session mainline/C++ A/B comparison.

@@ -61,6 +61,17 @@ looks_virtual_capture() {
   return 1
 }
 
+looks_irig_capture() {
+  local value
+  value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$value" in
+    *irig*|*ik\ multimedia*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 built_in_or_acoustic_output() {
   local value
   value="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
@@ -212,6 +223,10 @@ if [ -z "$capture_device" ]; then
 fi
 if looks_virtual_capture "$capture_device"; then
   echo "capture-device appears virtual/pre-device: $capture_device" >&2
+  exit 2
+fi
+if ! looks_irig_capture "$capture_device" && ! looks_irig_capture "$capture_device_uid"; then
+  echo "capture-device must be the physical iRig/IK Multimedia route: $capture_device" >&2
   exit 2
 fi
 if [ "$allow_same_device_loopback_diagnostic" -ne 1 ] && [ -n "$output_device" ]; then
