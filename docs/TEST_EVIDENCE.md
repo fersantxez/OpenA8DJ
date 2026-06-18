@@ -1,5 +1,47 @@
 # Test Evidence
 
+## 2026-06-18: Direct USB Time-Warp Attribution Hardened
+
+- Scope:
+  - Added automatic Python and C++ fractional time-warp analysis to future
+    Direct USB soundchecks.
+  - Reanalyzed the latest Direct USB Pair A evidence from
+    `20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`.
+  - Hardened Direct USB path attribution, physical-window readiness, and schema
+    checks so route-blocking evidence must prove the failure is not explained
+    by simple fractional delay/time-warp.
+  - No hardware, CoreAudio playback/capture, USB reset, driver load/unload,
+    default-device change, or service restart was performed for this analysis.
+- Commands:
+  - `.venv/bin/python scripts/analyze-fractional-time-warp.py --json-out local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp.json local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`
+  - `./build/cpp-release/opena8djcpp_fractional_time_warp --json-out local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp-cpp.json local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s`
+  - `./build/cpp-release/opena8djcpp_direct_usb_path_attribution | tee local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `./build/cpp-release/opena8djcpp_physical_window_readiness_gate | tee local-analysis/cpp-offline/physical-window-readiness-gate.json`
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Python time-warp: `fractional_time_warp_rejected`.
+  - C++ time-warp: `fractional_time_warp_rejected`.
+  - Scalar SNR improvement after time-warp: `0.295694 dB`.
+  - Matrix SNR improvement after time-warp: `0.235850 dB`.
+  - Direct USB attribution now reports
+    `post_usb_device_analog_or_capture_route_dominant_timewarp_rejected` and
+    `capture_failed_after_clean_not_timewarp_explained=true`.
+  - Full offline gates: Debug CTest `77/77` PASS, Release CTest `78/78` PASS.
+    Freshness/provenance reported FAIL before commit because the worktree was
+    dirty, correctly blocking current-candidate claims.
+- Evidence:
+  - `local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp.json`
+  - `local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp-cpp.json`
+  - `local-analysis/cpp-offline/direct-usb-path-attribution.json`
+  - `local-analysis/cpp-offline/physical-window-readiness-gate.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+- Interpretation:
+  - The present failure is not explained away by simple independent-clock drift
+    or fractional delay correction. Internal USB remains perfect, but the
+    signal-bearing physical route fails after that boundary. Product quality,
+    CPU/resource superiority, Timecode Vinyl readiness, and branch promotion
+    remain blocked.
+
 ## 2026-06-18: Post-Commit Direct USB Recheck Still Blocks Route
 
 - Scope:

@@ -119,8 +119,13 @@ int main(int argc, char** argv) {
       string_field_is(direct_usb, "result", "PASS") && latest_direct_usb.has_value() &&
       bool_field_is(*latest_direct_usb, "internal_clean", true) &&
       bool_field_is(*latest_direct_usb, "capture_failed", true) &&
+      bool_field_is(*latest_direct_usb, "has_timewarp_evidence", true) &&
+      string_field_is(*latest_direct_usb, "timewarp_classification",
+                      "fractional_time_warp_rejected") &&
+      bool_field_is(*latest_direct_usb,
+                    "capture_failed_after_clean_not_timewarp_explained", true) &&
       string_field_is(direct_usb, "readiness_claim",
-                      "DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS");
+                      "DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS_AND_TIMEWARP_DOES_NOT_EXPLAIN_IT");
   const bool historical_route_not_current =
       string_field_is(historical_route, "result", "PASS") &&
       bool_field_is(historical_route, "historical_reference_currently_valid_for_promotion", false) &&

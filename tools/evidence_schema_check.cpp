@@ -650,6 +650,13 @@ int main(int argc, char** argv) {
       object_present(direct_usb_path_attribution, "latest_run") &&
       bool_field_is(direct_usb_latest_run, "internal_clean", true) &&
       bool_field_is(direct_usb_latest_run, "capture_failed", true) &&
+      bool_field_is(direct_usb_latest_run, "has_timewarp_evidence", true) &&
+      string_field_is(direct_usb_latest_run, "timewarp_classification",
+                      "fractional_time_warp_rejected") &&
+      bool_field_is(direct_usb_latest_run,
+                    "capture_failed_after_clean_not_timewarp_explained", true) &&
+      number_field_present(direct_usb_latest_run, "timewarp_scalar_improvement_db") &&
+      number_field_present(direct_usb_latest_run, "timewarp_matrix_improvement_db") &&
       number_field_present(direct_usb_latest_run, "usb_alignment_score") &&
       number_field_present(direct_usb_latest_run, "usb_snr_floor_db") &&
       string_field_is(direct_usb_latest_run, "audiophile_wav_analysis_result", "FAIL") &&

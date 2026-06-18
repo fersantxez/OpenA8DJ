@@ -58,12 +58,20 @@ struct DirectRun {
   double failure_polynomial_improve_db = std::numeric_limits<double>::quiet_NaN();
   double lti_mid_coherence = std::numeric_limits<double>::quiet_NaN();
   double lti_snr_delta_db = std::numeric_limits<double>::quiet_NaN();
+  bool has_timewarp_evidence = false;
+  std::string timewarp_result;
+  std::string timewarp_classification;
+  double timewarp_scalar_improvement_db = std::numeric_limits<double>::quiet_NaN();
+  double timewarp_matrix_improvement_db = std::numeric_limits<double>::quiet_NaN();
+  double timewarp_delay_p95_frames = std::numeric_limits<double>::quiet_NaN();
+  double timewarp_jump_p95_frames = std::numeric_limits<double>::quiet_NaN();
   bool physical_routing_pass = false;
   double max_wrong_source_leakage_db = std::numeric_limits<double>::quiet_NaN();
 
   std::string attribution;
   bool internal_clean = false;
   bool capture_failed = false;
+  bool capture_failed_after_clean_not_timewarp_explained = false;
 };
 
 std::filesystem::path repo_root(char** argv) {
@@ -213,6 +221,39 @@ std::string json_slice_from_key(const std::string& json, const std::string& key)
   return json.substr(key_pos);
 }
 
+std::optional<std::filesystem::path> first_existing_timewarp_file(
+    const std::filesystem::path& dir) {
+  for (const auto& name : {"fractional-time-warp-cpp.json", "fractional-time-warp.json"}) {
+    const auto path = dir / name;
+    if (std::filesystem::is_regular_file(path)) {
+      return path;
+    }
+  }
+  std::optional<std::filesystem::path> newest;
+  std::filesystem::file_time_type newest_time{};
+  std::error_code error;
+  for (const auto& entry : std::filesystem::directory_iterator(dir, error)) {
+    if (error || !entry.is_regular_file()) {
+      continue;
+    }
+    const auto filename = entry.path().filename().string();
+    if (filename.rfind("fractional-time-warp", 0) != 0 ||
+        entry.path().extension() != ".json") {
+      continue;
+    }
+    const auto time = std::filesystem::last_write_time(entry.path(), error);
+    if (error) {
+      error.clear();
+      continue;
+    }
+    if (!newest.has_value() || time > newest_time) {
+      newest = entry.path();
+      newest_time = time;
+    }
+  }
+  return newest;
+}
+
 double number_or_nan(std::optional<double> value) {
   return value.value_or(std::numeric_limits<double>::quiet_NaN());
 }
@@ -259,6 +300,8 @@ DirectRun read_run(const std::filesystem::path& dir) {
   const auto lti = read_file(dir / "lti-transfer-quality.json");
   const auto tone_matrix = read_file(dir / "tone-matrix.json");
   const auto audiophile = read_file(dir / "audiophile-wav-analysis-maxlag6.json");
+  const auto timewarp_path = first_existing_timewarp_file(dir);
+  const auto timewarp = timewarp_path.has_value() ? read_file(*timewarp_path) : std::string{};
   run.has_required_artifacts = !diagnostics.empty() && (!native.empty() || !metrics.empty());
   for (const auto& path : {dir / "driver-diagnostics-analysis.txt", dir / "native-wav-quality.json",
                            dir / "metrics.json", dir / "failure-modes.json",
@@ -267,6 +310,9 @@ DirectRun read_run(const std::filesystem::path& dir) {
     if (std::filesystem::is_regular_file(path)) {
       update_evidence_time(run, path);
     }
+  }
+  if (timewarp_path.has_value()) {
+    update_evidence_time(run, *timewarp_path);
   }
 
   run.written_alignment = number_or_nan(key_value_number(diagnostics, "written_alignment_score"));
@@ -318,6 +364,16 @@ DirectRun read_run(const std::filesystem::path& dir) {
   }
   run.lti_mid_coherence = number_or_nan(json_number(lti, "min_mid_coherence"));
   run.lti_snr_delta_db = number_or_nan(json_number(lti, "min_lti_snr_delta_db"));
+  run.has_timewarp_evidence = !timewarp.empty();
+  run.timewarp_result = json_string(timewarp, "result").value_or("missing");
+  run.timewarp_classification = json_string(timewarp, "classification").value_or("missing");
+  run.timewarp_scalar_improvement_db =
+      number_or_nan(json_number(json_slice_from_key(timewarp, "global_scalar"), "improvement_db"));
+  run.timewarp_matrix_improvement_db =
+      number_or_nan(json_number(json_slice_from_key(timewarp, "global_matrix"), "improvement_db"));
+  const auto delay_slice = json_slice_from_key(timewarp, "delay");
+  run.timewarp_delay_p95_frames = number_or_nan(json_number(delay_slice, "p95_abs_frames"));
+  run.timewarp_jump_p95_frames = number_or_nan(json_number(delay_slice, "jump_p95_frames"));
   run.physical_routing_pass = json_string(tone_matrix, "result").value_or("missing") == "PASS";
   run.max_wrong_source_leakage_db =
       number_or_nan(json_number(tone_matrix, "max_wrong_source_leakage_db"));
@@ -343,8 +399,16 @@ DirectRun read_run(const std::filesystem::path& dir) {
        (finite(run.capture_mid_ratio) && run.capture_mid_ratio > 1.0) ||
        (finite(run.capture_high_ratio) && run.capture_high_ratio > 1.0) ||
        audiophile_claim_blocked);
+  const double best_timewarp_improvement =
+      std::max(run.timewarp_scalar_improvement_db, run.timewarp_matrix_improvement_db);
+  run.capture_failed_after_clean_not_timewarp_explained =
+      run.internal_clean && run.capture_failed && run.has_timewarp_evidence &&
+      run.timewarp_classification == "fractional_time_warp_rejected" &&
+      finite(best_timewarp_improvement) && best_timewarp_improvement < 3.0;
   if (run.internal_clean && run.capture_failed) {
-    run.attribution = "post_usb_device_analog_or_capture_route_dominant";
+    run.attribution = run.capture_failed_after_clean_not_timewarp_explained
+                          ? "post_usb_device_analog_or_capture_route_dominant_timewarp_rejected"
+                          : "post_usb_device_analog_or_capture_route_dominant";
   } else if (!run.internal_clean) {
     run.attribution = "internal_usb_payload_not_clean";
   } else {
@@ -392,12 +456,17 @@ int main(int argc, char** argv) {
   std::uint32_t required_artifact_runs = 0;
   std::uint32_t internal_clean_runs = 0;
   std::uint32_t capture_failed_after_clean_runs = 0;
+  std::uint32_t capture_failed_after_clean_not_timewarp_explained_runs = 0;
+  std::uint32_t timewarp_evidence_runs = 0;
   std::uint32_t product_candidates = 0;
   std::uint32_t physical_routing_pass_runs = 0;
   for (const auto& run : runs) {
     required_artifact_runs += run.has_required_artifacts ? 1U : 0U;
     internal_clean_runs += run.internal_clean ? 1U : 0U;
     capture_failed_after_clean_runs += (run.internal_clean && run.capture_failed) ? 1U : 0U;
+    capture_failed_after_clean_not_timewarp_explained_runs +=
+        run.capture_failed_after_clean_not_timewarp_explained ? 1U : 0U;
+    timewarp_evidence_runs += run.has_timewarp_evidence ? 1U : 0U;
     physical_routing_pass_runs += run.physical_routing_pass ? 1U : 0U;
     const auto snr_floor = std::min(run.capture_left_snr, run.capture_right_snr);
     product_candidates +=
@@ -405,7 +474,8 @@ int main(int argc, char** argv) {
                                                                                               : 0U;
   }
   const auto* latest = latest_attribution_run(runs);
-  const bool pass = latest != nullptr && latest->internal_clean && latest->capture_failed;
+  const bool pass = latest != nullptr && latest->internal_clean && latest->capture_failed &&
+                    latest->capture_failed_after_clean_not_timewarp_explained;
 
   std::cout << std::fixed << std::setprecision(6);
   std::cout << "{\n"
@@ -417,6 +487,9 @@ int main(int argc, char** argv) {
             << "  \"required_artifact_runs\": " << required_artifact_runs << ",\n"
             << "  \"internal_clean_runs\": " << internal_clean_runs << ",\n"
             << "  \"capture_failed_after_clean_runs\": " << capture_failed_after_clean_runs << ",\n"
+            << "  \"timewarp_evidence_runs\": " << timewarp_evidence_runs << ",\n"
+            << "  \"capture_failed_after_clean_not_timewarp_explained_runs\": "
+            << capture_failed_after_clean_not_timewarp_explained_runs << ",\n"
             << "  \"physical_routing_pass_runs\": " << physical_routing_pass_runs << ",\n"
             << "  \"product_candidate_runs\": " << product_candidates << ",\n"
             << "  \"latest_run\": ";
@@ -435,6 +508,21 @@ int main(int argc, char** argv) {
     print_number(latest->capture_high_ratio);
     std::cout << ", \"native_lag_jumps_gt_2_frames\": ";
     print_number(latest->capture_lag_jumps);
+    std::cout << ", \"has_timewarp_evidence\": "
+              << (latest->has_timewarp_evidence ? "true" : "false");
+    std::cout << ", \"timewarp_result\": \"" << json_escape(latest->timewarp_result) << "\"";
+    std::cout << ", \"timewarp_classification\": \""
+              << json_escape(latest->timewarp_classification) << "\"";
+    std::cout << ", \"timewarp_scalar_improvement_db\": ";
+    print_number(latest->timewarp_scalar_improvement_db);
+    std::cout << ", \"timewarp_matrix_improvement_db\": ";
+    print_number(latest->timewarp_matrix_improvement_db);
+    std::cout << ", \"timewarp_delay_p95_frames\": ";
+    print_number(latest->timewarp_delay_p95_frames);
+    std::cout << ", \"timewarp_jump_p95_frames\": ";
+    print_number(latest->timewarp_jump_p95_frames);
+    std::cout << ", \"capture_failed_after_clean_not_timewarp_explained\": "
+              << (latest->capture_failed_after_clean_not_timewarp_explained ? "true" : "false");
     std::cout << ", \"audiophile_wav_analysis_result\": \""
               << json_escape(latest->audiophile_result) << "\"";
     std::cout << ", \"audiophile_alignment_score\": ";
@@ -476,7 +564,7 @@ int main(int argc, char** argv) {
   } else {
     std::cout << "null,\n";
   }
-  std::cout << "  \"readiness_claim\": \"DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS\"\n"
+  std::cout << "  \"readiness_claim\": \"DIAGNOSTIC_ONLY_DIRECT_USB_PHYSICAL_CAPTURE_STILL_FAILS_AND_TIMEWARP_DOES_NOT_EXPLAIN_IT\"\n"
             << "}\n";
   return pass ? 0 : 1;
 }

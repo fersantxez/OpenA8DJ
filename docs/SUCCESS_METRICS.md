@@ -50,7 +50,14 @@ Any hardware-sensitive gate must report a blocked status, not PASS.
 - `capture_route_health_gate` must include
   `direct_usb_capture_failed_after_clean_payload=false` before physical quality
   evidence can support promotion. The current value is `true`, with latest
-  attribution `post_usb_device_analog_or_capture_route_dominant`.
+  attribution
+  `post_usb_device_analog_or_capture_route_dominant_timewarp_rejected`.
+- Direct USB route attribution must also include time-warp evidence for the
+  latest clean-internal/failing-capture run. The current blocker is accepted
+  only because `timewarp_classification=fractional_time_warp_rejected`,
+  `timewarp_scalar_improvement_db=0.295694`,
+  `timewarp_matrix_improvement_db=0.235850`, and
+  `capture_failed_after_clean_not_timewarp_explained=true`.
 - `capture_route_health_gate.result=PASS` is diagnostic-only unless the same
   object also reports `route_measurement_status=VALID_FOR_PROMOTION`,
   `measurement_valid_for_promotion=true`, `product_claim_allowed=true`, and

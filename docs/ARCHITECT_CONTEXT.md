@@ -23,8 +23,12 @@ Branch: `driverkit/cpp-redesign`
   `5.280257 dB`, audiophile alignment `0.798421`, mid coherence floor
   `0.631541`). A post-run iRig idle capture passed with max RMS
   `-63.654750 dBFS` and max peak `-37.322302 dBFS`. Current attribution
-  remains `post_usb_device_analog_or_capture_route_dominant`; this blocks
-  product quality, CPU/resource, Timecode Vinyl, and branch-promotion claims.
+  is now stricter:
+  `post_usb_device_analog_or_capture_route_dominant_timewarp_rejected`.
+  C++ and Python fractional time-warp analysis both classify the run as
+  `fractional_time_warp_rejected`, with only `0.295694 dB` scalar and
+  `0.235850 dB` matrix SNR improvement. This blocks product quality,
+  CPU/resource, Timecode Vinyl, and branch-promotion claims.
 - 2026-06-18 capture route diagnostic semantics status:
   `capture_route_health_gate.result=PASS` now means only that the offline
   diagnostic ran over existing evidence. The same artifact and the top-level
@@ -35,11 +39,15 @@ Branch: `driverkit/cpp-redesign`
   `capture_route_health_not_product`.
 - 2026-06-18 direct USB analysis hardening status: future
   `scripts/run-direct-usb-soundcheck` runs now automatically generate
-  `audiophile-wav-analysis-maxlag6.json` with a 6-second lag search, and the
-  audiophile analysis stack contract requires it. This preserves the corrected
-  attribution from the current route regression: internal USB payload evidence
-  can be clean while the physical analog/iRig capture route still fails. This
-  is not readiness evidence; it is fail-closed measurement discipline.
+  `audiophile-wav-analysis-maxlag6.json`, `fractional-time-warp.json`, and
+  `fractional-time-warp-cpp.json`. The direct USB attribution gate now requires
+  time-warp evidence on the latest run and exposes
+  `capture_failed_after_clean_not_timewarp_explained=true` before the route
+  blocker is accepted. This preserves the corrected attribution from the
+  current route regression: internal USB payload evidence can be clean while
+  the physical analog/iRig capture route still fails for reasons not explained
+  by simple fractional delay/time-warp. This is not readiness evidence; it is
+  fail-closed measurement discipline.
 - 2026-06-18 capture-batch diagnostic status: C++ now has an opt-in HAL build
   profile, `make hal-capture-batch-diagnostic`, that keeps logical playback at
   ISO8 while batching capture at `HAL_CAPTURE_ISO_FRAMES=64`. The default HAL

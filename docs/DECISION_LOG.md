@@ -1,5 +1,40 @@
 # Decision Log
 
+## 2026-06-18 - Require Time-Warp Rejection Before Direct USB Route Attribution Blocks Claims
+
+Decision:
+- `scripts/run-direct-usb-soundcheck` now runs both the Python and C++
+  fractional time-warp analyzers after every Direct USB capture.
+- `opena8djcpp_direct_usb_path_attribution` now consumes that evidence and
+  requires the latest clean-internal/failing-capture run to report
+  `capture_failed_after_clean_not_timewarp_explained=true`.
+- `opena8djcpp_physical_window_readiness_gate` and
+  `opena8djcpp_evidence_schema_check` require the same time-warp rejection
+  fields before treating Direct USB as a valid route blocker.
+
+Reason:
+- The latest Direct USB run estimated about `-165.649 ppm` drift, so a weak
+  analysis could incorrectly blame independent clock drift and understate the
+  physical route problem.
+- The stronger evidence rejects that explanation: Python and C++ time-warp
+  analyzers classify the run as `fractional_time_warp_rejected`, with only
+  `0.295694 dB` scalar and `0.235850 dB` matrix SNR improvement.
+- Therefore the blocker is not merely "timing might be off"; the route still
+  has large post-USB analog/capture residual after simple time-warp correction.
+
+Evidence:
+- `local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp.json`
+- `local-analysis/direct-usb-soundcheck/20260618T100915Z-direct-usb-post-d696aa8-irig-pairA-12s/fractional-time-warp-cpp.json`
+- `local-analysis/cpp-offline/direct-usb-path-attribution.json`
+- Full offline gates after the change: Debug CTest `77/77` PASS, Release
+  CTest `78/78` PASS. Provenance/freshness correctly reported FAIL before
+  commit because the worktree was dirty.
+
+Next implication:
+- The next allowed physical window is still route revalidation only. Product
+  A/B, CPU superiority, Traktor/timecode, and branch promotion remain blocked
+  until a validated route and same-session mainline/C++ comparison pass.
+
 ## 2026-06-18 - Require Strong Known-Good Route Evidence Before Product A/B
 
 Decision:

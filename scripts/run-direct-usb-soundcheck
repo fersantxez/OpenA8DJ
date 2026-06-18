@@ -364,6 +364,15 @@ analysis_rc="${analysis_rc:-0}"
 "$python_bin" "$root/scripts/analyze-lti-transfer-quality.py" "$run_dir" \
   --json-out "$run_dir/lti-transfer-quality.json" \
   > "$run_dir/lti-transfer-quality.log" 2>&1 || true
+"$python_bin" "$root/scripts/analyze-fractional-time-warp.py" "$run_dir" \
+  --json-out "$run_dir/fractional-time-warp.json" \
+  > "$run_dir/fractional-time-warp.log" 2>&1 || true
+if [ -x "$root/build/cpp-release/opena8djcpp_fractional_time_warp" ]; then
+  "$root/build/cpp-release/opena8djcpp_fractional_time_warp" \
+    --json-out "$run_dir/fractional-time-warp-cpp.json" \
+    "$run_dir" \
+    > "$run_dir/fractional-time-warp-cpp.log" 2>&1 || true
+fi
 
 audiophile_maxlag6_rc=0
 "$python_bin" "$root/scripts/analyze-audiophile-wav.py" \
