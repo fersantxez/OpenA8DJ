@@ -14000,3 +14000,73 @@ Full offline gate after commit:
   - The RC remains installable only as a diagnostic HAL candidate.
   - Product human listening, Timecode Vinyl physical readiness,
     CPU/resource superiority, and branch promotion remain blocked.
+
+## 2026-06-18 - Physical Evidence Window Planner Focused Checks
+
+- Commit context: local changes after `f28a733`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Read-only planning and filesystem/hash checks only.
+  - No hardware lock acquired.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+  - Mainline was read only at `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`.
+- Commands:
+  - `python3 -m py_compile scripts/plan-physical-evidence-window scripts/test-plan-physical-evidence-window.py`
+  - `bash -n scripts/run-cpp-offline-gates`
+  - `python3 scripts/test-plan-physical-evidence-window.py`
+  - `python3 scripts/plan-physical-evidence-window --watcher-json local-analysis/cpp-offline/watch-known-good-route-live-continuation.json --json-out local-analysis/cpp-offline/physical-evidence-window-plan-live-continuation.json`
+- Result:
+  - Py compile and shell syntax: PASS.
+  - Fixture self-test: PASS with `BLOCKED`, `ROUTE_ONLY_READY`, and
+    `FULL_AB_READY` cases.
+  - Live plan: `result=PASS`, `status=BLOCKED`,
+    `route_only_ready=false`, `full_ab_ready=false`.
+  - Current C++ candidate bundle: complete, HAL hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Current read-only mainline bundle: complete, HAL hash
+    `569c7303a1a9672d40c56eeee914eadccdbcd541562e1d2d674d1a3ffb9b90dc`.
+  - Live blocker:
+    `non_audio8_non_builtin_known_good_output_not_visible`.
+- Readiness impact:
+  - The next physical route/A-B commands can now be generated deterministically
+    once the watcher reports READY.
+  - Product human listening, Timecode Vinyl physical readiness, CPU/resource
+    superiority, and branch promotion remain blocked.
+
+## 2026-06-18 - Full Offline Gates With Physical Evidence Window Planner
+
+- Commit context: local changes after `f28a733`; expected provenance failure
+  until commit.
+- Worktree: `/Users/fer/dev/audio8djcpp`.
+- Branch: `driverkit/cpp-redesign`.
+- Safety:
+  - Offline build/package/evidence regeneration plus read-only CoreAudio
+    inventory and bundle-hash planning.
+  - No hardware lock acquired by the offline script.
+  - No playback, recording, default-device change, sample-rate change, buffer
+    change, USB reset, service restart, driver install/load/unload, or reboot.
+- Command:
+  - `./scripts/run-cpp-offline-gates`
+- Result:
+  - Debug/default CTest: `83/83` PASS.
+  - Release CTest: `84/84` PASS.
+  - Evidence schema: PASS, `required_files=91`, `missing_files=0`,
+    `summary_pass=true`, `manifest_pass=true`.
+  - Offline summary: `status=PASS`, `diagnostic_status=PASS`.
+  - Physical evidence window plan: `status=BLOCKED`,
+    `route_only_ready=false`, `full_ab_ready=false`,
+    `next_action=PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`.
+  - C++ candidate bundle hash:
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb`.
+  - Mainline read-only candidate bundle hash:
+    `569c7303a1a9672d40c56eeee914eadccdbcd541562e1d2d674d1a3ffb9b90dc`.
+  - Provenance freshness: FAIL only because the worktree had uncommitted
+    planner/docs/schema changes during this pre-commit run.
+- Readiness impact:
+  - The next physical window is now command-planned but remains blocked by the
+    missing non-Audio8 known-good output.
+  - Product human listening, Timecode Vinyl physical readiness,
+    CPU/resource superiority, and branch promotion remain blocked.

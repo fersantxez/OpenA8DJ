@@ -1,0 +1,315 @@
+#!/usr/bin/env python3
+"""Plan the next lock-gated physical evidence window from route readiness.
+
+This is a read-only planner. It does not acquire the hardware lock, play audio,
+record audio, install or unload drivers, restart CoreAudio, reset USB, change
+defaults, or mutate the mainline/Rust worktrees. It consumes the known-good
+route watcher output and emits exact commands for the next physical window.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MAINLINE_CANDIDATE = Path("/Users/fer/dev/opena8dj/build/OpenA8DJ.driver")
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def resolve_path(value: str | None) -> Path | None:
+    if not value:
+        return None
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def hal_bundle(path: Path | None) -> dict[str, Any]:
+    executable = path / "Contents/MacOS/OpenA8DJHAL" if path is not None else None
+    complete = bool(path and path.is_dir() and executable and executable.is_file())
+    return {
+        "path": str(path) if path else "",
+        "bundle_exists": bool(path and path.is_dir()),
+        "executable": str(executable) if executable else "",
+        "executable_exists": bool(executable and executable.is_file()),
+        "executable_bytes": executable.stat().st_size if executable and executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable and executable.is_file() else "",
+        "complete": complete,
+    }
+
+
+def shell_hint(argv: list[str]) -> str:
+    def quote(value: str) -> str:
+        if re.fullmatch(r"[A-Za-z0-9_./:=+,-]+", value):
+            return value
+        return "'" + value.replace("'", "'\"'\"'") + "'"
+
+    return " ".join(quote(item) for item in argv)
+
+
+def run_watcher(args: argparse.Namespace, output: Path) -> tuple[int, dict[str, Any]]:
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/watch-known-good-route"),
+        "--timeout-seconds",
+        str(args.watch_timeout_seconds),
+        "--interval-seconds",
+        str(args.watch_interval_seconds),
+        "--json-out",
+        str(output),
+    ]
+    if args.reference_wav:
+        command.extend(["--reference-wav", args.reference_wav])
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    return completed.returncode, load_json(output)
+
+
+def selected_route(watcher: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    selector = watcher.get("last_selector")
+    if not isinstance(selector, dict):
+        selector = {}
+    output = selector.get("selected_known_good_output")
+    capture = selector.get("selected_irig_capture")
+    return (
+        output if isinstance(output, dict) else {},
+        capture if isinstance(capture, dict) else {},
+    )
+
+
+def build_route_command(
+    args: argparse.Namespace,
+    run_dir: str,
+    output: dict[str, Any],
+    capture: dict[str, Any],
+    reference: Path,
+) -> list[str]:
+    return [
+        "scripts/run-physical-superiority-window",
+        "--execute",
+        "--route-only",
+        "--skip-build",
+        "--run-dir",
+        f"{run_dir}/route-validation",
+        "--known-good-output-device-uid",
+        str(output.get("uid", "")),
+        "--capture-device",
+        str(capture.get("name", args.capture_device)),
+        "--capture-channels",
+        args.capture_channels,
+        "--reference-wav",
+        str(reference),
+        "--seconds",
+        str(args.seconds),
+    ]
+
+
+def build_full_command(
+    args: argparse.Namespace,
+    run_dir: str,
+    output: dict[str, Any],
+    capture: dict[str, Any],
+    reference: Path,
+    mainline: Path,
+    candidate: Path,
+) -> list[str]:
+    command = [
+        "scripts/run-physical-superiority-window",
+        "--execute",
+        "--skip-build",
+        "--run-dir",
+        f"{run_dir}/same-session-ab",
+        "--mainline-candidate",
+        str(mainline),
+        "--candidate",
+        str(candidate),
+        "--known-good-output-device-uid",
+        str(output.get("uid", "")),
+        "--capture-device",
+        str(capture.get("name", args.capture_device)),
+        "--capture-channels",
+        args.capture_channels,
+        "--reference-wav",
+        str(reference),
+        "--pair",
+        args.pair,
+        "--seconds",
+        str(args.seconds),
+        "--rate",
+        str(args.rate),
+        "--buffer",
+        str(args.buffer),
+    ]
+    if args.music_file:
+        command.extend(["--music-file", str(resolve_path(args.music_file))])
+    if args.prepared_runtime_candidate:
+        command.append("--prepared-runtime-candidate")
+    return command
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--watcher-json", default="")
+    parser.add_argument("--json-out", default="")
+    parser.add_argument("--run-dir", default="local-analysis/physical-evidence-window/<timestamp>")
+    parser.add_argument("--candidate", default="build/OpenA8DJ.driver")
+    parser.add_argument("--mainline-candidate", default=str(DEFAULT_MAINLINE_CANDIDATE))
+    parser.add_argument("--reference-wav", default="")
+    parser.add_argument("--music-file", default="")
+    parser.add_argument("--capture-device", default="iRig Stream")
+    parser.add_argument("--capture-channels", default="1,2")
+    parser.add_argument("--pair", default="A")
+    parser.add_argument("--seconds", default="12")
+    parser.add_argument("--rate", default="48000")
+    parser.add_argument("--buffer", default="512")
+    parser.add_argument("--watch-timeout-seconds", type=float, default=0.0)
+    parser.add_argument("--watch-interval-seconds", type=float, default=2.0)
+    parser.add_argument("--prepared-runtime-candidate", action="store_true")
+    args = parser.parse_args()
+
+    if args.watcher_json:
+        watcher_path = resolve_path(args.watcher_json)
+        watcher_rc = 0
+        watcher = load_json(watcher_path) if watcher_path else {}
+    else:
+        watcher_path = ROOT / "local-analysis/cpp-offline/watch-known-good-route.json"
+        watcher_path.parent.mkdir(parents=True, exist_ok=True)
+        watcher_rc, watcher = run_watcher(args, watcher_path)
+
+    output, capture = selected_route(watcher)
+    candidate_path = resolve_path(args.candidate)
+    mainline_path = resolve_path(args.mainline_candidate)
+    reference_path = resolve_path(args.reference_wav) or resolve_path(
+        watcher.get("last_selector", {}).get("reference_wav")
+        if isinstance(watcher.get("last_selector"), dict)
+        else ""
+    )
+    candidate = hal_bundle(candidate_path)
+    mainline = hal_bundle(mainline_path)
+    run_dir = args.run_dir.replace("<timestamp>", datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+
+    blockers: list[str] = []
+    watcher_ok = watcher.get("result") == "PASS" and watcher_rc in (0, 2)
+    route_ready = watcher_ok and watcher.get("route_revalidation_ready") is True
+    if not watcher_ok:
+        blockers.append("known_good_route_watcher_failed")
+    if not route_ready:
+        blockers.extend(watcher.get("last_selector", {}).get("blockers", []) if isinstance(watcher.get("last_selector"), dict) else [])
+        if "known_good_route_not_ready" not in blockers:
+            blockers.append("known_good_route_not_ready")
+    if not reference_path or not reference_path.is_file():
+        blockers.append("reference_wav_missing")
+    if not candidate["complete"]:
+        blockers.append("cpp_candidate_bundle_incomplete")
+    if not mainline["complete"]:
+        blockers.append("mainline_candidate_bundle_incomplete")
+    if route_ready and not output.get("uid"):
+        blockers.append("known_good_output_uid_missing")
+    if route_ready and not capture.get("name"):
+        blockers.append("irig_capture_name_missing")
+
+    route_only_ready = (
+        route_ready
+        and bool(reference_path and reference_path.is_file())
+        and bool(output.get("uid"))
+        and bool(capture.get("name"))
+    )
+    full_ab_ready = route_only_ready and candidate["complete"] and mainline["complete"]
+
+    route_command = (
+        build_route_command(args, run_dir, output, capture, reference_path)
+        if route_only_ready and reference_path
+        else []
+    )
+    full_command = (
+        build_full_command(args, run_dir, output, capture, reference_path, mainline_path, candidate_path)
+        if full_ab_ready and reference_path and mainline_path and candidate_path
+        else []
+    )
+    unique_blockers = list(dict.fromkeys(blockers))
+    status = "FULL_AB_READY" if full_ab_ready else "ROUTE_ONLY_READY" if route_only_ready else "BLOCKED"
+    report = {
+        "schema": "opena8djcpp.physical-evidence-window-plan.v1",
+        "timestamp_utc": utc_now(),
+        "safety": "read_only_plan_only_no_lock_audio_capture_playback_driver_coreaudio_usb_defaults_or_external_worktree_mutation",
+        "result": "PASS" if watcher_ok else "FAIL",
+        "status": status,
+        "route_revalidation_ready": route_ready,
+        "route_only_ready": route_only_ready,
+        "full_ab_ready": full_ab_ready,
+        "product_claim_allowed": False,
+        "branch_promotion_allowed": False,
+        "lock_required_before_command": True,
+        "watcher_json": str(watcher_path) if watcher_path else "",
+        "watcher_status": watcher.get("status", ""),
+        "watcher_return_code": watcher_rc,
+        "selected_known_good_output": output,
+        "selected_irig_capture": capture,
+        "candidate": candidate,
+        "mainline_candidate": mainline,
+        "reference_wav": str(reference_path) if reference_path else "",
+        "music_file": str(resolve_path(args.music_file)) if args.music_file else "",
+        "run_dir": run_dir,
+        "route_only_command_argv": route_command,
+        "route_only_command_shell_hint": shell_hint(route_command) if route_command else "",
+        "full_ab_command_argv": full_command,
+        "full_ab_command_shell_hint": shell_hint(full_command) if full_command else "",
+        "blockers": unique_blockers,
+        "next_action": (
+            "ACQUIRE_LOCK_AND_RUN_FULL_AB_COMMAND"
+            if full_ab_ready
+            else "ACQUIRE_LOCK_AND_RUN_ROUTE_ONLY_COMMAND"
+            if route_only_ready
+            else "PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION"
+        ),
+        "meaning": (
+            "PASS means the physical window has been planned or explicitly blocked; it is not product readiness"
+        ),
+    }
+    text = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        output_path = resolve_path(args.json_out)
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0 if watcher_ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

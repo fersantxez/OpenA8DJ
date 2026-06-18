@@ -141,6 +141,8 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/known-good-route-selector.json",
       root / "local-analysis/cpp-offline/watch-known-good-route.json",
       root / "local-analysis/cpp-offline/watch-known-good-route-test.txt",
+      root / "local-analysis/cpp-offline/physical-evidence-window-plan.json",
+      root / "local-analysis/cpp-offline/physical-evidence-window-plan-test.txt",
       root / "local-analysis/cpp-offline/capture-readiness-contract.json",
       root / "local-analysis/cpp-offline/evidence-json-contract.json",
       root / "local-analysis/cpp-offline/diagnostic-pass-semantics-gate.json",
@@ -261,6 +263,9 @@ int main(int argc, char** argv) {
       opena8djcpp::evidence_json::json_object(summary, "known_good_route_selector").value_or("");
   const auto watch_known_good_route =
       opena8djcpp::evidence_json::json_object(summary, "watch_known_good_route").value_or("");
+  const auto physical_evidence_window_plan =
+      opena8djcpp::evidence_json::json_object(summary, "physical_evidence_window_plan")
+          .value_or("");
   const auto capture_readiness_contract =
       opena8djcpp::evidence_json::json_object(summary, "capture_readiness_contract").value_or("");
   const auto transport_budget_model =
@@ -310,6 +315,10 @@ int main(int argc, char** argv) {
       string_field_present(summary, "watch_known_good_route_status") &&
       bool_field_present(summary, "watch_known_good_route_ready") &&
       string_field_present(summary, "watch_known_good_route_next_action") &&
+      string_field_present(summary, "physical_evidence_window_plan_status") &&
+      bool_field_present(summary, "physical_evidence_window_plan_route_only_ready") &&
+      bool_field_present(summary, "physical_evidence_window_plan_full_ab_ready") &&
+      string_field_present(summary, "physical_evidence_window_plan_next_action") &&
       string_field_is(summary, "human_test_rc_status", "PASS") &&
       bool_field_present(summary, "human_test_diagnostic_rc_artifacts_ready") &&
       bool_field_is(summary, "human_test_product_allowed", false) &&
@@ -841,6 +850,21 @@ int main(int argc, char** argv) {
       bool_field_is(watch_known_good_route, "lock_required_before_command", true) &&
       bool_field_is(watch_known_good_route, "product_claim_allowed", false) &&
       bool_field_is(watch_known_good_route, "branch_promotion_allowed", false) &&
+      object_present(summary, "physical_evidence_window_plan") &&
+      string_field_is(physical_evidence_window_plan, "status", "PASS") &&
+      string_field_is(physical_evidence_window_plan, "schema",
+                      "opena8djcpp.physical-evidence-window-plan.v1") &&
+      string_field_present(physical_evidence_window_plan, "plan_status") &&
+      bool_field_present(physical_evidence_window_plan, "route_revalidation_ready") &&
+      bool_field_present(physical_evidence_window_plan, "route_only_ready") &&
+      bool_field_present(physical_evidence_window_plan, "full_ab_ready") &&
+      object_present(physical_evidence_window_plan, "candidate") &&
+      object_present(physical_evidence_window_plan, "mainline_candidate") &&
+      string_field_present(physical_evidence_window_plan, "next_action") &&
+      string_field_present(physical_evidence_window_plan, "evidence") &&
+      bool_field_is(physical_evidence_window_plan, "lock_required_before_command", true) &&
+      bool_field_is(physical_evidence_window_plan, "product_claim_allowed", false) &&
+      bool_field_is(physical_evidence_window_plan, "branch_promotion_allowed", false) &&
       object_present(summary, "capture_readiness_contract") &&
       string_field_is(capture_readiness_contract, "status", "PASS") &&
       string_field_is(capture_readiness_contract, "capture_status", "VISIBLE") &&

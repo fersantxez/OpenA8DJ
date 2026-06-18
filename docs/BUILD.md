@@ -1317,3 +1317,23 @@ run next. Exit `2` means the watcher ran correctly but the route is still
 blocked. It never acquires the hardware lock, plays audio, records audio,
 changes defaults, restarts services, resets USB, installs/unloads drivers, or
 touches worktrees outside `/Users/fer/dev/audio8djcpp`.
+
+## Physical Evidence Window Planner
+
+After the watcher writes JSON, generate the next route-only or full same-session
+A/B command without touching audio:
+
+```sh
+scripts/plan-physical-evidence-window \
+  --watcher-json local-analysis/cpp-offline/watch-known-good-route.json \
+  --candidate build/OpenA8DJ.driver \
+  --mainline-candidate /Users/fer/dev/opena8dj/build/OpenA8DJ.driver \
+  --json-out local-analysis/cpp-offline/physical-evidence-window-plan.json
+```
+
+The planner is read-only. It hashes the candidate bundles, checks whether the
+known-good route is ready, and emits command argv plus shell hints for the next
+lock-gated physical step. `ROUTE_ONLY_READY` authorizes only route validation
+after lock acquisition. `FULL_AB_READY` means both the route and the C++/mainline
+bundle identities are present for a same-session A/B window. Neither status is
+a product-quality, CPU, Timecode Vinyl, or branch-promotion claim.

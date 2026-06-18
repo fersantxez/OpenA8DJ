@@ -9583,3 +9583,33 @@ Next implication:
 - Readiness impact: improves the path to a controlled human test. It does not
   unblock product-quality listening, Timecode Vinyl physical readiness, CPU
   superiority, or branch promotion until physical evidence exists.
+
+## 2026-06-18 - Plan Physical Evidence Window From Watcher State
+
+- Decision: add a read-only physical evidence window planner that consumes the
+  route watcher JSON, validates C++ and mainline HAL bundle identity, and emits
+  exact lock-gated route-only and full same-session A/B commands when ready.
+- Reason: once the non-Audio8 known-good output appears, the team needs to move
+  quickly without improvising command arguments, device UIDs, candidate paths,
+  or evidence directories. The planner makes the next physical action
+  reproducible while keeping all product claims fail-closed.
+- Evidence:
+  - Fixture self-test covers blocked watcher, route-only readiness, and full
+    A/B readiness.
+  - Live plan reports the current C++ candidate hash
+    `23a2d5c9d48cf36f6e79d73652c139bd7f1413b5fde7537257db7ed5182e3fcb` and
+    a complete read-only mainline candidate at
+    `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`.
+  - Live plan remains `status=BLOCKED`, `route_only_ready=false`, and
+    `full_ab_ready=false` with blocker
+    `non_audio8_non_builtin_known_good_output_not_visible`.
+- Alternatives rejected:
+  - Let the operator manually compose the physical window command after the
+    watcher turns ready: rejected because UID/path mistakes would waste the
+    short physical window and weaken evidence attribution.
+  - Automatically execute the next command from the planner: rejected because
+    playback, capture, HAL install/reload, and CoreAudio effects must stay
+    behind explicit hardware lock authorization.
+- Readiness impact: improves readiness to collect decisive physical evidence.
+  It does not itself validate sound quality, CPU superiority, Timecode Vinyl,
+  or branch promotion.

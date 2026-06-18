@@ -3154,3 +3154,11 @@ Current implication:
   output (`route_revalidation_ready=false`,
   `next_action=PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`).
   This is a human-window accelerator, not product readiness.
+- Physical evidence window planner update: `scripts/plan-physical-evidence-window`
+  now consumes watcher output and produces the exact lock-gated route-only and
+  full same-session A/B commands when prerequisites are present. Current live
+  plan classifies the C++ HAL candidate and `/Users/fer/dev/opena8dj/build/OpenA8DJ.driver`
+  mainline bundle as complete, but keeps `status=BLOCKED`,
+  `route_only_ready=false`, and `full_ab_ready=false` because the known-good
+  non-Audio8 output is still missing. This reduces human-window ambiguity
+  without touching mainline, Rust, hardware, CoreAudio, USB, or defaults.

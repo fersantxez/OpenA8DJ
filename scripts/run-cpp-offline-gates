@@ -237,6 +237,10 @@ if [[ "$WATCH_KNOWN_GOOD_ROUTE_RC" -ne 0 && "$WATCH_KNOWN_GOOD_ROUTE_RC" -ne 2 ]
   exit "$WATCH_KNOWN_GOOD_ROUTE_RC"
 fi
 printf '%s\n' "$WATCH_KNOWN_GOOD_ROUTE_RC" > "$EVIDENCE_DIR/watch-known-good-route.rc"
+python3 scripts/plan-physical-evidence-window \
+  --watcher-json "$EVIDENCE_DIR/watch-known-good-route.json" \
+  --json-out "$EVIDENCE_DIR/physical-evidence-window-plan.json" \
+  >/dev/null
 ./build/cpp-release/opena8djcpp_capture_readiness_contract | tee "$EVIDENCE_DIR/capture-readiness-contract.json"
 ./build/cpp-release/opena8djcpp_physical_route_matrix_contract | tee "$EVIDENCE_DIR/physical-route-matrix-contract.json"
 python3 scripts/check-stream-stats-contract.py | tee "$EVIDENCE_DIR/stream-stats-contract.json"
@@ -250,15 +254,18 @@ python3 -m py_compile \
   scripts/test-promotion-window-contract.py \
   scripts/test-known-good-route-selector.py \
   scripts/test-watch-known-good-route.py \
+  scripts/test-plan-physical-evidence-window.py \
   scripts/validate-known-good-route-request.py \
   scripts/known-good-route-selector \
   scripts/watch-known-good-route \
+  scripts/plan-physical-evidence-window \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
   scripts/analyze-audiophile-wav.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
 python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-good-route-selector-test.txt"
 python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-good-route-test.txt"
+python3 scripts/test-plan-physical-evidence-window.py | tee "$EVIDENCE_DIR/physical-evidence-window-plan-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -380,6 +387,7 @@ physical_window_readiness_gate = load_json("physical-window-readiness-gate.json"
 physical_route_inventory = load_json("physical-route-inventory.json")
 known_good_route_selector = load_json("known-good-route-selector.json")
 watch_known_good_route = load_json("watch-known-good-route.json")
+physical_evidence_window_plan = load_json("physical-evidence-window-plan.json")
 capture_readiness_contract = load_json("capture-readiness-contract.json")
 physical_route_matrix_contract = load_json("physical-route-matrix-contract.json")
 diagnostic_pass_semantics_gate = load_json("diagnostic-pass-semantics-gate.json")
@@ -507,6 +515,16 @@ summary = {
     "watch_known_good_route_status": watch_known_good_route.get("status"),
     "watch_known_good_route_ready": watch_known_good_route.get("route_revalidation_ready"),
     "watch_known_good_route_next_action": watch_known_good_route.get("next_action"),
+    "physical_evidence_window_plan_status": physical_evidence_window_plan.get("status"),
+    "physical_evidence_window_plan_route_only_ready": physical_evidence_window_plan.get(
+        "route_only_ready"
+    ),
+    "physical_evidence_window_plan_full_ab_ready": physical_evidence_window_plan.get(
+        "full_ab_ready"
+    ),
+    "physical_evidence_window_plan_next_action": physical_evidence_window_plan.get(
+        "next_action"
+    ),
     "human_test_rc_status": human_test_rc_gate.get("result"),
     "human_test_diagnostic_rc_artifacts_ready": human_test_rc_gate.get(
         "diagnostic_rc_artifacts_ready"
@@ -1424,6 +1442,46 @@ summary = {
         ),
         "meaning": watch_known_good_route.get("meaning"),
         "evidence": "local-analysis/cpp-offline/watch-known-good-route.json",
+    },
+    "physical_evidence_window_plan": {
+        "status": physical_evidence_window_plan.get("result"),
+        "schema": physical_evidence_window_plan.get("schema"),
+        "plan_status": physical_evidence_window_plan.get("status"),
+        "route_revalidation_ready": physical_evidence_window_plan.get(
+            "route_revalidation_ready"
+        ),
+        "route_only_ready": physical_evidence_window_plan.get("route_only_ready"),
+        "full_ab_ready": physical_evidence_window_plan.get("full_ab_ready"),
+        "selected_known_good_output": physical_evidence_window_plan.get(
+            "selected_known_good_output"
+        ),
+        "selected_irig_capture": physical_evidence_window_plan.get(
+            "selected_irig_capture"
+        ),
+        "candidate": physical_evidence_window_plan.get("candidate"),
+        "mainline_candidate": physical_evidence_window_plan.get("mainline_candidate"),
+        "route_only_command_argv": physical_evidence_window_plan.get(
+            "route_only_command_argv"
+        ),
+        "route_only_command_shell_hint": physical_evidence_window_plan.get(
+            "route_only_command_shell_hint"
+        ),
+        "full_ab_command_argv": physical_evidence_window_plan.get("full_ab_command_argv"),
+        "full_ab_command_shell_hint": physical_evidence_window_plan.get(
+            "full_ab_command_shell_hint"
+        ),
+        "blockers": physical_evidence_window_plan.get("blockers"),
+        "next_action": physical_evidence_window_plan.get("next_action"),
+        "lock_required_before_command": physical_evidence_window_plan.get(
+            "lock_required_before_command"
+        ),
+        "product_claim_allowed": physical_evidence_window_plan.get(
+            "product_claim_allowed"
+        ),
+        "branch_promotion_allowed": physical_evidence_window_plan.get(
+            "branch_promotion_allowed"
+        ),
+        "evidence": "local-analysis/cpp-offline/physical-evidence-window-plan.json",
     },
     "capture_readiness_contract": {
         "status": capture_readiness_contract.get("result"),
