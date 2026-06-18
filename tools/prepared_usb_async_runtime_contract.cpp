@@ -34,7 +34,8 @@ int main() {
       .request_pool = PreparedUsbRequestPoolConfig{.request_slots = 4},
       .slots_per_submit = 8,
       .frames_per_slot = 8,
-      .bytes_per_slot = kMode2DefaultTransferBytes,
+      .capture_bytes_per_slot = 512 * 8,
+      .playback_bytes_per_slot = kMode2DefaultTransferBytes,
       .max_live_requests = 4,
   };
 
@@ -45,12 +46,15 @@ int main() {
   for (std::uint32_t index = 0; index < config.max_live_requests; ++index) {
     const auto direction = (index % 2U) == 0U ? UsbSlotDirection::Capture
                                               : UsbSlotDirection::Playback;
+    const auto bytes_per_slot = direction == UsbSlotDirection::Capture
+                                    ? config.capture_bytes_per_slot
+                                    : config.playback_bytes_per_slot;
     const auto submit = runtime.submit(direction,
                                        index * config.slots_per_submit,
                                        index * config.slots_per_submit * config.frames_per_slot,
                                        config.slots_per_submit,
                                        config.slots_per_submit * config.frames_per_slot,
-                                       config.slots_per_submit * config.bytes_per_slot);
+                                       config.slots_per_submit * bytes_per_slot);
     submissions_ok = submissions_ok && submit.handle.valid();
     handles.push_back(submit.handle);
   }
@@ -76,7 +80,7 @@ int main() {
                                                 config.slots_per_submit *
                                                     config.frames_per_slot,
                                                 config.slots_per_submit *
-                                                    config.bytes_per_slot);
+                                                    config.capture_bytes_per_slot);
     negative_fill_ok = negative_fill_ok && submit.handle.valid();
     negative_handles.push_back(submit.handle);
   }
@@ -87,7 +91,7 @@ int main() {
                   99,
                   config.slots_per_submit,
                   config.slots_per_submit * config.frames_per_slot,
-                  config.slots_per_submit * config.bytes_per_slot)
+                  config.slots_per_submit * config.capture_bytes_per_slot)
           .handle.valid() == false;
   for (const auto& handle : negative_handles) {
     (void)negative_runtime.complete(handle);
@@ -99,8 +103,28 @@ int main() {
                   1024,
                   config.slots_per_submit - 1U,
                   config.slots_per_submit * config.frames_per_slot,
-                  config.slots_per_submit * config.bytes_per_slot)
+                  config.slots_per_submit * config.playback_bytes_per_slot)
           .handle.valid() == false;
+  const auto capture_physical_shape_ok =
+      negative_runtime
+          .submit(UsbSlotDirection::Capture,
+                  256,
+                  2048,
+                  config.slots_per_submit,
+                  config.slots_per_submit * config.frames_per_slot,
+                  config.slots_per_submit * config.capture_bytes_per_slot)
+          .handle.valid();
+  (void)negative_runtime.cancel_all();
+  const auto playback_physical_shape_ok =
+      negative_runtime
+          .submit(UsbSlotDirection::Playback,
+                  264,
+                  2112,
+                  config.slots_per_submit,
+                  config.slots_per_submit * config.frames_per_slot,
+                  config.slots_per_submit * config.playback_bytes_per_slot)
+          .handle.valid();
+  (void)negative_runtime.cancel_all();
   const auto negative_counters = negative_runtime.counters();
   std::vector<const char*> blockers;
   if (!started) blockers.push_back("runtime_start_failed");
@@ -110,6 +134,8 @@ int main() {
   if (!rejected_over_limit) blockers.push_back("live_limit_not_enforced");
   if (!completions_ok) blockers.push_back("explicit_completions_failed");
   if (!rejected_bad_shape) blockers.push_back("descriptor_shape_not_enforced");
+  if (!capture_physical_shape_ok) blockers.push_back("capture_physical_shape_rejected");
+  if (!playback_physical_shape_ok) blockers.push_back("playback_physical_shape_rejected");
   if (counters.submit_calls != 4) blockers.push_back("unexpected_submit_count");
   if (counters.completion_calls != 4) blockers.push_back("unexpected_completion_count");
   if (negative_counters.live_limit_failures != 1) {
@@ -133,7 +159,8 @@ int main() {
             << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n";
   print_number("slots_per_submit", config.slots_per_submit);
   print_number("frames_per_slot", config.frames_per_slot);
-  print_number("bytes_per_slot", config.bytes_per_slot);
+  print_number("capture_bytes_per_slot", config.capture_bytes_per_slot);
+  print_number("playback_bytes_per_slot", config.playback_bytes_per_slot);
   print_number("request_slots", config.request_pool.request_slots);
   print_number("max_live_requests", config.max_live_requests);
   print_number("submit_calls", counters.submit_calls);

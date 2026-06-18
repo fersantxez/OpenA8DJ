@@ -8090,3 +8090,43 @@ Next implication:
 - Offline migration evidence now supports preparing a controlled hardware
   candidate. It still does not prove lower CPU, better sound quality, timecode
   vinyl behavior, or branch promotion.
+
+## 2026-06-18: Use Directional Byte Geometry for Prepared HAL Runtime
+
+Decision:
+- Replace the single prepared-runtime `bytesPerSlot`/`bytes_per_slot` value with
+  separate capture and playback byte geometry.
+- Configure capture as `kIsoBytesPerFrame * kIsoFramesPerTransfer`.
+- Configure playback as `bytesPerPacket * kIsoFramesPerTransfer`.
+
+Reason:
+- The first prepared HAL candidate loaded and enumerated, but the physical
+  diagnostic showed zero real USB submits:
+  `captureTransfersSubmitted=0`, `playbackTransfersSubmitted=0`, and
+  `outputFramesRead=0`.
+- Capture transfer buffers are physically sized as 512-byte ISO transactions,
+  while playback transaction sizes follow the negotiated bytes-per-packet
+  value. A single descriptor byte shape cannot represent both safely.
+
+Evidence:
+- Physical diagnostic:
+  `local-analysis/physical-superiority-window/20260618T071046Z-prepared-candidate-only-skip-route-5d633be`
+- Offline contracts after fix:
+  - `local-analysis/cpp-offline/prepared-usb-async-runtime-contract.json`
+  - `local-analysis/cpp-offline/hal-prepared-runtime-binding-contract.json`
+  - `local-analysis/cpp-offline/prepared-transport-migration-gate.json`
+- Candidate build:
+  - `make -B hal-prepared-runtime-candidate`
+  - Prepared candidate hash:
+    `a54d1aab197c5809c9734b37609a3b6713bf2bef39c78d9a64d48c08101eaea5`
+
+Alternatives discarded:
+- Loosen descriptor byte validation entirely: rejected because it would hide
+  real geometry mistakes in the hot path.
+- Use capture's 512-byte slot size for both directions: rejected because
+  playback would then accept descriptors that do not match submitted payloads.
+
+Next implication:
+- Rerun a lock-gated prepared candidate diagnostic after commit/freshness gates.
+  The first pass criterion is nonzero real capture/playback USB submits with
+  no qfail storm, not audio-quality superiority.

@@ -2782,3 +2782,17 @@ Current implication:
     iRig capture path during a HAL candidate window, or provide another
     non-Audio8 known-good route into the iRig before branch-promotion evidence
     can be accepted.
+  - Prepared HAL physical diagnostic
+    `local-analysis/physical-superiority-window/20260618T071046Z-prepared-candidate-only-skip-route-5d633be`
+    proved the prepared candidate can load and enumerate, but it initially
+    submitted zero USB transfers. Stream stats showed `captureSubmitAttempts`
+    climbing to `33152` while `captureTransfersSubmitted=0`,
+    `playbackTransfersSubmitted=0`, and `outputFramesRead=0`.
+  - Root cause: the C++ prepared async runtime used one bytes-per-slot value for
+    both directions. Real capture uses full 512-byte ISO transactions while
+    playback uses negotiated `bytesPerPacket`, so capture descriptors were
+    rejected before IOUSBHost enqueue.
+  - Current in-progress fix separates `capture_bytes_per_slot` from
+    `playback_bytes_per_slot` in core, bridge, HAL config, and contracts.
+    Focused contracts and full offline gates pass, but provenance remains
+    blocked until the fix is committed and gates are rerun on a clean tree.

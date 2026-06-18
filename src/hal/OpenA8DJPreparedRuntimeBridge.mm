@@ -70,7 +70,8 @@ OpenA8DJPreparedRuntimeBridgeCreate(const OpenA8DJPreparedRuntimeConfig *config)
       },
       .slots_per_submit = config->slotsPerSubmit,
       .frames_per_slot = config->framesPerSlot,
-      .bytes_per_slot = config->bytesPerSlot,
+      .capture_bytes_per_slot = config->captureBytesPerSlot,
+      .playback_bytes_per_slot = config->playbackBytesPerSlot,
       .max_live_requests = config->maxLiveRequests,
   };
   if (!bridge->runtime.start(core_config)) {

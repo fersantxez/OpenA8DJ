@@ -10,7 +10,8 @@ struct PreparedUsbAsyncRuntimeConfig {
   PreparedUsbRequestPoolConfig request_pool{};
   std::uint32_t slots_per_submit = 8;
   std::uint32_t frames_per_slot = 8;
-  std::uint32_t bytes_per_slot = kMode2DefaultTransferBytes;
+  std::uint32_t capture_bytes_per_slot = kMode2DefaultTransferBytes;
+  std::uint32_t playback_bytes_per_slot = kMode2DefaultTransferBytes;
   std::uint32_t max_live_requests = 4;
 };
 
@@ -84,6 +85,7 @@ class PreparedUsbAsyncRuntime {
 
  private:
   [[nodiscard]] bool descriptor_matches_config(const UsbSubmitDescriptor& descriptor) const;
+  [[nodiscard]] std::uint32_t bytes_per_slot_for(UsbSlotDirection direction) const;
   void refresh_counters();
 
   PreparedUsbAsyncRuntimeConfig config_{};

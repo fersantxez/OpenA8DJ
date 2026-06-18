@@ -173,10 +173,18 @@ int main(int argc, char** argv) {
       contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeComplete") &&
       contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeCancelAll") &&
       contains(bridge_header, "OpenA8DJPreparedRuntimeBridgeSnapshotCounters") &&
+      contains(bridge_header, "captureBytesPerSlot") &&
+      contains(bridge_header, "playbackBytesPerSlot") &&
       contains(bridge_source, "opena8djcpp::PreparedUsbAsyncRuntime") &&
+      contains(bridge_source, ".capture_bytes_per_slot = config->captureBytesPerSlot") &&
+      contains(bridge_source, ".playback_bytes_per_slot = config->playbackBytesPerSlot") &&
       contains(bridge_source, "bridge->runtime.submit") &&
       contains(bridge_source, "bridge->runtime.complete") &&
       contains(bridge_source, "bridge->runtime.cancel_all");
+  const bool hal_uses_directional_prepared_byte_geometry =
+      contains(hal_source, ".captureBytesPerSlot = kIsoBytesPerFrame * kIsoFramesPerTransfer") &&
+      contains(hal_source, ".playbackBytesPerSlot = bytesPerPacket * kIsoFramesPerTransfer") &&
+      !contains(hal_source, ".bytesPerSlot = bytesPerPacket * kIsoFramesPerTransfer");
 
   const bool capture_pool_uses_prepared_geometry =
       contains(hal_source, "CreateIsoTransferWithCapacity(kCaptureIsoFramesPerTransfer,") &&
@@ -302,6 +310,9 @@ int main(int argc, char** argv) {
   if (!prepared_bridge_opt_in_build_only) blockers.push_back("prepared_bridge_not_opt_in_only");
   if (!compile_time_geometry_guard_present) blockers.push_back("compile_time_geometry_guard_missing");
   if (!prepared_bridge_api_present) blockers.push_back("prepared_bridge_api_missing");
+  if (!hal_uses_directional_prepared_byte_geometry) {
+    blockers.push_back("hal_directional_prepared_byte_geometry_missing");
+  }
   if (!capture_pool_uses_prepared_geometry) blockers.push_back("capture_pool_not_prepared_geometry");
   if (!playback_pool_uses_prepared_geometry) blockers.push_back("playback_pool_not_prepared_geometry");
   if (!prepared_runtime_dispatch_path_present) {
@@ -341,6 +352,8 @@ int main(int argc, char** argv) {
   print_bool("prepared_bridge_opt_in_build_only", prepared_bridge_opt_in_build_only);
   print_bool("compile_time_geometry_guard_present", compile_time_geometry_guard_present);
   print_bool("prepared_bridge_api_present", prepared_bridge_api_present);
+  print_bool("hal_uses_directional_prepared_byte_geometry",
+             hal_uses_directional_prepared_byte_geometry);
   print_bool("capture_pool_uses_prepared_geometry", capture_pool_uses_prepared_geometry);
   print_bool("playback_pool_uses_prepared_geometry", playback_pool_uses_prepared_geometry);
   print_bool("prepared_runtime_dispatch_path_present", prepared_runtime_dispatch_path_present);

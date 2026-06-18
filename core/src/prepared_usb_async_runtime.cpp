@@ -6,7 +6,8 @@ namespace opena8djcpp {
 
 bool PreparedUsbAsyncRuntime::start(const PreparedUsbAsyncRuntimeConfig& config) {
   if (config.slots_per_submit == 0 || config.frames_per_slot == 0 ||
-      config.bytes_per_slot == 0 || config.max_live_requests == 0 ||
+      config.capture_bytes_per_slot == 0 || config.playback_bytes_per_slot == 0 ||
+      config.max_live_requests == 0 ||
       config.max_live_requests > config.request_pool.request_slots ||
       config.max_live_requests > kPreparedUsbRequestMaxSlots) {
     return false;
@@ -135,7 +136,14 @@ bool PreparedUsbAsyncRuntime::descriptor_matches_config(
     const UsbSubmitDescriptor& descriptor) const {
   return descriptor.slot_count == config_.slots_per_submit &&
          descriptor.frame_count == config_.slots_per_submit * config_.frames_per_slot &&
-         descriptor.byte_count == config_.slots_per_submit * config_.bytes_per_slot;
+         descriptor.byte_count ==
+             config_.slots_per_submit * bytes_per_slot_for(descriptor.direction);
+}
+
+std::uint32_t PreparedUsbAsyncRuntime::bytes_per_slot_for(
+    UsbSlotDirection direction) const {
+  return direction == UsbSlotDirection::Capture ? config_.capture_bytes_per_slot
+                                                : config_.playback_bytes_per_slot;
 }
 
 void PreparedUsbAsyncRuntime::refresh_counters() {

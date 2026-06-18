@@ -20,7 +20,8 @@ typedef struct OpenA8DJPreparedRuntimeConfig {
   uint32_t maxLiveRequests;
   uint32_t slotsPerSubmit;
   uint32_t framesPerSlot;
-  uint32_t bytesPerSlot;
+  uint32_t captureBytesPerSlot;
+  uint32_t playbackBytesPerSlot;
 } OpenA8DJPreparedRuntimeConfig;
 
 typedef struct OpenA8DJPreparedRuntimeHandle {

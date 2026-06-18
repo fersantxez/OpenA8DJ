@@ -11798,3 +11798,54 @@ Full offline gate after commit:
   - This is diagnostic-only evidence and is invalid for product promotion.
   - The hardware lock was released and the post-run inventory confirms no active
     OpenA8DJ HAL install.
+
+## 2026-06-18 Prepared HAL Candidate Diagnostic and Directional Byte Fix
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+  - Starting commit: `5d633be`
+- Physical diagnostic before fix:
+  - Run dir:
+    `local-analysis/physical-superiority-window/20260618T071046Z-prepared-candidate-only-skip-route-5d633be`
+  - Mode: `candidate-only`, `skip-known-good`, prepared-runtime HAL candidate.
+  - HAL safety: `PASS`; CoreAudio enumerated `Open Audio 8 DJ` as 8 in / 8 out.
+  - Soundcheck: `FAIL`.
+  - The run installed the candidate under the global hardware lock, then
+    unloaded it; post-run inventory confirmed no active OpenA8DJ HAL and the
+    lock was released.
+- Root-cause evidence:
+  - `stream-stats-after.txt` reported `captureSubmitAttempts=33152`,
+    `captureTransfersSubmitted=0`, `playbackTransfersSubmitted=0`,
+    `outputFramesRead=0`, and `captureQueueFailures=33152`.
+  - This means the prepared runtime rejected descriptors before real IOUSBHost
+    enqueue. It was not valid sound-quality evidence.
+  - Cause: the first prepared runtime model used one `bytesPerSlot` value for
+    both directions. Physical capture submits use `512 bytes/frame`, while
+    playback uses the negotiated `bytesPerPacket`; capture descriptors were
+    rejected as shape mismatches.
+- Fix:
+  - `PreparedUsbAsyncRuntimeConfig` now has separate
+    `capture_bytes_per_slot` and `playback_bytes_per_slot`.
+  - The HAL bridge exposes `captureBytesPerSlot` and `playbackBytesPerSlot`.
+  - The prepared HAL config binds capture to
+    `kIsoBytesPerFrame * kIsoFramesPerTransfer` and playback to
+    `bytesPerPacket * kIsoFramesPerTransfer`.
+  - The offline async runtime contract now reproduces the physical shape:
+    `capture_bytes_per_slot=4096`, `playback_bytes_per_slot=352`.
+- Offline verification after fix:
+  - `build/cpp-release/opena8djcpp_prepared_usb_async_runtime_contract`: `PASS`.
+  - `build/cpp-release/opena8djcpp_hal_prepared_runtime_binding_contract`: `PASS`.
+  - `build/cpp-release/opena8djcpp_prepared_transport_migration_gate`: `PASS`.
+  - `make -B hal-prepared-runtime-candidate`: `PASS`; prepared candidate hash
+    `a54d1aab197c5809c9734b37609a3b6713bf2bef39c78d9a64d48c08101eaea5`.
+  - `./scripts/run-cpp-offline-gates`: Debug `77/77 PASS`, Release
+    `78/78 PASS`; provenance remained blocked until this fix is committed.
+- Interpretation:
+  - This fixes the immediate no-transfer prepared-runtime blocker found by the
+    physical diagnostic.
+  - It does not prove audio quality, CPU/resource superiority, timecode vinyl
+    behavior, or branch-promotion readiness.
+  - The next allowed physical action is another lock-gated prepared candidate
+    diagnostic to verify real `captureTransfersSubmitted` and
+    `playbackTransfersSubmitted` are nonzero and reduced as expected.

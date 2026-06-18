@@ -4539,7 +4539,8 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         .maxLiveRequests = (uint32_t)(kCaptureQueueDepth + kPlaybackQueueMax),
         .slotsPerSubmit = kPreparedUsbSlotsPerSubmit,
         .framesPerSlot = kIsoFramesPerTransfer,
-        .bytesPerSlot = bytesPerPacket * kIsoFramesPerTransfer,
+        .captureBytesPerSlot = kIsoBytesPerFrame * kIsoFramesPerTransfer,
+        .playbackBytesPerSlot = bytesPerPacket * kIsoFramesPerTransfer,
     };
     _preparedRuntimeBridge = OpenA8DJPreparedRuntimeBridgeCreate(&preparedConfig);
     if (_preparedRuntimeBridge == NULL) {
