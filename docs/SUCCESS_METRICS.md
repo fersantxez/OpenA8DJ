@@ -2297,6 +2297,23 @@ Current implementation:
 - `local-analysis/cpp-offline/audiophile-precision-claim-gate.json` must be
   present and PASS as a guard. PASS means the guard is active; it does not mean
   audiophile superiority.
+- `local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json` must be
+  present and PASS. This validates the optional high-precision WAV analyzer
+  dependency chain and synthetic broadband measurement math. PASS means the
+  analyzer can measure a known clean fixture; it never means the driver is
+  better than mainline.
+- Physical WAV evidence intended for an audiophile claim must be analyzable by
+  `scripts/analyze-audiophile-wav.py` using the exact saved reference WAV from
+  the same run. Minimum per-run expectations before comparison:
+  - no clipping;
+  - residual SNR `>= 45 dB` per channel unless the specific route fixture has a
+    stricter documented threshold;
+  - active mid-band coherence `>= 0.90` per channel;
+  - delay-window p95 `<= 2` frames;
+  - stereo leakage evaluable with a decorrelated reference and worst off-diagonal
+    level `<= -70 dB` relative to the active diagonal.
+  If stereo leakage is not evaluable because the reference is too correlated,
+  the run cannot clear a no-leakage claim.
 - The gate can only allow a precision/superiority claim when:
   - candidate LTI coherence/residual thresholds pass;
   - candidate time-warp stability thresholds pass;

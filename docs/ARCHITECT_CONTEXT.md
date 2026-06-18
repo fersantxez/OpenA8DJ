@@ -2619,3 +2619,20 @@ Current implication:
     routing/decode margin guard. It is not a real Traktor-grade timecode vinyl
     decoder test because it does not model the proprietary vinyl encoding,
     direction/speed semantics, turntable wow/flutter, or scope-lock behavior.
+  - A local analysis virtualenv now exists at `.venv-analysis` with pinned
+    `numpy`, `scipy`, and `soundfile` from `requirements-analysis.txt`.
+    `scripts/analyze-audiophile-wav.py` performs offline WAV precision analysis
+    only: correlation alignment, residual SNR, active-band coherence, transfer
+    ripple, delay-window drift, clipping/DC checks, and stereo leakage when the
+    reference is decorrelated enough to make leakage evaluable.
+  - The offline gate runner now executes
+    `audiophile-wav-analysis-self-test.json`. Current self-test evidence is
+    PASS with alignment score `0.999868`, left/right SNR about `67.97/67.95 dB`,
+    active mid-band coherence about `0.9999999`, delay p95 `0` frames, and
+    worst off-diagonal leakage `-116.678 dB`.
+  - Reanalysis of existing 2026-06-17 physical mainline/C++ captures with their
+    own saved reference WAVs still FAILS. The captures show low residual SNR,
+    low mid-band coherence, delay-window instability, and the selected music
+    reference is not decorrelated enough for a valid stereo leakage claim. This
+    strengthens the blocker: existing physical captures cannot support
+    audiophile superiority or branch promotion.

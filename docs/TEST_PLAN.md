@@ -1465,6 +1465,27 @@ Expected artifact:
 
 - `local-analysis/cpp-offline/product-quality-claim-gate.json`.
 
+### Audiophile WAV Precision Analyzer
+
+Before any future audiophile superiority claim, run the high-precision WAV
+analyzer on the exact saved reference/capture pair from the physical window:
+
+```sh
+. .venv-analysis/bin/activate
+scripts/analyze-audiophile-wav.py \
+  --reference local-analysis/physical-superiority-window/<run>/<leg>/fixture/reference.wav \
+  --capture local-analysis/physical-superiority-window/<run>/<leg>/captured.wav \
+  --seconds 12 \
+  --json-out local-analysis/physical-superiority-window/<run>/<leg>/audiophile-wav-analysis.json
+```
+
+Use the decorrelated fixture, not normal stereo music, for any no-leakage claim.
+If `stereo_matrix.leakage_evaluable=false`, the run cannot clear deck/channel
+leakage readiness even if the music subjectively sounds acceptable.
+
+The analyzer is offline-only. It does not install, unload, reload, or touch any
+driver, USB device, CoreAudio state, default device, sample rate, or buffer size.
+
 PASS/FAIL semantics:
 
 - Current expected PASS means the guard is active and

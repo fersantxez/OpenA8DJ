@@ -3718,3 +3718,33 @@ Risk:
     reports `min_inactive_to_active_tone_gap_db`.
   - `timecode_readiness_gate` now returns FAIL if offline evidence fails, but
     still reports `product_timecode_ready=false` until physical evidence exists.
+
+## 2026-06-18 Subagent Limit and Pascal Runtime Notes
+
+- Attempted new subagent:
+  - Runtime/HAL performance scout for real USB submit reduction.
+- Result:
+  - Spawn failed because the thread had reached the subagent limit.
+- Reused agent context:
+  - Pascal (`019ed798-3e9c-7f41-8f84-a94f82051179`) already had a completed
+    runtime/HAL performance analysis.
+- Safety warning supplied in attempted spawn:
+  - `PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorización de ventana.`
+- Findings reused:
+  - The real HAL runtime still pays `enqueueIORequestWithData` in
+    `queueCaptureTransfer` and `queuePlaybackWithRequests`.
+  - Prepared transport accounting is only meaningful if future patches reduce
+    real submit cadence or expose that cadence as still unreduced.
+  - The current correct blocker remains: no CPU/resource superiority claim while
+    HAL runtime directly requeues USB work.
+- Integrated action this turn:
+  - Added a separate high-precision offline WAV analyzer instead of pretending
+    prepared transport already improves physical runtime.
+  - Kept `opena8djcpp_hal_transport_runtime_gate` blocking runtime superiority.
+- Next recommended action:
+  - Implement real prepared submit runtime or DriverKit USB transport binding,
+    then run a lock-gated same-session physical CPU/quality comparison.

@@ -945,6 +945,51 @@ Implication:
 - Do not substitute a macOS full installer for this dependency; the missing
   component is the DriverKit SDK/toolchain.
 
+## Local Audiophile Analysis Environment
+
+High-precision offline WAV analysis uses a local virtualenv inside this
+worktree. It is ignored by git and does not modify the system Python:
+
+```sh
+scripts/setup-analysis-env
+```
+
+Pinned dependencies live in `requirements-analysis.txt`:
+
+- `numpy`
+- `scipy`
+- `soundfile`
+
+The gate runner uses `.venv-analysis/bin/python` by default. To use another
+interpreter, set:
+
+```sh
+ANALYSIS_PY=/path/to/python scripts/run-cpp-offline-gates
+```
+
+Self-test:
+
+```sh
+. .venv-analysis/bin/activate
+scripts/analyze-audiophile-wav.py \
+  --self-test \
+  --json-out local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json
+```
+
+Analyze an existing physical run without touching hardware:
+
+```sh
+. .venv-analysis/bin/activate
+scripts/analyze-audiophile-wav.py \
+  --reference local-analysis/physical-superiority-window/<run>/<leg>/fixture/reference.wav \
+  --capture local-analysis/physical-superiority-window/<run>/<leg>/captured.wav \
+  --seconds 12 \
+  --json-out local-analysis/physical-superiority-window/<run>/<leg>/audiophile-wav-analysis.json
+```
+
+This tool is read-only with respect to audio hardware. It only reads WAV files
+and writes JSON evidence.
+
 ## Opt-In Capture USB Batching Candidate
 
 Default HAL build:

@@ -10861,3 +10861,59 @@ Full offline gate rerun:
     lock.
   - This is still not physical Traktor/timecode vinyl readiness and does not
     support branch promotion.
+
+## 2026-06-18 Audiophile WAV Analyzer
+
+- Worktree:
+  - `/Users/fer/dev/audio8djcpp`
+  - Branch: `driverkit/cpp-redesign`
+- Scope:
+  - Installed analysis dependencies locally in `.venv-analysis` only.
+  - Added `requirements-analysis.txt`, `scripts/setup-analysis-env`, and
+    `scripts/analyze-audiophile-wav.py`.
+  - Wired the analyzer self-test into `scripts/run-cpp-offline-gates` and
+    evidence schema.
+  - No hardware, USB, CoreAudio, driver install/reload, audio playback,
+    recording, default-device change, sample-rate change, or buffer-size change
+    was performed in this step.
+- Commands:
+  - `python3 -m venv .venv-analysis`
+  - `. .venv-analysis/bin/activate && python -m pip install numpy scipy soundfile`
+  - `scripts/analyze-audiophile-wav.py --self-test --json-out local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json`
+  - `scripts/analyze-audiophile-wav.py --reference local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/mainline-soundcheck/fixture/reference.wav --capture local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/mainline-soundcheck/captured.wav --seconds 12 --label mainline-212050-native-reference --json-out local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/mainline-soundcheck/audiophile-wav-analysis.json`
+  - `scripts/analyze-audiophile-wav.py --reference local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/cpp-soundcheck/fixture/reference.wav --capture local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/cpp-soundcheck/captured.wav --seconds 12 --label cpp-212050-native-reference --json-out local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/cpp-soundcheck/audiophile-wav-analysis.json`
+  - `cmake --build build/cpp-release --target opena8djcpp_evidence_schema_check`
+  - `scripts/run-cpp-offline-gates`
+- Results:
+  - Analyzer self-test: PASS.
+  - Self-test alignment score: `0.999868`.
+  - Self-test left/right SNR: `67.96998559899329` /
+    `67.95169941405572 dB`.
+  - Self-test active mid-band coherence:
+    `0.9999999013082621` / `0.9999999016115548`.
+  - Self-test delay p95: `0` frames.
+  - Self-test stereo leakage evaluable: `true`.
+  - Self-test worst off-diagonal leakage: `-116.67776480772764 dB`.
+  - Existing physical mainline leg reanalysis: FAIL.
+  - Existing physical C++ leg reanalysis: FAIL.
+  - Failure meaning: existing captures still cannot support audiophile
+    superiority because SNR/coherence/delay thresholds are not met, and the
+    selected music reference is too correlated to validate stereo no-leakage.
+  - Full offline gates after clean post-commit rerun: Debug CTest `63/63`
+    PASS, Release CTest `64/64` PASS, evidence schema required files `67`,
+    missing `0`.
+  - Provenance/freshness: PASS in
+    `local-analysis/cpp-offline/evidence-provenance-freshness-gate.json` after
+    a clean post-commit rerun, with `summary_matches_head=true`,
+    `working_tree_clean_for_claim=true`, and
+    `claimable_current_candidate=true` for offline evidence only. Use
+    `local-analysis/cpp-offline/current-offline-gates.json` for the exact
+    commit hash of the latest run.
+- Evidence:
+  - `local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json`
+  - `local-analysis/cpp-offline/current-offline-gates.json`
+  - `local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/mainline-soundcheck/audiophile-wav-analysis.json`
+  - `local-analysis/physical-superiority-window/20260617T212050Z-mainline-vs-cpp-raw-reuse-irig/cpp-soundcheck/audiophile-wav-analysis.json`
+- Interpretation:
+  - This is an analyzer/gate quality improvement, not a driver-readiness result.
+  - Current product readiness remains FAIL and branch promotion remains blocked.

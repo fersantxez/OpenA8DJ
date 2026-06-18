@@ -7198,3 +7198,53 @@ Next implication:
 - The expanded matrix uses a `30 ppm` synthetic frequency-error threshold
   because the current zero-crossing estimator can add several ppm of error
   under simultaneous drift, noise, crosstalk, and dropout.
+
+## 2026-06-18: Add Local SciPy/SoundFile Audiophile WAV Analyzer
+
+Decision:
+- Added a pinned local analysis environment (`requirements-analysis.txt` and
+  `scripts/setup-analysis-env`) inside the C++ worktree.
+- Added `scripts/analyze-audiophile-wav.py` for offline reference/capture WAV
+  analysis.
+- Integrated its synthetic broadband self-test into
+  `scripts/run-cpp-offline-gates`, `current-offline-gates.json`, and evidence
+  schema.
+
+Reason:
+- Existing C++ physical analysis is useful, but the fastest route to more
+  precise audiophile evidence is a dedicated numerical analyzer using proven
+  signal-processing libraries.
+- The analyzer must distinguish measurable sound-quality evidence from invalid
+  capture windows: exact reference matching, active-band coherence, residual
+  SNR, delay-window drift, transfer ripple, clipping, and stereo leakage only
+  when the reference is decorrelated enough.
+
+Evidence:
+- Local environment installed in `.venv-analysis` with `numpy 2.0.2`,
+  `scipy 1.13.1`, and `soundfile 0.13.1`.
+- Self-test PASS:
+  - alignment score `0.999868`;
+  - left/right SNR about `67.97/67.95 dB`;
+  - left/right active mid-band coherence about `0.9999999`;
+  - delay p95 `0` frames;
+  - stereo leakage evaluable;
+  - worst off-diagonal leakage `-116.678 dB`.
+- Reanalysis of existing 2026-06-17 mainline/C++ physical captures still FAILS
+  against each run's saved reference WAV: SNR and coherence are below threshold,
+  delay p95 is above threshold, and the selected music reference is too
+  correlated for a valid stereo leakage claim.
+
+Alternatives discarded:
+- Rely only on hand-written C++ WAV metrics: rejected for this layer because
+  SciPy/SoundFile gives better validated primitives for correlation, coherence,
+  CSD/Welch analysis, and varied WAV IO.
+- Make the new analyzer a product-readiness gate immediately: rejected because
+  the current physical captures are not valid promotion evidence and the tool's
+  self-test only validates the analyzer, not the driver.
+
+Next implication:
+- Future physical superiority windows must save exact reference WAVs and use a
+  decorrelated stereo fixture when validating no-leakage claims.
+- No branch promotion, mainline replacement, or audiophile superiority claim is
+  allowed until current same-session mainline/C++ evidence passes this analyzer
+  plus the existing route, CPU, DVS/timecode, and readiness gates.

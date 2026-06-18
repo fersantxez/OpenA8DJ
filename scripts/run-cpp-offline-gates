@@ -75,6 +75,14 @@ python3 scripts/mode2-cross-oracle-parity \
 ./build/cpp-release/opena8djcpp_channel_leakage_tone_contract | tee "$EVIDENCE_DIR/channel-leakage-tone-contract.json"
 ./build/cpp-release/opena8djcpp_audiophile_tone_gate | tee "$EVIDENCE_DIR/audiophile-tone-gate.json"
 ./build/cpp-release/opena8djcpp_audiophile_precision_claim_gate | tee "$EVIDENCE_DIR/audiophile-precision-claim-gate.json"
+ANALYSIS_PY="${ANALYSIS_PY:-$ROOT/.venv-analysis/bin/python}"
+if [[ ! -x "$ANALYSIS_PY" ]]; then
+  echo "missing analysis environment: run scripts/setup-analysis-env or set ANALYSIS_PY" >&2
+  exit 1
+fi
+"$ANALYSIS_PY" scripts/analyze-audiophile-wav.py \
+  --self-test \
+  --json-out "$EVIDENCE_DIR/audiophile-wav-analysis-self-test.json"
 ./build/cpp-release/opena8djcpp_physical_run_compare | tee "$EVIDENCE_DIR/physical-run-product-superiority.json"
 ./build/cpp-release/opena8djcpp_physical_evidence_frontier | tee "$EVIDENCE_DIR/physical-evidence-frontier.json"
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
@@ -94,7 +102,8 @@ python3 -m py_compile \
   scripts/test-promotion-window-contract.py \
   scripts/validate-known-good-route-request.py \
   scripts/summarize-transport-cadence.py \
-  scripts/summarize-physical-product-evidence.py
+  scripts/summarize-physical-product-evidence.py \
+  scripts/analyze-audiophile-wav.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
@@ -171,6 +180,7 @@ soundcheck_wav_quality = load_json("soundcheck-wav-quality.json")
 channel_leakage_tone = load_json("channel-leakage-tone-contract.json")
 audiophile_tone = load_json("audiophile-tone-gate.json")
 audiophile_precision_claim_gate = load_json("audiophile-precision-claim-gate.json")
+audiophile_wav_analysis_self_test = load_json("audiophile-wav-analysis-self-test.json")
 physical_run_product_superiority = load_json("physical-run-product-superiority.json")
 physical_evidence_frontier = load_json("physical-evidence-frontier.json")
 physical_capture_forensics = load_json("physical-capture-forensics.json")
@@ -579,6 +589,33 @@ summary = {
         ),
         "blocked_claim": audiophile_precision_claim_gate.get("blocked_claim"),
         "evidence": "local-analysis/cpp-offline/audiophile-precision-claim-gate.json",
+    },
+    "audiophile_wav_analysis_self_test": {
+        "status": audiophile_wav_analysis_self_test.get("result"),
+        "schema": audiophile_wav_analysis_self_test.get("schema"),
+        "alignment_score": audiophile_wav_analysis_self_test.get("alignment", {}).get("score"),
+        "left_snr_db": audiophile_wav_analysis_self_test.get("left", {}).get("snr_db"),
+        "right_snr_db": audiophile_wav_analysis_self_test.get("right", {}).get("snr_db"),
+        "left_mid_active_coherence": audiophile_wav_analysis_self_test.get("left", {}).get(
+            "coherence_mid_active_mean"
+        ),
+        "right_mid_active_coherence": audiophile_wav_analysis_self_test.get("right", {}).get(
+            "coherence_mid_active_mean"
+        ),
+        "delay_p95_frames": audiophile_wav_analysis_self_test.get("delay_windows", {}).get(
+            "p95_abs_frames"
+        ),
+        "leakage_evaluable": audiophile_wav_analysis_self_test.get("stereo_matrix", {}).get(
+            "leakage_evaluable"
+        ),
+        "worst_offdiag_db_relative": audiophile_wav_analysis_self_test.get(
+            "stereo_matrix", {}
+        ).get("worst_offdiag_db_relative"),
+        "blockers": audiophile_wav_analysis_self_test.get("blockers"),
+        "product_claim_allowed": audiophile_wav_analysis_self_test.get(
+            "product_claim_allowed"
+        ),
+        "evidence": "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
     },
     "physical_run_product_superiority": {
         "status": "PASS" if physical_run_product_superiority.get("result") in ("PASS", "FAIL") else "FAIL",

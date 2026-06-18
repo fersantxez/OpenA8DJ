@@ -103,6 +103,7 @@ int main(int argc, char** argv) {
       root / "local-analysis/cpp-offline/channel-leakage-tone-contract.json",
       root / "local-analysis/cpp-offline/audiophile-tone-gate.json",
       root / "local-analysis/cpp-offline/audiophile-precision-claim-gate.json",
+      root / "local-analysis/cpp-offline/audiophile-wav-analysis-self-test.json",
       root / "local-analysis/cpp-offline/physical-run-product-superiority.json",
       root / "local-analysis/cpp-offline/physical-evidence-frontier.json",
       root / "local-analysis/cpp-offline/physical-capture-forensics.json",
@@ -161,6 +162,9 @@ int main(int argc, char** argv) {
           .value_or("");
   const auto audiophile_precision_claim_gate =
       opena8djcpp::evidence_json::json_object(summary, "audiophile_precision_claim_gate")
+          .value_or("");
+  const auto audiophile_wav_analysis_self_test =
+      opena8djcpp::evidence_json::json_object(summary, "audiophile_wav_analysis_self_test")
           .value_or("");
   const auto dvs_timecode_stress_margin =
       opena8djcpp::evidence_json::json_object(summary, "dvs_timecode_stress_margin")
@@ -302,6 +306,20 @@ int main(int argc, char** argv) {
       string_field_is(
           audiophile_precision_claim_gate, "blocked_claim",
           "NO_AUDIOPHILE_PRECISION_OR_SUPERIORITY_CLAIM_WITHOUT_LTI_TIMEWARP_RUNTIME_AND_STATISTICAL_SAME_WINDOW_PASS") &&
+      object_present(summary, "audiophile_wav_analysis_self_test") &&
+      string_field_is(audiophile_wav_analysis_self_test, "status", "PASS") &&
+      string_field_is(audiophile_wav_analysis_self_test, "schema",
+                      "opena8djcpp.audiophile-wav-analysis.v1") &&
+      bool_field_is(audiophile_wav_analysis_self_test, "leakage_evaluable", true) &&
+      bool_field_is(audiophile_wav_analysis_self_test, "product_claim_allowed", false) &&
+      number_field_present(audiophile_wav_analysis_self_test, "alignment_score") &&
+      number_field_present(audiophile_wav_analysis_self_test, "left_snr_db") &&
+      number_field_present(audiophile_wav_analysis_self_test, "right_snr_db") &&
+      number_field_present(audiophile_wav_analysis_self_test, "left_mid_active_coherence") &&
+      number_field_present(audiophile_wav_analysis_self_test, "right_mid_active_coherence") &&
+      number_field_present(audiophile_wav_analysis_self_test, "delay_p95_frames") &&
+      number_field_present(audiophile_wav_analysis_self_test,
+                           "worst_offdiag_db_relative") &&
       object_present(summary, "dvs_timecode_stress_margin") &&
       string_field_is(dvs_timecode_stress_margin, "status", "PASS") &&
       number_field_is(dvs_timecode_stress_margin, "rows", 48.0) &&
