@@ -240,6 +240,18 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD 0.000001f
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_START_LATENCY_FRAMES
+#define OPENA8DJ_OUTPUT_START_LATENCY_FRAMES 8192
+#endif
+
+#ifndef OPENA8DJ_OUTPUT_RESTART_LATENCY_FRAMES
+#define OPENA8DJ_OUTPUT_RESTART_LATENCY_FRAMES 4096
+#endif
+
+#ifndef OPENA8DJ_OUTPUT_TARGET_LATENCY_FRAMES
+#define OPENA8DJ_OUTPUT_TARGET_LATENCY_FRAMES 8192
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
 #endif
@@ -346,9 +358,9 @@ enum {
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kRingFrames = 32768,
     kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
-    kOutputStartLatencyFrames = 8192,
-    kOutputRestartLatencyFrames = 4096,
-    kOutputTargetLatencyFrames = 8192,
+    kOutputStartLatencyFrames = OPENA8DJ_OUTPUT_START_LATENCY_FRAMES,
+    kOutputRestartLatencyFrames = OPENA8DJ_OUTPUT_RESTART_LATENCY_FRAMES,
+    kOutputTargetLatencyFrames = OPENA8DJ_OUTPUT_TARGET_LATENCY_FRAMES,
     kOutputElasticHighWaterFrames = 24576,
     kOutputReplayHoldFrames = 8,
     kOutputMaxReplayFrames = 192,

@@ -249,3 +249,73 @@ Conclusion:
   previous iRig idle route did not reproduce the headphone CPU-noise symptom.
 - Added `profile timecode-vinyl-low-noise` as a reversible control profile for
   this exact hardware-state experiment.
+
+## 2026-06-19 10:45 EDT - Low-latency scratch response candidate
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: yes, local HAL only
+- Playback: yes, one-second A-pair tone smoke
+- Capture: Core Audio input meter only
+
+Reason:
+
+- Human Traktor test reported good sound and working Timecode Vinyl, but
+  scratch/control response lagged by roughly 0.5-1.0 seconds.
+- The previous low-noise idle gate kept the output endpoint parked in silence,
+  but the output timeline still used `8192` startup/target latency frames.
+  At 48 kHz that alone is roughly 170 ms before Core Audio and Traktor latency.
+
+Change:
+
+```text
+HAL_OUTPUT_START_LATENCY_FRAMES=192
+HAL_OUTPUT_RESTART_LATENCY_FRAMES=192
+HAL_OUTPUT_TARGET_LATENCY_FRAMES=192
+```
+
+Evidence directory:
+
+```text
+local-analysis/install-low-latency-scratch-20260619-104535
+```
+
+Verification:
+
+```sh
+make -B hal
+make install-hal
+/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
+./build/audio-input-meter 4
+./build/audio-pair-tone A 1 440 0.02
+/usr/local/bin/opena8dj-control stream-stats
+```
+
+Observed after tone wake:
+
+```text
+output-ring: 0 / target 192 frames
+outputStartupSilenceFrames=192
+outputUnderruns=0
+outputActiveUnderruns=0
+outputTimelineResets=0
+playbackTransfersSubmitted=126
+playbackTransfersCompleted=126
+playbackTransferErrors=0
+```
+
+Input smoke:
+
+```text
+Input A: rmsL=0.00032448 rmsR=0.00035513
+Input B: rmsL=0.00032514 rmsR=0.00032882
+```
+
+Conclusion:
+
+- The exact loaded local HAL now uses the low-noise DVS profile plus a low
+  startup/restart/target output timeline.
+- This should materially reduce scratch wake/response delay, but final
+  acceptance still requires human Traktor control-vinyl testing because the
+  DVS response loop includes Traktor's own buffer and timecode processing.
