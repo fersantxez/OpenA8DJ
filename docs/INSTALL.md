@@ -52,6 +52,75 @@ To inspect the device from Terminal:
 /usr/local/bin/opena8dj-control
 ```
 
+## opena8dj-tools Installer
+
+OpenA8DJ has two control surfaces:
+
+- `/usr/local/bin/opena8dj-control`: scriptable engineering and recovery CLI.
+- `OpenA8DJ Control Center`: native macOS app for presets, status, import/export,
+  and safe profile switching.
+
+These tools have their own installer, separate from the full driver package.
+Use it when the HAL driver is already installed and you only need to update the
+CLI/panel/documentation:
+
+```sh
+make tools-package
+sudo installer -pkg build/opena8dj-tools-<version>.pkg -target /
+```
+
+To build the separate DMG:
+
+```sh
+make tools-dmg
+open build/opena8dj-tools-<version>.dmg
+```
+
+The opena8dj-tools installer adds:
+
+```text
+/Applications/OpenA8DJ Control Center.app
+/usr/local/bin/opena8dj-control
+/Library/Documentation/OpenA8DJ/ControlSurfaces
+```
+
+It does not install or replace:
+
+```text
+/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/Library/LaunchAgents/org.opena8dj.midid.plist
+/usr/local/bin/opena8dj-midid
+```
+
+Build and open the local app without packaging:
+
+```sh
+make control-center
+open build/OpenA8DJControlCenter.app
+```
+
+Manual local install without creating a package:
+
+```sh
+make install-control-surfaces
+```
+
+Uninstall only the control surfaces:
+
+```sh
+sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
+```
+
+The local app bundle embeds the matching `opena8dj-control` binary in
+`Contents/Resources`, so the UI and CLI use the same backend. Local builds are
+ad-hoc signed for development; public distribution still requires Developer ID
+signing and Apple notarization.
+
+Detailed usage, presets, cabling workflows, and diagrams are in
+[Control surfaces user guide](AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md).
+The planned recorded demo is documented in
+[Control surfaces demo runbook](AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md).
+
 For private builds, release checksums are published next to the DMG and PKG:
 
 ```sh

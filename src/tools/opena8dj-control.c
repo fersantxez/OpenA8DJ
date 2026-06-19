@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -220,6 +221,8 @@ static OpenA8DJWakeState gWakeState = {
 };
 static bool gWakeCleanupRegistered = false;
 
+static bool ParseBool(const char *text, uint8_t *outValue);
+
 static const char *InputModeName(uint8_t mode)
 {
     switch (mode) {
@@ -425,6 +428,348 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         return true;
     }
     return false;
+}
+
+typedef struct OpenA8DJPreset {
+    const char *name;
+    const char *title;
+    const char *surface;
+    const char *summary;
+} OpenA8DJPreset;
+
+static const OpenA8DJPreset kBuiltInPresets[] = {
+    {
+        "playback-4out",
+        "Playback / 4 Stereo Outputs",
+        "playback",
+        "Outputs A/B/C/D active, input decode off"
+    },
+    {
+        "traktor-dvs-vinyl",
+        "Traktor DVS Vinyl",
+        "dvs",
+        "A/B timecode vinyl, input mode 0, vinyl ground lift, software lock"
+    },
+    {
+        "traktor-dvs-cd-line",
+        "Traktor DVS CD-Line",
+        "dvs",
+        "A/B timecode CD or line players, input mode 1, CD-line ground lift, software lock"
+    },
+    {
+        "vinyl-recording",
+        "Vinyl Recording",
+        "recording",
+        "A/B phono capture, input mode 2, phono ground lift, software lock"
+    },
+    {
+        "dj-set-recording",
+        "DJ Set Recording",
+        "recording",
+        "C/D line capture workflow, input decode on, preserves A/B input mode"
+    },
+    {
+        "effects-loop",
+        "External Effects Loop",
+        "duplex",
+        "C/D duplex effects workflow, input decode on, preserves A/B input mode"
+    },
+    {
+        "microphone",
+        "Microphone",
+        "input",
+        "Front XLR mic workflow, input decode on, physical MIC/LINE switch required"
+    },
+    {
+        "midi-only",
+        "MIDI Only",
+        "midi",
+        "MIDI bridge workflow, playback-safe audio state"
+    },
+    {
+        "ground-diagnostics",
+        "Ground Diagnostics",
+        "diagnostics",
+        "Input/noise measurement workflow, input decode on, software lock"
+    },
+    {
+        "engineering-diagnostics",
+        "Engineering Diagnostics",
+        "diagnostics",
+        "Full input/output diagnostics, input decode on, software lock"
+    }
+};
+
+static const size_t kBuiltInPresetCount = sizeof(kBuiltInPresets) / sizeof(kBuiltInPresets[0]);
+
+static bool ApplyPreset(const char *name, OpenA8DJControlPayload *state)
+{
+    if (strcmp(name, "playback-4out") == 0 ||
+        strcmp(name, "playback") == 0 ||
+        strcmp(name, "output-only") == 0) {
+        return ApplyProfile("playback", state);
+    }
+    if (strcmp(name, "traktor-dvs-vinyl") == 0 ||
+        strcmp(name, "dvs-vinyl") == 0 ||
+        strcmp(name, "timecode-vinyl") == 0) {
+        return ApplyProfile("timecode-vinyl", state);
+    }
+    if (strcmp(name, "traktor-dvs-cd-line") == 0 ||
+        strcmp(name, "dvs-cd-line") == 0 ||
+        strcmp(name, "timecode-cd-line") == 0) {
+        return ApplyProfile("timecode-cd-line", state);
+    }
+    if (strcmp(name, "vinyl-recording") == 0 ||
+        strcmp(name, "phono-recording") == 0 ||
+        strcmp(name, "phono") == 0) {
+        return ApplyProfile("phono", state);
+    }
+    if (strcmp(name, "dj-set-recording") == 0 ||
+        strcmp(name, "effects-loop") == 0 ||
+        strcmp(name, "microphone") == 0) {
+        state->inputDecodeEnabled = 1;
+        state->softwareLock = 0;
+        ResetInputTransforms(state);
+        return true;
+    }
+    if (strcmp(name, "midi-only") == 0) {
+        return ApplyProfile("playback", state);
+    }
+    if (strcmp(name, "ground-diagnostics") == 0 ||
+        strcmp(name, "engineering-diagnostics") == 0) {
+        state->inputDecodeEnabled = 1;
+        state->softwareLock = 1;
+        ResetInputTransforms(state);
+        return true;
+    }
+    return false;
+}
+
+static void PrintProfiles(void)
+{
+    printf("OpenA8DJ built-in presets\n");
+    for (size_t i = 0; i < kBuiltInPresetCount; i++) {
+        printf("  %s\n", kBuiltInPresets[i].name);
+        printf("    title:   %s\n", kBuiltInPresets[i].title);
+        printf("    surface: %s\n", kBuiltInPresets[i].surface);
+        printf("    summary: %s\n", kBuiltInPresets[i].summary);
+    }
+}
+
+static const char *BoolJSON(uint8_t value)
+{
+    return value ? "true" : "false";
+}
+
+static char PairLetter(uint8_t value, int fallback)
+{
+    return (char)('A' + (value < kInputPairs ? value : fallback));
+}
+
+static const char *InferredPresetName(const OpenA8DJControlPayload *state)
+{
+    if (state->inputDecodeEnabled == 0) {
+        return "playback-4out";
+    }
+    if (state->inputMode == 0 && state->gndLiftTCVinyl && state->softwareLock) {
+        return "traktor-dvs-vinyl";
+    }
+    if (state->inputMode == 1 && state->gndLiftTCCDLine && state->softwareLock) {
+        return "traktor-dvs-cd-line";
+    }
+    if (state->inputMode == 2 && state->gndLiftPhono && state->softwareLock) {
+        return "vinyl-recording";
+    }
+    return "custom";
+}
+
+static void ExportConfig(FILE *out, const OpenA8DJControlPayload *state)
+{
+    fprintf(out, "{\n");
+    fprintf(out, "  \"schema\": \"org.opena8dj.control.v1\",\n");
+    fprintf(out, "  \"preset\": \"%s\",\n", InferredPresetName(state));
+    fprintf(out, "  \"inputMode\": \"%s\",\n", InputModeName(state->inputMode));
+    fprintf(out, "  \"inputModeValue\": %u,\n", state->inputMode);
+    fprintf(out, "  \"inputDecode\": %s,\n", BoolJSON(state->inputDecodeEnabled));
+    fprintf(out, "  \"softwareLock\": %s,\n", BoolJSON(state->softwareLock));
+    fprintf(out, "  \"groundLiftVinyl\": %s,\n", BoolJSON(state->gndLiftTCVinyl));
+    fprintf(out, "  \"groundLiftCDLine\": %s,\n", BoolJSON(state->gndLiftTCCDLine));
+    fprintf(out, "  \"groundLiftPhono\": %s,\n", BoolJSON(state->gndLiftPhono));
+    fprintf(out, "  \"inputSourceA\": \"%c\",\n", PairLetter(state->inputSource[0], 0));
+    fprintf(out, "  \"inputSourceB\": \"%c\",\n", PairLetter(state->inputSource[1], 1));
+    fprintf(out, "  \"inputSourceC\": \"%c\",\n", PairLetter(state->inputSource[2], 2));
+    fprintf(out, "  \"inputSourceD\": \"%c\",\n", PairLetter(state->inputSource[3], 3));
+    fprintf(out, "  \"inputTransformA\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 0)));
+    fprintf(out, "  \"inputTransformB\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 1)));
+    fprintf(out, "  \"inputTransformC\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 2)));
+    fprintf(out, "  \"inputTransformD\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 3)));
+    fprintf(out, "  \"inputSources\": {\n");
+    fprintf(out, "    \"A\": \"%c\",\n", PairLetter(state->inputSource[0], 0));
+    fprintf(out, "    \"B\": \"%c\",\n", PairLetter(state->inputSource[1], 1));
+    fprintf(out, "    \"C\": \"%c\",\n", PairLetter(state->inputSource[2], 2));
+    fprintf(out, "    \"D\": \"%c\"\n", PairLetter(state->inputSource[3], 3));
+    fprintf(out, "  },\n");
+    fprintf(out, "  \"inputTransforms\": {\n");
+    fprintf(out, "    \"A\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 0)));
+    fprintf(out, "    \"B\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 1)));
+    fprintf(out, "    \"C\": \"%s\",\n", InputTransformName(InputTransformForPair(state, 2)));
+    fprintf(out, "    \"D\": \"%s\"\n", InputTransformName(InputTransformForPair(state, 3)));
+    fprintf(out, "  }\n");
+    fprintf(out, "}\n");
+}
+
+static bool WriteConfigFile(const char *path, const OpenA8DJControlPayload *state)
+{
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        return false;
+    }
+    ExportConfig(file, state);
+    return fclose(file) == 0;
+}
+
+static char *ReadTextFile(const char *path)
+{
+    FILE *file = fopen(path, "r");
+    if (file == NULL) {
+        return NULL;
+    }
+    if (fseek(file, 0, SEEK_END) != 0) {
+        fclose(file);
+        return NULL;
+    }
+    long length = ftell(file);
+    if (length < 0 || length > 1024 * 1024) {
+        fclose(file);
+        return NULL;
+    }
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        fclose(file);
+        return NULL;
+    }
+    char *buffer = (char *)calloc((size_t)length + 1, 1);
+    if (buffer == NULL) {
+        fclose(file);
+        return NULL;
+    }
+    size_t readLength = fread(buffer, 1, (size_t)length, file);
+    fclose(file);
+    buffer[readLength] = '\0';
+    return buffer;
+}
+
+static const char *FindJSONValue(const char *json, const char *key)
+{
+    char pattern[128];
+    int written = snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    if (written < 0 || (size_t)written >= sizeof(pattern)) {
+        return NULL;
+    }
+    const char *match = strstr(json, pattern);
+    if (match == NULL) {
+        return NULL;
+    }
+    const char *colon = strchr(match + written, ':');
+    if (colon == NULL) {
+        return NULL;
+    }
+    const char *value = colon + 1;
+    while (*value != '\0' && isspace((unsigned char)*value)) {
+        value++;
+    }
+    return value;
+}
+
+static bool ReadJSONString(const char *json, const char *key, char *out, size_t outSize)
+{
+    const char *value = FindJSONValue(json, key);
+    if (value == NULL || *value != '"' || outSize == 0) {
+        return false;
+    }
+    value++;
+    size_t i = 0;
+    while (*value != '\0' && *value != '"' && i + 1 < outSize) {
+        if (*value == '\\' && value[1] != '\0') {
+            value++;
+        }
+        out[i++] = *value++;
+    }
+    out[i] = '\0';
+    return *value == '"';
+}
+
+static bool ReadJSONBool(const char *json, const char *key, uint8_t *out)
+{
+    const char *value = FindJSONValue(json, key);
+    if (value == NULL) {
+        return false;
+    }
+    if (strncmp(value, "true", 4) == 0 || strncmp(value, "1", 1) == 0) {
+        *out = 1;
+        return true;
+    }
+    if (strncmp(value, "false", 5) == 0 || strncmp(value, "0", 1) == 0) {
+        *out = 0;
+        return true;
+    }
+    char text[16];
+    if (ReadJSONString(json, key, text, sizeof(text)) && ParseBool(text, out)) {
+        return true;
+    }
+    return false;
+}
+
+static bool ApplyConfigJSON(const char *json, OpenA8DJControlPayload *state)
+{
+    char text[64];
+    if (ReadJSONString(json, "preset", text, sizeof(text)) && strcmp(text, "custom") != 0) {
+        if (!ApplyPreset(text, state)) {
+            return false;
+        }
+    }
+    if (ReadJSONString(json, "inputMode", text, sizeof(text))) {
+        uint8_t mode = 0;
+        if (!ParseInputMode(text, &mode)) {
+            return false;
+        }
+        state->inputMode = mode;
+    }
+    uint8_t value = 0;
+    if (ReadJSONBool(json, "inputDecode", &value)) {
+        state->inputDecodeEnabled = value;
+    }
+    if (ReadJSONBool(json, "softwareLock", &value)) {
+        state->softwareLock = value;
+    }
+    if (ReadJSONBool(json, "groundLiftVinyl", &value)) {
+        state->gndLiftTCVinyl = value;
+    }
+    if (ReadJSONBool(json, "groundLiftCDLine", &value)) {
+        state->gndLiftTCCDLine = value;
+    }
+    if (ReadJSONBool(json, "groundLiftPhono", &value)) {
+        state->gndLiftPhono = value;
+    }
+    for (int pair = 0; pair < kInputPairs; pair++) {
+        char key[32];
+        snprintf(key, sizeof(key), "inputSource%c", 'A' + pair);
+        if (ReadJSONString(json, key, text, sizeof(text))) {
+            int source = ParseInputPair(text);
+            if (source < 0) {
+                return false;
+            }
+            state->inputSource[pair] = (uint8_t)source;
+        }
+        snprintf(key, sizeof(key), "inputTransform%c", 'A' + pair);
+        if (ReadJSONString(json, key, text, sizeof(text))) {
+            uint8_t transform = 0;
+            if (!ParseInputTransform(text, &transform)) {
+                return false;
+            }
+            SetInputTransform(state, pair, transform);
+        }
+    }
+    return true;
 }
 
 static bool ReadFull(int fd, void *buffer, size_t length)
@@ -702,6 +1047,43 @@ static bool ReadState(int fd, OpenA8DJControlPayload *state)
         *state = latest;
     }
     return true;
+}
+
+static bool ConnectAndReadState(bool allowWake, int *outFd, OpenA8DJControlPayload *state)
+{
+    *outFd = -1;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        int fd = ConnectSocketWithWake(allowWake);
+        if (fd < 0) {
+            return false;
+        }
+        if (ReadState(fd, state)) {
+            *outFd = fd;
+            return true;
+        }
+        close(fd);
+        usleep(150000);
+    }
+    return false;
+}
+
+static bool SendStateAndReadBack(int *fd, bool allowWake, OpenA8DJControlPayload *state)
+{
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (*fd >= 0 && SendIPC(*fd, kIPCTypeControlSet, state, sizeof(*state)) && ReadState(*fd, state)) {
+            return true;
+        }
+        if (*fd >= 0) {
+            close(*fd);
+            *fd = -1;
+        }
+        usleep(150000);
+        *fd = ConnectSocketWithWake(allowWake);
+        if (*fd < 0) {
+            return false;
+        }
+    }
+    return false;
 }
 
 static bool ReadStats(int fd, OpenA8DJInputStatsPayload *stats)
@@ -1064,6 +1446,10 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
+    fprintf(stderr, "  %s list-profiles\n", argv0);
+    fprintf(stderr, "  %s export-config [path]\n", argv0);
+    fprintf(stderr, "  %s import-config path\n", argv0);
+    fprintf(stderr, "  %s apply-preset name\n", argv0);
     fprintf(stderr, "  %s profile playback|timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
     fprintf(stderr, "  %s input-decode on|off\n", argv0);
@@ -1082,17 +1468,16 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    bool allowWake = !EnvFlagEnabled("OPENA8DJ_CONTROL_NO_WAKE");
-    int fd = ConnectSocketWithWake(allowWake);
-    if (fd < 0) {
-        fprintf(stderr, "OpenA8DJ HAL bridge is not available at %s\n", kSocketPath);
-        return 1;
+    if (argc == 2 && strcmp(argv[1], "list-profiles") == 0) {
+        PrintProfiles();
+        return 0;
     }
 
+    bool allowWake = !EnvFlagEnabled("OPENA8DJ_CONTROL_NO_WAKE");
+    int fd = -1;
     OpenA8DJControlPayload state;
-    if (!ReadState(fd, &state)) {
-        fprintf(stderr, "Could not read Audio 8 DJ controls\n");
-        close(fd);
+    if (!ConnectAndReadState(allowWake, &fd, &state)) {
+        fprintf(stderr, "OpenA8DJ HAL bridge is not available at %s\n", kSocketPath);
         return 1;
     }
 
@@ -1127,6 +1512,18 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    if ((argc == 2 || argc == 3) && strcmp(argv[1], "export-config") == 0) {
+        if (argc == 2 || strcmp(argv[2], "-") == 0) {
+            ExportConfig(stdout, &state);
+        } else if (!WriteConfigFile(argv[2], &state)) {
+            fprintf(stderr, "Could not write config to %s\n", argv[2]);
+            close(fd);
+            return 1;
+        }
+        close(fd);
+        return 0;
+    }
+
     if (argc == 4 && strcmp(argv[1], "input-transform") == 0) {
         int pair = ParseInputPair(argv[2]);
         uint8_t transform = 0;
@@ -1145,6 +1542,20 @@ int main(int argc, char **argv)
             return 2;
         }
         state.inputSource[pair] = (uint8_t)source;
+    } else if (argc == 3 && strcmp(argv[1], "import-config") == 0) {
+        char *json = ReadTextFile(argv[2]);
+        if (json == NULL) {
+            fprintf(stderr, "Could not read config from %s\n", argv[2]);
+            close(fd);
+            return 1;
+        }
+        bool ok = ApplyConfigJSON(json, &state);
+        free(json);
+        if (!ok) {
+            fprintf(stderr, "Could not parse or apply config from %s\n", argv[2]);
+            close(fd);
+            return 2;
+        }
     } else if (argc != 3) {
         Usage(argv[0]);
         close(fd);
@@ -1159,6 +1570,13 @@ int main(int argc, char **argv)
         state.inputMode = mode;
     } else if (strcmp(argv[1], "profile") == 0) {
         if (!ApplyProfile(argv[2], &state)) {
+            Usage(argv[0]);
+            close(fd);
+            return 2;
+        }
+    } else if (strcmp(argv[1], "apply-preset") == 0) {
+        if (!ApplyPreset(argv[2], &state)) {
+            fprintf(stderr, "Unknown preset: %s\n", argv[2]);
             Usage(argv[0]);
             close(fd);
             return 2;
@@ -1187,9 +1605,11 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!SendIPC(fd, kIPCTypeControlSet, &state, sizeof(state)) || !ReadState(fd, &state)) {
+    if (!SendStateAndReadBack(&fd, allowWake, &state)) {
         fprintf(stderr, "Could not write Audio 8 DJ controls\n");
-        close(fd);
+        if (fd >= 0) {
+            close(fd);
+        }
         return 1;
     }
     PrintState(&state);

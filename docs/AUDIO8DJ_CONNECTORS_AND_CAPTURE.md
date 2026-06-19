@@ -2,14 +2,14 @@
 
 Source checked: `local-analysis/audio8dj-2.8.0/payload-files/Applications/Native Instruments/Audio 8 DJ Driver/Documentation/Audio 8 DJ Manual Spanish.pdf`, pages 18, 19, 32, 33, and 34.
 
-This project and the current hardware path are for Native Instruments Audio 8 DJ. If someone says "Audio 2 DJ" in notes, double-check the physical unit: the Audio 8 DJ manual is the one that matches the XLR multicore/turntable setup used here.
+This project and the current hardware path are for Native Instruments Audio 8 DJ. If someone says "Audio 2 DJ" in notes, double-check the physical unit: the Audio 8 DJ manual is the one that matches the RCA multicore/turntable setup and front-panel XLR mic input used here.
 
 ## Physical Connector Map
 
 Rear panel:
 
-- `CH A IN 1|2 - OUT 1|2`: Deck A multicore connection. The manual describes this as the male XLR part of the multicore cable. This path is used for turntable/timecode and mixer routing.
-- `CH B IN 3|4 - OUT 3|4`: Deck B multicore connection, same role for the second deck.
+- `CH A IN 1|2 - OUT 1|2`: Deck A RCA input/output cluster for the color-matched multicore cable. This path is used for turntable/timecode and mixer routing.
+- `CH B IN 3|4 - OUT 3|4`: Deck B RCA input/output cluster, same role for the second deck.
 - `CH C OUT 5|6`: output pair for an auxiliary mixer input or send-effects setup.
 - `CH D OUT 7|8`: output pair for an auxiliary mixer input or send-effects setup.
 - `GROUND`: optional turntable ground point if grounding through the mixer is noisy.
