@@ -1,5 +1,16 @@
 # Audio8DJ C++/DriverKit Success Metrics
 
+## Current Branch/Release Status
+
+The C++/DriverKit redesign has been promoted to `main` for the OpenA8DJ 0.4.0
+macOS public preview. The previous C/Objective-C implementation is preserved on
+`legacy`.
+
+The dated sections below include pre-promotion failures and rejected candidates.
+Treat those as historical evidence and guardrails, not as current branch
+instructions. Current branch status is documented in
+`docs/CURRENT_BRANCH_STATUS.md`.
+
 ## Human-Test Candidate Milestone For 2026-06-18 15:00 EDT
 
 This milestone is a controlled first human-test target, not a product
@@ -905,7 +916,7 @@ signing/notarization, DriverKit entitlement plan, and legal/provenance review.
 - [ ] Hardware-sensitive gates are blocked, not passed.
 - [x] Physical-window plan names lock owner, rollback, and stop conditions.
 
-## 2026-06-17 Current Gate Snapshot
+## 2026-06-17 Historical Gate Snapshot
 
 Latest promotion evaluation:
 `local-analysis/promotion-readiness-after-streamusage-sample.json`.
@@ -923,15 +934,15 @@ Latest promotion evaluation:
   `opena8dj_driver_p95=37.2%` and `coreaudiod_p95=35.0%`, versus mainline
   budget `driver <= 6.5%`, `coreaudiod <= 1.7%`.
 - Traktor/timecode physical validation: FAIL/BLOCKED, no physical DVS evidence.
-- Branch promotion: forbidden. Do not move C mainline to Legacy and do not move
-  C++ to main until these gates pass with reproducible evidence.
+- Historical pre-promotion conclusion: branch promotion was blocked at this
+  point. This dated conclusion is superseded by the 2026-06-19 promotion.
 
 CPU-root-cause evidence:
 `local-analysis/profiling/20260617-sudo-sample-streamusage-playback-only/opena8dj-driver.sample.txt`
 shows the active CPU hotspot is IOUSBHost async enqueue cadence in the USB
 completion path, not transfer-ledger diagnostics or pure sample conversion.
 
-## 2026-06-17 Updated Gate Snapshot After ISO64/q8 StopIO
+## 2026-06-17 Historical Snapshot After ISO64/q8 StopIO
 
 Latest promotion evaluation:
 `local-analysis/promotion-readiness-after-iso64q8-stopisoc.json`.
@@ -956,8 +967,8 @@ Latest promotion evaluation:
   capture path cannot support audiophile quality claims until independently
   validated.
 - Traktor/timecode physical validation: FAIL/BLOCKED, no physical DVS evidence.
-- Branch promotion: forbidden. Do not move C mainline to Legacy and do not move
-  C++ to main.
+- Historical pre-promotion conclusion: branch promotion was blocked at this
+  point. This dated conclusion is superseded by the 2026-06-19 promotion.
 
 ## 2026-06-17 Updated Snapshot After Input Decode And Channel Matrix
 
@@ -982,8 +993,10 @@ Latest promotion evaluation:
   - C++ max wrong-source leakage `-35.36 dB`.
   - threshold `-45 dB`.
 - Traktor/timecode vinyl physical validation: FAIL/BLOCKED.
-- Branch promotion: forbidden. C++ has not objectively beaten mainline on
-  quality, functionality/routing, or resource consumption.
+- Historical pre-promotion conclusion: branch promotion was blocked at this
+  point because C++ had not yet objectively beaten mainline on quality,
+  functionality/routing, or resource consumption. This dated conclusion is
+  superseded by the 2026-06-19 promotion.
 
 ## 2026-06-17 Updated Snapshot After ISO8/ISO10 Physical Gates
 
@@ -1627,9 +1640,10 @@ Latest promotion evaluation:
 - Readiness implication:
   - A routing PASS is not a sound-quality PASS.
   - A direct USB diagnostic PASS is not a product HAL PASS.
-  - Branch promotion remains forbidden until C++ beats or equals mainline in the
-    same physical route for quality, CPU, routing, latency, recovery, and
-    timecode.
+  - Historical pre-promotion conclusion: branch promotion remained blocked at
+    this dated point until C++ could beat or equal mainline in the same physical
+    route for quality, CPU, routing, latency, recovery, and timecode. This
+    entry is superseded by the 2026-06-19 promotion.
 
 ## 2026-06-17 Same-Day Mainline A/B Gate Status
 
@@ -1653,10 +1667,11 @@ Latest promotion evaluation:
   - C++ FAIL:
     driver p95 `23.2%` versus mainline `5.6%`.
     coreaudiod p95 `20.5%` versus mainline `10.3%`.
-- Promotion semantics:
+- Historical promotion semantics:
   - `PASS` requires C++ to clear absolute quality thresholds and be no worse
     than mainline on same-day quality and CPU.
-  - Current status forbids moving C++ to `main` or C mainline to `Legacy`.
+  - At this dated point, promotion was blocked. This entry is superseded by the
+    2026-06-19 promotion.
 
 ## 2026-06-17 Offline Rate-Shape Gate Status
 
@@ -2689,7 +2704,7 @@ Current implementation:
   - CPU/resource p95 no worse than mainline and preferably lower under the same
     physical workload;
   - physical Traktor/Timecode Vinyl evidence at required sample rates;
-  - explicit approval gate before any Legacy/main branch movement.
+  - explicit approval gate before any future major branch movement or rollback.
 - The 15:00 EDT target is allowed to produce an installable diagnostic RC with
   `objective_achieved=false`; it is not allowed to produce a superiority claim
   without the physical gates above.

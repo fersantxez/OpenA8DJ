@@ -263,6 +263,7 @@ public release line are the modern macOS C++ architecture.
 ## Documentation
 
 - [Install guide](docs/INSTALL.md)
+- [Current branch status](docs/CURRENT_BRANCH_STATUS.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Modern macOS driver architecture](docs/MODERN_MACOS_DRIVER.md)
 - [Legacy C branch](docs/LEGACY_C.md)

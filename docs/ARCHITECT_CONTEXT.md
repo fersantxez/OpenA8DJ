@@ -1773,8 +1773,10 @@ Next technical target:
   - Current next objective:
     get same-day mainline-vs-C++ product HAL A/B evidence with the same
     validated capture route, plus fixed-candidate CPU and timecode evidence.
-    Until that exists, do not move C++ to `main` and do not move C mainline to
-    `Legacy`.
+    Historical pre-promotion note: this was a blocker at the time of the
+    2026-06-17 run. It is superseded by the 2026-06-19 branch promotion:
+    `main` is now the modern C++/DriverKit line and `legacy` preserves the old
+    C/Objective-C line.
 - Same-day product HAL A/B status:
   - Evidence:
     `local-analysis/mainline-ab/20260617-sameday-ab-085735/ab-comparison.json`.
