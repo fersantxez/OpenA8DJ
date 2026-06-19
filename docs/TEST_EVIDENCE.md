@@ -599,3 +599,41 @@ Conclusion:
   installed artifact passed the calibrated iRig soundcheck and has no driver
   underruns, no clipping, no transfer errors, and no measurable idle CPU-noise
   increase in the iRig capture.
+
+## 2026-06-19 13:33 EDT - Human test feedback during Traktor session
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Installed commit under test: `6c2670e`
+- Hardware touched by Codex for this note: no
+- Driver installed/reloaded by Codex for this note: no
+
+User feedback:
+
+- Mac microphone/dictation works again while the installed OpenA8DJ load is
+  active.
+- Timecode Vinyl is now more or less responsive and usable.
+- Responsiveness could still improve a little.
+- Overall direction is improving.
+
+Concurrent observation:
+
+```text
+Traktor CPU: roughly 71-75%
+OpenA8DJ driver CPU: roughly 8-9.5%
+coreaudiod CPU: roughly 1.5-1.8%
+audio_stack_health=PASS
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+hardware lock: absent
+```
+
+Conclusion:
+
+- Keep this load as the current human-test baseline.
+- Next optimization should target driver CPU and Timecode Vinyl responsiveness
+  without regressing the now-working microphone/dictation state or the stable
+  zero-underrun transport.
