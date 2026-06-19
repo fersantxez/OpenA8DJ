@@ -83,12 +83,3 @@ Gatekeeper can verify the package without extra user steps.
 The older C/Objective-C driver line is preserved on the `legacy` branch. That
 branch is kept for comparison and recovery. New users who want the current
 macOS driver should install the `main`/`0.4.0` release from GitHub Releases.
-
-## Windows note
-
-Windows builds are distributed from
-[GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases) as
-experimental driver ZIP packages. They are not production MSIs yet.
-
-Use the Windows ZIPs only on test systems that can install test-signed or
-experimental drivers. See [Windows status](WINDOWS.md) before installing.

@@ -97,9 +97,7 @@ Before publishing a public release, verify that:
 - unvalidated features are described as unvalidated, not certified;
 - macOS packages are signed/notarized when advertised as polished
   public-ready releases; unsigned or ad-hoc-signed preview packages must be
-  clearly labeled as previews and must describe the macOS approval step;
-- Windows packages are not published unless a real Windows driver package,
-  catalog, INF, and signing flow exist.
+  clearly labeled as previews and must describe the macOS approval step.
 
 If provenance, licensing, or proprietary-payload status is uncertain, publish
 source only and hold binary artifacts until the uncertainty is resolved.

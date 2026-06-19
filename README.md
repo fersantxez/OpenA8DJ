@@ -12,11 +12,9 @@ and a DriverKit/AudioDriverKit path prepared for the future System Extension
 architecture. It ships as an easy DMG/PKG installer and exposes `Open Audio 8
 DJ` as a normal Core Audio device for DJ/audio applications.
 
-The old C/Objective-C driver line is preserved separately on the `legacy`
-branch. That branch keeps the historical C/Obj-C implementation, which was
-based on and inspired by Linux reverse-engineering work around the CAIAQ /
-`snd-usb-caiaq` Audio 8 DJ family, plus physical-test learnings and rollback
-baseline evidence. It is not the current user-facing driver line.
+The previous C/Objective-C implementation is preserved separately on the
+`legacy` branch for historical reference. It is not the current user-facing
+driver line.
 
 ## Download For macOS / OS X
 
@@ -106,12 +104,12 @@ The promoted mainline is an 8-in/8-out Traktor-facing public preview:
 - macOS enumerates `Open Audio 8 DJ` as 8 inputs and 8 outputs.
 - The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
   pairs, plus 4 stereo output streams named Output A/B/C/D. This keeps the
-  Traktor channel assignment surface while avoiding the multi-input-stream
-  Core Audio enumeration instability seen during 0.3.25 testing.
+  Traktor channel assignment surface while avoiding unstable multi-input-stream
+  Core Audio enumeration behavior.
 - 44.1 and 48 kHz playback topology and output quality are working in local
   listening tests on the tested physical route.
-- The current USB transport keeps the capture-paced output improvements from
-  0.3.24 while restoring the DVS/timecode input surface from 0.2.6.
+- The current USB transport uses the validated capture-paced output model while
+  restoring the DVS/timecode input surface expected by DJ applications.
 - Physical iRig loopback tests and human listening found the current output
   transport substantially cleaner than earlier crackling builds.
 - Core Audio buffer-size control is implemented through both modern frame-based
@@ -212,22 +210,6 @@ For vinyl timecode testing, put the interface in the hardware DVS profile first:
 Use [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the DVS validation
 plan.
 
-## Windows
-
-OpenA8DJ 0.4.0 is primarily a macOS release. The repository also contains
-an experimental Windows 10/11 WDK workstream under `windows/`.
-
-The Windows package builds a test-signed KMDF driver, INF/catalog package, and
-`opena8djctl.exe` control tool. It exposes the OpenA8DJ 8-in/8-out capability
-contract and hardware-control API, but it has not been exhaustively validated on
-Windows with the physical interface. Treat Windows builds as experimental and
-send feedback/logs.
-
-Windows support is tracked separately in [docs/WINDOWS.md](docs/WINDOWS.md).
-Experimental Windows ZIPs from earlier previews remain available in
-[GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases), but Windows
-artifacts are rebuilt and validated separately from the macOS HAL releases.
-
 ## Architecture
 
 ```text
@@ -256,9 +238,9 @@ hardware specifications, and original project test results. It avoids legacy
 kernel-extension architecture and keeps the real-time audio path isolated from
 installer, UI, logging, and diagnostic work.
 
-The old C/Objective-C implementation remains available on the `legacy` branch
-as the historical Linux/CAIAQ-derived reference. The repository default and
-public release line are the modern macOS C++ architecture.
+The previous C/Objective-C implementation remains available on the `legacy`
+branch as historical reference material. The repository default and public
+release line are the modern macOS C++ architecture.
 
 ## Documentation
 
@@ -269,7 +251,6 @@ public release line are the modern macOS C++ architecture.
 - [Legacy C branch](docs/LEGACY_C.md)
 - [Testing](docs/TESTING.md)
 - [Traktor timecode test plan](docs/TRAKTOR_TIMECODE.md)
-- [Windows status](docs/WINDOWS.md)
 - [Roadmap to production quality](docs/ROADMAP_TO_PRO.md)
 - [Release process](docs/RELEASE.md)
 - [Legal and publication policy](docs/LEGAL.md)

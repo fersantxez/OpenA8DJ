@@ -181,6 +181,10 @@ option(OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD
   "Enable build-only DriverKit SDK probe target; never install or activate a dext."
   OFF)
 
+option(OPENA8DJCPP_ENABLE_LOCAL_EVIDENCE_TESTS
+  "Enable tests that inspect machine-local physical/audio evidence under local-analysis."
+  OFF)
+
 if(OPENA8DJCPP_ENABLE_DRIVERKIT_SDK_BUILD)
   add_custom_target(opena8djcpp_driverkit_extension_build_probe
     COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -588,8 +592,10 @@ add_test(NAME opena8djcpp_human_test_rc_gate COMMAND opena8djcpp_human_test_rc_g
 add_test(NAME opena8djcpp_physical_evidence_frontier COMMAND opena8djcpp_physical_evidence_frontier)
 add_test(NAME opena8djcpp_physical_capture_forensics COMMAND opena8djcpp_physical_capture_forensics)
 add_test(NAME opena8djcpp_direct_usb_path_attribution COMMAND opena8djcpp_direct_usb_path_attribution)
-add_test(NAME opena8djcpp_irig_idle_capture_gate COMMAND opena8djcpp_irig_idle_capture_gate)
-add_test(NAME opena8djcpp_historical_route_reference_gate COMMAND opena8djcpp_historical_route_reference_gate)
+if(OPENA8DJCPP_ENABLE_LOCAL_EVIDENCE_TESTS)
+  add_test(NAME opena8djcpp_irig_idle_capture_gate COMMAND opena8djcpp_irig_idle_capture_gate)
+  add_test(NAME opena8djcpp_historical_route_reference_gate COMMAND opena8djcpp_historical_route_reference_gate)
+endif()
 add_test(NAME opena8djcpp_physical_window_readiness_gate COMMAND opena8djcpp_physical_window_readiness_gate)
 add_test(NAME opena8djcpp_capture_readiness_contract COMMAND opena8djcpp_capture_readiness_contract)
 add_test(NAME opena8djcpp_physical_route_matrix_contract COMMAND opena8djcpp_physical_route_matrix_contract)

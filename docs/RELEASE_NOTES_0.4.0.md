@@ -76,8 +76,8 @@ Final local checks for this promotion line:
   `big`.
 - 44.1 kHz and 48 kHz playback validated locally.
 
-Evidence is summarized in
-[`docs/MAINLINE_PROMOTION_2026-06-19.md`](MAINLINE_PROMOTION_2026-06-19.md).
+Current branch roles are summarized in
+[`docs/CURRENT_BRANCH_STATUS.md`](CURRENT_BRANCH_STATUS.md).
 
 ## Known Limits
 

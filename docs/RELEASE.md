@@ -133,9 +133,3 @@ approval step.
 For private validation snapshots, create a draft release and attach the DMG,
 PKG, and checksum file. Publish the release only after the legal/provenance gate
 and the appropriate preview or signing/notarization gate are complete.
-
-## Windows release gate
-
-Do not publish a Windows MSI from this macOS HAL tree. Windows release artifacts
-are only valid after the project contains a real Windows driver package with an
-INF, driver binary, catalog, and signing story. See `docs/WINDOWS.md`.
