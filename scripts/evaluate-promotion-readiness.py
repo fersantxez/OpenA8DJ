@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Evaluate whether the C++ candidate is eligible to replace mainline C.
+"""Evaluate whether the current macOS driver candidate is release-ready.
 
 This script is intentionally offline/read-only with respect to hardware and the
-mainline/Rust worktrees. It consumes existing evidence files and returns PASS
+legacy/Rust worktrees. It consumes existing evidence files and returns PASS
 only when every promotion gate is already proven.
 """
 

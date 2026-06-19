@@ -87,7 +87,7 @@ Recommended initial capacities:
 
 | Buffer | Initial capacity | Reason |
 | --- | ---: | --- |
-| Capture ring | 32768 frames | Existing prototype capacity; enough for transient USB/callback phase jitter. |
+| Capture ring | 32768 frames | Existing baseline capacity; enough for transient USB/callback phase jitter. |
 | Output timeline | 32768 frames | Matches capture ring and supports elastic correction without reallocating. |
 | Capture transfers | 64 transfers x 8 USB microframes | Existing capture queue depth and USB cadence. |
 | Playback transfers | 128 transfers x 8 USB microframes | Enough for target plus maximum in-flight playback lead. |
@@ -342,11 +342,18 @@ Output callback:
 1. Merge active Core Audio stream buffers into the fixed 8-channel cycle buffer.
 2. Determine the absolute start sample frame from callback sample time.
 3. Normalize small timestamp jitter against `write_max_frame + 1`.
-4. Write the batch into `OutputTimelineRing`.
-5. Publish `write_max_frame` and update counters.
+4. Optionally classify a whole callback buffer as active silence using a
+   fixed threshold and bounded frame counter.
+5. Write either the original batch or deterministic zero frames into
+   `OutputTimelineRing`.
+6. Publish `write_max_frame` and update counters.
 
-The output callback does not inspect the buffer to decide whether it is silence.
-Silence is valid audio and is queued the same way as any other frame.
+The active-silence check is intentionally coarse: it only treats a whole
+callback buffer below the configured threshold as silence. Normal music buffers
+are not zero-floored globally, so low-level musical detail and zero crossings
+stay on the ordinary path. If silence persists for the configured hold window,
+the playback gate parks output transfer submission while capture and timecode
+input remain active.
 
 ## USB Algorithm
 

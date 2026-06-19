@@ -55,8 +55,25 @@ Acquire the lock before any test that installs, unloads, reloads, plays audio,
 records audio, touches USB, changes Core Audio state, changes default devices,
 opens Traktor, or resets services.
 
-If the lock is occupied, do not wait while holding partial state. Report the
-desired window, duration, actions, and evidence directory.
+The lock is shared coordination state. Control Center and other OpenA8DJ tools
+may legitimately acquire it for their own hardware checks. Treat an occupied
+lock as an active owner unless the recorded PID is provably dead.
+
+If the lock is occupied:
+
+- do not steal it;
+- do not wait while holding partial state;
+- do not kill the owner process;
+- do not clean the lock unless the recorded owner PID is dead;
+- report the desired window, duration, actions, and evidence directory.
+
+When a test finishes, release the lock immediately. Do not keep the lock while
+waiting for user input, reading logs, doing offline analysis, or writing docs.
+Development work must be hardware-generous: compile, edit, inspect logs,
+analyze captures, update docs, package artifacts, and compare offline evidence
+without holding the lock. Acquire it as late as possible and release it as soon
+as playback, capture, install/reload, Core Audio recovery, USB access, or
+Traktor interaction is complete.
 
 ## Physical Sound-Quality Check
 

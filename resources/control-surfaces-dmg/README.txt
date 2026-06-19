@@ -1,7 +1,7 @@
-opena8dj-tools
-=========================
+opena8dj-tools 0.5.0
+====================
 
-This disk image installs only the OpenA8DJ control tools:
+This disk image installs only the optional OpenA8DJ control tools:
 
 - /Applications/OpenA8DJ Control Center.app
 - /usr/local/bin/opena8dj-control
@@ -33,9 +33,9 @@ Uninstall:
 
 sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
 
-This project is independent and is not affiliated with, endorsed by, sponsored
-by, or certified by Native Instruments. Product names are used only to identify
-compatibility.
+OpenA8DJ is an independent, open-source preservation project. It is not
+affiliated with, endorsed by, sponsored by, or certified by Native Instruments.
+Product names are used only to identify compatibility.
 
 This build may be ad-hoc signed and not Apple-notarized unless produced with
 Developer ID signing and notarization.

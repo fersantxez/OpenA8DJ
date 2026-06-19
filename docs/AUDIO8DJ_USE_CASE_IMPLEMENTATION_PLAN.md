@@ -536,8 +536,8 @@ Acceptance:
 
 ## Stage 12: DriverKit / Production Driver
 
-Goal: move from HAL prototype plus user-space USB bridge to a production-quality
-Apple driver architecture.
+Goal: move from the current HAL driver plus user-space USB bridge to a
+production-quality Apple System Extension driver architecture.
 
 Work:
 
