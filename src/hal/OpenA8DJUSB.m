@@ -431,6 +431,13 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
 
+typedef struct OpenA8DJInputTransformConfig {
+    uint8_t swapMask;
+    uint8_t invertLeftMask;
+    uint8_t invertRightMask;
+    uint32_t sourceMap;
+} OpenA8DJInputTransformConfig;
+
 typedef struct OpenA8DJInputStatsPayload {
     uint64_t frames[kStreams];
     double leftSquare[kStreams];
@@ -1375,7 +1382,7 @@ static void RingClear(FloatRing *ring)
 #endif
 }
 
-#if !OPENA8DJ_ENABLE_ELASTIC_OUTPUT
+#if !OPENA8DJ_ENABLE_ELASTIC_OUTPUT && OPENA8DJ_ENABLE_OUTPUT_FIFO
 static void RingTrimToLatest(FloatRing *ring, uint32_t maxFrames)
 {
     pthread_mutex_lock(&ring->mutex);
@@ -4956,9 +4963,10 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 
 - (BOOL)appendInputByte:(uint8_t)byte
                  stream:(uint32_t)stream
+                 config:(const OpenA8DJInputTransformConfig *)config
              inputStats:(OpenA8DJInputStatsPayload *)inputStats
 {
-    if (stream >= kStreams) {
+    if (stream >= kStreams || config == NULL) {
         return NO;
     }
     uint8_t pos = _inputByteCount[stream];
@@ -4973,15 +4981,15 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     float leftSample = (float)S24BEToS32(left) / 8388608.0f;
     float rightSample = (float)S24BEToS32(right) / 8388608.0f;
     uint32_t pairBit = 1u << stream;
-    if ((atomic_load(&_inputSwapMask) & pairBit) != 0) {
+    if ((config->swapMask & pairBit) != 0) {
         float tmp = leftSample;
         leftSample = rightSample;
         rightSample = tmp;
     }
-    if ((atomic_load(&_inputInvertLeftMask) & pairBit) != 0) {
+    if ((config->invertLeftMask & pairBit) != 0) {
         leftSample = -leftSample;
     }
-    if ((atomic_load(&_inputInvertRightMask) & pairBit) != 0) {
+    if ((config->invertRightMask & pairBit) != 0) {
         rightSample = -rightSample;
     }
     _pendingInput[stream * 2] = leftSample;
@@ -4991,9 +4999,8 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     _pendingInputMask |= (uint8_t)(1u << stream);
     if (_pendingInputMask == 0x0f) {
         float routedInput[kChannels];
-        uint32_t sourceMap = atomic_load(&_inputSourceMap);
         for (uint32_t destination = 0; destination < kStreams; destination++) {
-            uint32_t source = (sourceMap >> (destination * 4)) & 0x0f;
+            uint32_t source = (config->sourceMap >> (destination * 4)) & 0x0f;
             if (source >= kStreams) {
                 source = destination;
             }
@@ -5018,8 +5025,6 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     uint32_t decodedFrames = 0;
     uint64_t inputCheckErrors = 0;
     uint64_t outputPanicFlags = 0;
-    OpenA8DJInputStatsPayload inputStatsDelta;
-    memset(&inputStatsDelta, 0, sizeof(inputStatsDelta));
 #if OPENA8DJ_ENABLE_INPUT_DECODE && !OPENA8DJ_ENABLE_INPUT_CHECKS
     if (!atomic_load(&_inputDecodeActive)) {
         const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
@@ -5027,6 +5032,8 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return (uint32_t)(length / (groupSize * kChannelsPerStream));
     }
 #endif
+    OpenA8DJInputStatsPayload inputStatsDelta;
+    memset(&inputStatsDelta, 0, sizeof(inputStatsDelta));
 #if !OPENA8DJ_ENABLE_INPUT_DECODE
     const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
 #if !OPENA8DJ_ENABLE_INPUT_CHECKS
@@ -5050,12 +5057,19 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     decodedFrames = (uint32_t)(length / (groupSize * kChannelsPerStream));
 #endif
 #else
+    const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
+    const OpenA8DJInputTransformConfig inputConfig = {
+        .swapMask = (uint8_t)(atomic_load(&_inputSwapMask) & kInputTransformPairMask),
+        .invertLeftMask = (uint8_t)(atomic_load(&_inputInvertLeftMask) & kInputTransformPairMask),
+        .invertRightMask = (uint8_t)(atomic_load(&_inputInvertRightMask) & kInputTransformPairMask),
+        .sourceMap = atomic_load(&_inputSourceMap),
+    };
     for (NSUInteger offset = 0; offset < length; offset++, _inputMode2Index++) {
-        uint32_t groupOffset = (uint32_t)(_inputMode2Index % (kStreams * kBytesPerSampleUSB));
+        uint32_t groupOffset = (uint32_t)(_inputMode2Index % groupSize);
         if (groupOffset < kStreams) {
             uint32_t stream = groupOffset;
             uint8_t expected = Mode2CheckByte(stream, _inputMode2Index);
-            if ((_inputMode2Index / (kStreams * kBytesPerSampleUSB)) >= 4 &&
+            if ((_inputMode2Index / groupSize) >= 4 &&
                 (bytes[offset] & 0x3f) != expected) {
                 inputCheckErrors++;
             }
@@ -5076,7 +5090,10 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             continue;
         }
         uint32_t stream = groupOffset % kStreams;
-        if ([self appendInputByte:bytes[offset] stream:stream inputStats:&inputStatsDelta]) {
+        if ([self appendInputByte:bytes[offset]
+                            stream:stream
+                            config:&inputConfig
+                        inputStats:&inputStatsDelta]) {
             decodedFrames++;
         }
     }

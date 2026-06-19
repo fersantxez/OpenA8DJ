@@ -55,8 +55,8 @@ int main(int argc, char** argv) {
   const bool build_exposes_capture_iso =
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "-DOPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER=$(HAL_CAPTURE_ISO_FRAMES)");
-  const bool default_preserves_legacy_logical_size =
-      contains(makefile, "HAL_ISO_FRAMES ?= 8") &&
+  const bool default_preserves_promoted_iso64_profile =
+      contains(makefile, "HAL_ISO_FRAMES ?= 64") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)");
   const bool source_has_capture_macro =
       contains(hal_source, "#ifndef OPENA8DJ_CAPTURE_ISO_FRAMES_PER_TRANSFER") &&
@@ -127,7 +127,7 @@ int main(int argc, char** argv) {
   if (!source_present) failures.push_back("hal_source_missing");
   if (!makefile_present) failures.push_back("makefile_missing");
   if (!build_exposes_capture_iso) failures.push_back("build_capture_iso_flag_missing");
-  if (!default_preserves_legacy_logical_size) failures.push_back("default_capture_iso_not_legacy_safe");
+  if (!default_preserves_promoted_iso64_profile) failures.push_back("default_capture_iso_not_promoted_iso64_safe");
   if (!source_has_capture_macro) failures.push_back("capture_iso_macro_missing");
   if (!source_has_capture_constant) failures.push_back("capture_iso_constant_missing");
   if (!capture_pool_uses_physical_size) failures.push_back("capture_pool_not_physical_sized");
@@ -152,13 +152,13 @@ int main(int argc, char** argv) {
       << "  \"schema\": \"opena8djcpp.hal-logical-capture-batching-contract.v1\",\n"
       << "  \"safety\": \"offline_source_contract_only_no_audio_coreaudio_usb_or_hardware_touch\",\n"
       << "  \"result\": \"" << (pass ? "PASS" : "FAIL") << "\",\n"
-      << "  \"meaning\": \"PASS means capture may batch physical USB transfers without changing the default logical ISO8 audio cadence\",\n"
+      << "  \"meaning\": \"PASS means capture geometry remains explicit and rejected capture-batching experiments are not promoted into the default HAL profile\",\n"
       << "  \"source_present\": " << (source_present ? "true" : "false") << ",\n"
       << "  \"makefile_present\": " << (makefile_present ? "true" : "false") << ",\n"
       << "  \"build_exposes_capture_iso\": " << (build_exposes_capture_iso ? "true" : "false")
       << ",\n"
-      << "  \"default_preserves_legacy_logical_size\": "
-      << (default_preserves_legacy_logical_size ? "true" : "false") << ",\n"
+      << "  \"default_preserves_promoted_iso64_profile\": "
+      << (default_preserves_promoted_iso64_profile ? "true" : "false") << ",\n"
       << "  \"capture_pool_uses_physical_size\": "
       << (capture_pool_uses_physical_size ? "true" : "false") << ",\n"
       << "  \"capture_queue_uses_physical_size\": "

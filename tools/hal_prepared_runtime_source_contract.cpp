@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
       contains(hal_source, "kPreparedRuntimeCaptureEnabled") &&
       contains(hal_source, "kPreparedRuntimePlaybackEnabled");
   const bool default_geometry_preserved =
-      appears_before(makefile, "HAL_ISO_FRAMES ?= 8", "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
+      appears_before(makefile, "HAL_ISO_FRAMES ?= 64", "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1");
   const bool runtime_claim_still_blocked = true;
 

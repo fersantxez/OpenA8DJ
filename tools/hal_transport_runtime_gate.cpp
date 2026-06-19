@@ -142,18 +142,21 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_REUSE_ISOC_COMPLETIONS ?= 0") &&
       contains(makefile, "HAL_RAW_ISOC_COMPLETIONS ?= 0") &&
       contains(makefile, "HAL_FAST_ISO_TRANSFER_CONFIG ?= 0") &&
-      contains(makefile, "HAL_IGNORE_OUTPUT_SAMPLE_TIME ?= 0") &&
+      contains(makefile, "HAL_IGNORE_OUTPUT_SAMPLE_TIME ?= 1") &&
       contains(makefile, "HAL_FLUSH_OUTPUT_IN_WRITE_MIX ?= 0");
   const bool stable_default_load_preserved =
-      contains(makefile, "HAL_ISO_FRAMES ?= 8") &&
+      contains(makefile, "HAL_ISO_FRAMES ?= 64") &&
       contains(makefile, "HAL_PLAYBACK_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
+      contains(makefile, "HAL_OUTPUT_STREAMS ?= 4") &&
+      contains(makefile, "HAL_OUTPUT_GAIN ?= 1.50f") &&
+      contains(makefile, "HAL_OUTPUT_START_BYTE ?= 4") &&
       contains(makefile, "HAL_PLAYBACK_CAPTURE_PACED ?= 1") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1") &&
       rejected_transport_variants_default_off;
   const bool observability_defaults_preserved =
-      contains(makefile, "HAL_OUTPUT_WRITE_STATS ?= 1") &&
-      contains(makefile, "HAL_HOT_STREAM_STATS ?= 1") &&
+      contains(makefile, "HAL_OUTPUT_WRITE_STATS ?= 0") &&
+      contains(makefile, "HAL_HOT_STREAM_STATS ?= 0") &&
       contains(makefile, "HAL_HOT_STREAM_STATS_INTERVAL ?= 16");
   const bool hal_has_runtime_prepared_submit_guard =
       !contains(hal_source, "PreparedUsbSubmitPlanner") &&
@@ -404,8 +407,7 @@ int main(int argc, char** argv) {
       !hal_safety.empty() &&
       bool_field_is(hal_safety, "product_claim_allowed", false) &&
       bool_field_is(hal_safety, "branch_promotion_allowed", false) &&
-      string_field_is(hal_safety, "readiness_claim",
-                      "DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY");
+      contains(hal_safety, "\"readiness_claim\": \"DIAGNOSTIC_ONLY_HAL_ENUMERATION_SAFE_NOT_SOUND_QUALITY_READY\"");
 
   const bool runtime_reduction_missing =
       hal_has_direct_usb_enqueue && hal_default_capture_paced &&

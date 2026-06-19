@@ -16244,3 +16244,47 @@ Follow-up offline verification:
 - Result:
   - No quality-approved candidate exists.
   - Current loaded driver is the safest diagnostic state, not a ready build.
+
+## 2026-06-19 02:56 EDT - HAL Input Decode CPU Cleanup, Offline Only
+
+- Scope:
+  - No hardware, USB reset, CoreAudio change, driver install, or audio playback
+    was touched in this iteration.
+  - Mainline C and Rust remained read-only.
+  - Base commit before the change: `89ae548`.
+- Change:
+  - `src/hal/OpenA8DJUSB.m` now snapshots input transform configuration once
+    per capture decode chunk and passes that immutable snapshot into
+    `appendInputByte`.
+  - This removes repeated atomic loads for swap/invert/source-map policy from
+    the per-sample input decode path.
+  - The snapshot is taken after the input-decode inactive fast path, avoiding
+    unnecessary transform-policy atomics when capture bytes are only counted.
+  - `inputStatsDelta` is also cleared after that fast path, avoiding one
+    unnecessary stats-struct zeroing when input decode is inactive.
+  - The source contract records `audio_bytes_changed=false`; this is intended as
+    CPU hot-path cleanup, not an audio-byte transform change.
+- Evidence path:
+  - `local-analysis/offline-gates/cpu-input-snapshot-20260619/`.
+- Commands:
+  - `cmake --build build/cpp-release --target opena8djcpp_hal_prepared_runtime_source_contract opena8djcpp_hal_logical_capture_batching_contract opena8djcpp_static_policy_check opena8djcpp_hal_input_decode_snapshot_contract opena8djcpp_hal_transport_runtime_gate -j`
+  - `ctest --test-dir build/cpp-release --output-on-failure -R 'opena8djcpp_(hal_prepared_runtime_source_contract|hal_logical_capture_batching_contract|static_policy_check|hal_input_decode_snapshot_contract|hal_transport_runtime_gate|dvs_packet_input_decode|prepared_transport_routing_timecode_contract|timecode_matrix|realtime_audit)'`
+  - `make -B hal`
+  - `ctest --test-dir build/cpp-release --output-on-failure`
+- Results:
+  - Focused gates: PASS, 9/9.
+  - HAL build: PASS.
+  - Full offline suite: 89/90 PASS.
+  - Fast-path follow-up logs:
+    `focused-ctest-after-fastpath.txt` and `full-ctest-after-fastpath.txt`.
+  - Additional source-contract follow-up: `stats_clear_after_inactive_fast_path=true`.
+  - Remaining FAIL: `opena8djcpp_irig_idle_capture_gate`, using saved iRig idle
+    evidence at
+    `/Users/fer/dev/audio8djcpp/local-analysis/irig-capture-isolation/20260618T2319Z-irig-idle-after-hal-unload`
+    with `max_rms_dbfs=-50.195704` versus the `-55.0 dBFS` guardrail.
+- Claim status:
+  - CPU-path improvement is source-contract verified: per-sample input transform
+    atomic loads removed.
+  - No new physical sound-quality claim is allowed from this iteration.
+  - A candidate handoff still requires lock-gated playback/capture validation of
+    the exact loaded artifact.
