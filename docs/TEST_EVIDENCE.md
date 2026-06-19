@@ -862,3 +862,613 @@ OPENA8DJ_OUTPUT_ZERO_FLOOR=0.0f
 
 - The active-silence infrastructure remains in code, but the reproducible
   low-noise target no longer enables the rejected high-threshold gate.
+
+## 2026-06-19 14:10 EDT - SPSC CPU-lite rollback after Timecode Vinyl regression
+
+Operator report:
+
+- The SPSC CPU-lite build installed with SHA
+  `23aa5508aab6792e48d773e5be9f2781d7d4805d9302be39df1b5f4c65331ccc`
+  regressed Traktor Timecode Vinyl: signal was visible but did not synchronize.
+- This is treated as a blocking DVS regression. Do not promote
+  `OPENA8DJ_INPUT_SPSC_RING=1` without new physical DVS evidence.
+
+Action taken:
+
+```text
+rebuilt_profile=hal-timecode-low-noise-candidate
+OPENA8DJ_INPUT_SPSC_RING=0
+OPENA8DJ_INPUT_MAX_LATENCY_FRAMES=512
+OPENA8DJ_OUTPUT_GAIN=0.75f
+OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+OPENA8DJ_OUTPUT_ZERO_FLOOR=0.0f
+installed_sha256=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
+profile_after_install=timecode-vinyl-low-noise
+input-mode=timecode-vinyl
+input-decode=on
+lock_after_install=absent
+```
+
+Offline gates run before install:
+
+```text
+opena8djcpp_timecode_readiness_gate=PASS
+opena8djcpp_dvs_packet_input_decode=PASS
+opena8djcpp_soundcheck_wav_quality=PASS
+opena8djcpp_hal_candidate_safety_gate=PASS summary, active hash mismatch expected before install
+```
+
+Post-install CPU note:
+
+```text
+ps_after_coreaudiod_restart=misleading high decay value for coreaudiod/mediaremoted
+top_instant_coreaudiod=0.0%
+top_instant_opena8dj_driver=0.0%
+top_instant_mediaremoted=0.0%
+coreaudiod_sample=local-analysis/cpu-spike-20260619-140843/coreaudiod.sample.txt
+```
+
+Status:
+
+- Driver is installed and loaded for human DVS/audio retest.
+- This is a rollback from the SPSC optimization, not a new CPU improvement.
+- Next CPU optimization must preserve the proven non-SPSC capture semantics or
+  include a same-session Traktor Timecode Vinyl physical validation.
+
+## 2026-06-19 14:12 EDT - Live Traktor monitor after audible clipping reports
+
+Installed artifact at start:
+
+```text
+installed_sha256=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
+profile=timecode-vinyl-low-noise
+operator_report=initial impression good, then a couple of audible clippings
+monitor_run=local-analysis/live-monitor-20260619-141208
+focused_monitor_run=local-analysis/live-monitor-focused-20260619-141323
+lock_status=absent during passive monitoring
+```
+
+Observed during active Traktor playback:
+
+```text
+streaming=yes
+sample_rate=48000
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureTransactionErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+Traktor_CPU_observed=65-114%
+OpenA8DJ_driver_CPU_observed=about 5-9% while streaming
+coreaudiod_CPU_observed=about 1-6% before later audio-stack spin
+output_ring_growth_observed=10528 -> 18432 frames
+stream_transition_observed=streaming yes -> no after ring reached 18432 frames
+```
+
+Interpretation:
+
+- The audible clipping did not coincide with the current transport counters:
+  no USB transfer errors, active underruns, late writes, or panic flags were
+  reported.
+- The output timeline accumulated well above the 8192-frame target before the
+  stream stopped. That is not classified as an underrun by current counters,
+  but it is relevant to audible discontinuity/latency analysis.
+- The installed stable build has amplitude stats disabled, so
+  `output-level peak/near-clip/clipped=0` is not useful for proving or
+  disproving sample clipping.
+
+Rejected diagnostic attempt:
+
+```text
+diagnostic_sha256=fedfe71da4e1284eabcf17f9ae3e7854670f30ecdce5d39d12028f5f8193cbb8
+changes=output amplitude/write stats enabled, output elastic high-water lowered to 12288 frames
+offline_timecode_readiness=PASS
+offline_dvs_packet_input_decode=PASS
+offline_soundcheck_wav_quality=PASS
+status=REJECTED
+reason=coreaudiod remained about 95-100% after install, even with OpenA8DJ driver process at 0.0%
+coreaudiod_sample=local-analysis/coreaudiod-spike-fedfe71-20260619-141734/coreaudiod.sample.txt
+```
+
+Recovery:
+
+```text
+rollback_sha256=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
+profile_after_rollback=timecode-vinyl-low-noise
+Open_Audio_8_DJ_visible=yes, 8 in / 8 out, 48000 Hz
+iRig_Stream_visible=yes, 2 in / 2 out, 48000 Hz
+lock_after_recovery=absent
+```
+
+Remaining contaminant:
+
+- After rollback and audio stack recovery, `coreaudiod` still spun high while
+  the Codex audio service and `audioaccessoryd` were active. The OpenA8DJ
+  driver process remained at 0.0% and stream was stopped. Do not use that
+  system state as a clean driver CPU or sound-quality measurement.
+- For clean Traktor/audio validation, disable Codex dictation/microphone and
+  avoid Control Center builds or other high-CPU work during the listening
+  window.
+
+## 2026-06-19 14:29 EDT - Traktor Timecode Vinyl stuck on Calculating
+
+Operator report:
+
+```text
+symptom=Traktor Timecode Setup showed Deck B signal but stayed Calculating
+deck_a=mostly no signal/dot
+deck_b=visible grey timecode scope, no calibrated color
+installed_sha256=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
+```
+
+Initial state:
+
+```text
+streaming=no
+coreaudiod_CPU_observed=about 100-120%
+Codex_audio_service_CPU_observed=about 20-50%
+audioaccessoryd_CPU_observed=about 20-30%
+OpenA8DJ_driver_CPU_observed=0%
+profile_before_recovery=timecode-vinyl-low-noise
+gnd-vinyl=off
+```
+
+Actions:
+
+```text
+coreaudio_recovery=local-analysis/live-timecode-recovery-20260619-142457
+ni_agent_recovery=local-analysis/live-timecode-ni-agent-recovery-20260619-142742
+traktor_relaunch=local-analysis/live-timecode-traktor-relaunch-20260619-142822
+profile_sweep=local-analysis/live-timecode-profile-sweep-20260619-142853
+final_profile=timecode-vinyl
+gnd-vinyl=on
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+input-source=A=A B=B C=C D=D
+```
+
+Observed after recovery and Traktor relaunch:
+
+```text
+streaming=yes
+OpenA8DJ_driver_CPU_observed=about 5-7%
+coreaudiod_CPU_observed=about 1-3%
+NIHardwareAgent_CPU_observed=0% after killing its 100% spin
+Input_B_RMS_L=about 0.039
+Input_B_RMS_R=about 0.039
+Input_B_peak=about 0.10-0.11
+Input_B_corr=about 0.39-0.41
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+captureTransactionErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+```
+
+Interpretation:
+
+- `timecode-vinyl-low-noise` reduced the ground-lift setting but left Deck B
+  with too little or poorly shaped DVS signal in this session. It should not be
+  the default Traktor DVS validation profile until same-session DVS evidence
+  proves it stable.
+- `timecode-vinyl` with `gnd-vinyl=on` restored a plausible Deck B DVS signal
+  after the CoreAudio/NIHardwareAgent recovery and Traktor relaunch.
+- If Traktor still remains on `Calculating` with this final state, the next
+  reversible test is a Deck B-only `input-transform` sweep, starting with
+  polarity/channel transforms, not a rebuild.
+
+## 2026-06-19 14:35 EDT - Timecode input gate candidate for needle-up runaway
+
+Operator report:
+
+```text
+symptoms=Deck B low input, absolute-position recognition weak, needle-up runaway acceleration
+deck_a_status=ignored for this test; no vinyl connected on A
+deck_b_status=only active Timecode Vinyl input
+```
+
+Diagnosis:
+
+```text
+pre_gate_needle_up_input_b_rms=about 0.0015
+pre_gate_needle_up_input_b_peak=about 0.014
+pre_gate_needle_up_input_b_corr=about 0.98
+interpretation=Traktor was receiving low-level correlated noise instead of true silence
+```
+
+Rejected intermediate state:
+
+```text
+installed_sha256=6a39dc306229398842a951ed3d6a461e9bb75068f3792c990a2d89ddc1c9d300
+timecode_input_gain=2.0
+reason=Deck B level improved but later showed peak clamp at 1.0, unsafe for absolute-position decoding
+```
+
+Installed candidate:
+
+```text
+installed_sha256=e70a3d4d12767be22b83b39f9cdbf77f45b9ddd672accdd09b26403ead0fac29
+evidence=local-analysis/live-timecode-input-gate-install-20260619-143536
+timecode_input_gain=1.5
+input_max_latency_frames=512
+timecode_input_gate_threshold=0.025
+timecode_input_gate_hold_frames=4096
+output_start_latency_frames=8192
+output_target_latency_frames=8192
+profile=timecode-vinyl
+gnd-vinyl=on
+input-decode=on
+```
+
+Needle-up validation after install:
+
+```text
+streaming=yes
+Input B: frames=398970 rmsL=0.00000000 rmsR=0.00000000 peakL=0.00000000 peakR=0.00000000 corr=0.0000
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+```
+
+Interpretation:
+
+- The driver now gives Traktor true silence when the timecode signal is below
+  threshold, instead of passing correlated phono/control noise.
+- This directly targets the needle-up runaway symptom.
+- Human validation still needs Deck B needle-down scratch and absolute-position
+  behavior. If absolute position remains poor, next candidates should tune the
+  gate threshold/hold or Deck B transform, not reduce output latency.
+
+Follow-up result:
+
+- Rejected for DVS calibration. With needle down, Traktor stayed in
+  `Calculating` and did not settle into the previously working colored/stable
+  timecode state.
+- The digital input gate remains useful as a diagnosis of the needle-up
+  runaway cause, but must not be enabled in the current working Timecode Vinyl
+  candidate.
+
+## 2026-06-19 14:45 EDT - Frozen good Timecode Vinyl baseline
+
+Operator report:
+
+```text
+Deck B Timecode Vinyl is working very well.
+Deck A ignored; no vinyl connected on A.
+Remaining issue reported later: latency still slightly too high.
+```
+
+Frozen installed state:
+
+```text
+installed_sha256=bdd6f2f9ba2666f48dd27c639b279f13d89baa522f4bb7e60d42a0688777c5aa
+evidence=local-analysis/frozen-good-timecode-20260619-144506
+build_family=hal-timecode-frozen-good-candidate
+HAL_TIMECODE_INPUT_GAIN=1.0f
+HAL_TIMECODE_INPUT_GATE_THRESHOLD=0.0f
+HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES=0
+HAL_INPUT_MAX_LATENCY_FRAMES=0
+HAL_OUTPUT_GAIN=0.75f
+HAL_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+HAL_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+Runtime profile:
+
+```text
+profile=timecode-vinyl-low-noise
+input-mode=0 (timecode-vinyl)
+gnd-vinyl=off
+gnd-cd-line=off
+gnd-phono=off
+software-lock=on
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+input-source=A=A B=B C=C D=D
+```
+
+Post-freeze observed counters:
+
+```text
+streaming=yes
+sample_rate=48000
+Input B frames=1611222 rmsL=0.03932570 rmsR=0.03915196 peakL=0.11685729 peakR=0.13358474 corr=0.3697
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureTransactionErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+```
+
+Lessons frozen:
+
+- Keep the raw timecode waveform intact for Traktor. Do not enable digital
+  timecode gain, digital input gating, channel swap, polarity inversion, or SPSC
+  input ring in the current DVS baseline.
+- `timecode-vinyl-low-noise` with `gnd-vinyl=off` is the current human-validated
+  profile for the working Deck B test state.
+- The screenshot in this evidence folder may still show Traktor's setup panel
+  text as `Calculating`; the operator's live Deck B control report is the
+  acceptance signal for this freeze.
+
+Next latency-only candidate:
+
+```text
+target=hal-timecode-frozen-good-responsive-candidate
+change=HAL_INPUT_MAX_LATENCY_FRAMES=512
+unchanged=timecode gain/gate off, output gain, low-noise profile, channel transform identity
+intent=drop stale input backlog before CoreAudio serves Traktor, without changing waveform shape
+rollback=hal-timecode-frozen-good-candidate + profile timecode-vinyl-low-noise
+```
+
+## 2026-06-19 14:49 EDT - Frozen-good responsive candidate installed
+
+Reason:
+
+- Human validation said the 14:45 baseline worked very well, but Deck B still
+  had slightly too much Timecode Vinyl latency.
+- The new candidate changes only input freshness. It does not change the
+  waveform shape, digital gain, digital gate, output gain, output latency
+  target, channel transform, or low-noise hardware profile.
+
+Installed state:
+
+```text
+target=hal-timecode-frozen-good-responsive-candidate
+evidence=local-analysis/timecode-frozen-good-responsive-20260619-144915
+installed_sha256=fd8bd3ac6f422e2c3da783172fca964f47f289c9ffd7bb96f1e5be810725bca5
+previous_frozen_good_sha256=bdd6f2f9ba2666f48dd27c639b279f13d89baa522f4bb7e60d42a0688777c5aa
+HAL_TIMECODE_INPUT_GAIN=1.0f
+HAL_TIMECODE_INPUT_GATE_THRESHOLD=0.0f
+HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES=0
+HAL_INPUT_MAX_LATENCY_FRAMES=512
+HAL_OUTPUT_GAIN=0.75f
+HAL_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+HAL_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+Profile confirmed after install:
+
+```text
+input-mode=0 (timecode-vinyl)
+gnd-vinyl=off
+gnd-cd-line=off
+gnd-phono=off
+software-lock=on
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+input-source=A=A B=B C=C D=D
+```
+
+Validation before handoff:
+
+```text
+hal_smoke=PASS
+offline_gates=86/87 PASS
+offline_expected_block=opena8djcpp_hal_transport_runtime_gate
+offline_expected_block_reason=still no same-session physical proof for product/superiority claims
+audio_inspect=Open Audio 8 DJ visible, 8 inputs, 8 outputs, 48000 Hz
+audio_stack_health=PASS
+coreaudiod_idle_cpu=0.0
+OpenA8DJ_driver_idle_cpu=0.0
+lock_after_install=absent
+default_devices_changed=no
+usb_reset=no
+audio_playback=no
+recording=no
+```
+
+Handoff status:
+
+- Installed and ready for human Deck B Traktor validation.
+- If latency improves and calibration remains stable, promote this as the new
+  DVS working baseline.
+- If calibration, absolute position, or needle-up behavior regresses, roll back
+  to the previous frozen-good SHA and rebuild with
+  `hal-timecode-frozen-good-candidate`.
+
+Follow-up result:
+
+- Rejected for DVS. Human validation reported the timecode scope went blank /
+  low-signal-like and Traktor returned to `Calibrating`.
+- Do not use `HAL_INPUT_MAX_LATENCY_FRAMES=512` as the current latency fix.
+  Trimming the input ring this way appears to damage the continuity Traktor
+  needs for calibration/absolute tracking.
+
+Rollback:
+
+```text
+rollback_evidence=local-analysis/timecode-rollback-frozen-good-20260619-145209
+rollback_installed_sha256=bdd6f2f9ba2666f48dd27c639b279f13d89baa522f4bb7e60d42a0688777c5aa
+rollback_target=hal-timecode-frozen-good-candidate
+HAL_INPUT_MAX_LATENCY_FRAMES=0
+profile=timecode-vinyl-low-noise
+input-mode=0 (timecode-vinyl)
+gnd-vinyl=off
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+audio_inspect=Open Audio 8 DJ visible, 8 inputs, 8 outputs, 48000 Hz
+hardware_lock_after_rollback=absent
+```
+
+Next latency direction:
+
+- Do not drop old input frames at CoreAudio read time.
+- A safer latency improvement needs timestamp-aware capture pacing or smaller
+  stable CoreAudio input buffering that preserves continuous frame order, not
+  destructive ring trimming.
+
+## 2026-06-19 14:55 EDT - Timecode latency output4096 candidate installed
+
+Reason:
+
+- The previous frozen-good baseline calibrated and sounded good, but human
+  testing reported Timecode Vinyl latency: usable, nearly there, but still not
+  responsive enough.
+- The rejected `HAL_INPUT_MAX_LATENCY_FRAMES=512` experiment proved that
+  destructive input trimming breaks Traktor calibration. This candidate leaves
+  input continuity untouched and reduces only output timeline latency.
+
+Installed state:
+
+```text
+target=hal-timecode-frozen-good-output4096-candidate
+evidence=local-analysis/timecode-output4096-20260619-145416
+installed_sha256=5be65453c1e501f4c2a28bff67e37de71665662311d62a44c19087fe11a4caa7
+HAL_TIMECODE_INPUT_GAIN=1.0f
+HAL_TIMECODE_INPUT_GATE_THRESHOLD=0.0f
+HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES=0
+HAL_INPUT_MAX_LATENCY_FRAMES=0
+HAL_OUTPUT_GAIN=0.75f
+HAL_OUTPUT_START_LATENCY_FRAMES=4096
+HAL_OUTPUT_RESTART_LATENCY_FRAMES=2048
+HAL_OUTPUT_TARGET_LATENCY_FRAMES=4096
+HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES=12288
+HAL_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+HAL_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+Profile confirmed:
+
+```text
+profile=timecode-vinyl-low-noise
+input-mode=0 (timecode-vinyl)
+gnd-vinyl=off
+gnd-cd-line=off
+gnd-phono=off
+software-lock=on
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+input-source=A=A B=B C=C D=D
+```
+
+Validation:
+
+```text
+hal_smoke=PASS
+targeted_offline_gates=PASS
+  opena8djcpp_timecode_readiness_gate
+  opena8djcpp_dvs_packet_input_decode
+  opena8djcpp_soundcheck_wav_quality
+  opena8djcpp_audiophile_tone_gate
+  opena8djcpp_hal_candidate_safety_gate
+active_stream_target=4096 frames
+audio_stack_health_after_reload_settle=PASS
+coreaudiod_cpu_after_settle=0.0
+OpenA8DJ_driver_cpu_after_settle=0.0
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+hardware_lock_after_install=absent
+```
+
+Handoff status:
+
+- Installed for human Traktor Deck B validation.
+- Expected improvement is lower perceived scratch/playback latency, not stronger
+  timecode input signal.
+- If calibration remains stable and latency improves, promote this as the next
+  working DVS baseline.
+- If sound quality, clipping, or calibration regresses, roll back to
+  `bdd6f2f9ba2666f48dd27c639b279f13d89baa522f4bb7e60d42a0688777c5aa`.
+
+## 2026-06-19 15:02 EDT - Timecode latency output3072 candidate installed
+
+Reason:
+
+- Human validation of the output4096 candidate reported very good progress:
+  Timecode Vinyl was almost responsive enough, but still needed a small
+  latency reduction.
+- This candidate takes a smaller next step than jumping to 2048 frames. It
+  leaves the timecode input path untouched and reduces only the output timeline
+  target from 4096 to 3072 frames.
+
+Installed state:
+
+```text
+target=hal-timecode-frozen-good-output3072-candidate
+evidence=local-analysis/timecode-output3072-20260619-150122
+installed_sha256=70ae8ca3735235b3efbcf48decb1b45eb844b48824f593f1cc3f50b3e2a52790
+HAL_TIMECODE_INPUT_GAIN=1.0f
+HAL_TIMECODE_INPUT_GATE_THRESHOLD=0.0f
+HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES=0
+HAL_INPUT_MAX_LATENCY_FRAMES=0
+HAL_OUTPUT_GAIN=0.75f
+HAL_OUTPUT_START_LATENCY_FRAMES=3072
+HAL_OUTPUT_RESTART_LATENCY_FRAMES=1536
+HAL_OUTPUT_TARGET_LATENCY_FRAMES=3072
+HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES=9216
+HAL_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+HAL_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+Profile confirmed:
+
+```text
+profile=timecode-vinyl-low-noise
+input-mode=0 (timecode-vinyl)
+gnd-vinyl=off
+gnd-cd-line=off
+gnd-phono=off
+software-lock=on
+input-decode=on
+input-transform=A=normal B=normal C=normal D=normal
+input-source=A=A B=B C=C D=D
+```
+
+Validation:
+
+```text
+hal_smoke=PASS
+targeted_offline_gates=PASS
+  opena8djcpp_timecode_readiness_gate
+  opena8djcpp_dvs_packet_input_decode
+  opena8djcpp_soundcheck_wav_quality
+  opena8djcpp_audiophile_tone_gate
+  opena8djcpp_hal_candidate_safety_gate
+active_stream_target=3072 frames
+audio_stack_health_after_settle=PASS
+coreaudiod_cpu_after_settle=1.8
+OpenA8DJ_driver_cpu_after_settle=6.0
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+outputPanicFlags=0
+hardware_lock_after_install=absent
+```
+
+Handoff status:
+
+- Installed for human Traktor Deck B validation.
+- Expected improvement is one small step of lower perceived scratch/playback
+  latency versus output4096.
+- If calibration, sound quality, or stability regresses, roll back first to the
+  output4096 SHA `5be65453c1e501f4c2a28bff67e37de71665662311d62a44c19087fe11a4caa7`.
+- Do not try destructive input trimming again for this latency problem.
+
+Follow-up result:
+
+- Human validation: PASS.
+- Operator report: much better, works well, freeze this as stable.
+- This state is the local `0.5.0` stable reference until a later release-prep
+  change explicitly supersedes it.
+- Stable reference document:
+  `docs/STABLE_0.5.0_REFERENCE.md`.

@@ -62,6 +62,18 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_ENABLE_INPUT_DECODE 1
 #endif
 
+#ifndef OPENA8DJ_TIMECODE_INPUT_GAIN
+#define OPENA8DJ_TIMECODE_INPUT_GAIN 1.0f
+#endif
+
+#ifndef OPENA8DJ_TIMECODE_INPUT_GATE_THRESHOLD
+#define OPENA8DJ_TIMECODE_INPUT_GATE_THRESHOLD 0.0f
+#endif
+
+#ifndef OPENA8DJ_TIMECODE_INPUT_GATE_HOLD_FRAMES
+#define OPENA8DJ_TIMECODE_INPUT_GATE_HOLD_FRAMES 4096
+#endif
+
 #ifndef OPENA8DJ_INPUT_SPSC_RING
 #define OPENA8DJ_INPUT_SPSC_RING 0
 #endif
@@ -264,6 +276,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_OUTPUT_TARGET_LATENCY_FRAMES 8192
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_ELASTIC_HIGH_WATER_FRAMES
+#define OPENA8DJ_OUTPUT_ELASTIC_HIGH_WATER_FRAMES 24576
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
 #endif
@@ -375,7 +391,7 @@ enum {
     kOutputStartLatencyFrames = OPENA8DJ_OUTPUT_START_LATENCY_FRAMES,
     kOutputRestartLatencyFrames = OPENA8DJ_OUTPUT_RESTART_LATENCY_FRAMES,
     kOutputTargetLatencyFrames = OPENA8DJ_OUTPUT_TARGET_LATENCY_FRAMES,
-    kOutputElasticHighWaterFrames = 24576,
+    kOutputElasticHighWaterFrames = OPENA8DJ_OUTPUT_ELASTIC_HIGH_WATER_FRAMES,
     kOutputReplayHoldFrames = 8,
     kOutputMaxReplayFrames = 192,
     kOutputStatsFlushTransferInterval = 16,
@@ -469,6 +485,7 @@ typedef struct OpenA8DJInputTransformConfig {
     uint8_t swapMask;
     uint8_t invertLeftMask;
     uint8_t invertRightMask;
+    uint8_t inputMode;
     uint32_t sourceMap;
 } OpenA8DJInputTransformConfig;
 
@@ -503,6 +520,22 @@ static void InputStatsAddSample(OpenA8DJInputStatsPayload *stats,
     if (ra > stats->rightPeak[stream]) {
         stats->rightPeak[stream] = ra;
     }
+}
+
+static float OpenA8DJClampInputSample(float sample)
+{
+    if (sample > 1.0f) {
+        return 1.0f;
+    }
+    if (sample < -1.0f) {
+        return -1.0f;
+    }
+    return sample;
+}
+
+static float OpenA8DJAbsInputSample(float sample)
+{
+    return sample < 0.0f ? -sample : sample;
 }
 
 static bool InputStatsHasSamples(const OpenA8DJInputStatsPayload *stats)
@@ -2327,6 +2360,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     uint64_t _inputMode2Index;
     uint8_t _inputBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _inputByteCount[kStreams];
+    uint32_t _timecodeSignalHoldFrames[kStreams];
     float _pendingInput[kChannels];
     uint8_t _pendingInputMask;
     OpenA8DJInputStatsPayload _inputStats;
@@ -4716,6 +4750,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     OutputTimelineClear(&_outputTimeline);
     memset(_inputBytes, 0, sizeof(_inputBytes));
     memset(_inputByteCount, 0, sizeof(_inputByteCount));
+    memset(_timecodeSignalHoldFrames, 0, sizeof(_timecodeSignalHoldFrames));
     if (_spec.dataAlignment == 2) {
         for (uint32_t stream = 0; stream < kStreams; stream++) {
             bool leftFirst = (kInputMode2LeftFirstStreamMask & (1u << stream)) != 0;
@@ -5053,6 +5088,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if ((config->invertRightMask & pairBit) != 0) {
         rightSample = -rightSample;
     }
+    if (config->inputMode == 0) {
+        leftSample = OpenA8DJClampInputSample(leftSample * OPENA8DJ_TIMECODE_INPUT_GAIN);
+        rightSample = OpenA8DJClampInputSample(rightSample * OPENA8DJ_TIMECODE_INPUT_GAIN);
+        if (OPENA8DJ_TIMECODE_INPUT_GATE_THRESHOLD > 0.0f) {
+            float peak = OpenA8DJAbsInputSample(leftSample);
+            float rightPeak = OpenA8DJAbsInputSample(rightSample);
+            if (rightPeak > peak) {
+                peak = rightPeak;
+            }
+            if (peak >= OPENA8DJ_TIMECODE_INPUT_GATE_THRESHOLD) {
+                _timecodeSignalHoldFrames[stream] = OPENA8DJ_TIMECODE_INPUT_GATE_HOLD_FRAMES;
+            } else if (_timecodeSignalHoldFrames[stream] > 0) {
+                _timecodeSignalHoldFrames[stream]--;
+            }
+            if (_timecodeSignalHoldFrames[stream] == 0) {
+                leftSample = 0.0f;
+                rightSample = 0.0f;
+            }
+        }
+    }
     _pendingInput[stream * 2] = leftSample;
     _pendingInput[stream * 2 + 1] = rightSample;
     InputStatsAddSample(inputStats, stream, leftSample, rightSample);
@@ -5123,6 +5178,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         .swapMask = (uint8_t)(atomic_load(&_inputSwapMask) & kInputTransformPairMask),
         .invertLeftMask = (uint8_t)(atomic_load(&_inputInvertLeftMask) & kInputTransformPairMask),
         .invertRightMask = (uint8_t)(atomic_load(&_inputInvertRightMask) & kInputTransformPairMask),
+        .inputMode = _controlState[0],
         .sourceMap = atomic_load(&_inputSourceMap),
     };
     for (NSUInteger offset = 0; offset < length; offset++, _inputMode2Index++) {
