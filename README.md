@@ -1,20 +1,21 @@
 # OpenA8DJ
 
-OpenA8DJ is the modern open-source macOS driver for the Native Instruments
-Audio 8 DJ USB audio interface. The public `main` branch is the macOS-native
-C++ driver line, packaged for the normal OS X/macOS installer flow: download a
-DMG, open it, and run the bundled package.
+OpenA8DJ exists to keep the Native Instruments Audio 8 DJ usable on modern
+macOS.
 
-The current `main` branch is the C++/DriverKit redesign line. It is built for
-modern macOS using the macOS audio stack: Core Audio HAL for the current
-installable preview, IOUSBHost for USB transport, CoreMIDI for MIDI endpoints,
-and a DriverKit/AudioDriverKit path prepared for the future System Extension
-architecture. It ships as an easy DMG/PKG installer and exposes `Open Audio 8
-DJ` as a normal Core Audio device for DJ/audio applications.
+This is an independent, open-source preservation project. It is not affiliated
+with, endorsed by, sponsored by, or certified by Native Instruments. It is not a
+commercial product, and it does not include Native Instruments driver binaries,
+firmware, installers, logos, or proprietary payloads.
 
-The previous C/Objective-C implementation is preserved separately on the
-`legacy` branch for historical reference. It is not the current user-facing
-driver line.
+The project is for people who still love this interface: the sound, the
+8-in/8-out layout, the A/B/C/D deck routing, and the Traktor/timecode workflows
+that made the Audio 8 DJ a classic piece of DJ hardware. The goal is simple:
+let useful hardware keep working instead of becoming e-waste because the
+original driver no longer fits current macOS.
+
+If you only want to try the driver, download the DMG, open it, and run the
+bundled package.
 
 ## Download For macOS / OS X
 
@@ -42,7 +43,8 @@ approval step.
 
 ## Modern macOS Architecture
 
-OpenA8DJ `main` is a modern user-space macOS driver stack:
+The public `main` branch is now the current macOS driver line. It uses a
+macOS-native architecture:
 
 - Core Audio HAL plug-in for the current installable preview.
 - IOUSBHost-based CAIAQ USB transport for the Audio 8 DJ.
@@ -59,27 +61,14 @@ logging, UI, heavy diagnostics, and other non-audio control tasks.
 
 ## Legacy C Line
 
-The `legacy` branch preserves the previous C/Objective-C implementation. It is
-kept because it contains useful behavior learned from the Linux CAIAQ /
-`snd-usb-caiaq` reverse-engineering lineage, packet handling history,
-physical-test evidence, and recovery knowledge.
+The `legacy` branch preserves the previous C/Objective-C implementation. That
+older line was based on and inspired by Linux CAIAQ / `snd-usb-caiaq`
+reverse-engineering work, plus a lot of physical testing and recovery
+knowledge.
 
 New user-facing work should target `main`. Do not port code from `legacy`
 blindly; preserve behavior only when evidence shows it improves sound quality,
 routing, stability, Timecode Vinyl behavior, or resource use.
-
-## Why This Exists
-
-OpenA8DJ is a non-profit preservation project. We are long-time fans of the
-Audio 8 DJ: the way it sounds, the channel layout, the routing options, and the
-Traktor/timecode workflows made it a classic piece of DJ hardware. It would be
-a shame for a useful, good-sounding interface to disappear just because the
-original driver stopped working on modern systems.
-
-This project exists so people who still love this hardware can keep using it.
-It is not a commercial product, and there is no profit motive behind it. Any
-optional support goes toward practical project costs such as test hardware,
-signing, packaging, and ongoing maintenance.
 
 ## Support
 
@@ -96,10 +85,9 @@ and feature requests:
 
 ## Current Status
 
-OpenA8DJ 0.4.0 is the promoted modern macOS C++/DriverKit redesign mainline for
-local Apple Silicon/macOS validation.
+OpenA8DJ 0.4.0 is the current macOS public preview.
 
-The promoted mainline is an 8-in/8-out Traktor-facing public preview:
+The current driver is an 8-in/8-out Traktor-facing preview:
 
 - macOS enumerates `Open Audio 8 DJ` as 8 inputs and 8 outputs.
 - The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
@@ -120,7 +108,7 @@ The promoted mainline is an 8-in/8-out Traktor-facing public preview:
   Traktor Scratch/timecode testing.
 - A macOS DMG/PKG installer is generated and verified locally.
 
-Remaining release gates:
+Still open before calling this production-quality:
 
 - Full physical DVS/timecode matrix validation with turntables/control vinyl
   across every input pair.
@@ -240,7 +228,7 @@ installer, UI, logging, and diagnostic work.
 
 The previous C/Objective-C implementation remains available on the `legacy`
 branch as historical reference material. The repository default and public
-release line are the modern macOS C++ architecture.
+release line are the current macOS driver architecture.
 
 ## Documentation
 

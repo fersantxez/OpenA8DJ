@@ -1,6 +1,9 @@
 # Modern macOS Driver Architecture
 
-OpenA8DJ `main` is the modern macOS driver line for Audio 8 DJ.
+OpenA8DJ keeps the Audio 8 DJ usable on current macOS without redistributing
+Native Instruments software or pretending to be an official vendor driver.
+
+The `main` branch is the current macOS driver line.
 
 The current public preview is installable as a Core Audio HAL driver package.
 That gives macOS audio applications a normal Core Audio device named
@@ -20,6 +23,8 @@ This is the supported public binary path. GitHub Actions artifacts, local
 developer builds, and repackaged mirrors are not official release downloads.
 
 ## macOS Architecture
+
+For the technical side, the current driver uses a macOS-native architecture:
 
 - Core Audio HAL plug-in for the current installable preview.
 - IOUSBHost-based CAIAQ USB transport.

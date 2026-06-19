@@ -1,12 +1,16 @@
 # OpenA8DJ 0.4.0 Release Notes
 
-OpenA8DJ 0.4.0 is the promoted modern macOS C++/DriverKit redesign mainline for
-the Native Instruments Audio 8 DJ USB interface.
+OpenA8DJ 0.4.0 is a macOS public preview for the Native Instruments Audio 8 DJ
+USB interface.
+
+OpenA8DJ is an independent, open-source preservation project. It is not
+affiliated with, endorsed by, sponsored by, or certified by Native Instruments,
+and it does not include Native Instruments driver binaries, firmware,
+installers, logos, or proprietary payloads.
 
 ## Highlights
 
-- Promotes the C++/DriverKit redesign workstream to the repository mainline.
-  The public `main` branch is now the modern macOS driver line.
+- Makes the public `main` branch the current macOS driver line.
 - Preserves the previous C/Objective-C implementation on the `legacy` branch
   for baseline comparison, emergency reference, physical-test history, and
   behavior learned from the Linux CAIAQ / `snd-usb-caiaq` reverse-engineering
@@ -21,7 +25,7 @@ the Native Instruments Audio 8 DJ USB interface.
 - Exposes one 8-channel input stream with named Input A/B/C/D channel pairs,
   plus 4 stereo output streams named Output A/B/C/D. This preserves the
   Traktor channel assignment surface while avoiding the multi-input-stream
-  Core Audio enumeration instability found during promotion testing.
+  Core Audio enumeration instability found in earlier experiments.
 - Re-enables Audio 8 DJ input decoding so Traktor can be assigned the physical
   timecode input pairs.
 - Keeps the capture-paced output transport, stable Core Audio clocking, and
@@ -48,13 +52,13 @@ Deck A output -> Output A L/R
 Deck B output -> Output B L/R
 ```
 
-Operator validation for this promotion reported responsive timecode behavior.
+Operator validation for this release reported responsive timecode behavior.
 The release still keeps full DVS matrix testing open across every physical
 input pair and mode.
 
 ## Validation Snapshot
 
-Final local checks for this promotion line:
+Final local checks for this release line:
 
 - HAL package safety load: PASS.
 - HAL parity topology: expected 1 input stream / 4 output streams, 8 input
@@ -110,5 +114,5 @@ Uninstall:
 sudo /usr/local/bin/opena8dj-uninstall
 ```
 
-OpenA8DJ is independent and is not affiliated with, endorsed by, or sponsored by
-Native Instruments.
+OpenA8DJ is independent and is not affiliated with, endorsed by, sponsored by,
+or certified by Native Instruments.

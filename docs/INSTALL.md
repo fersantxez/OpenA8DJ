@@ -1,9 +1,12 @@
 # Installing OpenA8DJ
 
-OpenA8DJ installs the modern macOS mainline driver for Audio 8 DJ: a user-space
-Core Audio HAL driver, a MIDI/control LaunchAgent, and two command-line tools.
-The DriverKit/AudioDriverKit redesign is the repository direction; the current
-public preview uses the HAL package path that has been physically validated.
+OpenA8DJ is an independent open-source preservation driver for the Audio 8 DJ.
+It is not affiliated with, endorsed by, sponsored by, or certified by Native
+Instruments.
+
+This guide installs the current macOS package: a user-space Core Audio HAL
+driver, a MIDI/control LaunchAgent, and the command-line tools needed to switch
+Audio 8 DJ profiles such as `timecode-vinyl`.
 
 ## Two-click install
 
@@ -78,7 +81,7 @@ may ask you to approve an unidentified installer. A polished end-user release
 should use a Developer ID Installer certificate and Apple notarization so macOS
 Gatekeeper can verify the package without extra user steps.
 
-## Legacy C note
+## Historical branch note
 
 The older C/Objective-C driver line is preserved on the `legacy` branch. That
 branch is kept for comparison and recovery. New users who want the current

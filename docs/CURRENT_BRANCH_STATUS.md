@@ -4,9 +4,10 @@ Date: 2026-06-19
 
 ## Canonical State
 
-`main` is the current OpenA8DJ macOS driver line. It contains the modern
-C++/DriverKit redesign, the current macOS HAL installer path, the C++ core
-contracts, and the DriverKit/AudioDriverKit forward shell.
+`main` is the current OpenA8DJ macOS driver line. It is the branch users should
+see first when they want to download, build, or understand the current driver.
+It contains the macOS HAL installer path, the C++ core contracts, and the
+DriverKit/AudioDriverKit forward shell.
 
 `legacy` is the preserved previous C/Objective-C implementation. It contains
 the historical branch that was based on and inspired by Linux CAIAQ /
@@ -42,4 +43,3 @@ The current `main` branch still contains some `.c`, `.m`, and `.mm` files. That
 is expected for the macOS HAL plug-in, CoreAudio/CoreMIDI tooling, and bridge
 code. These files are part of the modern macOS C++/DriverKit product line. They
 do not mean the old C mainline is still active.
-
