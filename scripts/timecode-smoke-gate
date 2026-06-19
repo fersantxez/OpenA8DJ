@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir=""
+rate="48000"
+buffer="512"
+seconds="2"
+amplitude="0.02"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/timecode-smoke-gate [options]
+
+Runs a non-destructive Traktor/timecode surface smoke test:
+  1. Audio stack health.
+  2. Apply OpenA8DJ timecode-vinyl profile.
+  3. Verify the profile enables input decode.
+  4. Run a short Core Audio duplex I/O test.
+  5. Verify input/output callbacks advanced.
+  6. Restore playback profile and verify input decode is off.
+
+This does not replace physical Traktor vinyl/scope validation.
+
+Options:
+  --run-dir DIR
+  --rate HZ          Default: 48000
+  --buffer FRAMES    Default: 512
+  --seconds N        Default: 2
+  --amplitude VALUE  Default: 0.02
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --rate) rate="$2"; shift 2 ;;
+    --buffer) buffer="$2"; shift 2 ;;
+    --seconds) seconds="$2"; shift 2 ;;
+    --amplitude) amplitude="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/timecode-smoke-gate/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+make build/audio-list build/audio-io-test build/opena8dj-control >/dev/null
+
+capture_final_state() {
+  ./scripts/audio-stack-health >"$run_dir/audio-stack-health-final.txt" 2>&1 || true
+  ./build/audio-list >"$run_dir/audio-list-final.txt" 2>&1 || true
+  ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
+  OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control >"$run_dir/control-final.txt" 2>&1 || true
+}
+on_exit() {
+  capture_final_state
+  audio_gate_release_lock
+}
+trap on_exit EXIT
+
+write_result() {
+  local status="$1"
+  local reason="$2"
+  {
+    echo "timecode_smoke_gate=$status"
+    echo "reason=$reason"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+}
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+if ! audio_gate_acquire_lock "timecode-smoke-gate" "$run_dir"; then
+  write_result "FAIL" "${audio_gate_lock_error:-audio_gate_lock_busy}"
+  exit 75
+fi
+
+./scripts/audio-stack-health >"$run_dir/audio-stack-health-before.txt" 2>&1 || true
+if ! grep -Fq "audio_stack_health=PASS" "$run_dir/audio-stack-health-before.txt"; then
+  write_result "FAIL" "audio_stack_health_before_failed"
+  exit 1
+fi
+
+./build/audio-list >"$run_dir/audio-list-before.txt" 2>&1
+if ! grep -Fq "uid=org.opena8dj.Audio8DJ" "$run_dir/audio-list-before.txt"; then
+  write_result "FAIL" "open_audio8dj_uid_missing"
+  exit 1
+fi
+
+./build/opena8dj-control profile timecode-vinyl >"$run_dir/control-timecode-vinyl.txt" 2>&1
+if ! grep -Fq "input-mode:        0 (timecode-vinyl)" "$run_dir/control-timecode-vinyl.txt"; then
+  write_result "FAIL" "timecode_profile_not_applied"
+  exit 1
+fi
+if ! grep -Fq "input-decode:      on" "$run_dir/control-timecode-vinyl.txt"; then
+  write_result "FAIL" "timecode_input_decode_not_enabled"
+  exit 1
+fi
+
+./build/audio-io-test "$seconds" "$rate" "$buffer" "$amplitude" >"$run_dir/audio-io-test.txt" 2>&1 || {
+  write_result "FAIL" "audio_io_test_failed"
+  exit 1
+}
+
+python3 - "$run_dir/audio-io-test.txt" >"$run_dir/audio-io-gate.txt" <<'PY'
+import re
+import sys
+
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+match = re.search(r"I/O OK: .*callbacks=(\d+).*outputFrames=(\d+).*outputSamples=(\d+).*outputPeak=([0-9.]+).*inputFrames=(\d+).*inputRMS=([0-9.]+).*inputPeak=([0-9.]+)", text)
+errors = []
+values = {}
+if not match:
+    errors.append("audio-io-test summary missing")
+else:
+    keys = ("callbacks", "outputFrames", "outputSamples", "outputPeak", "inputFrames", "inputRMS", "inputPeak")
+    values = dict(zip(keys, match.groups()))
+    if int(values["callbacks"]) <= 0:
+        errors.append("callbacks did not advance")
+    if int(values["outputFrames"]) <= 0 or int(values["outputSamples"]) <= 0:
+        errors.append("output did not advance")
+    if float(values["outputPeak"]) <= 0.0:
+        errors.append("output peak was zero")
+    if int(values["inputFrames"]) <= 0:
+        errors.append("input frames did not advance")
+
+print("audio_io_gate=" + ("PASS" if not errors else "FAIL"))
+for key, value in values.items():
+    print(f"{key}={value}")
+for error in errors:
+    print("error=" + error)
+raise SystemExit(0 if not errors else 1)
+PY
+
+OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control input-stats >"$run_dir/input-stats-after-io.txt" 2>&1 || true
+
+./build/opena8dj-control profile playback >"$run_dir/control-playback-restore.txt" 2>&1
+if ! grep -Fq "input-decode:      off" "$run_dir/control-playback-restore.txt"; then
+  write_result "FAIL" "playback_profile_not_restored"
+  exit 1
+fi
+
+./scripts/audio-stack-health >"$run_dir/audio-stack-health-after.txt" 2>&1 || true
+if ! grep -Fq "audio_stack_health=PASS" "$run_dir/audio-stack-health-after.txt"; then
+  write_result "FAIL" "audio_stack_health_after_failed"
+  exit 1
+fi
+
+write_result "PASS" "timecode_surface_smoke_passed"

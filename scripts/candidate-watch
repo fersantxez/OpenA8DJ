@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+physical_baseline_json="local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json"
+run_dir=""
+wait_seconds="3600"
+interval_seconds="5"
+stable_polls="3"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-watch [options]
+
+Wait for iRig Stream to be visible in both USB and Core Audio, then run the
+full candidate-preflight ladder. This is intentionally non-destructive: it
+does not reset USB devices or restart Core Audio.
+
+Options:
+  --candidate NAME               Candidate label (default: current-loaded)
+  --music-file PATH              Real-music fixture
+  --physical-baseline-json PATH  Baseline JSON for physical comparison
+  --run-dir DIR                  Output directory
+  --wait SECONDS                 Maximum wait for iRig (default: 3600)
+  --interval SECONDS             Poll interval (default: 5)
+  --stable-polls COUNT           Consecutive READY polls required (default: 3)
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --wait) wait_seconds="$2"; shift 2 ;;
+    --interval) interval_seconds="$2"; shift 2 ;;
+    --stable-polls) stable_polls="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/candidate-watch/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+make build/audio-list >/dev/null
+
+capture_final_state() {
+  ./scripts/audio-stack-health >"$run_dir/audio-stack-health-final.txt" 2>&1 || true
+  ./build/audio-list >"$run_dir/audio-list-final.txt" 2>&1 || true
+  ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
+}
+trap capture_final_state EXIT
+
+max_attempts="$(python3 - "$wait_seconds" "$interval_seconds" <<'PY'
+import math
+import sys
+
+wait_seconds = max(0.0, float(sys.argv[1]))
+interval_seconds = max(0.1, float(sys.argv[2]))
+print(max(1, int(math.ceil(wait_seconds / interval_seconds))))
+PY
+)"
+stable_polls="$(python3 - "$stable_polls" <<'PY'
+import sys
+
+try:
+    value = int(float(sys.argv[1]))
+except Exception:
+    value = 3
+print(max(1, value))
+PY
+)"
+
+echo "candidate_watch=WAITING"
+echo "candidate=$candidate"
+echo "run_dir=$run_dir"
+echo "wait_seconds=$wait_seconds"
+echo "interval_seconds=$interval_seconds"
+echo "max_attempts=$max_attempts"
+echo "stable_polls=$stable_polls"
+
+attempt=0
+ready_streak=0
+found_audio8_core_audio=0
+found_irig_usb=0
+found_irig_usb_by_id=0
+found_irig_core_audio=0
+physical_capture_status="MISSING"
+physical_capture_reason="not_checked"
+usb_enumeration_failures="missing"
+failed_usb_ports="missing"
+next_recovery_action="missing"
+
+while [ "$attempt" -lt "$max_attempts" ]; do
+  attempt=$((attempt + 1))
+  audio_list="$run_dir/audio-list-attempt-$attempt.txt"
+  usb_ioreg="$run_dir/usb-ioreg-attempt-$attempt.txt"
+  diagnose_dir="$run_dir/capture-device-diagnose-attempt-$attempt"
+  diagnose_result="$diagnose_dir/result.txt"
+
+  ./build/audio-list >"$audio_list" 2>&1 || true
+  ioreg -p IOUSB -l -w 0 >"$usb_ioreg" 2>&1 || true
+  ./scripts/capture-device-diagnose --run-dir "$diagnose_dir" \
+    >"$run_dir/capture-device-diagnose-attempt-$attempt.txt" 2>&1 || true
+
+  if [ -f "$diagnose_result" ]; then
+    physical_capture_status="$(awk -F= '$1=="physical_capture_status"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    physical_capture_reason="$(awk -F= '$1=="reason"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    found_audio8_core_audio="$(awk -F= '$1=="found_audio8_core_audio"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    found_irig_usb="$(awk -F= '$1=="found_irig_usb"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    found_irig_usb_by_id="$(awk -F= '$1=="found_irig_usb_by_id"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    found_irig_core_audio="$(awk -F= '$1=="found_irig_core_audio"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    usb_enumeration_failures="$(awk -F= '$1=="usb_enumeration_failures"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    failed_usb_ports="$(awk -F= '$1=="failed_usb_ports"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    next_recovery_action="$(awk -F= '$1=="next_recovery_action"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+  fi
+
+  if [ "$found_audio8_core_audio" = "1" ] \
+    && [ "$physical_capture_status" = "READY" ]; then
+    ready_streak=$((ready_streak + 1))
+    cp "$audio_list" "$run_dir/audio-list-ready.txt"
+    cp "$usb_ioreg" "$run_dir/usb-ioreg-ready.txt"
+    cp "$diagnose_result" "$run_dir/capture-device-diagnose-ready.txt"
+    if [ "$ready_streak" -ge "$stable_polls" ]; then
+      break
+    fi
+  else
+    ready_streak=0
+  fi
+
+  {
+    echo "attempt=$attempt"
+    echo "ready_streak=$ready_streak"
+    echo "stable_polls=$stable_polls"
+    echo "physical_capture_status=$physical_capture_status"
+    echo "physical_capture_reason=$physical_capture_reason"
+    echo "found_audio8_core_audio=$found_audio8_core_audio"
+    echo "found_irig_usb=$found_irig_usb"
+    echo "found_irig_usb_by_id=$found_irig_usb_by_id"
+    echo "found_irig_core_audio=$found_irig_core_audio"
+    echo "usb_enumeration_failures=$usb_enumeration_failures"
+    echo "failed_usb_ports=$failed_usb_ports"
+    echo "next_recovery_action=$next_recovery_action"
+    echo "audio_list=$audio_list"
+    echo "usb_ioreg=$usb_ioreg"
+    echo "capture_device_diagnose=$diagnose_result"
+  } >"$run_dir/latest-status.txt"
+
+  sleep "$interval_seconds"
+done
+
+{
+  echo "attempts=$attempt"
+  echo "ready_streak=$ready_streak"
+  echo "stable_polls=$stable_polls"
+  echo "physical_capture_status=$physical_capture_status"
+  echo "physical_capture_reason=$physical_capture_reason"
+  echo "found_audio8_core_audio=$found_audio8_core_audio"
+  echo "found_irig_usb=$found_irig_usb"
+  echo "found_irig_usb_by_id=$found_irig_usb_by_id"
+  echo "found_irig_core_audio=$found_irig_core_audio"
+  echo "usb_enumeration_failures=$usb_enumeration_failures"
+  echo "failed_usb_ports=$failed_usb_ports"
+  echo "next_recovery_action=$next_recovery_action"
+} >"$run_dir/device-readiness.txt"
+
+if [ "$found_audio8_core_audio" != "1" ] \
+  || [ "$physical_capture_status" != "READY" ] \
+  || [ "$ready_streak" -lt "$stable_polls" ]; then
+  block_reason="open_audio8dj_missing_from_core_audio"
+  if [ "$found_audio8_core_audio" = "1" ] \
+    && [ "$physical_capture_status" = "READY" ] \
+    && [ "$ready_streak" -lt "$stable_polls" ]; then
+    block_reason="irig_not_stable_yet"
+  elif [ "$physical_capture_reason" != "not_checked" ]; then
+    block_reason="$physical_capture_reason"
+  elif [ "$found_irig_usb" != "1" ]; then
+    block_reason="irig_missing_from_usb_tree"
+  elif [ "$found_irig_usb_by_id" != "1" ]; then
+    block_reason="irig_usb_id_not_verified"
+  elif [ "$found_irig_core_audio" != "1" ]; then
+    block_reason="irig_missing_from_core_audio"
+  fi
+  {
+    echo "candidate_watch=BLOCKED_PHYSICAL_CAPTURE"
+    echo "candidate=$candidate"
+    echo "reason=$block_reason"
+    echo "attempts=$attempt"
+    echo "ready_streak=$ready_streak"
+    echo "stable_polls=$stable_polls"
+    echo "usb_enumeration_failures=$usb_enumeration_failures"
+    echo "failed_usb_ports=$failed_usb_ports"
+    echo "next_recovery_action=$next_recovery_action"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 3
+fi
+
+preflight_dir="$run_dir/candidate-preflight"
+if ! ./scripts/candidate-preflight \
+  --candidate "$candidate" \
+  --music-file "$music_file" \
+  --physical-baseline-json "$physical_baseline_json" \
+  --irig-wait "5" \
+  --irig-interval "1" \
+  --run-dir "$preflight_dir" \
+  >"$run_dir/candidate-preflight.txt" 2>&1; then
+  status="FAIL"
+  reason="candidate_preflight_failed"
+  if [ -f "$preflight_dir/result.txt" ]; then
+    parsed_status="$(awk -F= '$1=="candidate_preflight"{print $2; exit}' "$preflight_dir/result.txt")"
+    parsed_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$preflight_dir/result.txt")"
+    if [ -n "$parsed_status" ]; then
+      status="$parsed_status"
+    fi
+    if [ -n "$parsed_reason" ]; then
+      reason="$parsed_reason"
+    fi
+  fi
+  {
+    echo "candidate_watch=$status"
+    echo "candidate=$candidate"
+    echo "reason=$reason"
+    echo "candidate_preflight_dir=$preflight_dir"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  if [ "$status" = "BLOCKED_PHYSICAL_CAPTURE" ]; then
+    exit 3
+  fi
+  exit 1
+fi
+
+{
+  echo "candidate_watch=PASS"
+  echo "candidate=$candidate"
+  echo "reason=all_candidate_gates_passed"
+  echo "candidate_preflight_dir=$preflight_dir"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"

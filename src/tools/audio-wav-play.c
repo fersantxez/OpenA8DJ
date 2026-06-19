@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef struct WavData {
@@ -20,8 +21,24 @@ typedef struct PlayerState {
     UInt32 pairIndex;
     atomic_uint frameIndex;
     atomic_bool done;
+    atomic_bool sawFirstCallback;
     UInt64 callbacks;
 } PlayerState;
+
+static double MonotonicSeconds(void)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (double)now.tv_sec + (double)now.tv_nsec / 1000000000.0;
+}
+
+static void TimingLog(double start, const char *label)
+{
+    if (getenv("OPENA8DJ_PLAYER_TIMING") == NULL) {
+        return;
+    }
+    fprintf(stderr, "timing %s %.6f\n", label, MonotonicSeconds() - start);
+}
 
 static uint16_t ReadLE16(const uint8_t *p)
 {
@@ -214,6 +231,7 @@ static OSStatus IOProc(AudioObjectID inDevice,
 
     PlayerState *state = (PlayerState *)inClientData;
     state->callbacks++;
+    atomic_store(&state->sawFirstCallback, true);
     if (outOutputData == NULL || atomic_load(&state->done)) {
         return kAudioHardwareNoError;
     }
@@ -266,6 +284,7 @@ static OSStatus IOProc(AudioObjectID inDevice,
 
 int main(int argc, char **argv)
 {
+    double startedAt = MonotonicSeconds();
     if (argc < 2) {
         fprintf(stderr, "usage: audio-wav-play <file.wav> [A|B|C|D|0-3]\n");
         return 2;
@@ -276,6 +295,7 @@ int main(int argc, char **argv)
     if (!ReadWav(argv[1], &state.wav)) {
         return 3;
     }
+    TimingLog(startedAt, "read-wav");
 
     state.pairIndex = 0;
     if (argc > 2) {
@@ -294,6 +314,7 @@ int main(int argc, char **argv)
     }
     atomic_init(&state.frameIndex, 0);
     atomic_init(&state.done, false);
+    atomic_init(&state.sawFirstCallback, false);
 
     AudioObjectID device = FindDeviceByUID(CFSTR("org.opena8dj.Audio8DJ"));
     if (device == kAudioObjectUnknown) {
@@ -301,6 +322,7 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 5;
     }
+    TimingLog(startedAt, "find-device");
 
     double rate = state.wav.sampleRate;
     (void)SetProperty(device,
@@ -308,6 +330,7 @@ int main(int argc, char **argv)
                       kAudioObjectPropertyScopeGlobal,
                       sizeof(rate),
                       &rate);
+    TimingLog(startedAt, "set-rate");
 
     AudioDeviceIOProcID ioProcID = NULL;
     OSStatus status = AudioDeviceCreateIOProcID(device, IOProc, &state, &ioProcID);
@@ -316,6 +339,7 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 6;
     }
+    TimingLog(startedAt, "create-ioproc");
     status = AudioDeviceStart(device, ioProcID);
     if (status != kAudioHardwareNoError) {
         fprintf(stderr, "AudioDeviceStart failed: %d\n", (int)status);
@@ -323,13 +347,22 @@ int main(int argc, char **argv)
         free(state.wav.samples);
         return 7;
     }
+    TimingLog(startedAt, "device-start");
+
+    while (!atomic_load(&state.sawFirstCallback)) {
+        usleep(1000);
+    }
+    TimingLog(startedAt, "first-callback");
 
     while (!atomic_load(&state.done)) {
         usleep(10000);
     }
+    TimingLog(startedAt, "playback-done");
     usleep(100000);
     AudioDeviceStop(device, ioProcID);
+    TimingLog(startedAt, "device-stop");
     AudioDeviceDestroyIOProcID(device, ioProcID);
+    TimingLog(startedAt, "destroy-ioproc");
 
     printf("played path=%s pair=%c frames=%u callbacks=%llu\n",
            argv[1],

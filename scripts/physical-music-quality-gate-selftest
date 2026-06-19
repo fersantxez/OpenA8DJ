@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+"""Fast self-test for physical music quality gate helper metrics."""
+
+from __future__ import annotations
+
+import importlib.util
+import math
+from pathlib import Path
+
+
+def load_analyzer():
+    root = Path(__file__).resolve().parents[1]
+    path = root / "scripts" / "analyze-soundcheck-capture.py"
+    spec = importlib.util.spec_from_file_location("analyze_soundcheck_capture", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load analyzer: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def make_signal(rate: int, seconds: float, gains: dict[str, float]) -> list[float]:
+    frames = int(rate * seconds)
+    freqs = {
+        "low": 110.0,
+        "mid": 2200.0,
+        "high": 7600.0,
+    }
+    values: list[float] = []
+    for index in range(frames):
+        t = index / rate
+        # Gentle fade avoids filter-start transients dominating the short test.
+        fade = min(1.0, index / (rate * 0.05), (frames - index - 1) / (rate * 0.05))
+        sample = 0.0
+        for name, freq in freqs.items():
+            sample += gains.get(name, 1.0) * math.sin(2.0 * math.pi * freq * t)
+        values.append(0.12 * fade * sample)
+    return values
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise SystemExit(message)
+
+
+def main() -> int:
+    analyzer = load_analyzer()
+    rate = 48000
+    reference = make_signal(rate, 2.0, {"low": 1.0, "mid": 1.0, "high": 1.0})
+    uniform = make_signal(rate, 2.0, {"low": 0.65, "mid": 0.65, "high": 0.65})
+    metallic = make_signal(rate, 2.0, {"low": 0.45, "mid": 2.0, "high": 2.1})
+    bass_heavy = make_signal(rate, 2.0, {"low": 2.0, "mid": 0.55, "high": 0.50})
+
+    uniform_metrics = analyzer.spectral_color_metrics(reference, uniform, rate)
+    metallic_metrics = analyzer.spectral_color_metrics(reference, metallic, rate)
+    bass_metrics = analyzer.spectral_color_metrics(reference, bass_heavy, rate)
+
+    require(
+        uniform_metrics["metallic_coloration_score_db"] < 0.5,
+        f"uniform gain should not look metallic: {uniform_metrics}",
+    )
+    require(
+        metallic_metrics["metallic_coloration_score_db"] > 9.0,
+        f"mid/high boost should look metallic: {metallic_metrics}",
+    )
+    require(
+        metallic_metrics["mid_vs_low_coloration_delta_db"] > 8.0,
+        f"mid-vs-low boost not detected: {metallic_metrics}",
+    )
+    require(
+        metallic_metrics["high_vs_low_coloration_delta_db"] > 8.0,
+        f"high-vs-low boost not detected: {metallic_metrics}",
+    )
+    require(
+        bass_metrics["metallic_coloration_score_db"] > 8.0,
+        f"large spectral tilt should be detected both directions: {bass_metrics}",
+    )
+
+    print("physical_music_quality_gate_selftest=PASS")
+    print(f"uniform_metallic_coloration_score_db={uniform_metrics['metallic_coloration_score_db']:.6f}")
+    print(f"metallic_coloration_score_db={metallic_metrics['metallic_coloration_score_db']:.6f}")
+    print(f"metallic_mid_vs_low_coloration_delta_db={metallic_metrics['mid_vs_low_coloration_delta_db']:.6f}")
+    print(f"metallic_high_vs_low_coloration_delta_db={metallic_metrics['high_vs_low_coloration_delta_db']:.6f}")
+    print(f"bass_heavy_coloration_score_db={bass_metrics['metallic_coloration_score_db']:.6f}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,250 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+wait_seconds=120
+sample_seconds=30
+interval=0.25
+out_dir=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --wait)
+      wait_seconds="$2"
+      shift 2
+      ;;
+    --seconds)
+      sample_seconds="$2"
+      shift 2
+      ;;
+    --interval)
+      interval="$2"
+      shift 2
+      ;;
+    --out-dir)
+      out_dir="$2"
+      shift 2
+      ;;
+    *)
+      echo "usage: monitor-active-stream [--wait seconds] [--seconds seconds] [--interval seconds] [--out-dir dir]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [ -z "$out_dir" ]; then
+  out_dir="local-analysis/active-stream-monitor-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$out_dir/stats"
+
+{
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/Info.plist 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/Info.plist 2>/dev/null || true
+} > "$out_dir/version.txt"
+shasum -a 256 /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL > "$out_dir/hash.txt" 2>&1 || true
+./build/audio-list > "$out_dir/audio-list.txt" 2>&1 || true
+./build/audio-inspect org.opena8dj.Audio8DJ > "$out_dir/audio-inspect.txt" 2>&1 || true
+
+echo "waiting_for_active_stream wait_seconds=$wait_seconds out_dir=$out_dir"
+deadline=$(python3 - "$wait_seconds" <<'PY'
+import sys, time
+print(time.time() + float(sys.argv[1]))
+PY
+)
+
+active=0
+while python3 - "$deadline" <<'PY'
+import sys, time
+sys.exit(0 if time.time() < float(sys.argv[1]) else 1)
+PY
+do
+  if OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control stream-stats > "$out_dir/preflight-stream-stats.txt" 2>&1; then
+    if grep -q 'streaming:[[:space:]]*yes' "$out_dir/preflight-stream-stats.txt"; then
+      active=1
+      break
+    fi
+  fi
+  sleep 0.25
+done
+
+if [ "$active" -ne 1 ]; then
+  echo "ACTIVE STREAM MONITOR: TIMEOUT"
+  echo "run_dir=$out_dir"
+  echo "No active OpenA8DJ stream was observed."
+  exit 3
+fi
+
+echo "active_stream_detected"
+samples=$(python3 - "$sample_seconds" "$interval" <<'PY'
+import math, sys
+seconds = float(sys.argv[1])
+interval = float(sys.argv[2])
+print(max(1, int(math.ceil(seconds / interval))))
+PY
+)
+
+for i in $(seq 1 "$samples"); do
+  date '+%s.%N' > "$out_dir/stats/t-$i.txt"
+  OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control stream-stats > "$out_dir/stats/stream-$i.txt" 2>&1 || true
+  ps -axo pid,pcpu,pmem,comm | \
+    egrep 'coreaudiod|Core Audio Driver|WindowServer|Spotify|VLC|Traktor|Google Chrome|Codex' \
+    > "$out_dir/stats/cpu-$i.txt" || true
+  sleep "$interval"
+done
+
+python3 - "$out_dir" <<'PY'
+import pathlib, re, statistics, sys
+
+run = pathlib.Path(sys.argv[1])
+rows = []
+for path in sorted((run / "stats").glob("stream-*.txt"),
+                   key=lambda p: int(re.search(r"stream-(\d+)", p.name).group(1))):
+    index = int(re.search(r"stream-(\d+)", path.name).group(1))
+    text = path.read_text(errors="ignore")
+    row = {"i": index, "streaming": "streaming:              yes" in text}
+    patterns = {
+        "inflight": r"playback-queue:\s+in-flight=(\d+)",
+        "target": r"playback-queue:\s+in-flight=\d+ / target (\d+)",
+        "ring": r"output-ring:\s+(\d+) /",
+        "capture_transfers": r"capture:\s+transfers=(\d+)",
+        "capture_tx": r"capture:\s+transfers=\d+ tx=(\d+)",
+        "capture_bytes": r"capture:\s+transfers=\d+ tx=\d+ bytes=(\d+)",
+        "capture_status_failed": r"capture-detail:\s+status-failed=(\d+)",
+        "capture_zero_complete": r"capture-detail:.* zero-complete=(\d+)",
+        "capture_expected": r"capture-detail:.* expected=(\d+)",
+        "capture_other_size": r"capture-detail:.* other-size=(\d+)",
+        "active_underruns": r"active-underruns=(\d+)",
+        "elastic_drops": r"elastic-drops=(\d+)",
+        "elastic_replays": r"elastic-replays=(\d+)",
+        "timeline_resets": r"timeline-resets=(\d+)",
+        "late_write_frames": r"late-write-frames=(\d+)",
+        "late_write_batches": r"late-write-batches=(\d+)",
+        "playback_transfers": r"playback:\s+transfers=(\d+)",
+        "playback_tx": r"playback:\s+transfers=\d+ tx=(\d+)",
+        "playback_bytes": r"playback:\s+transfers=\d+ tx=\d+ bytes=(\d+)",
+        "output_written": r"output:\s+written=(\d+)",
+        "output_read": r"output:\s+written=\d+ read=(\d+)",
+        "playback_failed": r"playback:\s+transfers=\d+ tx=\d+ bytes=\d+ failed=(\d+)",
+        "playback_qfail": r"playback:.* qfail=(\d+)",
+        "capture_failed": r"capture:\s+transfers=\d+ tx=\d+ bytes=\d+ failed=(\d+)",
+        "clock_accepted": r"clock-anchor:.* accepted=(\d+)",
+        "clock_rejected": r"clock-anchor:.* rejected=(\d+)",
+        "capture_delta_max_ticks": r"timing-ticks:.* capture-delta min=\d+ max=(\d+)",
+        "playback_delta_max_ticks": r"timing-ticks:.* playback-delta min=\d+ max=(\d+)",
+        "cap_to_play_max_ticks": r"timing-ticks:.* cap-to-play min=\d+ max=(\d+)",
+        "output_peak": r"output-level:\s+peak=([0-9.]+)",
+    }
+    for key, pattern in patterns.items():
+        match = re.search(pattern, text)
+        if match:
+            row[key] = float(match.group(1)) if key == "output_peak" else int(match.group(1))
+    cpu_text = (run / "stats" / f"cpu-{index}.txt").read_text(errors="ignore")
+    for proc in ["coreaudiod", "Core Audio Driver", "WindowServer", "Spotify", "VLC", "Codex"]:
+        values = []
+        for line in cpu_text.splitlines():
+            if proc in line:
+                parts = line.split(None, 3)
+                if len(parts) >= 4:
+                    try:
+                        values.append(float(parts[1]))
+                    except ValueError:
+                        pass
+        row[proc.replace(" ", "_").lower() + "_cpu"] = max(values) if values else 0.0
+    t_path = run / "stats" / f"t-{index}.txt"
+    try:
+        row["time"] = float(t_path.read_text(errors="ignore").strip())
+    except Exception:
+        row["time"] = float(index)
+    rows.append(row)
+
+active = [row for row in rows if row["streaming"]]
+lines = [f"run_dir={run}", f"samples={len(rows)} streaming_samples={len(active)}"]
+for key in [
+    "inflight", "ring", "active_underruns", "elastic_drops", "elastic_replays",
+    "timeline_resets", "late_write_frames", "late_write_batches", "playback_failed", "playback_qfail", "capture_failed",
+    "capture_status_failed", "capture_zero_complete", "capture_expected", "capture_other_size",
+    "capture_delta_max_ticks", "playback_delta_max_ticks", "cap_to_play_max_ticks",
+    "output_peak",
+]:
+    values = [row[key] for row in active if key in row]
+    if values:
+        lines.append(f"{key}_min={min(values)} max={max(values)} last={values[-1]}")
+for key in [
+    "coreaudiod_cpu", "core_audio_driver_cpu", "windowserver_cpu", "spotify_cpu", "vlc_cpu", "codex_cpu",
+]:
+    values = [row.get(key, 0.0) for row in rows]
+    if values:
+        lines.append(f"{key}_max={max(values):.1f} avg={statistics.mean(values):.1f}")
+
+def corr(xs, ys):
+    pairs = [(x, y) for x, y in zip(xs, ys) if x is not None and y is not None]
+    if len(pairs) < 3:
+        return None
+    xs = [p[0] for p in pairs]
+    ys = [p[1] for p in pairs]
+    mx = statistics.mean(xs)
+    my = statistics.mean(ys)
+    sx = sum((x - mx) ** 2 for x in xs)
+    sy = sum((y - my) ** 2 for y in ys)
+    if sx <= 0.0 or sy <= 0.0:
+        return None
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / ((sx * sy) ** 0.5)
+
+rate_rows = []
+for prev, cur in zip(active, active[1:]):
+    dt = cur.get("time", 0.0) - prev.get("time", 0.0)
+    if dt <= 0:
+        continue
+    rr = {"dt": dt, "i": cur["i"]}
+    for key in [
+        "capture_transfers", "capture_tx", "capture_bytes", "capture_failed",
+        "capture_status_failed", "capture_zero_complete", "capture_expected", "capture_other_size",
+        "playback_transfers", "playback_tx", "playback_bytes",
+        "output_written", "output_read", "clock_accepted", "clock_rejected",
+    ]:
+        if key in prev and key in cur:
+            rr[key + "_rate"] = (cur[key] - prev[key]) / dt
+            rr[key + "_delta"] = cur[key] - prev[key]
+    rr["driver_cpu"] = cur.get("core_audio_driver_cpu", 0.0)
+    rr["windowserver_cpu"] = cur.get("windowserver_cpu", 0.0)
+    rate_rows.append(rr)
+
+if rate_rows:
+    lines.append("rate_jitter:")
+    for key in [
+        "capture_transfers_rate", "capture_tx_rate", "capture_failed_rate",
+        "capture_status_failed_rate", "capture_zero_complete_rate", "capture_expected_rate", "capture_other_size_rate",
+        "playback_transfers_rate", "playback_tx_rate", "output_written_rate", "output_read_rate",
+        "clock_accepted_rate", "clock_rejected_rate",
+    ]:
+        values = [row[key] for row in rate_rows if key in row]
+        if len(values) >= 2:
+            mean = statistics.mean(values)
+            stdev = statistics.pstdev(values)
+            cv = (stdev / mean) if mean else 0.0
+            p95 = sorted(values)[max(0, int(0.95 * (len(values) - 1)))]
+            lines.append(
+                f"  {key}: avg={mean:.1f}/s min={min(values):.1f} max={max(values):.1f} "
+                f"p95={p95:.1f} stdev={stdev:.1f} cv={cv:.3f}"
+            )
+    for cpu_key in ["driver_cpu", "windowserver_cpu"]:
+        for rate_key in [
+            "playback_transfers_rate", "playback_tx_rate", "output_read_rate",
+            "capture_tx_rate", "capture_failed_rate", "capture_status_failed_rate", "capture_zero_complete_rate",
+        ]:
+            c = corr(
+                [row.get(cpu_key) for row in rate_rows],
+                [row.get(rate_key) for row in rate_rows],
+            )
+            if c is not None:
+                lines.append(f"  corr({cpu_key},{rate_key})={c:.3f}")
+
+verdict = "PASS_CAPTURE"
+if not active:
+    verdict = "NO_ACTIVE_STREAM"
+lines.insert(0, f"ACTIVE STREAM MONITOR: {verdict}")
+summary = "\n".join(lines) + "\n"
+(run / "summary.txt").write_text(summary)
+print(summary, end="")
+PY

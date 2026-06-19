@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+physical_baseline_json="local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json"
+run_dir=""
+wait_lock="300"
+mode="internal"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/run-quality-window [options]
+
+Runs a quiet, exclusive OpenA8DJ quality window under the shared hardware lock.
+This is the safe entry point when multiple agents/worktrees share Audio 8 DJ,
+iRig Stream, Core Audio, USB, and CPU.
+
+Options:
+  --candidate NAME
+  --music-file PATH
+  --physical-baseline-json PATH
+  --run-dir DIR
+  --wait-lock SECONDS
+  --mode internal|candidate
+
+Modes:
+  internal   stack health, output-pair smoke, timecode smoke, playback CPU/UI
+  candidate  full candidate-preflight; blocks if iRig is absent
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --wait-lock) wait_lock="$2"; shift 2 ;;
+    --mode) mode="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+case "$mode" in
+  internal|candidate) ;;
+  *) echo "invalid mode: $mode" >&2; exit 2 ;;
+esac
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/quality-window/${safe_candidate}-${mode}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+
+deadline=0
+if [ "$wait_lock" != "0" ]; then
+  deadline=$(( $(date +%s) + wait_lock ))
+fi
+while ! audio_gate_acquire_lock "quality-window:$candidate:$mode" "$run_dir"; do
+  if [ "$deadline" = "0" ] || [ "$(date +%s)" -ge "$deadline" ]; then
+    {
+      echo "quality_window=BUSY"
+      echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+      cat "$run_dir/audio-gate-lock.txt"
+    } | tee "$run_dir/result.txt"
+    exit 75
+  fi
+  sleep 2
+done
+audio_gate_export_inherited_lock "quality-window:$candidate:$mode" "$run_dir"
+
+{
+  echo "quality_window=STARTED"
+  echo "candidate=$candidate"
+  echo "mode=$mode"
+  echo "run_dir=$run_dir"
+  echo "music_file=$music_file"
+  echo "physical_baseline_json=$physical_baseline_json"
+  echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} >"$run_dir/manifest.txt"
+
+write_result() {
+  local status="$1"
+  local reason="$2"
+  {
+    echo "quality_window=$status"
+    echo "reason=$reason"
+    echo "candidate=$candidate"
+    echo "mode=$mode"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+}
+
+make build/audio-list build/audio-record build/audio-wav-play build/opena8dj-control >/dev/null
+
+if ! ./scripts/audio-stack-guard \
+  --wait 2 \
+  --enumeration-timeout 5 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/audio-stack-guard-before" \
+  >"$run_dir/audio-stack-guard-before.txt" 2>&1; then
+  write_result "FAIL" "audio_stack_guard_before_failed"
+  exit 1
+fi
+
+./scripts/capture-device-diagnose --run-dir "$run_dir/capture-device-diagnose-before" \
+  >"$run_dir/capture-device-diagnose-before.txt" 2>&1 || true
+
+if [ "$mode" = "candidate" ]; then
+  rc=0
+  ./scripts/candidate-preflight \
+    --candidate "$candidate" \
+    --music-file "$music_file" \
+    --physical-baseline-json "$physical_baseline_json" \
+    --run-dir "$run_dir/candidate-preflight" \
+    >"$run_dir/candidate-preflight.txt" 2>&1 || rc=$?
+  if [ "$rc" = "0" ]; then
+    write_result "PASS" "candidate_preflight_passed"
+    exit 0
+  fi
+  reason="candidate_preflight_failed"
+  if [ -f "$run_dir/candidate-preflight/result.txt" ]; then
+    parsed="$(awk -F= '$1=="reason"{print substr($0, index($0, "=") + 1); exit}' "$run_dir/candidate-preflight/result.txt")"
+    if [ -n "$parsed" ]; then
+      reason="$parsed"
+    fi
+  fi
+  case "$reason" in
+    irig_missing_from_usb_tree|irig_missing_from_core_audio|irig_usb_id_not_verified|preferred_capture_missing_from_core_audio)
+      write_result "BLOCKED_PHYSICAL_CAPTURE" "$reason"
+      exit 3
+      ;;
+    *)
+      write_result "FAIL" "$reason"
+      exit "$rc"
+      ;;
+  esac
+fi
+
+if ! ./scripts/output-pair-smoke-gate \
+  --candidate "$candidate" \
+  --run-dir "$run_dir/output-pair-smoke-gate" \
+  >"$run_dir/output-pair-smoke-gate.txt" 2>&1; then
+  write_result "FAIL" "output_pair_smoke_gate_failed"
+  exit 1
+fi
+
+if ! ./scripts/timecode-smoke-gate \
+  --run-dir "$run_dir/timecode-smoke-gate" \
+  >"$run_dir/timecode-smoke-gate.txt" 2>&1; then
+  write_result "FAIL" "timecode_smoke_gate_failed"
+  exit 1
+fi
+
+if ! ./scripts/playback-cpu-gate \
+  --music-file "$music_file" \
+  --pair A \
+  --cpu-stress --cpu-stress-after 5 --cpu-stress-seconds 8 --cpu-stress-workers auto \
+  --ui-stress --ui-stress-after 12 --ui-stress-seconds 8 --ui-stress-interval 0.5 \
+  --run-dir "$run_dir/playback-cpu-gate" \
+  >"$run_dir/playback-cpu-gate.txt" 2>&1; then
+  write_result "FAIL" "playback_cpu_gate_failed"
+  exit 1
+fi
+
+if ! ./scripts/audio-stack-guard \
+  --wait 2 \
+  --enumeration-timeout 5 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/audio-stack-guard-after" \
+  >"$run_dir/audio-stack-guard-after.txt" 2>&1; then
+  write_result "FAIL" "audio_stack_guard_after_failed"
+  exit 1
+fi
+
+write_result "PASS" "internal_quality_window_passed"

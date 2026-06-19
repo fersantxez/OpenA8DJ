@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+physical_baseline_json="local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json"
+run_dir=""
+irig_wait="120"
+irig_interval="2"
+irig_record_seconds="2"
+run_physical_gate="1"
+active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-preflight [options]
+
+Runs the required pre-human-test candidate ladder:
+  1. Audio stack health and Core Audio enumeration.
+  2. Internal A/B/C/D output-pair smoke gate.
+  3. Non-physical timecode/Core Audio surface smoke gate.
+  4. Internal real-music playback CPU/UI stress gate.
+  5. Software-only digital audio quality gate.
+  6. Physical bench/capture sanity gate.
+  7. iRig USB/Core Audio recovery gate.
+  8. Short iRig capture.
+  9. Full physical candidate-listen-gate when iRig is ready.
+
+This script intentionally fails when iRig is absent. That is a bench/capture
+blocker, not proof that the driver audio quality failed.
+
+Options:
+  --candidate NAME               Candidate label (default: current-loaded)
+  --music-file PATH              Real-music fixture
+  --physical-baseline-json PATH  Baseline JSON for physical comparison
+  --run-dir DIR                  Output directory
+  --irig-wait SECONDS            How long to wait for iRig (default: 120)
+  --irig-interval SECONDS        Poll interval while waiting for iRig
+  --irig-record-seconds SECONDS  Short iRig probe duration
+  --no-physical-gate             Stop after short iRig recovery capture
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --irig-wait) irig_wait="$2"; shift 2 ;;
+    --irig-interval) irig_interval="$2"; shift 2 ;;
+    --irig-record-seconds) irig_record_seconds="$2"; shift 2 ;;
+    --no-physical-gate) run_physical_gate="0"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/candidate-preflight/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+result_file="$run_dir/result.txt"
+installed_version="missing"
+installed_hash="missing"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+if ! audio_gate_acquire_lock "candidate-preflight:$candidate" "$run_dir"; then
+  {
+    echo "candidate_preflight=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+  } | tee "$result_file"
+  exit 75
+fi
+audio_gate_export_inherited_lock "candidate-preflight:$candidate" "$run_dir"
+
+capture_final_state() {
+  ./scripts/audio-stack-health >"$run_dir/audio-stack-health-final.txt" 2>&1 || true
+  ./build/audio-list >"$run_dir/audio-list-final.txt" 2>&1 || true
+  ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
+}
+on_exit() {
+  capture_final_state
+  audio_gate_release_lock
+}
+trap on_exit EXIT
+
+if [ -d "$active_hal" ]; then
+  installed_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$active_hal/Contents/Info.plist" 2>/dev/null || echo unknown)"
+  if [ -f "$active_hal/Contents/MacOS/OpenA8DJHAL" ]; then
+    installed_hash="$(shasum -a 256 "$active_hal/Contents/MacOS/OpenA8DJHAL" 2>/dev/null | awk '{print $1}')"
+  fi
+fi
+
+write_result() {
+  local status="$1"
+  local reason="$2"
+  {
+    echo "candidate_preflight=$status"
+    echo "reason=$reason"
+    echo "candidate=$candidate"
+    echo "installed_version=$installed_version"
+    echo "installed_hash=$installed_hash"
+    echo "run_dir=$run_dir"
+  } | tee "$result_file"
+}
+
+run_stack_guard() {
+  local label="$1"
+  local wait_seconds="$2"
+  local guard_dir="$run_dir/audio-stack-guard-$label"
+  if ! ./scripts/audio-stack-guard \
+    --wait "$wait_seconds" \
+    --enumeration-timeout 20 \
+    --min-idle-pct 20 \
+    --run-dir "$guard_dir" \
+    >"$run_dir/audio-stack-guard-$label.txt" 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
+make build/audio-list build/audio-record build/audio-wav-play build/opena8dj-control >/dev/null
+
+if ! run_stack_guard "before" 4; then
+  write_result "FAIL" "audio_stack_guard_before_failed"
+  exit 1
+fi
+
+./build/audio-list >"$run_dir/audio-list-before.txt" 2>&1 || {
+  write_result "FAIL" "audio_list_before_failed"
+  exit 1
+}
+if ! grep -Fq "uid=org.opena8dj.Audio8DJ" "$run_dir/audio-list-before.txt"; then
+  write_result "FAIL" "open_audio8dj_uid_missing_before"
+  exit 1
+fi
+
+output_pair_dir="$run_dir/output-pair-smoke-gate"
+if ! ./scripts/output-pair-smoke-gate \
+  --candidate "$candidate" \
+  --run-dir "$output_pair_dir" \
+  >"$run_dir/output-pair-smoke-gate.txt" 2>&1; then
+  write_result "FAIL" "output_pair_smoke_gate_failed"
+  exit 1
+fi
+
+timecode_dir="$run_dir/timecode-smoke-gate"
+if ! ./scripts/timecode-smoke-gate \
+  --run-dir "$timecode_dir" \
+  >"$run_dir/timecode-smoke-gate.txt" 2>&1; then
+  write_result "FAIL" "timecode_smoke_gate_failed"
+  exit 1
+fi
+
+internal_dir="$run_dir/playback-cpu-gate"
+if ! ./scripts/playback-cpu-gate \
+  --music-file "$music_file" \
+  --pair A \
+  --cpu-stress --cpu-stress-after 5 --cpu-stress-seconds 8 --cpu-stress-workers auto \
+  --ui-stress --ui-stress-after 12 --ui-stress-seconds 8 --ui-stress-interval 0.5 \
+  --run-dir "$internal_dir" \
+  >"$run_dir/playback-cpu-gate.txt" 2>&1; then
+  write_result "FAIL" "internal_playback_cpu_gate_failed"
+  exit 1
+fi
+
+digital_quality_dir="$run_dir/digital-audio-quality-gate"
+if ! ./scripts/digital-audio-quality-gate \
+  --candidate "$candidate" \
+  --music-file "$music_file" \
+  --click-risk-runs 1 \
+  --run-dir "$digital_quality_dir" \
+  >"$run_dir/digital-audio-quality-gate.txt" 2>&1; then
+  write_result "FAIL" "digital_audio_quality_gate_failed"
+  exit 1
+fi
+
+capture_diagnose_dir="$run_dir/capture-device-diagnose"
+./scripts/capture-device-diagnose --run-dir "$capture_diagnose_dir" \
+  >"$run_dir/capture-device-diagnose.txt" 2>&1 || true
+
+bench_sanity_dir="$run_dir/physical-bench-sanity-gate"
+if ! ./scripts/physical-bench-sanity-gate \
+  --run-dir "$bench_sanity_dir" \
+  >"$run_dir/physical-bench-sanity-gate.txt" 2>&1; then
+  reason="physical_bench_sanity_failed"
+  if [ -f "$bench_sanity_dir/result.txt" ]; then
+    parsed_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$bench_sanity_dir/result.txt")"
+    if [ -n "$parsed_reason" ]; then
+      reason="$parsed_reason"
+    fi
+  fi
+  case "$reason" in
+    irig_missing_from_usb_tree|irig_missing_from_core_audio|irig_usb_id_not_verified|preferred_capture_missing_from_core_audio)
+      write_result "BLOCKED_PHYSICAL_CAPTURE" "$reason"
+      exit 3
+      ;;
+    *)
+      write_result "FAIL" "$reason"
+      exit 1
+      ;;
+  esac
+fi
+
+irig_dir="$run_dir/irig-recovery-gate"
+irig_args=(
+  --wait "$irig_wait"
+  --interval "$irig_interval"
+  --record-seconds "$irig_record_seconds"
+  --candidate "$candidate"
+  --music-file "$music_file"
+  --physical-baseline-json "$physical_baseline_json"
+  --run-dir "$irig_dir"
+)
+if [ "$run_physical_gate" = "1" ]; then
+  irig_args+=(--run-candidate-gate)
+fi
+
+if ! ./scripts/irig-recovery-gate "${irig_args[@]}" >"$run_dir/irig-recovery-gate.txt" 2>&1; then
+  reason="irig_recovery_gate_failed"
+  if [ -f "$irig_dir/result.txt" ]; then
+    parsed_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$irig_dir/result.txt")"
+    if [ -n "$parsed_reason" ]; then
+      reason="$parsed_reason"
+    fi
+  fi
+  case "$reason" in
+    irig_missing_from_usb_tree|irig_missing_from_core_audio|irig_usb_id_not_verified)
+      write_result "BLOCKED_PHYSICAL_CAPTURE" "$reason"
+      exit 3
+      ;;
+    *)
+      write_result "FAIL" "$reason"
+      exit 1
+      ;;
+  esac
+fi
+
+if ! run_stack_guard "after" 8; then
+  write_result "FAIL" "audio_stack_guard_after_failed"
+  exit 1
+fi
+
+if [ "$run_physical_gate" != "1" ]; then
+  write_result "DIAGNOSTIC_ONLY" "physical_candidate_gate_skipped"
+  exit 3
+fi
+
+write_result "PASS" "all_candidate_gates_passed"

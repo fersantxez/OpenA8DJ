@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+import argparse
+import datetime as dt
+from pathlib import Path
+
+
+def parse_kv(path):
+    values = {}
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                continue
+            key, value = stripped.split("=", 1)
+            values[key.strip()] = value.strip()
+    return values
+
+
+def as_float(values, key, default=0.0):
+    try:
+        return float(values.get(key, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def as_int(values, key, default=0):
+    try:
+        return int(float(values.get(key, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def fail_if(errors, condition, message):
+    if condition:
+        errors.append(message)
+
+
+def metric_line(label, candidate, baseline, unit=""):
+    suffix = f" {unit}" if unit else ""
+    return f"| {label} | {candidate}{suffix} | {baseline}{suffix} |"
+
+
+def score_tone(candidate, baseline):
+    errors = []
+    c_fund_db = as_float(candidate, "fundamental_dbfs", -240.0)
+    c_side = as_float(candidate, "sideband_ratio", 999.0)
+    c_strong = as_float(candidate, "strongest_sideband_relative_db", 240.0)
+    c_residual = as_float(candidate, "residual_ratio", 999.0)
+    c_clicks = as_int(candidate, "click_outliers", 999999)
+    c_peak = as_float(candidate, "peak", 0.0)
+
+    b_side = as_float(baseline, "sideband_ratio", 999.0)
+    b_strong = as_float(baseline, "strongest_sideband_relative_db", 240.0)
+    b_residual = as_float(baseline, "residual_ratio", 999.0)
+    b_clicks = as_int(baseline, "click_outliers", 999999)
+
+    fail_if(errors, c_fund_db < -45.0,
+            f"tone fundamental too low for physical QA: {c_fund_db:.2f} dBFS < -45.00 dBFS")
+    fail_if(errors, c_peak < 0.020,
+            f"tone capture peak too low for physical QA: {c_peak:.6f} < 0.020000")
+    fail_if(errors, c_peak > 0.950,
+            f"tone capture clips or is too close to clipping: {c_peak:.6f} > 0.950000")
+    fail_if(errors, c_side > b_side * 0.95,
+            f"tone sideband ratio not better than baseline: {c_side:.6f} > {b_side * 0.95:.6f}")
+    fail_if(errors, c_strong > b_strong - 1.0,
+            f"strongest sideband not at least 1 dB better than baseline: {c_strong:.2f} dB > {b_strong - 1.0:.2f} dB")
+    fail_if(errors, c_residual > b_residual * 0.98,
+            f"tone residual ratio not better than baseline: {c_residual:.6f} > {b_residual * 0.98:.6f}")
+    fail_if(errors, c_clicks > min(b_clicks, 8),
+            f"tone click outliers too high: {c_clicks} > {min(b_clicks, 8)}")
+
+    penalty = 0.0
+    if b_side > 0:
+        penalty += max(0.0, (c_side / b_side) - 0.75) * 35.0
+    if b_residual > 0:
+        penalty += max(0.0, (c_residual / b_residual) - 0.75) * 25.0
+    penalty += max(0.0, (c_strong - (b_strong - 6.0)) / 12.0) * 25.0
+    penalty += max(0.0, (-35.0 - c_fund_db) / 10.0) * 25.0
+    return max(0.0, 100.0 - penalty), errors
+
+
+def score_music(candidate, baseline):
+    errors = []
+    c_align = as_float(candidate, "quality_alignment_score", 0.0)
+    c_mid = as_float(candidate, "mid_band_1000_5000_residual_ratio", 999.0)
+    c_high = as_float(candidate, "high_band_5000_12000_residual_ratio", 999.0)
+    c_quiet = as_float(candidate, "quiet_mid_band_noise_dbfs", 240.0)
+    c_corr = as_float(candidate, "mid_band_cpu_corr", 999.0)
+    c_lag = as_int(candidate, "lag_jumps_gt_2_frames", 999999)
+    c_clicks = as_int(candidate, "click_outliers", 999999)
+    c_clipped = as_int(candidate, "capture_clipped_frames", 999999)
+
+    b_align = as_float(baseline, "quality_alignment_score", 0.0)
+    b_mid = as_float(baseline, "mid_band_1000_5000_residual_ratio", 999.0)
+    b_high = as_float(baseline, "high_band_5000_12000_residual_ratio", 999.0)
+    b_quiet = as_float(baseline, "quiet_mid_band_noise_dbfs", 240.0)
+    b_corr = as_float(baseline, "mid_band_cpu_corr", 999.0)
+    b_lag = as_int(baseline, "lag_jumps_gt_2_frames", 999999)
+    b_clicks = as_int(baseline, "click_outliers", 999999)
+
+    fail_if(errors, c_align < max(0.96, b_align),
+            f"music alignment worse than baseline: {c_align:.6f} < {max(0.96, b_align):.6f}")
+    fail_if(errors, c_mid > b_mid * 0.95,
+            f"mid-band residual not better than baseline: {c_mid:.6f} > {b_mid * 0.95:.6f}")
+    fail_if(errors, c_high > b_high * 0.95,
+            f"high-band residual not better than baseline: {c_high:.6f} > {b_high * 0.95:.6f}")
+    fail_if(errors, c_quiet > b_quiet - 1.0,
+            f"quiet mid-band noise not at least 1 dB better than baseline: {c_quiet:.2f} dBFS > {b_quiet - 1.0:.2f} dBFS")
+    fail_if(errors, c_corr > min(0.20, b_corr),
+            f"CPU/noise correlation too high: {c_corr:.6f} > {min(0.20, b_corr):.6f}")
+    fail_if(errors, c_lag > max(0, int(b_lag * 0.75)),
+            f"lag jumps not better than baseline: {c_lag} > {max(0, int(b_lag * 0.75))}")
+    fail_if(errors, c_clicks > min(b_clicks, 2),
+            f"click outliers too high: {c_clicks} > {min(b_clicks, 2)}")
+    fail_if(errors, c_clipped != 0,
+            f"capture clipped frames: {c_clipped}")
+
+    penalty = 0.0
+    if b_mid > 0:
+        penalty += max(0.0, (c_mid / b_mid) - 0.75) * 25.0
+    if b_high > 0:
+        penalty += max(0.0, (c_high / b_high) - 0.75) * 20.0
+    penalty += max(0.0, c_corr / 0.20) * 15.0
+    penalty += max(0.0, c_lag / max(1.0, b_lag)) * 15.0
+    penalty += max(0.0, (0.98 - c_align) / 0.08) * 20.0
+    return max(0.0, 100.0 - penalty), errors
+
+
+def append_ledger(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.read_text(encoding="utf-8", errors="replace").strip():
+        prefix = "\n\n"
+    else:
+        prefix = ""
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write(prefix + text.rstrip() + "\n")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Reject OpenA8DJ candidates that are not physically better than baseline.")
+    parser.add_argument("--candidate", required=True)
+    parser.add_argument("--tone-summary", required=True)
+    parser.add_argument("--baseline-tone-summary", default="local-analysis/final-0324-iso5-tone-20260613-005429/tone-summary.txt")
+    parser.add_argument("--music-summary")
+    parser.add_argument("--baseline-music-summary", default="local-analysis/final-0324-iso5-music-repeat-20260613-005553/music/summary.txt")
+    parser.add_argument("--ledger", default="docs/QUALITY_RUNS_2026-06-13.md")
+    parser.add_argument("--notes", default="")
+    args = parser.parse_args()
+
+    tone = parse_kv(args.tone_summary)
+    baseline_tone = parse_kv(args.baseline_tone_summary)
+    tone_score, errors = score_tone(tone, baseline_tone)
+    music_score = None
+    music = None
+    baseline_music = None
+    if args.music_summary:
+        music = parse_kv(args.music_summary)
+        baseline_music = parse_kv(args.baseline_music_summary)
+        music_score, music_errors = score_music(music, baseline_music)
+        errors.extend(music_errors)
+
+    total_score = tone_score if music_score is None else (0.55 * tone_score + 0.45 * music_score)
+    status = "PASS" if not errors else "FAIL"
+    timestamp = dt.datetime.now().astimezone().isoformat(timespec="seconds")
+
+    lines = [
+        f"## {timestamp} - {args.candidate}",
+        "",
+        f"status={status}",
+        f"quality_score={total_score:.2f}",
+        f"tone_score={tone_score:.2f}",
+    ]
+    if music_score is not None:
+        lines.append(f"music_score={music_score:.2f}")
+    if args.notes:
+        lines.append(f"notes={args.notes}")
+    lines.extend([
+        "",
+        "| Metric | Candidate | Baseline |",
+        "| --- | ---: | ---: |",
+        metric_line("tone fundamental", f"{as_float(tone, 'fundamental_dbfs', -240.0):.2f}", f"{as_float(baseline_tone, 'fundamental_dbfs', -240.0):.2f}", "dBFS"),
+        metric_line("tone peak", f"{as_float(tone, 'peak', 0.0):.6f}", f"{as_float(baseline_tone, 'peak', 0.0):.6f}"),
+        metric_line("tone sideband ratio", f"{as_float(tone, 'sideband_ratio', 999.0):.6f}", f"{as_float(baseline_tone, 'sideband_ratio', 999.0):.6f}"),
+        metric_line("strongest sideband", f"{as_float(tone, 'strongest_sideband_relative_db', 240.0):.2f}", f"{as_float(baseline_tone, 'strongest_sideband_relative_db', 240.0):.2f}", "dB"),
+        metric_line("tone residual ratio", f"{as_float(tone, 'residual_ratio', 999.0):.6f}", f"{as_float(baseline_tone, 'residual_ratio', 999.0):.6f}"),
+        metric_line("tone clicks", str(as_int(tone, 'click_outliers', 999999)), str(as_int(baseline_tone, 'click_outliers', 999999))),
+    ])
+    if music is not None and baseline_music is not None:
+        lines.extend([
+            metric_line("music alignment", f"{as_float(music, 'quality_alignment_score', 0.0):.6f}", f"{as_float(baseline_music, 'quality_alignment_score', 0.0):.6f}"),
+            metric_line("music mid residual", f"{as_float(music, 'mid_band_1000_5000_residual_ratio', 999.0):.6f}", f"{as_float(baseline_music, 'mid_band_1000_5000_residual_ratio', 999.0):.6f}"),
+            metric_line("music high residual", f"{as_float(music, 'high_band_5000_12000_residual_ratio', 999.0):.6f}", f"{as_float(baseline_music, 'high_band_5000_12000_residual_ratio', 999.0):.6f}"),
+            metric_line("quiet mid noise", f"{as_float(music, 'quiet_mid_band_noise_dbfs', 240.0):.2f}", f"{as_float(baseline_music, 'quiet_mid_band_noise_dbfs', 240.0):.2f}", "dBFS"),
+            metric_line("CPU/noise corr", f"{as_float(music, 'mid_band_cpu_corr', 999.0):.6f}", f"{as_float(baseline_music, 'mid_band_cpu_corr', 999.0):.6f}"),
+            metric_line("lag jumps", str(as_int(music, 'lag_jumps_gt_2_frames', 999999)), str(as_int(baseline_music, 'lag_jumps_gt_2_frames', 999999))),
+        ])
+    lines.append("")
+    if errors:
+        lines.append("failures:")
+        lines.extend(f"- {error}" for error in errors)
+    else:
+        lines.append("failures: none")
+    lines.extend([
+        "",
+        f"tone_summary={args.tone_summary}",
+    ])
+    if args.music_summary:
+        lines.append(f"music_summary={args.music_summary}")
+
+    output = "\n".join(lines)
+    print(output)
+    append_ledger(Path(args.ledger), output)
+    raise SystemExit(0 if status == "PASS" else 1)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,574 @@
+#!/usr/bin/env python3
+import argparse
+import importlib.util
+import json
+import math
+import sys
+from pathlib import Path
+
+
+def repo_root():
+    return Path(__file__).resolve().parents[1]
+
+
+def load_soundcheck_analyzer(root):
+    path = root / "scripts" / "analyze-soundcheck-capture.py"
+    spec = importlib.util.spec_from_file_location("analyze_soundcheck_capture", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load analyzer: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def resolve(path):
+    return Path(path).expanduser().resolve()
+
+
+def infer_run_files(run_dir):
+    run_dir = resolve(run_dir)
+    reference = run_dir / "fixture" / "reference.wav"
+    capture = run_dir / "captured.wav"
+    cpu_profile = run_dir / "cpu-profile.tsv"
+    missing = [str(path) for path in (reference, capture) if not path.exists()]
+    if missing:
+        raise SystemExit("run dir is missing expected file(s): " + ", ".join(missing))
+    return reference, capture, cpu_profile if cpu_profile.exists() else None
+
+
+def verify_irig_route(run_dir):
+    errors = []
+    if run_dir is None:
+        return ["iRig route cannot be verified without --run-dir"]
+    record_log = resolve(run_dir) / "record.log"
+    if not record_log.exists():
+        return [f"missing record.log for iRig route proof: {record_log}"]
+    text = record_log.read_text(encoding="utf-8", errors="replace")
+    if 'device="iRig Stream"' not in text:
+        errors.append("record.log does not prove capture device is iRig Stream")
+    if "IK Multimedia:iRig Stream" not in text:
+        errors.append("record.log does not prove capture UID is IK Multimedia iRig Stream")
+    return errors
+
+
+def rms(values):
+    if not values:
+        return 0.0
+    return math.sqrt(sum(value * value for value in values) / len(values))
+
+
+def dbfs(value):
+    if value <= 0.0:
+        return -240.0
+    return 20.0 * math.log10(value)
+
+
+def capture_level_metrics(pair, clipped_count):
+    left = [sample[0] for sample in pair]
+    right = [sample[1] for sample in pair]
+    peak = max((max(abs(l), abs(r)) for l, r in pair), default=0.0)
+    left_rms = rms(left)
+    right_rms = rms(right)
+    return {
+        "capture_peak": peak,
+        "capture_peak_dbfs": dbfs(peak),
+        "capture_rms": max(left_rms, right_rms),
+        "capture_rms_dbfs": dbfs(max(left_rms, right_rms)),
+        "capture_left_rms_dbfs": dbfs(left_rms),
+        "capture_right_rms_dbfs": dbfs(right_rms),
+        "capture_clipped_frames_full": clipped_count(pair),
+    }
+
+
+def metric(metrics, key, default=0.0):
+    value = metrics.get(key, default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def total_clicks(metrics):
+    return int(metric(metrics, "left_click_outliers", 0.0) + metric(metrics, "right_click_outliers", 0.0))
+
+
+def percentile(values, percent):
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0]
+    position = (len(ordered) - 1) * (percent / 100.0)
+    lower = int(math.floor(position))
+    upper = int(math.ceil(position))
+    if lower == upper:
+        return ordered[lower]
+    return ordered[lower] * (upper - position) + ordered[upper] * (position - lower)
+
+
+def add_ratio_stability_metrics(metrics):
+    median = metric(metrics, "mid_band_window_residual_ratio_median", 0.0)
+    p95 = metric(metrics, "mid_band_window_residual_ratio_p95", 0.0)
+    maximum = metric(metrics, "mid_band_window_residual_ratio_max", 0.0)
+    if median > 1e-9:
+        metrics["mid_band_window_residual_ratio_p95_over_median"] = p95 / median
+        metrics["mid_band_window_residual_ratio_max_over_median"] = maximum / median
+    else:
+        metrics["mid_band_window_residual_ratio_p95_over_median"] = 0.0
+        metrics["mid_band_window_residual_ratio_max_over_median"] = 0.0
+    metrics["mid_band_window_residual_ratio_p95_minus_median"] = p95 - median
+    metrics["mid_band_window_residual_ratio_max_minus_median"] = maximum - median
+
+
+def add_cpu_summary_metrics(metrics, cpu_rows):
+    columns = (
+        "opena8dj_driver",
+        "coreaudiod",
+        "total_audio_ui",
+        "windowserver",
+    )
+    for column in columns:
+        values = [row[column] for row in cpu_rows if column in row]
+        if not values:
+            continue
+        metrics[f"cpu_{column}_avg"] = sum(values) / len(values)
+        metrics[f"cpu_{column}_max"] = max(values)
+        metrics[f"cpu_{column}_p95"] = percentile(values, 95.0)
+
+
+def load_json(path):
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def fail_if(errors, condition, message):
+    if condition:
+        errors.append(message)
+
+
+def compare_against_baseline(errors, metrics, baseline, args):
+    checks = (
+        ("mid_band_residual_ratio", args.relative_mid_slack, "mid-band residual ratio"),
+        ("mid_band_window_residual_ratio_p95", args.relative_window_p95_slack, "mid-band window p95 residual ratio"),
+        ("mid_band_window_residual_ratio_max", args.relative_window_max_slack, "mid-band window max residual ratio"),
+        ("mid_band_window_residual_ratio_p95_over_median", args.relative_window_spread_slack, "mid-band p95/median spread"),
+        ("mid_band_window_residual_ratio_max_over_median", args.relative_window_spread_slack, "mid-band max/median spread"),
+        ("high_band_residual_ratio", args.relative_high_slack, "high-band residual ratio"),
+    )
+    for key, slack, label in checks:
+        current = metric(metrics, key, None)
+        base = metric(baseline, key, None)
+        if current is None or base is None or base <= 0.0:
+            continue
+        limit = base * slack
+        fail_if(errors, current > limit, f"{label} worse than baseline: {current:.6f} > {limit:.6f}")
+
+    quiet = metric(metrics, "quiet_mid_band_noise_dbfs", -240.0)
+    base_quiet = metric(baseline, "quiet_mid_band_noise_dbfs", -240.0)
+    fail_if(errors,
+            quiet > base_quiet + args.relative_quiet_db_slack,
+            f"quiet mid-band noise worse than baseline: {quiet:.2f} dBFS > {base_quiet + args.relative_quiet_db_slack:.2f} dBFS")
+
+    current_clicks = total_clicks(metrics)
+    baseline_clicks = total_clicks(baseline)
+    click_limit = max(args.max_clicks, int(math.ceil(baseline_clicks * args.relative_click_slack)))
+    fail_if(errors, current_clicks > click_limit, f"click outliers worse than baseline: {current_clicks} > {click_limit}")
+    for key, slack_db, label in (
+        ("metallic_coloration_score_db", args.relative_coloration_db_slack, "metallic coloration score"),
+        ("mid_vs_low_coloration_delta_db", args.relative_coloration_db_slack, "mid-vs-low coloration"),
+        ("high_vs_low_coloration_delta_db", args.relative_coloration_db_slack, "high-vs-low coloration"),
+    ):
+        if key not in metrics or key not in baseline:
+            continue
+        current = abs(metric(metrics, key, 0.0))
+        base = abs(metric(baseline, key, 0.0))
+        fail_if(errors,
+                current > base + slack_db,
+                f"{label} worse than baseline: {current:.2f} dB > {base + slack_db:.2f} dB")
+
+
+def classify_route_integrity(metrics, args):
+    alignment = metric(metrics, "quality_alignment_score", 0.0)
+    peak = metric(metrics, "capture_peak", 0.0)
+    rms_dbfs = metric(metrics, "capture_rms_dbfs", -240.0)
+    clipped = int(metric(metrics, "capture_clipped_frames_full", 0.0))
+    mid_ratio = metric(metrics, "mid_band_residual_ratio", 0.0)
+    high_ratio = metric(metrics, "high_band_residual_ratio", 0.0)
+    time_warp_score = metric(metrics, "time_warp_score_min", 1.0)
+
+    has_sane_level = (
+        peak >= args.min_capture_peak and
+        peak <= args.max_capture_peak and
+        rms_dbfs >= args.min_capture_rms_dbfs and
+        rms_dbfs <= args.max_capture_rms_dbfs and
+        clipped <= args.max_clipped_frames
+    )
+    catastrophic_mismatch = (
+        alignment < args.dirty_route_alignment_max and
+        time_warp_score < args.dirty_route_time_warp_score_max and
+        (mid_ratio > args.dirty_route_mid_ratio_min or
+         high_ratio > args.dirty_route_high_ratio_min)
+    )
+    if has_sane_level and catastrophic_mismatch:
+        return "DIRTY_OR_WRONG_ROUTE"
+    if has_sane_level:
+        return "VALID_SIGNAL"
+    return "BAD_CAPTURE_LEVEL"
+
+
+def verdict(metrics, baseline, args):
+    errors = []
+    warnings = []
+
+    compared_seconds = max(0.001, metric(metrics, "compared_seconds", 0.0))
+    clicks = total_clicks(metrics)
+    click_rate = clicks / compared_seconds
+    metrics["click_outliers_total"] = clicks
+    metrics["click_outliers_per_second"] = click_rate
+    route_integrity = classify_route_integrity(metrics, args)
+    metrics["physical_route_integrity"] = route_integrity
+    fail_if(errors,
+            route_integrity == "DIRTY_OR_WRONG_ROUTE",
+            "physical_route_integrity=DIRTY_OR_WRONG_ROUTE; capture has sane level but does not match the reference, so reject this run as a dirty Core Audio/iRig route before comparing driver quality")
+    fail_if(errors,
+            route_integrity == "BAD_CAPTURE_LEVEL",
+            "physical_route_integrity=BAD_CAPTURE_LEVEL; capture level is outside calibrated iRig bounds")
+
+    fail_if(errors,
+            metric(metrics, "quality_alignment_score", 0.0) < args.min_alignment,
+            f"quality_alignment_score={metric(metrics, 'quality_alignment_score', 0.0):.6f} < {args.min_alignment:.6f}")
+    fail_if(errors,
+            metric(metrics, "capture_peak", 0.0) < args.min_capture_peak,
+            f"capture_peak={metric(metrics, 'capture_peak', 0.0):.6f} < {args.min_capture_peak:.6f}")
+    fail_if(errors,
+            metric(metrics, "capture_peak", 0.0) > args.max_capture_peak,
+            f"capture_peak={metric(metrics, 'capture_peak', 0.0):.6f} > {args.max_capture_peak:.6f}")
+    fail_if(errors,
+            int(metric(metrics, "capture_clipped_frames", 0.0)) > args.max_clipped_frames,
+            f"capture_clipped_frames={int(metric(metrics, 'capture_clipped_frames', 0.0))} > {args.max_clipped_frames}")
+    fail_if(errors,
+            int(metric(metrics, "capture_clipped_frames_full", 0.0)) > args.max_clipped_frames,
+            f"capture_clipped_frames_full={int(metric(metrics, 'capture_clipped_frames_full', 0.0))} > {args.max_clipped_frames}")
+    fail_if(errors,
+            metric(metrics, "mid_band_residual_ratio", 999.0) > args.max_mid_band_residual_ratio,
+            f"mid_band_residual_ratio={metric(metrics, 'mid_band_residual_ratio', 999.0):.6f} > {args.max_mid_band_residual_ratio:.6f}")
+    fail_if(errors,
+            metric(metrics, "mid_band_window_residual_ratio_p95", 0.0) > args.max_mid_band_window_p95,
+            f"mid_band_window_residual_ratio_p95={metric(metrics, 'mid_band_window_residual_ratio_p95', 0.0):.6f} > {args.max_mid_band_window_p95:.6f}")
+    fail_if(errors,
+            metric(metrics, "mid_band_window_residual_ratio_max", 0.0) > args.max_mid_band_window_max,
+            f"mid_band_window_residual_ratio_max={metric(metrics, 'mid_band_window_residual_ratio_max', 0.0):.6f} > {args.max_mid_band_window_max:.6f}")
+    fail_if(errors,
+            metric(metrics, "mid_band_window_residual_ratio_p95_over_median", 0.0) > args.max_mid_band_window_p95_over_median,
+            f"mid_band_window_residual_ratio_p95_over_median={metric(metrics, 'mid_band_window_residual_ratio_p95_over_median', 0.0):.6f} > {args.max_mid_band_window_p95_over_median:.6f}")
+    fail_if(errors,
+            metric(metrics, "mid_band_window_residual_ratio_max_over_median", 0.0) > args.max_mid_band_window_max_over_median,
+            f"mid_band_window_residual_ratio_max_over_median={metric(metrics, 'mid_band_window_residual_ratio_max_over_median', 0.0):.6f} > {args.max_mid_band_window_max_over_median:.6f}")
+    fail_if(errors,
+            metric(metrics, "high_band_residual_ratio", 999.0) > args.max_high_band_residual_ratio,
+            f"high_band_residual_ratio={metric(metrics, 'high_band_residual_ratio', 999.0):.6f} > {args.max_high_band_residual_ratio:.6f}")
+    fail_if(errors,
+            abs(metric(metrics, "mid_vs_low_coloration_delta_db", 0.0)) > args.max_mid_vs_low_coloration_db,
+            f"mid_vs_low_coloration_delta_db={metric(metrics, 'mid_vs_low_coloration_delta_db', 0.0):.2f} exceeds +/-{args.max_mid_vs_low_coloration_db:.2f} dB")
+    fail_if(errors,
+            abs(metric(metrics, "high_vs_low_coloration_delta_db", 0.0)) > args.max_high_vs_low_coloration_db,
+            f"high_vs_low_coloration_delta_db={metric(metrics, 'high_vs_low_coloration_delta_db', 0.0):.2f} exceeds +/-{args.max_high_vs_low_coloration_db:.2f} dB")
+    fail_if(errors,
+            metric(metrics, "metallic_coloration_score_db", 0.0) > args.max_metallic_coloration_score_db,
+            f"metallic_coloration_score_db={metric(metrics, 'metallic_coloration_score_db', 0.0):.2f} > {args.max_metallic_coloration_score_db:.2f} dB")
+    fail_if(errors,
+            metric(metrics, "quiet_mid_band_noise_dbfs", 240.0) > args.max_quiet_mid_band_noise_dbfs,
+            f"quiet_mid_band_noise_dbfs={metric(metrics, 'quiet_mid_band_noise_dbfs', 240.0):.2f} > {args.max_quiet_mid_band_noise_dbfs:.2f}")
+    fail_if(errors, clicks > args.max_clicks, f"click_outliers_total={clicks} > {args.max_clicks}")
+    fail_if(errors,
+            click_rate > args.max_clicks_per_second,
+            f"click_outliers_per_second={click_rate:.3f} > {args.max_clicks_per_second:.3f}")
+    fail_if(errors,
+            int(metric(metrics, "lag_jumps_gt_2_frames", 0.0)) > args.max_lag_jumps,
+            f"lag_jumps_gt_2_frames={int(metric(metrics, 'lag_jumps_gt_2_frames', 0.0))} > {args.max_lag_jumps}")
+    fail_if(errors,
+            int(metric(metrics, "window_click_outliers_max", 0.0)) > args.max_window_clicks,
+            f"window_click_outliers_max={int(metric(metrics, 'window_click_outliers_max', 0.0))} > {args.max_window_clicks}")
+    fail_if(errors,
+            abs(metric(metrics, "time_warp_lag_drift_frames", 0.0)) > args.max_time_warp_lag_drift,
+            f"time_warp_lag_drift_frames={metric(metrics, 'time_warp_lag_drift_frames', 0.0):.0f} > {args.max_time_warp_lag_drift}")
+    fail_if(errors,
+            metric(metrics, "time_warp_score_min", 1.0) < args.min_time_warp_score,
+            f"time_warp_score_min={metric(metrics, 'time_warp_score_min', 1.0):.6f} < {args.min_time_warp_score:.6f}")
+
+    cpu_corr = metric(metrics, "mid_band_cpu_corr_max", 0.0)
+    if metric(metrics, "cpu_profile_samples", 0.0) > 0:
+        fail_if(errors,
+                cpu_corr > args.max_mid_band_cpu_corr,
+                f"mid_band_cpu_corr_max={cpu_corr:.6f} > {args.max_mid_band_cpu_corr:.6f}")
+        fail_if(errors,
+                metric(metrics, "cpu_opena8dj_driver_avg", 0.0) > args.max_driver_cpu_avg,
+                f"cpu_opena8dj_driver_avg={metric(metrics, 'cpu_opena8dj_driver_avg', 0.0):.2f} > {args.max_driver_cpu_avg:.2f}")
+        fail_if(errors,
+                metric(metrics, "cpu_opena8dj_driver_p95", 0.0) > args.max_driver_cpu_p95,
+                f"cpu_opena8dj_driver_p95={metric(metrics, 'cpu_opena8dj_driver_p95', 0.0):.2f} > {args.max_driver_cpu_p95:.2f}")
+        fail_if(errors,
+                metric(metrics, "cpu_coreaudiod_p95", 0.0) > args.max_coreaudiod_cpu_p95,
+                f"cpu_coreaudiod_p95={metric(metrics, 'cpu_coreaudiod_p95', 0.0):.2f} > {args.max_coreaudiod_cpu_p95:.2f}")
+    else:
+        message = "no cpu profile supplied; CPU/residual coupling was not evaluated"
+        if args.allow_missing_cpu_profile:
+            warnings.append(message)
+        else:
+            errors.append(message)
+
+    fail_if(errors,
+            metric(metrics, "capture_rms", 0.0) < args.min_capture_rms,
+            f"capture_rms={metric(metrics, 'capture_rms', 0.0):.6f} < {args.min_capture_rms:.6f}")
+    fail_if(errors,
+            metric(metrics, "capture_rms_dbfs", -240.0) < args.min_capture_rms_dbfs,
+            f"capture_rms_dbfs={metric(metrics, 'capture_rms_dbfs', -240.0):.2f} < {args.min_capture_rms_dbfs:.2f}")
+    fail_if(errors,
+            metric(metrics, "capture_rms_dbfs", 240.0) > args.max_capture_rms_dbfs,
+            f"capture_rms_dbfs={metric(metrics, 'capture_rms_dbfs', 240.0):.2f} > {args.max_capture_rms_dbfs:.2f}")
+
+    if baseline:
+        compare_against_baseline(errors, metrics, baseline, args)
+    else:
+        warnings.append("no baseline JSON supplied; verdict uses absolute physical-route limits only")
+
+    return not errors, errors, warnings
+
+
+def classify_measurement_status(metrics, errors):
+    if metrics.get("diagnostic_bypass_active"):
+        return "DIAGNOSTIC_ONLY"
+    route_integrity = str(metrics.get("physical_route_integrity", "UNKNOWN"))
+    if route_integrity == "DIRTY_OR_WRONG_ROUTE":
+        return "BLOCKED_DIRTY_ROUTE"
+    if route_integrity == "BAD_CAPTURE_LEVEL":
+        return "BLOCKED_CAPTURE_LEVEL"
+    for error in errors:
+        if "iRig route cannot be verified" in error:
+            return "BLOCKED_CAPTURE_ROUTE_UNVERIFIED"
+        if "record.log does not prove capture" in error:
+            return "BLOCKED_CAPTURE_ROUTE_UNVERIFIED"
+        if "no cpu profile supplied" in error:
+            return "BLOCKED_MISSING_CPU_PROFILE"
+    return "VALID"
+
+
+def print_summary(metrics, errors, warnings):
+    keys = [
+        "measurement_status",
+        "candidate_quality_status",
+        "quality_alignment_score",
+        "compared_seconds",
+        "capture_peak",
+        "capture_peak_dbfs",
+        "capture_rms_dbfs",
+        "left_snr_db",
+        "right_snr_db",
+        "mid_band_residual_ratio",
+        "mid_band_window_residual_ratio_median",
+        "mid_band_window_residual_ratio_p95",
+        "mid_band_window_residual_ratio_max",
+        "mid_band_window_residual_ratio_p95_over_median",
+        "mid_band_window_residual_ratio_max_over_median",
+        "mid_band_window_residual_ratio_p95_minus_median",
+        "mid_band_residual_dbfs",
+        "high_band_residual_ratio",
+        "high_band_residual_dbfs",
+        "low_band_capture_to_ref_gain_db",
+        "mid_band_capture_to_ref_gain_db",
+        "high_band_capture_to_ref_gain_db",
+        "mid_vs_low_coloration_delta_db",
+        "high_vs_low_coloration_delta_db",
+        "high_vs_mid_coloration_delta_db",
+        "metallic_coloration_score_db",
+        "quiet_mid_band_noise_dbfs",
+        "click_outliers_total",
+        "click_outliers_per_second",
+        "window_click_outliers_max",
+        "lag_jumps_gt_2_frames",
+        "capture_clipped_frames",
+        "capture_clipped_frames_full",
+        "physical_route_integrity",
+        "mid_band_cpu_corr_max",
+        "mid_band_cpu_corr_max_column",
+        "cpu_opena8dj_driver_avg",
+        "cpu_opena8dj_driver_p95",
+        "cpu_opena8dj_driver_max",
+        "cpu_coreaudiod_avg",
+        "cpu_coreaudiod_p95",
+        "cpu_coreaudiod_max",
+    ]
+    for key in keys:
+        if key in metrics:
+            value = metrics[key]
+            if isinstance(value, float):
+                print(f"{key}={value:.8f}")
+            else:
+                print(f"{key}={value}")
+    for warning in warnings:
+        print(f"warning={warning}")
+    for error in errors:
+        print(f"error={error}")
+    print(f"verdict={metrics['verdict']}")
+
+
+def main():
+    root = repo_root()
+    analyzer = load_soundcheck_analyzer(root)
+    parser = argparse.ArgumentParser(
+        description="Conservative physical music gate for digital reference vs iRig analog capture."
+    )
+    parser.add_argument("--run-dir", help="soundcheck run dir containing fixture/reference.wav and captured.wav")
+    parser.add_argument("--reference")
+    parser.add_argument("--capture")
+    parser.add_argument("--cpu-profile")
+    parser.add_argument("--baseline-json", help="optional known-good physical metrics JSON for relative gating")
+    parser.add_argument("--json-out")
+    parser.add_argument("--coupling-profile-out")
+    parser.add_argument("--max-seconds", type=float, default=30.0)
+    parser.add_argument("--max-lag", type=int, default=4096)
+    parser.add_argument("--time-warp-max-lag", type=int, default=256)
+    parser.add_argument("--window-seconds", type=float, default=0.5)
+    parser.add_argument("--hop-seconds", type=float, default=0.25)
+    parser.add_argument("--min-alignment", type=float, default=0.970)
+    parser.add_argument("--min-capture-peak", type=float, default=0.020)
+    parser.add_argument("--max-capture-peak", type=float, default=0.920)
+    parser.add_argument("--min-capture-rms", type=float, default=0.010)
+    parser.add_argument("--min-capture-rms-dbfs", type=float, default=-28.0)
+    parser.add_argument("--max-capture-rms-dbfs", type=float, default=-10.0)
+    parser.add_argument("--max-clipped-frames", type=int, default=0)
+    parser.add_argument("--max-mid-band-residual-ratio", type=float, default=1.38)
+    parser.add_argument("--max-mid-band-window-p95", type=float, default=1.40)
+    parser.add_argument("--max-mid-band-window-max", type=float, default=1.46)
+    parser.add_argument("--max-mid-band-window-p95-over-median", type=float, default=1.03)
+    parser.add_argument("--max-mid-band-window-max-over-median", type=float, default=1.06)
+    parser.add_argument("--max-high-band-residual-ratio", type=float, default=1.32)
+    parser.add_argument("--max-mid-vs-low-coloration-db", type=float, default=5.0)
+    parser.add_argument("--max-high-vs-low-coloration-db", type=float, default=6.0)
+    parser.add_argument("--max-metallic-coloration-score-db", type=float, default=6.0)
+    parser.add_argument("--max-quiet-mid-band-noise-dbfs", type=float, default=-32.5)
+    parser.add_argument("--max-clicks", type=int, default=0)
+    parser.add_argument("--max-clicks-per-second", type=float, default=0.0)
+    parser.add_argument("--max-window-clicks", type=int, default=0)
+    parser.add_argument("--max-lag-jumps", type=int, default=3)
+    parser.add_argument("--max-time-warp-lag-drift", type=float, default=8.0)
+    parser.add_argument("--min-time-warp-score", type=float, default=0.85)
+    parser.add_argument("--max-mid-band-cpu-corr", type=float, default=0.08)
+    parser.add_argument("--max-driver-cpu-avg", type=float, default=8.0)
+    parser.add_argument("--max-driver-cpu-p95", type=float, default=12.0)
+    parser.add_argument("--max-coreaudiod-cpu-p95", type=float, default=8.0)
+    parser.add_argument("--dirty-route-alignment-max", type=float, default=0.60)
+    parser.add_argument("--dirty-route-time-warp-score-max", type=float, default=0.20)
+    parser.add_argument("--dirty-route-mid-ratio-min", type=float, default=3.0)
+    parser.add_argument("--dirty-route-high-ratio-min", type=float, default=3.0)
+    parser.add_argument("--relative-mid-slack", type=float, default=0.97)
+    parser.add_argument("--relative-window-p95-slack", type=float, default=0.97)
+    parser.add_argument("--relative-window-max-slack", type=float, default=0.98)
+    parser.add_argument("--relative-window-spread-slack", type=float, default=1.00)
+    parser.add_argument("--relative-high-slack", type=float, default=0.98)
+    parser.add_argument("--relative-coloration-db-slack", type=float, default=0.75)
+    parser.add_argument("--relative-quiet-db-slack", type=float, default=-1.5)
+    parser.add_argument("--relative-click-slack", type=float, default=1.00)
+    parser.add_argument("--allow-missing-cpu-profile", action="store_true")
+    parser.add_argument("--allow-non-irig", action="store_true")
+    args = parser.parse_args()
+
+    if args.run_dir:
+        run_dir = resolve(args.run_dir)
+        reference, capture, cpu_profile = infer_run_files(run_dir)
+        if args.reference or args.capture:
+            raise SystemExit("--run-dir cannot be combined with --reference/--capture")
+    else:
+        run_dir = None
+        if not args.reference or not args.capture:
+            raise SystemExit("provide either --run-dir or both --reference and --capture")
+        reference = resolve(args.reference)
+        capture = resolve(args.capture)
+        cpu_profile = resolve(args.cpu_profile) if args.cpu_profile else None
+
+    if args.cpu_profile:
+        cpu_profile = resolve(args.cpu_profile)
+
+    ref_rate, ref = analyzer.read_wav_pair(str(reference))
+    got_rate, got = analyzer.read_wav_pair(str(capture))
+    original_got_rate = got_rate
+    got_for_levels = got
+    if ref_rate != got_rate:
+        got = analyzer.resample_pair_linear(got, got_rate, ref_rate)
+        got_rate = ref_rate
+
+    cpu_rows, cpu_columns = analyzer.load_cpu_profile(str(cpu_profile) if cpu_profile else None)
+    result, coupling = analyzer.compare_pair(
+        ref,
+        got,
+        ref_rate,
+        args.max_seconds,
+        args.max_lag,
+        True,
+        args.time_warp_max_lag,
+        args.window_seconds,
+        args.hop_seconds,
+        True,
+        args.window_seconds,
+        args.hop_seconds,
+        analyzer.DEFAULT_NOISE_BAND_LOW_HZ,
+        analyzer.DEFAULT_NOISE_BAND_HIGH_HZ,
+        analyzer.DEFAULT_HIGH_BAND_LOW_HZ,
+        analyzer.DEFAULT_HIGH_BAND_HIGH_HZ,
+        cpu_rows,
+        cpu_columns,
+    )
+    metrics = analyzer.flatten_metrics(result)
+    analyzer.add_coupling_metrics(metrics, coupling, cpu_columns, 1.0)
+    metrics.update(capture_level_metrics(got_for_levels, analyzer.clipped_count))
+    add_ratio_stability_metrics(metrics)
+    add_cpu_summary_metrics(metrics, cpu_rows)
+    metrics.update({
+        "reference": str(reference),
+        "capture": str(capture),
+        "cpu_profile": str(cpu_profile) if cpu_profile else "",
+        "rate": ref_rate,
+        "capture_original_rate": original_got_rate,
+        "cpu_profile_samples": len(cpu_rows),
+        "gate": "physical-music-quality-gate",
+        "gate_schema": 1,
+        "allow_non_irig": bool(args.allow_non_irig),
+        "allow_missing_cpu_profile": bool(args.allow_missing_cpu_profile),
+        "diagnostic_bypass_active": bool(args.allow_non_irig or args.allow_missing_cpu_profile),
+    })
+
+    baseline = load_json(resolve(args.baseline_json)) if args.baseline_json else None
+    passed, errors, warnings = verdict(metrics, baseline, args)
+    if not args.allow_non_irig:
+        errors.extend(verify_irig_route(run_dir))
+        passed = passed and not errors
+    measurement_status = classify_measurement_status(metrics, errors)
+    metrics["measurement_status"] = measurement_status
+    metrics["candidate_quality_status"] = (
+        "PASS" if passed and measurement_status == "VALID" else
+        "NOT_EVALUATED" if measurement_status != "VALID" else
+        "FAIL"
+    )
+    metrics["verdict"] = "PASS" if passed and measurement_status == "VALID" else "FAIL"
+    metrics["errors"] = errors
+    metrics["warnings"] = warnings
+
+    print_summary(metrics, errors, warnings)
+    if args.json_out:
+        with open(resolve(args.json_out), "w", encoding="utf-8") as handle:
+            json.dump(metrics, handle, indent=2)
+            handle.write("\n")
+    if args.coupling_profile_out:
+        with open(resolve(args.coupling_profile_out), "w", encoding="utf-8") as handle:
+            json.dump({
+                "reference": str(reference),
+                "capture": str(capture),
+                "cpu_columns": cpu_columns,
+                "windows": coupling,
+            }, handle, indent=2)
+            handle.write("\n")
+    return 0 if metrics["verdict"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

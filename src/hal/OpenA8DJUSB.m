@@ -26,6 +26,9 @@
 #include <time.h>
 #include <unistd.h>
 
+typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
+                                             IOUSBHostIsochronousTransaction *transactionList);
+
 #ifndef OPENA8DJ_ENABLE_TRACE
 #define OPENA8DJ_ENABLE_TRACE 0
 #endif
@@ -42,6 +45,10 @@
 #define OPENA8DJ_OUTPUT_GAIN 1.0f
 #endif
 
+#ifndef OPENA8DJ_OUTPUT_PREFETCH_FRAMES
+#define OPENA8DJ_OUTPUT_PREFETCH_FRAMES 256
+#endif
+
 #ifndef OPENA8DJ_ENABLE_INPUT_DECODE
 #define OPENA8DJ_ENABLE_INPUT_DECODE 1
 #endif
@@ -52,6 +59,14 @@
 
 #ifndef OPENA8DJ_OUTPUT_NATIVE_I24
 #define OPENA8DJ_OUTPUT_NATIVE_I24 0
+#endif
+
+#ifndef OPENA8DJ_FAST_OUTPUT_QUANTIZER
+#define OPENA8DJ_FAST_OUTPUT_QUANTIZER 0
+#endif
+
+#ifndef OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
+#define OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR 0
 #endif
 
 #ifndef OPENA8DJ_ISO_FRAMES_PER_TRANSFER
@@ -72,6 +87,14 @@
 
 #ifndef OPENA8DJ_CAPTURE_PACED_OUT_LEAD
 #define OPENA8DJ_CAPTURE_PACED_OUT_LEAD 1
+#endif
+
+#ifndef OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS
+#define OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS 1
+#endif
+
+#ifndef OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
+#define OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE 0
 #endif
 
 #ifndef OPENA8DJ_ENABLE_USB_CLOCK_ANCHOR
@@ -98,6 +121,34 @@
 #define OPENA8DJ_ENABLE_TRANSFER_POOL 0
 #endif
 
+#ifndef OPENA8DJ_FAST_ISO_TRANSFER_CONFIG
+#define OPENA8DJ_FAST_ISO_TRANSFER_CONFIG 0
+#endif
+
+#ifndef OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
+#define OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM 1
+#endif
+
+#ifndef OPENA8DJ_STRICT_TRANSFER_POOL
+#define OPENA8DJ_STRICT_TRANSFER_POOL 0
+#endif
+
+#ifndef OPENA8DJ_TRANSFER_POOL_CURSOR
+#define OPENA8DJ_TRANSFER_POOL_CURSOR 0
+#endif
+
+#ifndef OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+#define OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS 0
+#endif
+
+#ifndef OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS
+#define OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS 0
+#endif
+
+#ifndef OPENA8DJ_USB_QUEUE_QOS
+#define OPENA8DJ_USB_QUEUE_QOS 0
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER
 #define OPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER 1
 #endif
@@ -112,6 +163,18 @@
 
 #ifndef OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
+#endif
+
+#ifndef OPENA8DJ_ENABLE_HOT_STREAM_STATS
+#define OPENA8DJ_ENABLE_HOT_STREAM_STATS 1
+#endif
+
+#ifndef OPENA8DJ_HOT_STREAM_STATS_INTERVAL
+#define OPENA8DJ_HOT_STREAM_STATS_INTERVAL 1
+#endif
+
+#ifndef OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS
+#define OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS 1
 #endif
 
 static const uint16_t kVendorID = 0x17cc;
@@ -138,13 +201,15 @@ enum {
     kBytesPerSampleUSB = 4,
     kOutputUSBBytesPerFrame = kStreams * kBytesPerSampleUSB * kChannelsPerStream,
     kIsoFramesPerTransfer = OPENA8DJ_ISO_FRAMES_PER_TRANSFER,
+    kPlaybackCoalesceTransfers = OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS < 1 ? 1 : OPENA8DJ_PLAYBACK_COALESCE_TRANSFERS,
+    kPlaybackIsoFramesPerTransfer = kIsoFramesPerTransfer * kPlaybackCoalesceTransfers,
     kIsoBytesPerFrame = 512,
     kCaptureQueueDepth = OPENA8DJ_CAPTURE_QUEUE_DEPTH,
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kRingFrames = 32768,
-    kOutputPrefetchFrames = 256,
+    kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
     kOutputStartLatencyFrames = 8192,
     kOutputRestartLatencyFrames = 4096,
     kOutputTargetLatencyFrames = 8192,
@@ -196,6 +261,23 @@ enum {
     kIPCTypeStreamStats = 11
 };
 
+static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
+
+static dispatch_queue_attr_t OpenA8DJUSBQueueAttributes(void)
+{
+#if OPENA8DJ_USB_QUEUE_QOS >= 2
+    return dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
+                                                   QOS_CLASS_USER_INTERACTIVE,
+                                                   0);
+#elif OPENA8DJ_USB_QUEUE_QOS == 1
+    return dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL,
+                                                   QOS_CLASS_USER_INITIATED,
+                                                   0);
+#else
+    return DISPATCH_QUEUE_SERIAL;
+#endif
+}
+
 typedef struct OpenA8DJIPCHeader {
     uint32_t magic;
     uint8_t version;
@@ -213,6 +295,7 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputInvertLeftMask;
     uint8_t inputInvertRightMask;
     uint8_t inputSource[kStreams];
+    uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
 
 typedef struct OpenA8DJInputStatsPayload {
@@ -223,6 +306,43 @@ typedef struct OpenA8DJInputStatsPayload {
     double leftPeak[kStreams];
     double rightPeak[kStreams];
 } __attribute__((packed)) OpenA8DJInputStatsPayload;
+
+static void InputStatsAccumulate(OpenA8DJInputStatsPayload *stats,
+                                 uint32_t stream,
+                                 float left,
+                                 float right)
+{
+    if (stats == NULL || stream >= kStreams) {
+        return;
+    }
+    double l = left;
+    double r = right;
+    double la = fabs(l);
+    double ra = fabs(r);
+    stats->frames[stream]++;
+    stats->leftSquare[stream] += l * l;
+    stats->rightSquare[stream] += r * r;
+    stats->cross[stream] += l * r;
+    if (la > stats->leftPeak[stream]) {
+        stats->leftPeak[stream] = la;
+    }
+    if (ra > stats->rightPeak[stream]) {
+        stats->rightPeak[stream] = ra;
+    }
+}
+
+static bool InputStatsHasFrames(const OpenA8DJInputStatsPayload *stats)
+{
+    if (stats == NULL) {
+        return false;
+    }
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        if (stats->frames[stream] != 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 typedef struct OpenA8DJStreamStatsPayload {
     uint8_t streaming;
@@ -361,6 +481,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackRequestCountSamples;
     uint64_t playbackZeroCompleteTransactions;
     uint64_t playbackLayoutSignatureSum;
+    uint64_t outputLateWriteFrames;
+    uint64_t outputLateWriteBatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -870,7 +992,8 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
                                     uint32_t startLatencyFrames,
                                     uint32_t restartLatencyFrames,
                                     uint32_t targetLatencyFrames,
-                                    uint32_t *outResetCount)
+                                    uint32_t *outResetCount,
+                                    uint32_t *outLateWriteFrames)
 {
     if (ring->data == NULL || ring->frameNumbers == NULL || frames == NULL || frameCount == 0) {
         return 0;
@@ -878,6 +1001,7 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
 
     uint32_t dropped = 0;
     uint32_t resetCount = 0;
+    uint32_t lateWriteFrames = 0;
     pthread_mutex_lock(&ring->mutex);
     if (!ring->hasWritten) {
         OutputTimelineResetLocked(ring, startFrame, startLatencyFrames);
@@ -896,6 +1020,7 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
     for (uint32_t frame = 0; frame < frameCount; frame++) {
         int64_t frameNumber = startFrame + (int64_t)frame;
         if (frameNumber < ring->readFrame) {
+            lateWriteFrames++;
             continue;
         }
         uint32_t index = TimelineIndexForFrame(frameNumber, ring->capacityFrames);
@@ -919,6 +1044,9 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
     if (outResetCount != NULL) {
         *outResetCount = resetCount;
     }
+    if (outLateWriteFrames != NULL) {
+        *outLateWriteFrames = lateWriteFrames;
+    }
     return dropped;
 }
 
@@ -934,6 +1062,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
         return 0;
     }
 
+#if !OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
     memset(frames, 0, (size_t)frameCount * channels * sizeof(float));
     if (outHaveFrame != NULL) {
         memset(outHaveFrame, 0, (size_t)frameCount * sizeof(bool));
@@ -944,6 +1073,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
     if (outElasticDropFrames != NULL) {
         memset(outElasticDropFrames, 0, (size_t)frameCount * sizeof(uint32_t));
     }
+#endif
 
     pthread_mutex_lock(&ring->mutex);
     for (uint32_t frameIndex = 0; frameIndex < frameCount; frameIndex++) {
@@ -977,6 +1107,11 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
             ring->readFrame++;
         }
 
+#if OPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR
+        if (!haveFrame) {
+            memset(frame, 0, (size_t)channels * sizeof(float));
+        }
+#endif
         if (outHaveFrame != NULL) {
             outHaveFrame[frameIndex] = haveFrame;
         }
@@ -1156,6 +1291,16 @@ static void FloatToOutputI24(float sample, uint8_t *bytes)
     sample *= OPENA8DJ_OUTPUT_GAIN;
     if (sample > 1.0f) sample = 1.0f;
     if (sample < -1.0f) sample = -1.0f;
+    int32_t sample24;
+#if OPENA8DJ_FAST_OUTPUT_QUANTIZER
+    if (sample >= 1.0f) {
+        sample24 = 0x7fffff;
+    } else if (sample <= -1.0f) {
+        sample24 = -0x800000;
+    } else {
+        sample24 = (int32_t)(sample * 8388607.0f);
+    }
+#else
     int32_t value;
     if (sample >= 1.0f) {
         value = INT32_MAX;
@@ -1164,7 +1309,8 @@ static void FloatToOutputI24(float sample, uint8_t *bytes)
     } else {
         value = (int32_t)lrintf(sample * 2147483647.0f);
     }
-    int32_t sample24 = value >> 8;
+    sample24 = value >> 8;
+#endif
 #if OPENA8DJ_OUTPUT_NATIVE_I24
     bytes[0] = (uint8_t)(sample24 & 0xff);
     bytes[1] = (uint8_t)((sample24 >> 8) & 0xff);
@@ -1245,6 +1391,7 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 - (BOOL)ensureOpen;
 - (void)stop;
 - (void)close;
+- (void)setInputDecodeActive:(BOOL)active;
 - (uint32_t)readInput:(float *)outInterleaved frames:(uint32_t)frames channels:(uint32_t)channels;
 - (void)writeOutput:(const float *)inInterleaved frames:(uint32_t)frames channels:(uint32_t)channels;
 - (void)writeOutput:(const float *)inInterleaved
@@ -1271,10 +1418,12 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
                   transactions:(IOUSBHostIsochronousTransaction *)transactions;
 - (void)fillPlaybackQueue;
 - (BOOL)queuePlaybackTransfer;
+- (BOOL)queueCapturePacedPlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
 - (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count;
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
-                                            count:(NSUInteger)count;
+                                            count:(NSUInteger)count
+                                        nextIndex:(NSUInteger *)nextIndex;
 - (void)releasePooledTransfer:(OpenA8DJIsoTransfer *)transfer;
 - (void)resyncPlaybackSchedule;
 - (void)handlePlaybackTransfer:(OpenA8DJIsoTransfer *)transfer
@@ -1292,7 +1441,9 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
              outlierOffset:(size_t)outlierOffset
                      delta:(uint64_t)delta
                   threshold:(uint64_t)threshold;
+- (void)addInputStatsBatch:(const OpenA8DJInputStatsPayload *)stats;
 - (void)accumulateOutputFillStats:(const OpenA8DJOutputFillStats *)stats force:(BOOL)force;
+- (void)setInputDecodeEnabled:(BOOL)enabled;
 @end
 
 @interface OpenA8DJIsoTransfer : NSObject
@@ -1301,8 +1452,13 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
 @property(nonatomic) NSUInteger transactionCount;
 @property(nonatomic) NSUInteger capacityBytes;
 @property(nonatomic) NSUInteger capacityTransactions;
+@property(nonatomic) BOOL configured;
 @property(nonatomic) BOOL pooled;
 @property(nonatomic) BOOL inUse;
+@property(nonatomic) NSUInteger slotIndex;
+@property(nonatomic) uint64_t slotGeneration;
+@property(nonatomic, copy) OpenA8DJIsoCompletionHandler captureCompletionHandler;
+@property(nonatomic, copy) OpenA8DJIsoCompletionHandler playbackCompletionHandler;
 @end
 
 @implementation OpenA8DJIsoTransfer
@@ -1322,11 +1478,42 @@ static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *
         return NO;
     }
 
+    IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
+#if OPENA8DJ_FAST_ISO_TRANSFER_CONFIG
+    BOOL sameLayout = transfer.transactionCount == count &&
+        transfer.data.length == dataLength &&
+        transfer.transactions.length == sizeof(IOUSBHostIsochronousTransaction) * count;
+    if (transfer.configured && sameLayout) {
+        BOOL reusableLayout = YES;
+        uint32_t offset = 0;
+        for (NSUInteger index = 0; index < count; index++) {
+            if (transactions[index].requestCount != requests[index] ||
+                transactions[index].offset != offset) {
+                reusableLayout = NO;
+                break;
+            }
+            offset += requests[index];
+        }
+        if (!reusableLayout) {
+            sameLayout = NO;
+        }
+    }
+    if (transfer.configured && sameLayout) {
+        for (NSUInteger index = 0; index < count; index++) {
+            transactions[index].status = kIOReturnInvalid;
+            transactions[index].completeCount = 0;
+            transactions[index].timeStamp = 0;
+            transactions[index].options = IOUSBHostIsochronousTransactionOptionsNone;
+        }
+        return YES;
+    }
+#endif
+
     transfer.data.length = dataLength;
     transfer.transactions.length = sizeof(IOUSBHostIsochronousTransaction) * count;
     transfer.transactionCount = count;
+    transactions = transfer.transactions.mutableBytes;
 
-    IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
     uint32_t offset = 0;
     for (NSUInteger index = 0; index < count; index++) {
         transactions[index].status = kIOReturnInvalid;
@@ -1337,6 +1524,7 @@ static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *
         transactions[index].options = IOUSBHostIsochronousTransactionOptionsNone;
         offset += requests[index];
     }
+    transfer.configured = YES;
 
     return YES;
 }
@@ -1388,6 +1576,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OutputTimelineRing _outputTimeline;
     OpenA8DJStreamStatsPayload _streamStats;
     pthread_mutex_t _streamStatsMutex;
+    atomic_uint_fast64_t _outputFramesWrittenAtomic;
     OpenA8DJUSBClockAnchor _clockAnchor;
     pthread_mutex_t _clockAnchorMutex;
     uint64_t _clockAnchorResets;
@@ -1402,6 +1591,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     atomic_uint _inputInvertLeftMask;
     atomic_uint _inputInvertRightMask;
     atomic_uint _inputSourceMap;
+    atomic_bool _inputDecodeEnabled;
+    atomic_bool _inputDecodeActive;
     uint8_t _outputFrameBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _outputByteInFrame;
     bool _outputFrameLoaded;
@@ -1422,9 +1613,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint32_t _pendingOutputFillTransferCount;
     bool _playbackScheduleValid;
     uint64_t _nextPlaybackFrameNumber;
+    uint32_t _pendingPlaybackRequests[kPlaybackIsoFramesPerTransfer];
+    NSUInteger _pendingPlaybackRequestCount;
     atomic_bool _playbackUseExplicitScheduling;
     atomic_uint _playbackScheduleFailureStreak;
     atomic_uint _playbackTransfersInFlight;
+    atomic_ullong _captureHotStreamStatsCounter;
+    atomic_ullong _playbackHotStreamStatsCounter;
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
     uint64_t _lastCaptureTransactionUSBTime;
@@ -1433,6 +1628,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #endif
     NSMutableArray<OpenA8DJIsoTransfer *> *_captureTransferPool;
     NSMutableArray<OpenA8DJIsoTransfer *> *_playbackTransferPool;
+    NSUInteger _captureTransferPoolCursor;
+    NSUInteger _playbackTransferPoolCursor;
     pthread_mutex_t _transferPoolMutex;
 #if OPENA8DJ_ENABLE_TRACE
     uint64_t _debugCaptureCheckGroups;
@@ -1498,9 +1695,14 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_inputInvertLeftMask, 0);
         atomic_init(&_inputInvertRightMask, 0);
         atomic_init(&_inputSourceMap, kInputSourceIdentityMap);
+        atomic_init(&_inputDecodeEnabled, atomic_load(&gInputDecodeEnabledPreference));
+        atomic_init(&_inputDecodeActive, false);
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
+        atomic_init(&_outputFramesWrittenAtomic, 0);
+        atomic_init(&_captureHotStreamStatsCounter, 0);
+        atomic_init(&_playbackHotStreamStatsCounter, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -1508,7 +1710,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         pthread_mutex_init(&_diagnosticMutex, NULL);
         atomic_init(&_diagnosticEventCount, 0);
 #endif
-        _queue = dispatch_queue_create("org.opena8dj.driver.usb", DISPATCH_QUEUE_SERIAL);
+        _queue = dispatch_queue_create("org.opena8dj.driver.usb", OpenA8DJUSBQueueAttributes());
         _ep1Queue = dispatch_queue_create("org.opena8dj.driver.ep1", DISPATCH_QUEUE_SERIAL);
         _ipcQueue = dispatch_queue_create("org.opena8dj.driver.ipc", DISPATCH_QUEUE_SERIAL);
         pthread_mutex_init(&_bulkOutMutex, NULL);
@@ -1528,21 +1730,49 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #if OPENA8DJ_ENABLE_TRANSFER_POOL
         _captureTransferPool = [NSMutableArray arrayWithCapacity:kCaptureQueueDepth];
         _playbackTransferPool = [NSMutableArray arrayWithCapacity:kPlaybackQueueMax];
+#if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+        __weak OpenA8DJUSBEngine *weakSelf = self;
+#endif
         for (uint32_t i = 0; i < kCaptureQueueDepth; i++) {
             OpenA8DJIsoTransfer *transfer =
                 CreateIsoTransferWithCapacity(kIsoFramesPerTransfer,
                                               (NSUInteger)kIsoFramesPerTransfer * kIsoBytesPerFrame);
             if (transfer != nil) {
                 transfer.pooled = YES;
+#if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+                __unsafe_unretained OpenA8DJIsoTransfer *rawTransfer = transfer;
+                transfer.captureCompletionHandler =
+                    ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+                        OpenA8DJUSBEngine *strongSelf = weakSelf;
+                        if (strongSelf != nil) {
+                            [strongSelf handleCaptureTransfer:rawTransfer
+                                                       status:status
+                                                 transactions:transactionList];
+                        }
+                    };
+#endif
                 [_captureTransferPool addObject:transfer];
             }
         }
         for (uint32_t i = 0; i < kPlaybackQueueMax; i++) {
             OpenA8DJIsoTransfer *transfer =
-                CreateIsoTransferWithCapacity(kIsoFramesPerTransfer,
-                                              (NSUInteger)kIsoFramesPerTransfer * kIsoBytesPerFrame);
+                CreateIsoTransferWithCapacity(kPlaybackIsoFramesPerTransfer,
+                                              (NSUInteger)kPlaybackIsoFramesPerTransfer * kIsoBytesPerFrame);
             if (transfer != nil) {
                 transfer.pooled = YES;
+                transfer.slotIndex = i;
+#if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+                __unsafe_unretained OpenA8DJIsoTransfer *rawTransfer = transfer;
+                transfer.playbackCompletionHandler =
+                    ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+                        OpenA8DJUSBEngine *strongSelf = weakSelf;
+                        if (strongSelf != nil) {
+                            [strongSelf handlePlaybackTransfer:rawTransfer
+                                                        status:status
+                                                  transactions:transactionList];
+                        }
+                    };
+#endif
                 [_playbackTransferPool addObject:transfer];
             }
         }
@@ -1992,10 +2222,14 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (void)resetAudioParamsBeforeStream
 {
+#if OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM
     uint16_t bpp = CalculateBytesPerPacket(&_spec, _sampleRate);
     if (![self sendAudioParamsWithRateCode:0xff depth:0 bytesPerPacket:bpp name:"reset"]) {
         USBTrace("audio params reset did not complete; continuing to stream setup");
     }
+#else
+    USBTrace("audio params reset skipped before stream setup");
+#endif
 }
 
 - (BOOL)setAudioParams
@@ -2032,6 +2266,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         uint8_t source = (uint8_t)((sourceMap >> (stream * 4)) & 0x0f);
         payload->inputSource[stream] = source < kStreams ? source : (uint8_t)stream;
     }
+    payload->inputDecodeEnabled = atomic_load(&_inputDecodeEnabled) ? 1 : 0;
 }
 
 - (void)storeControlPayload:(const OpenA8DJControlPayload *)payload
@@ -2055,6 +2290,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         sourceMap |= ((uint32_t)source) << (stream * 4);
     }
     atomic_store(&_inputSourceMap, sourceMap);
+    [self setInputDecodeEnabled:(payload->inputDecodeEnabled != 0)];
 }
 
 - (BOOL)readControls
@@ -2427,14 +2663,31 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 - (OpenA8DJIsoTransfer *)checkoutTransferFromPool:(NSMutableArray<OpenA8DJIsoTransfer *> *)pool
                                          requests:(const uint32_t *)requests
                                             count:(NSUInteger)count
+                                        nextIndex:(NSUInteger *)nextIndex
 {
 #if !OPENA8DJ_ENABLE_TRANSFER_POOL
     (void)pool;
+    (void)nextIndex;
     return CreateIsoTransfer(requests, count);
 #else
     OpenA8DJIsoTransfer *selected = nil;
     pthread_mutex_lock(&_transferPoolMutex);
-    for (OpenA8DJIsoTransfer *transfer in pool) {
+    NSUInteger poolCount = pool.count;
+    BOOL legacyPlaybackPool = NO;
+#if OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS
+    legacyPlaybackPool = (pool == _playbackTransferPool);
+#endif
+#if OPENA8DJ_TRANSFER_POOL_CURSOR
+    NSUInteger startIndex = (nextIndex != NULL && poolCount > 0) ? (*nextIndex % poolCount) : 0;
+#else
+    NSUInteger startIndex = 0;
+    if (legacyPlaybackPool && nextIndex != NULL && poolCount > 0) {
+        startIndex = *nextIndex % poolCount;
+    }
+#endif
+    for (NSUInteger attempt = 0; attempt < poolCount; attempt++) {
+        NSUInteger index = (startIndex + attempt) % poolCount;
+        OpenA8DJIsoTransfer *transfer = pool[index];
         if (transfer.inUse) {
             continue;
         }
@@ -2442,6 +2695,18 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             continue;
         }
         transfer.inUse = YES;
+        if (legacyPlaybackPool) {
+            transfer.slotGeneration++;
+        }
+#if OPENA8DJ_TRANSFER_POOL_CURSOR
+        if (nextIndex != NULL && poolCount > 0) {
+            *nextIndex = (index + 1) % poolCount;
+        }
+#else
+        if (legacyPlaybackPool && nextIndex != NULL && poolCount > 0) {
+            *nextIndex = (index + 1) % poolCount;
+        }
+#endif
         selected = transfer;
         break;
     }
@@ -2450,6 +2715,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (selected != nil) {
         return selected;
     }
+#if OPENA8DJ_ENABLE_LEGACY_OUT_SLOTS
+    if (legacyPlaybackPool) {
+        return nil;
+    }
+#endif
+#if OPENA8DJ_STRICT_TRANSFER_POOL
+    if (nextIndex != NULL) {
+        return nil;
+    }
+#endif
     return CreateIsoTransfer(requests, count);
 #endif
 }
@@ -2469,6 +2744,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_lock(&_streamStatsMutex);
     memset(&_streamStats, 0, sizeof(_streamStats));
     pthread_mutex_unlock(&_streamStatsMutex);
+    atomic_store(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -2481,6 +2757,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats = _streamStats;
     pthread_mutex_unlock(&_streamStatsMutex);
 
+    stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
@@ -2823,20 +3100,28 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (stream >= kStreams) {
         return;
     }
-    double l = left;
-    double r = right;
-    double la = fabs(l);
-    double ra = fabs(r);
-    pthread_mutex_lock(&_inputStatsMutex);
-    _inputStats.frames[stream]++;
-    _inputStats.leftSquare[stream] += l * l;
-    _inputStats.rightSquare[stream] += r * r;
-    _inputStats.cross[stream] += l * r;
-    if (la > _inputStats.leftPeak[stream]) {
-        _inputStats.leftPeak[stream] = la;
+    OpenA8DJInputStatsPayload stats = {0};
+    InputStatsAccumulate(&stats, stream, left, right);
+    [self addInputStatsBatch:&stats];
+}
+
+- (void)addInputStatsBatch:(const OpenA8DJInputStatsPayload *)stats
+{
+    if (!InputStatsHasFrames(stats)) {
+        return;
     }
-    if (ra > _inputStats.rightPeak[stream]) {
-        _inputStats.rightPeak[stream] = ra;
+    pthread_mutex_lock(&_inputStatsMutex);
+    for (uint32_t stream = 0; stream < kStreams; stream++) {
+        _inputStats.frames[stream] += stats->frames[stream];
+        _inputStats.leftSquare[stream] += stats->leftSquare[stream];
+        _inputStats.rightSquare[stream] += stats->rightSquare[stream];
+        _inputStats.cross[stream] += stats->cross[stream];
+        if (stats->leftPeak[stream] > _inputStats.leftPeak[stream]) {
+            _inputStats.leftPeak[stream] = stats->leftPeak[stream];
+        }
+        if (stats->rightPeak[stream] > _inputStats.rightPeak[stream]) {
+            _inputStats.rightPeak[stream] = stats->rightPeak[stream];
+        }
     }
     pthread_mutex_unlock(&_inputStatsMutex);
 }
@@ -2867,8 +3152,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             [self sendControlStateToClient:fd];
             break;
         case kIPCTypeControlSet:
-            if (length >= sizeof(OpenA8DJControlPayload)) {
-                [self storeControlPayload:(const OpenA8DJControlPayload *)payload];
+            if (length >= offsetof(OpenA8DJControlPayload, inputDecodeEnabled)) {
+                OpenA8DJControlPayload state;
+                [self loadControlPayload:&state];
+                NSUInteger copyLength = length < sizeof(state) ? length : sizeof(state);
+                memcpy(&state, payload, copyLength);
+                [self storeControlPayload:&state];
                 (void)[self writeControls];
                 [self sendControlStateToClient:fd];
             }
@@ -3009,6 +3298,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     [self resetStreamStats];
     [self resetClockAnchorForNewStream];
     RingClear(&_inputRing);
+    atomic_store(&_inputDecodeActive, false);
     OutputTimelineClear(&_outputTimeline);
     memset(_inputBytes, 0, sizeof(_inputBytes));
     memset(_inputByteCount, 0, sizeof(_inputByteCount));
@@ -3347,6 +3637,14 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint32_t decodedFrames = 0;
     uint64_t inputCheckErrors = 0;
     uint64_t outputPanicFlags = 0;
+    OpenA8DJInputStatsPayload inputStatsBatch = {0};
+#if OPENA8DJ_ENABLE_INPUT_DECODE && !OPENA8DJ_ENABLE_INPUT_CHECKS
+    if (!atomic_load(&_inputDecodeActive)) {
+        const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
+        _inputMode2Index += length;
+        return (uint32_t)(length / (groupSize * kChannelsPerStream));
+    }
+#endif
 #if !OPENA8DJ_ENABLE_INPUT_DECODE
     const NSUInteger groupSize = kStreams * kBytesPerSampleUSB;
 #if !OPENA8DJ_ENABLE_INPUT_CHECKS
@@ -3396,11 +3694,55 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             continue;
         }
         uint32_t stream = groupOffset % kStreams;
-        if ([self appendInputByte:bytes[offset] stream:stream]) {
+        uint8_t pos = _inputByteCount[stream];
+        _inputBytes[stream][pos++] = bytes[offset];
+        _inputByteCount[stream] = pos;
+        if (pos < kChannelsPerStream * kBytesPerSample) {
+            continue;
+        }
+
+        const uint8_t *left = &_inputBytes[stream][0];
+        const uint8_t *right = &_inputBytes[stream][3];
+        float leftSample = (float)S24BEToS32(left) / 8388608.0f;
+        float rightSample = (float)S24BEToS32(right) / 8388608.0f;
+        uint32_t pairBit = 1u << stream;
+        if ((atomic_load(&_inputSwapMask) & pairBit) != 0) {
+            float tmp = leftSample;
+            leftSample = rightSample;
+            rightSample = tmp;
+        }
+        if ((atomic_load(&_inputInvertLeftMask) & pairBit) != 0) {
+            leftSample = -leftSample;
+        }
+        if ((atomic_load(&_inputInvertRightMask) & pairBit) != 0) {
+            rightSample = -rightSample;
+        }
+        _pendingInput[stream * 2] = leftSample;
+        _pendingInput[stream * 2 + 1] = rightSample;
+        InputStatsAccumulate(&inputStatsBatch, stream, leftSample, rightSample);
+        _inputByteCount[stream] = 0;
+        _pendingInputMask |= (uint8_t)(1u << stream);
+        if (_pendingInputMask == 0x0f) {
+            float routedInput[kChannels];
+            uint32_t sourceMap = atomic_load(&_inputSourceMap);
+            for (uint32_t destination = 0; destination < kStreams; destination++) {
+                uint32_t source = (sourceMap >> (destination * 4)) & 0x0f;
+                if (source >= kStreams) {
+                    source = destination;
+                }
+                routedInput[destination * 2] = _pendingInput[source * 2];
+                routedInput[destination * 2 + 1] = _pendingInput[source * 2 + 1];
+            }
+            RingWrite(&_inputRing, routedInput, 1);
+#if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
+            [self appendDiagnosticFrames:&_diagnosticInputBuffer counter:&_diagnosticInputFrames frames:routedInput count:1];
+#endif
+            _pendingInputMask = 0;
             decodedFrames++;
         }
     }
 #endif
+    [self addInputStatsBatch:&inputStatsBatch];
     if (inputCheckErrors > 0) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, inputCheckErrors)
                                value:inputCheckErrors];
@@ -3540,6 +3882,53 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     OpenA8DJOutputFillStats stats = {0};
     NSUInteger i = 0;
+    NSUInteger group = 0;
+#define OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED() \
+    do { \
+        if (!_outputFrameLoaded || _outputByteInFrame == 0) { \
+            [self loadNextOutputFrameWithStats:&stats]; \
+        } \
+    } while (0)
+    while (i + (kStreams * kBytesPerSampleUSB) <= length) {
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 0] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 1] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 2] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 3] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 4] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 5] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 6] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 7] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        uint8_t checkLowBit = (uint8_t)((~group) & 1);
+        bytes[i + 8] = checkLowBit;
+        bytes[i + 9] = (uint8_t)(2u | checkLowBit);
+        bytes[i + 10] = (uint8_t)(4u | checkLowBit);
+        bytes[i + 11] = (uint8_t)(6u | checkLowBit);
+
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
+        bytes[i + 12] = _outputFrameBytes[0][_outputByteInFrame];
+        bytes[i + 13] = _outputFrameBytes[1][_outputByteInFrame];
+        bytes[i + 14] = _outputFrameBytes[2][_outputByteInFrame];
+        bytes[i + 15] = _outputFrameBytes[3][_outputByteInFrame];
+        _outputByteInFrame++;
+        if (_outputByteInFrame >= kChannelsPerStream * kBytesPerSample) {
+            _outputByteInFrame = 0;
+        }
+
+        i += kStreams * kBytesPerSampleUSB;
+        group++;
+    }
     while (i < length) {
         if ((i % (kStreams * kBytesPerSampleUSB)) == (kStreams * kChannelsPerStream)) {
             for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
@@ -3548,7 +3937,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             continue;
         }
 
-        [self loadNextOutputFrameIfNeededWithStats:&stats];
+        OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED();
         for (uint32_t stream = 0; stream < kStreams && i < length; stream++, i++) {
             bytes[i] = _outputFrameBytes[stream][_outputByteInFrame];
         }
@@ -3557,6 +3946,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             _outputByteInFrame = 0;
         }
     }
+#undef OPENA8DJ_LOAD_OUTPUT_FRAME_IF_NEEDED
     [self accumulateOutputFillStats:&stats force:NO];
 }
 
@@ -3589,14 +3979,30 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
     OpenA8DJIsoTransfer *transfer = [self checkoutTransferFromPool:_captureTransferPool
                                                           requests:requests
-                                                             count:kIsoFramesPerTransfer];
+                                                             count:kIsoFramesPerTransfer
+                                                         nextIndex:&_captureTransferPoolCursor];
     if (transfer == nil) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)
                                value:1];
         return;
     }
     IOUSBHostIsochronousTransaction *transactions = transfer.transactions.mutableBytes;
+#if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+    OpenA8DJIsoCompletionHandler completionHandler = transfer.captureCompletionHandler;
+#else
+    OpenA8DJIsoCompletionHandler completionHandler = nil;
+#endif
     __weak OpenA8DJUSBEngine *weakSelf = self;
+    if (completionHandler == nil) {
+        completionHandler = ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+            OpenA8DJUSBEngine *strongSelf = weakSelf;
+            if (strongSelf != nil) {
+                [strongSelf handleCaptureTransfer:transfer
+                                           status:status
+                                     transactions:transactionList];
+            }
+        };
+    }
     NSError *error = nil;
     BOOL queued = [_capturePipe enqueueIORequestWithData:transfer.data
                                          transactionList:transactions
@@ -3604,14 +4010,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                         firstFrameNumber:0
                                                  options:IOUSBHostIsochronousTransferOptionsNone
                                                    error:&error
-                                       completionHandler:^(IOReturn status, IOUSBHostIsochronousTransaction transactionList[]) {
-                                           OpenA8DJUSBEngine *strongSelf = weakSelf;
-                                           if (strongSelf != nil) {
-                                               [strongSelf handleCaptureTransfer:transfer
-                                                                          status:status
-                                                                    transactions:transactionList];
-                                           }
-                                       }];
+                                       completionHandler:completionHandler];
     if (!queued) {
         [self releasePooledTransfer:transfer];
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)
@@ -3815,39 +4214,80 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 #endif
 
-    pthread_mutex_lock(&_streamStatsMutex);
-    StreamStatsAddTimingLocked(&_streamStats,
-                               offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaMin),
-                               offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaMax),
-                               offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaSum),
-                               offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaSamples),
-                               captureCompletionDelta);
-    StreamStatsAddTimingLocked(&_streamStats,
-                               offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaMin),
-                               offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaMax),
-                               offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSum),
-                               offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSamples),
-                               captureToPlaybackQueueDelta);
-    _streamStats.captureTransfers += 1;
-    _streamStats.captureTransactions += captureTransactions;
-    _streamStats.captureBytes += captureByteCount;
-    _streamStats.captureTransactionFailures += failedTransactions;
-    _streamStats.captureStatusFailures += statusFailures;
-    _streamStats.captureZeroCompleteTransactions += zeroCompleteTransactions;
-    _streamStats.captureExpectedTransactions += expectedTransactions;
-    _streamStats.captureOtherByteCountTransactions += otherByteCountTransactions;
-    _streamStats.filteredCaptureTransactions += filteredTransactions;
-    _streamStats.captureShortTransfers += shortTransfers;
-    pthread_mutex_unlock(&_streamStatsMutex);
+#if OPENA8DJ_ENABLE_HOT_STREAM_STATS
+    uint64_t captureStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
+    uint64_t captureStatsCounter = atomic_fetch_add(&_captureHotStreamStatsCounter, 1) + 1;
+    if (captureStatsInterval == 1 || (captureStatsCounter % captureStatsInterval) == 0) {
+        pthread_mutex_lock(&_streamStatsMutex);
+        StreamStatsAddTimingLocked(&_streamStats,
+                                   offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaMin),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaMax),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaSum),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureCompletionDeltaSamples),
+                                   captureCompletionDelta);
+        StreamStatsAddTimingLocked(&_streamStats,
+                                   offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaMin),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaMax),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSum),
+                                   offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSamples),
+                                   captureToPlaybackQueueDelta);
+        _streamStats.captureTransfers += 1;
+        _streamStats.captureTransactions += captureTransactions;
+        _streamStats.captureBytes += captureByteCount;
+        _streamStats.captureTransactionFailures += failedTransactions;
+        _streamStats.captureStatusFailures += statusFailures;
+        _streamStats.captureZeroCompleteTransactions += zeroCompleteTransactions;
+        _streamStats.captureExpectedTransactions += expectedTransactions;
+        _streamStats.captureOtherByteCountTransactions += otherByteCountTransactions;
+        _streamStats.filteredCaptureTransactions += filteredTransactions;
+        _streamStats.captureShortTransfers += shortTransfers;
+        pthread_mutex_unlock(&_streamStatsMutex);
+    }
+#else
+    (void)captureCompletionDelta;
+    (void)captureToPlaybackQueueDelta;
+    (void)captureTransactions;
+    (void)captureByteCount;
+    (void)failedTransactions;
+    (void)statusFailures;
+    (void)zeroCompleteTransactions;
+    (void)expectedTransactions;
+    (void)otherByteCountTransactions;
+    (void)filteredTransactions;
+    (void)shortTransfers;
+#endif
+
+#if OPENA8DJ_PLAYBACK_CAPTURE_PACED
+#if OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
+    if (playbackRequestCount > 0 && atomic_load(&_streaming)) {
+        if (kCapturePacedOutputLead <= 1) {
+            (void)[self queueCapturePacedPlaybackWithRequests:playbackRequests count:playbackRequestCount];
+        } else {
+            uint32_t desiredLead = kCapturePacedOutputLead;
+            if (desiredLead > kPlaybackQueueMax) {
+                desiredLead = kPlaybackQueueMax;
+            }
+            for (uint32_t queued = 0; queued < desiredLead && atomic_load(&_streaming); queued++) {
+                if (atomic_load(&_playbackTransfersInFlight) >= desiredLead) {
+                    break;
+                }
+                if (![self queuePlaybackWithRequests:playbackRequests count:playbackRequestCount]) {
+                    break;
+                }
+            }
+        }
+    }
+#endif
+#endif
 
     [self releasePooledTransfer:transfer];
     if (atomic_load(&_streaming)) {
         [self queueCaptureTransfer];
     }
-#if OPENA8DJ_PLAYBACK_CAPTURE_PACED
+#if OPENA8DJ_PLAYBACK_CAPTURE_PACED && !OPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE
     if (playbackRequestCount > 0 && atomic_load(&_streaming)) {
         if (kCapturePacedOutputLead <= 1) {
-            (void)[self queuePlaybackWithRequests:playbackRequests count:playbackRequestCount];
+            (void)[self queueCapturePacedPlaybackWithRequests:playbackRequests count:playbackRequestCount];
         } else {
             uint32_t desiredLead = kCapturePacedOutputLead;
             if (desiredLead > kPlaybackQueueMax) {
@@ -3875,6 +4315,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     _outputFrameLoaded = false;
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
+    _pendingPlaybackRequestCount = 0;
     _outputLastFrameValid = false;
     _outputReplayRunFrames = 0;
     _outputElasticCorrectionCountdown = 0;
@@ -4012,11 +4453,44 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return NO;
     }
 
-    uint32_t requests[kIsoFramesPerTransfer];
-    for (uint32_t frame = 0; frame < kIsoFramesPerTransfer; frame++) {
+    uint32_t requests[kPlaybackIsoFramesPerTransfer];
+    for (uint32_t frame = 0; frame < kPlaybackIsoFramesPerTransfer; frame++) {
         requests[frame] = requestBytes;
     }
-    return [self queuePlaybackWithRequests:requests count:kIsoFramesPerTransfer];
+    return [self queuePlaybackWithRequests:requests count:kPlaybackIsoFramesPerTransfer];
+}
+
+- (BOOL)queueCapturePacedPlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count
+{
+    if (requests == NULL || count == 0) {
+        return NO;
+    }
+    if (kPlaybackCoalesceTransfers <= 1) {
+        return [self queuePlaybackWithRequests:requests count:count];
+    }
+    if (count > kPlaybackIsoFramesPerTransfer) {
+        _pendingPlaybackRequestCount = 0;
+        return [self queuePlaybackWithRequests:requests count:count];
+    }
+    if (_pendingPlaybackRequestCount + count > kPlaybackIsoFramesPerTransfer) {
+        BOOL queued = [self queuePlaybackWithRequests:_pendingPlaybackRequests
+                                                count:_pendingPlaybackRequestCount];
+        _pendingPlaybackRequestCount = 0;
+        if (!queued) {
+            return NO;
+        }
+    }
+    memcpy(&_pendingPlaybackRequests[_pendingPlaybackRequestCount],
+           requests,
+           count * sizeof(requests[0]));
+    _pendingPlaybackRequestCount += count;
+    if (_pendingPlaybackRequestCount >= kPlaybackIsoFramesPerTransfer) {
+        BOOL queued = [self queuePlaybackWithRequests:_pendingPlaybackRequests
+                                                count:_pendingPlaybackRequestCount];
+        _pendingPlaybackRequestCount = 0;
+        return queued;
+    }
+    return YES;
 }
 
 - (BOOL)queuePlaybackWithRequests:(const uint32_t *)requests count:(NSUInteger)count
@@ -4035,7 +4509,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
     OpenA8DJIsoTransfer *transfer = [self checkoutTransferFromPool:_playbackTransferPool
                                                           requests:requests
-                                                             count:count];
+                                                             count:count
+                                                         nextIndex:&_playbackTransferPoolCursor];
     if (transfer == nil) {
         return NO;
     }
@@ -4060,7 +4535,22 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_fetch_add(&_cadenceDiagnostics.playbackQueueLayoutSignatureSum, playbackLayoutSignature);
     }
 #endif
+#if OPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS
+    OpenA8DJIsoCompletionHandler completionHandler = transfer.playbackCompletionHandler;
+#else
+    OpenA8DJIsoCompletionHandler completionHandler = nil;
+#endif
     __weak OpenA8DJUSBEngine *weakSelf = self;
+    if (completionHandler == nil) {
+        completionHandler = ^(IOReturn status, IOUSBHostIsochronousTransaction *transactionList) {
+            OpenA8DJUSBEngine *strongSelf = weakSelf;
+            if (strongSelf != nil) {
+                [strongSelf handlePlaybackTransfer:transfer
+                                            status:status
+                                      transactions:transactionList];
+            }
+        };
+    }
     NSError *error = nil;
     uint32_t inFlightAfterQueue = atomic_fetch_add(&_playbackTransfersInFlight, 1) + 1;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -4074,14 +4564,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                          firstFrameNumber:firstFrameNumber
                                                   options:IOUSBHostIsochronousTransferOptionsNone
                                                     error:&error
-                                        completionHandler:^(IOReturn status, IOUSBHostIsochronousTransaction transactionList[]) {
-                                            OpenA8DJUSBEngine *strongSelf = weakSelf;
-                                            if (strongSelf != nil) {
-                                                [strongSelf handlePlaybackTransfer:transfer
-                                                                            status:status
-                                                                      transactions:transactionList];
-                                            }
-                                        }];
+                                        completionHandler:completionHandler];
     if (!queued) {
         atomic_fetch_sub(&_playbackTransfersInFlight, 1);
         [self releasePooledTransfer:transfer];
@@ -4198,19 +4681,31 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (status != kIOReturnSuccess && status != kIOReturnAborted && atomic_load(&_streaming)) {
         USBTrace("isoc OUT complete status=0x%08x", status);
     }
-    pthread_mutex_lock(&_streamStatsMutex);
-    StreamStatsAddTimingLocked(&_streamStats,
-                               offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaMin),
-                               offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaMax),
-                               offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSum),
-                               offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSamples),
-                               playbackCompletionDelta);
-    _streamStats.playbackTransfers += 1;
-    _streamStats.playbackTransactions += playbackTransactions;
-    _streamStats.playbackBytes += playbackBytes;
-    _streamStats.playbackTransactionFailures += failedTransactions;
-    _streamStats.playbackShortTransfers += shortTransfers;
-    pthread_mutex_unlock(&_streamStatsMutex);
+#if OPENA8DJ_ENABLE_HOT_STREAM_STATS
+    uint64_t playbackStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
+    uint64_t playbackStatsCounter = atomic_fetch_add(&_playbackHotStreamStatsCounter, 1) + 1;
+    if (playbackStatsInterval == 1 || (playbackStatsCounter % playbackStatsInterval) == 0) {
+        pthread_mutex_lock(&_streamStatsMutex);
+        StreamStatsAddTimingLocked(&_streamStats,
+                                   offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaMin),
+                                   offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaMax),
+                                   offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSum),
+                                   offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSamples),
+                                   playbackCompletionDelta);
+        _streamStats.playbackTransfers += 1;
+        _streamStats.playbackTransactions += playbackTransactions;
+        _streamStats.playbackBytes += playbackBytes;
+        _streamStats.playbackTransactionFailures += failedTransactions;
+        _streamStats.playbackShortTransfers += shortTransfers;
+        pthread_mutex_unlock(&_streamStatsMutex);
+    }
+#else
+    (void)playbackCompletionDelta;
+    (void)playbackTransactions;
+    (void)playbackBytes;
+    (void)failedTransactions;
+    (void)shortTransfers;
+#endif
     [self releasePooledTransfer:transfer];
 #if !OPENA8DJ_PLAYBACK_CAPTURE_PACED
     if (atomic_load(&_streaming)) {
@@ -4221,11 +4716,33 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (uint32_t)readInput:(float *)outInterleaved frames:(uint32_t)frames channels:(uint32_t)channels
 {
+    BOOL decodeEnabled = atomic_load(&_inputDecodeEnabled);
+    atomic_store(&_inputDecodeActive, decodeEnabled);
     if (channels != kChannels) {
         memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
         return 0;
     }
+    if (!decodeEnabled) {
+        memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
+        return 0;
+    }
     return RingRead(&_inputRing, outInterleaved, frames, true);
+}
+
+- (void)setInputDecodeEnabled:(BOOL)enabled
+{
+    atomic_store(&gInputDecodeEnabledPreference, enabled);
+    atomic_store(&_inputDecodeEnabled, enabled);
+    if (!enabled) {
+        atomic_store(&_inputDecodeActive, false);
+        RingClear(&_inputRing);
+    }
+}
+
+- (void)setInputDecodeActive:(BOOL)active
+{
+    BOOL decodeEnabled = atomic_load(&_inputDecodeEnabled);
+    atomic_store(&_inputDecodeActive, active && decodeEnabled);
 }
 
 - (void)writeOutput:(const float *)inInterleaved
@@ -4278,6 +4795,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 
     uint32_t timelineResets = 0;
+    uint32_t lateWriteFrames = 0;
     uint32_t dropped = OutputTimelineWrite(&_outputTimeline,
                                            inInterleaved,
                                            frames,
@@ -4285,7 +4803,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                            kOutputStartLatencyFrames,
                                            kOutputRestartLatencyFrames,
                                            kOutputTargetLatencyFrames,
-                                           &timelineResets);
+                                           &timelineResets,
+                                           &lateWriteFrames);
     if (timelineResets > 0) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputTimelineResets)
                                value:timelineResets];
@@ -4293,6 +4812,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (dropped > 0) {
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputElasticDrops)
                                value:dropped];
+    }
+    if (lateWriteFrames > 0) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputLateWriteFrames)
+                               value:lateWriteFrames];
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputLateWriteBatches)
+                               value:1];
     }
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     uint16_t diagnosticFlags = 0;
@@ -4306,8 +4831,11 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                               value:dropped
                               extra:timelineResets];
 #endif
-    [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputFramesWritten)
-                           value:frames];
+#if OPENA8DJ_ENABLE_OUTPUT_WRITE_STATS
+    atomic_fetch_add(&_outputFramesWrittenAtomic, frames);
+#else
+    (void)frames;
+#endif
 #if OPENA8DJ_ENABLE_TRACE
     _debugOutputFramesWritten += frames;
 #endif
@@ -4395,6 +4923,14 @@ bool OpenA8DJUSBDevicePresent(void)
     }
     IOObjectRelease(service);
     return true;
+}
+
+void OpenA8DJUSBSetInputDecodeActive(bool active)
+{
+    pthread_mutex_lock(&gEngineMutex);
+    OpenA8DJUSBEngine *engine = gEngine;
+    pthread_mutex_unlock(&gEngineMutex);
+    [engine setInputDecodeActive:active];
 }
 
 void OpenA8DJUSBStop(void)

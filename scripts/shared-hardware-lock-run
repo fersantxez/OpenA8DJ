@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+gate="manual-hardware-window"
+run_dir=""
+wait_seconds="0"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/shared-hardware-lock-run [options] -- command [args...]
+
+Runs a command under the shared OpenA8DJ hardware lock. Child gates inherit the
+lock through AUDIO_GATE_LOCK_HELD=1, so compound test windows can acquire the
+physical Audio 8 DJ/iRig/Core Audio resource once and run nested gates safely.
+
+Options:
+  --gate NAME
+  --run-dir DIR
+  --wait-lock SECONDS   Wait for lock; 0 means fail fast (default: 0)
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --gate) gate="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --wait-lock) wait_seconds="$2"; shift 2 ;;
+    --) shift; break ;;
+    -h|--help) usage; exit 0 ;;
+    *) break ;;
+  esac
+done
+
+if [ "$#" -eq 0 ]; then
+  usage >&2
+  exit 2
+fi
+
+if [ -z "$run_dir" ]; then
+  safe_gate="$(printf '%s' "$gate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/shared-hardware-lock-run/${safe_gate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+
+deadline=0
+if [ "$wait_seconds" != "0" ]; then
+  deadline=$(( $(date +%s) + wait_seconds ))
+fi
+
+while ! audio_gate_acquire_lock "$gate" "$run_dir"; do
+  if [ "$deadline" = "0" ] || [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "shared_hardware_lock_run=BUSY" | tee "$run_dir/result.txt"
+    cat "$run_dir/audio-gate-lock.txt" >>"$run_dir/result.txt"
+    exit 75
+  fi
+  sleep 2
+done
+audio_gate_export_inherited_lock "$gate" "$run_dir"
+
+{
+  echo "shared_hardware_lock_run=STARTED"
+  echo "gate=$gate"
+  echo "run_dir=$run_dir"
+  echo "command=$*"
+  echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} >"$run_dir/manifest.txt"
+
+rc=0
+"$@" >"$run_dir/command.stdout" 2>"$run_dir/command.stderr" || rc=$?
+
+{
+  echo "shared_hardware_lock_run=$([ "$rc" = "0" ] && echo PASS || echo FAIL)"
+  echo "exit_code=$rc"
+  echo "gate=$gate"
+  echo "run_dir=$run_dir"
+  echo "finished_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} | tee "$run_dir/result.txt"
+
+exit "$rc"

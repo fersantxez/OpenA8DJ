@@ -1,9 +1,10 @@
 PROJECT := opena8dj
-VERSION := 0.3.25
+VERSION := 0.3.135
 TOOL := build/opena8dj-probe
 SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
+HAL_CONFIG := build/hal-build-config.txt
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
@@ -28,6 +29,8 @@ AUDIO_PAIR_TONE := build/audio-pair-tone
 AUDIO_PAIR_TONE_SRC := src/tools/audio-pair-tone.c
 AUDIO_ROUTE := build/audio-route
 AUDIO_ROUTE_SRC := src/tools/audio-route.c
+AUDIO_DEVICE_CONTROLS := build/audio-device-controls
+AUDIO_DEVICE_CONTROLS_SRC := src/tools/audio-device-controls.c
 INPUT_METER := build/audio-input-meter
 INPUT_METER_SRC := src/tools/audio-input-meter.c
 MACBOOK_MIC_RECORD := build/macbook-mic-record
@@ -36,6 +39,8 @@ USB_PLAY := build/opena8dj-usb-play
 USB_PLAY_SRC := src/tools/opena8dj-usb-play.m
 USB_INPUT_METER := build/opena8dj-usb-input-meter
 USB_INPUT_METER_SRC := src/tools/opena8dj-usb-input-meter.m
+USB_RESET_DEVICE := build/usb-reset-device
+USB_RESET_DEVICE_SRC := src/tools/usb-reset-device.m
 MIDI_BRIDGE := build/opena8dj-midid
 MIDI_BRIDGE_SRC := src/tools/opena8dj-midid.m
 CONTROL_TOOL := build/opena8dj-control
@@ -57,30 +62,51 @@ PKG_SIGN_IDENTITY ?=
 DMG_SIGN_IDENTITY ?=
 HAL_DIAGNOSTIC ?= 0
 HAL_OUTPUT_GAIN ?= 0.50f
+HAL_OUTPUT_PREFETCH_FRAMES ?= 64
 HAL_INPUT_DECODE ?= 1
 HAL_INPUT_STREAMS ?= 1
 HAL_INPUT_CHECKS ?= 0
 HAL_OUTPUT_STREAMS ?= 4
-HAL_ISO_FRAMES ?= 5
-HAL_CAPTURE_QUEUE ?= 64
-HAL_PLAYBACK_QUEUE ?= 64
+HAL_ISO_FRAMES ?= 64
+HAL_CAPTURE_QUEUE ?= 8
+HAL_PLAYBACK_QUEUE ?= 8
 HAL_PLAYBACK_CAPTURE_PACED ?= 1
 HAL_CAPTURE_PACED_OUT_LEAD ?= 1
+HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1
+HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE ?= 0
 HAL_USB_CLOCK_ANCHOR ?= 0
 HAL_USB_STABLE_FRAME ?= 0
 HAL_USB_ZERO_TIMESTAMP ?= 0
 HAL_USB_ANCHOR_FILTER ?= 8
 HAL_EXPLICIT_SCHED ?= 0
 HAL_OUTPUT_NATIVE ?= 0
+HAL_FAST_OUTPUT_QUANTIZER ?= 0
+HAL_FAST_OUTPUT_PREFETCH_CLEAR ?= 1
 HAL_STREAM_USAGE ?= 0
 HAL_TRANSFER_POOL ?= 1
+HAL_STRICT_TRANSFER_POOL ?= 0
+HAL_TRANSFER_POOL_CURSOR ?= 0
+HAL_REUSE_ISOC_COMPLETIONS ?= 0
+HAL_LEGACY_OUT_SLOTS ?= 0
+HAL_USB_QUEUE_QOS ?= 0
 HAL_OUTPUT_SAMPLE_TIME_FOLLOWER ?= 0
 HAL_CADENCE_DIAGNOSTIC ?= 0
 HAL_STREAM_KEEPALIVE ?= 0
-HAL_OUTPUT_AMPLITUDE_STATS ?= 1
+HAL_OUTPUT_AMPLITUDE_STATS ?= 0
+HAL_HOT_STREAM_STATS ?= 1
+HAL_HOT_STREAM_STATS_INTERVAL ?= 1
+HAL_OUTPUT_WRITE_STATS ?= 1
 HAL_PROPERTY_BACKOFF_USEC ?= 0
 HAL_OUTPUT_START_BYTE ?= 4
 HAL_VALID_CAPTURE_OUT_LAYOUT ?= 0
+HAL_BACKGROUND_WARM_OPEN ?= 0
+HAL_BACKGROUND_PREOPEN_ON_INIT ?= 1
+HAL_STOP_GRACE_USEC ?= 10000000
+HAL_OPTFLAGS ?= -O2
+HAL_STOP_ISOC_ON_STOP ?= 1
+HAL_FAST_ISO_TRANSFER_CONFIG ?= 0
+HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM ?= 1
+HAL_FLUSH_TOUCHED_OUTPUT ?= 0
 SOUNDCHECK_MUSIC ?=
 SOUNDCHECK_MUSIC_DIR ?= $(HOME)/Music
 SOUNDCHECK_CAPTURE ?=
@@ -102,17 +128,79 @@ SIM_OUTPUT_SECONDS ?= 3
 SIM_OUTPUT_MODE ?= dense
 SIM_OUTPUT_PAIR ?= A
 SIM_OUTPUT_GAIN ?= 0.5
+PLAYBACK_GATE_MUSIC ?= local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav
+PLAYBACK_GATE_PAIR ?= A
+PLAYBACK_GATE_CPU_STRESS ?= 1
+PLAYBACK_GATE_CPU_STRESS_AFTER ?= 5
+PLAYBACK_GATE_CPU_STRESS_SECONDS ?= 8
+PLAYBACK_GATE_CPU_STRESS_WORKERS ?= auto
+PLAYBACK_GATE_UI_STRESS ?= 1
+PLAYBACK_GATE_UI_STRESS_AFTER ?= 12
+PLAYBACK_GATE_UI_STRESS_SECONDS ?= 8
+PLAYBACK_GATE_UI_STRESS_INTERVAL ?= 0.5
+NO_IRIG_CLICK_RISK_RUNS ?= 3
+NO_IRIG_CLICK_RISK_LABEL ?= $(VERSION)
+DIGITAL_AUDIO_GATE_LABEL ?= $(VERSION)
+DIGITAL_AUDIO_GATE_PAIRS ?= A,B,C,D
+DIGITAL_AUDIO_GATE_SIM_SECONDS ?= 6
+DIGITAL_AUDIO_GATE_SIM_MODE ?= dense
+DIGITAL_AUDIO_GATE_CLICK_RISK_RUNS ?= 1
+IRIG_RECOVERY_WAIT ?= 120
+IRIG_RECOVERY_INTERVAL ?= 2
+IRIG_RECOVERY_RECORD_SECONDS ?= 2
+IRIG_RECOVERY_CANDIDATE ?= current-loaded
+IRIG_RECOVERY_MUSIC ?= local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav
+IRIG_RECOVERY_BASELINE_JSON ?= local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json
+IRIG_RECOVERY_RUN_CANDIDATE_GATE ?= 0
+CANDIDATE_PREFLIGHT_LABEL ?= current-loaded
+CANDIDATE_PREFLIGHT_MUSIC ?= local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav
+CANDIDATE_PREFLIGHT_BASELINE_JSON ?= local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json
+CANDIDATE_PREFLIGHT_IRIG_WAIT ?= 120
+CANDIDATE_PREFLIGHT_IRIG_INTERVAL ?= 2
+CANDIDATE_PREFLIGHT_IRIG_RECORD_SECONDS ?= 2
+CANDIDATE_PREFLIGHT_RUN_PHYSICAL_GATE ?= 1
+CANDIDATE_WATCH_LABEL ?= current-loaded
+CANDIDATE_WATCH_MUSIC ?= local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav
+CANDIDATE_WATCH_BASELINE_JSON ?= local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json
+CANDIDATE_WATCH_WAIT ?= 3600
+CANDIDATE_WATCH_INTERVAL ?= 5
+CANDIDATE_WATCH_STABLE_POLLS ?= 3
+CANDIDATE_READY_EMAIL_TO ?= fernandosanchezmunoz@gmail.com
+CANDIDATE_WATCH_READY_EMAIL_WAIT ?= 3600
+CANDIDATE_WATCH_READY_EMAIL_INTERVAL ?= 5
+CANDIDATE_WATCH_READY_EMAIL_STABLE_POLLS ?= $(CANDIDATE_WATCH_STABLE_POLLS)
+SAFE_REPLUG_WATCH_WAIT ?= 7200
+SAFE_REPLUG_WATCH_INTERVAL ?= 5
+SAFE_REPLUG_WATCH_STABLE_POLLS ?= $(CANDIDATE_WATCH_STABLE_POLLS)
+AUTONOMOUS_AUDIO_QA_WAIT ?= 0
+AUTONOMOUS_AUDIO_QA_INTERVAL ?= 30
+AUTONOMOUS_AUDIO_QA_STABLE_POLLS ?= $(CANDIDATE_WATCH_STABLE_POLLS)
+AUTONOMOUS_AUDIO_QA_RECOVERY_WAIT ?= 20
+AUTONOMOUS_AUDIO_QA_RECOVERY_INTERVAL_CYCLES ?= 10
+AUTONOMOUS_AUDIO_QA_CANDIDATE_GATE_WAIT ?= 240
+OUTPUT_PAIR_GATE_LABEL ?= current-loaded
+OUTPUT_PAIR_GATE_PAIRS ?= A,B,C,D
+OUTPUT_PAIR_GATE_SECONDS ?= 2
+CAPTURE_DIAGNOSE_DEVICE ?= iRig Stream
+PHYSICAL_BENCH_CAPTURE_DEVICE ?= iRig Stream
+PHYSICAL_BENCH_CAPTURE_CHANNELS ?= 1,2
+PHYSICAL_BENCH_RECORD_SECONDS ?= 2
+IRIG_ISOLATION_WAIT ?= 8
+IRIG_USB_RECOVERY_WAIT ?= 60
+IRIG_USB_RECOVERY_INTERVAL ?= 3
+QUALITY_WINDOW_LABEL ?= current-loaded
+QUALITY_WINDOW_WAIT_LOCK ?= 300
 
 CC := xcrun clang
 CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2
-HAL_CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic -O2 -DOPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE=$(HAL_DIAGNOSTIC) -DOPENA8DJ_OUTPUT_GAIN=$(HAL_OUTPUT_GAIN) -DOPENA8DJ_ENABLE_INPUT_DECODE=$(HAL_INPUT_DECODE) -DOPENA8DJ_INPUT_STREAM_COUNT=$(HAL_INPUT_STREAMS) -DOPENA8DJ_ENABLE_INPUT_CHECKS=$(HAL_INPUT_CHECKS) -DOPENA8DJ_OUTPUT_STREAM_COUNT=$(HAL_OUTPUT_STREAMS) -DOPENA8DJ_ISO_FRAMES_PER_TRANSFER=$(HAL_ISO_FRAMES) -DOPENA8DJ_CAPTURE_QUEUE_DEPTH=$(HAL_CAPTURE_QUEUE) -DOPENA8DJ_PLAYBACK_QUEUE_TARGET=$(HAL_PLAYBACK_QUEUE) -DOPENA8DJ_PLAYBACK_CAPTURE_PACED=$(HAL_PLAYBACK_CAPTURE_PACED) -DOPENA8DJ_CAPTURE_PACED_OUT_LEAD=$(HAL_CAPTURE_PACED_OUT_LEAD) -DOPENA8DJ_ENABLE_USB_CLOCK_ANCHOR=$(HAL_USB_CLOCK_ANCHOR) -DOPENA8DJ_ENABLE_USB_STABLE_FRAME_POLL=$(HAL_USB_STABLE_FRAME) -DOPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP=$(HAL_USB_ZERO_TIMESTAMP) -DOPENA8DJ_USB_ANCHOR_FILTER=$(HAL_USB_ANCHOR_FILTER) -DOPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING=$(HAL_EXPLICIT_SCHED) -DOPENA8DJ_OUTPUT_NATIVE_I24=$(HAL_OUTPUT_NATIVE) -DOPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY=$(HAL_STREAM_USAGE) -DOPENA8DJ_ENABLE_TRANSFER_POOL=$(HAL_TRANSFER_POOL) -DOPENA8DJ_PROPERTY_BACKOFF_USEC=$(HAL_PROPERTY_BACKOFF_USEC) -DOPENA8DJ_OUTPUT_START_BYTE=$(HAL_OUTPUT_START_BYTE) -DOPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER=$(HAL_OUTPUT_SAMPLE_TIME_FOLLOWER) -DOPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC=$(HAL_CADENCE_DIAGNOSTIC) -DOPENA8DJ_ENABLE_STREAM_KEEPALIVE=$(HAL_STREAM_KEEPALIVE) -DOPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS=$(HAL_OUTPUT_AMPLITUDE_STATS) -DOPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=$(HAL_VALID_CAPTURE_OUT_LAYOUT)
+HAL_CFLAGS := -fobjc-arc -Wall -Wextra -Wpedantic $(HAL_OPTFLAGS) -DOPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE=$(HAL_DIAGNOSTIC) -DOPENA8DJ_OUTPUT_GAIN=$(HAL_OUTPUT_GAIN) -DOPENA8DJ_OUTPUT_PREFETCH_FRAMES=$(HAL_OUTPUT_PREFETCH_FRAMES) -DOPENA8DJ_ENABLE_INPUT_DECODE=$(HAL_INPUT_DECODE) -DOPENA8DJ_INPUT_STREAM_COUNT=$(HAL_INPUT_STREAMS) -DOPENA8DJ_ENABLE_INPUT_CHECKS=$(HAL_INPUT_CHECKS) -DOPENA8DJ_OUTPUT_STREAM_COUNT=$(HAL_OUTPUT_STREAMS) -DOPENA8DJ_ISO_FRAMES_PER_TRANSFER=$(HAL_ISO_FRAMES) -DOPENA8DJ_CAPTURE_QUEUE_DEPTH=$(HAL_CAPTURE_QUEUE) -DOPENA8DJ_PLAYBACK_QUEUE_TARGET=$(HAL_PLAYBACK_QUEUE) -DOPENA8DJ_PLAYBACK_CAPTURE_PACED=$(HAL_PLAYBACK_CAPTURE_PACED) -DOPENA8DJ_CAPTURE_PACED_OUT_LEAD=$(HAL_CAPTURE_PACED_OUT_LEAD) -DOPENA8DJ_PLAYBACK_COALESCE_TRANSFERS=$(HAL_PLAYBACK_COALESCE_TRANSFERS) -DOPENA8DJ_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE=$(HAL_QUEUE_PLAYBACK_BEFORE_CAPTURE_REQUEUE) -DOPENA8DJ_ENABLE_USB_CLOCK_ANCHOR=$(HAL_USB_CLOCK_ANCHOR) -DOPENA8DJ_ENABLE_USB_STABLE_FRAME_POLL=$(HAL_USB_STABLE_FRAME) -DOPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP=$(HAL_USB_ZERO_TIMESTAMP) -DOPENA8DJ_USB_ANCHOR_FILTER=$(HAL_USB_ANCHOR_FILTER) -DOPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING=$(HAL_EXPLICIT_SCHED) -DOPENA8DJ_OUTPUT_NATIVE_I24=$(HAL_OUTPUT_NATIVE) -DOPENA8DJ_FAST_OUTPUT_QUANTIZER=$(HAL_FAST_OUTPUT_QUANTIZER) -DOPENA8DJ_FAST_OUTPUT_PREFETCH_CLEAR=$(HAL_FAST_OUTPUT_PREFETCH_CLEAR) -DOPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY=$(HAL_STREAM_USAGE) -DOPENA8DJ_ENABLE_TRANSFER_POOL=$(HAL_TRANSFER_POOL) -DOPENA8DJ_STRICT_TRANSFER_POOL=$(HAL_STRICT_TRANSFER_POOL) -DOPENA8DJ_TRANSFER_POOL_CURSOR=$(HAL_TRANSFER_POOL_CURSOR) -DOPENA8DJ_REUSE_ISOC_COMPLETION_HANDLERS=$(HAL_REUSE_ISOC_COMPLETIONS) -DOPENA8DJ_ENABLE_LEGACY_OUT_SLOTS=$(HAL_LEGACY_OUT_SLOTS) -DOPENA8DJ_USB_QUEUE_QOS=$(HAL_USB_QUEUE_QOS) -DOPENA8DJ_PROPERTY_BACKOFF_USEC=$(HAL_PROPERTY_BACKOFF_USEC) -DOPENA8DJ_OUTPUT_START_BYTE=$(HAL_OUTPUT_START_BYTE) -DOPENA8DJ_ENABLE_OUTPUT_SAMPLE_TIME_FOLLOWER=$(HAL_OUTPUT_SAMPLE_TIME_FOLLOWER) -DOPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC=$(HAL_CADENCE_DIAGNOSTIC) -DOPENA8DJ_ENABLE_STREAM_KEEPALIVE=$(HAL_STREAM_KEEPALIVE) -DOPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS=$(HAL_OUTPUT_AMPLITUDE_STATS) -DOPENA8DJ_ENABLE_HOT_STREAM_STATS=$(HAL_HOT_STREAM_STATS) -DOPENA8DJ_HOT_STREAM_STATS_INTERVAL=$(HAL_HOT_STREAM_STATS_INTERVAL) -DOPENA8DJ_ENABLE_OUTPUT_WRITE_STATS=$(HAL_OUTPUT_WRITE_STATS) -DOPENA8DJ_VALID_CAPTURE_OUT_LAYOUT=$(HAL_VALID_CAPTURE_OUT_LAYOUT) -DOPENA8DJ_BACKGROUND_WARM_OPEN=$(HAL_BACKGROUND_WARM_OPEN) -DOPENA8DJ_BACKGROUND_PREOPEN_ON_INIT=$(HAL_BACKGROUND_PREOPEN_ON_INIT) -DOPENA8DJ_STOP_GRACE_USEC=$(HAL_STOP_GRACE_USEC) -DOPENA8DJ_STOP_ISOC_ON_STOP=$(HAL_STOP_ISOC_ON_STOP) -DOPENA8DJ_FAST_ISO_TRANSFER_CONFIG=$(HAL_FAST_ISO_TRANSFER_CONFIG) -DOPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM=$(HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM) -DOPENA8DJ_FLUSH_TOUCHED_OUTPUT=$(HAL_FLUSH_TOUCHED_OUTPUT)
 FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck usb-play usb-input-meter midi-list package dmg checksums dist
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package dmg checksums dist FORCE
 
-all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
+all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
 $(TOOL): $(SRC)
 	@mkdir -p build
@@ -120,9 +208,24 @@ $(TOOL): $(SRC)
 
 hal: $(HAL_BIN)
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_PLIST)
+$(HAL_CONFIG): FORCE
+	@mkdir -p build
+	@tmp="$@.tmp"; \
+	{ \
+		printf '%s\n' '$(HAL_CFLAGS)'; \
+		printf 'VERSION=%s\n' '$(VERSION)'; \
+	} > "$$tmp"; \
+	if [ ! -f "$@" ] || ! cmp -s "$$tmp" "$@"; then \
+		mv "$$tmp" "$@"; \
+	else \
+		rm -f "$$tmp"; \
+	fi
+
+$(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_CONFIG)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
+	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
+	@/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
 	xcrun clang $(HAL_CFLAGS) -bundle $(HAL_FRAMEWORKS) -o $@ $(HAL_SRC)
 
 sign-hal: $(HAL_BIN)
@@ -205,6 +308,13 @@ $(AUDIO_ROUTE): $(AUDIO_ROUTE_SRC)
 audio-route: $(AUDIO_ROUTE)
 	./$(AUDIO_ROUTE) org.opena8dj.Audio8DJ both
 
+$(AUDIO_DEVICE_CONTROLS): $(AUDIO_DEVICE_CONTROLS_SRC)
+	@mkdir -p build
+	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+audio-device-controls: $(AUDIO_DEVICE_CONTROLS)
+	./$(AUDIO_DEVICE_CONTROLS) "iRig Stream"
+
 $(INPUT_METER): $(INPUT_METER_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
@@ -254,6 +364,164 @@ simulated-output-soundcheck:
 		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
 		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)"
 
+playback-cpu-gate: $(AUDIO_WAV_PLAY) $(CONTROL_TOOL)
+	./scripts/playback-cpu-gate \
+		--music-file "$(PLAYBACK_GATE_MUSIC)" \
+		--pair "$(PLAYBACK_GATE_PAIR)" \
+		--max-elastic-drops 0 \
+		--max-elastic-replays 0 \
+		--max-late-write-frames 0 \
+		--max-late-write-batches 0 \
+		--max-playback-completion-delta-outliers 0 \
+		--max-capture-to-playback-queue-delta-outliers 0 \
+		--max-playback-zero-complete-transactions 0 \
+		$(if $(filter 1 true yes on,$(PLAYBACK_GATE_CPU_STRESS)),--cpu-stress --cpu-stress-after "$(PLAYBACK_GATE_CPU_STRESS_AFTER)" --cpu-stress-seconds "$(PLAYBACK_GATE_CPU_STRESS_SECONDS)" --cpu-stress-workers "$(PLAYBACK_GATE_CPU_STRESS_WORKERS)",) \
+		$(if $(filter 1 true yes on,$(PLAYBACK_GATE_UI_STRESS)),--ui-stress --ui-stress-after "$(PLAYBACK_GATE_UI_STRESS_AFTER)" --ui-stress-seconds "$(PLAYBACK_GATE_UI_STRESS_SECONDS)" --ui-stress-interval "$(PLAYBACK_GATE_UI_STRESS_INTERVAL)",)
+
+no-irig-click-risk-gate: $(AUDIO_WAV_PLAY) $(CONTROL_TOOL)
+	./scripts/no-irig-click-risk-gate \
+		--candidate "$(NO_IRIG_CLICK_RISK_LABEL)" \
+		--runs "$(NO_IRIG_CLICK_RISK_RUNS)" \
+		--music-file "$(PLAYBACK_GATE_MUSIC)"
+
+digital-audio-quality-gate: $(AUDIO_WAV_PLAY) $(CONTROL_TOOL)
+	./scripts/digital-audio-quality-gate \
+		--candidate "$(DIGITAL_AUDIO_GATE_LABEL)" \
+		--music-file "$(PLAYBACK_GATE_MUSIC)" \
+		--pairs "$(DIGITAL_AUDIO_GATE_PAIRS)" \
+		--sim-seconds "$(DIGITAL_AUDIO_GATE_SIM_SECONDS)" \
+		--sim-mode "$(DIGITAL_AUDIO_GATE_SIM_MODE)" \
+		--click-risk-runs "$(DIGITAL_AUDIO_GATE_CLICK_RISK_RUNS)"
+
+output-pair-smoke-gate: $(AUDIO_WAV_PLAY) $(CONTROL_TOOL)
+	./scripts/output-pair-smoke-gate \
+		--candidate "$(OUTPUT_PAIR_GATE_LABEL)" \
+		--pairs "$(OUTPUT_PAIR_GATE_PAIRS)" \
+		--seconds "$(OUTPUT_PAIR_GATE_SECONDS)"
+
+capture-device-diagnose: $(AUDIO_LIST)
+	./scripts/capture-device-diagnose \
+		--preferred-capture-device "$(CAPTURE_DIAGNOSE_DEVICE)"
+
+capture-device-diagnose-selftest: $(AUDIO_LIST)
+	./scripts/capture-device-diagnose-selftest
+
+physical-bench-sanity-gate: $(AUDIO_LIST) $(AUDIO_RECORD)
+	./scripts/physical-bench-sanity-gate \
+		--capture-device "$(PHYSICAL_BENCH_CAPTURE_DEVICE)" \
+		--capture-channels "$(PHYSICAL_BENCH_CAPTURE_CHANNELS)" \
+		--record-seconds "$(PHYSICAL_BENCH_RECORD_SECONDS)"
+
+physical-music-quality-gate-selftest:
+	./scripts/physical-music-quality-gate-selftest
+
+timecode-smoke-gate: $(AUDIO_LIST) $(AUDIO_IO_TEST) $(CONTROL_TOOL)
+	./scripts/timecode-smoke-gate
+
+irig-recovery-gate: $(AUDIO_LIST) $(AUDIO_RECORD)
+	./scripts/irig-recovery-gate \
+		--wait "$(IRIG_RECOVERY_WAIT)" \
+		--interval "$(IRIG_RECOVERY_INTERVAL)" \
+		--record-seconds "$(IRIG_RECOVERY_RECORD_SECONDS)" \
+		--candidate "$(IRIG_RECOVERY_CANDIDATE)" \
+		--music-file "$(IRIG_RECOVERY_MUSIC)" \
+		--physical-baseline-json "$(IRIG_RECOVERY_BASELINE_JSON)" \
+		$(if $(filter 1 true yes on,$(IRIG_RECOVERY_RUN_CANDIDATE_GATE)),--run-candidate-gate,)
+
+irig-isolation-diagnose: $(AUDIO_LIST)
+	./scripts/irig-isolation-diagnose \
+		--wait "$(IRIG_ISOLATION_WAIT)"
+
+irig-usb-recovery-diagnose: $(AUDIO_LIST) $(USB_RESET_DEVICE)
+	./scripts/irig-usb-recovery-diagnose \
+		--wait "$(IRIG_USB_RECOVERY_WAIT)" \
+		--interval "$(IRIG_USB_RECOVERY_INTERVAL)"
+
+candidate-preflight: $(AUDIO_LIST) $(AUDIO_RECORD) $(AUDIO_WAV_PLAY) $(CONTROL_TOOL)
+	./scripts/candidate-preflight \
+		--candidate "$(CANDIDATE_PREFLIGHT_LABEL)" \
+		--music-file "$(CANDIDATE_PREFLIGHT_MUSIC)" \
+		--physical-baseline-json "$(CANDIDATE_PREFLIGHT_BASELINE_JSON)" \
+		--irig-wait "$(CANDIDATE_PREFLIGHT_IRIG_WAIT)" \
+		--irig-interval "$(CANDIDATE_PREFLIGHT_IRIG_INTERVAL)" \
+		--irig-record-seconds "$(CANDIDATE_PREFLIGHT_IRIG_RECORD_SECONDS)" \
+		$(if $(filter 0 false no off,$(CANDIDATE_PREFLIGHT_RUN_PHYSICAL_GATE)),--no-physical-gate,)
+
+candidate-watch: $(AUDIO_LIST)
+	./scripts/candidate-watch \
+		--candidate "$(CANDIDATE_WATCH_LABEL)" \
+		--music-file "$(CANDIDATE_WATCH_MUSIC)" \
+		--physical-baseline-json "$(CANDIDATE_WATCH_BASELINE_JSON)" \
+		--wait "$(CANDIDATE_WATCH_WAIT)" \
+		--interval "$(CANDIDATE_WATCH_INTERVAL)" \
+		--stable-polls "$(CANDIDATE_WATCH_STABLE_POLLS)"
+
+candidate-status: $(AUDIO_LIST)
+	./scripts/candidate-status
+
+candidate-ready-email-gate: $(AUDIO_LIST)
+	./scripts/candidate-ready-email-gate \
+		--to "$(CANDIDATE_READY_EMAIL_TO)"
+
+candidate-watch-ready-email-gate: $(AUDIO_LIST)
+	./scripts/candidate-watch-ready-email-gate \
+		--candidate "$(CANDIDATE_WATCH_LABEL)" \
+		--music-file "$(CANDIDATE_WATCH_MUSIC)" \
+		--physical-baseline-json "$(CANDIDATE_WATCH_BASELINE_JSON)" \
+		--wait "$(CANDIDATE_WATCH_READY_EMAIL_WAIT)" \
+		--interval "$(CANDIDATE_WATCH_READY_EMAIL_INTERVAL)" \
+		--stable-polls "$(CANDIDATE_WATCH_READY_EMAIL_STABLE_POLLS)" \
+		--to "$(CANDIDATE_READY_EMAIL_TO)"
+
+safe-replug-watch-start: $(AUDIO_LIST)
+	./scripts/start-safe-replug-watch \
+		--candidate "$(CANDIDATE_WATCH_LABEL)" \
+		--wait "$(SAFE_REPLUG_WATCH_WAIT)" \
+		--interval "$(SAFE_REPLUG_WATCH_INTERVAL)" \
+		--stable-polls "$(SAFE_REPLUG_WATCH_STABLE_POLLS)" \
+		--to "$(CANDIDATE_READY_EMAIL_TO)"
+
+safe-replug-watch-status:
+	./scripts/safe-replug-watch-status
+
+safe-replug-watch-stop:
+	./scripts/stop-safe-replug-watch
+
+autonomous-audio-qa-start: $(AUDIO_LIST)
+	./scripts/start-autonomous-audio-qa \
+		--candidate "$(CANDIDATE_WATCH_LABEL)" \
+		--wait "$(AUTONOMOUS_AUDIO_QA_WAIT)" \
+		--interval "$(AUTONOMOUS_AUDIO_QA_INTERVAL)" \
+		--stable-polls "$(AUTONOMOUS_AUDIO_QA_STABLE_POLLS)" \
+		--recovery-wait "$(AUTONOMOUS_AUDIO_QA_RECOVERY_WAIT)" \
+		--recovery-interval-cycles "$(AUTONOMOUS_AUDIO_QA_RECOVERY_INTERVAL_CYCLES)" \
+		--candidate-gate-wait "$(AUTONOMOUS_AUDIO_QA_CANDIDATE_GATE_WAIT)" \
+		--to "$(CANDIDATE_READY_EMAIL_TO)"
+
+autonomous-audio-qa-status:
+	./scripts/autonomous-audio-qa-status
+
+autonomous-audio-qa-stop:
+	./scripts/stop-autonomous-audio-qa
+
+shared-hardware-lock-status:
+	./scripts/shared-hardware-lock-status
+
+quality-window-internal: $(AUDIO_LIST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(CONTROL_TOOL)
+	./scripts/run-quality-window \
+		--candidate "$(QUALITY_WINDOW_LABEL)" \
+		--mode internal \
+		--wait-lock "$(QUALITY_WINDOW_WAIT_LOCK)" \
+		--music-file "$(PLAYBACK_GATE_MUSIC)"
+
+quality-window-candidate: $(AUDIO_LIST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(CONTROL_TOOL)
+	./scripts/run-quality-window \
+		--candidate "$(QUALITY_WINDOW_LABEL)" \
+		--mode candidate \
+		--wait-lock "$(QUALITY_WINDOW_WAIT_LOCK)" \
+		--music-file "$(CANDIDATE_PREFLIGHT_MUSIC)" \
+		--physical-baseline-json "$(CANDIDATE_PREFLIGHT_BASELINE_JSON)"
+
 $(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m
@@ -266,6 +534,17 @@ $(USB_INPUT_METER): $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8D
 
 usb-input-meter: $(USB_INPUT_METER)
 	./$(USB_INPUT_METER) 6 48000
+
+$(USB_RESET_DEVICE): $(USB_RESET_DEVICE_SRC)
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(FRAMEWORKS) -o $@ $<
+
+usb-reset-device: $(USB_RESET_DEVICE)
+	./scripts/shared-hardware-lock-run \
+		--gate make-usb-reset-device \
+		--run-dir local-analysis/shared-hardware-lock-run/make-usb-reset-device-$$(date +%Y%m%d-%H%M%S) \
+		--wait-lock 0 \
+		-- ./$(USB_RESET_DEVICE) || test $$? -eq 2
 
 $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build
@@ -283,12 +562,11 @@ midi-list: $(MIDI_LIST)
 	./$(MIDI_LIST)
 
 install-hal: sign-hal
-	sudo install -d /Library/Audio/Plug-Ins/HAL
-	sudo rm -rf /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-	sudo cp -R $(HAL_BUNDLE) /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-	sudo xattr -cr /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-	sudo codesign --force --sign "$(SIGN_IDENTITY)" --timestamp=none /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-	sudo killall coreaudiod || true
+	./scripts/test-hal-candidate-safety \
+		--candidate "$(HAL_BUNDLE)" \
+		--cycles 1 \
+		--leave-loaded \
+		--run-dir local-analysis/hal-candidate-safety/make-install-hal-$$(date +%Y%m%d-%H%M%S)
 
 install-tools: $(CONTROL_TOOL)
 	sudo install -d /usr/local/bin

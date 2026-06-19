@@ -68,6 +68,16 @@ if [ -z "$run_dir" ]; then
 fi
 mkdir -p "$run_dir"
 
+# shellcheck source=scripts/audio-gate-lock.sh
+source "$ROOT/scripts/audio-gate-lock.sh"
+audio_stack_guard_recovery_lock="0"
+cleanup_recovery_lock() {
+  if [ "$audio_stack_guard_recovery_lock" = "1" ]; then
+    audio_gate_release_lock
+  fi
+}
+trap cleanup_recovery_lock EXIT
+
 active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
 disabled_hal="/Library/Audio/Plug-Ins/HAL.disabled"
 
@@ -225,6 +235,23 @@ recover_stack() {
   } > "$run_dir/recovery.log" 2>&1
 }
 
+acquire_recovery_lock() {
+  if [ "$audio_stack_guard_recovery_lock" = "1" ]; then
+    return 0
+  fi
+  if ! audio_gate_acquire_lock "audio-stack-guard:recover" "$run_dir"; then
+    {
+      echo "audio_stack_guard=FAIL"
+      echo "error=${audio_gate_lock_error:-audio_gate_lock_busy}"
+      cat "$run_dir/audio-gate-lock.txt" 2>/dev/null || true
+    } > "$run_dir/summary.txt"
+    cat "$run_dir/summary.txt"
+    exit 75
+  fi
+  audio_gate_export_inherited_lock "audio-stack-guard:recover" "$run_dir"
+  audio_stack_guard_recovery_lock="1"
+}
+
 evaluate() {
   top_snapshot "$run_dir/top.txt"
   local idle_pct
@@ -285,6 +312,7 @@ if [ "$recover" != "1" ]; then
   exit 1
 fi
 
+acquire_recovery_lock
 recover_stack
 if evaluate; then
   cat "$run_dir/summary.txt"

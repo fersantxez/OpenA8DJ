@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+state_dir="local-analysis/autonomous-audio-qa"
+current_file="$state_dir/current.env"
+label="com.fer.opena8dj.autonomous-audio-qa"
+uid="$(id -u)"
+
+read_key() {
+  local file="$1"
+  local key="$2"
+  local fallback="${3:-}"
+  if [ ! -f "$file" ]; then
+    echo "$fallback"
+    return 0
+  fi
+  awk -F= -v k="$key" -v fallback="$fallback" '
+    $1 == k {print substr($0, index($0, "=") + 1); found=1; exit}
+    END {if (!found) print fallback}
+  ' "$file"
+}
+
+if [ ! -f "$current_file" ]; then
+  echo "autonomous_audio_qa=ABSENT"
+  echo "current_file=$current_file"
+  exit 0
+fi
+
+pid="$(read_key "$current_file" pid "")"
+run_dir="$(read_key "$current_file" run_dir "")"
+plist="$(read_key "$current_file" plist "$HOME/Library/LaunchAgents/$label.plist")"
+launch_state="$(launchctl print "gui/$uid/$label" 2>/dev/null || true)"
+if [ -n "$pid" ] && ps -p "$pid" >/dev/null 2>&1; then
+  status="RUNNING"
+elif printf '%s\n' "$launch_state" | grep -q 'pid = '; then
+  status="RUNNING"
+else
+  status="EXITED"
+fi
+
+echo "autonomous_audio_qa=$status"
+cat "$current_file"
+echo "plist=$plist"
+
+if [ -n "$run_dir" ]; then
+  latest="$run_dir/latest-status.txt"
+  result="$run_dir/result.txt"
+  if [ -f "$latest" ]; then
+    awk -F= '
+      $1 ~ /^(updated_at|autonomous_audio_qa|cycle|physical_capture_status|reason|ready_streak|found_audio8_core_audio|found_irig_usb|found_irig_usb_by_id|found_irig_core_audio|usb_enumeration_failures|failed_usb_ports|next_recovery_action|cycle_dir)$/ {
+        print "latest_" $0
+      }
+    ' "$latest"
+  fi
+  if [ -f "$result" ]; then
+    awk -F= '
+      $1 ~ /^(updated_at|autonomous_audio_qa|reason|cycle|candidate_watch_ready_email_gate|candidate_watch_ready_email_result|candidate_ready_email_result|physical_capture_status|physical_capture_reason)$/ {
+        print "result_" $0
+      }
+    ' "$result"
+  fi
+fi

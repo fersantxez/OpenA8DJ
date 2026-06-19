@@ -1,0 +1,246 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir=""
+capture_device="iRig Stream"
+capture_channels="1,2"
+record_seconds="2"
+max_idle_peak_dbfs="-3.0"
+max_idle_rms_dbfs="-12.0"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/physical-bench-sanity-gate [options]
+
+Checks that the physical capture bench is usable before a candidate is judged:
+  1. Audio stack health is clean after a short cooldown/enumeration guard.
+  2. The configured capture device is visible and verified.
+  3. A short capture can be recorded.
+  4. The capture is not clipped or implausibly hot.
+  5. Audio stack health remains clean afterwards.
+
+This is a bench/capture sanity gate, not an audio-quality approval.
+
+Options:
+  --run-dir DIR
+  --capture-device NAME       Default: iRig Stream
+  --capture-channels CHANS    Default: 1,2
+  --record-seconds N          Default: 2
+  --max-idle-peak-dbfs DB     Default: -3.0
+  --max-idle-rms-dbfs DB      Default: -12.0
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --capture-device) capture_device="$2"; shift 2 ;;
+    --capture-channels) capture_channels="$2"; shift 2 ;;
+    --record-seconds) record_seconds="$2"; shift 2 ;;
+    --max-idle-peak-dbfs) max_idle_peak_dbfs="$2"; shift 2 ;;
+    --max-idle-rms-dbfs) max_idle_rms_dbfs="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/physical-bench-sanity-gate/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+result_file="$run_dir/result.txt"
+
+write_result() {
+  local status="$1"
+  local reason="$2"
+  {
+    echo "physical_bench_sanity_gate=$status"
+    echo "reason=$reason"
+    echo "capture_device=$capture_device"
+    echo "run_dir=$run_dir"
+  } | tee "$result_file"
+}
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+
+capture_final_state() {
+  ./scripts/audio-stack-health >"$run_dir/audio-stack-health-final.txt" 2>&1 || true
+  ./build/audio-list >"$run_dir/audio-list-final.txt" 2>&1 || true
+  ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
+}
+
+on_exit() {
+  capture_final_state
+  audio_gate_release_lock
+}
+trap on_exit EXIT
+
+if ! audio_gate_acquire_lock "physical-bench-sanity-gate" "$run_dir"; then
+  write_result "FAIL" "${audio_gate_lock_error:-audio_gate_lock_busy}"
+  exit 75
+fi
+
+make build/audio-list build/audio-record >/dev/null
+
+if ! ./scripts/audio-stack-guard \
+  --wait 8 \
+  --enumeration-timeout 20 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/audio-stack-guard-before" \
+  >"$run_dir/audio-stack-guard-before.txt" 2>&1; then
+  write_result "FAIL" "audio_stack_guard_before_failed"
+  exit 1
+fi
+
+diagnose_dir="$run_dir/capture-device-diagnose"
+if ! ./scripts/capture-device-diagnose \
+  --preferred-capture-device "$capture_device" \
+  --run-dir "$diagnose_dir" >"$run_dir/capture-device-diagnose.txt" 2>&1; then
+  reason="capture_device_not_ready"
+  if [ -f "$diagnose_dir/result.txt" ]; then
+    parsed_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$diagnose_dir/result.txt")"
+    if [ -n "$parsed_reason" ]; then
+      reason="$parsed_reason"
+    fi
+  fi
+  case "$reason" in
+    irig_missing_from_usb_tree|irig_missing_from_core_audio|irig_usb_id_not_verified|preferred_capture_missing_from_core_audio)
+      write_result "BLOCKED_PHYSICAL_CAPTURE" "$reason"
+      exit 3
+      ;;
+    *)
+      write_result "FAIL" "$reason"
+      exit 1
+      ;;
+  esac
+fi
+
+capture="$run_dir/bench-capture.wav"
+if ! ./build/audio-record "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
+  >"$run_dir/bench-capture-record.log" 2>&1; then
+  write_result "FAIL" "bench_capture_record_failed"
+  exit 1
+fi
+
+if [ "$capture_device" = "iRig Stream" ]; then
+  if ! grep -Fq 'device="iRig Stream"' "$run_dir/bench-capture-record.log"; then
+    write_result "FAIL" "bench_capture_device_not_irig"
+    exit 1
+  fi
+  if ! grep -Fq 'uid="AppleUSBAudioEngine:IK Multimedia:iRig Stream:' "$run_dir/bench-capture-record.log"; then
+    write_result "FAIL" "bench_capture_uid_not_irig"
+    exit 1
+  fi
+fi
+
+if ! python3 - \
+  "$capture" \
+  "$max_idle_peak_dbfs" \
+  "$max_idle_rms_dbfs" \
+  "$run_dir/bench-capture-summary.json" \
+  "$run_dir/bench-capture-summary.txt" <<'PY'
+import json
+import math
+import sys
+import wave
+
+import numpy as np
+
+capture, max_peak_s, max_rms_s, json_out, text_out = sys.argv[1:6]
+max_peak_dbfs = float(max_peak_s)
+max_rms_dbfs = float(max_rms_s)
+
+def dbfs(value):
+    return -240.0 if value <= 0 else 20.0 * math.log10(float(value))
+
+with wave.open(capture, "rb") as wav:
+    channels = wav.getnchannels()
+    rate = wav.getframerate()
+    frames = wav.getnframes()
+    raw = wav.readframes(frames)
+
+data = np.frombuffer(raw, dtype="<i2").astype(np.float64)
+if channels > 0:
+    data = data.reshape(-1, channels) / 32768.0
+else:
+    data = np.zeros((0, 0), dtype=np.float64)
+
+summary = {
+    "capture": capture,
+    "rate": rate,
+    "frames": frames,
+    "channels": channels,
+    "duration_seconds": frames / rate if rate else 0.0,
+    "max_idle_peak_dbfs": max_peak_dbfs,
+    "max_idle_rms_dbfs": max_rms_dbfs,
+    "channel_metrics": [],
+}
+errors = []
+if channels <= 0 or frames <= 0 or rate <= 0:
+    errors.append("capture has no audio frames")
+
+overall_peak = 0.0
+overall_rms = 0.0
+overall_clipped = 0
+for index in range(channels):
+    values = data[:, index]
+    rms = float(np.sqrt(np.mean(values * values))) if len(values) else 0.0
+    peak = float(np.max(np.abs(values))) if len(values) else 0.0
+    clipped = int(np.sum(np.abs(values) >= 0.999))
+    overall_peak = max(overall_peak, peak)
+    overall_rms = max(overall_rms, rms)
+    overall_clipped += clipped
+    summary["channel_metrics"].append({
+        "channel": index + 1,
+        "rms_dbfs": dbfs(rms),
+        "peak_dbfs": dbfs(peak),
+        "clipped_samples": clipped,
+    })
+
+summary["peak_dbfs"] = dbfs(overall_peak)
+summary["rms_dbfs"] = dbfs(overall_rms)
+summary["clipped_samples"] = overall_clipped
+if summary["peak_dbfs"] > max_peak_dbfs:
+    errors.append(f"idle capture peak too hot: {summary['peak_dbfs']:.2f} dBFS > {max_peak_dbfs:.2f} dBFS")
+if summary["rms_dbfs"] > max_rms_dbfs:
+    errors.append(f"idle capture RMS too hot: {summary['rms_dbfs']:.2f} dBFS > {max_rms_dbfs:.2f} dBFS")
+if overall_clipped > 0:
+    errors.append(f"idle capture clipped samples: {overall_clipped}")
+
+summary["verdict"] = "PASS" if not errors else "FAIL"
+summary["errors"] = errors
+open(json_out, "w", encoding="utf-8").write(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+with open(text_out, "w", encoding="utf-8") as out:
+    out.write(f"bench_capture_verdict={summary['verdict']}\n")
+    out.write(f"rate={rate}\n")
+    out.write(f"frames={frames}\n")
+    out.write(f"channels={channels}\n")
+    out.write(f"duration_seconds={summary['duration_seconds']:.6f}\n")
+    out.write(f"peak_dbfs={summary['peak_dbfs']:.6f}\n")
+    out.write(f"rms_dbfs={summary['rms_dbfs']:.6f}\n")
+    out.write(f"clipped_samples={overall_clipped}\n")
+    for error in errors:
+        out.write("error=" + error + "\n")
+print(open(text_out, encoding="utf-8").read(), end="")
+raise SystemExit(0 if not errors else 1)
+PY
+then
+  write_result "FAIL" "bench_capture_level_failed"
+  exit 1
+fi
+
+if ! ./scripts/audio-stack-guard \
+  --wait 8 \
+  --enumeration-timeout 20 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/audio-stack-guard-after" \
+  >"$run_dir/audio-stack-guard-after.txt" 2>&1; then
+  write_result "FAIL" "audio_stack_guard_after_failed"
+  exit 1
+fi
+
+write_result "PASS" "physical_bench_sanity_passed"

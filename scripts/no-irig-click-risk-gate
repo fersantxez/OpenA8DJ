@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+runs="3"
+run_dir=""
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/no-irig-click-risk-gate [options]
+
+Runs repeated non-physical playback stress gates. This is not a hi-fi physical
+quality proof; it is a strict local filter for CPU-correlated click risk while
+iRig capture is unavailable.
+
+Options:
+  --candidate NAME
+  --music-file PATH
+  --runs N
+  --run-dir DIR
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --runs) runs="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/no-irig-click-risk/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "no-irig-click-risk:$candidate" "$run_dir"; then
+  {
+    echo "no_irig_click_risk_gate=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "no-irig-click-risk:$candidate" "$run_dir"
+
+make build/audio-wav-play build/opena8dj-control >/dev/null
+
+failures=0
+for run in $(seq 1 "$runs"); do
+  pass_dir="$run_dir/run-$run"
+  if ! ./scripts/playback-cpu-gate \
+      --music-file "$music_file" \
+      --pair A \
+      --cpu-stress --cpu-stress-after 5 --cpu-stress-seconds 35 --cpu-stress-workers auto \
+      --ui-stress --ui-stress-after 12 --ui-stress-seconds 35 --ui-stress-interval 0.25 \
+      --min-ui-stress-files 20 \
+      --max-driver-cpu-p95 8 \
+      --max-stress-driver-cpu-p95 8 \
+      --max-coreaudiod-cpu-p95 5 \
+      --max-stress-coreaudiod-cpu-p95 5 \
+      --max-windowserver-cpu-p95 35 \
+      --max-elastic-drops 0 \
+      --max-elastic-replays 0 \
+      --max-late-write-frames 0 \
+      --max-late-write-batches 0 \
+      --max-playback-completion-delta-outliers 0 \
+      --max-capture-to-playback-queue-delta-outliers 0 \
+      --max-playback-zero-complete-transactions 0 \
+      --run-dir "$pass_dir" \
+      >"$run_dir/run-$run.txt" 2>&1; then
+    failures=$((failures + 1))
+  fi
+done
+
+{
+  if [ "$failures" = "0" ]; then
+    echo "no_irig_click_risk_gate=PASS"
+    echo "reason=all_repeated_internal_stress_gates_passed"
+  else
+    echo "no_irig_click_risk_gate=FAIL"
+    echo "reason=repeated_internal_stress_gate_failed"
+  fi
+  echo "candidate=$candidate"
+  echo "runs=$runs"
+  echo "failures=$failures"
+  echo "run_dir=$run_dir"
+  for run in $(seq 1 "$runs"); do
+    summary="$run_dir/run-$run/summary.txt"
+    if [ -f "$summary" ]; then
+      echo "run_${run}_summary=$summary"
+      awk -F= -v prefix="run_${run}_" '
+        $1 == "playback_cpu_gate" ||
+        $1 == "reason" ||
+        $1 == "cpu_opena8dj_driver_p95" ||
+        $1 == "cpu_coreaudiod_p95" ||
+        $1 == "cpu_opena8dj_driver_stress_p95" ||
+        $1 == "cpu_coreaudiod_stress_p95" ||
+        $1 == "output_late_write_frames" ||
+        $1 == "output_elastic_drops" ||
+        $1 == "playback_completion_delta_outliers" {
+          print prefix $0
+        }
+      ' "$summary"
+    fi
+  done
+} | tee "$run_dir/result.txt"
+
+if [ "$failures" = "0" ]; then
+  exit 0
+fi
+exit 1

@@ -11,10 +11,12 @@ seconds="${4:-2}"
 make build/audio-io-test build/audio-config build/opena8dj-control >/dev/null
 
 ./build/audio-config org.opena8dj.Audio8DJ "$rate" "$buffer" >/tmp/opena8dj-verify-audio-config.log
+./build/opena8dj-control stream-stats >/dev/null 2>&1 || true
 
 io_log="$(mktemp /tmp/opena8dj-verify-audio-io.XXXXXX)"
 stats_log="$(mktemp /tmp/opena8dj-verify-stream-stats.XXXXXX)"
 stats_try="$(mktemp /tmp/opena8dj-verify-stream-stats-try.XXXXXX)"
+: >"$stats_log"
 
 ./build/audio-io-test "$seconds" "$rate" "$buffer" "$amplitude" >"$io_log" 2>&1 &
 io_pid=$!
@@ -22,19 +24,14 @@ for _ in $(seq 1 120); do
     [ -S /tmp/opena8dj-control.sock ] && break
     sleep 0.1
 done
-if ! ./build/opena8dj-control stream-stats >"$stats_log" 2>&1; then
-    wait "$io_pid" || true
-    echo "VERIFY OUTPUT PATH: FAIL"
-    echo "  stream-stats unavailable while audio was active"
-    cat "$stats_log"
-    cat "$io_log"
-    exit 1
-fi
 
 stats_seen=0
 while kill -0 "$io_pid" 2>/dev/null; do
     if ./build/opena8dj-control stream-stats >"$stats_try" 2>&1; then
-        cp "$stats_try" "$stats_log"
+        {
+            printf '%s\n' '--- stream-stats sample ---'
+            cat "$stats_try"
+        } >>"$stats_log"
         stats_seen=1
     fi
     sleep 0.25
@@ -52,9 +49,19 @@ stats_output="$(cat "$stats_log")"
 
 generator_peak="$(printf '%s\n' "$io_output" | awk -F'outputPeak=' '/outputPeak=/ {split($2, a, " "); print a[1]; exit}')"
 generator_samples="$(printf '%s\n' "$io_output" | awk -F'outputSamples=' '/outputSamples=/ {split($2, a, " "); print a[1]; exit}')"
-driver_peak="$(printf '%s\n' "$stats_output" | awk -F'peak=' '/output-level:/ {split($2, a, " "); print a[1]; exit}')"
-active_underruns="$(printf '%s\n' "$stats_output" | awk -F'active-underruns=' '/output:/ {split($2, a, " "); print a[1]; exit}')"
-playback_failed="$(printf '%s\n' "$stats_output" | awk -F'failed=' '/playback:/ {split($2, a, " "); print a[1]; exit}')"
+read -r driver_peak active_underruns playback_failed <<EOF
+$(python3 - "$stats_log" <<'PY'
+import re
+import sys
+
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+peaks = [float(value) for value in re.findall(r"output-level:\s+peak=([0-9.]+)", text)]
+underruns = [int(value) for value in re.findall(r"active-underruns=([0-9]+)", text)]
+failed = [int(value) for value in re.findall(r"playback:\s+.*?failed=([0-9]+)", text)]
+print(f"{max(peaks) if peaks else 0.0} {max(underruns) if underruns else 0} {max(failed) if failed else 0}")
+PY
+)
+EOF
 
 python3 - "$generator_peak" "$generator_samples" "$driver_peak" "$active_underruns" "$playback_failed" <<'PY'
 import sys

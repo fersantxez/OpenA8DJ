@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import atexit
 import datetime as dt
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -12,6 +14,121 @@ from pathlib import Path
 
 def repo_root():
     return Path(__file__).resolve().parents[1]
+
+
+class AudioGateLock:
+    def __init__(self, root, run_dir, gate_name):
+        lock_override = os.environ.get("AUDIO_GATE_LOCK_ROOT")
+        self.lock_dir = Path(lock_override) if lock_override else Path.home() / ".opena8dj" / "hardware-gate.lock"
+        self.root = root
+        self.run_dir = run_dir
+        self.gate_name = gate_name
+        self.acquired = False
+        self.inherited = False
+        self.error = None
+
+    def _owner(self):
+        owner_path = self.lock_dir / "owner"
+        values = {}
+        try:
+            for line in owner_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    values[key] = value
+        except FileNotFoundError:
+            pass
+        return values
+
+    @staticmethod
+    def _pid_alive(pid):
+        try:
+            pid_int = int(pid)
+        except (TypeError, ValueError):
+            return False
+        try:
+            os.kill(pid_int, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _write_status(self, status, extra=None):
+        extra = extra or {}
+        lines = [
+            f"audio_gate_lock={status}",
+            f"lock_dir={self.lock_dir}",
+            f"gate={self.gate_name}",
+        ]
+        lines.extend(f"{key}={value}" for key, value in extra.items())
+        (self.run_dir / "audio-gate-lock.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def acquire(self):
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        if os.environ.get("AUDIO_GATE_LOCK_HELD") == "1":
+            self.inherited = True
+            self._write_status("INHERITED", {
+                "owner_gate": os.environ.get("AUDIO_GATE_LOCK_OWNER_GATE", "unknown"),
+                "owner_run_dir": os.environ.get("AUDIO_GATE_LOCK_OWNER_RUN_DIR", "unknown"),
+                "owner_cwd": os.environ.get("AUDIO_GATE_LOCK_OWNER_CWD", "unknown"),
+            })
+            return True
+        self.lock_dir.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.lock_dir.mkdir()
+        except FileExistsError:
+            owner = self._owner()
+            owner_pid = owner.get("pid", "")
+            if not self._pid_alive(owner_pid):
+                shutil.rmtree(self.lock_dir, ignore_errors=True)
+                try:
+                    self.lock_dir.mkdir()
+                except FileExistsError:
+                    owner = self._owner()
+                    self.error = "audio_gate_lock_busy"
+                    self._write_status("BUSY", {
+                        "owner_pid": owner.get("pid", "unknown"),
+                        "owner_gate": owner.get("gate", "unknown"),
+                        "owner_run_dir": owner.get("run_dir", "unknown"),
+                    })
+                    return False
+                self.acquired = True
+                self._write_owner({"recovered_stale_lock": "1", "stale_owner_pid": owner_pid or "unknown"})
+                self._write_status("ACQUIRED_AFTER_STALE", {
+                    "stale_owner_pid": owner_pid or "unknown",
+                    "stale_owner_gate": owner.get("gate", "unknown"),
+                    "stale_owner_run_dir": owner.get("run_dir", "unknown"),
+                })
+                return True
+            self.error = "audio_gate_lock_busy"
+            self._write_status("BUSY", {
+                "owner_pid": owner_pid or "unknown",
+                "owner_gate": owner.get("gate", "unknown"),
+                "owner_run_dir": owner.get("run_dir", "unknown"),
+            })
+            return False
+        self.acquired = True
+        self._write_owner({})
+        self._write_status("ACQUIRED")
+        return True
+
+    def _write_owner(self, extra):
+        lines = [
+            f"pid={os.getpid()}",
+            f"gate={self.gate_name}",
+            f"run_dir={self.run_dir}",
+            f"cwd={self.root}",
+            "started_at=" + dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ]
+        lines.extend(f"{key}={value}" for key, value in extra.items())
+        (self.lock_dir / "owner").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def release(self):
+        if self.inherited or not self.acquired:
+            return
+        owner = self._owner()
+        if owner.get("pid") == str(os.getpid()):
+            shutil.rmtree(self.lock_dir, ignore_errors=True)
 
 
 def run(command, cwd, stdout=None, stderr=None, check=True):
@@ -62,6 +179,10 @@ def looks_like_virtual_capture(name):
         return False
     normalized = name.strip().lower()
     return any(hint in normalized for hint in VIRTUAL_CAPTURE_HINTS)
+
+
+def looks_like_irig_capture(name):
+    return bool(name) and "irig" in name.strip().lower()
 
 
 CPU_PROFILE_COLUMNS = [
@@ -421,9 +542,11 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
     interval = max(0.05, args.cpu_profile_interval)
     stream_stats_txt = base_dir / ("stream-stats-during.txt" if args.stream_stats_snapshots else "stream-stats.txt")
     stream_stats_legacy_txt = base_dir / "stream-stats.txt"
-    with open(stream_stats_txt, "w", encoding="utf-8") as stream_file:
+    monitor_stream_stats = args.monitor_stream_stats or args.stream_stats_snapshots
+    stream_file = open(stream_stats_txt, "w", encoding="utf-8") if monitor_stream_stats else None
+    try:
         legacy_stream_file = None
-        if args.stream_stats_snapshots:
+        if args.stream_stats_snapshots and stream_file is not None:
             legacy_stream_file = open(stream_stats_legacy_txt, "w", encoding="utf-8")
         stream_tsv_file = None
         if args.stream_stats_snapshots:
@@ -444,18 +567,22 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
                         and elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
                     stop_cpu_stress(stress_workers)
                     stress_finished = True
-                stats_text, stats_error = capture_stream_stats(root, control, args.monitor_command_timeout)
+                if monitor_stream_stats:
+                    stats_text, stats_error = capture_stream_stats(root, control, args.monitor_command_timeout)
+                else:
+                    stats_text, stats_error = "", None
                 sample_time = time.time()
-                for file in (stream_file, legacy_stream_file):
-                    if not file:
-                        continue
-                    file.write(f"# sample_time={sample_time:.3f}\n")
-                    if stats_error:
-                        file.write(f"{stats_error}\n")
-                    else:
-                        file.write(stats_text)
-                    file.write("\n")
-                    file.flush()
+                if monitor_stream_stats:
+                    for file in (stream_file, legacy_stream_file):
+                        if not file:
+                            continue
+                        file.write(f"# sample_time={sample_time:.3f}\n")
+                        if stats_error:
+                            file.write(f"{stats_error}\n")
+                        else:
+                            file.write(stats_text)
+                        file.write("\n")
+                        file.flush()
                 if stream_tsv_file:
                     write_stream_stats_tsv_sample(stream_tsv_file,
                                                   sample_index,
@@ -480,6 +607,9 @@ def monitor_playback(root, base_dir, playback_process, args, playback_start_mono
                 legacy_stream_file.close()
             if cpu_file:
                 cpu_file.close()
+    finally:
+        if stream_file:
+            stream_file.close()
 
 
 def build_prepare_command(root, args, fixture_dir):
@@ -512,7 +642,12 @@ def load_metrics(path):
 
 def soundcheck_summary(metadata, metrics, args):
     verdict = metrics.get("verdict", "FAIL")
-    clicks = int(metrics.get("left_click_outliers", 0)) + int(metrics.get("right_click_outliers", 0))
+    measurement_status = metrics.get("measurement_status", "UNKNOWN")
+    candidate_quality_status = metrics.get("candidate_quality_status", "UNKNOWN")
+    if "click_outliers_total" in metrics:
+        clicks = int(metrics.get("click_outliers_total", 0))
+    else:
+        clicks = int(metrics.get("left_click_outliers", 0)) + int(metrics.get("right_click_outliers", 0))
     min_snr = min(float(metrics.get("left_snr_db", 0.0)), float(metrics.get("right_snr_db", 0.0)))
     mid_ratio = float(metrics.get("mid_band_residual_ratio", 0.0))
     mid_dbfs = float(metrics.get("mid_band_residual_dbfs", -240.0))
@@ -523,6 +658,8 @@ def soundcheck_summary(metadata, metrics, args):
     cpu_corr_column = metrics.get("mid_band_cpu_corr_max_column", "")
     lines = [
         f"SOUNDCHECK {args.pair} {args.rate}/{args.buffer}: {verdict}",
+        f"measurement_status={measurement_status}",
+        f"candidate_quality_status={candidate_quality_status}",
         f"source={metadata.get('source_name', '')} offset={metadata.get('start_seconds', 0.0):.3f}s mode={metadata.get('mode', args.mode)}",
         f"alignment_score={float(metrics.get('alignment_score', 0.0)):.6f}",
         f"quality_alignment_score={float(metrics.get('quality_alignment_score', 0.0)):.6f}",
@@ -535,8 +672,12 @@ def soundcheck_summary(metadata, metrics, args):
         f"quiet_mid_band_noise_dbfs={quiet_mid_dbfs:.2f}",
         f"mid_band_cpu_corr={cpu_corr:.6f} source={cpu_corr_column}",
         f"click_outliers={clicks}",
+        f"clicks_per_second={float(metrics.get('click_outliers_per_second', 0.0)):.6f}",
         f"lag_jumps_gt_2_frames={metrics.get('lag_jumps_gt_2_frames', 0)}",
         f"capture_clipped_frames={metrics.get('capture_clipped_frames', 0)}",
+        f"cpu_opena8dj_driver_avg={float(metrics.get('cpu_opena8dj_driver_avg', 0.0)):.2f}",
+        f"cpu_opena8dj_driver_p95={float(metrics.get('cpu_opena8dj_driver_p95', 0.0)):.2f}",
+        f"cpu_coreaudiod_p95={float(metrics.get('cpu_coreaudiod_p95', 0.0)):.2f}",
     ]
     for error in metrics.get("errors", []):
         lines.append(f"error={error}")
@@ -577,6 +718,8 @@ def main():
     parser.add_argument("--cpu-stress-seconds", type=float, default=8.0)
     parser.add_argument("--cpu-stress-workers", default="auto")
     parser.add_argument("--monitor-command-timeout", type=float, default=1.0)
+    parser.add_argument("--monitor-stream-stats", action="store_true",
+                        help="poll stream-stats during playback; disabled by default to avoid perturbing audio")
     parser.add_argument("--stream-stats-snapshots", action="store_true",
                         help="write stream-stats-before.txt, stream-stats-during.txt/.tsv, and stream-stats-after.txt")
     parser.add_argument("--skip-audio-stack-health", action="store_true")
@@ -594,6 +737,8 @@ def main():
     parser.add_argument("--max-high-band-residual-ratio", type=float, default=0.08)
     parser.add_argument("--max-quiet-mid-band-noise-dbfs", type=float, default=-58.0)
     parser.add_argument("--max-mid-band-cpu-corr", type=float, default=0.60)
+    parser.add_argument("--physical-baseline-json",
+                        help="known-good iRig metrics JSON for relative physical-route gating")
     args = parser.parse_args()
 
     root = repo_root()
@@ -601,6 +746,17 @@ def main():
     base_dir = Path(args.run_dir).expanduser() if args.run_dir else root / "local-analysis" / "soundcheck" / run_id()
     base_dir.mkdir(parents=True, exist_ok=True)
     fixture_dir = base_dir / "fixture"
+
+    gate_lock = AudioGateLock(root, base_dir, "run-soundcheck")
+    if not args.prepare_only:
+        if not gate_lock.acquire():
+            write_summary(base_dir / "summary.txt", [
+                "SOUNDCHECK: BLOCKED",
+                gate_lock.error or "audio_gate_lock_busy",
+                f"run_dir={base_dir}",
+            ])
+            return 75
+        atexit.register(gate_lock.release)
 
     if not args.prepare_only and not args.capture_device:
         write_summary(base_dir / "summary.txt", [
@@ -700,57 +856,118 @@ def main():
         ])
         raise SystemExit(f"soundcheck playback/record failed; see {base_dir}")
 
-    metrics_json = base_dir / "metrics.json"
-    analysis_txt = base_dir / "analysis.txt"
-    analysis_err = base_dir / "analysis.err"
     cpu_profile_path = base_dir / "cpu-profile.tsv"
-    coupling_profile_path = base_dir / "coupling-profile.json"
-    with open(analysis_txt, "w", encoding="utf-8") as out, open(analysis_err, "w", encoding="utf-8") as err:
-        analysis = run([
+    if looks_like_irig_capture(args.capture_device):
+        physical_txt = base_dir / "physical-music-gate.txt"
+        physical_json = base_dir / "physical-music-gate.json"
+        physical_coupling = base_dir / "physical-coupling-profile.json"
+        physical_txt_tmp = base_dir / "physical-music-gate.txt.tmp"
+        physical_json_tmp = base_dir / "physical-music-gate.json.tmp"
+        physical_coupling_tmp = base_dir / "physical-coupling-profile.json.tmp"
+        physical_command = [
             sys.executable,
-            str(root / "scripts" / "analyze-soundcheck-capture.py"),
-            str(reference),
-            str(capture),
+            str(root / "scripts" / "physical-music-quality-gate"),
+            "--run-dir",
+            str(base_dir),
             "--max-seconds",
             str(args.seconds),
-            "--max-lag",
-            str(args.max_lag),
-            *(["--time-warp"] if args.time_warp else []),
-            "--time-warp-max-lag",
-            str(args.time_warp_max_lag),
-            *(["--drift-profile"] if args.drift_profile else []),
-            "--min-alignment",
-            str(args.min_alignment),
-            "--min-snr-db",
-            str(args.min_snr_db),
-            "--max-clicks",
-            str(args.max_clicks),
-            "--max-lag-jumps",
-            str(args.max_lag_jumps),
-            *(["--cpu-profile", str(cpu_profile_path)] if cpu_profile_path.exists() else []),
-            "--coupling-profile-out",
-            str(coupling_profile_path),
-            "--max-mid-band-residual-ratio",
-            str(args.max_mid_band_residual_ratio),
-            "--max-high-band-residual-ratio",
-            str(args.max_high_band_residual_ratio),
-            "--max-quiet-mid-band-noise-dbfs",
-            str(args.max_quiet_mid_band_noise_dbfs),
-            "--max-mid-band-cpu-corr",
-            str(args.max_mid_band_cpu_corr),
             "--json-out",
-            str(metrics_json),
-        ], root, stdout=out, stderr=err, check=False)
-
-    if metrics_json.exists():
-        metrics = load_metrics(metrics_json)
-    else:
-        analysis_error = "analysis did not produce metrics"
-        if analysis_err.exists():
-            error_text = analysis_err.read_text(encoding="utf-8", errors="replace").strip()
+            str(physical_json_tmp),
+            "--coupling-profile-out",
+            str(physical_coupling_tmp),
+        ]
+        if args.physical_baseline_json:
+            physical_command.extend(["--baseline-json", args.physical_baseline_json])
+        with open(physical_txt_tmp, "w", encoding="utf-8") as out, open(base_dir / "physical-music-gate.err", "w", encoding="utf-8") as err:
+            physical = run(physical_command, root, stdout=out, stderr=err, check=False)
+        gate_returncode = physical.returncode
+        if physical_txt_tmp.exists():
+            os.replace(physical_txt_tmp, physical_txt)
+        metrics = None
+        physical_metrics_valid = False
+        if physical_json_tmp.exists() and physical_json_tmp.stat().st_size > 0:
+            try:
+                metrics = load_metrics(physical_json_tmp)
+                physical_metrics_valid = True
+            except (OSError, json.JSONDecodeError, ValueError) as error:
+                metrics = {
+                    "verdict": "FAIL",
+                    "errors": [f"physical music gate produced invalid metrics: {error}"],
+                }
+        if physical_metrics_valid:
+            os.replace(physical_json_tmp, physical_json)
+            if physical_coupling_tmp.exists() and physical_coupling_tmp.stat().st_size > 0:
+                os.replace(physical_coupling_tmp, physical_coupling)
+        else:
+            physical_error = "physical music gate did not produce metrics"
+            error_text = ""
+            if (base_dir / "physical-music-gate.err").exists():
+                error_text = (base_dir / "physical-music-gate.err").read_text(encoding="utf-8", errors="replace").strip()
+            if not error_text and physical_txt.exists():
+                error_text = physical_txt.read_text(encoding="utf-8", errors="replace").strip()
             if error_text:
-                analysis_error = error_text.splitlines()[0]
-        metrics = {"verdict": "FAIL", "errors": [analysis_error]}
+                physical_error = error_text.splitlines()[0]
+            metrics = {
+                "verdict": "FAIL",
+                "errors": [physical_error],
+            }
+            for leftover in (physical_json_tmp, physical_coupling_tmp):
+                try:
+                    leftover.unlink()
+                except FileNotFoundError:
+                    pass
+    else:
+        metrics_json = base_dir / "metrics.json"
+        analysis_txt = base_dir / "analysis.txt"
+        analysis_err = base_dir / "analysis.err"
+        coupling_profile_path = base_dir / "coupling-profile.json"
+        with open(analysis_txt, "w", encoding="utf-8") as out, open(analysis_err, "w", encoding="utf-8") as err:
+            analysis = run([
+                sys.executable,
+                str(root / "scripts" / "analyze-soundcheck-capture.py"),
+                str(reference),
+                str(capture),
+                "--max-seconds",
+                str(args.seconds),
+                "--max-lag",
+                str(args.max_lag),
+                *(["--time-warp"] if args.time_warp else []),
+                "--time-warp-max-lag",
+                str(args.time_warp_max_lag),
+                *(["--drift-profile"] if args.drift_profile else []),
+                "--min-alignment",
+                str(args.min_alignment),
+                "--min-snr-db",
+                str(args.min_snr_db),
+                "--max-clicks",
+                str(args.max_clicks),
+                "--max-lag-jumps",
+                str(args.max_lag_jumps),
+                *(["--cpu-profile", str(cpu_profile_path)] if cpu_profile_path.exists() else []),
+                "--coupling-profile-out",
+                str(coupling_profile_path),
+                "--max-mid-band-residual-ratio",
+                str(args.max_mid_band_residual_ratio),
+                "--max-high-band-residual-ratio",
+                str(args.max_high_band_residual_ratio),
+                "--max-quiet-mid-band-noise-dbfs",
+                str(args.max_quiet_mid_band_noise_dbfs),
+                "--max-mid-band-cpu-corr",
+                str(args.max_mid_band_cpu_corr),
+                "--json-out",
+                str(metrics_json),
+            ], root, stdout=out, stderr=err, check=False)
+
+        if metrics_json.exists():
+            metrics = load_metrics(metrics_json)
+        else:
+            analysis_error = "analysis did not produce metrics"
+            if analysis_err.exists():
+                error_text = analysis_err.read_text(encoding="utf-8", errors="replace").strip()
+                if error_text:
+                    analysis_error = error_text.splitlines()[0]
+            metrics = {"verdict": "FAIL", "errors": [analysis_error]}
+        gate_returncode = analysis.returncode
     summary = soundcheck_summary(metadata, metrics, args)
     if args.stream_stats_snapshots:
         summary.extend([
@@ -759,10 +976,15 @@ def main():
             "stream_stats_during_tsv=stream-stats-during.tsv",
             "stream_stats_after=stream-stats-after.txt",
         ])
+    if looks_like_irig_capture(args.capture_device):
+        summary.extend([
+            "physical_music_gate=physical-music-gate.txt",
+            "physical_music_gate_json=physical-music-gate.json",
+        ])
     summary.append(f"run_dir={base_dir}")
     write_summary(base_dir / "summary.txt", summary)
     print("\n".join(summary))
-    return 0 if analysis.returncode == 0 and metrics.get("verdict") == "PASS" else 1
+    return 0 if gate_returncode == 0 and metrics.get("verdict") == "PASS" else 1
 
 
 if __name__ == "__main__":

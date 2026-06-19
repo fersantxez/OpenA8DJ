@@ -136,6 +136,74 @@ def sideband_metrics(samples, rate, frequency, spacing, count, fundamental_amp):
     return rows, strongest, sideband_rms
 
 
+def percentile(sorted_values, percentile_value):
+    if not sorted_values:
+        return 0.0
+    if len(sorted_values) == 1:
+        return sorted_values[0]
+    rank = (len(sorted_values) - 1) * percentile_value
+    lower = int(math.floor(rank))
+    upper = int(math.ceil(rank))
+    if lower == upper:
+        return sorted_values[lower]
+    weight = rank - lower
+    return sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
+
+
+def segment_metrics(samples, rate, frequency, spacing, count, segment_seconds=1.0, hop_seconds=1.0):
+    segment_size = max(1, int(segment_seconds * rate))
+    hop_size = max(1, int(hop_seconds * rate))
+    if len(samples) < segment_size:
+        return {}
+
+    ratios = []
+    strongest_values = []
+    clicks_per_second = []
+    dirty_segments = 0
+    segment_count = 0
+    for start in range(0, len(samples) - segment_size + 1, hop_size):
+        segment = samples[start:start + segment_size]
+        fundamental_amp, _power, _phase = fit_sine_power(segment, rate, frequency)
+        if fundamental_amp <= 0.0:
+            continue
+        _rows, strongest, sideband_rms = sideband_metrics(segment,
+                                                          rate,
+                                                          frequency,
+                                                          spacing,
+                                                          count,
+                                                          fundamental_amp)
+        ratio = sideband_rms / fundamental_amp
+        ratios.append(ratio)
+        strongest_values.append(strongest["relative_db"])
+        clicks, _threshold = click_score(segment)
+        clicks_per_second.append(clicks / segment_seconds)
+        if ratio > 0.08 or strongest["relative_db"] > -25.0:
+            dirty_segments += 1
+        segment_count += 1
+
+    if not ratios:
+        return {}
+    ratios.sort()
+    strongest_sorted = sorted(strongest_values)
+    clicks_sorted = sorted(clicks_per_second)
+    return {
+        "segment_count": segment_count,
+        "segment_seconds": segment_seconds,
+        "segment_sideband_ratio_min": ratios[0],
+        "segment_sideband_ratio_median": statistics.median(ratios),
+        "segment_sideband_ratio_p95": percentile(ratios, 0.95),
+        "segment_sideband_ratio_max": ratios[-1],
+        "segment_strongest_sideband_relative_db_median": statistics.median(strongest_values),
+        "segment_strongest_sideband_relative_db_p95": percentile(strongest_sorted, 0.95),
+        "segment_strongest_sideband_relative_db_max": strongest_sorted[-1],
+        "segment_clicks_per_second_median": statistics.median(clicks_per_second),
+        "segment_clicks_per_second_p95": percentile(clicks_sorted, 0.95),
+        "segment_clicks_per_second_max": clicks_sorted[-1],
+        "segment_dirty_count": dirty_segments,
+        "segment_dirty_seconds": dirty_segments * segment_seconds,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Analyze a microphone recording of a pure tone playback test.")
     parser.add_argument("wav")
@@ -182,6 +250,11 @@ def main():
                                                                   args.sideband_spacing,
                                                                   args.sideband_count,
                                                                   fundamental_amp)
+    segments = segment_metrics(window,
+                               rate,
+                               args.frequency,
+                               args.sideband_spacing,
+                               args.sideband_count)
 
     print(f"path={args.wav}")
     print(f"rate={rate}")
@@ -211,6 +284,11 @@ def main():
         print(f"sideband_{index}_relative_db={sideband['relative_db']:.2f}")
     print(f"click_outliers={outliers}")
     print(f"delta_threshold={delta_threshold:.8f}")
+    for key, value in segments.items():
+        if isinstance(value, float):
+            print(f"{key}={value:.6f}")
+        else:
+            print(f"{key}={value}")
 
 
 if __name__ == "__main__":

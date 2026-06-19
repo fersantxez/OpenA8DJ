@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+label="com.fer.opena8dj.safe-replug-watch"
+uid="$(id -u)"
+state_dir="local-analysis/safe-replug-watch"
+current_file="$state_dir/current.env"
+
+launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+
+{
+  echo "safe_replug_watch=STOPPED"
+  echo "label=$label"
+  echo "current_file=$current_file"
+  echo "stopped_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+} | tee "$state_dir/stop-$(date +%Y%m%d-%H%M%S).txt"

@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir="local-analysis/capture-device-diagnose-selftest/$(date +%Y%m%d-%H%M%S)"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/capture-device-diagnose-selftest [--run-dir DIR]
+
+Runs fixture-based tests for scripts/capture-device-diagnose. These tests do
+not require physical iRig hardware; they verify that USB/Core Audio identity
+parsing does not produce false READY or false MISSING results for known cases.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+mkdir -p "$run_dir/fixtures" "$run_dir/cases"
+
+write_audio_list_with_irig() {
+  local path="$1"
+  cat >"$path" <<'EOF'
+  0 id=49 Open Audio 8 DJ uid=org.opena8dj.Audio8DJ in=8 out=8 rate=48000
+  1 id=86 MacBook Air Microphone uid=BuiltInMicrophoneDevice in=1 out=0 rate=44100
+  2 id=93 iRig Stream uid=IK Multimedia:iRig Stream in=2 out=2 rate=48000
+EOF
+}
+
+write_audio_list_with_irig_rust_audio8() {
+  local path="$1"
+  cat >"$path" <<'EOF'
+  0 id=49 Open Audio 8 DJ-rust uid=org.opena8dj.Audio8DJ-rust in=8 out=8 rate=48000
+  1 id=86 MacBook Air Microphone uid=BuiltInMicrophoneDevice in=1 out=0 rate=44100
+  2 id=93 iRig Stream uid=IK Multimedia:iRig Stream in=2 out=2 rate=48000
+EOF
+}
+
+write_audio_list_without_irig() {
+  local path="$1"
+  cat >"$path" <<'EOF'
+  0 id=49 Open Audio 8 DJ uid=org.opena8dj.Audio8DJ in=8 out=8 rate=48000
+  1 id=86 MacBook Air Microphone uid=BuiltInMicrophoneDevice in=1 out=0 rate=44100
+EOF
+}
+
+write_usb_decimal_id() {
+  local path="$1"
+  cat >"$path" <<'EOF'
++-o iRig Stream@00150000  <class IOUSBHostDevice, id 0x100000a55, registered, matched, active, busy 0, retain 19>
+  {
+    "USB Vendor Name" = "IK Multimedia"
+    "USB Product Name" = "iRig Stream"
+    "idVendor" = 6499
+    "idProduct" = 89
+  }
+EOF
+}
+
+write_usb_hex_id() {
+  local path="$1"
+  cat >"$path" <<'EOF'
++-o MysteryAudio@00150000  <class IOUSBHostDevice, id 0x100000a55, registered, matched, active, busy 0, retain 19>
+  {
+    "USB Vendor Name" = "Unknown"
+    "USB Product Name" = "USB Audio"
+    "idVendor" = 0x1963
+    "idProduct" = 0x0059
+  }
+EOF
+}
+
+write_usb_bare_hex_id() {
+  local path="$1"
+  cat >"$path" <<'EOF'
++-o MysteryAudio@00150000  <class IOUSBHostDevice, id 0x100000a55, registered, matched, active, busy 0, retain 19>
+  {
+    "USB Vendor Name" = "Unknown"
+    "USB Product Name" = "USB Audio"
+    "idVendor" = 1963
+    "idProduct" = 0059
+  }
+EOF
+}
+
+write_usb_false_device() {
+  local path="$1"
+  cat >"$path" <<'EOF'
++-o Shadow@00200000  <class IOUSBHostDevice, id 0x100000899, registered, matched, active, busy 0, retain 1169>
+  {
+    "USB Vendor Name" = "U32"
+    "USB Product Name" = "Shadow"
+    "idVendor" = 5964
+    "idProduct" = 21930
+  }
+EOF
+}
+
+write_usb_name_only_irig() {
+  local path="$1"
+  cat >"$path" <<'EOF'
++-o iRig Stream@00150000  <class IOUSBHostDevice, id 0x100000a55, registered, matched, active, busy 0, retain 19>
+  {
+    "USB Vendor Name" = "IK Multimedia"
+    "USB Product Name" = "iRig Stream"
+    "idVendor" = 1234
+    "idProduct" = 5678
+  }
+EOF
+}
+
+run_case() {
+  local name="$1"
+  local audio_fixture="$2"
+  local usb_fixture="$3"
+  local expected_status="$4"
+  local expected_reason="$5"
+  local expected_usb="$6"
+  local expected_core_audio="$7"
+  local expected_audio8="${8:-1}"
+  local expected_audio8_any="${9:-1}"
+  local expected_audio8_rust="${10:-0}"
+  local case_dir="$run_dir/cases/$name"
+  mkdir -p "$case_dir"
+
+  set +e
+  ./scripts/capture-device-diagnose \
+    --run-dir "$case_dir" \
+    --audio-list-file "$audio_fixture" \
+    --usb-ioreg-file "$usb_fixture" \
+    >"$case_dir/stdout.txt" 2>"$case_dir/stderr.txt"
+  local command_status=$?
+  set -e
+
+  local expected_exit=1
+  if [ "$expected_status" = "READY" ]; then
+    expected_exit=0
+  elif [ "$expected_status" = "MISSING" ]; then
+    expected_exit=3
+  fi
+  if [ "$command_status" -ne "$expected_exit" ]; then
+    echo "capture_device_diagnose_selftest=FAIL"
+    echo "reason=case_exit_code_mismatch"
+    echo "case=$name"
+    echo "expected_exit=$expected_exit"
+    echo "actual_exit=$command_status"
+    echo "run_dir=$run_dir"
+    exit 1
+  fi
+
+  local result="$case_dir/result.txt"
+  local status reason found_usb found_core found_audio8 found_audio8_any found_audio8_rust
+  status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$result")"
+  reason="$(awk -F= '$1=="reason"{print $2; exit}' "$result")"
+  found_usb="$(awk -F= '$1=="found_irig_usb"{print $2; exit}' "$result")"
+  found_core="$(awk -F= '$1=="found_irig_core_audio"{print $2; exit}' "$result")"
+  found_audio8="$(awk -F= '$1=="found_audio8_core_audio"{print $2; exit}' "$result")"
+  found_audio8_any="$(awk -F= '$1=="found_audio8_core_audio_any"{print $2; exit}' "$result")"
+  found_audio8_rust="$(awk -F= '$1=="found_audio8_rust_core_audio"{print $2; exit}' "$result")"
+
+  {
+    echo "case=$name"
+    echo "expected_status=$expected_status"
+    echo "actual_status=$status"
+    echo "expected_reason=$expected_reason"
+    echo "actual_reason=$reason"
+    echo "expected_found_irig_usb=$expected_usb"
+    echo "actual_found_irig_usb=$found_usb"
+    echo "expected_found_irig_core_audio=$expected_core_audio"
+    echo "actual_found_irig_core_audio=$found_core"
+    echo "expected_found_audio8_core_audio=$expected_audio8"
+    echo "actual_found_audio8_core_audio=$found_audio8"
+    echo "expected_found_audio8_core_audio_any=$expected_audio8_any"
+    echo "actual_found_audio8_core_audio_any=$found_audio8_any"
+    echo "expected_found_audio8_rust_core_audio=$expected_audio8_rust"
+    echo "actual_found_audio8_rust_core_audio=$found_audio8_rust"
+  } >"$case_dir/assertions.txt"
+
+  if [ "$status" != "$expected_status" ] \
+    || [ "$reason" != "$expected_reason" ] \
+    || [ "$found_usb" != "$expected_usb" ] \
+    || [ "$found_core" != "$expected_core_audio" ] \
+    || [ "$found_audio8" != "$expected_audio8" ] \
+    || [ "$found_audio8_any" != "$expected_audio8_any" ] \
+    || [ "$found_audio8_rust" != "$expected_audio8_rust" ]; then
+    cat "$case_dir/assertions.txt"
+    echo "capture_device_diagnose_selftest=FAIL" | tee "$run_dir/result.txt"
+    echo "reason=case_assertion_failed" | tee -a "$run_dir/result.txt"
+    echo "case=$name" | tee -a "$run_dir/result.txt"
+    echo "run_dir=$run_dir" | tee -a "$run_dir/result.txt"
+    exit 1
+  fi
+}
+
+audio_with_irig="$run_dir/fixtures/audio-list-with-irig.txt"
+audio_with_irig_rust_audio8="$run_dir/fixtures/audio-list-with-irig-rust-audio8.txt"
+audio_without_irig="$run_dir/fixtures/audio-list-without-irig.txt"
+usb_decimal="$run_dir/fixtures/usb-decimal-id.txt"
+usb_hex="$run_dir/fixtures/usb-hex-id.txt"
+usb_bare_hex="$run_dir/fixtures/usb-bare-hex-id.txt"
+usb_false="$run_dir/fixtures/usb-false-device.txt"
+usb_name_only="$run_dir/fixtures/usb-name-only-irig.txt"
+
+write_audio_list_with_irig "$audio_with_irig"
+write_audio_list_with_irig_rust_audio8 "$audio_with_irig_rust_audio8"
+write_audio_list_without_irig "$audio_without_irig"
+write_usb_decimal_id "$usb_decimal"
+write_usb_hex_id "$usb_hex"
+write_usb_bare_hex_id "$usb_bare_hex"
+write_usb_false_device "$usb_false"
+write_usb_name_only_irig "$usb_name_only"
+
+run_case "decimal-id-ready" "$audio_with_irig" "$usb_decimal" "READY" "preferred_capture_ready" "1" "1"
+run_case "rust-audio8-is-not-objc-candidate" "$audio_with_irig_rust_audio8" "$usb_decimal" "READY" "preferred_capture_ready" "1" "1" "0" "1" "1"
+run_case "hex-id-ready" "$audio_with_irig" "$usb_hex" "READY" "preferred_capture_ready" "1" "1"
+run_case "bare-hex-id-ready" "$audio_with_irig" "$usb_bare_hex" "READY" "preferred_capture_ready" "1" "1"
+run_case "usb-present-core-audio-missing" "$audio_without_irig" "$usb_decimal" "MISSING" "irig_missing_from_core_audio" "1" "0"
+run_case "false-usb-device" "$audio_with_irig" "$usb_false" "MISSING" "irig_missing_from_usb_tree" "0" "1"
+run_case "name-only-id-not-verified" "$audio_with_irig" "$usb_name_only" "MISSING" "irig_usb_id_not_verified" "1" "1"
+
+{
+  echo "capture_device_diagnose_selftest=PASS"
+  echo "reason=all_fixture_cases_passed"
+  echo "run_dir=$run_dir"
+  echo "cases=decimal-id-ready,rust-audio8-is-not-objc-candidate,hex-id-ready,bare-hex-id-ready,usb-present-core-audio-missing,false-usb-device,name-only-id-not-verified"
+} | tee "$run_dir/result.txt"

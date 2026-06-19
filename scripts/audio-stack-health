@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 threshold="25"
 total_threshold="120"
 reset="0"
@@ -178,6 +179,19 @@ fi
 if [ "$reset" != "1" ]; then
   exit 1
 fi
+
+reset_lock_dir="$ROOT/local-analysis/audio-stack-health/reset-$(date +%Y%m%d-%H%M%S)"
+# shellcheck source=scripts/audio-gate-lock.sh
+source "$ROOT/scripts/audio-gate-lock.sh"
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "audio-stack-health:reset" "$reset_lock_dir"; then
+  echo "audio_stack_health=FAIL"
+  echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+  echo "audio_gate_lock_run_dir=$reset_lock_dir"
+  exit 75
+fi
+audio_gate_export_inherited_lock "audio-stack-health:reset" "$reset_lock_dir"
+echo "audio_gate_lock_run_dir=$reset_lock_dir"
 
 reset_stack
 print_health

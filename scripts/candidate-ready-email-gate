@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir=""
+to="fernandosanchezmunoz@gmail.com"
+subject="Tengo un driver para tu prueba"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-ready-email-gate [options]
+
+Checks candidate-status and prepares the readiness email payload only when the
+installed candidate is READY_FOR_HUMAN_TEST. This script never sends mail; it
+creates a guarded body/metadata bundle for the operator or Gmail connector to
+send after the gate returns PASS.
+
+Options:
+  --run-dir DIR
+  --to ADDRESS       Default: fernandosanchezmunoz@gmail.com
+  --subject TEXT     Default: Tengo un driver para tu prueba
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --to) to="$2"; shift 2 ;;
+    --subject) subject="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/candidate-ready-email-gate/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+status_dir="$run_dir/candidate-status"
+status_log="$run_dir/candidate-status.txt"
+status_rc=0
+./scripts/candidate-status --run-dir "$status_dir" >"$status_log" 2>&1 || status_rc=$?
+status_file="$status_dir/status.txt"
+
+read_key() {
+  local key="$1"
+  local fallback="${2:-missing}"
+  if [ -f "$status_file" ]; then
+    awk -F= -v key="$key" -v fallback="$fallback" '$1==key{print $2; found=1; exit} END{if (!found) print fallback}' "$status_file"
+  else
+    echo "$fallback"
+  fi
+}
+
+candidate_status="$(read_key candidate_status)"
+reason="$(read_key reason)"
+installed_version="$(read_key installed_version)"
+installed_hash="$(read_key installed_hash)"
+found_irig_usb_by_id="$(read_key found_irig_usb_by_id)"
+found_irig_core_audio="$(read_key found_irig_core_audio)"
+preflight_status="$(read_key latest_candidate_preflight_status)"
+preflight_hash_status="$(read_key latest_candidate_preflight_hash_status)"
+preflight_output_pair_status="$(read_key latest_candidate_preflight_output_pair_status)"
+preflight_timecode_status="$(read_key latest_candidate_preflight_timecode_status)"
+preflight_playback_cpu_status="$(read_key latest_candidate_preflight_playback_cpu_status)"
+preflight_bench_sanity_status="$(read_key latest_candidate_preflight_bench_sanity_status)"
+preflight_capture_status="$(read_key latest_candidate_preflight_capture_status)"
+preflight_result="$(read_key latest_candidate_preflight_result)"
+
+body_file="$run_dir/email-body.md"
+metadata_file="$run_dir/email-metadata.txt"
+
+if [ "$candidate_status" != "READY_FOR_HUMAN_TEST" ]; then
+  {
+    echo "candidate_ready_email_gate=BLOCKED"
+    echo "reason=$reason"
+    echo "candidate_status=$candidate_status"
+    echo "candidate_status_rc=$status_rc"
+    echo "candidate_status_file=$status_file"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 3
+fi
+
+block_ready_payload() {
+  local block_reason="$1"
+  {
+    echo "candidate_ready_email_gate=BLOCKED"
+    echo "reason=$block_reason"
+    echo "candidate_status=$candidate_status"
+    echo "candidate_status_file=$status_file"
+    echo "candidate_preflight_result=$preflight_result"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 3
+}
+
+if [ "$found_irig_usb_by_id" != "1" ]; then
+  block_ready_payload "irig_usb_id_not_verified"
+fi
+if [ "$found_irig_core_audio" != "1" ]; then
+  block_ready_payload "irig_missing_from_core_audio"
+fi
+if [ "$preflight_status" != "PASS" ]; then
+  block_ready_payload "candidate_preflight_not_passed"
+fi
+if [ "$preflight_hash_status" != "MATCH" ]; then
+  block_ready_payload "candidate_preflight_hash_not_matched"
+fi
+if [ "$preflight_output_pair_status" != "PASS" ] \
+  || [ "$preflight_timecode_status" != "PASS" ] \
+  || [ "$preflight_playback_cpu_status" != "PASS" ] \
+  || [ "$preflight_bench_sanity_status" != "PASS" ] \
+  || [ "$preflight_capture_status" != "READY" ]; then
+  block_ready_payload "candidate_subgate_not_passed"
+fi
+if [ ! -f "$preflight_result" ]; then
+  block_ready_payload "candidate_preflight_result_missing"
+fi
+preflight_file_status="$(awk -F= '$1=="candidate_preflight"{print $2; exit}' "$preflight_result")"
+preflight_file_hash="$(awk -F= '$1=="installed_hash"{print $2; exit}' "$preflight_result")"
+if [ "$preflight_file_status" != "PASS" ]; then
+  block_ready_payload "candidate_preflight_file_not_pass"
+fi
+if [ "$preflight_file_hash" != "$installed_hash" ]; then
+  block_ready_payload "candidate_preflight_file_hash_mismatch"
+fi
+preflight_dir="$(dirname "$preflight_result")"
+candidate_listen_result="$preflight_dir/irig-recovery-gate/candidate-listen-gate/result.txt"
+if [ ! -f "$candidate_listen_result" ]; then
+  block_ready_payload "candidate_listen_gate_result_missing"
+fi
+candidate_listen_status="$(awk -F= '$1=="candidate_listen_gate"{print $2; exit}' "$candidate_listen_result")"
+if [ "$candidate_listen_status" != "PASS" ]; then
+  block_ready_payload "candidate_listen_gate_result_not_pass"
+fi
+
+cat >"$body_file" <<EOF
+Tengo un driver para tu prueba.
+
+Candidate: $installed_version
+Hash: $installed_hash
+Status: $candidate_status
+Preflight: $preflight_result
+
+Ha pasado los gates requeridos para escucha humana.
+EOF
+
+{
+  echo "to=$to"
+  echo "subject=$subject"
+  echo "body_file=$body_file"
+  echo "candidate_status_file=$status_file"
+  echo "candidate_preflight_result=$preflight_result"
+} >"$metadata_file"
+
+{
+  echo "candidate_ready_email_gate=PASS"
+  echo "reason=ready_email_payload_prepared"
+  echo "to=$to"
+  echo "subject=$subject"
+  echo "body_file=$body_file"
+  echo "metadata_file=$metadata_file"
+  echo "candidate_status=$candidate_status"
+  echo "installed_version=$installed_version"
+  echo "installed_hash=$installed_hash"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"

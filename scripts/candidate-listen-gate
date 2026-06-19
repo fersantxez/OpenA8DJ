@@ -1,0 +1,379 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate=""
+capture_device="iRig Stream"
+capture_channels="1,2"
+capture_input_volume="0.70"
+pair="A"
+rate="48000"
+buffer="512"
+tone_seconds="8"
+tone_frequency="1000"
+tone_amplitude="0.12"
+music_file=""
+music_seconds="60"
+target_peak_db="-12"
+run_dir=""
+physical_baseline_json=""
+stress_seconds="60"
+stress_after="8"
+stress_duration="20"
+stress_workers="auto"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-listen-gate --candidate NAME [options]
+
+Runs the minimum physical gate required before asking for human listening:
+  1. Core Audio safety guard.
+  2. Active output path guard.
+  3. Physical iRig 1 kHz tone capture and sideband analysis.
+  4. Mandatory physical music capture.
+  5. Mandatory physical music capture under CPU/UI-style stress.
+  6. Numeric comparison against a fresh physical baseline JSON.
+
+The gate fails if physical capture level is too low, sidebands are worse than
+baseline, residual noise is worse than baseline, or the stack is unstable.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --capture-device) capture_device="$2"; shift 2 ;;
+    --capture-channels) capture_channels="$2"; shift 2 ;;
+    --capture-input-volume) capture_input_volume="$2"; shift 2 ;;
+    --pair) pair="$2"; shift 2 ;;
+    --rate) rate="$2"; shift 2 ;;
+    --buffer) buffer="$2"; shift 2 ;;
+    --tone-seconds) tone_seconds="$2"; shift 2 ;;
+    --tone-frequency) tone_frequency="$2"; shift 2 ;;
+    --tone-amplitude) tone_amplitude="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --music-seconds) music_seconds="$2"; shift 2 ;;
+    --target-peak-db) target_peak_db="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --stress-seconds) stress_seconds="$2"; shift 2 ;;
+    --stress-after) stress_after="$2"; shift 2 ;;
+    --stress-duration) stress_duration="$2"; shift 2 ;;
+    --stress-workers) stress_workers="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$candidate" ]; then
+  echo "--candidate is required" >&2
+  usage >&2
+  exit 2
+fi
+
+if [ -z "$music_file" ]; then
+  echo "--music-file is required for a human-test candidate; tone-only runs are diagnostics, not candidates" >&2
+  exit 2
+fi
+
+if [ -z "$physical_baseline_json" ]; then
+  echo "--physical-baseline-json is required so the candidate proves it is better than a fresh physical baseline" >&2
+  exit 2
+fi
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/listen-gate/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "candidate-listen-gate:$candidate" "$run_dir"; then
+  {
+    printf 'candidate_listen_gate=FAIL\n'
+    printf 'reason=%s\n' "${audio_gate_lock_error:-audio_gate_lock_busy}"
+    printf 'run_dir=%s\n' "$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "candidate-listen-gate:$candidate" "$run_dir"
+
+make build/audio-record build/audio-wav-play build/audio-config build/opena8dj-control build/audio-io-test build/audio-device-controls >/dev/null
+make build/audio-list >/dev/null
+
+./build/audio-list >"$run_dir/audio-list-preflight.txt" 2>"$run_dir/audio-list-preflight.err"
+if [ "$capture_device" = "iRig Stream" ]; then
+  capture_diagnose_dir="$run_dir/capture-device-diagnose-preflight"
+  ./scripts/capture-device-diagnose \
+    --preferred-capture-device "$capture_device" \
+    --run-dir "$capture_diagnose_dir" \
+    >"$run_dir/capture-device-diagnose-preflight.txt" 2>&1 || true
+  capture_diagnose_result="$capture_diagnose_dir/result.txt"
+  physical_capture_status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$capture_diagnose_result" 2>/dev/null || echo MISSING)"
+  physical_capture_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$capture_diagnose_result" 2>/dev/null || echo capture_device_diagnose_failed)"
+  if [ "$physical_capture_status" != "READY" ]; then
+    {
+      printf 'candidate_listen_gate=FAIL\n'
+      printf 'reason=%s\n' "$physical_capture_reason"
+      printf 'capture_device=%s\n' "$capture_device"
+      printf 'capture_device_diagnose=%s\n' "$capture_diagnose_result"
+      printf 'audio_list=%s\n' "$run_dir/audio-list-preflight.txt"
+      printf 'usb_ioreg=%s\n' "$capture_diagnose_dir/usb-ioreg.txt"
+    } | tee "$run_dir/preflight-capture-device.txt"
+    exit 1
+  fi
+elif ! grep -Fq "$capture_device" "$run_dir/audio-list-preflight.txt"; then
+  {
+    printf 'candidate_listen_gate=FAIL\n'
+    printf 'reason=capture_device_missing_from_core_audio\n'
+    printf 'capture_device=%s\n' "$capture_device"
+    printf 'audio_list=%s\n' "$run_dir/audio-list-preflight.txt"
+  } | tee "$run_dir/preflight-capture-device.txt"
+  exit 1
+fi
+
+if [ "$capture_device" = "iRig Stream" ]; then
+  ./build/audio-device-controls "$capture_device" set-input-volume 0 "$capture_input_volume" >"$run_dir/capture-device-controls.txt" 2>&1 || true
+else
+  ./build/audio-device-controls "$capture_device" >"$run_dir/capture-device-controls.txt" 2>&1 || true
+fi
+
+scripts/audio-stack-guard \
+  --wait 8 \
+  --enumeration-timeout 20 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/pre-guard"
+
+./build/audio-config org.opena8dj.Audio8DJ "$rate" "$buffer" >"$run_dir/audio-config.log" 2>&1
+
+tone_source_wav="$run_dir/tone-source.wav"
+tone_wav="$run_dir/tone.wav"
+python3 - <<'PY' "$tone_source_wav" "$tone_seconds" "$tone_frequency" "$tone_amplitude" >"$run_dir/tone-source.log"
+import math
+import struct
+import sys
+import wave
+
+path = sys.argv[1]
+tone_seconds = float(sys.argv[2])
+frequency = float(sys.argv[3])
+amplitude = float(sys.argv[4])
+rate = 48000
+lead_seconds = 2.0
+tail_seconds = 2.0
+
+with wave.open(path, "wb") as wav:
+    wav.setnchannels(2)
+    wav.setsampwidth(2)
+    wav.setframerate(rate)
+    total_frames = int((lead_seconds + tone_seconds + tail_seconds) * rate)
+    lead_frames = int(lead_seconds * rate)
+    tone_frames = int(tone_seconds * rate)
+    for frame in range(total_frames):
+        tone_frame = frame - lead_frames
+        if 0 <= tone_frame < tone_frames:
+            sample = amplitude * math.sin((2.0 * math.pi * frequency * tone_frame) / rate)
+        else:
+            sample = 0.0
+        value = max(-32768, min(32767, int(round(sample * 32767.0))))
+        wav.writeframesraw(struct.pack("<hh", value, value))
+
+print(f"tone_source={path}")
+print(f"rate={rate}")
+print(f"lead_seconds={lead_seconds:.3f}")
+print(f"tone_seconds={tone_seconds:.3f}")
+print(f"tail_seconds={tail_seconds:.3f}")
+print(f"frequency={frequency:.3f}")
+print(f"amplitude={amplitude:.6f}")
+PY
+
+# Core Audio may take several seconds before physical output appears after
+# starting a fresh IOProc. The tone itself is precomputed so the gate measures
+# driver/device quality, not realtime sin() work in the test generator.
+record_seconds="$(python3 - <<'PY' "$tone_seconds"
+import math
+import sys
+print(int(math.ceil(float(sys.argv[1]) + 14.0)))
+PY
+)"
+./build/audio-record "$record_seconds" "$tone_wav" "$capture_device" "$capture_channels" >"$run_dir/tone-record.log" 2>&1 &
+record_pid=$!
+sleep 1
+./build/audio-wav-play "$tone_source_wav" "$pair" >"$run_dir/tone-play.log" 2>&1
+wait "$record_pid"
+python3 scripts/analyze-tone-capture.py "$tone_wav" --frequency "$tone_frequency" --auto-window >"$run_dir/tone-summary.txt"
+
+python3 - <<'PY' "$run_dir/tone-summary.txt" >"$run_dir/tone-gate.txt"
+import sys
+
+def kv(path):
+    out = {}
+    for line in open(path, encoding="utf-8", errors="replace"):
+        if "=" not in line:
+            continue
+        k, v = line.strip().split("=", 1)
+        out[k] = v
+    return out
+
+def f(d, key, default=0.0):
+    try:
+        return float(d.get(key, default))
+    except ValueError:
+        return default
+
+d = kv(sys.argv[1])
+errors = []
+if f(d, "peak") < 0.020:
+    errors.append(f"tone peak too low: {f(d, 'peak'):.6f} < 0.020000")
+if f(d, "peak") > 0.920:
+    errors.append(f"tone peak too high: {f(d, 'peak'):.6f} > 0.920000")
+if f(d, "sideband_ratio", 999.0) > 0.008:
+    errors.append(f"tone sideband_ratio too high: {f(d, 'sideband_ratio'):.6f} > 0.008000")
+if f(d, "segment_sideband_ratio_p95", 999.0) > 0.006:
+    errors.append(f"tone segment_sideband_ratio_p95 too high: {f(d, 'segment_sideband_ratio_p95'):.6f} > 0.006000")
+if f(d, "segment_sideband_ratio_max", 999.0) > 0.008:
+    errors.append(f"tone segment_sideband_ratio_max too high: {f(d, 'segment_sideband_ratio_max'):.6f} > 0.008000")
+if f(d, "click_outliers", 999999) > 0:
+    errors.append(f"tone click_outliers > 0: {f(d, 'click_outliers'):.0f}")
+if f(d, "segment_clicks_per_second_max", 999.0) > 0:
+    errors.append(f"tone segment_clicks_per_second_max > 0: {f(d, 'segment_clicks_per_second_max'):.6f}")
+print("tone_gate=" + ("PASS" if not errors else "FAIL"))
+for error in errors:
+    print("error=" + error)
+raise SystemExit(0 if not errors else 1)
+PY
+
+./scripts/run-soundcheck \
+  --skip-build \
+  --music-file "$music_file" \
+  --pair "$pair" \
+  --rate "$rate" \
+  --buffer "$buffer" \
+  --seconds "$music_seconds" \
+  --mode dense \
+  --target-peak-db "$target_peak_db" \
+  --capture-device "$capture_device" \
+  --capture-channels "$capture_channels" \
+  --drift-profile \
+  --cpu-profile \
+  --physical-baseline-json "$physical_baseline_json" \
+  --run-dir "$run_dir/music"
+
+python3 - <<'PY' "$run_dir/music/physical-music-gate.json" >"$run_dir/music-json-gate.txt"
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+errors = list(data.get("errors", []))
+measurement_status = data.get("measurement_status", "UNKNOWN")
+candidate_quality_status = data.get("candidate_quality_status", "UNKNOWN")
+if measurement_status != "VALID":
+    errors.insert(0, f"physical music measurement is {measurement_status}")
+if candidate_quality_status != "PASS":
+    errors.insert(0, f"physical music candidate quality is {candidate_quality_status}")
+if data.get("verdict") != "PASS":
+    errors.insert(0, f"physical music verdict is {data.get('verdict')}")
+print("music_json_gate=" + ("PASS" if not errors else "FAIL"))
+for key in (
+    "measurement_status",
+    "candidate_quality_status",
+    "quality_alignment_score",
+    "mid_band_residual_ratio",
+    "mid_band_window_residual_ratio_p95",
+    "high_band_residual_ratio",
+    "quiet_mid_band_noise_dbfs",
+    "click_outliers_total",
+    "window_click_outliers_max",
+    "lag_jumps_gt_2_frames",
+    "mid_band_cpu_corr_max",
+    "cpu_opena8dj_driver_avg",
+    "cpu_opena8dj_driver_p95",
+    "cpu_coreaudiod_p95",
+):
+    if key in data:
+        print(f"{key}={data[key]}")
+for error in errors:
+    print("error=" + str(error))
+raise SystemExit(0 if not errors else 1)
+PY
+
+./scripts/run-soundcheck \
+  --skip-build \
+  --music-file "$music_file" \
+  --pair "$pair" \
+  --rate "$rate" \
+  --buffer "$buffer" \
+  --seconds "$stress_seconds" \
+  --mode dense \
+  --target-peak-db "$target_peak_db" \
+  --capture-device "$capture_device" \
+  --capture-channels "$capture_channels" \
+  --drift-profile \
+  --cpu-profile \
+  --cpu-stress \
+  --cpu-stress-after "$stress_after" \
+  --cpu-stress-seconds "$stress_duration" \
+  --cpu-stress-workers "$stress_workers" \
+  --physical-baseline-json "$physical_baseline_json" \
+  --run-dir "$run_dir/music-stress"
+
+python3 - <<'PY' "$run_dir/music-stress/physical-music-gate.json" >"$run_dir/music-stress-json-gate.txt"
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+errors = list(data.get("errors", []))
+measurement_status = data.get("measurement_status", "UNKNOWN")
+candidate_quality_status = data.get("candidate_quality_status", "UNKNOWN")
+if measurement_status != "VALID":
+    errors.insert(0, f"physical stress music measurement is {measurement_status}")
+if candidate_quality_status != "PASS":
+    errors.insert(0, f"physical stress music candidate quality is {candidate_quality_status}")
+if data.get("verdict") != "PASS":
+    errors.insert(0, f"physical stress music verdict is {data.get('verdict')}")
+print("music_stress_json_gate=" + ("PASS" if not errors else "FAIL"))
+for key in (
+    "measurement_status",
+    "candidate_quality_status",
+    "quality_alignment_score",
+    "mid_band_residual_ratio",
+    "mid_band_window_residual_ratio_p95",
+    "high_band_residual_ratio",
+    "quiet_mid_band_noise_dbfs",
+    "click_outliers_total",
+    "window_click_outliers_max",
+    "lag_jumps_gt_2_frames",
+    "mid_band_cpu_corr_max",
+    "cpu_opena8dj_driver_avg",
+    "cpu_opena8dj_driver_p95",
+    "cpu_coreaudiod_p95",
+):
+    if key in data:
+        print(f"{key}={data[key]}")
+for error in errors:
+    print("error=" + str(error))
+raise SystemExit(0 if not errors else 1)
+PY
+
+scripts/verify-active-output-path.sh "$rate" "$buffer" 0.20 4 >"$run_dir/active-output.txt"
+
+scripts/audio-stack-guard \
+  --wait 8 \
+  --enumeration-timeout 20 \
+  --min-idle-pct 20 \
+  --run-dir "$run_dir/post-guard"
+
+cat "$run_dir/tone-gate.txt"
+cat "$run_dir/music-json-gate.txt"
+cat "$run_dir/music-stress-json-gate.txt"
+{
+  printf 'candidate_listen_gate=PASS\n'
+  printf 'reason=physical_tone_music_and_stress_passed\n'
+  printf 'tone_gate=%s\n' "$(awk -F= '$1=="tone_gate"{print $2; exit}' "$run_dir/tone-gate.txt")"
+  printf 'music_json_gate=%s\n' "$(awk -F= '$1=="music_json_gate"{print $2; exit}' "$run_dir/music-json-gate.txt")"
+  printf 'music_stress_json_gate=%s\n' "$(awk -F= '$1=="music_stress_json_gate"{print $2; exit}' "$run_dir/music-stress-json-gate.txt")"
+  printf 'run_dir=%s\n' "$run_dir"
+} | tee "$run_dir/result.txt"

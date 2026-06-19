@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir=""
+wait_seconds="8"
+active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+disabled_root="/Library/Audio/Plug-Ins/HAL.disabled"
+disabled_hal=""
+restored="0"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/irig-isolation-diagnose [--run-dir DIR] [--wait SECONDS]
+
+Temporarily removes OpenA8DJ from the active HAL directory, restarts the macOS
+audio services, diagnoses whether iRig Stream appears without OpenA8DJ loaded,
+then restores OpenA8DJ and diagnoses again.
+
+This is a state-changing diagnostic, but it is designed to leave the installed
+driver restored before exiting.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --wait) wait_seconds="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/irig-isolation-diagnose/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+if ! audio_gate_acquire_lock "irig-isolation-diagnose" "$run_dir"; then
+  {
+    echo "irig_isolation_diagnose=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "irig-isolation-diagnose" "$run_dir"
+
+restart_audio_services() {
+  sudo -n killall coreaudiod audioaccessoryd audiomxd systemsoundserverd 2>/dev/null || true
+  sleep "$wait_seconds"
+}
+
+restore_driver() {
+  if [ "$restored" = "1" ]; then
+    return
+  fi
+  if [ -n "$disabled_hal" ] && [ -d "$disabled_hal" ]; then
+    sudo -n mv "$disabled_hal" "$active_hal"
+    restored="1"
+    echo "restore=restored" >>"$run_dir/hal-move.txt"
+    restart_audio_services
+  elif [ -d "$active_hal" ]; then
+    restored="1"
+    echo "restore=already_active" >>"$run_dir/hal-move.txt"
+  else
+    echo "restore=failed_missing_active_and_disabled" >>"$run_dir/hal-move.txt"
+    return 1
+  fi
+}
+
+cleanup() {
+  restore_driver >/dev/null 2>&1 || true
+  audio_gate_release_lock
+}
+trap cleanup EXIT
+
+make build/audio-list >/dev/null
+
+if [ -d "$active_hal" ]; then
+  sudo -n mkdir -p "$disabled_root"
+  disabled_hal="$disabled_root/OpenA8DJ.driver.irig-isolation-$(date +%Y%m%d-%H%M%S)"
+  sudo -n mv "$active_hal" "$disabled_hal"
+  echo "move=moved" >"$run_dir/hal-move.txt"
+  echo "disabled_hal=$disabled_hal" >>"$run_dir/hal-move.txt"
+else
+  echo "move=already_unloaded" >"$run_dir/hal-move.txt"
+fi
+
+restart_audio_services
+./scripts/capture-device-diagnose \
+  --run-dir "$run_dir/capture-device-diagnose-unloaded" \
+  >"$run_dir/capture-device-diagnose-unloaded.txt" 2>&1 || true
+
+restore_driver
+
+./scripts/capture-device-diagnose \
+  --run-dir "$run_dir/capture-device-diagnose-restored" \
+  >"$run_dir/capture-device-diagnose-restored.txt" 2>&1 || true
+
+unloaded_result="$run_dir/capture-device-diagnose-unloaded/result.txt"
+restored_result="$run_dir/capture-device-diagnose-restored/result.txt"
+unloaded_capture_status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$unloaded_result" 2>/dev/null || echo missing)"
+unloaded_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$unloaded_result" 2>/dev/null || echo missing)"
+restored_capture_status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$restored_result" 2>/dev/null || echo missing)"
+restored_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$restored_result" 2>/dev/null || echo missing)"
+found_audio8_restored="$(awk -F= '$1=="found_audio8_core_audio"{print $2; exit}' "$restored_result" 2>/dev/null || echo 0)"
+
+status="FAIL"
+reason="irig_missing_even_without_opena8dj"
+if [ "$unloaded_capture_status" = "READY" ] || [ "$restored_capture_status" = "READY" ]; then
+  status="PASS"
+  reason="irig_visible_during_isolation"
+elif [ "$found_audio8_restored" != "1" ]; then
+  reason="opena8dj_not_restored_to_core_audio"
+fi
+
+{
+  echo "irig_isolation_diagnose=$status"
+  echo "reason=$reason"
+  echo "unloaded_physical_capture_status=$unloaded_capture_status"
+  echo "unloaded_reason=$unloaded_reason"
+  echo "restored_physical_capture_status=$restored_capture_status"
+  echo "restored_reason=$restored_reason"
+  echo "found_audio8_restored=$found_audio8_restored"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"
+
+if [ "$status" = "PASS" ]; then
+  exit 0
+fi
+exit 3

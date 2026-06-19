@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+run_dir=""
+pairs="A,B,C,D"
+seconds="2"
+rate="48000"
+amplitude="0.02"
+max_start_seconds="0.75"
+max_first_callback_seconds="0.80"
+min_output_read_ratio="0.90"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/output-pair-smoke-gate [options]
+
+Runs an internal A/B/C/D output surface smoke test through Core Audio. This
+checks that every exposed stereo output pair opens, starts promptly, advances
+callbacks, and produces no internal underruns/resets/panic flags.
+
+This is not a physical routing or analog quality proof. Physical iRig capture
+is still required before human listening or release.
+
+Options:
+  --candidate NAME
+  --run-dir DIR
+  --pairs A,B,C,D
+  --seconds N
+  --rate HZ
+  --amplitude VALUE
+  --max-start-seconds VALUE
+  --max-first-callback-seconds VALUE
+  --min-output-read-ratio VALUE
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --pairs) pairs="$2"; shift 2 ;;
+    --seconds) seconds="$2"; shift 2 ;;
+    --rate) rate="$2"; shift 2 ;;
+    --amplitude) amplitude="$2"; shift 2 ;;
+    --max-start-seconds) max_start_seconds="$2"; shift 2 ;;
+    --max-first-callback-seconds) max_first_callback_seconds="$2"; shift 2 ;;
+    --min-output-read-ratio) min_output_read_ratio="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/output-pair-smoke-gate/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+result_file="$run_dir/result.txt"
+
+write_result() {
+  local status="$1"
+  local reason="$2"
+  {
+    echo "output_pair_smoke_gate=$status"
+    echo "reason=$reason"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+  } | tee "$result_file"
+}
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+if ! audio_gate_acquire_lock "output-pair-smoke-gate" "$run_dir"; then
+  write_result "FAIL" "${audio_gate_lock_error:-audio_gate_lock_busy}"
+  exit 75
+fi
+
+capture_final_state() {
+  ./scripts/audio-stack-health >"$run_dir/audio-stack-health-final.txt" 2>&1 || true
+  ./build/audio-list >"$run_dir/audio-list-final.txt" 2>&1 || true
+  ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
+  OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control stream-stats >"$run_dir/stream-stats-final.txt" 2>&1 || true
+}
+on_exit() {
+  capture_final_state
+  audio_gate_release_lock
+}
+trap on_exit EXIT
+
+make build/audio-list build/audio-wav-play build/opena8dj-control >/dev/null
+
+./scripts/audio-stack-health >"$run_dir/audio-stack-health-before.txt" 2>&1 || true
+if ! grep -Fq "audio_stack_health=PASS" "$run_dir/audio-stack-health-before.txt"; then
+  write_result "FAIL" "audio_stack_health_before_failed"
+  exit 1
+fi
+
+./build/audio-list >"$run_dir/audio-list-before.txt" 2>&1 || {
+  write_result "FAIL" "audio_list_before_failed"
+  exit 1
+}
+if ! grep -Fq "uid=org.opena8dj.Audio8DJ" "$run_dir/audio-list-before.txt"; then
+  write_result "FAIL" "open_audio8dj_uid_missing"
+  exit 1
+fi
+
+fixture="$run_dir/output-pair-fixture.wav"
+python3 - "$fixture" "$seconds" "$rate" "$amplitude" <<'PY'
+import math
+import struct
+import sys
+import wave
+
+path, seconds_s, rate_s, amp_s = sys.argv[1:5]
+seconds = float(seconds_s)
+rate = int(rate_s)
+amp = float(amp_s)
+frames = max(1, int(round(seconds * rate)))
+with wave.open(path, "wb") as out:
+    out.setnchannels(2)
+    out.setsampwidth(2)
+    out.setframerate(rate)
+    for index in range(frames):
+        t = index / rate
+        left = amp * math.sin(2.0 * math.pi * 997.0 * t)
+        right = amp * math.sin(2.0 * math.pi * 1499.0 * t)
+        out.writeframesraw(struct.pack("<hh", int(left * 32767), int(right * 32767)))
+PY
+
+IFS=',' read -r -a pair_list <<<"$pairs"
+failures=()
+summary_tsv="$run_dir/pair-summary.tsv"
+printf 'pair\tverdict\treturncode\tdevice_start_seconds\tfirst_callback_seconds\toutput_frames_written\toutput_frames_read\toutput_timeline_resets\toutput_active_underruns\toutput_panic_flags\n' >"$summary_tsv"
+
+for pair in "${pair_list[@]}"; do
+  pair="$(printf '%s' "$pair" | tr -d '[:space:]')"
+  if [ -z "$pair" ]; then
+    continue
+  fi
+  pair_dir="$run_dir/pair-$pair"
+  mkdir -p "$pair_dir"
+
+  OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control stream-stats >"$pair_dir/stream-stats-before.txt" 2>&1 || true
+
+  set +e
+  OPENA8DJ_PLAYER_TIMING=1 ./build/audio-wav-play "$fixture" "$pair" >"$pair_dir/play.log" 2>&1
+  rc=$?
+  set -e
+
+  OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control stream-stats >"$pair_dir/stream-stats-after.txt" 2>&1 || true
+
+  if python3 - \
+    "$pair" \
+    "$rc" \
+    "$pair_dir/play.log" \
+    "$pair_dir/stream-stats-after.txt" \
+    "$max_start_seconds" \
+    "$max_first_callback_seconds" \
+    "$min_output_read_ratio" \
+    "$pair_dir/pair-summary.json" \
+    "$pair_dir/pair-summary.env" <<'PY'
+import json
+import re
+import sys
+
+pair, rc_s, play_log, stats_path, max_start_s, max_first_s, min_ratio_s, json_path, env_path = sys.argv[1:10]
+rc = int(rc_s)
+max_start = float(max_start_s)
+max_first = float(max_first_s)
+min_ratio = float(min_ratio_s)
+log_text = open(play_log, encoding="utf-8", errors="replace").read()
+stats_text = open(stats_path, encoding="utf-8", errors="replace").read()
+
+timings = {m.group(1): float(m.group(2)) for m in re.finditer(r"^timing\s+(\S+)\s+([0-9.]+)", log_text, re.MULTILINE)}
+stats = {}
+for line in stats_text.splitlines():
+    if "=" not in line:
+        continue
+    key, value = line.strip().split("=", 1)
+    if not re.match(r"^[A-Za-z0-9_]+$", key):
+        continue
+    try:
+        stats[key] = int(float(value))
+    except ValueError:
+        pass
+
+written = int(stats.get("outputFramesWritten", 0))
+read = int(stats.get("outputFramesRead", 0))
+timeline_resets = int(stats.get("outputTimelineResets", 0))
+active_underruns = int(stats.get("outputActiveUnderruns", 0))
+panic_flags = int(stats.get("outputPanicFlags", 0))
+start = timings.get("device-start", 9999.0)
+first = timings.get("first-callback", 9999.0)
+
+failures = []
+if rc != 0:
+    failures.append(f"audio-wav-play returned {rc}")
+if "played path=" not in log_text:
+    failures.append("audio-wav-play did not report played summary")
+if start > max_start:
+    failures.append(f"device-start {start:.6f}s > {max_start:.6f}s")
+if first > max_first:
+    failures.append(f"first-callback {first:.6f}s > {max_first:.6f}s")
+if written <= 0:
+    failures.append("outputFramesWritten is 0")
+if written > 0 and read < int(written * min_ratio):
+    failures.append(f"outputFramesRead {read} < {min_ratio:.2f} * outputFramesWritten {written}")
+if timeline_resets != 0:
+    failures.append(f"outputTimelineResets {timeline_resets} > 0")
+if active_underruns != 0:
+    failures.append(f"outputActiveUnderruns {active_underruns} > 0")
+if panic_flags != 0:
+    failures.append(f"outputPanicFlags {panic_flags} > 0")
+
+summary = {
+    "pair": pair,
+    "verdict": "PASS" if not failures else "FAIL",
+    "returncode": rc,
+    "device_start_seconds": start,
+    "first_callback_seconds": first,
+    "output_frames_written": written,
+    "output_frames_read": read,
+    "output_timeline_resets": timeline_resets,
+    "output_active_underruns": active_underruns,
+    "output_panic_flags": panic_flags,
+    "failures": failures,
+}
+open(json_path, "w", encoding="utf-8").write(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+with open(env_path, "w", encoding="utf-8") as out:
+    for key, value in summary.items():
+        if key == "failures":
+            continue
+        out.write(f"{key}={value}\n")
+    for failure in failures:
+        out.write(f"failure={failure}\n")
+print(json.dumps(summary, sort_keys=True))
+raise SystemExit(0 if not failures else 1)
+PY
+  then
+    :
+  else
+    failures+=("pair_${pair}_failed")
+  fi
+
+  # shellcheck disable=SC1090
+  source "$pair_dir/pair-summary.env"
+  printf '%s\t%s\t%s\t%.6f\t%.6f\t%s\t%s\t%s\t%s\t%s\n' \
+    "$pair" \
+    "$verdict" \
+    "$returncode" \
+    "$device_start_seconds" \
+    "$first_callback_seconds" \
+    "$output_frames_written" \
+    "$output_frames_read" \
+    "$output_timeline_resets" \
+    "$output_active_underruns" \
+    "$output_panic_flags" >>"$summary_tsv"
+done
+
+./scripts/audio-stack-health >"$run_dir/audio-stack-health-after.txt" 2>&1 || true
+if ! grep -Fq "audio_stack_health=PASS" "$run_dir/audio-stack-health-after.txt"; then
+  failures+=("audio_stack_health_after_failed")
+fi
+
+if [ "${#failures[@]}" -gt 0 ]; then
+  {
+    echo "failures:"
+    printf -- "- %s\n" "${failures[@]}"
+  } >"$run_dir/failures.txt"
+  write_result "FAIL" "$(IFS=,; echo "${failures[*]}")"
+  exit 1
+fi
+
+write_result "PASS" "all_output_pairs_smoke_passed"

@@ -1,0 +1,599 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+run_dir=""
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-status [--run-dir DIR]
+
+Print a read-only readiness summary for the currently installed OpenA8DJ
+candidate. This does not start audio, reset USB, or change driver state.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/candidate-status/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+make build/audio-list >/dev/null
+
+health_file="$run_dir/audio-stack-health.txt"
+audio_list_file="$run_dir/audio-list.txt"
+usb_ioreg_file="$run_dir/usb-ioreg.txt"
+capture_diagnose_dir="$run_dir/capture-device-diagnose"
+capture_diagnose_result="$capture_diagnose_dir/result.txt"
+
+./scripts/audio-stack-health >"$health_file" 2>&1 || true
+./build/audio-list >"$audio_list_file" 2>&1 || true
+ioreg -p IOUSB -w 0 >"$usb_ioreg_file" 2>&1 || true
+./scripts/capture-device-diagnose --run-dir "$capture_diagnose_dir" >"$run_dir/capture-device-diagnose.txt" 2>&1 || true
+
+health_status="FAIL"
+if grep -Fq "audio_stack_health=PASS" "$health_file"; then
+  health_status="PASS"
+fi
+
+installed_version="missing"
+installed_hash="missing"
+if [ -d "$active_hal" ]; then
+  installed_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$active_hal/Contents/Info.plist" 2>/dev/null || echo unknown)"
+  if [ -f "$active_hal/Contents/MacOS/OpenA8DJHAL" ]; then
+    installed_hash="$(shasum -a 256 "$active_hal/Contents/MacOS/OpenA8DJHAL" 2>/dev/null | awk '{print $1}')"
+  fi
+fi
+
+found_audio8_core_audio=0
+found_audio8_core_audio_any=0
+found_opena8dj_core_audio=0
+found_audio8_rust_core_audio=0
+found_irig_usb=0
+found_irig_usb_by_id=0
+found_irig_core_audio=0
+physical_capture_status="missing"
+physical_capture_reason="missing"
+external_core_audio_input_count="0"
+external_core_audio_inputs=""
+usb_enumeration_failures="missing"
+failed_usb_ports="missing"
+capture_next_recovery_action="missing"
+
+if [ -f "$capture_diagnose_result" ]; then
+  physical_capture_status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$capture_diagnose_result")"
+  physical_capture_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$capture_diagnose_result")"
+  found_audio8_core_audio="$(awk -F= '$1=="found_audio8_core_audio"{print $2; exit}' "$capture_diagnose_result")"
+  found_audio8_core_audio_any="$(awk -F= '$1=="found_audio8_core_audio_any"{print $2; exit}' "$capture_diagnose_result")"
+  found_opena8dj_core_audio="$(awk -F= '$1=="found_opena8dj_core_audio"{print $2; exit}' "$capture_diagnose_result")"
+  found_audio8_rust_core_audio="$(awk -F= '$1=="found_audio8_rust_core_audio"{print $2; exit}' "$capture_diagnose_result")"
+  found_irig_usb="$(awk -F= '$1=="found_irig_usb"{print $2; exit}' "$capture_diagnose_result")"
+  found_irig_usb_by_id="$(awk -F= '$1=="found_irig_usb_by_id"{print $2; exit}' "$capture_diagnose_result")"
+  found_irig_core_audio="$(awk -F= '$1=="found_irig_core_audio"{print $2; exit}' "$capture_diagnose_result")"
+  external_core_audio_input_count="$(awk -F= '$1=="external_core_audio_input_count"{print $2; exit}' "$capture_diagnose_result")"
+  external_core_audio_inputs="$(awk -F= '$1=="external_core_audio_inputs"{print $2; exit}' "$capture_diagnose_result")"
+  usb_enumeration_failures="$(awk -F= '$1=="usb_enumeration_failures"{print substr($0, index($0, "=") + 1); exit}' "$capture_diagnose_result")"
+  failed_usb_ports="$(awk -F= '$1=="failed_usb_ports"{print substr($0, index($0, "=") + 1); exit}' "$capture_diagnose_result")"
+  capture_next_recovery_action="$(awk -F= '$1=="next_recovery_action"{print substr($0, index($0, "=") + 1); exit}' "$capture_diagnose_result")"
+fi
+
+find_latest_result() {
+  local root="$1"
+  local candidate_key="$2"
+  local fallback=""
+  while IFS= read -r result; do
+    fallback="$result"
+    local candidate_line
+    candidate_line="$(awk -F= '$1=="candidate"{print $2; exit}' "$result")"
+    if [ "$candidate_line" = "current-loaded" ] \
+      || [ "$candidate_line" = "$candidate_key" ] \
+      || [[ "$candidate_line" == *"$candidate_key"* ]]; then
+      echo "$result"
+      return 0
+    fi
+  done < <(
+    find "$root" -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null \
+      | while IFS= read -r result; do
+        if [ -f "$result" ]; then
+          printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+        fi
+      done | sort -nr | cut -f2-
+  )
+  if [ -n "$fallback" ]; then
+    echo "$fallback"
+  fi
+}
+
+find_latest_by_mtime() {
+  local root="$1"
+  find "$root" -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null \
+    | while IFS= read -r result; do
+      if [ -f "$result" ]; then
+        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+      fi
+    done | sort -nr | cut -f2- | head -n 1
+}
+
+find_latest_playback_cpu_summary() {
+  {
+    find local-analysis -mindepth 2 -maxdepth 2 -path 'local-analysis/playback-cpu-gate*/summary.txt' -print 2>/dev/null
+    find local-analysis/quality-window -mindepth 3 -maxdepth 3 -path '*/playback-cpu-gate/summary.txt' -print 2>/dev/null
+  } \
+    | while IFS= read -r result; do
+      if [ -f "$result" ]; then
+        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+      fi
+    done | sort -nr | cut -f2- | head -n 1
+}
+
+find_latest_quality_window_result() {
+  find local-analysis/quality-window -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null \
+    | while IFS= read -r result; do
+      if [ -f "$result" ]; then
+        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+      fi
+    done | sort -nr | cut -f2- | head -n 1
+}
+
+find_latest_irig_usb_recovery_result() {
+  {
+    find local-analysis/irig-recovery-investigation -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null
+    find local-analysis/autonomous-audio-qa -mindepth 4 -maxdepth 4 -path '*/irig-usb-recovery-diagnose/result.txt' -print 2>/dev/null
+  } \
+    | while IFS= read -r result; do
+      if [ -f "$result" ]; then
+        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+      fi
+    done | sort -nr | cut -f2- | head -n 1
+}
+
+find_latest_digital_audio_quality_result() {
+  {
+    find local-analysis/digital-audio-quality-gate -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null
+    find local-analysis/candidate-preflight -mindepth 3 -maxdepth 3 -path '*/digital-audio-quality-gate/result.txt' -print 2>/dev/null
+    find local-analysis/quality-window -mindepth 4 -maxdepth 4 -path '*/candidate-preflight/digital-audio-quality-gate/result.txt' -print 2>/dev/null
+  } \
+    | while IFS= read -r result; do
+      if [ -f "$result" ]; then
+        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+      fi
+    done | sort -nr | cut -f2- | head -n 1
+}
+
+find_latest_preflight_result() {
+  local candidate_key="$1"
+  local fallback=""
+  while IFS= read -r result; do
+    fallback="$result"
+    local candidate_line
+    candidate_line="$(awk -F= '$1=="candidate"{print $2; exit}' "$result")"
+    if [ "$candidate_line" = "current-loaded" ] \
+      || [ "$candidate_line" = "$candidate_key" ] \
+      || [[ "$candidate_line" == *"$candidate_key"* ]]; then
+      echo "$result"
+      return 0
+    fi
+	  done < <(
+	    {
+	      find local-analysis/candidate-preflight -mindepth 2 -maxdepth 2 -name result.txt -print 2>/dev/null
+	      find local-analysis/candidate-watch -mindepth 3 -maxdepth 3 -path '*/candidate-preflight/result.txt' -print 2>/dev/null
+	      find local-analysis/quality-window -mindepth 3 -maxdepth 3 -path '*/candidate-preflight/result.txt' -print 2>/dev/null
+	    } | while IFS= read -r result; do
+	      if [ -f "$result" ]; then
+	        printf '%s\t%s\n' "$(stat -f '%m' "$result" 2>/dev/null || echo 0)" "$result"
+	      fi
+    done | sort -nr | cut -f2-
+  )
+  if [ -n "$fallback" ]; then
+    echo "$fallback"
+  fi
+}
+
+read_result_key() {
+  local file="$1"
+  local key="$2"
+  local fallback="${3:-missing}"
+  if [ -f "$file" ]; then
+    awk -F= -v key="$key" -v fallback="$fallback" '$1==key{print substr($0, index($0, "=") + 1); found=1; exit} END{if (!found) print fallback}' "$file"
+  else
+    echo "$fallback"
+  fi
+}
+
+latest_preflight="$(find_latest_preflight_result "$installed_version" || true)"
+latest_watch="$(find_latest_result local-analysis/candidate-watch "$installed_version" || true)"
+latest_timecode="$(find_latest_by_mtime local-analysis/timecode-smoke-gate || true)"
+latest_output_pair="$(find_latest_result local-analysis/output-pair-smoke-gate "$installed_version" || true)"
+latest_playback_cpu="$(find_latest_playback_cpu_summary || true)"
+latest_digital_quality="$(find_latest_digital_audio_quality_result || true)"
+latest_bench_sanity="$(find_latest_by_mtime local-analysis/physical-bench-sanity-gate || true)"
+latest_irig_usb_recovery="$(find_latest_irig_usb_recovery_result || true)"
+latest_quality_window="$(find_latest_quality_window_result || true)"
+
+safe_watch_status="ABSENT"
+safe_watch_pid=""
+safe_watch_run_dir=""
+safe_watch_result=""
+safe_watch_stable_polls=""
+safe_watch_current_file="local-analysis/safe-replug-watch/current.env"
+if [ -f "$safe_watch_current_file" ]; then
+  safe_watch_pid="$(read_result_key "$safe_watch_current_file" pid "")"
+  safe_watch_run_dir="$(read_result_key "$safe_watch_current_file" run_dir "")"
+  safe_watch_result="$(read_result_key "$safe_watch_current_file" result "")"
+  safe_watch_stable_polls="$(read_result_key "$safe_watch_current_file" stable_polls "")"
+  if [ -n "$safe_watch_pid" ] && ps -p "$safe_watch_pid" >/dev/null 2>&1; then
+    safe_watch_status="RUNNING"
+  else
+    safe_watch_status="EXITED"
+  fi
+fi
+
+autonomous_qa_status="ABSENT"
+autonomous_qa_pid=""
+autonomous_qa_run_dir=""
+autonomous_qa_stable_polls=""
+autonomous_qa_recovery_interval_cycles=""
+autonomous_qa_latest_cycle=""
+autonomous_qa_latest_capture_status=""
+autonomous_qa_latest_reason=""
+autonomous_qa_current_file="local-analysis/autonomous-audio-qa/current.env"
+if [ -f "$autonomous_qa_current_file" ]; then
+  autonomous_qa_pid="$(read_result_key "$autonomous_qa_current_file" pid "")"
+  autonomous_qa_run_dir="$(read_result_key "$autonomous_qa_current_file" run_dir "")"
+  autonomous_qa_stable_polls="$(read_result_key "$autonomous_qa_current_file" stable_polls "")"
+  autonomous_qa_recovery_interval_cycles="$(read_result_key "$autonomous_qa_current_file" recovery_interval_cycles "")"
+  if [ -n "$autonomous_qa_pid" ] && ps -p "$autonomous_qa_pid" >/dev/null 2>&1; then
+    autonomous_qa_status="RUNNING"
+  else
+    autonomous_qa_status="EXITED"
+  fi
+  autonomous_qa_latest_status="$autonomous_qa_run_dir/latest-status.txt"
+  if [ -f "$autonomous_qa_latest_status" ]; then
+    autonomous_qa_latest_cycle="$(read_result_key "$autonomous_qa_latest_status" cycle "")"
+    autonomous_qa_latest_capture_status="$(read_result_key "$autonomous_qa_latest_status" physical_capture_status "")"
+    autonomous_qa_latest_reason="$(read_result_key "$autonomous_qa_latest_status" reason "")"
+    if [ -z "$autonomous_qa_latest_capture_status" ]; then
+      autonomous_qa_latest_capture_status="$(read_result_key "$autonomous_qa_latest_status" after_physical_capture_status "")"
+    fi
+    if [ -z "$autonomous_qa_latest_reason" ]; then
+      autonomous_qa_latest_reason="$(read_result_key "$autonomous_qa_latest_status" after_reason "")"
+    fi
+  fi
+fi
+
+preflight_status="missing"
+preflight_reason="missing"
+preflight_installed_version="missing"
+preflight_installed_hash="missing"
+preflight_hash_status="missing"
+preflight_result=""
+preflight_dir=""
+preflight_output_pair_status="missing"
+preflight_output_pair_reason="missing"
+preflight_timecode_status="missing"
+preflight_timecode_reason="missing"
+preflight_playback_cpu_status="missing"
+preflight_playback_cpu_reason="missing"
+preflight_digital_quality_status="missing"
+preflight_digital_quality_reason="missing"
+preflight_bench_sanity_status="missing"
+preflight_bench_sanity_reason="missing"
+preflight_capture_status="missing"
+preflight_capture_reason="missing"
+if [ -n "$latest_preflight" ] && [ -f "$latest_preflight" ]; then
+  preflight_result="$latest_preflight"
+  preflight_dir="$(dirname "$latest_preflight")"
+  preflight_status="$(read_result_key "$latest_preflight" candidate_preflight)"
+  preflight_reason="$(read_result_key "$latest_preflight" reason)"
+  preflight_installed_version="$(read_result_key "$latest_preflight" installed_version)"
+  preflight_installed_hash="$(read_result_key "$latest_preflight" installed_hash)"
+  if [ "$preflight_status" = "PASS" ]; then
+    if [ -z "$preflight_installed_hash" ] || [ "$preflight_installed_hash" = "missing" ]; then
+      preflight_hash_status="missing"
+    elif [ "$preflight_installed_hash" = "$installed_hash" ]; then
+      preflight_hash_status="MATCH"
+    else
+      preflight_hash_status="MISMATCH"
+    fi
+  else
+    preflight_hash_status="not_required"
+  fi
+  preflight_output_pair_result="$preflight_dir/output-pair-smoke-gate/result.txt"
+  preflight_timecode_result="$preflight_dir/timecode-smoke-gate/result.txt"
+  preflight_playback_cpu_result="$preflight_dir/playback-cpu-gate/summary.txt"
+  preflight_digital_quality_result="$preflight_dir/digital-audio-quality-gate/result.txt"
+  preflight_bench_sanity_result="$preflight_dir/physical-bench-sanity-gate/result.txt"
+  preflight_capture_result="$preflight_dir/capture-device-diagnose/result.txt"
+  preflight_output_pair_status="$(read_result_key "$preflight_output_pair_result" output_pair_smoke_gate)"
+  preflight_output_pair_reason="$(read_result_key "$preflight_output_pair_result" reason)"
+  preflight_timecode_status="$(read_result_key "$preflight_timecode_result" timecode_smoke_gate)"
+  preflight_timecode_reason="$(read_result_key "$preflight_timecode_result" reason)"
+  preflight_playback_cpu_status="$(read_result_key "$preflight_playback_cpu_result" playback_cpu_gate)"
+  preflight_playback_cpu_reason="$(read_result_key "$preflight_playback_cpu_result" reason)"
+  preflight_digital_quality_status="$(read_result_key "$preflight_digital_quality_result" digital_audio_quality_gate)"
+  preflight_digital_quality_reason="$(read_result_key "$preflight_digital_quality_result" reason)"
+  preflight_bench_sanity_status="$(read_result_key "$preflight_bench_sanity_result" physical_bench_sanity_gate)"
+  preflight_bench_sanity_reason="$(read_result_key "$preflight_bench_sanity_result" reason)"
+  preflight_capture_status="$(read_result_key "$preflight_capture_result" physical_capture_status)"
+  preflight_capture_reason="$(read_result_key "$preflight_capture_result" reason)"
+fi
+
+if [ -n "$preflight_dir" ]; then
+  nested_output_pair="$preflight_dir/output-pair-smoke-gate/result.txt"
+  nested_timecode="$preflight_dir/timecode-smoke-gate/result.txt"
+  nested_playback_cpu="$preflight_dir/playback-cpu-gate/summary.txt"
+  nested_digital_quality="$preflight_dir/digital-audio-quality-gate/result.txt"
+  nested_bench_sanity="$preflight_dir/physical-bench-sanity-gate/result.txt"
+  if [ -f "$nested_output_pair" ]; then
+    latest_output_pair="$nested_output_pair"
+  fi
+  if [ -f "$nested_timecode" ]; then
+    latest_timecode="$nested_timecode"
+  fi
+  if [ -f "$nested_playback_cpu" ]; then
+    latest_playback_cpu="$nested_playback_cpu"
+  fi
+  if [ -f "$nested_digital_quality" ]; then
+    latest_digital_quality="$nested_digital_quality"
+  fi
+  if [ -f "$nested_bench_sanity" ]; then
+    latest_bench_sanity="$nested_bench_sanity"
+  fi
+fi
+
+watch_status="missing"
+watch_reason="missing"
+watch_result=""
+if [ -n "$latest_watch" ] && [ -f "$latest_watch" ]; then
+  watch_result="$latest_watch"
+  watch_status="$(read_result_key "$latest_watch" candidate_watch)"
+  watch_reason="$(read_result_key "$latest_watch" reason)"
+fi
+
+quality_window_status="missing"
+quality_window_reason="missing"
+quality_window_mode="missing"
+quality_window_result=""
+if [ -n "$latest_quality_window" ] && [ -f "$latest_quality_window" ]; then
+  quality_window_result="$latest_quality_window"
+  quality_window_status="$(read_result_key "$latest_quality_window" quality_window)"
+  quality_window_reason="$(read_result_key "$latest_quality_window" reason)"
+  quality_window_mode="$(read_result_key "$latest_quality_window" mode)"
+fi
+
+timecode_status="missing"
+timecode_reason="missing"
+timecode_result=""
+if [ -n "$latest_timecode" ] && [ -f "$latest_timecode" ]; then
+  timecode_result="$latest_timecode"
+  timecode_status="$(read_result_key "$latest_timecode" timecode_smoke_gate)"
+  timecode_reason="$(read_result_key "$latest_timecode" reason)"
+fi
+
+output_pair_status="missing"
+output_pair_reason="missing"
+output_pair_result=""
+if [ -n "$latest_output_pair" ] && [ -f "$latest_output_pair" ]; then
+  output_pair_result="$latest_output_pair"
+  output_pair_status="$(read_result_key "$latest_output_pair" output_pair_smoke_gate)"
+  output_pair_reason="$(read_result_key "$latest_output_pair" reason)"
+fi
+
+playback_cpu_status="missing"
+playback_cpu_reason="missing"
+playback_cpu_result=""
+playback_cpu_driver_p95="missing"
+playback_cpu_coreaudiod_p95="missing"
+playback_cpu_stress_coreaudiod_p95="missing"
+playback_cpu_timeline_resets="missing"
+playback_cpu_active_underruns="missing"
+if [ -n "$latest_playback_cpu" ] && [ -f "$latest_playback_cpu" ]; then
+  playback_cpu_result="$latest_playback_cpu"
+  playback_cpu_status="$(read_result_key "$latest_playback_cpu" playback_cpu_gate)"
+  playback_cpu_reason="$(read_result_key "$latest_playback_cpu" reason)"
+  playback_cpu_driver_p95="$(read_result_key "$latest_playback_cpu" cpu_opena8dj_driver_p95)"
+  playback_cpu_coreaudiod_p95="$(read_result_key "$latest_playback_cpu" cpu_coreaudiod_p95)"
+  playback_cpu_stress_coreaudiod_p95="$(read_result_key "$latest_playback_cpu" cpu_coreaudiod_stress_p95)"
+  playback_cpu_timeline_resets="$(read_result_key "$latest_playback_cpu" output_timeline_resets)"
+  playback_cpu_active_underruns="$(read_result_key "$latest_playback_cpu" output_active_underruns)"
+fi
+
+digital_quality_status="missing"
+digital_quality_reason="missing"
+digital_quality_result=""
+digital_quality_failures="missing"
+digital_quality_click_risk_runs="missing"
+if [ -n "$latest_digital_quality" ] && [ -f "$latest_digital_quality" ]; then
+  digital_quality_result="$latest_digital_quality"
+  digital_quality_status="$(read_result_key "$latest_digital_quality" digital_audio_quality_gate)"
+  digital_quality_reason="$(read_result_key "$latest_digital_quality" reason)"
+  digital_quality_failures="$(read_result_key "$latest_digital_quality" failures)"
+  digital_quality_click_risk_runs="$(read_result_key "$latest_digital_quality" click_risk_runs)"
+fi
+
+bench_sanity_status="missing"
+bench_sanity_reason="missing"
+bench_sanity_result=""
+if [ -n "$latest_bench_sanity" ] && [ -f "$latest_bench_sanity" ]; then
+  bench_sanity_result="$latest_bench_sanity"
+  bench_sanity_status="$(read_result_key "$latest_bench_sanity" physical_bench_sanity_gate)"
+  bench_sanity_reason="$(read_result_key "$latest_bench_sanity" reason)"
+fi
+
+irig_usb_recovery_status="missing"
+irig_usb_recovery_reason="missing"
+irig_usb_recovery_result=""
+irig_usb_recovery_found_by_id="missing"
+irig_usb_recovery_found_core_audio="missing"
+irig_usb_recovery_enum_failures="missing"
+irig_usb_recovery_counter_changes="missing"
+irig_usb_recovery_port_summary=""
+irig_usb_recovery_port_delta=""
+irig_usb_recovery_next_action=""
+if [ -n "$latest_irig_usb_recovery" ] && [ -f "$latest_irig_usb_recovery" ]; then
+  irig_usb_recovery_result="$latest_irig_usb_recovery"
+  irig_usb_recovery_status="$(read_result_key "$latest_irig_usb_recovery" irig_recovery)"
+  if [ "$irig_usb_recovery_status" = "missing" ]; then
+    irig_usb_recovery_status="$(read_result_key "$latest_irig_usb_recovery" physical_capture_status)"
+  fi
+  irig_usb_recovery_reason="$(read_result_key "$latest_irig_usb_recovery" reason)"
+  irig_usb_recovery_found_by_id="$(read_result_key "$latest_irig_usb_recovery" found_irig_usb_by_id)"
+  irig_usb_recovery_found_core_audio="$(read_result_key "$latest_irig_usb_recovery" found_irig_core_audio)"
+  irig_usb_recovery_enum_failures="$(read_result_key "$latest_irig_usb_recovery" usb_enumeration_failures)"
+  irig_usb_recovery_counter_changes="$(read_result_key "$latest_irig_usb_recovery" usb_port_counter_changes)"
+  irig_usb_recovery_port_summary="$(read_result_key "$latest_irig_usb_recovery" port_summary "")"
+  irig_usb_recovery_port_delta="$(read_result_key "$latest_irig_usb_recovery" port_delta "")"
+  irig_usb_recovery_next_action="$(read_result_key "$latest_irig_usb_recovery" next_recovery_action "")"
+fi
+
+readiness="NOT_READY"
+reason="unknown"
+
+if [ "$health_status" != "PASS" ]; then
+  reason="audio_stack_health_failed"
+elif [ "$found_audio8_core_audio" != "1" ]; then
+  if [ "$found_audio8_rust_core_audio" = "1" ]; then
+    reason="open_audio8dj_objc_candidate_missing_rust_active"
+  else
+    reason="open_audio8dj_missing_from_core_audio"
+  fi
+elif [ "$found_irig_usb" != "1" ]; then
+  reason="irig_missing_from_usb_tree"
+elif [ "$found_irig_usb_by_id" != "1" ]; then
+  reason="irig_usb_id_not_verified"
+elif [ "$found_irig_core_audio" != "1" ]; then
+  reason="irig_missing_from_core_audio"
+elif [ "$preflight_status" = "PASS" ] && [ "$preflight_hash_status" = "MATCH" ]; then
+  readiness="READY_FOR_HUMAN_TEST"
+  reason="candidate_preflight_passed"
+elif [ "$preflight_status" = "PASS" ] && [ "$preflight_hash_status" = "MISMATCH" ]; then
+  reason="candidate_preflight_hash_mismatch"
+elif [ "$preflight_status" = "PASS" ] && [ "$preflight_hash_status" = "missing" ]; then
+  reason="candidate_preflight_hash_missing"
+elif [ "$output_pair_status" != "PASS" ]; then
+  reason="output_pair_smoke_gate_not_passed"
+elif [ "$playback_cpu_status" != "PASS" ]; then
+  reason="playback_cpu_gate_not_passed"
+elif [ "$digital_quality_status" != "PASS" ]; then
+  reason="digital_audio_quality_gate_not_passed"
+elif [ "$bench_sanity_status" != "PASS" ]; then
+  reason="physical_bench_sanity_gate_not_passed"
+elif [ "$timecode_status" != "PASS" ]; then
+  reason="timecode_smoke_gate_not_passed"
+elif [ "$preflight_status" = "BLOCKED_PHYSICAL_CAPTURE" ]; then
+  reason="$preflight_reason"
+else
+  reason="candidate_preflight_not_passed"
+fi
+
+{
+  echo "candidate_status=$readiness"
+  echo "reason=$reason"
+  echo "run_dir=$run_dir"
+  echo "installed_version=$installed_version"
+  echo "installed_hash=$installed_hash"
+  echo "audio_stack_health=$health_status"
+  echo "found_audio8_core_audio=$found_audio8_core_audio"
+  echo "found_audio8_core_audio_any=$found_audio8_core_audio_any"
+  echo "found_opena8dj_core_audio=$found_opena8dj_core_audio"
+  echo "found_audio8_rust_core_audio=$found_audio8_rust_core_audio"
+  echo "found_irig_usb=$found_irig_usb"
+  echo "found_irig_usb_by_id=$found_irig_usb_by_id"
+  echo "found_irig_core_audio=$found_irig_core_audio"
+  echo "physical_capture_status=$physical_capture_status"
+  echo "physical_capture_reason=$physical_capture_reason"
+  echo "external_core_audio_input_count=$external_core_audio_input_count"
+  echo "external_core_audio_inputs=$external_core_audio_inputs"
+  echo "usb_enumeration_failures=$usb_enumeration_failures"
+  echo "failed_usb_ports=$failed_usb_ports"
+  echo "capture_next_recovery_action=$capture_next_recovery_action"
+  echo "safe_replug_watch_status=$safe_watch_status"
+  echo "safe_replug_watch_pid=$safe_watch_pid"
+  echo "safe_replug_watch_run_dir=$safe_watch_run_dir"
+  echo "safe_replug_watch_result=$safe_watch_result"
+  echo "safe_replug_watch_stable_polls=$safe_watch_stable_polls"
+  echo "autonomous_audio_qa_status=$autonomous_qa_status"
+  echo "autonomous_audio_qa_pid=$autonomous_qa_pid"
+  echo "autonomous_audio_qa_run_dir=$autonomous_qa_run_dir"
+  echo "autonomous_audio_qa_stable_polls=$autonomous_qa_stable_polls"
+  echo "autonomous_audio_qa_recovery_interval_cycles=$autonomous_qa_recovery_interval_cycles"
+  echo "autonomous_audio_qa_latest_cycle=$autonomous_qa_latest_cycle"
+  echo "autonomous_audio_qa_latest_capture_status=$autonomous_qa_latest_capture_status"
+  echo "autonomous_audio_qa_latest_reason=$autonomous_qa_latest_reason"
+  echo "latest_candidate_preflight_status=$preflight_status"
+  echo "latest_candidate_preflight_reason=$preflight_reason"
+  echo "latest_candidate_preflight_installed_version=$preflight_installed_version"
+  echo "latest_candidate_preflight_installed_hash=$preflight_installed_hash"
+  echo "latest_candidate_preflight_hash_status=$preflight_hash_status"
+  echo "latest_candidate_preflight_result=$preflight_result"
+  echo "latest_candidate_preflight_output_pair_status=$preflight_output_pair_status"
+  echo "latest_candidate_preflight_output_pair_reason=$preflight_output_pair_reason"
+  echo "latest_candidate_preflight_timecode_status=$preflight_timecode_status"
+  echo "latest_candidate_preflight_timecode_reason=$preflight_timecode_reason"
+  echo "latest_candidate_preflight_playback_cpu_status=$preflight_playback_cpu_status"
+  echo "latest_candidate_preflight_playback_cpu_reason=$preflight_playback_cpu_reason"
+  echo "latest_candidate_preflight_digital_audio_quality_status=$preflight_digital_quality_status"
+  echo "latest_candidate_preflight_digital_audio_quality_reason=$preflight_digital_quality_reason"
+  echo "latest_candidate_preflight_bench_sanity_status=$preflight_bench_sanity_status"
+  echo "latest_candidate_preflight_bench_sanity_reason=$preflight_bench_sanity_reason"
+  echo "latest_candidate_preflight_capture_status=$preflight_capture_status"
+  echo "latest_candidate_preflight_capture_reason=$preflight_capture_reason"
+  echo "latest_candidate_watch_status=$watch_status"
+  echo "latest_candidate_watch_reason=$watch_reason"
+  echo "latest_candidate_watch_result=$watch_result"
+  echo "latest_output_pair_smoke_status=$output_pair_status"
+  echo "latest_output_pair_smoke_reason=$output_pair_reason"
+  echo "latest_output_pair_smoke_result=$output_pair_result"
+  echo "latest_playback_cpu_status=$playback_cpu_status"
+  echo "latest_playback_cpu_reason=$playback_cpu_reason"
+  echo "latest_playback_cpu_driver_p95=$playback_cpu_driver_p95"
+  echo "latest_playback_cpu_coreaudiod_p95=$playback_cpu_coreaudiod_p95"
+  echo "latest_playback_cpu_stress_coreaudiod_p95=$playback_cpu_stress_coreaudiod_p95"
+  echo "latest_playback_cpu_timeline_resets=$playback_cpu_timeline_resets"
+  echo "latest_playback_cpu_active_underruns=$playback_cpu_active_underruns"
+  echo "latest_playback_cpu_result=$playback_cpu_result"
+  echo "latest_digital_audio_quality_status=$digital_quality_status"
+  echo "latest_digital_audio_quality_reason=$digital_quality_reason"
+  echo "latest_digital_audio_quality_failures=$digital_quality_failures"
+  echo "latest_digital_audio_quality_click_risk_runs=$digital_quality_click_risk_runs"
+  echo "latest_digital_audio_quality_result=$digital_quality_result"
+  echo "latest_quality_window_status=$quality_window_status"
+  echo "latest_quality_window_reason=$quality_window_reason"
+  echo "latest_quality_window_mode=$quality_window_mode"
+  echo "latest_quality_window_result=$quality_window_result"
+  echo "latest_physical_bench_sanity_status=$bench_sanity_status"
+  echo "latest_physical_bench_sanity_reason=$bench_sanity_reason"
+  echo "latest_physical_bench_sanity_result=$bench_sanity_result"
+  echo "latest_irig_usb_recovery_status=$irig_usb_recovery_status"
+  echo "latest_irig_usb_recovery_reason=$irig_usb_recovery_reason"
+  echo "latest_irig_usb_recovery_found_irig_usb_by_id=$irig_usb_recovery_found_by_id"
+  echo "latest_irig_usb_recovery_found_irig_core_audio=$irig_usb_recovery_found_core_audio"
+  echo "latest_irig_usb_recovery_usb_enumeration_failures=$irig_usb_recovery_enum_failures"
+  echo "latest_irig_usb_recovery_usb_port_counter_changes=$irig_usb_recovery_counter_changes"
+  echo "latest_irig_usb_recovery_port_summary=$irig_usb_recovery_port_summary"
+  echo "latest_irig_usb_recovery_port_delta=$irig_usb_recovery_port_delta"
+  echo "latest_irig_usb_recovery_next_action=$irig_usb_recovery_next_action"
+  echo "latest_irig_usb_recovery_result=$irig_usb_recovery_result"
+  echo "latest_timecode_smoke_status=$timecode_status"
+  echo "latest_timecode_smoke_reason=$timecode_reason"
+  echo "latest_timecode_smoke_result=$timecode_result"
+  echo "audio_list=$audio_list_file"
+  echo "usb_ioreg=$usb_ioreg_file"
+  echo "audio_stack_health_file=$health_file"
+  echo "capture_device_diagnose=$capture_diagnose_result"
+} | tee "$run_dir/status.txt"
+
+if [ "$readiness" = "READY_FOR_HUMAN_TEST" ]; then
+  exit 0
+fi
+exit 3

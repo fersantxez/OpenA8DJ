@@ -1,0 +1,395 @@
+#!/usr/bin/env bash
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT" || exit 10
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+physical_baseline_json="local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json"
+wait_seconds="0"
+interval_seconds="30"
+stable_polls="3"
+recovery_wait_seconds="20"
+recovery_interval_cycles="10"
+max_recoveries_per_hour="3"
+candidate_gate_wait_seconds="240"
+to="fernandosanchezmunoz@gmail.com"
+run_dir=""
+run_once="0"
+passive_recovery="0"
+allow_active_media="0"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/autonomous-audio-qa-supervisor [options]
+
+Runs the unattended OpenA8DJ recovery and QA loop. It assumes Audio 8 DJ and
+iRig Stream are physically connected. If iRig is not visible, the loop treats
+that as recoverable macOS USB/Core Audio state, not as a cabling request.
+
+Options:
+  --candidate NAME
+  --music-file PATH
+  --physical-baseline-json PATH
+  --wait SECONDS                 0 means no deadline (default: 0)
+  --interval SECONDS             Poll interval (default: 30)
+  --stable-polls COUNT           Consecutive READY polls before gates (default: 3)
+  --recovery-wait SECONDS        Watch time after each recovery (default: 20)
+  --recovery-interval-cycles N   Recovery cadence while iRig is missing (default: 10)
+  --max-recoveries-per-hour N    Recovery cap before observe-only backoff (default: 3)
+  --candidate-gate-wait SECONDS  Gate wait once devices are stable (default: 240)
+  --to ADDRESS                   Readiness email recipient for payload (default: Fernando)
+  --run-dir DIR
+  --run-once                     One poll/recovery cycle, for validation
+  --passive-recovery             Do not refresh audio/USB services
+  --allow-active-media           Allow gates/recovery while VLC/Spotify/Traktor are active
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --wait) wait_seconds="$2"; shift 2 ;;
+    --interval) interval_seconds="$2"; shift 2 ;;
+    --stable-polls) stable_polls="$2"; shift 2 ;;
+    --recovery-wait) recovery_wait_seconds="$2"; shift 2 ;;
+    --recovery-interval-cycles) recovery_interval_cycles="$2"; shift 2 ;;
+    --max-recoveries-per-hour) max_recoveries_per_hour="$2"; shift 2 ;;
+    --candidate-gate-wait) candidate_gate_wait_seconds="$2"; shift 2 ;;
+    --to) to="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --run-once) run_once="1"; shift ;;
+    --passive-recovery) passive_recovery="1"; shift ;;
+    --allow-active-media) allow_active_media="1"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/autonomous-audio-qa/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+state_dir="local-analysis/autonomous-audio-qa"
+mkdir -p "$state_dir"
+ln -sfn "$ROOT/$run_dir" "$state_dir/latest"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+
+read_key() {
+  local file="$1"
+  local key="$2"
+  local fallback="${3:-}"
+  if [ ! -f "$file" ]; then
+    echo "$fallback"
+    return 0
+  fi
+  awk -F= -v k="$key" -v fallback="$fallback" '
+    $1 == k {print substr($0, index($0, "=") + 1); found=1; exit}
+    END {if (!found) print fallback}
+  ' "$file"
+}
+
+write_status() {
+  local file="$1"
+  shift
+  {
+    echo "updated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+    echo "wait_seconds=$wait_seconds"
+    echo "interval_seconds=$interval_seconds"
+    echo "stable_polls=$stable_polls"
+    echo "recovery_wait_seconds=$recovery_wait_seconds"
+    echo "recovery_interval_cycles=$recovery_interval_cycles"
+    echo "max_recoveries_per_hour=$max_recoveries_per_hour"
+    echo "candidate_gate_wait_seconds=$candidate_gate_wait_seconds"
+    echo "passive_recovery=$passive_recovery"
+    echo "allow_active_media=$allow_active_media"
+    printf '%s\n' "$@"
+  } >"$file"
+  cp "$file" "$run_dir/latest-status.txt"
+}
+
+active_media_clients() {
+  pgrep -f '/Applications/VLC.app|[V]LC.app|[S]potify|[T]raktor|audio-wav-play' 2>/dev/null \
+    | awk -v self="$$" '$1 != "" && $1 != self {print $1}' \
+    | paste -sd, -
+}
+
+recovery_count_last_hour() {
+  local now="$1"
+  local cutoff=$((now - 3600))
+  local tmp="$run_dir/recovery-history.tmp"
+  touch "$recovery_history_file"
+  awk -v cutoff="$cutoff" '$1 >= cutoff {print}' "$recovery_history_file" > "$tmp"
+  mv "$tmp" "$recovery_history_file"
+  awk 'END {print NR + 0}' "$recovery_history_file"
+}
+
+record_recovery_time() {
+  local now="$1"
+  echo "$now" >> "$recovery_history_file"
+}
+
+run_capture_diagnose() {
+  local cycle_dir="$1"
+  mkdir -p "$cycle_dir/capture-device-diagnose"
+  ./scripts/capture-device-diagnose \
+    --run-dir "$cycle_dir/capture-device-diagnose" \
+    >"$cycle_dir/capture-device-diagnose.log" 2>&1 || true
+}
+
+run_audio_guard() {
+  local cycle_dir="$1"
+  mkdir -p "$cycle_dir/audio-stack-guard"
+  ./scripts/audio-stack-guard \
+    --wait 1 \
+    --enumeration-timeout 5 \
+    --min-idle-pct 15 \
+    --run-dir "$cycle_dir/audio-stack-guard" \
+    >"$cycle_dir/audio-stack-guard.txt" 2>&1 || true
+}
+
+run_recovery() {
+  local cycle_dir="$1"
+  mkdir -p "$cycle_dir/irig-usb-recovery-diagnose"
+  if [ "$passive_recovery" = "1" ]; then
+    {
+      echo "irig_recovery=SKIPPED"
+      echo "reason=passive_recovery"
+    } >"$cycle_dir/irig-usb-recovery-diagnose/result.txt"
+    return 0
+  fi
+  ./scripts/irig-usb-recovery-diagnose \
+    --wait "$recovery_wait_seconds" \
+    --interval "$interval_seconds" \
+    --lightweight \
+    --run-dir "$cycle_dir/irig-usb-recovery-diagnose" \
+    >"$cycle_dir/irig-usb-recovery-diagnose.log" 2>&1 || true
+}
+
+run_candidate_gate() {
+  local cycle_dir="$1"
+  mkdir -p "$cycle_dir/candidate-watch-ready-email-gate"
+  ./scripts/candidate-watch-ready-email-gate \
+    --candidate "$candidate" \
+    --music-file "$music_file" \
+    --physical-baseline-json "$physical_baseline_json" \
+    --wait "$candidate_gate_wait_seconds" \
+    --interval "$interval_seconds" \
+    --stable-polls "$stable_polls" \
+    --to "$to" \
+    --run-dir "$cycle_dir/candidate-watch-ready-email-gate" \
+    >"$cycle_dir/candidate-watch-ready-email-gate.log" 2>&1
+}
+
+{
+  echo "supervisor_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "root=$ROOT"
+  echo "candidate=$candidate"
+  echo "run_dir=$run_dir"
+  echo "music_file=$music_file"
+  echo "physical_baseline_json=$physical_baseline_json"
+  echo "wait_seconds=$wait_seconds"
+  echo "interval_seconds=$interval_seconds"
+  echo "stable_polls=$stable_polls"
+  echo "recovery_wait_seconds=$recovery_wait_seconds"
+  echo "recovery_interval_cycles=$recovery_interval_cycles"
+  echo "max_recoveries_per_hour=$max_recoveries_per_hour"
+  echo "candidate_gate_wait_seconds=$candidate_gate_wait_seconds"
+  echo "to=$to"
+  echo "allow_active_media=$allow_active_media"
+} >"$run_dir/manifest.txt"
+
+deadline=0
+if [ "$wait_seconds" != "0" ]; then
+  deadline=$(( $(date +%s) + wait_seconds ))
+fi
+
+cycle=0
+ready_streak=0
+last_reason="not_checked"
+last_status="MISSING"
+recovery_history_file="$run_dir/recovery-history.tsv"
+: > "$recovery_history_file"
+
+while :; do
+  cycle=$((cycle + 1))
+  cycle_dir="$run_dir/cycle-$cycle"
+  mkdir -p "$cycle_dir"
+
+  if ! audio_gate_acquire_lock "autonomous-audio-qa:$candidate" "$cycle_dir"; then
+    owner_pid="$(read_key "$cycle_dir/audio-gate-lock.txt" owner_pid "unknown")"
+    owner_gate="$(read_key "$cycle_dir/audio-gate-lock.txt" owner_gate "unknown")"
+    owner_run_dir="$(read_key "$cycle_dir/audio-gate-lock.txt" owner_run_dir "unknown")"
+    write_status "$cycle_dir/status.txt" \
+      "autonomous_audio_qa=SKIPPED_BUSY" \
+      "cycle=$cycle" \
+      "reason=${audio_gate_lock_error:-audio_gate_lock_busy}" \
+      "owner_pid=$owner_pid" \
+      "owner_gate=$owner_gate" \
+      "owner_run_dir=$owner_run_dir" \
+      "cycle_dir=$cycle_dir"
+    sleep "$interval_seconds"
+    continue
+  fi
+  audio_gate_export_inherited_lock "autonomous-audio-qa:$candidate" "$cycle_dir"
+
+  run_audio_guard "$cycle_dir"
+  run_capture_diagnose "$cycle_dir"
+
+  diagnose_result="$cycle_dir/capture-device-diagnose/result.txt"
+  last_status="$(read_key "$diagnose_result" physical_capture_status "MISSING")"
+  last_reason="$(read_key "$diagnose_result" reason "missing_diagnosis")"
+  found_audio8="$(read_key "$diagnose_result" found_audio8_core_audio "0")"
+  found_irig_usb="$(read_key "$diagnose_result" found_irig_usb "0")"
+  found_irig_by_id="$(read_key "$diagnose_result" found_irig_usb_by_id "0")"
+  found_irig_core="$(read_key "$diagnose_result" found_irig_core_audio "0")"
+  usb_enum="$(read_key "$diagnose_result" usb_enumeration_failures "missing")"
+  failed_ports="$(read_key "$diagnose_result" failed_usb_ports "missing")"
+  next_action="$(read_key "$diagnose_result" next_recovery_action "missing")"
+
+  if [ "$last_status" = "READY" ] && [ "$found_audio8" = "1" ]; then
+    ready_streak=$((ready_streak + 1))
+  else
+    ready_streak=0
+  fi
+
+  write_status "$cycle_dir/status.txt" \
+    "autonomous_audio_qa=RUNNING" \
+    "cycle=$cycle" \
+    "physical_capture_status=$last_status" \
+    "reason=$last_reason" \
+    "ready_streak=$ready_streak" \
+    "found_audio8_core_audio=$found_audio8" \
+    "found_irig_usb=$found_irig_usb" \
+    "found_irig_usb_by_id=$found_irig_by_id" \
+    "found_irig_core_audio=$found_irig_core" \
+    "usb_enumeration_failures=$usb_enum" \
+    "failed_usb_ports=$failed_ports" \
+    "next_recovery_action=$next_action" \
+    "cycle_dir=$cycle_dir"
+
+  active_media_pids=""
+  if [ "$allow_active_media" != "1" ]; then
+    active_media_pids="$(active_media_clients)"
+  fi
+
+  if [ "$ready_streak" -ge "$stable_polls" ]; then
+    if [ -n "$active_media_pids" ]; then
+      ready_streak=0
+      write_status "$cycle_dir/status-gate-deferred.txt" \
+        "autonomous_audio_qa=DEFERRED_USER_SESSION_ACTIVE" \
+        "cycle=$cycle" \
+        "reason=active_media_clients" \
+        "active_media_pids=$active_media_pids"
+    else
+      gate_rc=0
+      run_candidate_gate "$cycle_dir" || gate_rc=$?
+      gate_result="$cycle_dir/candidate-watch-ready-email-gate/result.txt"
+      gate_status="$(read_key "$gate_result" candidate_watch_ready_email_gate "missing")"
+      gate_reason="$(read_key "$gate_result" reason "missing")"
+      if [ "$gate_status" = "PASS" ]; then
+        email_result="$(read_key "$gate_result" candidate_ready_email_result "")"
+        write_status "$run_dir/result.txt" \
+          "autonomous_audio_qa=PASS" \
+          "reason=ready_for_human_test_email_payload_prepared" \
+          "cycle=$cycle" \
+          "candidate_watch_ready_email_gate=$gate_status" \
+          "candidate_watch_ready_email_result=$gate_result" \
+          "candidate_ready_email_result=$email_result"
+        exit 0
+      fi
+      ready_streak=0
+      write_status "$cycle_dir/status-after-gate.txt" \
+        "autonomous_audio_qa=GATE_BLOCKED" \
+        "cycle=$cycle" \
+        "gate_rc=$gate_rc" \
+        "reason=$gate_reason" \
+        "candidate_watch_ready_email_gate=$gate_status" \
+        "candidate_watch_ready_email_result=$gate_result"
+    fi
+  fi
+
+  if [ "$recovery_interval_cycles" = "0" ]; then
+    do_recovery="0"
+  elif [ "$cycle" = "1" ]; then
+    do_recovery="1"
+  elif [ $((cycle % recovery_interval_cycles)) -eq 0 ]; then
+    do_recovery="1"
+  else
+    do_recovery="0"
+  fi
+
+  if [ "$last_status" != "READY" ] && [ "$do_recovery" = "1" ]; then
+    now="$(date +%s)"
+    recoveries_last_hour="$(recovery_count_last_hour "$now")"
+    if [ -n "$active_media_pids" ]; then
+      write_status "$cycle_dir/status-after-recovery.txt" \
+        "autonomous_audio_qa=RECOVERY_DEFERRED" \
+        "cycle=$cycle" \
+        "reason=active_media_clients" \
+        "active_media_pids=$active_media_pids" \
+        "before_physical_capture_status=$last_status" \
+        "before_reason=$last_reason"
+    elif [ "$max_recoveries_per_hour" != "0" ] && [ "$recoveries_last_hour" -ge "$max_recoveries_per_hour" ]; then
+      write_status "$cycle_dir/status-after-recovery.txt" \
+        "autonomous_audio_qa=RECOVERY_DEFERRED" \
+        "cycle=$cycle" \
+        "reason=max_recoveries_per_hour_reached" \
+        "recoveries_last_hour=$recoveries_last_hour" \
+        "max_recoveries_per_hour=$max_recoveries_per_hour" \
+        "before_physical_capture_status=$last_status" \
+        "before_reason=$last_reason"
+    else
+      record_recovery_time "$now"
+      recoveries_last_hour=$((recoveries_last_hour + 1))
+      run_recovery "$cycle_dir"
+      run_audio_guard "$cycle_dir/post-recovery"
+      run_capture_diagnose "$cycle_dir/post-recovery"
+      post_result="$cycle_dir/post-recovery/capture-device-diagnose/result.txt"
+      post_status="$(read_key "$post_result" physical_capture_status "MISSING")"
+      post_reason="$(read_key "$post_result" reason "missing_diagnosis")"
+      write_status "$cycle_dir/status-after-recovery.txt" \
+        "autonomous_audio_qa=RECOVERY_ATTEMPTED" \
+        "cycle=$cycle" \
+        "recoveries_last_hour=$recoveries_last_hour" \
+        "before_physical_capture_status=$last_status" \
+        "before_reason=$last_reason" \
+        "after_physical_capture_status=$post_status" \
+        "after_reason=$post_reason" \
+        "recovery_result=$cycle_dir/irig-usb-recovery-diagnose/result.txt"
+    fi
+  fi
+
+  if [ "$run_once" = "1" ]; then
+    write_status "$run_dir/result.txt" \
+      "autonomous_audio_qa=INCOMPLETE" \
+      "reason=run_once_complete" \
+      "cycle=$cycle" \
+      "physical_capture_status=$last_status" \
+      "physical_capture_reason=$last_reason"
+    exit 3
+  fi
+
+  if [ "$deadline" != "0" ] && [ "$(date +%s)" -ge "$deadline" ]; then
+    write_status "$run_dir/result.txt" \
+      "autonomous_audio_qa=TIMEOUT" \
+      "reason=$last_reason" \
+      "cycle=$cycle" \
+      "physical_capture_status=$last_status"
+    exit 2
+  fi
+
+  audio_gate_release_lock
+  audio_gate_lock_dir=""
+  sleep "$interval_seconds"
+done

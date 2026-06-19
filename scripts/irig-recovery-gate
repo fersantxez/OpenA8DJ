@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate=""
+music_file=""
+physical_baseline_json=""
+run_dir=""
+wait_seconds="120"
+interval_seconds="2"
+record_seconds="2"
+capture_device="iRig Stream"
+capture_channels="1,2"
+run_candidate_gate="0"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/irig-recovery-gate [options]
+
+Waits for a real iRig Stream recovery before physical audio QA:
+  1. Confirms Open Audio 8 DJ in Core Audio.
+  2. Confirms iRig Stream in the USB tree.
+  3. Confirms iRig Stream in Core Audio with IK Multimedia UID.
+  4. Records a short iRig capture.
+  5. Checks audio stack health.
+  6. Optionally runs candidate-listen-gate after the short capture succeeds.
+
+Options:
+  --wait SECONDS                 How long to wait for iRig recovery (default: 120)
+  --interval SECONDS             Poll interval (default: 2)
+  --record-seconds SECONDS       Short capture duration after recovery (default: 2)
+  --run-dir DIR                  Output directory
+  --candidate NAME               Candidate name for optional full gate
+  --music-file PATH              Music fixture for optional full gate
+  --physical-baseline-json PATH  Physical baseline JSON for optional full gate
+  --run-candidate-gate           Run candidate-listen-gate after short capture
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --wait) wait_seconds="$2"; shift 2 ;;
+    --interval) interval_seconds="$2"; shift 2 ;;
+    --record-seconds) record_seconds="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --run-candidate-gate) run_candidate_gate="1"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/irig-recovery-gate-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "irig-recovery-gate" "$run_dir"; then
+  {
+    echo "irig_recovery_gate=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "irig-recovery-gate" "$run_dir"
+
+make build/audio-list build/audio-record >/dev/null
+
+max_attempts="$(python3 - "$wait_seconds" "$interval_seconds" <<'PY'
+import math
+import sys
+
+wait_seconds = max(0.0, float(sys.argv[1]))
+interval_seconds = max(0.1, float(sys.argv[2]))
+print(max(1, int(math.ceil(wait_seconds / interval_seconds))))
+PY
+)"
+
+attempt=0
+found_audio8_core_audio=0
+found_irig_usb=0
+found_irig_usb_by_id=0
+found_irig_core_audio=0
+physical_capture_status="MISSING"
+physical_capture_reason="not_checked"
+
+echo "irig_recovery_gate=WAITING"
+echo "run_dir=$run_dir"
+echo "wait_seconds=$wait_seconds"
+echo "interval_seconds=$interval_seconds"
+echo "max_attempts=$max_attempts"
+
+while [ "$attempt" -lt "$max_attempts" ]; do
+  attempt=$((attempt + 1))
+  audio_list="$run_dir/audio-list-attempt-$attempt.txt"
+  usb_ioreg="$run_dir/usb-ioreg-attempt-$attempt.txt"
+  diagnose_dir="$run_dir/capture-device-diagnose-attempt-$attempt"
+  diagnose_result="$diagnose_dir/result.txt"
+
+  ./build/audio-list >"$audio_list" 2>&1 || true
+  ioreg -p IOUSB -l -w 0 >"$usb_ioreg" 2>&1 || true
+  ./scripts/capture-device-diagnose --run-dir "$diagnose_dir" \
+    >"$run_dir/capture-device-diagnose-attempt-$attempt.txt" 2>&1 || true
+
+  if [ -f "$diagnose_result" ]; then
+    physical_capture_status="$(awk -F= '$1=="physical_capture_status"{print $2; exit}' "$diagnose_result")"
+    physical_capture_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$diagnose_result")"
+    found_audio8_core_audio="$(awk -F= '$1=="found_audio8_core_audio"{print $2; exit}' "$diagnose_result")"
+    found_irig_usb="$(awk -F= '$1=="found_irig_usb"{print $2; exit}' "$diagnose_result")"
+    found_irig_usb_by_id="$(awk -F= '$1=="found_irig_usb_by_id"{print $2; exit}' "$diagnose_result")"
+    found_irig_core_audio="$(awk -F= '$1=="found_irig_core_audio"{print $2; exit}' "$diagnose_result")"
+  fi
+
+  {
+    echo "attempt=$attempt"
+    echo "physical_capture_status=$physical_capture_status"
+    echo "physical_capture_reason=$physical_capture_reason"
+    echo "found_audio8_core_audio=$found_audio8_core_audio"
+    echo "found_irig_usb=$found_irig_usb"
+    echo "found_irig_usb_by_id=$found_irig_usb_by_id"
+    echo "found_irig_core_audio=$found_irig_core_audio"
+    echo "audio_list=$audio_list"
+    echo "usb_ioreg=$usb_ioreg"
+    echo "capture_device_diagnose=$diagnose_result"
+  } >"$run_dir/latest-status.txt"
+
+  if [ "$found_audio8_core_audio" = "1" ] \
+    && [ "$physical_capture_status" = "READY" ]; then
+    cp "$audio_list" "$run_dir/audio-list-ready.txt"
+    cp "$usb_ioreg" "$run_dir/usb-ioreg-ready.txt"
+    cp "$diagnose_result" "$run_dir/capture-device-diagnose-ready.txt"
+    break
+  fi
+
+  sleep "$interval_seconds"
+done
+
+{
+  echo "attempts=$attempt"
+  echo "physical_capture_status=$physical_capture_status"
+  echo "physical_capture_reason=$physical_capture_reason"
+  echo "found_audio8_core_audio=$found_audio8_core_audio"
+  echo "found_irig_usb=$found_irig_usb"
+  echo "found_irig_usb_by_id=$found_irig_usb_by_id"
+  echo "found_irig_core_audio=$found_irig_core_audio"
+} >"$run_dir/device-readiness.txt"
+
+if [ "$found_audio8_core_audio" != "1" ] \
+  || [ "$physical_capture_status" != "READY" ]; then
+  {
+    echo "irig_recovery_gate=FAIL"
+    if [ "$physical_capture_reason" != "not_checked" ]; then
+      echo "reason=$physical_capture_reason"
+    elif [ "$found_irig_usb" != "1" ]; then
+      echo "reason=irig_missing_from_usb_tree"
+    elif [ "$found_irig_usb_by_id" != "1" ]; then
+      echo "reason=irig_usb_id_not_verified"
+    elif [ "$found_irig_core_audio" != "1" ]; then
+      echo "reason=irig_missing_from_core_audio"
+    else
+      echo "reason=open_audio8dj_missing_from_core_audio"
+    fi
+    echo "attempts=$attempt"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 1
+fi
+
+capture="$run_dir/irig-recovery-capture.wav"
+./build/audio-record "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
+  >"$run_dir/irig-recovery-record.log" 2>&1
+
+python3 - "$capture" >"$run_dir/irig-recovery-capture-summary.txt" <<'PY'
+import math
+import sys
+import wave
+
+import numpy as np
+
+path = sys.argv[1]
+with wave.open(path, "rb") as wav:
+    channels = wav.getnchannels()
+    rate = wav.getframerate()
+    frames = wav.getnframes()
+    raw = wav.readframes(frames)
+
+data = np.frombuffer(raw, dtype="<i2").astype(np.float64)
+if channels:
+    data = data.reshape(-1, channels) / 32768.0
+
+def dbfs(value):
+    return -240.0 if value <= 0 else 20.0 * math.log10(float(value))
+
+print(f"capture={path}")
+print(f"rate={rate}")
+print(f"frames={frames}")
+print(f"channels={channels}")
+print(f"duration_seconds={frames / rate if rate else 0.0:.6f}")
+for index in range(channels):
+    values = data[:, index]
+    rms = float(np.sqrt(np.mean(values * values))) if len(values) else 0.0
+    peak = float(np.max(np.abs(values))) if len(values) else 0.0
+    clipped = int(np.sum(np.abs(values) >= 0.999))
+    print(f"channel_{index + 1}_rms_dbfs={dbfs(rms):.6f}")
+    print(f"channel_{index + 1}_peak_dbfs={dbfs(peak):.6f}")
+    print(f"channel_{index + 1}_clipped_samples={clipped}")
+PY
+
+./scripts/audio-stack-health >"$run_dir/audio-stack-health-after-capture.txt" 2>&1
+
+if [ "$run_candidate_gate" = "1" ]; then
+  if [ -z "$candidate" ] || [ -z "$music_file" ] || [ -z "$physical_baseline_json" ]; then
+    {
+      echo "irig_recovery_gate=FAIL"
+      echo "reason=missing_candidate_gate_arguments"
+      echo "run_dir=$run_dir"
+    } | tee "$run_dir/result.txt"
+    exit 2
+  fi
+  if ! ./scripts/candidate-listen-gate \
+    --candidate "$candidate" \
+    --music-file "$music_file" \
+    --physical-baseline-json "$physical_baseline_json" \
+    --run-dir "$run_dir/candidate-listen-gate" \
+    >"$run_dir/candidate-listen-gate.txt" 2>&1; then
+    {
+      echo "irig_recovery_gate=FAIL"
+      echo "reason=candidate_listen_gate_failed"
+      echo "candidate_gate_log=$run_dir/candidate-listen-gate.txt"
+      echo "run_dir=$run_dir"
+    } | tee "$run_dir/result.txt"
+    exit 1
+  fi
+  candidate_listen_result="$run_dir/candidate-listen-gate/result.txt"
+  candidate_listen_status="$(awk -F= '$1=="candidate_listen_gate"{print $2; exit}' "$candidate_listen_result" 2>/dev/null || true)"
+  if [ "$candidate_listen_status" != "PASS" ]; then
+    {
+      echo "irig_recovery_gate=FAIL"
+      echo "reason=candidate_listen_gate_result_not_pass"
+      echo "candidate_listen_gate_result=$candidate_listen_result"
+      echo "run_dir=$run_dir"
+    } | tee "$run_dir/result.txt"
+    exit 1
+  fi
+fi
+
+{
+  if [ "$run_candidate_gate" = "1" ]; then
+    echo "irig_recovery_gate=PASS"
+    echo "reason=candidate_listen_gate_passed"
+  else
+    echo "irig_recovery_gate=READY_FOR_PHYSICAL_GATE"
+    echo "reason=short_irig_capture_passed_candidate_gate_not_run"
+  fi
+  echo "attempts=$attempt"
+  echo "capture=$capture"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"

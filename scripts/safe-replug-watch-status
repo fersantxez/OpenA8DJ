@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+state_dir="local-analysis/safe-replug-watch"
+current_file="$state_dir/current.env"
+
+if [ ! -f "$current_file" ]; then
+  echo "safe_replug_watch_status=NOT_STARTED"
+  echo "current_file=$current_file"
+  exit 3
+fi
+
+read_key() {
+  local key="$1"
+  local fallback="${2:-}"
+  awk -F= -v key="$key" -v fallback="$fallback" '$1==key{print substr($0, index($0, "=") + 1); found=1; exit} END{if (!found) print fallback}' "$current_file"
+}
+
+pid="$(read_key pid)"
+label="$(read_key label "com.fer.opena8dj.safe-replug-watch")"
+run_dir="$(read_key run_dir)"
+result="$(read_key result)"
+stdout="$(read_key stdout)"
+stderr="$(read_key stderr)"
+runner="$(read_key runner)"
+started_at="$(read_key started_at)"
+wait_seconds="$(read_key wait_seconds)"
+interval_seconds="$(read_key interval_seconds)"
+stable_polls="$(read_key stable_polls)"
+
+launch_state="$(launchctl print "gui/$(id -u)/$label" 2>/dev/null || true)"
+launch_pid="$(printf '%s\n' "$launch_state" | awk '/pid = /{print $3; exit}')"
+if [ -n "$launch_pid" ]; then
+  pid="$launch_pid"
+fi
+
+if [ -n "$pid" ] && [ "$pid" != "unknown" ] && ps -p "$pid" >/dev/null 2>&1; then
+  status="RUNNING"
+else
+  status="EXITED"
+fi
+
+{
+  echo "safe_replug_watch_status=$status"
+  echo "label=$label"
+  echo "pid=$pid"
+  echo "run_dir=$run_dir"
+  echo "result=$result"
+  echo "stdout=$stdout"
+  echo "stderr=$stderr"
+  echo "runner=$runner"
+  echo "started_at=$started_at"
+  echo "wait_seconds=$wait_seconds"
+  echo "interval_seconds=$interval_seconds"
+  echo "stable_polls=$stable_polls"
+}
+
+latest_status=""
+if [ -n "$run_dir" ]; then
+  latest_status="$run_dir/candidate-watch-ready-email-gate/candidate-watch/latest-status.txt"
+fi
+if [ -f "$latest_status" ]; then
+  awk '
+    $1 ~ /^(attempt|ready_streak|stable_polls|physical_capture_status|physical_capture_reason|found_audio8_core_audio|found_irig_usb|found_irig_usb_by_id|found_irig_core_audio|usb_enumeration_failures|failed_usb_ports|next_recovery_action|capture_device_diagnose)=/ {
+      print "latest_" $0
+    }
+  ' "$latest_status"
+  echo "latest_status=$latest_status"
+fi
+
+if [ -f "$result" ]; then
+  awk '
+    $1 ~ /^(candidate_watch_ready_email_gate|reason|candidate_watch_status|candidate_watch_rc|candidate_watch_result|candidate_ready_email_gate|candidate_ready_email_result|usb_enumeration_failures|failed_usb_ports|next_recovery_action)=/ {
+      print
+    }
+  ' "$result"
+elif [ "$status" = "EXITED" ]; then
+  echo "result_status=MISSING"
+  if [ -f "$stdout" ]; then
+    echo "stdout_tail_begin"
+    tail -20 "$stdout" | sed 's/^/stdout: /'
+    echo "stdout_tail_end"
+  fi
+  if [ -f "$stderr" ]; then
+    echo "stderr_tail_begin"
+    tail -20 "$stderr" | sed 's/^/stderr: /'
+    echo "stderr_tail_end"
+  fi
+fi

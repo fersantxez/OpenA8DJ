@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+set -u
+
+ROOT="/Users/fer/dev/opena8dj"
+RUN_ROOT="$ROOT/local-analysis/startup"
+RUN_DIR="$RUN_ROOT/post-reboot-$(date +%Y%m%d-%H%M%S)"
+PY="/Users/fer/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3"
+OPEN_AUDIO_QA_MEDIA_APPS="${OPEN_AUDIO_QA_MEDIA_APPS:-0}"
+
+mkdir -p "$RUN_DIR"
+ln -sfn "$RUN_DIR" "$RUN_ROOT/latest"
+
+exec >"$RUN_DIR/startup.log" 2>&1
+
+echo "startup_time=$(date '+%Y-%m-%dT%H:%M:%S%z')"
+echo "root=$ROOT"
+echo "run_dir=$RUN_DIR"
+echo "open_audio_qa_media_apps=$OPEN_AUDIO_QA_MEDIA_APPS"
+cd "$ROOT" || exit 10
+
+run_with_timeout() {
+  timeout_seconds="$1"
+  stdout_path="$2"
+  stderr_path="$3"
+  shift 3
+  "$@" >"$stdout_path" 2>"$stderr_path" &
+  pid="$!"
+  elapsed=0
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$elapsed" -ge "$timeout_seconds" ]; then
+      kill "$pid" 2>/dev/null || true
+      sleep 0.2
+      kill -9 "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+      echo "timeout_after_seconds=$timeout_seconds" >>"$stderr_path"
+      return 124
+    fi
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+  wait "$pid"
+}
+
+cat > "$RUN_DIR/RUN_MANIFEST.txt" <<EOF
+OpenA8DJ post-reboot audio QA startup
+
+startup_time=$(date '+%Y-%m-%dT%H:%M:%S%z')
+root=$ROOT
+run_dir=$RUN_DIR
+latest_link=$RUN_ROOT/latest
+launch_agent=$HOME/Library/LaunchAgents/com.fer.opena8dj.audio-qa-startup.plist
+media_apps_opt_in=$OPEN_AUDIO_QA_MEDIA_APPS
+
+This run starts quiet, checks audio stack health, and then hands off to the
+autonomous supervisor. The supervisor only plays audio after Audio 8 DJ and
+iRig Stream are both visible and stable.
+EOF
+
+cat > "$RUN_DIR/RESUME_FOR_CODEX.md" <<EOF
+# Resume OpenA8DJ Audio QA
+
+Startup run: \`$RUN_DIR\`
+
+Immediate checks:
+
+- Read \`startup.log\`.
+- Read \`audio-stack-health-before-apps.txt\` and \`audio-stack-health-after-app-open.txt\`.
+- Read \`irig-startup-baseline-summary.json\`.
+- Confirm the autonomous supervisor is running.
+- Do not ask for human listening until physical gates pass.
+
+Expected scope:
+
+- Own only startup/resume automation and docs/scripts around it.
+- Do not touch HAL driver source.
+- Continue physical iRig QA from the latest handoff.
+EOF
+
+if [ -d "/Applications/Codex.app" ]; then
+  {
+    echo "codex_open=begin"
+    /usr/bin/open -a "Codex" "$ROOT"
+    /usr/bin/osascript -e 'tell application "Codex" to activate'
+    echo "codex_open=end"
+  } > "$RUN_DIR/open-codex.log" 2>&1 || true
+else
+  echo "missing_app=/Applications/Codex.app" > "$RUN_DIR/open-codex.log"
+fi
+
+echo "waiting_for_audio_devices=begin"
+found_devices=0
+found_audio8_core_audio=0
+found_irig_core_audio=0
+found_irig_usb=0
+physical_capture_status="MISSING"
+physical_capture_reason="not_checked"
+for attempt in $(seq 1 60); do
+  if [ -x "$ROOT/build/audio-list" ]; then
+    run_with_timeout 10 \
+      "$RUN_DIR/audio-list-attempt-$attempt.txt" \
+      "$RUN_DIR/audio-list-attempt-$attempt.err" \
+      "$ROOT/build/audio-list" || true
+    /usr/sbin/ioreg -p IOUSB -l -w 0 > "$RUN_DIR/usb-ioreg-attempt-$attempt.txt" 2>&1 || true
+    /usr/sbin/ioreg -p IOService -l -w0 -r -c IOUSBHostDevice > "$RUN_DIR/usb-port-ioreg-attempt-$attempt.txt" 2>&1 || true
+    diagnose_dir="$RUN_DIR/capture-device-diagnose-attempt-$attempt"
+    diagnose_result="$diagnose_dir/result.txt"
+    if [ -x "$ROOT/scripts/capture-device-diagnose" ]; then
+      "$ROOT/scripts/capture-device-diagnose" \
+        --run-dir "$diagnose_dir" \
+        --audio-list-file "$RUN_DIR/audio-list-attempt-$attempt.txt" \
+        --usb-ioreg-file "$RUN_DIR/usb-ioreg-attempt-$attempt.txt" \
+        --usb-port-ioreg-file "$RUN_DIR/usb-port-ioreg-attempt-$attempt.txt" \
+        > "$RUN_DIR/capture-device-diagnose-attempt-$attempt.txt" 2>&1 || true
+    fi
+    if [ -f "$diagnose_result" ]; then
+      physical_capture_status="$(/usr/bin/awk -F= '$1=="physical_capture_status"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+      physical_capture_reason="$(/usr/bin/awk -F= '$1=="reason"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+      found_audio8_core_audio="$(/usr/bin/awk -F= '$1=="found_audio8_core_audio"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+      found_irig_usb="$(/usr/bin/awk -F= '$1=="found_irig_usb"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+      found_irig_core_audio="$(/usr/bin/awk -F= '$1=="found_irig_core_audio"{print substr($0, index($0, "=") + 1); exit}' "$diagnose_result")"
+    fi
+    if [ "$found_audio8_core_audio" = "1" ] \
+      && [ "$physical_capture_status" = "READY" ]; then
+      cp "$RUN_DIR/audio-list-attempt-$attempt.txt" "$RUN_DIR/audio-list-ready.txt"
+      cp "$RUN_DIR/usb-ioreg-attempt-$attempt.txt" "$RUN_DIR/usb-ioreg-ready.txt"
+      cp "$diagnose_result" "$RUN_DIR/capture-device-diagnose-ready.txt"
+      found_devices=1
+      echo "audio_devices_ready_attempt=$attempt"
+      break
+    fi
+  else
+    echo "missing_tool=$ROOT/build/audio-list"
+  fi
+  sleep 2
+done
+echo "waiting_for_audio_devices=end found=$found_devices"
+{
+  echo "audio_devices_ready=$found_devices"
+  echo "physical_capture_status=$physical_capture_status"
+  echo "physical_capture_reason=$physical_capture_reason"
+  echo "found_audio8_core_audio=$found_audio8_core_audio"
+  echo "found_irig_core_audio=$found_irig_core_audio"
+  echo "found_irig_usb=$found_irig_usb"
+  if [ -f "$diagnose_result" ]; then
+    /usr/bin/awk -F= '$1=="usb_enumeration_failures" || $1=="failed_usb_ports" || $1=="next_recovery_action" {print}' "$diagnose_result"
+  fi
+} > "$RUN_DIR/device-readiness.txt"
+
+if [ -x "$ROOT/build/audio-default" ]; then
+  "$ROOT/build/audio-default" > "$RUN_DIR/audio-default-before.txt" 2>&1 || true
+  "$ROOT/build/audio-default" "org.opena8dj.Audio8DJ" > "$RUN_DIR/audio-default-set-open-audio8dj.txt" 2>&1 || true
+  "$ROOT/build/audio-default" > "$RUN_DIR/audio-default-after.txt" 2>&1 || true
+fi
+
+if [ -x "$ROOT/scripts/audio-stack-guard" ]; then
+  "$ROOT/scripts/audio-stack-guard" \
+    --wait 3 \
+    --enumeration-timeout 5 \
+    --min-idle-pct 20 \
+    --run-dir "$RUN_DIR/audio-stack-guard-before-apps" \
+    > "$RUN_DIR/audio-stack-health-before-apps.txt" 2>&1 || true
+  cp "$RUN_DIR/audio-stack-health-before-apps.txt" "$RUN_DIR/audio-stack-health.txt"
+elif [ -x "$ROOT/scripts/audio-stack-health" ]; then
+  "$ROOT/scripts/audio-stack-health" --wait 3 > "$RUN_DIR/audio-stack-health-before-apps.txt" 2>&1 || true
+  cp "$RUN_DIR/audio-stack-health-before-apps.txt" "$RUN_DIR/audio-stack-health.txt"
+fi
+
+if [ "$found_devices" = "1" ] && [ -x "$ROOT/build/audio-record" ]; then
+  "$ROOT/build/audio-record" 8 "$RUN_DIR/irig-startup-baseline.wav" "iRig Stream" 1,2 \
+    > "$RUN_DIR/irig-startup-baseline-record.log" 2>&1 || true
+else
+  {
+    echo "record_skipped=1"
+    echo "reason=$physical_capture_reason"
+    echo "physical_capture_status=$physical_capture_status"
+    echo "found_irig_usb=$found_irig_usb"
+    echo "found_irig_core_audio=$found_irig_core_audio"
+  } > "$RUN_DIR/irig-startup-baseline-record.log"
+fi
+
+if [ -x "$PY" ] && [ -f "$RUN_DIR/irig-startup-baseline.wav" ]; then
+  "$PY" - "$RUN_DIR" <<'PY'
+from pathlib import Path
+import json
+import math
+import sys
+import wave
+
+import numpy as np
+
+run = Path(sys.argv[1])
+path = run / "irig-startup-baseline.wav"
+with wave.open(str(path), "rb") as wav:
+    channels = wav.getnchannels()
+    rate = wav.getframerate()
+    frames = wav.getnframes()
+    raw = wav.readframes(frames)
+data = np.frombuffer(raw, dtype="<i2").astype(np.float64).reshape(-1, channels) / 32768.0
+
+def dbfs(value):
+    return -240.0 if value <= 0 else 20.0 * math.log10(float(value))
+
+summary = {
+    "capture": str(path),
+    "rate": rate,
+    "duration_sec": frames / rate if rate else 0.0,
+    "channels": [],
+}
+for index in range(channels):
+    values = data[:, index]
+    rms = float(np.sqrt(np.mean(values * values))) if len(values) else 0.0
+    peak = float(np.max(np.abs(values))) if len(values) else 0.0
+    summary["channels"].append({
+        "channel": index + 1,
+        "rms_dbfs": dbfs(rms),
+        "peak_dbfs": dbfs(peak),
+        "clipped_samples": int(np.sum(np.abs(values) >= 0.999)),
+    })
+(run / "irig-startup-baseline-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+print(json.dumps(summary, indent=2))
+PY
+elif [ ! -f "$RUN_DIR/irig-startup-baseline.wav" ]; then
+  cat > "$RUN_DIR/irig-startup-baseline-summary.json" <<EOF
+{
+  "verdict": "SKIPPED",
+  "reason": "$physical_capture_reason",
+  "physical_capture_status": "$physical_capture_status",
+  "found_irig_usb": $found_irig_usb,
+  "found_irig_core_audio": $found_irig_core_audio
+}
+EOF
+fi
+
+echo "opening_media_apps=begin opt_in=$OPEN_AUDIO_QA_MEDIA_APPS"
+if [ "$OPEN_AUDIO_QA_MEDIA_APPS" = "1" ]; then
+  for app in \
+    "/Applications/VLC.app" \
+    "/Applications/Spotify.app" \
+    "/Applications/Native Instruments/Traktor Pro 3/Traktor.app"
+  do
+    if [ -d "$app" ]; then
+      /usr/bin/open -g "$app" || true
+      echo "opened=$app"
+    else
+      echo "missing_app=$app"
+    fi
+  done
+else
+  echo "skipped_media_apps=quiet_startup_default"
+  echo "set OPEN_AUDIO_QA_MEDIA_APPS=1 in the LaunchAgent environment to restore app opening"
+fi
+echo "opening_media_apps=end"
+
+sleep 3
+if [ -x "$ROOT/scripts/audio-stack-guard" ]; then
+  "$ROOT/scripts/audio-stack-guard" \
+    --wait 1 \
+    --enumeration-timeout 5 \
+    --min-idle-pct 20 \
+    --run-dir "$RUN_DIR/audio-stack-guard-after-app-open" \
+    > "$RUN_DIR/audio-stack-health-after-app-open.txt" 2>&1 || true
+elif [ -x "$ROOT/scripts/audio-stack-health" ]; then
+  "$ROOT/scripts/audio-stack-health" --wait 1 > "$RUN_DIR/audio-stack-health-after-app-open.txt" 2>&1 || true
+fi
+
+/bin/ps aux > "$RUN_DIR/ps-after-startup.txt" 2>&1 || true
+
+cat > "$RUN_DIR/NEXT_TESTS.txt" <<'EOF'
+Post-reboot OpenA8DJ audio QA startup is ready.
+
+Important paths:
+
+- latest startup run: /Users/fer/dev/opena8dj/local-analysis/startup/latest
+- resume note for Codex: /Users/fer/dev/opena8dj/local-analysis/startup/latest/RESUME_FOR_CODEX.md
+- run manifest: /Users/fer/dev/opena8dj/local-analysis/startup/latest/RUN_MANIFEST.txt
+- baseline iRig capture: /Users/fer/dev/opena8dj/local-analysis/startup/latest/irig-startup-baseline.wav
+- startup health before apps: /Users/fer/dev/opena8dj/local-analysis/startup/latest/audio-stack-health-before-apps.txt
+- startup health after apps: /Users/fer/dev/opena8dj/local-analysis/startup/latest/audio-stack-health-after-app-open.txt
+
+Recommended next commands:
+
+1. Confirm devices:
+   ./build/audio-list
+   ./build/audio-default
+   ./scripts/capture-device-diagnose
+   ./scripts/audio-stack-guard --wait 1 --enumeration-timeout 5 --min-idle-pct 20
+
+2. Confirm the autonomous recovery/QA supervisor:
+   ./scripts/autonomous-audio-qa-status
+
+3. Run physical soundcheck gate:
+   ./scripts/run-soundcheck --skip-build --music-file "local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav" --capture-device "iRig Stream" --capture-channels 1,2 --pair A --rate 48000 --buffer 512 --seconds 20 --mode dense --target-peak-db -18 --drift-profile --cpu-profile
+
+Do not ask for human listening until physical iRig capture metrics pass.
+EOF
+
+if [ -x "$ROOT/scripts/start-autonomous-audio-qa" ]; then
+  "$ROOT/scripts/start-autonomous-audio-qa" \
+    --candidate "post-reboot-auto" \
+    --wait 0 \
+    --interval 30 \
+    --stable-polls 3 \
+    --recovery-wait 20 \
+    --recovery-interval-cycles 10 \
+    --max-recoveries-per-hour 3 \
+    --candidate-gate-wait 240 \
+    --to "fernandosanchezmunoz@gmail.com" \
+    > "$RUN_DIR/start-autonomous-audio-qa.txt" 2>&1 || true
+else
+  echo "start_autonomous_audio_qa=missing" > "$RUN_DIR/start-autonomous-audio-qa.txt"
+fi
+
+cat >> "$RUN_DIR/RUN_MANIFEST.txt" <<EOF
+
+startup_complete=$(date '+%Y-%m-%dT%H:%M:%S%z')
+baseline_capture=$RUN_DIR/irig-startup-baseline.wav
+baseline_summary=$RUN_DIR/irig-startup-baseline-summary.json
+health_before_apps=$RUN_DIR/audio-stack-health-before-apps.txt
+health_after_apps=$RUN_DIR/audio-stack-health-after-app-open.txt
+resume_note=$RUN_DIR/RESUME_FOR_CODEX.md
+autonomous_supervisor_start=$RUN_DIR/start-autonomous-audio-qa.txt
+EOF
+
+echo "startup_complete=$(date '+%Y-%m-%dT%H:%M:%S%z')"

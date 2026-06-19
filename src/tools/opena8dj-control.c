@@ -56,6 +56,7 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputInvertLeftMask;
     uint8_t inputInvertRightMask;
     uint8_t inputSource[kInputPairs];
+    uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
 
 typedef struct OpenA8DJInputStatsPayload {
@@ -204,6 +205,8 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackRequestCountSamples;
     uint64_t playbackZeroCompleteTransactions;
     uint64_t playbackLayoutSignatureSum;
+    uint64_t outputLateWriteFrames;
+    uint64_t outputLateWriteBatches;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -377,12 +380,20 @@ static void ResetInputTransforms(OpenA8DJControlPayload *state)
 
 static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
 {
+    if (strcmp(name, "playback") == 0 ||
+        strcmp(name, "output-only") == 0 ||
+        strcmp(name, "spotify") == 0 ||
+        strcmp(name, "vlc") == 0) {
+        state->inputDecodeEnabled = 0;
+        return true;
+    }
     if (strcmp(name, "timecode-vinyl") == 0 || strcmp(name, "tc-vinyl") == 0) {
         state->inputMode = 0;
         state->gndLiftTCVinyl = 1;
         state->gndLiftTCCDLine = 0;
         state->gndLiftPhono = 0;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -395,6 +406,7 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         state->gndLiftTCCDLine = 1;
         state->gndLiftPhono = 0;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -404,6 +416,7 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         state->gndLiftTCCDLine = 0;
         state->gndLiftPhono = 1;
         state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
         ResetInputTransforms(state);
         return true;
     }
@@ -599,11 +612,24 @@ static bool StartHALWake(void)
     return true;
 }
 
-static int ConnectSocketWithWake(void)
+static bool EnvFlagEnabled(const char *name)
+{
+    const char *value = getenv(name);
+    return value != NULL &&
+        (strcmp(value, "1") == 0 ||
+         strcmp(value, "true") == 0 ||
+         strcmp(value, "yes") == 0 ||
+         strcmp(value, "on") == 0);
+}
+
+static int ConnectSocketWithWake(bool allowWake)
 {
     int fd = ConnectSocket();
     if (fd >= 0) {
         return fd;
+    }
+    if (!allowWake) {
+        return -1;
     }
 
     fprintf(stderr, "OpenA8DJ HAL bridge is not available; waking the device...\n");
@@ -635,8 +661,14 @@ static bool ReadOneState(int fd, OpenA8DJControlPayload *state)
         if (header.length > 0 && !ReadFull(fd, payload, header.length)) {
             return false;
         }
-        if (header.type == kIPCTypeControlState && header.length >= sizeof(*state)) {
-            memcpy(state, payload, sizeof(*state));
+        if (header.type == kIPCTypeControlState &&
+            header.length >= offsetof(OpenA8DJControlPayload, inputDecodeEnabled)) {
+            memset(state, 0, sizeof(*state));
+            size_t copyLength = header.length < sizeof(*state) ? header.length : sizeof(*state);
+            memcpy(state, payload, copyLength);
+            if (header.length < sizeof(*state)) {
+                state->inputDecodeEnabled = 1;
+            }
             return true;
         }
     }
@@ -733,6 +765,7 @@ static void PrintState(const OpenA8DJControlPayload *state)
     printf("  gnd-cd-line:       %s\n", state->gndLiftTCCDLine ? "on" : "off");
     printf("  gnd-phono:         %s\n", state->gndLiftPhono ? "on" : "off");
     printf("  software-lock:     %s\n", state->softwareLock ? "on" : "off");
+    printf("  input-decode:      %s\n", state->inputDecodeEnabled ? "on" : "off");
     printf("  input-transform:   A=%s B=%s C=%s D=%s\n",
            InputTransformName(InputTransformForPair(state, 0)),
            InputTransformName(InputTransformForPair(state, 1)),
@@ -827,7 +860,7 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->playbackTransactionFailures,
            (unsigned long long)stats->playbackShortTransfers,
            (unsigned long long)stats->playbackQueueFailures);
-    printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu\n",
+    printf("  output:                 written=%llu read=%llu underruns=%llu active-underruns=%llu startup-silence=%llu overruns=%llu elastic-drops=%llu elastic-replays=%llu timeline-resets=%llu late-write-frames=%llu late-write-batches=%llu\n",
            (unsigned long long)stats->outputFramesWritten,
            (unsigned long long)stats->outputFramesRead,
            (unsigned long long)stats->outputUnderruns,
@@ -836,7 +869,9 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
            (unsigned long long)stats->outputRingOverruns,
            (unsigned long long)stats->outputElasticDrops,
            (unsigned long long)stats->outputElasticReplays,
-           (unsigned long long)stats->outputTimelineResets);
+           (unsigned long long)stats->outputTimelineResets,
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteFrames : 0),
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteBatches : 0));
     printf("  output-level:           peak=%.6f near-clip=%llu clipped=%llu\n",
            stats->outputPeak,
            (unsigned long long)stats->outputNearClipSamples,
@@ -980,6 +1015,10 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
     printf("outputElasticDrops=%llu\n", (unsigned long long)stats->outputElasticDrops);
     printf("outputElasticReplays=%llu\n", (unsigned long long)stats->outputElasticReplays);
     printf("outputTimelineResets=%llu\n", (unsigned long long)stats->outputTimelineResets);
+    printf("outputLateWriteFrames=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteFrames : 0));
+    printf("outputLateWriteBatches=%llu\n",
+           (unsigned long long)(STREAM_STATS_HAS_FIELD(payloadLength, outputLateWriteBatches) ? stats->outputLateWriteBatches : 0));
     printf("outputPanicFlags=%llu\n", (unsigned long long)stats->outputPanicFlags);
     printf("clockAnchorValid=%u\n", stats->clockAnchorValid);
     printf("clockAcceptedAnchors=%llu\n", (unsigned long long)stats->clockAcceptedAnchors);
@@ -1024,8 +1063,10 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s\n", argv0);
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
-    fprintf(stderr, "  %s profile timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
+    fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
+    fprintf(stderr, "  %s profile playback|timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
+    fprintf(stderr, "  %s input-decode on|off\n", argv0);
     fprintf(stderr, "  %s gnd-vinyl on|off\n", argv0);
     fprintf(stderr, "  %s gnd-cd-line on|off\n", argv0);
     fprintf(stderr, "  %s gnd-phono on|off\n", argv0);
@@ -1041,7 +1082,8 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    int fd = ConnectSocketWithWake();
+    bool allowWake = !EnvFlagEnabled("OPENA8DJ_CONTROL_NO_WAKE");
+    int fd = ConnectSocketWithWake(allowWake);
     if (fd < 0) {
         fprintf(stderr, "OpenA8DJ HAL bridge is not available at %s\n", kSocketPath);
         return 1;
@@ -1136,6 +1178,8 @@ int main(int argc, char **argv)
             state.gndLiftPhono = value;
         } else if (strcmp(argv[1], "software-lock") == 0) {
             state.softwareLock = value;
+        } else if (strcmp(argv[1], "input-decode") == 0) {
+            state.inputDecodeEnabled = value;
         } else {
             Usage(argv[0]);
             close(fd);

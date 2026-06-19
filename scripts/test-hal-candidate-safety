@@ -76,6 +76,20 @@ if [ -z "$run_dir" ]; then
 fi
 mkdir -p "$run_dir"
 
+# shellcheck source=scripts/audio-gate-lock.sh
+source "$ROOT/scripts/audio-gate-lock.sh"
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "test-hal-candidate-safety" "$run_dir"; then
+  {
+    echo "hal_candidate_safety=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/summary.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "test-hal-candidate-safety" "$run_dir"
+
 active_hal="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
 disabled_hal="/Library/Audio/Plug-Ins/HAL.disabled"
 

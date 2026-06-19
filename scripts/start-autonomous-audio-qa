@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+wait_seconds="0"
+interval_seconds="30"
+stable_polls="3"
+recovery_wait_seconds="20"
+recovery_interval_cycles="10"
+max_recoveries_per_hour="3"
+candidate_gate_wait_seconds="240"
+run_dir=""
+to="fernandosanchezmunoz@gmail.com"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/start-autonomous-audio-qa [options]
+
+Starts the unattended OpenA8DJ software-recovery and physical QA supervisor as
+a user LaunchAgent. It is safe to run repeatedly; an already-running supervisor
+is reused.
+
+Options:
+  --candidate NAME
+  --wait SECONDS                  0 means no deadline (default: 0)
+  --interval SECONDS              Default: 30
+  --stable-polls COUNT            Default: 3
+  --recovery-wait SECONDS         Default: 20
+  --recovery-interval-cycles N    Default: 10
+  --max-recoveries-per-hour N     Default: 3
+  --candidate-gate-wait SECONDS   Default: 240
+  --run-dir DIR
+  --to ADDRESS                    Default: fernandosanchezmunoz@gmail.com
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --wait) wait_seconds="$2"; shift 2 ;;
+    --interval) interval_seconds="$2"; shift 2 ;;
+    --stable-polls) stable_polls="$2"; shift 2 ;;
+    --recovery-wait) recovery_wait_seconds="$2"; shift 2 ;;
+    --recovery-interval-cycles) recovery_interval_cycles="$2"; shift 2 ;;
+    --max-recoveries-per-hour) max_recoveries_per_hour="$2"; shift 2 ;;
+    --candidate-gate-wait) candidate_gate_wait_seconds="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --to) to="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/autonomous-audio-qa/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+state_dir="local-analysis/autonomous-audio-qa"
+mkdir -p "$state_dir"
+current_file="$state_dir/current.env"
+label="com.fer.opena8dj.autonomous-audio-qa"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+uid="$(id -u)"
+root="$(pwd)"
+
+if [ -f "$current_file" ]; then
+  old_pid="$(awk -F= '$1=="pid"{print $2; exit}' "$current_file" 2>/dev/null || true)"
+  if [ -n "$old_pid" ] && ps -p "$old_pid" >/dev/null 2>&1; then
+    old_run_dir="$(awk -F= '$1=="run_dir"{print substr($0, index($0, "=") + 1); exit}' "$current_file" 2>/dev/null || true)"
+    {
+      echo "autonomous_audio_qa=ALREADY_RUNNING"
+      echo "pid=$old_pid"
+      echo "run_dir=$old_run_dir"
+      echo "current_file=$current_file"
+    } | tee "$run_dir/result.txt"
+    exit 0
+  fi
+fi
+
+stdout="$run_dir/supervisor.stdout"
+stderr="$run_dir/supervisor.stderr"
+runner="$run_dir/run-supervisor.sh"
+runner_abs="$root/$runner"
+stdout_abs="$root/$stdout"
+stderr_abs="$root/$stderr"
+
+cat >"$runner" <<EOF
+#!/usr/bin/env bash
+set -u
+cd "$root" || exit 10
+./scripts/autonomous-audio-qa-supervisor \\
+  --candidate "$candidate" \\
+  --wait "$wait_seconds" \\
+  --interval "$interval_seconds" \\
+  --stable-polls "$stable_polls" \\
+  --recovery-wait "$recovery_wait_seconds" \\
+  --recovery-interval-cycles "$recovery_interval_cycles" \\
+  --max-recoveries-per-hour "$max_recoveries_per_hour" \\
+  --candidate-gate-wait "$candidate_gate_wait_seconds" \\
+  --to "$to" \\
+  --run-dir "$run_dir"
+EOF
+chmod +x "$runner"
+
+mkdir -p "$HOME/Library/LaunchAgents"
+cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>$runner_abs</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>$root</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>Crashed</key>
+    <true/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>$stdout_abs</string>
+  <key>StandardErrorPath</key>
+  <string>$stderr_abs</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>AUDIO_GATE_LOCK_ROOT</key>
+    <string>$HOME/.opena8dj/hardware-gate.lock</string>
+  </dict>
+</dict>
+</plist>
+EOF
+
+launchctl bootout "gui/$uid/$label" >/dev/null 2>&1 || true
+launchctl bootstrap "gui/$uid" "$plist"
+sleep 0.5
+pid="$(launchctl print "gui/$uid/$label" 2>/dev/null | awk '/pid = /{print $3; exit}' || true)"
+
+{
+  echo "label=$label"
+  echo "pid=${pid:-unknown}"
+  echo "candidate=$candidate"
+  echo "run_dir=$run_dir"
+  echo "started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "wait_seconds=$wait_seconds"
+  echo "interval_seconds=$interval_seconds"
+  echo "stable_polls=$stable_polls"
+  echo "recovery_wait_seconds=$recovery_wait_seconds"
+  echo "recovery_interval_cycles=$recovery_interval_cycles"
+  echo "max_recoveries_per_hour=$max_recoveries_per_hour"
+  echo "candidate_gate_wait_seconds=$candidate_gate_wait_seconds"
+  echo "to=$to"
+  echo "stdout=$stdout"
+  echo "stderr=$stderr"
+  echo "runner=$runner"
+  echo "plist=$plist"
+} >"$current_file"
+
+{
+  echo "autonomous_audio_qa=STARTED"
+  echo "label=$label"
+  echo "pid=${pid:-unknown}"
+  echo "candidate=$candidate"
+  echo "run_dir=$run_dir"
+  echo "wait_seconds=$wait_seconds"
+  echo "interval_seconds=$interval_seconds"
+  echo "stable_polls=$stable_polls"
+  echo "recovery_wait_seconds=$recovery_wait_seconds"
+  echo "recovery_interval_cycles=$recovery_interval_cycles"
+  echo "max_recoveries_per_hour=$max_recoveries_per_hour"
+  echo "candidate_gate_wait_seconds=$candidate_gate_wait_seconds"
+  echo "stdout=$stdout"
+  echo "stderr=$stderr"
+  echo "runner=$runner"
+  echo "plist=$plist"
+  echo "current_file=$current_file"
+} | tee "$run_dir/result.txt"

@@ -1,0 +1,643 @@
+#!/usr/bin/env python3
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+
+WATCH_PATTERNS = {
+    "coreaudiod": re.compile(r"\bcoreaudiod\b"),
+    "opena8dj_driver": re.compile(r"Core Audio Driver \(OpenA8DJ\.driver\)"),
+    "audio_wav_play": re.compile(r"\baudio-wav-play\b"),
+    "spotify": re.compile(r"Spotify(?:\.app)?"),
+    "traktor": re.compile(r"Traktor(?:\.app)?", re.IGNORECASE),
+    "windowserver": re.compile(r"\bWindowServer\b"),
+}
+
+
+def repo_root():
+    return Path(__file__).resolve().parents[1]
+
+
+class AudioGateLock:
+    def __init__(self, root, run_dir, gate_name):
+        lock_override = os.environ.get("AUDIO_GATE_LOCK_ROOT")
+        self.lock_dir = Path(lock_override) if lock_override else Path.home() / ".opena8dj" / "hardware-gate.lock"
+        self.root = root
+        self.run_dir = run_dir
+        self.gate_name = gate_name
+        self.acquired = False
+        self.inherited = False
+        self.error = None
+
+    def _owner(self):
+        owner_path = self.lock_dir / "owner"
+        values = {}
+        try:
+            for line in owner_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    values[key] = value
+        except FileNotFoundError:
+            pass
+        return values
+
+    @staticmethod
+    def _pid_alive(pid):
+        try:
+            pid_int = int(pid)
+        except (TypeError, ValueError):
+            return False
+        try:
+            os.kill(pid_int, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def _write_status(self, status, extra=None):
+        extra = extra or {}
+        lines = [
+            f"audio_gate_lock={status}",
+            f"lock_dir={self.lock_dir}",
+            f"gate={self.gate_name}",
+        ]
+        lines.extend(f"{key}={value}" for key, value in extra.items())
+        (self.run_dir / "audio-gate-lock.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def acquire(self):
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        if os.environ.get("AUDIO_GATE_LOCK_HELD") == "1":
+            self.inherited = True
+            self._write_status("INHERITED", {
+                "owner_gate": os.environ.get("AUDIO_GATE_LOCK_OWNER_GATE", "unknown"),
+                "owner_run_dir": os.environ.get("AUDIO_GATE_LOCK_OWNER_RUN_DIR", "unknown"),
+                "owner_cwd": os.environ.get("AUDIO_GATE_LOCK_OWNER_CWD", "unknown"),
+            })
+            return True
+        self.lock_dir.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.lock_dir.mkdir()
+        except FileExistsError:
+            owner = self._owner()
+            owner_pid = owner.get("pid", "")
+            if not self._pid_alive(owner_pid):
+                shutil.rmtree(self.lock_dir, ignore_errors=True)
+                try:
+                    self.lock_dir.mkdir()
+                except FileExistsError:
+                    owner = self._owner()
+                    self.error = "audio_gate_lock_busy"
+                    self._write_status("BUSY", {
+                        "owner_pid": owner.get("pid", "unknown"),
+                        "owner_gate": owner.get("gate", "unknown"),
+                        "owner_run_dir": owner.get("run_dir", "unknown"),
+                    })
+                    return False
+                self.acquired = True
+                self._write_owner({"recovered_stale_lock": "1", "stale_owner_pid": owner_pid or "unknown"})
+                self._write_status("ACQUIRED_AFTER_STALE", {
+                    "stale_owner_pid": owner_pid or "unknown",
+                    "stale_owner_gate": owner.get("gate", "unknown"),
+                    "stale_owner_run_dir": owner.get("run_dir", "unknown"),
+                })
+                return True
+            self.error = "audio_gate_lock_busy"
+            self._write_status("BUSY", {
+                "owner_pid": owner_pid or "unknown",
+                "owner_gate": owner.get("gate", "unknown"),
+                "owner_run_dir": owner.get("run_dir", "unknown"),
+            })
+            return False
+
+        self.acquired = True
+        self._write_owner({})
+        self._write_status("ACQUIRED")
+        return True
+
+    def _write_owner(self, extra):
+        lines = [
+            f"pid={os.getpid()}",
+            f"gate={self.gate_name}",
+            f"run_dir={self.run_dir}",
+            f"cwd={self.root}",
+            "started_at=" + dt.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        ]
+        lines.extend(f"{key}={value}" for key, value in extra.items())
+        (self.lock_dir / "owner").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def release(self):
+        if self.inherited:
+            return
+        if not self.acquired:
+            return
+        owner = self._owner()
+        if owner.get("pid") == str(os.getpid()):
+            shutil.rmtree(self.lock_dir, ignore_errors=True)
+
+
+def timestamp_id():
+    return dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def percentile(values, pct):
+    if not values:
+        return 0.0
+    ordered = sorted(values)
+    index = int(round((pct / 100.0) * (len(ordered) - 1)))
+    return ordered[max(0, min(index, len(ordered) - 1))]
+
+
+def sample_process_cpu():
+    result = subprocess.run(
+        ["ps", "-axo", "pid=,pcpu=,args="],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    totals = {name: 0.0 for name in WATCH_PATTERNS}
+    own_pid = os.getpid()
+    for line in result.stdout.splitlines():
+        parts = line.strip().split(None, 2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+            cpu = float(parts[1])
+        except ValueError:
+            continue
+        if pid == own_pid:
+            continue
+        args = parts[2]
+        for name, pattern in WATCH_PATTERNS.items():
+            if pattern.search(args):
+                totals[name] += cpu
+    return totals
+
+
+def write_cpu_profile(path, rows):
+    columns = ["elapsed_seconds", "stress_active", "active_stress_workers"] + list(WATCH_PATTERNS.keys())
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("\t".join(columns) + "\n")
+        for elapsed, stress_active, stress_workers, sample in rows:
+            handle.write(
+                "\t".join(
+                    [f"{elapsed:.3f}", "1" if stress_active else "0", str(stress_workers if stress_active else 0)] +
+                    [f"{sample.get(name, 0.0):.2f}" for name in WATCH_PATTERNS]
+                )
+                + "\n"
+            )
+
+
+def parse_timing(log_text):
+    timings = {}
+    for match in re.finditer(r"^timing\s+(\S+)\s+([0-9.]+)", log_text, re.MULTILINE):
+        timings[match.group(1)] = float(match.group(2))
+    return timings
+
+
+def parse_stream_stats(text):
+    values = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if "=" in stripped and re.match(r"^[A-Za-z0-9_]+=", stripped):
+            key, value = stripped.split("=", 1)
+            try:
+                values[key] = int(float(value))
+            except ValueError:
+                continue
+    return values
+
+
+def read_stream_stats(root, run_dir, label):
+    control = root / "build" / "opena8dj-control"
+    env = os.environ.copy()
+    env["OPENA8DJ_CONTROL_NO_WAKE"] = "1"
+    result = subprocess.run(
+        [str(control), "stream-stats"],
+        cwd=str(root),
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+    (run_dir / f"stream-stats-{label}.txt").write_text(result.stdout, encoding="utf-8", errors="replace")
+    return parse_stream_stats(result.stdout)
+
+
+def stream_delta(after, before):
+    # The HAL resets stream stats at StartIO, so after a successful playback the
+    # post-run snapshot is the authoritative measurement for that run.  Treating
+    # it as a monotonic delta against the pre-run snapshot can falsely fail when
+    # two identical-length runs produce the same frame count.
+    del before
+    keys = (
+        "playbackTransfersCompleted",
+        "playbackTransferErrors",
+        "playbackScheduleErrors",
+        "outputFramesWritten",
+        "outputFramesRead",
+        "outputUnderruns",
+        "outputActiveUnderruns",
+        "outputElasticDrops",
+        "outputElasticReplays",
+        "outputTimelineResets",
+        "outputLateWriteFrames",
+        "outputLateWriteBatches",
+        "outputPanicFlags",
+        "playbackCompletionDeltaOutliers",
+        "captureToPlaybackQueueDeltaOutliers",
+        "playbackZeroCompleteTransactions",
+    )
+    return {key: int(after.get(key, 0)) for key in keys}
+
+
+def stress_worker_count(value):
+    if value == "auto":
+        return max(1, min(4, (os.cpu_count() or 2) // 2))
+    try:
+        return max(0, int(value))
+    except ValueError:
+        raise SystemExit(f"invalid --cpu-stress-workers value: {value}")
+
+
+def start_cpu_stress(worker_count, duration_seconds):
+    workers = []
+    code = (
+        "import math,time\n"
+        f"end=time.time()+{max(0.1, duration_seconds):.6f}\n"
+        "x=0.0\n"
+        "while time.time()<end:\n"
+        "    for _ in range(20000):\n"
+        "        x=math.sin(x+1.000001)\n"
+    )
+    for _index in range(worker_count):
+        workers.append(subprocess.Popen([sys.executable, "-c", code],
+                                        stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL))
+    return workers
+
+
+def stop_cpu_stress(workers):
+    for worker in workers:
+        if worker.poll() is None:
+            worker.terminate()
+    deadline = time.time() + 1.0
+    for worker in workers:
+        while worker.poll() is None and time.time() < deadline:
+            time.sleep(0.02)
+        if worker.poll() is None:
+            worker.kill()
+
+
+def start_ui_stress(run_dir, duration_seconds, interval_seconds):
+    if shutil.which("screencapture") is None:
+        return []
+    command = (
+        "import pathlib,subprocess,time\n"
+        f"out=pathlib.Path({str(run_dir / 'ui-stress').__repr__()})\n"
+        "out.mkdir(parents=True, exist_ok=True)\n"
+        f"end=time.time()+{max(0.1, duration_seconds):.6f}\n"
+        f"interval={max(0.1, interval_seconds):.6f}\n"
+        "index=0\n"
+        "while time.time()<end:\n"
+        "    path=out / f'screen-{index:04d}.jpg'\n"
+        "    subprocess.run(['screencapture','-x','-t','jpg',str(path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)\n"
+        "    index += 1\n"
+        "    time.sleep(interval)\n"
+    )
+    return [subprocess.Popen([sys.executable, "-c", command],
+                             stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)]
+
+
+def stop_ui_stress(workers):
+    stop_cpu_stress(workers)
+
+
+def summarize_cpu(rows, prefix, selector):
+    summary = {}
+    selected = [sample for _elapsed, stress_active, _stress_workers, sample in rows if selector(stress_active)]
+    summary[f"{prefix}_samples"] = len(selected)
+    for name in WATCH_PATTERNS:
+        values = [sample.get(name, 0.0) for sample in selected]
+        summary[f"cpu_{name}_{prefix}_avg"] = sum(values) / len(values) if values else 0.0
+        summary[f"cpu_{name}_{prefix}_p95"] = percentile(values, 95.0)
+        summary[f"cpu_{name}_{prefix}_max"] = max(values) if values else 0.0
+    return summary
+
+
+def summarize(rows, timings, returncode, stream_stats, args):
+    summary = {
+        "returncode": returncode,
+        "samples": len(rows),
+    }
+    summary.update(summarize_cpu(rows, "all", lambda _stress: True))
+    summary.update(summarize_cpu(rows, "stress", lambda stress: stress))
+    summary.update(summarize_cpu(rows, "nonstress", lambda stress: not stress))
+    for name in WATCH_PATTERNS:
+        summary[f"cpu_{name}_avg"] = summary[f"cpu_{name}_all_avg"]
+        summary[f"cpu_{name}_p95"] = summary[f"cpu_{name}_all_p95"]
+        summary[f"cpu_{name}_max"] = summary[f"cpu_{name}_all_max"]
+    for key, value in timings.items():
+        summary[f"timing_{key}_seconds"] = value
+    for key in (
+        "playbackTransfersCompleted",
+        "playbackTransferErrors",
+        "playbackScheduleErrors",
+        "outputFramesWritten",
+        "outputFramesRead",
+        "outputUnderruns",
+        "outputActiveUnderruns",
+        "outputElasticDrops",
+        "outputElasticReplays",
+        "outputTimelineResets",
+        "outputLateWriteFrames",
+        "outputLateWriteBatches",
+        "outputPanicFlags",
+        "playbackCompletionDeltaOutliers",
+        "captureToPlaybackQueueDeltaOutliers",
+        "playbackZeroCompleteTransactions",
+    ):
+        summary[f"stream_{key}"] = int(stream_stats.get(key, 0))
+    start = timings.get("device-start", 9999.0)
+    first = timings.get("first-callback", 9999.0)
+    failures = []
+    if returncode != 0:
+        failures.append(f"audio-wav-play returned {returncode}")
+    if start > args.max_start_seconds:
+        failures.append(f"device-start {start:.3f}s > {args.max_start_seconds:.3f}s")
+    if first > args.max_first_callback_seconds:
+        failures.append(f"first-callback {first:.3f}s > {args.max_first_callback_seconds:.3f}s")
+    if summary["cpu_opena8dj_driver_avg"] > args.max_driver_cpu_avg:
+        failures.append(
+            f"driver CPU avg {summary['cpu_opena8dj_driver_avg']:.2f}% > {args.max_driver_cpu_avg:.2f}%"
+        )
+    if summary["cpu_opena8dj_driver_p95"] > args.max_driver_cpu_p95:
+        failures.append(
+            f"driver CPU p95 {summary['cpu_opena8dj_driver_p95']:.2f}% > {args.max_driver_cpu_p95:.2f}%"
+        )
+    if summary["cpu_coreaudiod_p95"] > args.max_coreaudiod_cpu_p95:
+        failures.append(
+            f"coreaudiod CPU p95 {summary['cpu_coreaudiod_p95']:.2f}% > {args.max_coreaudiod_cpu_p95:.2f}%"
+        )
+    if args.cpu_stress and summary["stress_samples"] == 0:
+        failures.append("CPU stress was requested but no stress samples were recorded")
+    if args.cpu_stress:
+        if summary["cpu_opena8dj_driver_stress_avg"] > args.max_stress_driver_cpu_avg:
+            failures.append(
+                f"driver CPU stress avg {summary['cpu_opena8dj_driver_stress_avg']:.2f}% > {args.max_stress_driver_cpu_avg:.2f}%"
+            )
+        if summary["cpu_opena8dj_driver_stress_p95"] > args.max_stress_driver_cpu_p95:
+            failures.append(
+                f"driver CPU stress p95 {summary['cpu_opena8dj_driver_stress_p95']:.2f}% > {args.max_stress_driver_cpu_p95:.2f}%"
+            )
+        if summary["cpu_coreaudiod_stress_p95"] > args.max_stress_coreaudiod_cpu_p95:
+            failures.append(
+                f"coreaudiod CPU stress p95 {summary['cpu_coreaudiod_stress_p95']:.2f}% > {args.max_stress_coreaudiod_cpu_p95:.2f}%"
+            )
+    written = summary["stream_outputFramesWritten"]
+    read = summary["stream_outputFramesRead"]
+    if written <= 0:
+        failures.append("outputFramesWritten delta is 0; Core Audio did not write new frames during gate")
+    if summary["stream_playbackTransfersCompleted"] <= 0 and written <= 0:
+        failures.append("playbackTransfersCompleted delta is 0 and outputFramesWritten delta is 0")
+    if written > 0 and read < int(written * args.min_output_read_ratio):
+        failures.append(
+            f"outputFramesRead {read} < {args.min_output_read_ratio:.2f} * outputFramesWritten {written}"
+        )
+    if summary["stream_outputTimelineResets"] > args.max_timeline_resets:
+        failures.append(
+            f"outputTimelineResets {summary['stream_outputTimelineResets']} > {args.max_timeline_resets}"
+        )
+    if summary["stream_outputActiveUnderruns"] > 0:
+        failures.append(f"outputActiveUnderruns {summary['stream_outputActiveUnderruns']} > 0")
+    if summary["stream_outputElasticDrops"] > args.max_elastic_drops:
+        failures.append(
+            f"outputElasticDrops {summary['stream_outputElasticDrops']} > {args.max_elastic_drops}"
+        )
+    if summary["stream_outputElasticReplays"] > args.max_elastic_replays:
+        failures.append(
+            f"outputElasticReplays {summary['stream_outputElasticReplays']} > {args.max_elastic_replays}"
+        )
+    if summary["stream_outputLateWriteFrames"] > args.max_late_write_frames:
+        failures.append(
+            f"outputLateWriteFrames {summary['stream_outputLateWriteFrames']} > {args.max_late_write_frames}"
+        )
+    if summary["stream_outputLateWriteBatches"] > args.max_late_write_batches:
+        failures.append(
+            f"outputLateWriteBatches {summary['stream_outputLateWriteBatches']} > {args.max_late_write_batches}"
+        )
+    if summary["stream_outputPanicFlags"] > 0:
+        failures.append(f"outputPanicFlags {summary['stream_outputPanicFlags']} > 0")
+    if summary["stream_playbackCompletionDeltaOutliers"] > args.max_playback_completion_delta_outliers:
+        failures.append(
+            "playbackCompletionDeltaOutliers "
+            f"{summary['stream_playbackCompletionDeltaOutliers']} > {args.max_playback_completion_delta_outliers}"
+        )
+    if summary["stream_captureToPlaybackQueueDeltaOutliers"] > args.max_capture_to_playback_queue_delta_outliers:
+        failures.append(
+            "captureToPlaybackQueueDeltaOutliers "
+            f"{summary['stream_captureToPlaybackQueueDeltaOutliers']} > {args.max_capture_to_playback_queue_delta_outliers}"
+        )
+    if summary["stream_playbackZeroCompleteTransactions"] > args.max_playback_zero_complete_transactions:
+        failures.append(
+            "playbackZeroCompleteTransactions "
+            f"{summary['stream_playbackZeroCompleteTransactions']} > {args.max_playback_zero_complete_transactions}"
+        )
+    summary["verdict"] = "PASS" if not failures else "FAIL"
+    summary["reason"] = "playback_cpu_gate_passed" if not failures else failures[0]
+    summary["failures"] = failures
+    return summary
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Playback CPU/start-latency gate for OpenA8DJ.")
+    parser.add_argument("--music-file", default="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav")
+    parser.add_argument("--pair", default="A")
+    parser.add_argument("--run-dir")
+    parser.add_argument("--sample-interval", type=float, default=0.25)
+    parser.add_argument("--max-start-seconds", type=float, default=0.25)
+    parser.add_argument("--max-first-callback-seconds", type=float, default=0.30)
+    parser.add_argument("--max-driver-cpu-avg", type=float, default=10.0)
+    parser.add_argument("--max-driver-cpu-p95", type=float, default=12.0)
+    parser.add_argument("--max-coreaudiod-cpu-p95", type=float, default=8.0)
+    parser.add_argument("--cpu-stress", action="store_true")
+    parser.add_argument("--cpu-stress-after", type=float, default=3.0)
+    parser.add_argument("--cpu-stress-seconds", type=float, default=8.0)
+    parser.add_argument("--cpu-stress-workers", default="auto")
+    parser.add_argument("--ui-stress", action="store_true")
+    parser.add_argument("--ui-stress-after", type=float, default=3.0)
+    parser.add_argument("--ui-stress-seconds", type=float, default=8.0)
+    parser.add_argument("--ui-stress-interval", type=float, default=0.35)
+    parser.add_argument("--min-ui-stress-files", type=int, default=1)
+    parser.add_argument("--max-stress-driver-cpu-avg", type=float, default=10.0)
+    parser.add_argument("--max-stress-driver-cpu-p95", type=float, default=12.0)
+    parser.add_argument("--max-stress-coreaudiod-cpu-p95", type=float, default=8.0)
+    parser.add_argument("--max-windowserver-cpu-p95", type=float, default=45.0)
+    parser.add_argument("--min-output-read-ratio", type=float, default=0.90)
+    parser.add_argument("--max-timeline-resets", type=int, default=0)
+    parser.add_argument("--max-elastic-drops", type=int, default=0)
+    parser.add_argument("--max-elastic-replays", type=int, default=0)
+    parser.add_argument("--max-late-write-frames", type=int, default=0)
+    parser.add_argument("--max-late-write-batches", type=int, default=0)
+    parser.add_argument("--max-playback-completion-delta-outliers", type=int, default=0)
+    parser.add_argument("--max-capture-to-playback-queue-delta-outliers", type=int, default=0)
+    parser.add_argument("--max-playback-zero-complete-transactions", type=int, default=0)
+    args = parser.parse_args()
+
+    root = repo_root()
+    run_dir = Path(args.run_dir) if args.run_dir else root / "local-analysis" / f"playback-cpu-gate-{timestamp_id()}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    gate_lock = AudioGateLock(root, run_dir, "playback-cpu-gate")
+    if not gate_lock.acquire():
+        lines = [
+            "playback_cpu_gate=FAIL",
+            f"reason={gate_lock.error or 'audio_gate_lock_busy'}",
+            f"run_dir={run_dir}",
+        ]
+        (run_dir / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print("\n".join(lines))
+        raise SystemExit(75)
+    music = Path(args.music_file)
+    try:
+        if not music.is_absolute():
+            music = root / music
+        player = root / "build" / "audio-wav-play"
+        if not player.exists():
+            raise SystemExit(f"missing player: {player}")
+        if not music.exists():
+            raise SystemExit(f"missing music file: {music}")
+
+        rows = []
+        stop = threading.Event()
+        stress_workers = []
+        ui_workers = []
+        stress_count = stress_worker_count(args.cpu_stress_workers)
+        stress_started = threading.Event()
+        ui_stress_started = threading.Event()
+
+        def monitor():
+            started = time.monotonic()
+            started_stress = False
+            stopped_stress = False
+            started_ui_stress = False
+            stopped_ui_stress = False
+            while not stop.is_set():
+                elapsed = time.monotonic() - started
+                if args.cpu_stress and not started_stress and elapsed >= args.cpu_stress_after:
+                    stress_workers.extend(start_cpu_stress(stress_count, args.cpu_stress_seconds))
+                    started_stress = True
+                    stress_started.set()
+                if args.ui_stress and not started_ui_stress and elapsed >= args.ui_stress_after:
+                    ui_workers.extend(start_ui_stress(run_dir, args.ui_stress_seconds, args.ui_stress_interval))
+                    started_ui_stress = True
+                    ui_stress_started.set()
+                if (started_stress and not stopped_stress and
+                        elapsed >= args.cpu_stress_after + args.cpu_stress_seconds):
+                    stop_cpu_stress(stress_workers)
+                    stopped_stress = True
+                if (started_ui_stress and not stopped_ui_stress and
+                        elapsed >= args.ui_stress_after + args.ui_stress_seconds):
+                    stop_ui_stress(ui_workers)
+                    stopped_ui_stress = True
+                stress_active = (started_stress and not stopped_stress) or (started_ui_stress and not stopped_ui_stress)
+                rows.append((elapsed, stress_active, stress_count if stress_active else 0, sample_process_cpu()))
+                stop.wait(max(0.05, args.sample_interval))
+            stop_cpu_stress(stress_workers)
+            stop_ui_stress(ui_workers)
+
+        thread = threading.Thread(target=monitor, daemon=True)
+        thread.start()
+        stream_before = read_stream_stats(root, run_dir, "before")
+        env = os.environ.copy()
+        env["OPENA8DJ_PLAYER_TIMING"] = "1"
+        with (run_dir / "play.log").open("w", encoding="utf-8") as log:
+            proc = subprocess.run(
+                [str(player), str(music), args.pair],
+                cwd=str(root),
+                env=env,
+                text=True,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+        stop.set()
+        thread.join(timeout=2.0)
+        rows.append((rows[-1][0] if rows else 0.0, False, 0, sample_process_cpu()))
+
+        log_text = (run_dir / "play.log").read_text(encoding="utf-8", errors="replace")
+        timings = parse_timing(log_text)
+        stream_after = read_stream_stats(root, run_dir, "after")
+        stream_stats = stream_delta(stream_after, stream_before)
+        (run_dir / "stream-stats-delta.json").write_text(json.dumps(stream_stats, indent=2, sort_keys=True) + "\n",
+                                                         encoding="utf-8")
+        summary = summarize(rows, timings, proc.returncode, stream_stats, args)
+        if args.ui_stress:
+            ui_dir = run_dir / "ui-stress"
+            ui_files = list(ui_dir.glob("screen-*.jpg")) if ui_dir.exists() else []
+            summary["ui_stress_files"] = len(ui_files)
+            if len(ui_files) < args.min_ui_stress_files:
+                summary["failures"].append(
+                    f"UI stress produced {len(ui_files)} files < {args.min_ui_stress_files}"
+                )
+                summary["verdict"] = "FAIL"
+                summary["reason"] = summary["failures"][0]
+            if summary["cpu_windowserver_p95"] > args.max_windowserver_cpu_p95:
+                summary["failures"].append(
+                    f"WindowServer CPU p95 {summary['cpu_windowserver_p95']:.2f}% > {args.max_windowserver_cpu_p95:.2f}%"
+                )
+                summary["verdict"] = "FAIL"
+                summary["reason"] = summary["failures"][0]
+        write_cpu_profile(run_dir / "cpu-profile.tsv", rows)
+        (run_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        lines = [
+            f"playback_cpu_gate={summary['verdict']}",
+            f"reason={summary['reason']}",
+            f"run_dir={run_dir}",
+            f"device_start_seconds={summary.get('timing_device-start_seconds', 0.0):.6f}",
+            f"first_callback_seconds={summary.get('timing_first-callback_seconds', 0.0):.6f}",
+            f"cpu_opena8dj_driver_avg={summary['cpu_opena8dj_driver_avg']:.2f}",
+            f"cpu_opena8dj_driver_p95={summary['cpu_opena8dj_driver_p95']:.2f}",
+            f"cpu_coreaudiod_p95={summary['cpu_coreaudiod_p95']:.2f}",
+            f"cpu_stress_samples={summary['stress_samples']}",
+            f"ui_stress_files={summary.get('ui_stress_files', 0)}",
+            f"cpu_windowserver_p95={summary['cpu_windowserver_p95']:.2f}",
+            f"cpu_opena8dj_driver_stress_avg={summary['cpu_opena8dj_driver_stress_avg']:.2f}",
+            f"cpu_opena8dj_driver_stress_p95={summary['cpu_opena8dj_driver_stress_p95']:.2f}",
+            f"cpu_coreaudiod_stress_p95={summary['cpu_coreaudiod_stress_p95']:.2f}",
+            f"playback_transfers_completed_delta={summary['stream_playbackTransfersCompleted']}",
+            f"output_frames_written={summary['stream_outputFramesWritten']}",
+            f"output_frames_read={summary['stream_outputFramesRead']}",
+            f"output_timeline_resets={summary['stream_outputTimelineResets']}",
+            f"output_active_underruns={summary['stream_outputActiveUnderruns']}",
+            f"output_elastic_drops={summary['stream_outputElasticDrops']}",
+            f"output_elastic_replays={summary['stream_outputElasticReplays']}",
+            f"output_late_write_frames={summary['stream_outputLateWriteFrames']}",
+            f"output_late_write_batches={summary['stream_outputLateWriteBatches']}",
+            f"playback_completion_delta_outliers={summary['stream_playbackCompletionDeltaOutliers']}",
+            f"capture_to_playback_queue_delta_outliers={summary['stream_captureToPlaybackQueueDeltaOutliers']}",
+            f"playback_zero_complete_transactions={summary['stream_playbackZeroCompleteTransactions']}",
+        ]
+        if summary["failures"]:
+            lines.append("failures:")
+            lines.extend(f"- {failure}" for failure in summary["failures"])
+        (run_dir / "summary.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print("\n".join(lines))
+        raise SystemExit(0 if summary["verdict"] == "PASS" else 1)
+    finally:
+        gate_lock.release()
+
+
+if __name__ == "__main__":
+    main()

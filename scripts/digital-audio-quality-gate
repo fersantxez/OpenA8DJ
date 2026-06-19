@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+pairs="A,B,C,D"
+sim_seconds="6"
+sim_mode="dense"
+sim_target_peak_db="-12"
+click_risk_runs="1"
+run_dir=""
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/digital-audio-quality-gate [options]
+
+Runs the required software-only audio quality gate before any physical iRig
+capture gate. This does not prove DAC/analog quality; it proves that the
+candidate passes digital packing, channel-pair, CPU/jitter, and click-risk
+checks before spending a physical measurement window.
+
+Options:
+  --candidate NAME
+  --music-file PATH
+  --pairs A,B,C,D
+  --sim-seconds N
+  --sim-mode dense|transient|wideband|start
+  --sim-target-peak-db DB
+  --click-risk-runs N
+  --run-dir DIR
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --pairs) pairs="$2"; shift 2 ;;
+    --sim-seconds) sim_seconds="$2"; shift 2 ;;
+    --sim-mode) sim_mode="$2"; shift 2 ;;
+    --sim-target-peak-db) sim_target_peak_db="$2"; shift 2 ;;
+    --click-risk-runs) click_risk_runs="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/digital-audio-quality-gate/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "digital-audio-quality:$candidate" "$run_dir"; then
+  {
+    echo "digital_audio_quality_gate=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "candidate=$candidate"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "digital-audio-quality:$candidate" "$run_dir"
+
+make build/audio-wav-play build/opena8dj-control >/dev/null
+
+failures=0
+pair_count=0
+IFS=',' read -r -a pair_array <<< "$pairs"
+for pair in "${pair_array[@]}"; do
+  pair="$(printf '%s' "$pair" | tr -d '[:space:]')"
+  [ -n "$pair" ] || continue
+  pair_count=$((pair_count + 1))
+  pair_dir="$run_dir/simulated-output-$pair"
+  if ! ./scripts/run-simulated-output-soundcheck \
+      --music-file "$music_file" \
+      --pair "$pair" \
+      --seconds "$sim_seconds" \
+      --mode "$sim_mode" \
+      --target-peak-db "$sim_target_peak_db" \
+      --run-dir "$pair_dir" \
+      >"$run_dir/simulated-output-$pair.txt" 2>&1; then
+    failures=$((failures + 1))
+  fi
+done
+
+if [ "$pair_count" = "0" ]; then
+  failures=$((failures + 1))
+  echo "error=no_pairs_requested" >"$run_dir/pair-error.txt"
+fi
+
+click_risk_dir="$run_dir/no-irig-click-risk-gate"
+if ! ./scripts/no-irig-click-risk-gate \
+    --candidate "$candidate" \
+    --runs "$click_risk_runs" \
+    --music-file "$music_file" \
+    --run-dir "$click_risk_dir" \
+    >"$run_dir/no-irig-click-risk-gate.txt" 2>&1; then
+  failures=$((failures + 1))
+fi
+
+{
+  if [ "$failures" = "0" ]; then
+    echo "digital_audio_quality_gate=PASS"
+    echo "reason=digital_simulation_and_click_risk_passed"
+  else
+    echo "digital_audio_quality_gate=FAIL"
+    echo "reason=digital_prephysical_gate_failed"
+  fi
+  echo "candidate=$candidate"
+  echo "music_file=$music_file"
+  echo "pairs=$pairs"
+  echo "pair_count=$pair_count"
+  echo "sim_seconds=$sim_seconds"
+  echo "sim_mode=$sim_mode"
+  echo "click_risk_runs=$click_risk_runs"
+  echo "failures=$failures"
+  echo "run_dir=$run_dir"
+  for pair in "${pair_array[@]}"; do
+    pair="$(printf '%s' "$pair" | tr -d '[:space:]')"
+    [ -n "$pair" ] || continue
+    summary="$run_dir/simulated-output-$pair/summary.txt"
+    metrics="$run_dir/simulated-output-$pair/metrics.json"
+    echo "simulated_output_${pair}_summary=$summary"
+    if [ -f "$summary" ]; then
+      awk -F= -v pair="$pair" '
+        $1 == "simulated_snr_db" ||
+        $1 == "alignment_score" ||
+        $1 == "mid_band_1000_5000_residual_ratio" ||
+        $1 == "mid_band_1000_5000_residual_dbfs" {
+          print "simulated_output_" pair "_" $0
+        }
+      ' "$summary"
+    fi
+    if [ -f "$metrics" ]; then
+      python3 - "$metrics" "$pair" <<'PY'
+import json
+import sys
+
+path, pair = sys.argv[1:3]
+data = json.load(open(path, encoding="utf-8"))
+print(f"simulated_output_{pair}_verdict={data.get('verdict', 'missing')}")
+for key in (
+    "left_snr_db",
+    "right_snr_db",
+    "mid_band_residual_ratio",
+    "click_outliers_total",
+    "window_click_outliers_max",
+):
+    if key in data:
+        print(f"simulated_output_{pair}_{key}={data[key]}")
+PY
+    fi
+  done
+  click_result="$click_risk_dir/result.txt"
+  echo "no_irig_click_risk_result=$click_result"
+  if [ -f "$click_result" ]; then
+    awk -F= '
+      $1 == "no_irig_click_risk_gate" ||
+      $1 == "reason" ||
+      $1 == "runs" ||
+      $1 == "failures" ||
+      $1 ~ /^run_[0-9]+_(cpu_|output_|playback_)/ {
+        print "click_risk_" $0
+      }
+    ' "$click_result"
+  fi
+  echo "physical_gate_required_after_this=1"
+  echo "physical_gate_replaced_by_this=0"
+} | tee "$run_dir/result.txt"
+
+if [ "$failures" = "0" ]; then
+  exit 0
+fi
+exit 1

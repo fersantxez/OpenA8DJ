@@ -40,6 +40,26 @@
 #define OPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP 0
 #endif
 
+#ifndef OPENA8DJ_BACKGROUND_WARM_OPEN
+#define OPENA8DJ_BACKGROUND_WARM_OPEN 0
+#endif
+
+#ifndef OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
+#define OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT 0
+#endif
+
+#ifndef OPENA8DJ_STOP_GRACE_USEC
+#define OPENA8DJ_STOP_GRACE_USEC 4000000
+#endif
+
+#ifndef OPENA8DJ_STOP_ISOC_ON_STOP
+#define OPENA8DJ_STOP_ISOC_ON_STOP 0
+#endif
+
+#ifndef OPENA8DJ_FLUSH_TOUCHED_OUTPUT
+#define OPENA8DJ_FLUSH_TOUCHED_OUTPUT 0
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_STREAM_COUNT
 #define OPENA8DJ_OUTPUT_STREAM_COUNT 4
 #endif
@@ -52,11 +72,11 @@
 #error OPENA8DJ_OUTPUT_STREAM_COUNT must divide the 8 hardware output channels evenly
 #endif
 
-#if OPENA8DJ_INPUT_STREAM_COUNT < 1 || OPENA8DJ_INPUT_STREAM_COUNT > 4
-#error OPENA8DJ_INPUT_STREAM_COUNT must be between 1 and 4
+#if OPENA8DJ_INPUT_STREAM_COUNT < 0 || OPENA8DJ_INPUT_STREAM_COUNT > 4
+#error OPENA8DJ_INPUT_STREAM_COUNT must be between 0 and 4
 #endif
 
-#if (8 % OPENA8DJ_INPUT_STREAM_COUNT) != 0
+#if OPENA8DJ_INPUT_STREAM_COUNT > 0 && (8 % OPENA8DJ_INPUT_STREAM_COUNT) != 0
 #error OPENA8DJ_INPUT_STREAM_COUNT must divide the 8 hardware input channels evenly
 #endif
 
@@ -82,7 +102,8 @@ enum {
     kOpenA8DJMinBufferFrames = 512,
     kOpenA8DJMaxAdvertisedBufferFrames = 4096,
     kOpenA8DJMaxBufferFrames = 4096,
-    kOpenA8DJZeroTimeStampPeriodFrames = 16384
+    kOpenA8DJZeroTimeStampPeriodFrames = 16384,
+    kOpenA8DJStopGraceUsec = OPENA8DJ_STOP_GRACE_USEC
 };
 
 static const CFStringRef kDriverBundleID = CFSTR("org.opena8dj.driver.hal");
@@ -96,6 +117,7 @@ static atomic_uint gRefCount = 1;
 static Float64 gSampleRate = 48000.0;
 static UInt32 gBufferFrames = kOpenA8DJPreferredBufferFrames;
 static UInt32 gRunningClients = 0;
+static atomic_uint gStopGeneration = 1;
 static UInt64 gZeroTimeStampSeed = 1;
 static Float64 gSampleTime = 0.0;
 static UInt64 gHostTime = 0;
@@ -448,7 +470,7 @@ static UInt32 StreamDirection(AudioObjectID objectID)
 
 static UInt32 ActiveInputStreamCount(void)
 {
-#if OPENA8DJ_ENABLE_INPUT_IO
+#if OPENA8DJ_ENABLE_INPUT_IO && OPENA8DJ_INPUT_STREAM_COUNT > 0
     return kOpenA8DJInputStreamCount;
 #else
     return 0;
@@ -1074,9 +1096,10 @@ static void CopyClientOutputToOutput(UInt32 streamIndex, const Float32 *inInterl
     gOutputCycleTouched = true;
 }
 
-#if OPENA8DJ_ENABLE_INPUT_IO
+#if OPENA8DJ_ENABLE_INPUT_IO && OPENA8DJ_INPUT_STREAM_COUNT > 0
 static void PrepareInputCycle(UInt32 frameCount, UInt64 cycleCounter)
 {
+    OpenA8DJUSBSetInputDecodeActive(true);
     UInt32 clampedFrames = frameCount <= kOpenA8DJMaxBufferFrames ? frameCount : kOpenA8DJMaxBufferFrames;
     if (cycleCounter == 0) {
         gInputCycleFrames = clampedFrames;
@@ -1142,7 +1165,11 @@ static bool OutputCycleHasExpectedStreams(void)
 {
     UInt32 expectedMask = atomic_load(&gExpectedOutputStreamMask) & kOpenA8DJAllOutputStreamMask;
     if (expectedMask == 0) {
+#if OPENA8DJ_FLUSH_TOUCHED_OUTPUT
+        return gOutputCycleTouched;
+#else
         expectedMask = kOpenA8DJAllOutputStreamMask;
+#endif
     }
     return (gOutputCycleStreamMask & expectedMask) == expectedMask;
 }
@@ -1176,6 +1203,114 @@ static void StopClock(void)
 {
     atomic_store(&gClockRunning, false);
 }
+
+#if OPENA8DJ_BACKGROUND_WARM_OPEN
+static void *BackgroundWarmOpenThread(void *arg)
+{
+    unsigned int generation = (unsigned int)(uintptr_t)arg;
+    pthread_mutex_lock(&gIOMutex);
+    if (gRunningClients == 0 && atomic_load(&gStopGeneration) == generation) {
+        if (OpenA8DJUSBEnsureOpen(gSampleRate)) {
+            Trace("StopIO USB warm-opened in background");
+        } else {
+            Trace("StopIO USB warm-open in background failed");
+        }
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+    }
+    pthread_mutex_unlock(&gIOMutex);
+    return NULL;
+}
+
+static void ScheduleBackgroundWarmOpen(void)
+{
+    unsigned int generation = atomic_fetch_add(&gStopGeneration, 1) + 1;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, BackgroundWarmOpenThread, (void *)(uintptr_t)generation) == 0) {
+        pthread_detach(thread);
+    } else {
+        if (OpenA8DJUSBEnsureOpen(gSampleRate)) {
+            Trace("StopIO USB warm-opened after background thread failure");
+        }
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+    }
+}
+#else
+static void *DelayedCloseThread(void *arg)
+{
+    unsigned int generation = (unsigned int)(uintptr_t)arg;
+    usleep(kOpenA8DJStopGraceUsec);
+    pthread_mutex_lock(&gIOMutex);
+    if (gRunningClients == 0 && atomic_load(&gStopGeneration) == generation) {
+        FlushOutputCycle();
+        OpenA8DJUSBSetInputDecodeActive(false);
+#if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+        Trace("StopIO USB kept open after grace");
+#else
+        OpenA8DJUSBClose();
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+        Trace("StopIO USB closed after grace");
+#endif
+    }
+    pthread_mutex_unlock(&gIOMutex);
+    return NULL;
+}
+
+static void ScheduleDelayedClose(void)
+{
+    unsigned int generation = atomic_fetch_add(&gStopGeneration, 1) + 1;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, DelayedCloseThread, (void *)(uintptr_t)generation) == 0) {
+        pthread_detach(thread);
+    } else {
+        OpenA8DJUSBSetInputDecodeActive(false);
+#if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+        Trace("StopIO USB kept open after grace thread failure");
+#else
+        OpenA8DJUSBClose();
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+        Trace("StopIO USB closed immediately after grace thread failure");
+#endif
+    }
+}
+#endif
+
+#if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
+static void *BackgroundPreopenThread(void *arg)
+{
+    unsigned int generation = (unsigned int)(uintptr_t)arg;
+    pthread_mutex_lock(&gIOMutex);
+    if (gRunningClients == 0 && atomic_load(&gStopGeneration) == generation) {
+        if (OpenA8DJUSBEnsureOpen(gSampleRate)) {
+            Trace("Initialize USB pre-opened in background");
+        } else {
+            Trace("Initialize USB pre-open in background failed");
+        }
+        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+    }
+    pthread_mutex_unlock(&gIOMutex);
+    return NULL;
+}
+
+static void ScheduleBackgroundPreopen(void)
+{
+    unsigned int generation = atomic_load(&gStopGeneration);
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, BackgroundPreopenThread, (void *)(uintptr_t)generation) == 0) {
+        pthread_detach(thread);
+    } else {
+        pthread_mutex_lock(&gIOMutex);
+        if (gRunningClients == 0 && atomic_load(&gStopGeneration) == generation) {
+            if (OpenA8DJUSBEnsureOpen(gSampleRate)) {
+                Trace("Initialize USB pre-opened after background thread failure");
+            }
+            atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+        }
+        pthread_mutex_unlock(&gIOMutex);
+    }
+}
+#endif
 
 static void NotifySampleRateChanged(void)
 {
@@ -1292,6 +1427,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_Initialize(AudioServerPlugInDriverRef
     gBufferFrames = RecommendedBufferFramesForRate(gSampleRate);
     pthread_mutex_unlock(&gClockMutex);
     atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+#if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
+    ScheduleBackgroundPreopen();
+#endif
     return kAudioHardwareNoError;
 }
 
@@ -1865,6 +2003,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
         return kAudioHardwareBadDeviceError;
     }
     pthread_mutex_lock(&gIOMutex);
+    atomic_fetch_add(&gStopGeneration, 1);
     if (gRunningClients == 0) {
         StartClock();
         if (!OpenA8DJUSBStart(gSampleRate)) {
@@ -1897,10 +2036,20 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inD
     }
     if (gRunningClients == 0) {
         FlushOutputCycle();
+        OpenA8DJUSBSetInputDecodeActive(false);
+#if OPENA8DJ_STOP_ISOC_ON_STOP
+        OpenA8DJUSBStop();
+#endif
+        StopClock();
+#if OPENA8DJ_BACKGROUND_WARM_OPEN
         OpenA8DJUSBClose();
         atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
-        StopClock();
-        Trace("StopIO USB closed");
+        ScheduleBackgroundWarmOpen();
+        Trace("StopIO USB closed; warm-open scheduled");
+#else
+        ScheduleDelayedClose();
+        Trace("StopIO USB close scheduled after grace");
+#endif
     }
     pthread_mutex_unlock(&gIOMutex);
     return kAudioHardwareNoError;
@@ -1975,7 +2124,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_WillDoIOOperation(AudioServerPlugInDr
         return kAudioHardwareBadPropertySizeError;
     }
     *outWillDo = inOperationID == kAudioServerPlugInIOOperationWriteMix;
-#if OPENA8DJ_ENABLE_INPUT_IO
+#if OPENA8DJ_ENABLE_INPUT_IO && OPENA8DJ_INPUT_STREAM_COUNT > 0
     if (inOperationID == kAudioServerPlugInIOOperationReadInput) {
         *outWillDo = true;
     }
@@ -1995,7 +2144,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_BeginIOOperation(AudioServerPlugInDri
     if (inIOBufferFrameSize > kOpenA8DJMaxBufferFrames) {
         return kAudioHardwareUnsupportedOperationError;
     }
-#if OPENA8DJ_ENABLE_INPUT_IO
+#if OPENA8DJ_ENABLE_INPUT_IO && OPENA8DJ_INPUT_STREAM_COUNT > 0
     if (inOperationID == kAudioServerPlugInIOOperationReadInput) {
         PrepareInputCycle(inIOBufferFrameSize, CycleCounterFromInfo(inIOCycleInfo));
     } else if (inOperationID == kAudioServerPlugInIOOperationWriteMix) {
@@ -2024,7 +2173,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_DoIOOperation(AudioServerPlugInDriver
     }
     if (inOperationID == kAudioServerPlugInIOOperationReadInput &&
         IsInputStreamObject(inStreamObjectID)) {
-#if !OPENA8DJ_ENABLE_INPUT_IO
+#if !OPENA8DJ_ENABLE_INPUT_IO || OPENA8DJ_INPUT_STREAM_COUNT == 0
         memset(ioMainBuffer,
                0,
                (size_t)inIOBufferFrameSize * InputChannelsPerStream() * sizeof(Float32));

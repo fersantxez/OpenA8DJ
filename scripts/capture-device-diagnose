@@ -1,0 +1,419 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+run_dir=""
+preferred_capture_device="iRig Stream"
+input_audio_list_file=""
+input_usb_ioreg_file=""
+input_usb_port_ioreg_file=""
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/capture-device-diagnose [options]
+
+Reports the physical capture state for OpenA8DJ quality gates. This is
+read-only: it does not start audio, reset USB, or restart Core Audio.
+
+Options:
+  --run-dir DIR
+  --preferred-capture-device NAME   Default: iRig Stream
+  --audio-list-file PATH            Use an existing audio-list snapshot
+  --usb-ioreg-file PATH             Use an existing IOUSB ioreg snapshot
+  --usb-port-ioreg-file PATH        Use an existing IOService USB-port snapshot
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --preferred-capture-device) preferred_capture_device="$2"; shift 2 ;;
+    --audio-list-file) input_audio_list_file="$2"; shift 2 ;;
+    --usb-ioreg-file) input_usb_ioreg_file="$2"; shift 2 ;;
+    --usb-port-ioreg-file) input_usb_port_ioreg_file="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  run_dir="local-analysis/capture-device-diagnose/$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+make build/audio-list >/dev/null
+
+audio_list="$run_dir/audio-list.txt"
+usb_ioreg="$run_dir/usb-ioreg.txt"
+usb_port_ioreg="$run_dir/usb-port-ioreg.txt"
+usb_summary="$run_dir/usb-summary.txt"
+core_audio_inputs="$run_dir/core-audio-inputs.tsv"
+
+if [ -n "$input_audio_list_file" ]; then
+  cp "$input_audio_list_file" "$audio_list"
+else
+  ./build/audio-list >"$audio_list" 2>&1 || true
+fi
+if [ -n "$input_usb_ioreg_file" ]; then
+  cp "$input_usb_ioreg_file" "$usb_ioreg"
+else
+  ioreg -p IOUSB -l -w 0 >"$usb_ioreg" 2>&1 || true
+fi
+if [ -n "$input_usb_port_ioreg_file" ]; then
+  cp "$input_usb_port_ioreg_file" "$usb_port_ioreg"
+elif [ -n "$input_usb_ioreg_file" ]; then
+  cp "$input_usb_ioreg_file" "$usb_port_ioreg"
+else
+  ioreg -p IOService -l -w0 -r -c IOUSBHostDevice >"$usb_port_ioreg" 2>&1 || true
+fi
+
+awk '
+  /\+-o / { node=$0 }
+  /"USB Product Name" = / ||
+  /"USB Vendor Name" = / ||
+  /"idVendor" = / ||
+  /"idProduct" = / ||
+  /"locationID" = / ||
+  /"bDeviceClass" = / ||
+  /"bDeviceSubClass" = / ||
+  /"bDeviceProtocol" = / ||
+  /"UsbExclusiveOwner" = / {
+    print node
+    print $0
+  }
+' "$usb_ioreg" >"$usb_summary" || true
+
+python3 - \
+  "$audio_list" \
+  "$usb_ioreg" \
+  "$usb_port_ioreg" \
+  "$preferred_capture_device" \
+  "$core_audio_inputs" \
+  "$run_dir/diagnosis.json" \
+  "$run_dir/result.txt" <<'PY'
+import json
+import re
+import sys
+
+audio_list_path, usb_ioreg_path, usb_port_ioreg_path, preferred, inputs_path, json_path, result_path = sys.argv[1:8]
+audio_text = open(audio_list_path, encoding="utf-8", errors="replace").read()
+usb_text = open(usb_ioreg_path, encoding="utf-8", errors="replace").read()
+usb_port_text = open(usb_port_ioreg_path, encoding="utf-8", errors="replace").read()
+IRIG_VENDOR_ID = 0x1963
+IRIG_PRODUCT_ID = 0x0059
+OPENA8DJ_CORE_AUDIO_UID = "org.opena8dj.Audio8DJ"
+OPENA8DJ_RUST_CORE_AUDIO_UID = "org.opena8dj.Audio8DJ-rust"
+
+devices = []
+for line in audio_text.splitlines():
+    match = re.match(
+        r"\s*\d+\s+id=(?P<id>\d+)\s+(?P<name>.*?)\s+uid=(?P<uid>.*?)\s+in=(?P<ins>\d+)\s+out=(?P<outs>\d+)\s+rate=(?P<rate>[0-9.]+)",
+        line,
+    )
+    if not match:
+        continue
+    item = match.groupdict()
+    item["ins"] = int(item["ins"])
+    item["outs"] = int(item["outs"])
+    devices.append(item)
+
+input_devices = [item for item in devices if item["ins"] > 0]
+excluded_uid_fragments = (
+    "BuiltInMicrophoneDevice",
+    "org.opena8dj.Audio8DJ",
+)
+excluded_name_fragments = (
+    "MacBook Air Microphone",
+    "Open Audio 8 DJ",
+)
+
+external_inputs = []
+for item in input_devices:
+    uid = item["uid"]
+    name = item["name"]
+    if any(fragment in uid for fragment in excluded_uid_fragments):
+        continue
+    if any(fragment in name for fragment in excluded_name_fragments):
+        continue
+    external_inputs.append(item)
+
+preferred_core_audio = [
+    item for item in input_devices
+    if preferred.lower() in item["name"].lower() or preferred.lower() in item["uid"].lower()
+]
+
+def parse_usb_devices(text):
+    parsed = []
+    current = None
+    for line in text.splitlines():
+        node_match = re.search(r"\+-o\s+([^@<]+)@([0-9A-Fa-f]+)", line)
+        if node_match:
+            if current:
+                parsed.append(current)
+            current = {
+                "node": node_match.group(1).strip(),
+                "location": node_match.group(2),
+                "raw": [line],
+            }
+            continue
+        if current is None:
+            continue
+        current["raw"].append(line)
+        prop_match = re.search(r'"([^"]+)"\s*=\s*(?:"([^"]*)"|((?:0x)?[0-9A-Fa-f]+))', line)
+        if prop_match:
+            key = prop_match.group(1)
+            value = prop_match.group(2) if prop_match.group(2) is not None else prop_match.group(3)
+            current[key] = value
+    if current:
+        parsed.append(current)
+    return parsed
+
+
+def int_prop(device, key):
+    value = device.get(key)
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+        if re.fullmatch(r"[0-9A-Fa-f]+", text) and any(ch in "ABCDEFabcdef" for ch in text):
+            return int(text, 16)
+        return int(text, 0)
+    except ValueError:
+        return None
+
+
+def int_prop_candidates(device, key):
+    value = device.get(key)
+    if value is None:
+        return []
+    text = str(value).strip()
+    candidates = []
+    try:
+        candidates.append(int(text, 0))
+    except ValueError:
+        pass
+    if re.fullmatch(r"[0-9A-Fa-f]+", text):
+        try:
+            candidates.append(int(text, 16))
+        except ValueError:
+            pass
+    deduped = []
+    for candidate in candidates:
+        if candidate not in deduped:
+            deduped.append(candidate)
+    return deduped
+
+
+usb_devices = parse_usb_devices(usb_text)
+
+usb_ports = []
+current_port = None
+for line in usb_port_text.splitlines():
+    node_match = re.search(r"\+-o\s+([^@<]+)@([0-9A-Fa-f]+).*<class\s+([^,>]+)", line)
+    if node_match:
+        name = node_match.group(1).strip()
+        klass = node_match.group(3).strip()
+        if "HubPort" in klass or "XHCIPort" in klass or "HostPort" in klass:
+            current_port = {
+                "name": name,
+                "class": klass,
+                "location": node_match.group(2),
+                "connect_count": 0,
+                "enumeration_failure_count": 0,
+                "address_failure_count": 0,
+                "over_current_count": 0,
+                "port_status": "unknown",
+            }
+            usb_ports.append(current_port)
+        else:
+            current_port = None
+        continue
+    if current_port is None:
+        continue
+    status_match = re.search(r'"port-status"\s*=\s*([0-9]+)', line)
+    if status_match:
+        current_port["port_status"] = status_match.group(1)
+    location_match = re.search(r'"locationID"\s*=\s*([0-9]+)', line)
+    if location_match:
+        current_port["location_id"] = int(location_match.group(1))
+    stats_map = {
+        "connect_count": "kPortStatConnectCount",
+        "enumeration_failure_count": "kPortStatEnumerationFailureCount",
+        "address_failure_count": "kPortStatAddressFailureCount",
+        "over_current_count": "kPortStatOverCurrentCount",
+    }
+    for out_key, stat_key in stats_map.items():
+        stat_match = re.search(r'"%s"=([0-9]+)' % re.escape(stat_key), line)
+        if stat_match:
+            current_port[out_key] = int(stat_match.group(1))
+
+failed_usb_ports = [
+    port for port in usb_ports
+    if port.get("enumeration_failure_count", 0) > 0 or port.get("address_failure_count", 0) > 0
+]
+usb_enumeration_failures = bool(failed_usb_ports)
+
+irig_usb_devices = []
+for device in usb_devices:
+    product_name = device.get("USB Product Name") or device.get("kUSBProductString") or device.get("node", "")
+    vendor_name = device.get("USB Vendor Name") or device.get("kUSBVendorString") or ""
+    vendor_id = int_prop(device, "idVendor")
+    product_id = int_prop(device, "idProduct")
+    vendor_candidates = int_prop_candidates(device, "idVendor")
+    product_candidates = int_prop_candidates(device, "idProduct")
+    by_name = "iRig Stream" in product_name and ("IK Multimedia" in vendor_name or "iRig Stream" in product_name)
+    by_id = IRIG_VENDOR_ID in vendor_candidates and IRIG_PRODUCT_ID in product_candidates
+    if by_name or by_id:
+        irig_usb_devices.append({
+            "node": device.get("node", ""),
+            "product_name": product_name,
+            "vendor_name": vendor_name,
+            "idVendor": vendor_id,
+            "idProduct": product_id,
+            "idVendorCandidates": vendor_candidates,
+            "idProductCandidates": product_candidates,
+            "matched_by": "id" if by_id else "name",
+        })
+
+found_audio8_core_audio_any = any("Open Audio 8 DJ" in item["name"] for item in devices)
+found_opena8dj_core_audio = any(item["uid"] == OPENA8DJ_CORE_AUDIO_UID for item in devices)
+found_audio8_rust_core_audio = any(item["uid"] == OPENA8DJ_RUST_CORE_AUDIO_UID for item in devices)
+found_audio8_core_audio = found_opena8dj_core_audio
+found_irig_usb_by_name = "IK Multimedia" in usb_text and "iRig Stream" in usb_text
+found_irig_usb_by_id = any(
+    item.get("matched_by") == "id"
+    for item in irig_usb_devices
+)
+found_irig_usb = bool(irig_usb_devices)
+found_irig_core_audio = any(
+    ("iRig Stream" in item["name"] or "iRig Stream" in item["uid"]) and
+    ("IK Multimedia" in item["uid"] or "iRig Stream" in item["uid"])
+    for item in input_devices
+)
+preferred_core_audio_ready = bool(preferred_core_audio)
+
+usb_device_names = []
+for match in re.finditer(r'"USB Product Name"\s*=\s*"([^"]+)"', usb_text):
+    name = match.group(1)
+    if name not in usb_device_names:
+        usb_device_names.append(name)
+
+if preferred == "iRig Stream" and found_irig_usb_by_id and found_irig_core_audio:
+    status = "READY"
+    reason = "preferred_capture_ready"
+elif preferred == "iRig Stream" and not found_irig_usb:
+    status = "MISSING"
+    reason = "irig_missing_from_usb_tree"
+elif preferred == "iRig Stream" and not found_irig_usb_by_id:
+    status = "MISSING"
+    reason = "irig_usb_id_not_verified"
+elif preferred == "iRig Stream" and not found_irig_core_audio:
+    status = "MISSING"
+    reason = "irig_missing_from_core_audio"
+elif not preferred_core_audio_ready:
+    status = "MISSING"
+    reason = "preferred_capture_missing_from_core_audio"
+else:
+    status = "UNKNOWN"
+    reason = "preferred_capture_present_but_not_usb_verified"
+
+if status == "READY":
+    next_recovery_action = "run_candidate_preflight_or_physical_gate"
+elif preferred == "iRig Stream" and usb_enumeration_failures and not found_irig_usb:
+    next_recovery_action = "run_autonomous_audio_qa_software_recovery"
+elif preferred == "iRig Stream" and found_irig_usb and not found_irig_core_audio:
+    next_recovery_action = "restart_core_audio_or_reset_exact_irig_usb_device_then_rerun_capture_device_diagnose"
+elif preferred == "iRig Stream" and found_irig_usb and not found_irig_usb_by_id:
+    next_recovery_action = "verify_capture_device_identity_before_using_for_quality_gate"
+elif preferred == "iRig Stream" and not found_irig_usb:
+    next_recovery_action = "run_autonomous_audio_qa_software_recovery"
+else:
+    next_recovery_action = "verify_preferred_capture_device_then_rerun_capture_device_diagnose"
+
+with open(inputs_path, "w", encoding="utf-8") as out:
+    out.write("name\tuid\tinputs\toutputs\trate\texternal_candidate\n")
+    for item in input_devices:
+        external = "1" if item in external_inputs else "0"
+        out.write(
+            f"{item['name']}\t{item['uid']}\t{item['ins']}\t{item['outs']}\t{item['rate']}\t{external}\n"
+        )
+
+diagnosis = {
+    "physical_capture_status": status,
+    "reason": reason,
+    "preferred_capture_device": preferred,
+    "found_audio8_core_audio": found_audio8_core_audio,
+    "found_audio8_core_audio_any": found_audio8_core_audio_any,
+    "found_opena8dj_core_audio": found_opena8dj_core_audio,
+    "found_audio8_rust_core_audio": found_audio8_rust_core_audio,
+    "found_irig_usb": found_irig_usb,
+    "found_irig_usb_by_name": found_irig_usb_by_name,
+    "found_irig_usb_by_id": found_irig_usb_by_id,
+    "found_irig_core_audio": found_irig_core_audio,
+    "preferred_core_audio_ready": preferred_core_audio_ready,
+    "core_audio_input_devices": input_devices,
+    "external_core_audio_input_devices": external_inputs,
+    "external_core_audio_input_count": len(external_inputs),
+    "irig_usb_devices": irig_usb_devices,
+    "usb_device_names": usb_device_names,
+    "usb_ports": usb_ports,
+    "failed_usb_ports": failed_usb_ports,
+    "usb_enumeration_failures": usb_enumeration_failures,
+    "next_recovery_action": next_recovery_action,
+}
+open(json_path, "w", encoding="utf-8").write(json.dumps(diagnosis, indent=2, sort_keys=True) + "\n")
+
+failed_port_text = ";".join(
+    "name={name},class={class},location={location_id},status={port_status},connect={connect_count},enum_fail={enumeration_failure_count},addr_fail={address_failure_count},over_current={over_current_count}".format(
+        name=port.get("name", "unknown"),
+        **{
+            "class": port.get("class", "unknown"),
+            "location_id": port.get("location_id", port.get("location", "unknown")),
+            "port_status": port.get("port_status", "unknown"),
+            "connect_count": port.get("connect_count", 0),
+            "enumeration_failure_count": port.get("enumeration_failure_count", 0),
+            "address_failure_count": port.get("address_failure_count", 0),
+            "over_current_count": port.get("over_current_count", 0),
+        },
+    )
+    for port in failed_usb_ports
+) or "none"
+
+with open(result_path, "w", encoding="utf-8") as out:
+    out.write(f"physical_capture_status={status}\n")
+    out.write(f"reason={reason}\n")
+    out.write(f"preferred_capture_device={preferred}\n")
+    out.write(f"found_audio8_core_audio={1 if found_audio8_core_audio else 0}\n")
+    out.write(f"found_audio8_core_audio_any={1 if found_audio8_core_audio_any else 0}\n")
+    out.write(f"found_opena8dj_core_audio={1 if found_opena8dj_core_audio else 0}\n")
+    out.write(f"found_audio8_rust_core_audio={1 if found_audio8_rust_core_audio else 0}\n")
+    out.write(f"found_irig_usb={1 if found_irig_usb else 0}\n")
+    out.write(f"found_irig_usb_by_name={1 if found_irig_usb_by_name else 0}\n")
+    out.write(f"found_irig_usb_by_id={1 if found_irig_usb_by_id else 0}\n")
+    out.write(f"found_irig_core_audio={1 if found_irig_core_audio else 0}\n")
+    out.write(f"preferred_core_audio_ready={1 if preferred_core_audio_ready else 0}\n")
+    out.write(f"core_audio_input_count={len(input_devices)}\n")
+    out.write(f"external_core_audio_input_count={len(external_inputs)}\n")
+    out.write("external_core_audio_inputs=" + ",".join(item["name"] for item in external_inputs) + "\n")
+    out.write(
+        "irig_usb_matches=" +
+        ",".join(
+            f"{item['node']}:{item['idVendor'] or 'unknown'}:{item['idProduct'] or 'unknown'}:{item['matched_by']}"
+            for item in irig_usb_devices
+        ) + "\n"
+    )
+    out.write("usb_device_names=" + ",".join(usb_device_names) + "\n")
+    out.write(f"usb_enumeration_failures={'YES' if usb_enumeration_failures else 'NO'}\n")
+    out.write(f"failed_usb_ports={failed_port_text}\n")
+    out.write(f"next_recovery_action={next_recovery_action}\n")
+    out.write(f"audio_list={audio_list_path}\n")
+    out.write(f"usb_ioreg={usb_ioreg_path}\n")
+    out.write(f"usb_port_ioreg={usb_port_ioreg_path}\n")
+    out.write(f"usb_summary={result_path.rsplit('/', 1)[0]}/usb-summary.txt\n")
+    out.write(f"core_audio_inputs={inputs_path}\n")
+    out.write(f"diagnosis_json={json_path}\n")
+
+print(open(result_path, encoding="utf-8").read(), end="")
+raise SystemExit(0 if status == "READY" else 3)
+PY

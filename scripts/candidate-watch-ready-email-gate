@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+candidate="current-loaded"
+music_file="local-analysis/baseline-fixtures/nueva-mexico-baseline-268s-60s-48k-s16.wav"
+physical_baseline_json="local-analysis/physical-baseline-0.3.111-iso5-normal-20260614-105615/physical-music-gate.json"
+run_dir=""
+wait_seconds="3600"
+interval_seconds="5"
+stable_polls="3"
+to="fernandosanchezmunoz@gmail.com"
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/candidate-watch-ready-email-gate [options]
+
+Waits for iRig Stream, runs the full candidate-watch/preflight ladder, then
+prepares the readiness email payload only if candidate-status confirms
+READY_FOR_HUMAN_TEST. This script never sends mail.
+
+Options:
+  --candidate NAME
+  --music-file PATH
+  --physical-baseline-json PATH
+  --run-dir DIR
+  --wait SECONDS
+  --interval SECONDS
+  --stable-polls COUNT
+  --to ADDRESS
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --candidate) candidate="$2"; shift 2 ;;
+    --music-file) music_file="$2"; shift 2 ;;
+    --physical-baseline-json) physical_baseline_json="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    --wait) wait_seconds="$2"; shift 2 ;;
+    --interval) interval_seconds="$2"; shift 2 ;;
+    --stable-polls) stable_polls="$2"; shift 2 ;;
+    --to) to="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$run_dir" ]; then
+  safe_candidate="$(printf '%s' "$candidate" | tr -c '[:alnum:]_.-' '-')"
+  run_dir="local-analysis/candidate-watch-ready-email-gate/${safe_candidate}-$(date +%Y%m%d-%H%M%S)"
+fi
+mkdir -p "$run_dir"
+
+watch_dir="$run_dir/candidate-watch"
+email_dir="$run_dir/candidate-ready-email-gate"
+watch_log="$run_dir/candidate-watch.txt"
+email_log="$run_dir/candidate-ready-email-gate.txt"
+
+watch_rc=0
+./scripts/candidate-watch \
+  --candidate "$candidate" \
+  --music-file "$music_file" \
+  --physical-baseline-json "$physical_baseline_json" \
+  --wait "$wait_seconds" \
+  --interval "$interval_seconds" \
+  --stable-polls "$stable_polls" \
+  --run-dir "$watch_dir" \
+  >"$watch_log" 2>&1 || watch_rc=$?
+
+watch_status="missing"
+watch_reason="missing"
+watch_usb_enumeration_failures="missing"
+watch_failed_usb_ports="missing"
+watch_next_recovery_action="missing"
+if [ -f "$watch_dir/result.txt" ]; then
+  watch_status="$(awk -F= '$1=="candidate_watch"{print substr($0, index($0, "=") + 1); exit}' "$watch_dir/result.txt")"
+  watch_reason="$(awk -F= '$1=="reason"{print substr($0, index($0, "=") + 1); exit}' "$watch_dir/result.txt")"
+  watch_usb_enumeration_failures="$(awk -F= '$1=="usb_enumeration_failures"{print substr($0, index($0, "=") + 1); exit}' "$watch_dir/result.txt")"
+  watch_failed_usb_ports="$(awk -F= '$1=="failed_usb_ports"{print substr($0, index($0, "=") + 1); exit}' "$watch_dir/result.txt")"
+  watch_next_recovery_action="$(awk -F= '$1=="next_recovery_action"{print substr($0, index($0, "=") + 1); exit}' "$watch_dir/result.txt")"
+fi
+
+if [ "$watch_status" != "PASS" ]; then
+  {
+    echo "candidate_watch_ready_email_gate=BLOCKED"
+    echo "reason=$watch_reason"
+    echo "candidate_watch_status=$watch_status"
+    echo "candidate_watch_rc=$watch_rc"
+    echo "candidate_watch_result=$watch_dir/result.txt"
+    echo "usb_enumeration_failures=$watch_usb_enumeration_failures"
+    echo "failed_usb_ports=$watch_failed_usb_ports"
+    echo "next_recovery_action=$watch_next_recovery_action"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 3
+fi
+
+email_rc=0
+./scripts/candidate-ready-email-gate \
+  --to "$to" \
+  --run-dir "$email_dir" \
+  >"$email_log" 2>&1 || email_rc=$?
+
+email_status="missing"
+email_reason="missing"
+if [ -f "$email_dir/result.txt" ]; then
+  email_status="$(awk -F= '$1=="candidate_ready_email_gate"{print $2; exit}' "$email_dir/result.txt")"
+  email_reason="$(awk -F= '$1=="reason"{print $2; exit}' "$email_dir/result.txt")"
+fi
+
+if [ "$email_status" != "PASS" ]; then
+  {
+    echo "candidate_watch_ready_email_gate=BLOCKED"
+    echo "reason=$email_reason"
+    echo "candidate_watch_status=$watch_status"
+    echo "candidate_ready_email_gate=$email_status"
+    echo "candidate_ready_email_rc=$email_rc"
+    echo "candidate_watch_result=$watch_dir/result.txt"
+    echo "candidate_ready_email_result=$email_dir/result.txt"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 3
+fi
+
+{
+  echo "candidate_watch_ready_email_gate=PASS"
+  echo "reason=ready_email_payload_prepared_after_watch"
+  echo "candidate_watch_result=$watch_dir/result.txt"
+  echo "candidate_ready_email_result=$email_dir/result.txt"
+  echo "run_dir=$run_dir"
+} | tee "$run_dir/result.txt"

@@ -107,6 +107,12 @@ def dbfs(value):
     return 20.0 * math.log10(value)
 
 
+def db_ratio(value):
+    if value <= 0.0:
+        return -240.0
+    return 20.0 * math.log10(value)
+
+
 def first_signal_index(pair):
     envelope = [max(abs(left), abs(right)) for left, right in pair]
     if not envelope:
@@ -437,6 +443,32 @@ def bandpass(values, rate, low_hz, high_hz):
 
 def band_rms(values, rate, low_hz, high_hz):
     return rms(bandpass(values, rate, low_hz, high_hz))
+
+
+def spectral_color_metrics(ref_signal, got_signal, rate):
+    bands = {
+        "low": (40.0, 250.0),
+        "mid": (1000.0, 5000.0),
+        "high": (5000.0, 12000.0),
+    }
+    gains = {}
+    metrics = {}
+    for name, (low_hz, high_hz) in bands.items():
+        ref_rms = band_rms(ref_signal, rate, low_hz, high_hz)
+        got_rms = band_rms(got_signal, rate, low_hz, high_hz)
+        gain_db = db_ratio(got_rms / ref_rms) if ref_rms > 1e-9 else 0.0
+        gains[name] = gain_db
+        metrics[f"{name}_band_capture_to_ref_gain_db"] = gain_db
+    mid_vs_low = gains["mid"] - gains["low"]
+    high_vs_low = gains["high"] - gains["low"]
+    high_vs_mid = gains["high"] - gains["mid"]
+    metrics.update({
+        "mid_vs_low_coloration_delta_db": mid_vs_low,
+        "high_vs_low_coloration_delta_db": high_vs_low,
+        "high_vs_mid_coloration_delta_db": high_vs_mid,
+        "metallic_coloration_score_db": max(abs(mid_vs_low), abs(high_vs_low), abs(high_vs_mid)),
+    })
+    return metrics
 
 
 def lag_profile(ref, got, rate, ref_start, got_start, usable, max_lag, window_seconds, hop_seconds):
@@ -784,6 +816,16 @@ def compare_pair(ref,
                             noise_band_high,
                             high_band_low,
                             high_band_high)
+    left_color = spectral_color_metrics(ref_left, got_left, rate)
+    right_color = spectral_color_metrics(ref_right, got_right, rate)
+    color_metrics = {}
+    for key in left_color:
+        left_value = left_color[key]
+        right_value = right_color[key]
+        if "score" in key or "delta" in key:
+            color_metrics[key] = left_value if abs(left_value) >= abs(right_value) else right_value
+        else:
+            color_metrics[key] = max(left_value, right_value)
     coupling = build_coupling_profile(ref_left,
                                       ref_right,
                                       got_left,
@@ -822,6 +864,13 @@ def compare_pair(ref,
         "high_band_residual_ratio": max(left["high_band_residual_ratio"], right["high_band_residual_ratio"]),
         "high_band_residual_rms": max(left["high_band_residual_rms"], right["high_band_residual_rms"]),
         "high_band_residual_dbfs": max(left["high_band_residual_dbfs"], right["high_band_residual_dbfs"]),
+        "low_band_capture_to_ref_gain_db": color_metrics["low_band_capture_to_ref_gain_db"],
+        "mid_band_capture_to_ref_gain_db": color_metrics["mid_band_capture_to_ref_gain_db"],
+        "high_band_capture_to_ref_gain_db": color_metrics["high_band_capture_to_ref_gain_db"],
+        "mid_vs_low_coloration_delta_db": color_metrics["mid_vs_low_coloration_delta_db"],
+        "high_vs_low_coloration_delta_db": color_metrics["high_vs_low_coloration_delta_db"],
+        "high_vs_mid_coloration_delta_db": color_metrics["high_vs_mid_coloration_delta_db"],
+        "metallic_coloration_score_db": color_metrics["metallic_coloration_score_db"],
         "quiet_mid_band_noise_dbfs": max(left["quiet_mid_band_noise_dbfs"], right["quiet_mid_band_noise_dbfs"]),
         "quiet_fullband_noise_dbfs": max(left["quiet_fullband_noise_dbfs"], right["quiet_fullband_noise_dbfs"]),
         "left": left,

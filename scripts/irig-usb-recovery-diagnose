@@ -1,0 +1,324 @@
+#!/usr/bin/env bash
+set -u
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+wait_seconds=60
+interval_seconds=3
+run_dir="local-analysis/irig-recovery-investigation/recovery-$(date +%Y%m%d-%H%M%S)"
+lightweight="0"
+
+usage() {
+  cat <<'USAGE'
+Usage: scripts/irig-usb-recovery-diagnose [options]
+
+Diagnoses and tries safe recovery for a physically connected iRig Stream that
+is not visible to macOS. This never resets Audio 8 DJ.
+
+Options:
+  --wait SECONDS       How long to watch for iRig recovery (default: 60)
+  --interval SECONDS   Poll interval while watching (default: 3)
+  --run-dir DIR        Directory for evidence
+  --lightweight        Skip system_profiler snapshots for unattended loops
+USAGE
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --wait)
+      wait_seconds="$2"
+      shift 2
+      ;;
+    --interval)
+      interval_seconds="$2"
+      shift 2
+      ;;
+    --run-dir)
+      run_dir="$2"
+      shift 2
+      ;;
+    --lightweight)
+      lightweight="1"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+mkdir -p "$run_dir"
+
+# shellcheck source=scripts/audio-gate-lock.sh
+source ./scripts/audio-gate-lock.sh
+trap audio_gate_release_lock EXIT
+if ! audio_gate_acquire_lock "irig-usb-recovery-diagnose" "$run_dir"; then
+  {
+    echo "irig_recovery=FAIL"
+    echo "reason=${audio_gate_lock_error:-audio_gate_lock_busy}"
+    echo "run_dir=$run_dir"
+  } | tee "$run_dir/result.txt"
+  exit 75
+fi
+audio_gate_export_inherited_lock "irig-usb-recovery-diagnose" "$run_dir"
+
+snapshot() {
+  local name="$1"
+  local dir="$run_dir/$name"
+  mkdir -p "$dir"
+  ioreg -p IOUSB -l -w0 >"$dir/ioreg-usb.txt" 2>&1 || true
+  ioreg -p IOService -l -w0 -r -c IOUSBHostDevice >"$dir/iousbhostdevice.txt" 2>&1 || true
+  if [ "$lightweight" = "1" ]; then
+    echo "system_profiler_skipped=lightweight" >"$dir/system-profiler-usb-audio.txt"
+  else
+    system_profiler SPUSBDataType SPAudioDataType >"$dir/system-profiler-usb-audio.txt" 2>&1 || true
+  fi
+  ./scripts/capture-device-diagnose --run-dir "$dir/capture" >"$dir/capture-device-diagnose.txt" 2>&1 || true
+  python3 - "$dir/iousbhostdevice.txt" >"$dir/usb-port-summary.txt" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+text = open(path, "r", errors="replace").read().splitlines()
+
+current_port = None
+ports = []
+devices = []
+for line in text:
+    node = re.search(r"\+\-o ([^@<]+)@([0-9A-Fa-f]+).*<class ([^,>]+)", line)
+    if node:
+        name = node.group(1).strip()
+        loc = node.group(2)
+        cls = node.group(3)
+        if "HubPort" in cls or "HostPort" in cls:
+            current_port = {"name": name, "location": loc, "class": cls}
+            ports.append(current_port)
+        elif "IOUSBHostDevice" in cls:
+            current_port = None
+            devices.append({"name": name, "location": loc, "class": cls})
+        else:
+            current_port = None
+        continue
+    if current_port is not None:
+        m = re.search(r'"port-status" = ([0-9]+)', line)
+        if m:
+            current_port["port_status"] = m.group(1)
+        m = re.search(r'"locationID" = ([0-9]+)', line)
+        if m:
+            current_port["location_id"] = m.group(1)
+        if '"port-statistics"' in line:
+            for key in (
+                "kPortStatConnectCount",
+                "kPortStatAddressFailureCount",
+                "kPortStatEnumerationFailureCount",
+                "kPortStatOverCurrentCount",
+                "kPortStatRemoteWakeCount",
+            ):
+                m = re.search(r'"%s"=([0-9]+)' % re.escape(key), line)
+                if m:
+                    current_port[key] = int(m.group(1))
+
+print("usb_devices=" + ",".join(d["name"] for d in devices))
+for index, port in enumerate(ports, 1):
+    enum_fail = port.get("kPortStatEnumerationFailureCount", 0)
+    addr_fail = port.get("kPortStatAddressFailureCount", 0)
+    over_current = port.get("kPortStatOverCurrentCount", 0)
+    status = port.get("port_status", "unknown")
+    location = port.get("location_id", port.get("location", "unknown"))
+    print(
+        "port_%02d=%s@%s status=%s connect=%s enum_fail=%s addr_fail=%s over_current=%s"
+        % (
+            index,
+            port.get("class", port.get("name", "unknown")),
+            location,
+            status,
+            port.get("kPortStatConnectCount", 0),
+            enum_fail,
+            addr_fail,
+            over_current,
+        )
+    )
+PY
+}
+
+read_field() {
+  local file="$1"
+  local key="$2"
+  awk -F= -v k="$key" '$1 == k {print substr($0, index($0, "=") + 1); exit}' "$file" 2>/dev/null
+}
+
+write_port_delta() {
+  local before_file="$1"
+  local after_file="$2"
+  local out_file="$3"
+  python3 - "$before_file" "$after_file" >"$out_file" <<'PY'
+import re
+import sys
+
+before_path, after_path = sys.argv[1:3]
+
+def parse(path):
+    ports = {}
+    try:
+        lines = open(path, "r", errors="replace").read().splitlines()
+    except FileNotFoundError:
+        return ports
+    for line in lines:
+        if not line.startswith("port_"):
+            continue
+        key = line.split("=", 1)[0]
+        values = {}
+        for name in ("connect", "enum_fail", "addr_fail", "over_current"):
+            m = re.search(r"\b%s=([0-9]+)" % name, line)
+            values[name] = int(m.group(1)) if m else 0
+        values["line"] = line
+        ports[key] = values
+    return ports
+
+before = parse(before_path)
+after = parse(after_path)
+keys = sorted(set(before) | set(after))
+changed = False
+for key in keys:
+    b = before.get(key, {})
+    a = after.get(key, {})
+    deltas = {}
+    for name in ("connect", "enum_fail", "addr_fail", "over_current"):
+        deltas[name] = a.get(name, 0) - b.get(name, 0)
+        if deltas[name] != 0:
+            changed = True
+    print(
+        "%s delta_connect=%+d delta_enum_fail=%+d delta_addr_fail=%+d delta_over_current=%+d before='%s' after='%s'"
+        % (
+            key,
+            deltas["connect"],
+            deltas["enum_fail"],
+            deltas["addr_fail"],
+            deltas["over_current"],
+            b.get("line", "missing"),
+            a.get("line", "missing"),
+        )
+    )
+print("usb_port_counter_changes=%s" % ("YES" if changed else "NO"))
+PY
+}
+
+snapshot before
+
+{
+  echo "recovery_started=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "run_dir=$run_dir"
+  echo "lightweight=$lightweight"
+  echo "stage=audio_and_usb_service_refresh"
+} >"$run_dir/recovery.log"
+
+launchctl kickstart -k system/com.apple.audio.coreaudiod >>"$run_dir/recovery.log" 2>&1 || true
+launchctl kickstart -k system/com.apple.audio.audiohald >>"$run_dir/recovery.log" 2>&1 || true
+launchctl kickstart -k system/com.apple.audio.AudioComponentRegistrar >>"$run_dir/recovery.log" 2>&1 || true
+launchctl kickstart -k system/com.apple.usbaudiod >>"$run_dir/recovery.log" 2>&1 || true
+launchctl kickstart -k system/com.apple.usbpowerd >>"$run_dir/recovery.log" 2>&1 || true
+
+snapshot after-audio-refresh
+
+if [ -x build/usb-reset-device ]; then
+  echo "stage=irig_exact_usb_reset_if_visible" >>"$run_dir/recovery.log"
+  ./build/usb-reset-device 0x1963 0x0059 >"$run_dir/irig-reset.txt" 2>&1 || true
+else
+  echo "stage=irig_exact_usb_reset_if_visible_skipped_missing_tool" >>"$run_dir/recovery.log"
+fi
+
+snapshot after-irig-reset
+
+deadline=$(( $(date +%s) + wait_seconds ))
+attempt=0
+ready=0
+while [ "$(date +%s)" -le "$deadline" ]; do
+  attempt=$((attempt + 1))
+  snapshot "watch-$attempt"
+  status="$(read_field "$run_dir/watch-$attempt/capture-device-diagnose.txt" physical_capture_status)"
+  by_id="$(read_field "$run_dir/watch-$attempt/capture-device-diagnose.txt" found_irig_usb_by_id)"
+  core_audio="$(read_field "$run_dir/watch-$attempt/capture-device-diagnose.txt" found_irig_core_audio)"
+  echo "watch_attempt=$attempt physical_capture_status=${status:-unknown} found_irig_usb_by_id=${by_id:-unknown} found_irig_core_audio=${core_audio:-unknown}" >>"$run_dir/recovery.log"
+  if [ "$status" = "READY" ]; then
+    ready=1
+    break
+  fi
+  sleep "$interval_seconds"
+done
+
+latest="watch-$attempt"
+write_port_delta "$run_dir/before/usb-port-summary.txt" "$run_dir/$latest/usb-port-summary.txt" "$run_dir/port-delta.txt"
+failed_ports="$(
+  awk '
+    /^port_/ {
+      enum_fail = 0
+      addr_fail = 0
+      if (match($0, /enum_fail=[0-9]+/)) {
+        enum_fail = substr($0, RSTART + 10, RLENGTH - 10)
+      }
+      if (match($0, /addr_fail=[0-9]+/)) {
+        addr_fail = substr($0, RSTART + 10, RLENGTH - 10)
+      }
+      if (enum_fail > 0 || addr_fail > 0) {
+        if (out != "") {
+          out = out ";"
+        }
+        out = out $0
+      }
+    }
+    END { print out }
+  ' "$run_dir/$latest/usb-port-summary.txt"
+)"
+if [ "$ready" -eq 1 ]; then
+  verdict="READY"
+  reason="irig_visible_to_usb_and_core_audio"
+else
+  verdict="MISSING"
+  reason="$(read_field "$run_dir/$latest/capture-device-diagnose.txt" reason)"
+  if [ -z "$reason" ]; then
+    reason="irig_not_enumerated_by_macos"
+  fi
+fi
+
+{
+  echo "irig_recovery=$verdict"
+  echo "reason=$reason"
+  echo "run_dir=$run_dir"
+  echo "lightweight=$lightweight"
+  echo "latest_snapshot=$run_dir/$latest"
+  echo "before_status=$(read_field "$run_dir/before/capture-device-diagnose.txt" physical_capture_status)"
+  echo "after_audio_refresh_status=$(read_field "$run_dir/after-audio-refresh/capture-device-diagnose.txt" physical_capture_status)"
+  echo "after_irig_reset_status=$(read_field "$run_dir/after-irig-reset/capture-device-diagnose.txt" physical_capture_status)"
+  echo "found_irig_usb_by_id=$(read_field "$run_dir/$latest/capture-device-diagnose.txt" found_irig_usb_by_id)"
+  echo "found_irig_core_audio=$(read_field "$run_dir/$latest/capture-device-diagnose.txt" found_irig_core_audio)"
+  echo "usb_devices=$(read_field "$run_dir/$latest/capture-device-diagnose.txt" usb_device_names)"
+  echo "port_summary=$run_dir/$latest/usb-port-summary.txt"
+  echo "port_delta=$run_dir/port-delta.txt"
+  echo "usb_port_counter_changes=$(read_field "$run_dir/port-delta.txt" usb_port_counter_changes)"
+  echo "failed_usb_ports=${failed_ports:-none}"
+  if rg -q "enum_fail=([1-9][0-9]*)|addr_fail=([1-9][0-9]*)" "$run_dir/$latest/usb-port-summary.txt"; then
+    echo "usb_enumeration_failures=YES"
+  else
+    echo "usb_enumeration_failures=NO"
+  fi
+  if [ "$verdict" != "READY" ] && [ "$(read_field "$run_dir/$latest/capture-device-diagnose.txt" found_irig_usb_by_id)" = "0" ]; then
+    echo "software_recovery_limit=no_irig_usb_object_to_reset"
+  fi
+  if [ "$verdict" != "READY" ]; then
+    echo "next_recovery_action=observe_with_backoff_until_manual_usb_power_cycle_or_irig_reenumerates"
+  fi
+} >"$run_dir/result.txt"
+
+cat "$run_dir/result.txt"
+
+if [ "$ready" -eq 1 ]; then
+  exit 0
+fi
+exit 1
