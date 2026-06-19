@@ -87,7 +87,7 @@ Recommended initial capacities:
 
 | Buffer | Initial capacity | Reason |
 | --- | ---: | --- |
-| Capture ring | 32768 frames | Existing prototype capacity; enough for transient USB/callback phase jitter. |
+| Capture ring | 32768 frames | Existing baseline capacity; enough for transient USB/callback phase jitter. |
 | Output timeline | 32768 frames | Matches capture ring and supports elastic correction without reallocating. |
 | Capture transfers | 64 transfers x 8 USB microframes | Existing capture queue depth and USB cadence. |
 | Playback transfers | 128 transfers x 8 USB microframes | Enough for target plus maximum in-flight playback lead. |

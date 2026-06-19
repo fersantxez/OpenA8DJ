@@ -3,11 +3,79 @@
 This file records reproducible release and validation evidence for the modern
 macOS mainline.
 
+## 2026-06-19 15:30 EDT - Canonical 0.5.0 repo cleanup and release packaging
+
+- Commit before changes: `0f5ea24`
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch at time: `codex/canonical-0.5-cleanup`
+- Hardware touched: no
+- Audio/CoreAudio touched: no
+- Driver installed/reloaded: no
+
+Commands run:
+
+```sh
+make all
+make control-center
+make dist
+hdiutil verify build/OpenA8DJ-0.5.0.dmg
+hdiutil verify build/opena8dj-tools-0.5.0.dmg
+pkgutil --payload-files build/OpenA8DJ-0.5.0.pkg
+pkgutil --payload-files build/opena8dj-tools-0.5.0.pkg
+pkgutil --check-signature build/OpenA8DJ-0.5.0.pkg
+pkgutil --check-signature build/opena8dj-tools-0.5.0.pkg
+./build/opena8dj-control list-profiles
+./build/opena8dj-control export-config /tmp/opena8dj-export-test.json
+make smoke-hal parity-smoke-hal
+cmake -S . -B build/cmake-release -DCMAKE_BUILD_TYPE=Release
+cmake --build build/cmake-release --parallel
+ctest --test-dir build/cmake-release --output-on-failure
+```
+
+Results:
+
+- `make all`: PASS.
+- `make control-center`: PASS.
+- `make dist`: PASS.
+- Driver artifact generated: `build/OpenA8DJ-0.5.0.pkg`.
+- Driver DMG generated: `build/OpenA8DJ-0.5.0.dmg`.
+- Tools artifact generated: `build/opena8dj-tools-0.5.0.pkg`.
+- Tools DMG generated: `build/opena8dj-tools-0.5.0.dmg`.
+- Checksums generated: `build/OpenA8DJ-0.5.0-checksums.txt`.
+- DMG verification: PASS for driver and tools DMGs.
+- Package payload inspection: PASS; driver package contains HAL, MIDI bridge,
+  control CLI, uninstall tool, LaunchAgent, and docs. Tools package contains
+  Control Center, `opena8dj-control`, and control-surface docs.
+- Package signature status: expected unsigned/ad-hoc preview state,
+  `pkgutil --check-signature` reports `Status: no signature` for both packages.
+- HAL bundle version: `CFBundleShortVersionString=0.5.0`,
+  `CFBundleVersion=150`.
+- HAL smoke: PASS, 8 input channels and 8 output channels.
+- HAL parity smoke: PASS, 1 input stream, 4 output streams, 16 total stream
+  channels.
+- CMake build: PASS.
+- CTest: PASS, 88/88 tests.
+
+Checksums:
+
+```text
+573012e43c65a9c27559f002a646bb5f542b8e0b195285e0dc3f5b2911f32a49  OpenA8DJ-0.5.0.dmg
+86ea9992682aae34c0439651f384e0a597decd9865171c554e69c248b334ee5a  OpenA8DJ-0.5.0.pkg
+daa8a60fe9e6bc9555ec54c9ef80b072e404daefa8cf2e3ff2199ef40424bccb  opena8dj-tools-0.5.0.dmg
+05d4904b85b733bcf2cf20e786698ab36c814555de79592724025db49724ffbb  opena8dj-tools-0.5.0.pkg
+```
+
+Scope note:
+
+This evidence validates repository cleanup, offline build/test gates, packaging,
+and static release artifacts. It does not install the driver and does not
+replace hardware sound-quality validation for a future loaded candidate.
+
 ## 2026-06-19 09:54 EDT - Signing and notarization release gate
 
 - Commit before changes: `5f6e457`
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: no
 - Audio/CoreAudio touched: no
 - Driver installed/reloaded: no
@@ -73,7 +141,7 @@ credentials can exist on this machine.
 ## 2026-06-19 10:28 EDT - Unity gain and Timecode Vinyl input restore
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: yes, local HAL install only
 - GitHub release assets replaced: no
@@ -135,7 +203,7 @@ Conclusion:
 ## 2026-06-19 10:33 EDT - Idle CPU-noise investigation
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: no
 - Playback: no
@@ -196,7 +264,7 @@ Conclusion:
 ## 2026-06-19 10:41 EDT - Timecode Vinyl low-noise ground-lift A/B
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: no
 - Playback: no
@@ -253,7 +321,7 @@ Conclusion:
 ## 2026-06-19 10:45 EDT - Low-latency scratch response candidate - REJECTED
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: yes, local HAL only
 - Playback: yes, one-second A-pair tone smoke
@@ -338,7 +406,7 @@ Conclusion:
 ## 2026-06-19 10:51 EDT - Roll back rejected low-latency build
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: yes, local HAL only
 - Playback: yes, one-second A-pair tone smoke
@@ -385,7 +453,7 @@ Conclusion:
 ## 2026-06-19 12:31 EDT - Shared hardware lock policy update
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: no
 - Playback/capture: no
 - Driver installed/reloaded: no
@@ -418,7 +486,7 @@ $HOME/.opena8dj/hardware-gate.lock absent
 ## 2026-06-19 12:35 EDT - Preopen responsiveness candidate
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock only during install and
   physical playback/capture windows
 - Playback/capture: yes, iRig Stream capture from Audio 8 DJ output B
@@ -497,7 +565,7 @@ Conclusion:
 ## 2026-06-19 12:44 EDT - Final integrated installed load for human test
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock during install and physical
   playback/capture windows
 - Playback/capture: yes, Audio 8 DJ output B into iRig Stream capture
@@ -603,7 +671,7 @@ Conclusion:
 ## 2026-06-19 13:33 EDT - Human test feedback during Traktor session
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Installed commit under test: `6c2670e`
 - Hardware touched by Codex for this note: no
 - Driver installed/reloaded by Codex for this note: no
@@ -641,7 +709,7 @@ Conclusion:
 ## 2026-06-19 13:38 EDT - Timecode responsiveness input-latest candidate
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch: `driverkit/cpp-redesign`
+- Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock during install/reload and
   post-install checks
 - Driver installed/reloaded: yes, local HAL only

@@ -1,16 +1,16 @@
 # Roadmap to a Production-Quality Audio 8 DJ Driver
 
-This document captures the current gap between the working OpenA8DJ HAL
-prototype and a production-quality independent macOS driver.
+This document captures the current gap between the OpenA8DJ 0.5.x macOS driver
+baseline and a production-quality independent macOS driver.
 
-Current status: OpenA8DJ 0.4.0 is the modern macOS C++ mainline. The previous
-C/Objective-C implementation is preserved on `legacy` for historical
-Linux/CAIAQ-derived behavior, comparison, and recovery.
+Current status: OpenA8DJ 0.5.0 is the canonical macOS C++ line. The previous
+C/Objective-C implementation is preserved on `legacy` for historical reference,
+comparison, and recovery.
 
 ## Current evidence
 
 - macOS enumerates `Open Audio 8 DJ` as an 8-input / 8-output device in the
-  0.4.0 preview.
+  0.5.0 baseline.
 - The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
   pairs and 4 stereo output streams with named Output A/B/C/D pairs.
 - Local listening confirmed substantially cleaner playback at 44.1 and 48 kHz
@@ -144,13 +144,13 @@ Acceptance:
 
 ## Priority 5: installation and signing
 
-The current PKG/DMG is useful for local testing. The production target should be
+The current PKG/DMG is useful for public preview testing. The production target should be
 a signed app bundle containing a DriverKit system extension, plus a DMG or PKG
 wrapper for distribution.
 
 Actions:
 
-1. Short term: keep the HAL package for internal testing.
+1. Short term: keep the HAL package as the current installable macOS driver.
 2. Medium term: ship a signed app that installs/updates the HAL and control
    helper cleanly.
 3. Long term: migrate audio and USB transport into an AudioDriverKit +
@@ -192,8 +192,8 @@ Core Audio / Core MIDI
   - stable clock and channel layout
 ```
 
-The HAL prototype remains valuable as an independent test bed, but
-AudioDriverKit is the right endpoint for a durable macOS driver.
+The HAL driver remains the current installable baseline. AudioDriverKit is the
+right endpoint for a durable future macOS System Extension driver.
 
 ## Test matrix before calling it 1.0
 

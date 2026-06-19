@@ -51,6 +51,9 @@ MIDI_BRIDGE := build/opena8dj-midid
 MIDI_BRIDGE_SRC := src/tools/opena8dj-midid.m
 CONTROL_TOOL := build/opena8dj-control
 CONTROL_TOOL_SRC := src/tools/opena8dj-control.c
+CONTROL_CENTER_APP := build/OpenA8DJControlCenter.app
+CONTROL_CENTER_SRC := macos/OpenA8DJControlCenter/OpenA8DJControlCenter.swift
+CONTROL_CENTER_PLIST := macos/OpenA8DJControlCenter/Info.plist
 MIDI_LIST := build/midi-list
 MIDI_LIST_SRC := src/tools/midi-list.c
 PHYSICAL_RUN_COMPARE := build/physical-run-compare
@@ -60,9 +63,15 @@ PKG_ROOT := build/pkgroot
 PKG_SCRIPTS := resources/pkg/scripts
 PKG_SANITIZER := scripts/sanitize-macos-pkg.sh
 PKG := build/OpenA8DJ-$(VERSION).pkg
+CONTROL_PKG_ROOT := build/control-pkgroot
+CONTROL_PKG_SCRIPTS := resources/control-surfaces-pkg/scripts
+CONTROL_PKG := build/opena8dj-tools-$(VERSION).pkg
 DMG_ROOT := build/dmgroot
 DMG := build/OpenA8DJ-$(VERSION).dmg
 DMG_README := resources/dmg/README.txt
+CONTROL_DMG_ROOT := build/control-dmgroot
+CONTROL_DMG := build/opena8dj-tools-$(VERSION).dmg
+CONTROL_DMG_README := resources/control-surfaces-dmg/README.txt
 CHECKSUMS := build/OpenA8DJ-$(VERSION)-checksums.txt
 RELEASE_NOTES := docs/RELEASE_NOTES_$(VERSION).md
 SIGN_IDENTITY ?= -
@@ -79,7 +88,7 @@ HAL_OUTPUT_PREFETCH_FRAMES ?= 128
 HAL_INPUT_DECODE ?= 1
 HAL_TIMECODE_INPUT_GAIN ?= 1.0f
 HAL_TIMECODE_INPUT_GATE_THRESHOLD ?= 0.0f
-HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES ?= 4096
+HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES ?= 0
 HAL_INPUT_SPSC_RING ?= 0
 HAL_INPUT_DECODE_ACTIVE_GATING ?= 1
 HAL_INPUT_MAX_LATENCY_FRAMES ?= 0
@@ -135,10 +144,10 @@ HAL_IDLE_PLAYBACK_GATE ?= 1
 HAL_IDLE_PLAYBACK_GATE_THRESHOLD ?= 0.000001f
 HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES ?= 0
 HAL_OUTPUT_ZERO_FLOOR ?= 0.0f
-HAL_OUTPUT_START_LATENCY_FRAMES ?= 8192
-HAL_OUTPUT_RESTART_LATENCY_FRAMES ?= 4096
-HAL_OUTPUT_TARGET_LATENCY_FRAMES ?= 8192
-HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES ?= 24576
+HAL_OUTPUT_START_LATENCY_FRAMES ?= 3072
+HAL_OUTPUT_RESTART_LATENCY_FRAMES ?= 1536
+HAL_OUTPUT_TARGET_LATENCY_FRAMES ?= 3072
+HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES ?= 9216
 HAL_OUTPUT_AMPLITUDE_STATS ?= 0
 HAL_OUTPUT_WRITE_STATS ?= 0
 HAL_HOT_STREAM_STATS ?= 0
@@ -209,7 +218,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate sign-hal sign-tools install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist release-signed notarize verify-signed-release FORCE
+.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate sign-hal sign-tools install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist release-signed notarize verify-signed-release FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -643,6 +652,16 @@ $(CONTROL_TOOL): $(CONTROL_TOOL_SRC) src/hal/OpenA8DJUSB.m
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 
+$(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL)
+	rm -rf "$(CONTROL_CENTER_APP)"
+	mkdir -p "$(CONTROL_CENTER_APP)/Contents/MacOS" "$(CONTROL_CENTER_APP)/Contents/Resources"
+	cp "$(CONTROL_CENTER_PLIST)" "$(CONTROL_CENTER_APP)/Contents/Info.plist"
+	cp "$(CONTROL_TOOL)" "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
+	xcrun swiftc -parse-as-library -O -framework SwiftUI -framework AppKit -o "$(CONTROL_CENTER_APP)/Contents/MacOS/OpenA8DJControlCenter" "$(CONTROL_CENTER_SRC)"
+	codesign --force --deep --sign - "$(CONTROL_CENTER_APP)"
+
+control-center: $(CONTROL_CENTER_APP)
+
 $(MIDI_LIST): $(MIDI_LIST_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreMIDI -framework CoreFoundation -o $@ $<
@@ -668,6 +687,17 @@ install-hal: sign-hal
 install-tools: $(CONTROL_TOOL)
 	sudo install -d /usr/local/bin
 	sudo install -m 755 $(CONTROL_TOOL) /usr/local/bin/opena8dj-control
+
+install-control-surfaces: $(CONTROL_CENTER_APP)
+	sudo install -d /usr/local/bin /Applications /Library/Documentation/OpenA8DJ/ControlSurfaces
+	sudo install -m 755 $(CONTROL_TOOL) /usr/local/bin/opena8dj-control
+	sudo rm -rf "/Applications/OpenA8DJ Control Center.app"
+	COPYFILE_DISABLE=1 sudo cp -R "$(CONTROL_CENTER_APP)" "/Applications/OpenA8DJ Control Center.app"
+	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md /Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md
+	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md /Library/Documentation/OpenA8DJ/ControlSurfaces/DEMO_RUNBOOK_2026-06-19.md
+	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACE_VERIFICATION_2026-06-19.md /Library/Documentation/OpenA8DJ/ControlSurfaces/VERIFICATION_2026-06-19.md
+	sudo install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
+	sudo xattr -cr "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces 2>/dev/null || true
 
 install-midid: $(MIDI_BRIDGE) $(LAUNCH_AGENT_PLIST)
 	sudo install -d /usr/local/bin
@@ -702,6 +732,29 @@ package: all sign-hal sign-tools
 	COPYFILE_DISABLE=1 pkgbuild --root "$(PKG_ROOT)" --scripts "$(PKG_SCRIPTS)" --identifier org.opena8dj.driver --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(PKG)"
 	if [ -z "$(PKG_SIGN_IDENTITY)" ]; then "$(PKG_SANITIZER)" "$(PKG)" "$(PKG_ROOT)" "$(PKG_SCRIPTS)"; fi
 
+control-surfaces-package: $(CONTROL_CENTER_APP)
+	rm -rf "$(CONTROL_PKG_ROOT)"
+	install -d "$(CONTROL_PKG_ROOT)/Applications"
+	COPYFILE_DISABLE=1 cp -R "$(CONTROL_CENTER_APP)" "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app"
+	install -d "$(CONTROL_PKG_ROOT)/usr/local/bin"
+	install -m 755 "$(CONTROL_TOOL)" "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-control"
+	install -d "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces"
+	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md"
+	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/DEMO_RUNBOOK_2026-06-19.md"
+	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACE_VERIFICATION_2026-06-19.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/VERIFICATION_2026-06-19.md"
+	install -m 644 LICENSE "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LICENSE"
+	install -m 644 NOTICE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/NOTICE.md"
+	install -m 644 docs/LEGAL.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LEGAL.md"
+	install -m 644 BRAND_POLICY.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/BRAND_POLICY.md"
+	install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh"
+	chmod +x "$(CONTROL_PKG_SCRIPTS)/preinstall" "$(CONTROL_PKG_SCRIPTS)/postinstall" "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh"
+	xattr -cr "$(CONTROL_PKG_ROOT)" 2>/dev/null || true
+	find "$(CONTROL_PKG_ROOT)" -name '._*' -delete
+	COPYFILE_DISABLE=1 pkgbuild --root "$(CONTROL_PKG_ROOT)" --scripts "$(CONTROL_PKG_SCRIPTS)" --identifier org.opena8dj.tools --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(CONTROL_PKG)"
+	if [ -z "$(PKG_SIGN_IDENTITY)" ]; then "$(PKG_SANITIZER)" "$(CONTROL_PKG)" "$(CONTROL_PKG_ROOT)" "$(CONTROL_PKG_SCRIPTS)"; fi
+
+tools-package: control-surfaces-package
+
 dmg: package $(DMG_README)
 	rm -rf "$(DMG_ROOT)" "$(DMG)"
 	install -d "$(DMG_ROOT)"
@@ -715,8 +768,24 @@ dmg: package $(DMG_README)
 	hdiutil create -volname "OpenA8DJ $(VERSION)" -srcfolder "$(DMG_ROOT)" -ov -format UDZO "$(DMG)"
 	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(DMG)"; fi
 
-checksums: dmg
-	(cd build && shasum -a 256 "OpenA8DJ-$(VERSION).dmg" "OpenA8DJ-$(VERSION).pkg" > "OpenA8DJ-$(VERSION)-checksums.txt")
+control-surfaces-dmg: control-surfaces-package $(CONTROL_DMG_README)
+	rm -rf "$(CONTROL_DMG_ROOT)" "$(CONTROL_DMG)"
+	install -d "$(CONTROL_DMG_ROOT)"
+	install -m 644 "$(CONTROL_PKG)" "$(CONTROL_DMG_ROOT)/opena8dj-tools-$(VERSION).pkg"
+	install -m 644 "$(CONTROL_DMG_README)" "$(CONTROL_DMG_ROOT)/README.txt"
+	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md "$(CONTROL_DMG_ROOT)/CONTROL_SURFACES_USER_GUIDE.md"
+	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md "$(CONTROL_DMG_ROOT)/CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md"
+	install -m 644 LICENSE "$(CONTROL_DMG_ROOT)/LICENSE"
+	install -m 644 NOTICE.md "$(CONTROL_DMG_ROOT)/NOTICE.md"
+	install -m 644 docs/LEGAL.md "$(CONTROL_DMG_ROOT)/LEGAL.md"
+	install -m 644 BRAND_POLICY.md "$(CONTROL_DMG_ROOT)/BRAND_POLICY.md"
+	hdiutil create -volname "opena8dj-tools $(VERSION)" -srcfolder "$(CONTROL_DMG_ROOT)" -ov -format UDZO "$(CONTROL_DMG)"
+	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(CONTROL_DMG)"; fi
+
+tools-dmg: control-surfaces-dmg
+
+checksums: dmg control-surfaces-dmg
+	(cd build && shasum -a 256 "OpenA8DJ-$(VERSION).dmg" "OpenA8DJ-$(VERSION).pkg" "opena8dj-tools-$(VERSION).dmg" "opena8dj-tools-$(VERSION).pkg" > "OpenA8DJ-$(VERSION)-checksums.txt")
 
 dist: checksums
 

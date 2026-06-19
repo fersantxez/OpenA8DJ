@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+/usr/sbin/chown -R root:wheel "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces
+/bin/chmod -R go-w "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces
+/usr/sbin/chown root:wheel /usr/local/bin/opena8dj-control
+/bin/chmod 755 /usr/local/bin/opena8dj-control
+/bin/chmod 755 /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh 2>/dev/null || true
+/usr/bin/xattr -cr "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces 2>/dev/null || true
+/usr/bin/find "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces /usr/local/bin -name '._*' -delete 2>/dev/null || true
+
+exit 0

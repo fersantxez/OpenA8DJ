@@ -149,7 +149,12 @@ int main(int argc, char** argv) {
       contains(makefile, "HAL_PLAYBACK_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_CAPTURE_ISO_FRAMES ?= $(HAL_ISO_FRAMES)") &&
       contains(makefile, "HAL_OUTPUT_STREAMS ?= 4") &&
-      contains(makefile, "HAL_OUTPUT_GAIN ?= 1.50f") &&
+      contains(makefile, "HAL_OUTPUT_GAIN ?= 0.75f") &&
+      contains(makefile, "HAL_TIMECODE_INPUT_GATE_HOLD_FRAMES ?= 0") &&
+      contains(makefile, "HAL_OUTPUT_START_LATENCY_FRAMES ?= 3072") &&
+      contains(makefile, "HAL_OUTPUT_RESTART_LATENCY_FRAMES ?= 1536") &&
+      contains(makefile, "HAL_OUTPUT_TARGET_LATENCY_FRAMES ?= 3072") &&
+      contains(makefile, "HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES ?= 9216") &&
       contains(makefile, "HAL_OUTPUT_START_BYTE ?= 4") &&
       contains(makefile, "HAL_PLAYBACK_CAPTURE_PACED ?= 1") &&
       contains(makefile, "HAL_PLAYBACK_COALESCE_TRANSFERS ?= 1") &&

@@ -1,8 +1,7 @@
 # OpenA8DJ 0.5.0 Release Notes
 
-OpenA8DJ 0.5.0 is the current local stable candidate for the modern macOS Audio
-8 DJ driver line. It is frozen locally for release preparation, but it has not
-yet been published as a GitHub release.
+OpenA8DJ 0.5.0 is the current macOS C++ driver baseline for the Audio 8 DJ. It
+is the reference build for the public 0.5.x line.
 
 ## Stable Reference
 
@@ -51,6 +50,6 @@ yet been published as a GitHub release.
 
 ## Signing Status
 
-This local candidate is still ad-hoc signed. Developer ID signing and Apple
-notarization remain release tasks before a normal user-facing macOS installer
-can avoid Gatekeeper friction.
+This release may be ad-hoc signed unless the GitHub release explicitly states
+that Developer ID signing and Apple notarization are complete. Unsigned or
+ad-hoc signed builds can require manual Gatekeeper approval on macOS.

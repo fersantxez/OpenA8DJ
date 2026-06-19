@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+
+/bin/rm -rf "/Applications/OpenA8DJ Control Center.app"
+/bin/rm -f /usr/local/bin/opena8dj-control
+
+exit 0

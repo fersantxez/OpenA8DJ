@@ -4,42 +4,50 @@ Date: 2026-06-19
 
 ## Canonical State
 
-`main` is the current OpenA8DJ macOS driver line. It is the branch users should
-see first when they want to download, build, or understand the current driver.
-It contains the macOS HAL installer path, the C++ core contracts, and the
-DriverKit/AudioDriverKit forward shell.
+`main` is the OpenA8DJ macOS driver line. It is the branch users should see
+first when they want to download, build, install, or understand the current
+driver.
 
-`legacy` is the preserved previous C/Objective-C implementation. It contains
-the historical branch that was based on and inspired by Linux CAIAQ /
-`snd-usb-caiaq` reverse-engineering work and the 0.3.x physical-test history.
+The current product architecture is the macOS C++ stack:
 
-## Verified Remote Refs
+- Core Audio HAL plug-in for installation today
+- IOUSBHost transport for the Audio 8 DJ
+- CoreMIDI bridge
+- C++ core contracts and offline gates
+- DriverKit/AudioDriverKit scaffolding as the forward System Extension path
+- support tools and Control Center for profile/configuration workflows
 
-| Ref | Current role |
-|---|---|
-| `origin/main` | Current public default branch and macOS C++ line. |
-| `origin/driverkit/cpp-redesign` | Same modern C++/DriverKit development line. |
-| `origin/legacy` | Preserved previous C/Objective-C line. |
-| `v0.4.0` | Public release tag for OpenA8DJ 0.4.0. |
+## Preserved Branches
+
+`legacy` preserves the previous C/Objective-C implementation as historical
+reference material.
+
+Rust work is kept separately as an experimental lab/oracle. It may inform tests
+or future implementation choices, but it is not part of the macOS `main` runtime.
+
+Windows and Linux work should stay isolated in platform-specific branches and
+paths until those platforms have their own tested installers and validation
+evidence.
 
 ## What Belongs In Main
 
-- Modern macOS installation and packaging docs.
-- Core Audio HAL implementation for the current installable preview.
-- C++ core/audio/transport contracts.
-- DriverKit/AudioDriverKit scaffolding and readiness notes.
-- Current quality, routing, timecode, and performance gates.
-- Historical evidence only when clearly marked as dated audit material.
+- macOS C++ driver source
+- HAL installer path and packaging
+- DriverKit/AudioDriverKit forward scaffolding
+- current quality, routing, timecode, and performance gates
+- macOS support/configuration tools
+- docs for current macOS installation and experimental platform status
 
-## What Belongs In Legacy
+## What Does Not Belong In Main
 
-- The previous C/Objective-C product branch.
-- Old Linux/CAIAQ-derived runtime architecture.
-- 0.3.x branch behavior and emergency reference state.
+- full legacy C implementation history
+- Rust runtime experiments
+- Windows or Linux driver code that can interfere with macOS build/release
+- hardware tests that assume exclusive access without the project hardware lock
 
 ## Important Clarification
 
-The current `main` branch still contains some `.c`, `.m`, and `.mm` files. That
-is expected for the macOS HAL plug-in, CoreAudio/CoreMIDI tooling, and bridge
-code. These files are part of the modern macOS C++/DriverKit product line. They
-do not mean the old C mainline is still active.
+The current macOS branch still contains `.c`, `.m`, and `.mm` files. That is
+expected for Core Audio HAL, CoreMIDI, IOUSBHost, and bridge code. These files
+are part of the modern macOS product line. They do not mean the old C branch is
+still the active driver architecture.
