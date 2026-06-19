@@ -131,3 +131,64 @@ Conclusion:
   default-on for future loads.
 - Do not replace GitHub release assets until the real-music iRig quality gate
   passes.
+
+## 2026-06-19 10:33 EDT - Idle CPU-noise investigation
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: no
+- Playback: no
+- Capture: yes, iRig Stream idle capture
+
+Reason:
+
+- Human headphone test reported faint computer/CPU-like background noise in
+  silence.
+
+Commands/evidence:
+
+```sh
+/usr/local/bin/opena8dj-control stream-stats
+./build/audio-record 8 idle-low-load.wav "iRig Stream" 1,2
+yes >/dev/null & ...  # temporary CPU load
+./build/audio-record 8 idle-high-load.wav "iRig Stream" 1,2
+/usr/local/bin/opena8dj-control stream-stats
+```
+
+Evidence directory:
+
+```text
+local-analysis/unity-gain-fix-20260619-102845/idle-cpu-noise-20260619-103313
+```
+
+Observed stream state during reported idle:
+
+```text
+outputFramesWritten=0
+outputPeak=0.000000
+output near-clip=0
+output clipped=0
+outputActiveUnderruns=0
+```
+
+iRig idle capture:
+
+```text
+low load:  rms=0.00160015 peak=0.00869751 clipped=0
+high load: rms=0.00028737 peak=0.00402832 clipped=0
+```
+
+Conclusion:
+
+- The current evidence does not show non-zero digital output samples during
+  idle; the HAL reports digital silence.
+- The iRig route did not reproduce a CPU-load-correlated noise increase in
+  this short capture. The high-load capture was quieter than the low-load
+  capture.
+- The headphone noise may be analog coupling, USB bus/power/ground noise, or a
+  route not captured by the iRig loopback path.
+- Safe mitigations already loaded: unity output gain and strict idle digital
+  silence. Further mitigation should be a separate low-noise transport
+  experiment that reduces idle USB transfer activity only if it does not break
+  Timecode Vinyl input capture or fast playback start.
