@@ -244,6 +244,14 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD 0.000001f
 #endif
 
+#ifndef OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES
+#define OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES 0
+#endif
+
+#ifndef OPENA8DJ_OUTPUT_ZERO_FLOOR
+#define OPENA8DJ_OUTPUT_ZERO_FLOOR 0.0f
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_START_LATENCY_FRAMES
 #define OPENA8DJ_OUTPUT_START_LATENCY_FRAMES 8192
 #endif
@@ -361,6 +369,7 @@ enum {
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kInputMaxLatencyFrames = OPENA8DJ_INPUT_MAX_LATENCY_FRAMES,
+    kIdlePlaybackGateHoldFrames = OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES,
     kRingFrames = 32768,
     kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
     kOutputStartLatencyFrames = OPENA8DJ_OUTPUT_START_LATENCY_FRAMES,
@@ -1636,10 +1645,11 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
                                     uint32_t *outResetCount,
                                     uint32_t *outLateWriteFrames)
 {
-    if (ring->data == NULL || ring->frameNumbers == NULL || frames == NULL || frameCount == 0) {
+    if (ring->data == NULL || ring->frameNumbers == NULL || frameCount == 0) {
         return 0;
     }
 
+    const bool writeSilence = frames == NULL;
     uint32_t dropped = 0;
     uint32_t resetCount = 0;
     uint32_t lateWriteFrames = 0;
@@ -1688,9 +1698,14 @@ static uint32_t OutputTimelineWrite(OutputTimelineRing *ring,
             continue;
         }
         uint32_t index = TimelineIndexForFrame(frameNumber, ring->capacityFrames);
-        memcpy(&ring->data[(size_t)index * ring->channels],
-               &frames[(size_t)frame * ring->channels],
-               (size_t)ring->channels * sizeof(float));
+        float *destination = &ring->data[(size_t)index * ring->channels];
+        if (writeSilence) {
+            memset(destination, 0, (size_t)ring->channels * sizeof(float));
+        } else {
+            memcpy(destination,
+                   &frames[(size_t)frame * ring->channels],
+                   (size_t)ring->channels * sizeof(float));
+        }
         ring->frameNumbers[index] = frameNumber;
         if (frameNumber > ring->maxWrittenFrame) {
             ring->maxWrittenFrame = frameNumber;
@@ -1959,6 +1974,9 @@ static void FloatToOutputI24(float sample, uint8_t *bytes)
         sample = 0.0f;
     }
     sample *= OPENA8DJ_OUTPUT_GAIN;
+    if (fabsf(sample) <= OPENA8DJ_OUTPUT_ZERO_FLOOR) {
+        sample = 0.0f;
+    }
     if (sample > 1.0f) sample = 1.0f;
     if (sample < -1.0f) sample = -1.0f;
     int32_t value;
@@ -2325,6 +2343,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     bool _outputPlaybackPrimed;
     bool _outputHasStartedPlayback;
     atomic_bool _idlePlaybackGateActive;
+    uint64_t _idlePlaybackSilentFrames;
     uint64_t _outputFramesServed;
     float _outputLastFrame[kChannels];
     bool _outputLastFrameValid;
@@ -2460,6 +2479,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_inputDecodeEnabled, atomic_load(&gInputDecodeEnabledPreference));
         atomic_init(&_inputDecodeActive, false);
         atomic_init(&_idlePlaybackGateActive, true);
+        _idlePlaybackSilentFrames = 0;
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
@@ -4715,6 +4735,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     _outputFrameLoaded = false;
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
+    _idlePlaybackSilentFrames = 0;
     _outputFramesServed = 0;
     memset(_outputLastFrame, 0, sizeof(_outputLastFrame));
     _outputLastFrameValid = false;
@@ -6021,6 +6042,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
     atomic_store(&_idlePlaybackGateActive, true);
+    _idlePlaybackSilentFrames = 0;
     _outputLastFrameValid = false;
     _outputReplayRunFrames = 0;
     _outputElasticCorrectionCountdown = 0;
@@ -6794,14 +6816,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             }
         }
     }
+#if !OPENA8DJ_ENABLE_OUTPUT_FIFO
+    bool writeTimelineSilence = false;
+#endif
 #if OPENA8DJ_IDLE_PLAYBACK_GATE
     if (peak <= OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD) {
-        if (!atomic_exchange(&_idlePlaybackGateActive, true)) {
-            [self softResetPlaybackPipelineWithScheduleReset:NO];
+        _idlePlaybackSilentFrames += frames;
+        if (atomic_load(&_idlePlaybackGateActive) ||
+            _idlePlaybackSilentFrames >= (uint64_t)kIdlePlaybackGateHoldFrames) {
+            if (!atomic_exchange(&_idlePlaybackGateActive, true)) {
+                [self softResetPlaybackPipelineWithScheduleReset:NO];
+            }
+            return;
         }
-        return;
+#if !OPENA8DJ_ENABLE_OUTPUT_FIFO
+        writeTimelineSilence = true;
+#endif
+    } else {
+        _idlePlaybackSilentFrames = 0;
+        atomic_store(&_idlePlaybackGateActive, false);
     }
-    atomic_store(&_idlePlaybackGateActive, false);
 #endif
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self appendDiagnosticFrames:&_diagnosticWrittenBuffer counter:&_diagnosticWrittenFrames frames:inInterleaved count:frames];
@@ -6824,8 +6858,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                value:dropped];
     }
 #else
+    const float *timelineFrames = writeTimelineSilence ? NULL : inInterleaved;
     uint32_t dropped = OutputTimelineWrite(&_outputTimeline,
-                                           inInterleaved,
+                                           timelineFrames,
                                            frames,
                                            sampleTime,
                                            sampleTimeValid,

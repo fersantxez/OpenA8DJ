@@ -723,3 +723,142 @@ Next operator check:
 - Confirm that no new output crackle, saturation, or white noise appears.
 - If responsiveness improves without regressions, keep the input-latest trim as
   the next DVS baseline and tune the limit lower only with physical evidence.
+
+## 2026-06-19 13:50 EDT - Low-noise active-silence candidate installed, physical soundcheck failed
+
+Scope:
+
+- Goal: reduce reported CPU/hardware-like headphone background noise without
+  changing the working Timecode Vinyl input-latency behavior.
+- Driver installed/reloaded: yes, local HAL only.
+- Playback/capture sound-quality run: executed after the Control Center demo
+  released the global hardware lock.
+- Default devices changed: no intentional default-device change.
+- USB reset: no.
+- System reboot: no.
+
+Code change under test:
+
+```text
+OPENA8DJ_INPUT_MAX_LATENCY_FRAMES=512
+OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD=0.00003f
+OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES=1536
+OPENA8DJ_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+Behavior:
+
+- Keeps the current input-latest trim for Traktor timecode responsiveness.
+- Adds an active-silence path in the output timeline: if a whole Core Audio
+  output buffer is below the idle threshold, the HAL writes deterministic zero
+  frames instead of preserving possible client dither/sub-noise.
+- Parks playback after 1536 consecutive silent frames.
+- Does not apply a global zero-floor to normal music playback, so ordinary
+  zero crossings and low-level musical detail are left untouched.
+- Leaves output timeline latency, output gain, routing, capture queue,
+  playback queue, and timecode profile unchanged.
+
+Installed evidence:
+
+```text
+installed_sha=dd16595f7280a669b4d0928719bb4d07681abef789fe17fc19dd6035f79c79dc
+build_sha=dd16595f7280a669b4d0928719bb4d07681abef789fe17fc19dd6035f79c79dc
+installed_path=/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+profile=timecode-vinyl-low-noise
+input-mode=timecode-vinyl
+input-decode=on
+```
+
+Offline validation:
+
+```text
+ctest targeted gates: PASS
+- opena8djcpp_timecode_readiness_gate
+- opena8djcpp_dvs_packet_input_decode
+- opena8djcpp_soundcheck_wav_quality
+- opena8djcpp_hal_candidate_safety_gate
+- opena8djcpp_hal_input_spsc_ring_contract
+
+simulated output soundcheck: PASS
+run_dir=/Users/fer/dev/audio8djcpp/local-analysis/simulated-output/2026-06-19T135007
+alignment_score=1.000000
+simulated_snr_db=75.54
+mid_band_1000_5000_residual_ratio=0.000630
+mid_band_1000_5000_residual_dbfs=-108.70
+mid_band_cpu_corr=0.000000
+
+audio stack guard after install: PASS
+run_dir=local-analysis/low-noise-20260619-134933-audio-stack
+global_cpu_idle_pct=81.70
+coreaudiod.cpu_pct=0.0
+opena8dj_driver.cpu_pct=0.0
+```
+
+Physical validation status:
+
+```text
+requested_soundcheck=route B, Cable Guy, iRig Stream capture, 48 kHz, 512 frames
+run_dir=local-analysis/low-noise-20260619-135132-routeB-cable-guy
+result=FAIL
+quality_alignment_score=0.135231
+analog_snr_db=-42.17
+quiet_mid_band_noise_dbfs=-34.52
+mid_band_cpu_corr=0.497966
+lag_jumps_gt_2_frames=41
+capture_clipped_frames=0
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+```
+
+Readiness statement:
+
+- This build is rejected for human-test handoff. It passes offline gates, but
+  the exact installed artifact failed the required external iRig sound-quality
+  capture.
+- The aggressive threshold/hold combination must not be promoted. The next
+  low-noise candidate should either use the known-good idle threshold or prove
+  any higher threshold through same-session A/B before install.
+
+Follow-up diagnostic:
+
+```text
+stable_rollback_installed_sha=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
+stable_rollback_run=local-analysis/stable-rollback-20260619-135326-routeB-cable-guy
+stable_rollback_result=FAIL
+wide_lag_reanalysis_alignment=0.95026155
+wide_lag_reanalysis_quiet_mid_band_noise_dbfs=-33.30
+route_matrix_pairB=strongest iRig route
+route_matrix_pairC=near silence
+route_matrix_pairD=near silence
+observed_traktor_process=running, about 56 percent CPU
+```
+
+Interpretation:
+
+- The route map shows output pair B is physically reaching the iRig, but the
+  music soundcheck has large pre-existing energy/noise before playback starts.
+- Traktor was still running during the failed quality run and can contaminate
+  the analog capture because the iRig records the physical output mix, not just
+  the test process.
+- A clean quality decision requires a quiesced audio environment: no Traktor,
+  VLC, Spotify, Control Center hardware demo, or other Audio 8 client during
+  the capture.
+- An attempt to close Traktor for a clean rerun was correctly blocked because
+  `control-surfaces-demo` had reacquired the hardware lock.
+
+Current safe state:
+
+- The installed rollback keeps the Timecode Vinyl input-latest behavior and
+  restores the known-good idle threshold:
+
+```text
+OPENA8DJ_INPUT_MAX_LATENCY_FRAMES=512
+OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
+OPENA8DJ_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
+OPENA8DJ_OUTPUT_ZERO_FLOOR=0.0f
+```
+
+- The active-silence infrastructure remains in code, but the reproducible
+  low-noise target no longer enables the rejected high-threshold gate.
