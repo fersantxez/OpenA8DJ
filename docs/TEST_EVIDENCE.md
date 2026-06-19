@@ -58,7 +58,14 @@ Current external blocker:
 No Keychain password item found for profile: OpenA8DJNotary
 ```
 
-The Apple Developer browser session is authenticated, but Developer Program
-enrollment is still on the personal/legal identity page. The account owner must
-complete enrollment, payment, and any Apple verification before Developer ID
-certificates and notarization credentials can exist on this machine.
+The Apple Developer browser session is authenticated and the Developer Program
+enrollment form has been submitted. Apple currently shows:
+
+```text
+Thank you for your submission.
+We'll review the details you provided and contact you soon.
+```
+
+The account owner must wait for Apple acceptance and complete any remaining
+payment or verification before Developer ID certificates and notarization
+credentials can exist on this machine.

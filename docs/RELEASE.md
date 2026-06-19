@@ -136,13 +136,18 @@ Current local blocker observed during the Apple enrollment attempt:
 No Keychain password item found for profile: OpenA8DJNotary
 ```
 
-The browser session is authenticated as an Apple ID, but Apple is still asking
-for legal name, phone number, and address to complete Developer Program
-enrollment. That page transmits personal/legal data to Apple and must be
-completed by the account owner. After enrollment is accepted and payment is
-complete, create/download the Developer ID Application and Developer ID
-Installer certificates, then store notarization credentials and rerun the
-official release commands above.
+The browser session is authenticated as an Apple ID and the Developer Program
+enrollment form has been submitted. Apple currently shows:
+
+```text
+Thank you for your submission.
+We'll review the details you provided and contact you soon.
+```
+
+After Apple accepts enrollment and any payment/verification is complete,
+create/download the Developer ID Application and Developer ID Installer
+certificates, then store notarization credentials and rerun the official
+release commands above.
 
 Without this step, macOS Gatekeeper may block the PKG with a message saying
 Apple could not verify it is free of malware. That is expected for ad-hoc signed
