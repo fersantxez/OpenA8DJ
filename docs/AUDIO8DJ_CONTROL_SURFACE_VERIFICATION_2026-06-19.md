@@ -81,7 +81,7 @@ The CLI successfully applied and exported every built-in preset:
 | Preset | Hardware field verification | Panel coverage |
 | --- | --- | --- |
 | `playback-4out` | `inputDecode=false` | Apply button calls same CLI preset |
-| `traktor-dvs-vinyl` | `inputMode=timecode-vinyl`, vinyl ground lift, software lock | Apply button calls same CLI preset |
+| `traktor-dvs-vinyl` | `inputMode=timecode-vinyl`, low-noise vinyl ground state, software lock | Apply button calls same CLI preset |
 | `traktor-dvs-cd-line` | `inputMode=timecode-cd-line`, CD-line ground lift, software lock | Apply button calls same CLI preset |
 | `vinyl-recording` | `inputMode=phono`, phono ground lift, software lock | Apply button calls same CLI preset |
 | `dj-set-recording` | `inputDecode=true`, `softwareLock=false` | Apply button calls same CLI preset |

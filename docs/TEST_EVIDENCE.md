@@ -3,6 +3,101 @@
 This file records reproducible release and validation evidence for the modern
 macOS mainline.
 
+This is a technical evidence log. It intentionally contains internal build
+target names, local evidence paths, rejected experiments, and command-level
+details that are too noisy for public release notes. For the external-facing
+summary, see `docs/PUBLIC_VALIDATION_SUMMARY.md`.
+
+## 2026-06-19 17:01 EDT - Main package fix, DVS default, Control Center, and calibrated soundcheck
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch at time: `main`
+- Hardware touched: yes, under the hardware lock
+- Driver installed/reloaded: yes, via the rebuilt 0.5.0 packages
+- Driver source delta from public `v0.5.0`: HAL startup now re-applies the
+  default DVS Vinyl low-noise state; `traktor-dvs-vinyl` now maps to that state
+  in the control tool; Control Center presents `DVS Vinyl` first.
+
+What changed:
+
+- Fixed the tools package component metadata so
+  `OpenA8DJ Control Center.app` installs into `/Applications` and is not
+  relocated by macOS Installer.
+- Made DVS Vinyl the default visible user state: input mode `timecode-vinyl`,
+  input decode on, software lock on, identity A/B/C/D routing, and vinyl ground
+  lift off for the validated low-noise state.
+- Removed Terminal commands from the normal user-facing vinyl flow. Normal
+  options are handled through Control Center.
+- Exposed all soundcheck analyzer thresholds through `make soundcheck`.
+- Added `make soundcheck-irig-calibrated` for the same iRig Stream physical
+  validation route used by the accepted 0.5.0 sound-quality reference.
+
+Commands run:
+
+```sh
+make checksums
+(cd build && shasum -a 256 -c OpenA8DJ-0.5.0-checksums.txt)
+sudo installer -pkg build/OpenA8DJ-0.5.0.pkg -target /
+sudo installer -pkg build/opena8dj-tools-0.5.0.pkg -target /
+scripts/audio-stack-health
+OPENA8DJ_CONTROL_NO_WAKE=1 /usr/local/bin/opena8dj-control export-config /tmp/opena8dj-installed-config-final.json
+make soundcheck-irig-calibrated \
+  SOUNDCHECK_MUSIC="/Users/fer/Music/DJ/000_santxez_spring_25_select/Cable Guy - Dj Deep (Original Mix).mp3" \
+  SOUNDCHECK_CAPTURE="iRig Stream" \
+  SOUNDCHECK_CAPTURE_CHANNELS=1,2
+make smoke-hal parity-smoke-hal
+```
+
+Results:
+
+- Rebuilt driver and tools packages installed successfully.
+- Checksums verified for driver DMG, driver PKG, tools DMG, and tools PKG.
+- `pkgutil --check-signature` reports `Status: no signature` for both PKGs.
+- Installed HAL, Control Center app, and `opena8dj-control` pass
+  `codesign --verify --strict` as valid on disk.
+- Audio stack health: PASS; `coreaudiod` and `opena8dj_driver` CPU at 0.0%.
+- Installed config reports `preset=traktor-dvs-vinyl`,
+  `inputMode=timecode-vinyl`, `inputDecode=true`, `softwareLock=true`,
+  `groundLiftVinyl=false`, and normal A/B/C/D routing without a user Terminal
+  command.
+- HAL smoke: PASS, 8 input channels and 8 output channels.
+- HAL parity smoke: PASS.
+- Hardware lock released after install; final lock state free.
+
+Final post-install physical soundcheck:
+
+```text
+SOUNDCHECK B 48000/512: PASS
+source=Cable Guy - Dj Deep (Original Mix).mp3 offset=0.000s mode=start
+alignment_score=0.953251
+quality_alignment_score=0.949793
+time_warp=1 drift_frames=-12
+analog_snr_db=8.79
+mid_band_1000_5000_residual_ratio=1.522415
+high_band_5000_12000_residual_ratio=1.407434
+quiet_mid_band_noise_dbfs=-39.89
+mid_band_cpu_corr=0.542229 source=codex_audio_service
+click_outliers=191
+lag_jumps_gt_2_frames=20
+capture_clipped_frames=0
+run_dir=/private/tmp/opena8dj-main-merge/local-analysis/soundcheck/2026-06-19T170322
+```
+
+Final package install evidence:
+
+```text
+evidence=/private/tmp/opena8dj-main-merge/local-analysis/install-dvs-default-final-20260619-170303
+```
+
+Current replacement asset hashes from this run:
+
+```text
+d5ede10360873e154e14a37628ed36ca302d68752d80feb72fff54f7bc46b92b  OpenA8DJ-0.5.0.dmg
+f509bc07fb8172556ac53d7bfd1d66ed6023781fab27c7a55543c10fc15e631a  OpenA8DJ-0.5.0.pkg
+6c75c15e6259b76ea2708cd56a5f54ad8d1806a37326e5a26a5065eb2fe26025  opena8dj-tools-0.5.0.dmg
+74b365ee11a629facb14a00e5a81599f2a4e09ded1b2de37dbbe73c1c00f5fe2  opena8dj-tools-0.5.0.pkg
+```
+
 ## 2026-06-19 15:30 EDT - Canonical 0.5.0 repo cleanup and release packaging
 
 - Commit under test: `be6d2a6`

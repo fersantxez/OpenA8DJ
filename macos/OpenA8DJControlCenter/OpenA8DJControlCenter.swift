@@ -80,18 +80,18 @@ final class ControlModel: ObservableObject {
 
     let presets: [Preset] = [
         Preset(
-            id: "playback-4out",
-            title: "Playback",
-            surface: "4 stereo outputs",
-            summary: "A/B/C/D output pairs, input decode off.",
-            cabling: "Use mixer line inputs. Avoid moving deck multicore wiring for tests."
-        ),
-        Preset(
             id: "traktor-dvs-vinyl",
             title: "DVS Vinyl",
             surface: "Traktor A/B",
-            summary: "A/B timecode vinyl, vinyl ground lift, software lock.",
-            cabling: "Turntables must be on A/B. Do not use C/D for phono cartridges."
+            summary: "Default state: A/B timecode vinyl, input decode on, software lock.",
+            cabling: "Turntables on A/B. The driver keeps vinyl input ready without Terminal commands."
+        ),
+        Preset(
+            id: "playback-4out",
+            title: "Output Only",
+            surface: "4 stereo outputs",
+            summary: "Advanced: A/B/C/D outputs with input decode off.",
+            cabling: "Use only when you deliberately do not need vinyl or input capture."
         ),
         Preset(
             id: "traktor-dvs-cd-line",

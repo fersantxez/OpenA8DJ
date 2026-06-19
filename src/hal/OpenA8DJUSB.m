@@ -3306,9 +3306,14 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 {
     pthread_mutex_lock(&_ep1Mutex);
     _controlState[0] = 0;
-    _controlState[3] = (uint8_t)((_controlState[3] & ~(uint8_t)0x07) | (1u << 0));
+    _controlState[3] &= ~(uint8_t)0x07;
     _controlState[5] |= (1u << 0);
     pthread_mutex_unlock(&_ep1Mutex);
+    atomic_store(&_inputDecodeEnabled, true);
+    atomic_store(&_inputSwapMask, 0);
+    atomic_store(&_inputInvertLeftMask, 0);
+    atomic_store(&_inputInvertRightMask, 0);
+    atomic_store(&_inputSourceMap, kInputSourceIdentityMap);
     (void)[self writeControls];
 }
 
@@ -3419,6 +3424,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return NO;
     }
     (void)[self readControls];
+    [self applyTimecodeVinylDefaults];
 
     _capturePipe = [_interface copyPipeWithAddress:kEndpointIsoCapture error:&error];
     if (_capturePipe == nil) {

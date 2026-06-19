@@ -24,26 +24,27 @@ want to use an Audio 8 DJ on a Mac.
 - `OpenA8DJ-0.5.0.pkg`: direct installer package
 - `OpenA8DJ-0.5.0-checksums.txt`: SHA-256 checksums
 - `opena8dj-tools-0.5.0.dmg`: optional control tools and Control Center
+- `opena8dj-tools-0.5.0.pkg`: optional tools direct installer package
 
 Release assets are the only supported public binary downloads. GitHub Actions
 artifacts are temporary build files and are not used as end-user distribution.
 
 ## Signing Status
 
-OpenA8DJ 0.5.0 may be ad-hoc signed but is not yet Apple Developer ID signed
-and notarized unless the release notes for the downloaded asset explicitly say
-otherwise. macOS may therefore block the installer with a warning such as:
+OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
+Apple-notarized. macOS Gatekeeper will likely block them unless manually
+approved after checksum verification. macOS may show a warning such as:
 
 ```text
 "OpenA8DJ-0.5.0.pkg" Not Opened
 Apple could not verify "OpenA8DJ-0.5.0.pkg" is free of malware.
 ```
 
-This means Apple has not notarized this independent driver package yet. It does
-not by itself mean the file changed or came from somewhere else.
+This means Apple has not notarized this independent driver package. It does not
+by itself mean the file changed or came from somewhere else.
 
-If you choose to install the unsigned preview, use only official GitHub release
-assets from this repository and verify the checksum first:
+Use only official GitHub release assets from this repository and verify the
+checksum before approving any blocked installer:
 
 ```sh
 shasum -a 256 OpenA8DJ-0.5.0.pkg
@@ -66,13 +67,39 @@ so the normal double-click DMG/PKG install works without this manual approval.
 
 ## Install
 
-Normal path:
+### Simple Step-By-Step Install
 
-1. Download `OpenA8DJ-0.5.0.dmg` from GitHub Releases.
-2. Open the DMG.
-3. Double-click `OpenA8DJ-0.5.0.pkg`.
-4. Follow the macOS Installer prompts.
-5. Reconnect the Audio 8 DJ if it does not appear immediately.
+1. Open the [latest release](https://github.com/fersantxez/OpenA8DJ/releases/latest).
+2. Download `OpenA8DJ-0.5.0.dmg`.
+3. Open the downloaded DMG file.
+4. Double-click `OpenA8DJ-0.5.0.pkg`.
+5. Follow the macOS Installer prompts.
+6. If macOS blocks the installer, click `Done`, open System Settings, go to
+   Privacy & Security, and choose `Open Anyway` for OpenA8DJ.
+7. Reconnect the Audio 8 DJ if it does not appear immediately.
+
+After install, open Audio MIDI Setup and confirm `Open Audio 8 DJ` appears with
+8 inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once,
+then reopen the audio app.
+
+### Basic Use After Install
+
+1. Connect the Audio 8 DJ by USB.
+2. Open Audio MIDI Setup.
+3. Select `Open Audio 8 DJ`.
+4. Confirm it shows 8 inputs and 8 outputs.
+5. Open your DJ/audio app.
+6. Choose `Open Audio 8 DJ` as the audio device.
+7. Assign outputs as stereo pairs:
+   - channels 1-2: deck/output A
+   - channels 3-4: deck/output B
+   - channels 5-6: deck/output C
+   - channels 7-8: deck/output D
+8. For Traktor timecode vinyl, calibrate the vinyl inside Traktor as usual. The
+   driver keeps the Audio 8 DJ input path ready for vinyl by default.
+
+If anything looks wrong, unplug and reconnect the Audio 8 DJ once, then reopen
+the audio app.
 
 Installed files:
 
@@ -103,7 +130,8 @@ OpenA8DJ 0.5.0 is the current macOS driver baseline.
 - 44.1 kHz and 48 kHz are the primary validated rates
 - CoreMIDI endpoints for Audio 8 DJ MIDI I/O
 - Traktor output routing for decks A/B/C/D
-- Traktor Timecode Vinyl profile, including a low-noise variant
+- Traktor Timecode Vinyl input enabled by default, using the low-noise validated
+  state
 - Control bridge for input mode, ground-lift, software lock, routing transforms,
   stream statistics, and diagnostic state
 - Optional Control Center and command-line tools for support workflows
@@ -111,6 +139,9 @@ OpenA8DJ 0.5.0 is the current macOS driver baseline.
 The current release is meant to be useful, testable, and recoverable. It is not
 claimed to be perfect. Please report hardware results, regressions, routing
 issues, and timecode findings through GitHub Issues.
+
+For a public, non-internal summary of what was validated, see
+[docs/PUBLIC_VALIDATION_SUMMARY.md](docs/PUBLIC_VALIDATION_SUMMARY.md).
 
 ## Modern macOS Architecture
 
@@ -132,43 +163,17 @@ diagnostics, and other non-audio work.
 ## Traktor And Timecode Vinyl
 
 For Traktor, select `Open Audio 8 DJ` as the audio device and assign the deck
-outputs to A/B/C/D as needed.
+outputs to A/B/C/D as needed. For vinyl timecode, connect the turntables to
+inputs A/B and calibrate the control vinyl inside Traktor. OpenA8DJ keeps the
+vinyl input path active by default; no extra setup step is needed for normal
+vinyl use.
 
-For vinyl timecode, put the hardware into the DVS profile:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl
-```
-
-If your rig has audible computer/CPU-like background noise while the Traktor
-scope is otherwise stable, try the reversible low-noise variant:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
-```
-
-Validate the Traktor scope after changing profiles. If the scope degrades,
-return to `profile timecode-vinyl`.
+If you want to confirm or re-apply the normal vinyl state, open
+`OpenA8DJ Control Center.app`, choose `DVS Vinyl`, and click `Apply`.
 
 See [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the DVS checklist.
 
 ## Tools And Control Center
-
-The driver installer includes the command-line control tool:
-
-```sh
-/usr/local/bin/opena8dj-control
-```
-
-Useful examples:
-
-```sh
-opena8dj-control list-profiles
-opena8dj-control apply-preset traktor-dvs-vinyl
-opena8dj-control profile timecode-vinyl-low-noise
-opena8dj-control stream-stats
-opena8dj-control export-config ~/Desktop/opena8dj-config.json
-```
 
 The optional `opena8dj-tools-0.5.0.dmg` installs:
 
@@ -181,16 +186,21 @@ The optional `opena8dj-tools-0.5.0.dmg` installs:
 Those tools are for support, configuration, demonstrations, and experimental
 workflows. They do not replace the HAL driver by themselves.
 
+Use Control Center for normal options. The command-line control tool is still
+installed for maintainers and diagnostics, but non-technical users should not
+need it.
+
 ## Experimental Platforms
 
-macOS is the only current canonical driver line.
+macOS `main` plus GitHub Releases are the only user-facing driver line.
 
-Windows and Linux support are experimental community areas. They are not part of
-the validated macOS driver path, and they should not be assumed to work without
-platform-specific testing.
+Windows, Linux, and Rust branches are public for research and continuity only.
+They are not validated release branches, and they should not be assumed to work
+without platform-specific testing.
 
-- Windows: experimental work belongs under Windows-specific branches and paths.
-- Linux: experimental work belongs under Linux-specific branches and paths.
+- Windows: `windows/rebuild-surface` is experimental and not validated.
+- Linux: `linux/full-driver-agent` is experimental and not validated.
+- Rust: `rust/modular-core-spike` is a lab/oracle branch, not the macOS runtime.
 - Feedback is welcome, especially hardware reports and reproducible logs.
 
 See [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) for the current matrix.

@@ -17,11 +17,12 @@ Install:
 2. Follow the macOS Installer prompts.
 3. Open /Applications/OpenA8DJ Control Center.app.
 
-Command-line use:
+Normal use:
 
-opena8dj-control list-profiles
-opena8dj-control apply-preset traktor-dvs-vinyl
-opena8dj-control export-config ~/Desktop/opena8dj-config.json
+Open /Applications/OpenA8DJ Control Center.app.
+
+For Traktor timecode vinyl, choose DVS Vinyl and click Apply if you want to
+re-apply the default vinyl state. Normal users should use Control Center.
 
 Documentation:
 
@@ -37,5 +38,6 @@ OpenA8DJ is an independent, open-source preservation project. It is not
 affiliated with, endorsed by, sponsored by, or certified by Native Instruments.
 Product names are used only to identify compatibility.
 
-This build may be ad-hoc signed and not Apple-notarized unless produced with
-Developer ID signing and notarization.
+OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
+Apple-notarized. macOS Gatekeeper will likely block them unless manually
+approved after checksum verification.

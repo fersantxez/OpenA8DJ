@@ -6,7 +6,7 @@ The opena8dj-tools installer is separate from the full OpenA8DJ driver
 installer. It installs:
 
 - `/Applications/OpenA8DJ Control Center.app`
-- `/usr/local/bin/opena8dj-control`
+- `/usr/local/bin/opena8dj-control` for maintainer diagnostics
 - `/Library/Documentation/OpenA8DJ/ControlSurfaces`
 
 It does not install, replace, unload, or restart the HAL driver. It does not
@@ -60,7 +60,7 @@ User
   |      |
   |      +-- Contents/Resources/opena8dj-control
   |
-  +-- Terminal: /usr/local/bin/opena8dj-control
+  +-- Maintainer diagnostics: /usr/local/bin/opena8dj-control
          |
          v
   /tmp/opena8dj-control.sock
@@ -108,10 +108,10 @@ The panel supports:
 - Export current config as JSON.
 - Import a saved JSON config.
 
-It intentionally does not yet expose every low-level field as manual controls.
-Use the CLI for individual toggles and routing transforms.
+Normal users should use the panel. The command-line tool is for maintainers,
+diagnostics, and scripted validation.
 
-## CLI Quick Reference
+## Maintainer CLI Reference
 
 List presets:
 
@@ -149,16 +149,38 @@ Read without waking the HAL bridge:
 OPENA8DJ_CONTROL_NO_WAKE=1 opena8dj-control export-config -
 ```
 
-## Case 1: Playback / Four Stereo Outputs
+## Case 1: Traktor DVS With Timecode Vinyl
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset playback-4out
+Choose `DVS Vinyl` and click `Apply`.
+
+This is the default state. Use it for turntables with timecode vinyl on deck A
+and deck B.
+
+```text
+Turntable A -- RCA --> Audio 8 DJ CH A IN 1/2
+Audio 8 DJ CH A OUT 1/2 --> Mixer channel A
+
+Turntable B -- RCA --> Audio 8 DJ CH B IN 3/4
+Audio 8 DJ CH B OUT 3/4 --> Mixer channel B
 ```
 
-Use when the Audio 8 DJ is acting as an output interface for software playback,
-Spotify/VLC testing, DAW playback, or four stereo output pairs into a mixer.
+Configured behavior:
+
+- Input mode: `timecode-vinyl`
+- Vinyl ground state: low-noise default.
+- Software lock on.
+- Input decode on.
+
+## Case 2: Playback / Four Stereo Outputs
+
+Panel:
+
+Choose `Output Only` and click `Apply`.
+
+Use only when the Audio 8 DJ is acting as an output interface and you
+deliberately do not need vinyl/timecode inputs.
 
 ```text
 Mac / Core Audio
@@ -178,46 +200,11 @@ Configured behavior:
 - Output pairs A/B/C/D remain available.
 - No phono/timecode state is required.
 
-## Case 2: Traktor DVS With Timecode Vinyl
-
-Preset:
-
-```sh
-opena8dj-control apply-preset traktor-dvs-vinyl
-```
-
-Use for turntables with timecode vinyl on deck A and deck B.
-
-```text
-Turntable A -- RCA --> Audio 8 DJ CH A IN 1/2
-Audio 8 DJ CH A OUT 1/2 --> Mixer channel A
-
-Turntable B -- RCA --> Audio 8 DJ CH B IN 3/4
-Audio 8 DJ CH B OUT 3/4 --> Mixer channel B
-
-Ground wires --> Mixer ground and/or Audio 8 DJ GROUND, tested one path at a time
-```
-
-Configured behavior:
-
-- Input mode: `timecode-vinyl`
-- Vinyl ground lift on.
-- Software lock on.
-- Input decode on.
-
-Notes:
-
-- Use A/B for phono cartridges.
-- C/D are line-level paths, not phono preamps.
-- Validate Traktor scope after applying the preset.
-
 ## Case 3: Traktor DVS With CDJ / Line Timecode
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset traktor-dvs-cd-line
-```
+Choose `DVS CD-Line` and click `Apply`.
 
 Use for CDJs, media players, or line-level timecode sources.
 
@@ -237,11 +224,9 @@ Configured behavior:
 
 ## Case 4: Vinyl Recording
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset vinyl-recording
-```
+Choose `Vinyl Recording` and click `Apply`.
 
 Use for recording vinyl from turntables connected to A/B.
 
@@ -259,11 +244,9 @@ Configured behavior:
 
 ## Case 5: DJ Set Recording
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset dj-set-recording
-```
+Choose `DJ Set Recording` and click `Apply`.
 
 Use when the mixer already contains the final DJ mix and you want to capture a
 stereo record output.
@@ -286,11 +269,9 @@ Configured behavior:
 
 ## Case 6: External Effects Loop
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset effects-loop
-```
+Choose `Effects Loop` and click `Apply`.
 
 Use for a software effects send/return or an external processing loop.
 
@@ -309,11 +290,9 @@ Start with sends and returns low to avoid feedback.
 
 ## Case 7: Microphone
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset microphone
-```
+Choose `Microphone` and click `Apply`.
 
 Use the front XLR mic path.
 
@@ -338,11 +317,9 @@ Hardware requirements:
 
 ## Case 8: MIDI Only
 
-Preset:
+Panel:
 
-```sh
-opena8dj-control apply-preset midi-only
-```
+Choose `MIDI Only` and click `Apply`.
 
 Use when the Audio 8 DJ is mainly a DIN MIDI bridge and audio routing should be
 kept playback-safe.

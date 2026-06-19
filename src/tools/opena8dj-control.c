@@ -605,7 +605,7 @@ static const OpenA8DJPreset kBuiltInPresets[] = {
         "traktor-dvs-vinyl",
         "Traktor DVS Vinyl",
         "dvs",
-        "A/B timecode vinyl, input mode 0, vinyl ground lift, software lock"
+        "A/B timecode vinyl, input mode 0, low-noise ground state, software lock"
     },
     {
         "traktor-dvs-cd-line",
@@ -669,7 +669,7 @@ static bool ApplyPreset(const char *name, OpenA8DJControlPayload *state)
     if (strcmp(name, "traktor-dvs-vinyl") == 0 ||
         strcmp(name, "dvs-vinyl") == 0 ||
         strcmp(name, "timecode-vinyl") == 0) {
-        return ApplyProfile("timecode-vinyl", state);
+        return ApplyProfile("timecode-vinyl-low-noise", state);
     }
     if (strcmp(name, "traktor-dvs-cd-line") == 0 ||
         strcmp(name, "dvs-cd-line") == 0 ||
@@ -728,7 +728,7 @@ static const char *InferredPresetName(const OpenA8DJControlPayload *state)
     if (state->inputDecodeEnabled == 0) {
         return "playback-4out";
     }
-    if (state->inputMode == 0 && state->gndLiftTCVinyl && state->softwareLock) {
+    if (state->inputMode == 0 && state->softwareLock) {
         return "traktor-dvs-vinyl";
     }
     if (state->inputMode == 1 && state->gndLiftTCCDLine && state->softwareLock) {

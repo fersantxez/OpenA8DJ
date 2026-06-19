@@ -40,19 +40,22 @@ Generated release artifacts:
 ```text
 build/OpenA8DJ-<version>.pkg
 build/OpenA8DJ-<version>.dmg
+build/opena8dj-tools-<version>.pkg
+build/opena8dj-tools-<version>.dmg
 build/OpenA8DJ-<version>-checksums.txt
 ```
 
-The preview package may be ad-hoc signed unless signing identities are supplied.
-A polished end-user release requires Developer ID signing and Apple
-notarization.
+Artifacts produced by `make dist` without release signing identities are
+unsigned preview artifacts. They are not Developer ID signed and not
+Apple-notarized. macOS Gatekeeper will likely block them unless manually
+approved after checksum verification.
 
 ## Build The Official Signed Release
 
-Official GitHub release binaries must be signed and notarized before upload.
-This requires an active Apple Developer Program team, a `Developer ID
-Application` certificate, a `Developer ID Installer` certificate, and a local
-`notarytool` keychain profile.
+The long-term official release path is Developer ID signing and Apple
+notarization. This requires an active Apple Developer Program team, a
+`Developer ID Application` certificate, a `Developer ID Installer` certificate,
+and a local `notarytool` keychain profile.
 
 ```sh
 make clean
@@ -64,7 +67,7 @@ make notarize NOTARY_PROFILE=OpenA8DJNotary
 make verify-signed-release
 ```
 
-Do not upload the DMG/PKG as an official end-user release unless
+Do not describe DMG/PKG assets as Developer ID signed or Apple-notarized unless
 `make verify-signed-release` passes. A build that merely compiles or packages is
 not enough.
 

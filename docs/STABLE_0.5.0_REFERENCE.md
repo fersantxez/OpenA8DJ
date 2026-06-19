@@ -2,16 +2,18 @@
 
 Date: 2026-06-19
 
-This is the local stable reference for the next OpenA8DJ release line. It is
-not yet a public GitHub release.
+This is the public GitHub release reference for OpenA8DJ 0.5.0, the current
+macOS C++ 0.5.x baseline.
 
-## Installed Reference
+## Public Reference
 
 ```text
-installed_sha256=70ae8ca3735235b3efbcf48decb1b45eb844b48824f593f1cc3f50b3e2a52790
-installed_path=/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL
-evidence=local-analysis/timecode-output3072-20260619-150122
-target=hal-timecode-frozen-good-output3072-candidate
+release=OpenA8DJ 0.5.0
+branch=main
+platform=macOS
+driver=Core Audio HAL user-space driver
+runtime_state=DVS Vinyl input active, low-noise ground setting
+technical_evidence=docs/TEST_EVIDENCE.md
 ```
 
 ## Build Profile
@@ -34,7 +36,7 @@ HAL_OUTPUT_ZERO_FLOOR=0.0f
 ## Runtime Profile
 
 ```text
-profile=timecode-vinyl-low-noise
+state=DVS Vinyl input active, low-noise ground setting
 input-mode=0 (timecode-vinyl)
 gnd-vinyl=off
 gnd-cd-line=off

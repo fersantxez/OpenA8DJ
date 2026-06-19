@@ -22,9 +22,10 @@ click Done, not Move to Trash. Then open System Settings > Privacy & Security,
 find the blocked OpenA8DJ package in the Security section, and choose
 Open Anyway.
 
-This build may be ad-hoc signed but not Apple Developer ID signed or
-Apple-notarized. Only override Gatekeeper for official release assets from this
-repository, and verify the SHA-256 checksum first.
+OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
+Apple-notarized. macOS Gatekeeper will likely block them unless manually
+approved after checksum verification. Only override Gatekeeper for official
+release assets from this repository, and verify the SHA-256 checksum first.
 
 The installer adds:
 
@@ -46,9 +47,13 @@ Current status:
 - Core Audio device: Open Audio 8 DJ
 - Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Primary validated playback rates: 44.1 kHz and 48 kHz
-- Traktor Timecode Vinyl: supported through the Audio 8 DJ profile controls
+- Traktor Timecode Vinyl: vinyl input path active by default
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
 - Legacy C line: preserved separately on the repository legacy branch
 - Windows/Linux: experimental platform areas, not included in this macOS driver
+
+After install, open Audio MIDI Setup and confirm Open Audio 8 DJ appears with 8
+inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once, then
+reopen the audio app.
 
 The permanent distribution goal is Developer ID signing plus Apple notarization.

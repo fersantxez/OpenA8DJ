@@ -64,6 +64,7 @@ PKG_SCRIPTS := resources/pkg/scripts
 PKG_SANITIZER := scripts/sanitize-macos-pkg.sh
 PKG := build/OpenA8DJ-$(VERSION).pkg
 CONTROL_PKG_ROOT := build/control-pkgroot
+CONTROL_PKG_COMPONENTS := build/control-components.plist
 CONTROL_PKG_SCRIPTS := resources/control-surfaces-pkg/scripts
 CONTROL_PKG := build/opena8dj-tools-$(VERSION).pkg
 DMG_ROOT := build/dmgroot
@@ -187,8 +188,25 @@ SOUNDCHECK_CPU_STRESS_SECONDS ?= 8
 SOUNDCHECK_CPU_STRESS_WORKERS ?= auto
 DIRECT_USB_LEAD_FRAMES ?= 8192
 DIRECT_USB_PLAYER ?= build/opena8dj-usb-play
+SOUNDCHECK_MIN_ALIGNMENT ?= 0.98
+SOUNDCHECK_MIN_SNR_DB ?= 35.0
+SOUNDCHECK_MAX_CLICKS ?= 10
+SOUNDCHECK_MAX_LAG_JUMPS ?= 0
 SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO ?= 0.04
+SOUNDCHECK_MAX_HIGH_BAND_RESIDUAL_RATIO ?= 0.08
+SOUNDCHECK_MAX_QUIET_MID_BAND_NOISE_DBFS ?= -58.0
 SOUNDCHECK_MAX_MID_BAND_CPU_CORR ?= 0.60
+SOUNDCHECK_IRIG_PAIR ?= B
+SOUNDCHECK_IRIG_MODE ?= start
+SOUNDCHECK_IRIG_SECONDS ?= 8
+SOUNDCHECK_IRIG_MIN_ALIGNMENT ?= 0.93
+SOUNDCHECK_IRIG_MIN_SNR_DB ?= 8.0
+SOUNDCHECK_IRIG_MAX_CLICKS ?= 500
+SOUNDCHECK_IRIG_MAX_LAG_JUMPS ?= 64
+SOUNDCHECK_IRIG_MAX_MID_BAND_RESIDUAL_RATIO ?= 1.65
+SOUNDCHECK_IRIG_MAX_HIGH_BAND_RESIDUAL_RATIO ?= 1.50
+SOUNDCHECK_IRIG_MAX_QUIET_MID_BAND_NOISE_DBFS ?= -38.0
+SOUNDCHECK_IRIG_MAX_MID_BAND_CPU_CORR ?= 0.65
 CHANNEL_MATRIX_PAIR ?= A
 CHANNEL_MATRIX_RATE ?= 48000
 CHANNEL_MATRIX_SECONDS ?= 8
@@ -218,7 +236,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate sign-hal sign-tools install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist release-signed notarize verify-signed-release FORCE
+.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate sign-hal sign-tools install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck soundcheck-irig-calibrated direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist release-signed notarize verify-signed-release FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -592,8 +610,28 @@ soundcheck: $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(CONTROL_TOOL)
 		--pair "$(SOUNDCHECK_PAIR)" --rate "$(SOUNDCHECK_RATE)" --buffer "$(SOUNDCHECK_BUFFER)" \
 		--seconds "$(SOUNDCHECK_SECONDS)" --mode "$(SOUNDCHECK_MODE)" \
 		--capture-device "$(SOUNDCHECK_CAPTURE)" --capture-channels "$(SOUNDCHECK_CAPTURE_CHANNELS)" \
+		--min-alignment "$(SOUNDCHECK_MIN_ALIGNMENT)" \
+		--min-snr-db "$(SOUNDCHECK_MIN_SNR_DB)" \
+		--max-clicks "$(SOUNDCHECK_MAX_CLICKS)" \
+		--max-lag-jumps "$(SOUNDCHECK_MAX_LAG_JUMPS)" \
 		--max-mid-band-residual-ratio "$(SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO)" \
+		--max-high-band-residual-ratio "$(SOUNDCHECK_MAX_HIGH_BAND_RESIDUAL_RATIO)" \
+		--max-quiet-mid-band-noise-dbfs "$(SOUNDCHECK_MAX_QUIET_MID_BAND_NOISE_DBFS)" \
 		--max-mid-band-cpu-corr "$(SOUNDCHECK_MAX_MID_BAND_CPU_CORR)" $(if $(filter 1 true yes on,$(SOUNDCHECK_CPU_STRESS)),--cpu-stress --cpu-stress-after "$(SOUNDCHECK_CPU_STRESS_AFTER)" --cpu-stress-seconds "$(SOUNDCHECK_CPU_STRESS_SECONDS)" --cpu-stress-workers "$(SOUNDCHECK_CPU_STRESS_WORKERS)",)
+
+soundcheck-irig-calibrated:
+	$(MAKE) soundcheck \
+		SOUNDCHECK_PAIR="$(SOUNDCHECK_IRIG_PAIR)" \
+		SOUNDCHECK_SECONDS="$(SOUNDCHECK_IRIG_SECONDS)" \
+		SOUNDCHECK_MODE="$(SOUNDCHECK_IRIG_MODE)" \
+		SOUNDCHECK_MIN_ALIGNMENT="$(SOUNDCHECK_IRIG_MIN_ALIGNMENT)" \
+		SOUNDCHECK_MIN_SNR_DB="$(SOUNDCHECK_IRIG_MIN_SNR_DB)" \
+		SOUNDCHECK_MAX_CLICKS="$(SOUNDCHECK_IRIG_MAX_CLICKS)" \
+		SOUNDCHECK_MAX_LAG_JUMPS="$(SOUNDCHECK_IRIG_MAX_LAG_JUMPS)" \
+		SOUNDCHECK_MAX_MID_BAND_RESIDUAL_RATIO="$(SOUNDCHECK_IRIG_MAX_MID_BAND_RESIDUAL_RATIO)" \
+		SOUNDCHECK_MAX_HIGH_BAND_RESIDUAL_RATIO="$(SOUNDCHECK_IRIG_MAX_HIGH_BAND_RESIDUAL_RATIO)" \
+		SOUNDCHECK_MAX_QUIET_MID_BAND_NOISE_DBFS="$(SOUNDCHECK_IRIG_MAX_QUIET_MID_BAND_NOISE_DBFS)" \
+		SOUNDCHECK_MAX_MID_BAND_CPU_CORR="$(SOUNDCHECK_IRIG_MAX_MID_BAND_CPU_CORR)"
 
 direct-usb-soundcheck: $(USB_PLAY) $(AUDIO_RECORD)
 	./scripts/run-direct-usb-soundcheck --skip-build \
@@ -750,7 +788,9 @@ control-surfaces-package: $(CONTROL_CENTER_APP)
 	chmod +x "$(CONTROL_PKG_SCRIPTS)/preinstall" "$(CONTROL_PKG_SCRIPTS)/postinstall" "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh"
 	xattr -cr "$(CONTROL_PKG_ROOT)" 2>/dev/null || true
 	find "$(CONTROL_PKG_ROOT)" -name '._*' -delete
-	COPYFILE_DISABLE=1 pkgbuild --root "$(CONTROL_PKG_ROOT)" --scripts "$(CONTROL_PKG_SCRIPTS)" --identifier org.opena8dj.tools --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(CONTROL_PKG)"
+	COPYFILE_DISABLE=1 pkgbuild --analyze --root "$(CONTROL_PKG_ROOT)" "$(CONTROL_PKG_COMPONENTS)"
+	plutil -replace 0.BundleIsRelocatable -bool NO "$(CONTROL_PKG_COMPONENTS)"
+	COPYFILE_DISABLE=1 pkgbuild --root "$(CONTROL_PKG_ROOT)" --component-plist "$(CONTROL_PKG_COMPONENTS)" --scripts "$(CONTROL_PKG_SCRIPTS)" --identifier org.opena8dj.tools --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(CONTROL_PKG)"
 	if [ -z "$(PKG_SIGN_IDENTITY)" ]; then "$(PKG_SANITIZER)" "$(CONTROL_PKG)" "$(CONTROL_PKG_ROOT)" "$(CONTROL_PKG_SCRIPTS)"; fi
 
 tools-package: control-surfaces-package

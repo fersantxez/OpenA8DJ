@@ -1,5 +1,8 @@
 # OpenA8DJ 0.4.0 Release Notes
 
+Historical release note: 0.4.0 is preserved for changelog and archival context.
+New users should use the latest 0.5.x release from GitHub Releases.
+
 OpenA8DJ 0.4.0 is a macOS public preview for the Native Instruments Audio 8 DJ
 USB interface.
 
@@ -31,7 +34,7 @@ installers, logos, or proprietary payloads.
 - Keeps the capture-paced output transport, stable Core Audio clocking, and
   playback-quality improvements accepted in human validation.
 - Sets the default build profile to the accepted 4-output-stream, 8-in/8-out
-  candidate profile used for the final loaded driver.
+  profile used for the final loaded driver.
 - Includes repeatable audio QA tooling for HAL topology, tone sidebands,
   real-music residuals, click outliers, CPU guards, and package safety checks.
 
@@ -72,7 +75,7 @@ Final local checks for this release line:
 - `opena8dj-control profile timecode-vinyl`: PASS, including HAL temporary
   wake when the control socket is closed.
 - Active output path: PASS at 48 kHz / 512 frames with active underruns `0`
-  and playback failures `0` in the accepted loaded candidate.
+  and playback failures `0` in the accepted loaded build.
 - Final idle health: PASS, `coreaudiod=0.0%`, OpenA8DJ driver `0.0%`.
 - Idle capture: RMS about `-68 dBFS`, peak about `-42.7 dBFS`.
 - Internal diagnostic path: written, consumed, and USB-packed alignment scores

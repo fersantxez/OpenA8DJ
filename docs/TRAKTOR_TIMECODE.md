@@ -9,28 +9,20 @@ The driver exposes the Core Audio surface Traktor expects:
 - one 8-channel input stream with named stereo channel pairs:
   Input A, B, C, and D
 - CoreMIDI endpoints for MIDI I/O
-- Audio 8 DJ hardware profile control for timecode vinyl, CD/line, phono,
-  ground-lift flags, software lock, and input decode
+- Audio 8 DJ hardware control through OpenA8DJ Control Center for DVS Vinyl,
+  CD/line, phono, ground-lift flags, software lock, and input decode
 
 ## Pre-Test Checklist
 
 1. Confirm the driver is installed and visible in macOS:
 
-```sh
-./build/audio-inspect
-```
+Open Audio MIDI Setup and check that `Open Audio 8 DJ` appears with 8 inputs
+and 8 outputs.
 
-2. Confirm the Audio 8 DJ control bridge is reachable:
+2. Open `OpenA8DJ Control Center.app`.
 
-```sh
-/usr/local/bin/opena8dj-control
-```
-
-3. Put the hardware in the Timecode Vinyl profile:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl
-```
+3. Select `DVS Vinyl` and click `Apply` if you want to re-apply the default
+vinyl state. The driver already starts with vinyl input active by default.
 
 Expected state:
 
@@ -40,25 +32,7 @@ software-lock: on
 input-decode: on
 ```
 
-If the physical rig has audible computer/CPU-like background noise in the
-headphones while the Traktor scope is otherwise stable, test the reversible
-low-noise profile:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
-```
-
-Expected state for that variant:
-
-```text
-input-mode: 0 (timecode-vinyl)
-gnd-vinyl: off
-software-lock: on
-input-decode: on
-```
-
-Keep this only if the Traktor scope remains stable and the audible noise drops.
-If timecode signal quality gets worse, switch back to `profile timecode-vinyl`.
+The default `DVS Vinyl` state uses the validated low-noise vinyl settings.
 
 4. Set Traktor to use `Open Audio 8 DJ`.
 
@@ -80,15 +54,13 @@ Deck B timecode input -> Input B L/R
 
 ## Hardware-Control Items
 
-`opena8dj-control` exposes Audio 8 DJ control values:
+OpenA8DJ Control Center exposes Audio 8 DJ control values:
 
 ```text
-input-mode: 0|1|2|timecode-vinyl|timecode-cd-line|phono
-gnd-vinyl: on|off
-gnd-cd-line: on|off
-gnd-phono: on|off
-software-lock: on|off
-input-decode: on|off
+input mode
+ground lift
+software lock
+input decode
 ```
 
 Input mode mapping:

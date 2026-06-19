@@ -51,9 +51,9 @@ file. Do not install if it differs.
 
 ## If macOS Blocks The Package
 
-OpenA8DJ 0.5.0 may be ad-hoc signed but not yet Apple Developer ID signed and
-notarized unless the release notes explicitly say otherwise. Recent macOS
-versions may show:
+OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
+Apple-notarized. macOS Gatekeeper will likely block them unless manually
+approved after checksum verification. Recent macOS versions may show:
 
 ```text
 "OpenA8DJ-0.5.0.pkg" Not Opened
@@ -76,8 +76,8 @@ Terminal fallback after checksum verification:
 sudo installer -pkg OpenA8DJ-0.5.0.pkg -target /
 ```
 
-This is a preview workaround, not the final distribution experience. The final
-fix is Developer ID signing and Apple notarization.
+This is an unsigned-preview workaround, not the final distribution experience.
+The final fix is Developer ID signing and Apple notarization.
 
 ## Installed Files
 
@@ -103,6 +103,10 @@ Optional tools package:
 After installation, macOS should show `Open Audio 8 DJ` as an audio device with
 8 inputs and 8 outputs.
 
+Open Audio MIDI Setup and confirm `Open Audio 8 DJ` appears with 8 inputs and 8
+outputs. If it does not appear, reconnect the Audio 8 DJ once, then reopen the
+audio app.
+
 Primary validated rates:
 
 ```text
@@ -126,31 +130,16 @@ Useful local checks from a source checkout:
 ./build/midi-list
 ```
 
-Useful installed control checks:
-
-```sh
-/usr/local/bin/opena8dj-control
-/usr/local/bin/opena8dj-control list-profiles
-/usr/local/bin/opena8dj-control profile timecode-vinyl
-```
+Optional installed control check: open `/Applications/OpenA8DJ Control
+Center.app`, choose `DVS Vinyl`, and confirm the hardware state shows input
+decode on.
 
 ## Traktor / Timecode Vinyl
 
-For Traktor Scratch / DVS:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl
-```
-
-If the rig has audible CPU-like background noise while the Traktor scope is
-otherwise stable:
-
-```sh
-/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
-```
-
-Validate the scope in Traktor after changing profiles. If signal quality gets
-worse, switch back to `profile timecode-vinyl`.
+For Traktor Scratch / DVS, select `Open Audio 8 DJ` in Traktor and calibrate the
+control vinyl there. OpenA8DJ keeps the vinyl input path active by default. If
+you want to confirm or re-apply that state, open `OpenA8DJ Control Center.app`,
+choose `DVS Vinyl`, and click `Apply`.
 
 ## Uninstall
 
@@ -170,7 +159,7 @@ sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-
 
 ## Signing Note For Maintainers
 
-Local and CI builds may be ad-hoc signed. A polished end-user release should
+Local and CI builds can be ad-hoc signed. A polished end-user release should
 use a Developer ID Installer certificate and Apple notarization so macOS
 Gatekeeper can verify the package without extra user steps.
 
