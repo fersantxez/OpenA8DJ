@@ -258,3 +258,230 @@ The same read-only pass reaffirmed the baseline split:
 - physical route proof still requires the external route
   `Open Audio 8 DJ -> external mixer -> mixer REC OUT -> iRig Stream -> macOS
   capture`.
+
+## 2026-06-18 No-Repeat Findings From Mainline C
+
+This pass was triggered after the C++ candidate reproduced a split already seen
+in the C line: good-looking counters and useful Timecode behavior can coexist
+with unusable white-noise or metallic playback. The following mainline findings
+are treated as constraints for C++ work, not optional background.
+
+### Do Not Repeat
+
+- Do not retry `HAL_OUTPUT_START_BYTE=2` as a playback fix. Mainline tested the
+  legacy mode-2 input cursor as an output byte start in 0.2.11 and documented it
+  as loud white noise; playback byte start must stay at 4 unless a future
+  packet-level proof explicitly disproves the old finding
+  (`docs/OLD_DRIVER_COMPAT_PLAN.md:24-29`, `docs/OLD_DRIVER_COMPAT_PLAN.md:136-142`).
+- Do not promote any build from underrun/panic counters alone. Mainline 0.2.29
+  had clean automated counters but did not improve listening quality, and the
+  current C++ output1/start variants repeated the same false-positive pattern
+  (`docs/OLD_DRIVER_COMPAT_PLAN.md:302-312`).
+- Do not use explicit future-frame USB scheduling as a quick path. The mainline
+  records it as less stable than capture-paced immediate output and associated
+  with output underproduction or drift (`docs/OLD_DRIVER_COMPAT_PLAN.md:27-29`).
+- Do not expose USB micro-packet cadence as the public CoreAudio app buffer.
+  Mainline corrected the public model back to 512-frame default and 512-4096
+  frame range after small public cycle sizes interacted badly with input-client
+  activation (`docs/OLD_DRIVER_COMPAT_PLAN.md:190-203`).
+- Do not treat ISO grouping, OUT coalescing, QoS, queue-depth changes, reusable
+  completions, or fixed-slot flags as untried simple wins. Mainline already ran
+  a physical matrix across those families; lower ISO tended to sound cleaner
+  with high CPU, while larger ISO/coalescing reduced CPU at the cost of clicks,
+  noise, or no useful output (`docs/QUALITY_RUNS_2026-06-13.md:724-810`,
+  `docs/QUALITY_RUNS_2026-06-14.md:42-130`,
+  `docs/QUALITY_RUNS_2026-06-14.md:160-220`,
+  `docs/QUALITY_RUNS_2026-06-14.md:736-748`).
+- Do not poll hot stream stats during physical playback acceptance unless the
+  test is explicitly about observability overhead. Mainline found playback-time
+  stream-stats polling perturbed CPU/jitter and hardened the harness to avoid it
+  by default (`docs/QUALITY_RUNS_2026-06-14.md:132-158`).
+- Do not rebuild, reload, or ask for human listening while the iRig physical
+  route is absent or idle capture is unhealthy. Mainline added early capture
+  diagnostics and physical-bench sanity checks precisely to avoid wasting
+  candidate cycles when the measurement route is invalid
+  (`docs/TESTING.md:188-258`).
+
+### Preserve As C++ Architecture
+
+- Preserve the old-driver-derived transport hypothesis: continuous capture
+  transfers, output queued from successful capture completions, 64 capture
+  transfers, up to 128 output slots, output transaction lengths derived from the
+  actual successful input frame list, and output slots freed only by output
+  completion (`docs/OLD_DRIVER_COMPAT_PLAN.md:16-23`,
+  `docs/OLD_DRIVER_COMPAT_PLAN.md:82-97`,
+  `docs/OLD_DRIVER_COMPAT_PLAN.md:222-280`).
+- Keep stable CoreAudio timing public and put device-clock following inside the
+  USB transport/output-buffer model rather than in `GetZeroTimeStamp`
+  (`docs/OLD_DRIVER_COMPAT_PLAN.md:54-73`).
+- Keep playback-quality isolation separate from Timecode/input enablement.
+  Mainline deliberately hid or disabled Audio 8 input I/O during output-only
+  debugging after laptop-mic/input-client activation perturbed playback. The C++
+  line still needs full input for Traktor, but output-quality candidates must be
+  measured in a controlled playback profile before being combined with duplex
+  Timecode (`docs/OLD_DRIVER_COMPAT_PLAN.md:205-216`,
+  `docs/TESTING.md:561-583`).
+- Preserve the Traktor-facing surface from 0.3.25: four stereo outputs A/B/C/D,
+  one 8-channel input stream with A/B/C/D stereo pairs, timecode-vinyl mode 0,
+  software lock on, and first validation at 44.1/48 kHz
+  (`docs/TRAKTOR_TIMECODE.md:7-23`, `docs/TRAKTOR_TIMECODE.md:39-109`).
+- Use the automated real-music source-reference ladder before human listening:
+  prepare deterministic music fixture, run simulated output when no physical
+  route exists, run analog iRig capture when the route exists, then compare
+  alignment/SNR/residual/clicks/lag/clipping/CPU coupling
+  (`docs/AUTOMATED_SOUNDCHECK.md:1-70`,
+  `docs/PHYSICAL_MUSIC_QUALITY_GATE.md:48-82`).
+
+### Current Baseline Meaning
+
+- `0.3.135` is the current no-iRig/software baseline, not a physical-quality
+  winner. It passed digital/no-iRig gates with stable resource numbers after
+  0.3.136 and 0.3.137 failed to improve it, and 0.3.138 overheated the stack
+  (`docs/QUALITY_RUNS_2026-06-15.md:7-116`).
+- `0.3.64` and `0.3.111` are useful physical/cadence evidence points, not
+  release targets. They show the physical-quality/CPU tradeoff and identify
+  IOUSBHost isochronous enqueue pressure as the dominant cost center
+  (`docs/QUALITY_RUNS_2026-06-13.md:782-810`,
+  `docs/QUALITY_RUNS_2026-06-14.md:718-734`,
+  `docs/QUALITY_RUNS_2026-06-14.md:750-759`).
+- The C++ line must beat mainline by measured evidence across source-reference
+  playback quality, CPU/resource use, routing A/B/C/D, input/timecode behavior,
+  and physical route stability. Compilation, enumeration, clean counters, or
+  Timecode success alone are not enough.
+
+## 2026-06-18 Reusable Mainline Flags And Parameters
+
+This inventory separates reusable behavior from rejected compile-time toggles.
+The C++ line should convert stable choices into typed policy/configuration, not
+carry over a large Makefile-style flag surface.
+
+### Adopt As Product Policy
+
+- Channel topology:
+  - 8 hardware inputs and 8 hardware outputs;
+  - four stereo output pairs A/B/C/D;
+  - one 8-channel input stream with A/B/C/D stereo pairs for Traktor/timecode;
+  - sample rates 44.1 and 48 kHz as first product gates, with 88.2/96 kHz kept
+    as protocol-supported but lower-priority validation targets.
+  References: `Makefile:66-70`, `docs/TRAKTOR_TIMECODE.md:7-23`,
+  `docs/TESTING.md:473-486`.
+- Public CoreAudio buffer policy: 512-frame default/preferred buffer, exposed
+  range 512/1024/2048/4096. Do not expose USB micro-packet cadence to clients
+  (`docs/OLD_DRIVER_COMPAT_PLAN.md:190-203`).
+- Output sample format and packing:
+  - Float32 input from CoreAudio;
+  - signed 24-bit output payload;
+  - big-endian I24 bytes by default;
+  - mode-2 check-byte cadence preserved;
+  - output start byte 4;
+  - product output headroom/gain starts at 0.50.
+  References: `Makefile:64`, `Makefile:82`, `Makefile:100`,
+  `docs/HANDOFF_2026-06-10_AUDIO_CRACKLE.md:125-139`,
+  `docs/HANDOFF_2026-06-10_AUDIO_CRACKLE.md:519-525`,
+  `scripts/validate-mode2-output-packing.py:11-24`.
+- Input decode policy:
+  - playback/output-only/VLC/Spotify profile keeps Audio 8 input decode off;
+  - timecode-vinyl/timecode-cd-line/phono profile enables input decode;
+  - `timecode-vinyl` uses input mode 0 with software lock on.
+  References: `docs/QUALITY_RUNS_2026-06-13.md:561-615`,
+  `docs/TRAKTOR_TIMECODE.md:39-88`.
+- Timing/scheduling policy:
+  - keep HAL/CoreAudio public timing stable;
+  - keep USB zero timestamp and forced public USB clock anchoring off;
+  - keep explicit isochronous future scheduling off;
+  - use capture-paced output with lead 1 as the safe behavioral baseline.
+  References: `Makefile:73-81`, `docs/QUALITY_RUNS_2026-06-12.md:1275-1350`,
+  `docs/TESTING.md:488-492`.
+- Stream startup policy:
+  - send reset-style `AUDIO_PARAMS` before real stream parameters;
+  - do not skip it for start-latency reasons because the mainline skip test did
+    not improve client start time.
+  References: `Makefile:108`, `docs/QUALITY_RUNS_2026-06-14.md:847-853`.
+- Real-time build policy:
+  - default optimization equivalent to `-O2`, not `-O3`;
+  - diagnostic capture/log-heavy paths disabled in product builds;
+  - no per-buffer or per-transfer disk I/O.
+  References: `Makefile:63`, `Makefile:105`,
+  `docs/QUALITY_RUNS_2026-06-14.md:256-263`,
+  `docs/HANDOFF_2026-06-10_AUDIO_CRACKLE.md:533-545`.
+
+### Reusable As Diagnostics Or Gates
+
+- Keep a no-wake control read equivalent to `OPENA8DJ_CONTROL_NO_WAKE=1`, so
+  reading stats cannot itself wake or perturb CoreAudio. Mainline added this
+  after monitor reads caused false activity (`docs/QUALITY_RUNS_2026-06-13.md:500-513`).
+- Keep player timing equivalent to `OPENA8DJ_PLAYER_TIMING=1` only in tools, not
+  in the real-time driver path (`scripts/playback-cpu-gate:564`,
+  `src/tools/audio-wav-play.c:37`).
+- Keep offline mode-2 packing validation with:
+  - all A/B/C/D streams;
+  - default start byte 4;
+  - transfer byte target 352 at 48 kHz;
+  - check-byte/panic-flag validation.
+  References: `scripts/validate-mode2-output-packing.py:11-24`,
+  `scripts/validate-mode2-output-packing.py:334-410`,
+  `docs/TESTING.md:483-510`.
+- Keep simulated-output and real-music gates as first-class C++ QA tools:
+  preflight fixture, simulated output when no hardware route exists, physical
+  iRig source-reference capture when it does (`docs/AUTOMATED_SOUNDCHECK.md:1-70`).
+- Keep physical route readiness checks equivalent to:
+  - exact iRig USB/CoreAudio identity;
+  - short healthy capture before full gate;
+  - route-dirty classification for sane-level catastrophic mismatches.
+  References: `docs/QUALITY_RUNS_2026-06-14.md:649-667`,
+  `docs/QUALITY_RUNS_2026-06-14.md:1010-1080`.
+- Keep cadence/stream counters, but sample them outside the hot path and never
+  let them replace the physical capture gate. `HAL_HOT_STREAM_STATS_INTERVAL`
+  showed that sampling telemetry can reduce overhead slightly, but it was not a
+  standalone product win (`docs/QUALITY_RUNS_2026-06-14.md:864-873`,
+  `docs/QUALITY_RUNS_2026-06-15.md:35-73`).
+
+### Useful Hypotheses, Not Reusable Product Flags
+
+- `HAL_ISO_FRAMES=64`, capture/playback queues `8/8`, output prefetch 64,
+  preopen-on-init, and stop-ISO-on-stop are the best no-iRig/software internal
+  baseline family. They produced excellent CPU and start latency internally, but
+  are not physically qualified because earlier high-ISO families often sounded
+  worse. Treat this as a C++ transport hypothesis requiring physical proof, not
+  as a product default (`docs/QUALITY_RUNS_2026-06-14.md:883-941`,
+  `docs/QUALITY_RUNS_2026-06-14.md:950-1006`,
+  `docs/QUALITY_RUNS_2026-06-15.md:15-33`).
+- ISO5 with deeper capture queue remains the safer physical-cadence clue, but
+  CPU is too high. Reuse the cadence/lifecycle model, not the exact Objective-C
+  implementation or its CPU profile (`docs/QUALITY_RUNS_2026-06-12.md:1312-1349`,
+  `docs/QUALITY_RUNS_2026-06-13.md:782-810`,
+  `docs/QUALITY_RUNS_2026-06-14.md:574-588`).
+- Background preopen/open-while-idle is a useful latency idea only if the C++
+  implementation proves idle CPU stays low and playback stats stay reliable.
+  Mainline warm-open variants were mixed until the later keep-open design
+  (`docs/QUALITY_RUNS_2026-06-14.md:855-881`,
+  `docs/QUALITY_RUNS_2026-06-14.md:918-941`,
+  `docs/QUALITY_RUNS_2026-06-14.md:950-978`).
+
+### Do Not Reuse As Product Flags
+
+- `HAL_OUTPUT_START_BYTE=2`: known white-noise playback failure.
+- `HAL_OUTPUT_NATIVE=1`: catastrophic native-I24 physical failure in mainline.
+- `HAL_EXPLICIT_SCHED=1` / USB zero timestamp / public USB-clock anchoring:
+  unstable or wrong layer for this HAL path.
+- `HAL_OPTFLAGS=-O3`: safety failure with hot `coreaudiod`.
+- `HAL_FLUSH_TOUCHED_OUTPUT=1`: worsened tone/click behavior in C and is not a
+  safe general fix for single-pair clients.
+- `HAL_STREAM_USAGE=1`: intended to reduce unnecessary input work, but worsened
+  physical tone in mainline and caused a C++ safety spike in the current run.
+- `HAL_CAPTURE_QUEUE=128`: worsened tone/click behavior.
+- `HAL_PLAYBACK_COALESCE_TRANSFERS>1`: lowered CPU in some runs but produced no
+  useful output or physical degradation.
+- `HAL_REUSE_ISOC_COMPLETIONS=1`, `HAL_FAST_ISO_TRANSFER_CONFIG=1`,
+  `HAL_LEGACY_OUT_SLOTS=1`, `HAL_TRANSFER_POOL_CURSOR=1`, and
+  `HAL_STRICT_TRANSFER_POOL=1`: useful for understanding lifecycle problems, but
+  the flag implementations caused hot CoreAudio, no output, or no measured
+  product win. Reimplement the lifecycle cleanly in C++ only with new gates.
+- `HAL_USB_QUEUE_QOS=2`: no CPU win and worse physical residual/click behavior.
+- `HAL_STOP_ISOC_ON_STOP=0`: created active underruns/resets after StopIO.
+- `HAL_BACKGROUND_WARM_OPEN=1` as originally implemented: can make gates blind to
+  active playback; only the later open-but-not-streaming idea is worth redesign.
+- `HAL_HOT_STREAM_STATS=0`, `HAL_OUTPUT_AMPLITUDE_STATS=0`,
+  `HAL_OUTPUT_WRITE_STATS=0`, and atomic hot-count rewrites: not product wins;
+  some destabilized the stack. Replace with C++ observability snapshots instead
+  of compile-time stat-removal toggles.

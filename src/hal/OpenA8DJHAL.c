@@ -71,6 +71,14 @@
 #define OPENA8DJ_OUTPUT_STREAM_COUNT 4
 #endif
 
+#ifndef OPENA8DJ_PRIMARY_OUTPUT_PAIR
+#define OPENA8DJ_PRIMARY_OUTPUT_PAIR 0
+#endif
+
+#if OPENA8DJ_PRIMARY_OUTPUT_PAIR < 0 || OPENA8DJ_PRIMARY_OUTPUT_PAIR > 3
+#error OPENA8DJ_PRIMARY_OUTPUT_PAIR must be between 0 and 3
+#endif
+
 #if OPENA8DJ_OUTPUT_STREAM_COUNT < 1 || OPENA8DJ_OUTPUT_STREAM_COUNT > 4
 #error OPENA8DJ_OUTPUT_STREAM_COUNT must be between 1 and 4
 #endif
@@ -1099,7 +1107,16 @@ static void CopyClientOutputToOutput(UInt32 streamIndex, const Float32 *inInterl
         const Float32 *src = &inInterleaved[(size_t)frame * sourceChannels];
         Float32 *dst = &gOutputCycleBuffer[(size_t)frame * kOpenA8DJChannels];
         if (kOpenA8DJOutputStreamCount == 1) {
+#if OPENA8DJ_PRIMARY_OUTPUT_PAIR != 0
+            UInt32 primaryLeft = (UInt32)OPENA8DJ_PRIMARY_OUTPUT_PAIR * kOpenA8DJChannelsPerStream;
+            UInt32 primaryRight = primaryLeft + 1;
+            if (sourceChannels >= 2 && primaryRight < kOpenA8DJChannels) {
+                dst[primaryLeft] = src[0];
+                dst[primaryRight] = src[1];
+            }
+#else
             memcpy(dst, src, kOpenA8DJChannels * sizeof(Float32));
+#endif
         } else {
             dst[startChannel] = src[0];
             dst[startChannel + 1] = src[1];

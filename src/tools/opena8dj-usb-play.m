@@ -83,6 +83,28 @@ static int ParsePair(const char *text)
     return (int)(c - 'A');
 }
 
+static void FillOutputChunk(float *out,
+                            uint32_t outFrames,
+                            const uint8_t *audio,
+                            uint32_t audioFrameOffset,
+                            uint16_t channels,
+                            int selectedPair)
+{
+    memset(out, 0, (size_t)outFrames * 8 * sizeof(float));
+    for (uint32_t i = 0; i < outFrames; i++) {
+        const int16_t *src = (const int16_t *)(audio + ((audioFrameOffset + i) * channels * sizeof(int16_t)));
+        float left = (float)src[0] / 32768.0f;
+        float right = channels > 1 ? (float)src[1] / 32768.0f : left;
+        for (uint32_t pair = 0; pair < 4; pair++) {
+            if (selectedPair >= 0 && (uint32_t)selectedPair != pair) {
+                continue;
+            }
+            out[i * 8 + pair * 2] = left;
+            out[i * 8 + pair * 2 + 1] = right;
+        }
+    }
+}
+
 static void PrintDiagnostics(const char *label)
 {
     OpenA8DJUSBDiagnostics diagnostics;
@@ -202,10 +224,11 @@ int main(int argc, char **argv)
         int selectedPair = -1;
         uint32_t leadFrames = 0;
         bool applyPlaybackProfile = false;
+        bool prefillBeforeStart = false;
         if (argc > 2) {
             selectedPair = ParsePair(argv[2]);
             if (selectedPair < -1) {
-                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile] [--prefill-before-start]\n", argv[0]);
                 return 2;
             }
         }
@@ -213,17 +236,20 @@ int main(int argc, char **argv)
             char *end = NULL;
             unsigned long parsed = strtoul(argv[3], &end, 10);
             if (end == argv[3] || *end != '\0' || parsed > UINT32_MAX) {
-                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile] [--prefill-before-start]\n", argv[0]);
                 return 2;
             }
             leadFrames = (uint32_t)parsed;
         }
-        if (argc > 4) {
-            if (argc != 5 || strcmp(argv[4], "--playback-profile") != 0) {
-                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile]\n", argv[0]);
+        for (int argi = 4; argi < argc; argi++) {
+            if (strcmp(argv[argi], "--playback-profile") == 0) {
+                applyPlaybackProfile = true;
+            } else if (strcmp(argv[argi], "--prefill-before-start") == 0) {
+                prefillBeforeStart = true;
+            } else {
+                fprintf(stderr, "usage: %s [wav] [A|B|C|D|all] [lead_frames] [--playback-profile] [--prefill-before-start]\n", argv[0]);
                 return 2;
             }
-            applyPlaybackProfile = true;
         }
         NSData *data = [NSData dataWithContentsOfFile:[NSString stringWithUTF8String:path]];
         if (data == nil || data.length < 44) {
@@ -274,12 +300,14 @@ int main(int argc, char **argv)
             return 5;
         }
 
-        if (applyPlaybackProfile) {
+        if (applyPlaybackProfile || prefillBeforeStart) {
             if (!OpenA8DJUSBEnsureOpen((double)sampleRate)) {
                 fprintf(stderr, "OpenA8DJUSBEnsureOpen failed\n");
                 return 6;
             }
             PrintEvent("after-ensure-open", processStartNsec);
+        }
+        if (applyPlaybackProfile) {
             if (!OpenA8DJUSBApplyPlaybackProfile()) {
                 fprintf(stderr, "OpenA8DJUSBApplyPlaybackProfile failed\n");
                 return 6;
@@ -287,6 +315,34 @@ int main(int argc, char **argv)
             PrintEvent("after-playback-profile", processStartNsec);
             PrintDiagnostics("after-playback-profile");
         }
+
+        const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
+        enum { chunkFrames = 256 };
+        float out[chunkFrames * 8];
+        uint32_t frame = 0;
+        bool printedFirstWrite = false;
+        if (prefillBeforeStart) {
+            uint32_t prefillFrames = leadFrames;
+            if (prefillFrames > sourceFrames) {
+                prefillFrames = sourceFrames;
+            }
+            PrintEvent("before-prefill", processStartNsec);
+            while (frame < prefillFrames) {
+                uint32_t todo = prefillFrames - frame;
+                if (todo > chunkFrames) {
+                    todo = chunkFrames;
+                }
+                FillOutputChunk(out, todo, audio, frame, channels, selectedPair);
+                OpenA8DJUSBWriteOutput(out, todo, 8);
+                if (!printedFirstWrite) {
+                    PrintEvent("after-first-write", processStartNsec);
+                    printedFirstWrite = true;
+                }
+                frame += todo;
+            }
+            PrintDiagnostics("after-prefill");
+        }
+
         PrintEvent("before-start", processStartNsec);
         if (!OpenA8DJUSBStart((double)sampleRate)) {
             fprintf(stderr, "OpenA8DJUSBStart failed\n");
@@ -296,42 +352,28 @@ int main(int argc, char **argv)
         PrintEvent("after-start", processStartNsec);
         PrintDiagnostics("after-start");
 
-        const uint32_t sourceFrames = audioBytes / ((uint32_t)channels * sizeof(int16_t));
         fprintf(stderr,
-                "usb_play path=%s pair=%s lead_frames=%u rate=%u channels=%u source_frames=%u duration=%.3f\n",
+                "usb_play path=%s pair=%s lead_frames=%u prefill_before_start=%u rate=%u channels=%u source_frames=%u duration=%.3f\n",
                 path,
                 selectedPair < 0 ? "all" : (const char *[]){"A", "B", "C", "D"}[selectedPair],
                 leadFrames,
+                prefillBeforeStart ? 1 : 0,
                 sampleRate,
                 channels,
                 sourceFrames,
                 (double)sourceFrames / (double)sampleRate);
         fflush(stderr);
         PrintDiagnostics("before-play");
-        enum { chunkFrames = 256 };
-        float out[chunkFrames * 8];
-        uint32_t frame = 0;
         uint64_t playbackStartNsec = MonotonicNsec();
-        PrintEvent("before-first-write", processStartNsec);
-        bool printedFirstWrite = false;
+        if (!printedFirstWrite) {
+            PrintEvent("before-first-write", processStartNsec);
+        }
         while (frame < sourceFrames) {
             uint32_t todo = sourceFrames - frame;
             if (todo > chunkFrames) {
                 todo = chunkFrames;
             }
-            memset(out, 0, sizeof(out));
-            for (uint32_t i = 0; i < todo; i++) {
-                const int16_t *src = (const int16_t *)(audio + ((frame + i) * channels * sizeof(int16_t)));
-                float left = (float)src[0] / 32768.0f;
-                float right = channels > 1 ? (float)src[1] / 32768.0f : left;
-                for (uint32_t pair = 0; pair < 4; pair++) {
-                    if (selectedPair >= 0 && (uint32_t)selectedPair != pair) {
-                        continue;
-                    }
-                    out[i * 8 + pair * 2] = left;
-                    out[i * 8 + pair * 2 + 1] = right;
-                }
-            }
+            FillOutputChunk(out, todo, audio, frame, channels, selectedPair);
             OpenA8DJUSBWriteOutput(out, todo, 8);
             if (!printedFirstWrite) {
                 PrintEvent("after-first-write", processStartNsec);

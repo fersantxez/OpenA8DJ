@@ -1,5 +1,10 @@
 # Agent Handoffs
 
+Current status: OpenA8DJ 0.4.0 promotes the modern macOS C++ driver line to
+local `main`, with the older C/Objective-C implementation preserved on
+`legacy`. Older handoffs below are retained as project history and may mention
+pre-promotion blockers.
+
 ## 2026-06-18 - Archimedes - ISO8 CPU Hot-Path Scout
 
 Mission:
@@ -5626,3 +5631,65 @@ Subagent: input/Traktor explorer.
   - Applied and verified `timecode-vinyl`: input mode `0`, software lock on,
     input decode on, identity source map.
   - Captured nonzero input stats on A/B/C/D before human retest.
+
+## 2026-06-18 - Copernicus: iRig Recovery Subagent
+
+- Agent: Copernicus (`019edd10-3a9e-7063-8572-1635e35b769e`).
+- Mission:
+  - Recover iRig Stream visibility after it disappeared from CoreAudio and IOUSB
+    following output soundcheck iterations.
+  - Do not play audio or run soundchecks.
+  - Use the global hardware lock before any CoreAudio/USB/hardware action.
+- Required warning given:
+  - "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana."
+- Current parent context:
+  - Audio 8 DJ remains visible on USB.
+  - iRig Stream is missing from CoreAudio and IOUSB.
+  - OpenA8DJ HAL was unloaded in
+    `local-analysis/hardware-recovery/20260618T2328Z-unload-hal-while-irig-missing`.
+- Expected output:
+  - iRig USB/CoreAudio state, actions executed, evidence path, risks, and next
+    recommended recovery action.
+- Result:
+  - iRig Stream remains absent from both IOUSB and CoreAudio.
+  - USB still shows `USB2.0 Hub`, `Audio 8 DJ`, `USB Type-C Digital AV Adapter`,
+    `DN-SC2000`, and `Shadow`; no `iRig`, `IK Multimedia`, or equivalent USB
+    audio identity.
+  - Copernicus attempted enumeration and observed the parent service recovery;
+    no playback, recording, USB reset, Audio 8 reset, install, or driver reload
+    was performed by the subagent.
+  - Evidence:
+    `/Users/fer/dev/audio8djcpp/local-analysis/hardware-recovery/20260618-192835-irig-recovery-subagent`.
+  - Recommended next step: physical iRig-only reconnect, then repeat USB and
+    CoreAudio enumeration under the lock. Do not reset the shared hub unless a
+    safe, isolated iRig node is identified or the user explicitly accepts the
+    risk to Audio 8 DJ/DN-SC2000.
+
+## 2026-06-18 - Dalton the 2nd: HAL Music Failure Explorer
+
+- Agent: Dalton the 2nd (`019eddcc-b531-7430-916a-53d035796e8d`).
+- Required warning given:
+  - "PROHIBIDO tocar, editar, formatear, generar archivos, limpiar, resetear,
+    instalar o mutar cualquier cosa en /Users/fer/dev/opena8dj o
+    /Users/fer/dev/audio8djrust. Esos worktrees son READ ONLY. Solo puedes
+    escribir en /Users/fer/dev/audio8djcpp. No tocar hardware/audio/CoreAudio/USB
+    sin lock global y sin autorizacion de ventana."
+- Mission:
+  - Read-only analysis of recent direct USB/HAL/tone evidence and HAL timeline
+    code.
+  - No hardware, playback, recording, installation, reset, or file edits.
+- Findings:
+  - Tone success does not prove music quality; music runs expose timebase or
+    alignment instability.
+  - Direct USB is better than HAL on lag but still not a full physical-quality
+    pass.
+  - L/R matrix, polarity, and simple nonlinearity do not explain the residual.
+  - Recommended next step is targeted timeline/packet instrumentation, not
+    repeating prefetch/lead/start-byte sweeps without new evidence.
+- Integration:
+  - Parent tested the remaining bounded hypotheses and documented the rejected
+    variants in `docs/TEST_EVIDENCE.md`.

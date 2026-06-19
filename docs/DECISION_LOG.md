@@ -1,5 +1,44 @@
 # Decision Log
 
+Current status: OpenA8DJ 0.4.0 is the modern macOS C++ mainline. The previous
+C/Objective-C implementation is preserved on `legacy`. Older decisions below
+remain audit history and may describe pre-promotion blockers.
+
+## 2026-06-18 - Reject Fresh Loaded Candidates After Mandatory Sound Gate
+
+Decision:
+- Do not leave a C++ driver loaded for human testing after the 20:08-20:19 EDT
+  window.
+- Treat the current blocker as downstream of clean software/USB payload until a
+  new lock-gated run proves otherwise.
+
+Reason:
+- `OpenA8DJ-iso5q64-fullio-start4.driver` and
+  `OpenA8DJ-iso5q64-output1-start4.driver` both safety-loaded and enumerated,
+  but both failed real Audio 8 DJ -> iRig source-reference soundchecks.
+- Direct USB playback with HAL unloaded also failed, including after exact
+  Audio 8 USB reset `0x17cc:0x1978`.
+- Diagnostic direct USB payload evidence is clean before the device:
+  written/consumed/packed USB alignment `1.000000`, USB SNR `999 dB`,
+  `usb_check_errors=0`, and `usb_panic_flags=0`.
+- iRig idle capture was usable enough for diagnostics (`rms=-56.68 dBFS`,
+  `peak=-40.59 dBFS`), so the immediate failure is not a simple idle iRig
+  noise-floor rejection.
+
+Alternatives discarded:
+- Hand off the loaded driver anyway: rejected by the hard user rule and by the
+  sound-quality evidence.
+- Keep iterating HAL flags while direct USB fails in the same route: rejected
+  as low-value until the Audio 8 output route or device state is recovered.
+- Blame output pair selection: rejected because A/B/C/D pair sweep failed.
+
+Evidence:
+- `local-analysis/human-test-candidate/20260619T000918Z-iso5q64-fullio-start4-irig-soundcheck`
+- `local-analysis/human-test-candidate/20260619T001046Z-iso5q64-output1-start4-irig-soundcheck`
+- `local-analysis/human-test-candidate/20260619T001141Z-iso5q64-output1-start4-pair-sweep`
+- `local-analysis/direct-usb-soundcheck/20260619T001527Z-direct-usb-after-reset-diag-pairA`
+- `local-analysis/hardware-recovery/20260619T001951Z-final-unload-after-rejected-audio8-route`
+
 ## 2026-06-18 - Treat Same-Device iRig Loopback As Diagnostic Only
 
 Decision:
@@ -10416,3 +10455,181 @@ Next implication:
 - Readiness impact: allows a focused human diagnostic retest only. It does not
   allow product readiness, superiority, CPU/resource superiority, or branch
   promotion claims.
+
+## 2026-06-18 - Reject Output1 Start2 For White Noise And Require Automated iRig Capture
+
+- Decision: reject `OpenA8DJ-traktor-recovery-output1-start2.driver` and all
+  follow-up output variants tested in the 23:06-23:22 UTC window for product or
+  human-listening handoff.
+- Reason: human feedback and automated Audio 8 DJ -> iRig Stream captures agree
+  that Timecode Vinyl input improved, but ordinary playback is unusable white
+  noise. Transport counters and CoreAudio client probes were not sufficient to
+  predict the audible failure.
+- Evidence:
+  - Human feedback: beep/pulse gone; Timecode Vinyl/Scratch Control excellent;
+    VLC and Traktor output produce white noise.
+  - `output1-start2` iRig soundcheck:
+    `local-analysis/human-feedback/20260618T2306Z-output1-start2-irig-soundcheck`
+    with `quality_alignment_score=-0.005820` and `analog_snr_db=-61.40`.
+  - Rejected follow-ups:
+    `20260618T2308Z-output1-start4-irig-soundcheck`,
+    `20260618T2309Z-output4-start4-irig-soundcheck`,
+    `20260618T2311Z-output4-start4-iso64-irig-soundcheck`,
+    `20260618T2313Z-output4-start4-mainlineflush-irig-soundcheck`,
+    `20260618T2316Z-default-output1-start4-current-irig-soundcheck`, and
+    `20260618T2322Z-default-output1-start4-current-playback-profile-irig-soundcheck`.
+- New gate:
+  - Before any future candidate is sent for human listening, run a locked
+    source-reference playback through Audio 8 DJ, capture through iRig Stream,
+    and compare the captured WAV to the reference.
+  - A candidate with white noise, no useful output, failed alignment, failed
+    SNR, clipping, unhealthy iRig idle capture, or missing iRig is not eligible
+    for human listening.
+- Alternatives rejected:
+  - Trust no-underrun/no-panic counters: rejected because multiple runs had
+    clean transport counters and bad physical audio.
+  - Treat Timecode Vinyl success as overall readiness: rejected because output
+    quality is a separate product-critical gate.
+  - Continue soundchecks while iRig is missing: rejected because the capture
+    route is currently invalid.
+- Readiness impact: human test readiness and branch promotion are blocked until
+  iRig is recovered and a future candidate passes the automated source-reference
+  capture gate.
+
+## 2026-06-18 - Adopt Mainline No-Repeat Rules For C++ Stabilization
+
+- Decision: treat documented C mainline failures as hard no-repeat constraints
+  for the C++/DriverKit line.
+- Reason: the current C++ failure pattern overlaps mainline history: Timecode
+  can look good while ordinary playback is white noise or metallic, and clean
+  counters can miss the real audible failure. Repeating rejected C experiments
+  would burn the remaining stabilization budget without increasing confidence.
+- Evidence:
+  - Mainline documented start byte 2 for playback as a loud white-noise failure;
+    C++ `output1-start2` also failed physical iRig capture catastrophically.
+  - Mainline 0.2.29 showed clean counters with bad listening; current C++
+    candidates showed clean client/transport probes with bad physical audio.
+  - Mainline ISO/QoS/coalescing/fixed-slot matrices already showed that simple
+    cadence-number tuning trades CPU against clicks/noise rather than solving
+    the DAC-output quality problem.
+  - Mainline profiling identified IOUSBHost isochronous enqueue/requeue pressure
+    as the dominant hot path, so packing/gain/stat tweaks alone are low-leverage.
+- Alternatives rejected:
+  - Retry start byte 2, stream-count reshaping, or ISO number sweeps as quick
+    playback fixes: rejected because mainline and C++ evidence already mark
+    those paths as unsafe or insufficient.
+  - Accept Traktor Scratch success as product readiness: rejected because output
+    playback quality is still failing.
+  - Accept no-underrun/no-panic counters as readiness: rejected because both
+    mainline and C++ have false positives.
+- Readiness impact: next C++ candidate must preserve start byte 4, avoid
+  playback-time hot polling, use a controlled playback profile before duplex
+  Timecode combination, and pass source-reference physical capture before any
+  new human-listening handoff.
+
+## 2026-06-18 - Load No-Repeat Traktor Start4 Diagnostic Candidate
+
+- Decision: build and load `OpenA8DJ-no-repeat-traktor-start4.driver` for a
+  focused human diagnostic retest.
+- Reason: the user requested a new version after integrating mainline
+  no-repeat rules and reusable flag policy. This candidate deliberately avoids
+  the known bad mainline/C++ paths while preserving the Traktor-facing surface.
+- Candidate policy:
+  - output start byte 4;
+  - four stereo output streams A/B/C/D;
+  - one 8-channel input stream;
+  - input I/O and input decode enabled for Timecode Vinyl;
+  - stream usage disabled;
+  - flush touched output disabled;
+  - strict idle silence enabled;
+  - no native I24, no explicit scheduling, no USB zero timestamp, no coalescing.
+- Evidence:
+  - Offline build: `build/hal-candidates/no-repeat-traktor-start4.json`, PASS.
+  - Mode-2 pack validation: PASS with `check_errors=0`, `panic_flags=0`.
+  - Safety load:
+    `local-analysis/hal-candidate-safety/20260618T234152Z-no-repeat-traktor-start4-load`,
+    PASS and left loaded.
+  - Finalization:
+    `local-analysis/human-test-candidate/20260618T234221Z-no-repeat-traktor-start4-finalize`,
+    `Open Audio 8 DJ` visible as `8 in / 8 out`; `timecode-vinyl` applied;
+    settled health PASS with driver/coreaudiod at `0.0%`.
+  - Direct Audio 8 gate:
+    `local-analysis/human-test-candidate/20260618T234250Z-no-repeat-traktor-start4-audio8-direct`,
+    PASS with successful CoreAudio I/O and input capture on pairs 1/2 and 7/8.
+- Alternatives rejected:
+  - Reload `output1-start2`: rejected because it produced white noise and
+    violates the no-repeat start-byte rule.
+  - Use stream usage or flush touched output: rejected by mainline and current
+    safety/quality history.
+  - Wait for iRig before any human diagnostic test: rejected for this specific
+    diagnostic request because the user asked for a new loaded version, but the
+    claim boundary is explicit.
+- Readiness impact:
+  diagnostic human testing is allowed, but product readiness, audiophile
+  superiority, CPU superiority, and branch promotion remain blocked until iRig
+  source-reference output capture passes.
+
+## 2026-06-18 - Tighten Candidate Handoff Rule After Untested Sound Build
+
+- Decision: no future build may be handed to the user as a candidate without a
+  passing real sound-quality gate, unless the user explicitly asks for an
+  unqualified diagnostic build.
+- Reason: the `no-repeat-traktor-start4` build was loaded and handed off after
+  build, safety, CoreAudio enumeration, mode-2 packing, and direct Audio 8 I/O
+  checks, but without source-reference output capture. That is not sufficient
+  for the user's required workflow and can waste human listening time.
+- Required evidence for normal handoff:
+  - actual playback through Audio 8 DJ;
+  - external capture through iRig Stream or another known-good non-Audio8
+    capture device;
+  - comparison against the original reference audio;
+  - good measured quality results;
+  - written evidence path and installed hash.
+- Blocker rule:
+  if iRig or another external capture route is missing, the correct outcome is
+  `BLOCKED_SOUND_QUALITY_GATE`, not "candidate ready".
+- Readiness impact:
+  `OpenA8DJ-no-repeat-traktor-start4.driver` is reclassified as diagnostic-only.
+  It must not be treated as a quality candidate or precedent for future
+  handoffs.
+
+## 2026-06-18 - Revoke No-Repeat Start4 Human Candidate Approval
+
+- Decision: revoke user-facing approval for
+  `OpenA8DJ-no-repeat-traktor-start4.driver`.
+- Reason: it was handed to the user before the required sound-quality capture
+  gate. Build, safety, CoreAudio enumeration, packet validation, and direct I/O
+  are not substitutes for real playback/capture quality evidence.
+- Required future behavior:
+  - if source-reference output capture cannot run, report blocked;
+  - do not hand off a human candidate;
+  - only provide an unqualified diagnostic build when explicitly requested by
+    the user, and label it as such.
+- Readiness impact: the loaded build is not approved for human sound-quality
+  testing and must not be counted as a candidate.
+
+## 2026-06-18 - Reject Flag-Sweep Sound Fixes After iRig Evidence
+
+- Decision: do not promote the current C++ HAL to a human-test candidate.
+- Evidence:
+  - The best clean ISO64/lead2/stats-off HAL run still fails the refined
+    physical music gate.
+  - Direct USB improves some metrics but also fails the same gate, so the
+    low-level output path remains suspect.
+  - Gain, capture-paced off, replay, ISO5, generic packer, no CPU/profile
+    sampling, and OUT-before-IN order were measured and did not produce a pass.
+- Reason:
+  - The remaining defect is objective residual/spread/jitter, not a missing
+    compile flag or CoreAudio enumeration issue.
+  - Repeating mainline flag sweeps is now lower-value than instrumenting the
+    packet/timeline boundary and comparing HAL vs direct USB consumed audio.
+- Alternatives discarded:
+  - Lower acceptance thresholds: rejected because the user requires audible
+    quality, not threshold gaming.
+  - Human handoff of the best diagnostic build: rejected because the mandatory
+    iRig capture gate fails.
+  - ISO5 fallback: rejected for this branch because CPU regressed sharply while
+    quality still failed.
+- Readiness impact:
+  output-quality readiness remains blocked; current loaded build is diagnostic
+  only.

@@ -1,11 +1,31 @@
 # OpenA8DJ C++/DriverKit Architect Context
 
+Current status: OpenA8DJ 0.4.0 promotes the modern macOS C++ driver line to
+local `main`; the previous C/Objective-C line is preserved on `legacy`. Entries
+below this note are historical engineering context and may describe earlier
+blocked candidates.
+
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`
 
 ## 2026-06-18 Human-Test Milestone
 
+- 20:19 EDT hard sound-gate update: no C++ driver is currently loaded for
+  human testing. Two fresh candidates were built and safety-loaded, then
+  rejected by the mandatory Audio 8 DJ -> iRig source-reference sound gate:
+  `build/OpenA8DJ-iso5q64-fullio-start4.driver` scored
+  `quality_alignment_score=0.176726`, SNR `-13.35 dB`, and
+  `build/OpenA8DJ-iso5q64-output1-start4.driver` scored
+  `quality_alignment_score=0.206290`, SNR `-36.27 dB`. A/B/C/D pair sweep also
+  failed. Direct USB with HAL unloaded also failed after exact Audio 8 reset,
+  while diagnostic payload analysis proved written/consumed/packed USB is
+  clean (`alignment=1.0`, USB SNR `999 dB`, `usb_check_errors=0`,
+  `usb_panic_flags=0`). Current blocker is downstream of the software payload:
+  Audio 8 transport/device state, DAC/firmware interpretation, or the physical
+  Audio 8 -> mixer/iRig route. Final state is safe: HAL unloaded, iRig visible,
+  audio stack PASS, lock free. Do not hand off another candidate until this
+  exact physical sound gate passes.
 - Near-term target: produce a stable, complete first human-test candidate by
   15:00 America/New_York. This is not the same as proving superiority over
   mainline or authorizing branch promotion.
@@ -3668,3 +3688,126 @@ Current implication:
   - Then confirm Traktor Scratch Control still locks.
   - Then test ChatGPT dictation/MacBook microphone again to see whether the
     side effect persists with the current output1 candidate.
+
+## 2026-06-18 19:28 EDT - Current Blocker: iRig Missing, Output White Noise
+
+- Current status: no C++ HAL candidate is approved for human listening.
+- Human feedback on `output1-start2`:
+  - Beep/pulse artifact disappeared.
+  - Traktor Scratch Control/Timecode Vinyl is excellent and responsive.
+  - VLC and Traktor playback output white noise and are unusable.
+- Automated physical evidence:
+  - `output1-start2` failed iRig soundcheck catastrophically:
+    `quality_alignment_score=-0.005820`, `analog_snr_db=-61.40`.
+  - `output1-start4`, `output4-start4`, `output4-start4-iso64`,
+    `output4-start4-mainlineflush`, current default output1/start4, and
+    playback-profile output1/start4 all failed source-reference iRig captures.
+  - Direct USB A/B carried some correlated signal but still failed strict
+    capture quality; C/D did not show useful correlated signal. Treat this as
+    route/control diagnostic only, not product evidence.
+- Measurement gate change:
+  - Future candidate handoff requires automated source/reference -> Audio 8 DJ
+    output -> iRig Stream capture -> WAV comparison before user listening.
+  - Traktor Scratch scope still requires human/Traktor validation, but ordinary
+    output quality must be automated first.
+- Current hardware blocker:
+  - iRig Stream disappeared from CoreAudio and IOUSB after the latest
+    no-stream-usage capture attempt.
+  - Audio 8 DJ remains visible on USB, but OpenA8DJ HAL has been unloaded to
+    reduce risk while iRig is missing.
+  - Further soundchecks, playback captures, and human candidate claims are
+    blocked until iRig is visible again and idle capture returns to healthy
+    levels.
+  - Recovery subagent Copernicus independently confirmed iRig is absent from
+    IOUSB/CoreAudio after service recovery. Recommended next step is a physical
+    iRig-only reconnect, not a shared-hub reset.
+
+## 2026-06-18 Mainline No-Repeat Integration
+
+- The C mainline already tried several tempting playback fixes. C++ must not
+  spend the next stabilization loop repeating them unless new packet-level or
+  physical evidence changes the premise.
+- Hard no-repeat constraints:
+  - no playback start byte 2 retest as a fix; keep start byte 4;
+  - no product claims from underrun/panic counters, client probes, or CoreAudio
+    enumeration alone;
+  - no broad ISO/QoS/coalescing/fixed-slot sweeps without a more specific
+    IOUSBHost lifecycle hypothesis;
+  - no playback-time hot stats polling during acceptance captures;
+  - no human-listening handoff while iRig is missing or idle capture is unhealthy.
+- Mainline evidence to preserve:
+  - output quality depends on physical cadence and IOUSBHost request lifecycle,
+    not just sample packing;
+  - old-driver-style capture-completion-paced output slots remain the best
+    architectural clue, but C++ must implement it as a measured lifecycle model,
+    not as another flag sweep;
+  - playback-output isolation and duplex Timecode validation are separate gates.
+- Immediate C++ implication:
+  - first recover a valid capture route;
+  - then prove source-reference playback quality on output A/B with start byte 4
+    and controlled input state;
+  - only after that combine the proven playback path with the Timecode Vinyl
+    profile that the user reported as responsive.
+
+## 2026-06-18 Mainline Flag/Parameter Reuse Policy
+
+- Reusable as C++ product policy:
+  - 8 in / 8 out, A/B/C/D stereo pairs, one 8-channel input stream for
+    Traktor/timecode, four stereo outputs for normal routing;
+  - public buffer default/range 512/512-4096, not USB micro-packet cadence;
+  - big-endian 24-bit output packing, output gain/headroom 0.50, start byte 4;
+  - playback profile disables input decode; timecode profiles enable it;
+  - stable public CoreAudio timing, USB zero timestamp off, explicit scheduling
+    off, capture-paced output lead 1;
+  - reset-style `AUDIO_PARAMS` before real stream params.
+- Reusable as tools only:
+  - no-wake stats reads;
+  - player timing;
+  - mode-2 packing validator;
+  - simulated-output gate;
+  - iRig/capture-route readiness diagnostics;
+  - cadence/stream counters sampled outside the hot path.
+- Not reusable as product flags:
+  - start byte 2, native I24, `-O3`, stream usage, flush-touched-output,
+    capture queue 128, OUT coalescing, reused completions, fast ISO config,
+    legacy-out-slot flag path, USB queue QoS 2, keep-ISO-after-stop, hot-stat
+    removal/atomic rewrites.
+- Open question:
+  - ISO64/q8/preopen is the best no-iRig software baseline, while ISO5 remains
+    the safer physical-cadence clue with high CPU. The C++ architecture should
+    model both as named transport profiles and let physical source-reference
+    metrics decide; it must not silently choose ISO64 for product readiness.
+
+## 2026-06-18 23:16 EDT - Current C++ HAL Quality State
+
+- Current loaded state:
+  - ISO64, capture-paced, lead2, prefetch128, start byte 4, gain 1.5, stats off,
+    one 8-channel output stream remapped to physical pair B for diagnostics.
+  - `timecode-vinyl` profile is applied and CoreAudio shows 8 inputs / 8
+    outputs.
+- Claim boundary:
+  - Not approved for human sound testing.
+  - Not ready for branch promotion or mainline replacement.
+  - Timecode profile is present, but the output-quality gate still blocks a
+    candidate claim.
+- Best current evidence:
+  - Best clean HAL music capture:
+    `local-analysis/soundcheck/20260619T030619Z-clean-iso64-prefetch128-lead2-statsoff-nostreamstats`.
+  - Physical gate FAIL: residual/spread/lag/CPU, no clipping and no click
+    outliers.
+  - Direct USB upper-bound also fails the refined physical gate, although it is
+    closer than HAL on mid-band residual and lag.
+- Rejected hypotheses:
+  - Lower gain alone.
+  - Disable capture-paced playback.
+  - Replay/fade missing frames instead of strict silence.
+  - ISO5 as a direct transplant from mainline.
+  - Generic packer instead of unrolled packer.
+  - Removing stream-stats and CPU sampling from the quality run.
+  - Queue OUT before IN requeue.
+- Next architecture work:
+  - Build a dedicated packet/timeline diagnostic that records consumed audio
+    frame windows without polling the driver during playback.
+  - Compare HAL consumed frames to direct USB consumed frames offline, then
+    isolate whether residual is produced before USB submit or by hardware/route.
+  - Keep 8-in/8-out and Timecode Vinyl topology intact while fixing output.

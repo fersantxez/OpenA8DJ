@@ -1,5 +1,10 @@
 # Promotion Readiness Status
 
+Status update: this document is historical and predates the 0.4.0 promotion.
+The C++ line has since been promoted to local `main`, and the previous
+C/Objective-C line is preserved on `legacy`. Keep the entries below as the
+pre-promotion audit trail, not as the current repository status.
+
 Date: 2026-06-16
 Worktree: `/Users/fer/dev/audio8djcpp`
 Branch: `driverkit/cpp-redesign`

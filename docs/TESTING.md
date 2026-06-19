@@ -65,7 +65,7 @@ Dispositivos Core Audio: 4
 ```
 
 Detailed channel inspection should show 8 input channels and 8 output channels.
-The 0.3.25 macOS-safe topology exposes one 8-channel input stream with A/B/C/D
+The 0.4.0 modern macOS topology exposes one 8-channel input stream with A/B/C/D
 left/right channel names, plus four stereo output streams:
 
 ```sh

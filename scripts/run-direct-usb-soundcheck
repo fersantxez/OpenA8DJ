@@ -25,6 +25,7 @@ Options:
   --lead-frames N            Direct USB lead frames, default 8192
   --player PATH              Direct USB player, default build/opena8dj-usb-play
   --playback-profile         Force playback-only control bytes before stream
+  --prefill-before-start     Diagnostic: write lead frames before starting USB streaming
   --collect-usb-diagnostics  Capture written/consumed/packed USB diagnostics
   --skip-build               Do not build tools before running
   -h, --help                 Show this help
@@ -184,6 +185,7 @@ target_peak_db="-16"
 lead_frames="8192"
 player="build/opena8dj-usb-play"
 playback_profile=0
+prefill_before_start=0
 collect_usb_diagnostics=0
 skip_build=0
 
@@ -204,6 +206,7 @@ while [ "$#" -gt 0 ]; do
     --lead-frames) lead_frames="$2"; shift 2 ;;
     --player) player="$2"; shift 2 ;;
     --playback-profile) playback_profile=1; shift ;;
+    --prefill-before-start) prefill_before_start=1; shift ;;
     --collect-usb-diagnostics) collect_usb_diagnostics=1; shift ;;
     --skip-build) skip_build=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -322,6 +325,9 @@ set +e
 player_args=("$reference" "$pair" "$lead_frames")
 if [ "$playback_profile" = "1" ]; then
   player_args+=(--playback-profile)
+fi
+if [ "$prefill_before_start" = "1" ]; then
+  player_args+=(--prefill-before-start)
 fi
 if [ "$collect_usb_diagnostics" = "1" ]; then
   OPENA8DJ_DIAGNOSTIC_DIR="$driver_diag_dir" "$player_path" "${player_args[@]}" > "$run_dir/play.log" 2>&1
@@ -445,6 +451,7 @@ first_energy_after_first_write_seconds="$(nsec_delta_seconds "$first_write_nsec"
   echo "pair=$pair"
   echo "lead_frames=$lead_frames"
   echo "playback_profile=$([ "$playback_profile" = "1" ] && echo forced || echo default)"
+  echo "prefill_before_start=$([ "$prefill_before_start" = "1" ] && echo yes || echo no)"
   echo "usb_diagnostics=$([ "$collect_usb_diagnostics" = "1" ] && echo "$driver_diag_dir" || echo "disabled")"
   echo "audiophile_wav_analysis_maxlag6=$run_dir/audiophile-wav-analysis-maxlag6.json"
   echo "audiophile_wav_analysis_maxlag6_rc=$audiophile_maxlag6_rc"

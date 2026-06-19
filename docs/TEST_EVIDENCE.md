@@ -1,5 +1,51 @@
 # Test Evidence
 
+## 2026-06-19: Mainline Promotion Build 0.4.0
+
+- Scope:
+  - Promoted the accepted C++/DriverKit line to local `main` and local tag
+    `v0.4.0`.
+  - Refreshed public documentation to present `main` as the modern macOS C++
+    driver line, describe the `legacy` branch as the preserved C/Linux-derived
+    reference, and make the DMG/PKG download path explicit.
+  - Preserved the previous C/Objective-C mainline on local branch `legacy` at
+    commit `7265e80109b2960d306a00f15f758540fcbaf333`.
+  - Built release artifacts with `make dist`.
+  - Did not install, reload, unload, reset USB, restart Core Audio, change
+    defaults, play audio, or record audio during this packaging step.
+- Build profile:
+  - Version: `0.4.0`.
+  - HAL output streams: `4`.
+  - HAL input streams: `1`.
+  - HAL output gain: `1.50f`.
+  - HAL output start byte: `4`.
+  - HAL diagnostic capture: `0`.
+  - HAL output FIFO experiment: `0`.
+- Commands:
+  - `make dist`
+  - `hdiutil verify build/OpenA8DJ-0.4.0.dmg`
+  - `pkgutil --check-signature build/OpenA8DJ-0.4.0.pkg`
+  - `pkgutil --payload-files build/OpenA8DJ-0.4.0.pkg`
+- Result:
+  - `make dist`: PASS.
+  - DMG verification: PASS, checksum valid.
+  - PKG signature check: expected unsigned preview package, `Status: no
+    signature`.
+  - PKG payload includes the HAL driver, control tool, MIDI bridge, uninstall
+    helper, LaunchAgent, and documentation.
+  - `CFBundleShortVersionString=0.4.0`, `CFBundleVersion=128`.
+- Artifacts:
+  - `build/OpenA8DJ-0.4.0.dmg`
+  - `build/OpenA8DJ-0.4.0.pkg`
+  - `build/OpenA8DJ-0.4.0-checksums.txt`
+- SHA-256:
+  - `00ca03f55d5aeab9215be7997ed477eb7e9a4f66bb15c0d360ed3116507fca13  OpenA8DJ-0.4.0.dmg`
+  - `2edae49038c050de1ab42fbbb03180ab34d08fae548ab654a2c48a618a8bcb8b  OpenA8DJ-0.4.0.pkg`
+- Publication status:
+  - Local tag `v0.4.0` created.
+  - Remote push/release is blocked in this environment because GitHub HTTPS
+    credentials are unavailable and the `gh` token is invalid.
+
 ## 2026-06-18: Post-Commit Timecode Planner RC Evidence
 
 - Scope:
@@ -15932,3 +15978,269 @@ Follow-up offline verification:
   - The human result improved materially on Timecode Vinyl input, but output
     quality and VLC playback still require human confirmation on the currently
     loaded `output1-start2` candidate.
+
+## 2026-06-18 - Human White-Noise Rejection And Mandatory iRig Gate
+
+- Scope:
+  - Captured human feedback on `OpenA8DJ-traktor-recovery-output1-start2`.
+  - The strange beep/pulse disappeared and Traktor Scratch Control/Timecode
+    Vinyl felt excellent: immediate, synced, and responsive.
+  - VLC and Traktor playback both produced unpleasant white noise instead of
+    usable audio.
+  - User requirement is now explicit: every future human candidate must first
+    pass an automated source-reference Audio 8 DJ output -> iRig Stream capture
+    comparison. Traktor scope remains human-only, but ordinary playback quality
+    must be checked by automation before handoff.
+- Evidence:
+  - Rejected active `output1-start2` soundcheck:
+    `local-analysis/human-feedback/20260618T2306Z-output1-start2-irig-soundcheck`
+    (`quality_alignment_score=-0.005820`, `analog_snr_db=-61.40`,
+    `capture_clipped_frames=231314`).
+  - `output1-start4`:
+    `local-analysis/human-feedback/20260618T2308Z-output1-start4-irig-soundcheck`
+    (`quality_alignment_score=0.099399`, `analog_snr_db=-32.17`).
+  - `output4-start4`:
+    `local-analysis/human-feedback/20260618T2309Z-output4-start4-irig-soundcheck`
+    (`quality_alignment_score=0.155858`, `analog_snr_db=-24.64`).
+  - `output4-start4-iso64`:
+    `local-analysis/human-feedback/20260618T2311Z-output4-start4-iso64-irig-soundcheck`
+    (`quality_alignment_score=0.193200`, `analog_snr_db=-24.14`).
+  - `output4-start4-mainlineflush`:
+    `local-analysis/human-feedback/20260618T2313Z-output4-start4-mainlineflush-irig-soundcheck`
+    (`quality_alignment_score=0.094573`, `analog_snr_db=-31.99`,
+    `mid_band_cpu_corr=0.741059 source=opena8dj_driver`).
+  - Fresh default one-stream reload:
+    `local-analysis/human-feedback/20260618T2316Z-default-output1-start4-current-irig-soundcheck`
+    (`quality_alignment_score=0.443196`, `analog_snr_db=-21.57`).
+  - Playback-profile retry:
+    `local-analysis/human-feedback/20260618T2322Z-default-output1-start4-current-playback-profile-irig-soundcheck`
+    (`quality_alignment_score=0.118046`, `analog_snr_db=-27.01`).
+- Route/control diagnostics:
+  - VLC was found running and was quit before follow-up captures.
+  - iRig idle capture after VLC quit stayed too noisy for product evidence:
+    `local-analysis/irig-capture-isolation/20260618T2318Z-irig-idle-after-vlc-quit`
+    (`max_rms_dbfs=-50.29`, `idle_capture_unhealthy=true`).
+  - iRig idle after HAL unload remained noisy:
+    `local-analysis/irig-capture-isolation/20260618T2319Z-irig-idle-after-hal-unload`
+    (`max_rms_dbfs=-50.20`, `idle_capture_unhealthy=true`).
+  - Direct USB A/B/C/D route matrix after VLC quit:
+    `local-analysis/human-feedback/20260618T2320Z-direct-usb-pair-matrix-after-vlc-quit`.
+    Pair A and B carried some correlated audio in the wide-lag audiophile
+    analyzer but still failed badly; C/D carried no useful correlated signal.
+- Safety/recovery:
+  - The HAL internal diagnostic candidate was rejected by safety load because
+    `coreaudiod` reached about 121% and `mediaremoted` about 38%.
+    Evidence: `local-analysis/human-feedback/20260618T2323Z-hal-internal-diagnostic-output1-start4/load`.
+  - After a no-stream-usage soundcheck attempt, iRig Stream disappeared from
+    CoreAudio and IOUSB. Evidence:
+    `local-analysis/hardware-recovery/20260618T2327Z-recover-irig-missing-after-soundcheck`.
+  - OpenA8DJ HAL was unloaded while iRig is missing:
+    `local-analysis/hardware-recovery/20260618T2328Z-unload-hal-while-irig-missing`.
+  - Explicit audio service recovery did not restore iRig:
+    `local-analysis/hardware-recovery/20260618T2332Z-explicit-audio-service-restart-for-irig`.
+  - Subagent recovery evidence:
+    `local-analysis/hardware-recovery/20260618-192835-irig-recovery-subagent`.
+- Result:
+  - No currently tested C++ HAL candidate is approved for human listening.
+  - No product quality, CPU/resource superiority, Timecode Vinyl readiness, or
+    branch-promotion claim is allowed.
+  - Further physical playback/capture tests are blocked until iRig Stream is
+    visible again and an idle capture is healthy.
+
+## 2026-06-18 19:43 EDT - Loaded No-Repeat Traktor Start4 Diagnostic Candidate
+
+- Command:
+  `python3 scripts/build-hal-traktor-recovery-candidate --candidate build/OpenA8DJ-no-repeat-traktor-start4.driver --json-out build/hal-candidates/no-repeat-traktor-start4.json --output-streams 4 --stream-usage 0 --flush-touched-output 0 --output-start-byte 4`
+- Result: PASS.
+- Offline candidate hash:
+  `df78999d97a6080ffaed276b4bcb5938b3016420489e72f94267b716a79c9c15`.
+- Offline bundle completeness:
+  `scripts/check-hal-bundle-complete --candidate build/OpenA8DJ-no-repeat-traktor-start4.driver`
+  PASS.
+- Mode-2 packing command:
+  `python3 scripts/validate-mode2-output-packing.py --start-byte 4 --frames 512 --transfer-bytes 352 --gain 0.5 --byte-order big`
+- Mode-2 result: PASS, `check_errors=0`, `panic_flags=0`.
+- Safety load command:
+  `scripts/test-hal-candidate-safety --candidate build/OpenA8DJ-no-repeat-traktor-start4.driver --cycles 1 --leave-loaded --wait 3 --enumeration-timeout 8 --run-dir local-analysis/hal-candidate-safety/20260618T234152Z-no-repeat-traktor-start4-load`
+- Safety load result: PASS, left loaded.
+- Installed post-codesign hash:
+  `c1508c1cf60b292dfdc73931c322f84f6552835a745553c5eb8933e77e421354`.
+- Profile command:
+  `./build/opena8dj-control profile timecode-vinyl`
+- Profile result: PASS, input mode `0`, software lock `on`, input decode `on`.
+- Final health evidence:
+  `local-analysis/human-test-candidate/20260618T234221Z-no-repeat-traktor-start4-finalize`
+  with after-settle `audio_stack_health=PASS`, `coreaudiod=0.0%`,
+  `opena8dj_driver=0.0%`.
+- Direct Audio 8 gate command:
+  `scripts/run-audio8dj-direct-gate --seconds 2 --out-dir local-analysis/human-test-candidate/20260618T234250Z-no-repeat-traktor-start4-audio8-direct`
+- Direct Audio 8 result: PASS. `audio_io_test_status=0`,
+  `audio_record_12_status=0`, `audio_record_78_status=0`.
+- Hardware/capture limitation:
+  iRig Stream is still absent from CoreAudio and IOUSB, so automated
+  source-reference output capture could not be run.
+- Interpretation:
+  loaded for human diagnostic testing only; no product readiness or superiority
+  claim.
+
+## 2026-06-18 19:47 EDT - Revoked And Unloaded Unapproved No-Repeat Start4 Build
+
+- Reason:
+  the build was handed off without the mandatory real sound-quality capture gate.
+- Command/action:
+  under the global audio hardware lock, moved active
+  `/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver` to `HAL.disabled`, restarted
+  `coreaudiod`, and checked CoreAudio/health.
+- Evidence:
+  `local-analysis/human-test-candidate/20260618T234745Z-revoke-unapproved-no-repeat-start4`
+- Result:
+  - `unloaded=1`;
+  - CoreAudio devices after unload: MacBook Air Microphone and MacBook Air
+    Speakers only;
+  - `OpenA8DJ.driver` process absent;
+  - `audio_stack_health=PASS`;
+  - `coreaudiod=0.0%`.
+- Interpretation:
+  no OpenA8DJ C++ build is currently active for user testing. Future handoff is
+  blocked until a build passes real source-reference sound-quality capture, or
+  the user explicitly asks for an unqualified diagnostic build.
+
+## 2026-06-18 20:08-20:19 EDT - Rejected Fresh C++ Candidates By Mandatory iRig Sound Gate
+
+- Scope:
+  - iRig Stream was visible in CoreAudio and USB.
+  - Audio 8 DJ was visible on USB.
+  - No mainline or Rust files were edited.
+  - Global hardware lock was used for HAL load/reload, profile changes,
+    Audio 8 playback/capture, exact Audio 8 USB reset, and recovery.
+- Candidate `build/OpenA8DJ-iso5q64-fullio-start4.driver`:
+  - Built as ISO5/q64, 4 output streams, 1 input stream, start byte 4, gain 0.5.
+  - Safety load PASS:
+    `local-analysis/hal-candidate-safety/20260619T000832Z-iso5q64-fullio-start4-load`.
+  - Timecode-vinyl profile applied:
+    `local-analysis/human-test-candidate/20260619T000906Z-iso5q64-fullio-start4-profile-timecode`.
+  - Mandatory iRig soundcheck FAIL:
+    `local-analysis/human-test-candidate/20260619T000918Z-iso5q64-fullio-start4-irig-soundcheck`
+    with `quality_alignment_score=0.176726`, `analog_snr_db=-13.35`,
+    `lag_jumps_gt_2_frames=38`, `capture_clipped_frames=0`.
+- Candidate `build/OpenA8DJ-iso5q64-output1-start4.driver`:
+  - Built as ISO5/q64, 1 output stream carrying 8 channels, 1 input stream,
+    start byte 4, gain 0.5.
+  - Safety load PASS:
+    `local-analysis/hal-candidate-safety/20260619T001010Z-iso5q64-output1-start4-load`.
+  - Timecode-vinyl profile applied:
+    `local-analysis/human-test-candidate/20260619T001037Z-iso5q64-output1-start4-profile-timecode`.
+  - Mandatory iRig soundcheck FAIL:
+    `local-analysis/human-test-candidate/20260619T001046Z-iso5q64-output1-start4-irig-soundcheck`
+    with `quality_alignment_score=0.206290`, `analog_snr_db=-36.27`,
+    `lag_jumps_gt_2_frames=42`, `capture_clipped_frames=0`.
+  - Pair sweep A/B/C/D also FAIL:
+    `local-analysis/human-test-candidate/20260619T001141Z-iso5q64-output1-start4-pair-sweep`.
+    Best pair was still unusable (`pair A quality_alignment_score=0.117991`;
+    B/C/D were lower).
+- Route isolation:
+  - HAL was force-unloaded before direct USB diagnostics:
+    `local-analysis/hardware-recovery/20260619T001306Z-force-unload-failed-candidate-before-direct-usb`.
+  - Direct USB Audio 8 -> iRig before Audio 8 reset FAIL:
+    `local-analysis/direct-usb-soundcheck/20260619T001319Z-direct-usb-route-check-pairA`
+    with `quality_alignment_score=0.200013`, `snr_db_min=-31.09`.
+  - iRig idle capture after direct USB FAIL was usable/low enough for
+    diagnostics:
+    `local-analysis/irig-capture-isolation/20260619T001400Z-irig-idle-after-direct-usb-fail`
+    with RMS `-56.68 dBFS`, peak `-40.59 dBFS`, `idle_capture_unhealthy=false`.
+  - Exact Audio 8 USB reset `0x17cc:0x1978` returned PASS without resetting
+    iRig or hubs:
+    `local-analysis/hardware-recovery/20260619T001430Z-reset-audio8-exact-after-direct-usb-fail`.
+  - Direct USB after Audio 8 reset improved only partially and still FAIL:
+    `local-analysis/direct-usb-soundcheck/20260619T001445Z-direct-usb-after-audio8-reset-pairA`
+    with `quality_alignment_score=0.344101`, `snr_db_min=-17.71`.
+  - Diagnostic direct USB run confirmed the software payload is bit-perfect
+    before the device: written/consumed/packed USB alignment `1.000000`,
+    USB SNR `999 dB`, `usb_check_errors=0`, `usb_panic_flags=0`.
+    Evidence:
+    `local-analysis/direct-usb-soundcheck/20260619T001527Z-direct-usb-after-reset-diag-pairA`.
+  - Default-profile direct USB and post-FwUpdate disable-attempt direct USB
+    also FAIL:
+    `local-analysis/direct-usb-soundcheck/20260619T001649Z-direct-usb-after-reset-default-profile-pairA`,
+    `local-analysis/direct-usb-soundcheck/20260619T001833Z-direct-usb-after-fwupdate-disable-attempt-pairA`.
+- Holder/process check:
+  - No live `FwUpdateManagerd`/Pioneer process was found.
+  - `com.pioneerdj.FwUpdateManagerd` did not resolve as a loaded user service
+    when bootout/disable was attempted:
+    `local-analysis/hardware-recovery/20260619T001828Z-disable-pioneer-fwupdater-before-direct-usb`.
+- Final safety:
+  - Active HAL force-unloaded and final health PASS:
+    `local-analysis/hardware-recovery/20260619T001951Z-final-unload-after-rejected-audio8-route`.
+  - Final CoreAudio devices: iRig Stream, MacBook Air Microphone, MacBook Air
+    Speakers only; OpenA8DJ absent.
+  - Hardware lock released.
+- Result:
+  - No driver is loaded for human testing.
+  - No candidate passed the mandatory real sound-quality gate.
+  - Do not hand off a driver until the Audio 8 -> iRig physical route produces
+    a passing direct USB baseline or a HAL candidate independently passes the
+    same source-reference iRig gate.
+
+## 2026-06-18 22:54-23:16 EDT - C++ HAL Sound-Fix Iteration With iRig Gate
+
+- Scope:
+  - Hardware lock used by soundcheck/safety tooling for playback/capture and
+    HAL load/reload.
+  - iRig Stream stayed visible; no iRig reset was performed.
+  - Mainline and Rust remained read-only.
+- Current restored loaded state:
+  - Safety load PASS:
+    `local-analysis/hal-safety/20260619T031444Z-clean-iso64-lead2-out-before-in-load`.
+  - CoreAudio lists `Open Audio 8 DJ` as `8 in / 8 out` and `iRig Stream` as
+    `2 in / 2 out`.
+  - `timecode-vinyl` profile applied, input decode on, software lock on.
+  - This is diagnostic only; it is not approved for human sound-quality testing.
+- Best measured HAL family before this round:
+  - ISO64, prefetch 128, lead2, start byte 4, gain 1.5, stats off:
+    `local-analysis/soundcheck/20260619T030619Z-clean-iso64-prefetch128-lead2-statsoff-nostreamstats`.
+  - Physical gate FAIL: `quality_alignment_score=0.971811`,
+    `mid_band_residual_ratio=1.391797`, `high_band_residual_ratio=1.359228`,
+    `lag_jumps_gt_2_frames=27`, driver CPU avg `9.92%`.
+  - No clicks or clipping; failure is residual/spread/jitter/CPU, not obvious
+    clipping.
+- Direct USB upper-bound check:
+  - `local-analysis/direct-usb-soundcheck/20260619T020506Z-after-reset-start4-tol0-gain15-pairB-sweep`.
+  - Physical gate FAIL but better than HAL in some dimensions:
+    `quality_alignment_score=0.977263`, `mid_band_residual_ratio=1.312628`,
+    `high_band_residual_ratio=1.360981`, `lag_jumps_gt_2_frames=9`.
+  - Interpretation: HAL adds jitter, but the low-level output path also still
+    misses the physical gate.
+- Variants tested and rejected:
+  - Gain 0.5:
+    `local-analysis/soundcheck/20260619T025723Z-gain050-iso64-prefetch128-lead2`,
+    worse correlation and drift.
+  - Playback not capture-paced:
+    `local-analysis/soundcheck/20260619T025933Z-gain150-iso64-prefetch128-not-capture-paced`,
+    still FAIL with residual/spread and CPU issues.
+  - Mainline-style replay (`STRICT_IDLE_SILENCE=0`):
+    `local-analysis/soundcheck/20260619T030220Z-gain150-iso64-prefetch128-lead2-replay`,
+    worse quality/drift.
+  - ISO5/lead1:
+    `local-analysis/soundcheck/20260619T030417Z-gain150-iso5-prefetch128-lead1`,
+    worse CPU (`31.26%` avg driver) and still FAIL.
+  - Generic/non-unrolled packer:
+    `local-analysis/soundcheck/20260619T030909Z-clean-iso64-prefetch128-lead2-genericpack-nostreamstats`,
+    no material improvement.
+  - Pure audio run without CPU profile or stream-stats:
+    `local-analysis/soundcheck/20260619T031003Z-genericpack-pure-audio-no-cpu-no-streamstats`,
+    still FAIL on residual/spread/lag.
+  - ISO64 lead1:
+    safety load failed and temporarily removed OpenA8DJ from CoreAudio; restored
+    by the later lead2 safety load.
+  - OUT-before-IN requeue order:
+    `local-analysis/soundcheck/20260619T031557Z-clean-iso64-lead2-out-before-in-nostreamstats`,
+    still FAIL (`mid_band_residual_ratio=1.393064`,
+    `lag_jumps_gt_2_frames=27`).
+- Offline diagnosis:
+  - Linear L/R matrix, polarity, polynomial nonlinearity, and fractional
+    time-warp do not explain the residual enough to be a fix.
+  - Window trace on the clean ISO64 run shows local lag in the tens of frames,
+    not catastrophic thousands, but the physical gate still rejects the spread.
+- Result:
+  - No quality-approved candidate exists.
+  - Current loaded driver is the safest diagnostic state, not a ready build.

@@ -1,5 +1,10 @@
 # Reproducible Build Plan
 
+Current status: the user-facing release line is the modern macOS C++ mainline.
+`make dist` builds the current easy-install macOS DMG/PKG preview. CMake remains
+the long-term canonical build direction for the pure C++ core and future
+DriverKit/System Extension work.
+
 This document is the build/release engineering contract for the C++ redesign.
 It describes the desired build shape before mutating the build system. It does
 not require hardware, Core Audio device access, USB access, install steps, or

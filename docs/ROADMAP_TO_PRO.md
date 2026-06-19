@@ -3,10 +3,14 @@
 This document captures the current gap between the working OpenA8DJ HAL
 prototype and a production-quality independent macOS driver.
 
+Current status: OpenA8DJ 0.4.0 is the modern macOS C++ mainline. The previous
+C/Objective-C implementation is preserved on `legacy` for historical
+Linux/CAIAQ-derived behavior, comparison, and recovery.
+
 ## Current evidence
 
 - macOS enumerates `Open Audio 8 DJ` as an 8-input / 8-output device in the
-  0.3.25 preview.
+  0.4.0 preview.
 - The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
   pairs and 4 stereo output streams with named Output A/B/C/D pairs.
 - Local listening confirmed substantially cleaner playback at 44.1 and 48 kHz

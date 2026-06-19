@@ -78,6 +78,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC 0
 #endif
 
+#ifndef OPENA8DJ_ENABLE_OUTPUT_FIFO
+#define OPENA8DJ_ENABLE_OUTPUT_FIFO 0
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_NATIVE_I24
 #define OPENA8DJ_OUTPUT_NATIVE_I24 0
 #endif
@@ -270,6 +274,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_AUDIO_PARAMS_RESET_SETTLE_USEC 0
 #endif
 
+#ifndef OPENA8DJ_CLOCK_DRIFT_TOLERANCE
+#define OPENA8DJ_CLOCK_DRIFT_TOLERANCE 5
+#endif
+
 #ifndef OPENA8DJ_ENABLE_TRANSFER_LEDGER
 #define OPENA8DJ_ENABLE_TRANSFER_LEDGER 0
 #endif
@@ -342,7 +350,7 @@ enum {
     kPlaybackScheduleLeadFrames = 100,
     kPlaybackScheduleMaxLeadFrames = kPlaybackScheduleLeadFrames + (kPlaybackQueueTarget * kPlaybackIsoFramesPerTransfer) + 64,
     kPlaybackScheduleFallbackThreshold = 64,
-    kClockDriftTolerance = 5,
+    kClockDriftTolerance = OPENA8DJ_CLOCK_DRIFT_TOLERANCE,
     kA8DJControlStateBytes = 6
 };
 
@@ -364,7 +372,10 @@ enum {
     kDiagnosticEventMaxCount = 262144
 };
 static const uint64_t kDiagnosticPackedMaxBytes = (uint64_t)kDiagnosticCaptureMaxFrames * kStreams * kBytesPerSampleUSB;
-static const char *kDefaultDiagnosticDir = "/tmp";
+#ifndef OPENA8DJ_DIAGNOSTIC_DIR_DEFAULT
+#define OPENA8DJ_DIAGNOSTIC_DIR_DEFAULT "/tmp"
+#endif
+static const char *kDefaultDiagnosticDir = OPENA8DJ_DIAGNOSTIC_DIR_DEFAULT;
 #endif
 
 enum {
@@ -2239,6 +2250,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     IOUSBHostPipe *_playbackPipe;
     CaiaqDeviceSpec _spec;
     FloatRing _inputRing;
+    FloatRing _outputFifo;
     OutputTimelineRing _outputTimeline;
     OpenA8DJStreamStatsPayload _streamStats;
     pthread_mutex_t _streamStatsMutex;
@@ -2460,6 +2472,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
             _ipcClients[i] = -1;
         }
         RingInit(&_inputRing, kRingFrames, kChannels);
+        RingInit(&_outputFifo, kRingFrames, kChannels);
         OutputTimelineInit(&_outputTimeline, kRingFrames, kChannels);
 #if OPENA8DJ_ENABLE_TRANSFER_POOL
         _captureTransferPool = [NSMutableArray arrayWithCapacity:kCaptureQueueDepth];
@@ -2564,6 +2577,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     pthread_mutex_destroy(&_ep1Mutex);
     pthread_mutex_destroy(&_bulkOutMutex);
     RingDestroy(&_inputRing);
+    RingDestroy(&_outputFifo);
     OutputTimelineDestroy(&_outputTimeline);
 }
 
@@ -3973,7 +3987,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     }
 #endif
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
+#if OPENA8DJ_ENABLE_OUTPUT_FIFO
+    stats.outputRingFrames = _outputFifo.availableFrames;
+#else
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
+#endif
     stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
     stats.outputByteInFrame = _outputByteInFrame;
     stats.playbackLeadFrames = kPlaybackScheduleLeadFrames;
@@ -4622,6 +4640,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     [self resetTransferLedger];
     [self resetClockAnchorForNewStream];
     RingClear(&_inputRing);
+    RingClear(&_outputFifo);
 #if OPENA8DJ_INPUT_DECODE_ACTIVE_GATING
     atomic_store(&_inputDecodeActive, false);
 #else
@@ -5077,6 +5096,21 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 - (void)refillOutputPrefetch
 {
     _outputPrefetchIndex = 0;
+#if OPENA8DJ_ENABLE_OUTPUT_FIFO
+    memset(_outputPrefetch, 0, sizeof(_outputPrefetch));
+    memset(_outputPrefetchHaveFrame, 0, sizeof(_outputPrefetchHaveFrame));
+    memset(_outputPrefetchStartupSilence, 0, sizeof(_outputPrefetchStartupSilence));
+    memset(_outputPrefetchElasticDrops, 0, sizeof(_outputPrefetchElasticDrops));
+    _outputPrefetchCount = kOutputPrefetchFrames;
+    uint32_t read = RingRead(&_outputFifo,
+                             _outputPrefetch,
+                             kOutputPrefetchFrames,
+                             true);
+    for (uint32_t frame = 0; frame < kOutputPrefetchFrames; frame++) {
+        _outputPrefetchHaveFrame[frame] = frame < read;
+        _outputPrefetchStartupSilence[frame] = !_outputHasStartedPlayback && frame >= read;
+    }
+#else
     _outputPrefetchCount = OutputTimelineReadFrames(&_outputTimeline,
                                                     _outputPrefetch,
                                                     kOutputPrefetchFrames,
@@ -5084,6 +5118,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                                                     _outputPrefetchHaveFrame,
                                                     _outputPrefetchStartupSilence,
                                                     _outputPrefetchElasticDrops);
+#endif
 }
 
 - (void)loadNextOutputFrameWithStats:(OpenA8DJOutputFillStats *)stats
@@ -6696,6 +6731,16 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     int64_t startFrame = 0;
     uint32_t timelineResets = 0;
     uint32_t lateWriteFrames = 0;
+#if OPENA8DJ_ENABLE_OUTPUT_FIFO
+    (void)sampleTime;
+    (void)sampleTimeValid;
+    uint32_t dropped = 0;
+    RingWriteWithDropped(&_outputFifo, inInterleaved, frames, &dropped);
+    if (dropped > 0) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputRingOverruns)
+                               value:dropped];
+    }
+#else
     uint32_t dropped = OutputTimelineWrite(&_outputTimeline,
                                            inInterleaved,
                                            frames,
@@ -6721,6 +6766,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, outputLateWriteBatches)
                                value:1];
     }
+#endif
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     uint16_t diagnosticFlags = 0;
     if (sampleTimeValid) diagnosticFlags |= kDiagnosticFlagSampleTimeValid;

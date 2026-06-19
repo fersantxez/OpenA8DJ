@@ -1,5 +1,9 @@
 # Release Process
 
+This process applies to the modern macOS C++ mainline. The previous
+C/Objective-C implementation is preserved separately on the `legacy` branch and
+is not the user-facing release line.
+
 ## Build
 
 ```sh
@@ -112,6 +116,10 @@ build/OpenA8DJ-<version>-checksums.txt
 
 The README links to the latest release page and the current versioned assets so
 testers can download the installer without building from source.
+
+For 0.4.0 and later, the public release should make the easy path clear:
+download the DMG from GitHub Releases, open it, run the bundled PKG installer,
+and reconnect the Audio 8 DJ if needed.
 
 The DMG includes `LICENSE`, `NOTICE.md`, `LEGAL.md`, and `BRAND_POLICY.md`.
 The PKG installs the same files under `/Library/Documentation/OpenA8DJ`.

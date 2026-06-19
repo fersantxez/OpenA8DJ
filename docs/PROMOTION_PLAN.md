@@ -1,6 +1,13 @@
 # OpenA8DJ C++ Promotion Plan
 
-Status: design only. Do not execute branch moves from this document until every gate below is PASS and the user explicitly authorizes the promotion window.
+Status update: this document is historical. The user authorized promotion after
+the 0.4.0 human validation milestone, the C++ line was promoted to local
+`main`, and the previous C/Objective-C line was preserved on `legacy`. Keep this
+document as the audit model for future large branch moves.
+
+Original status: design only. Do not execute branch moves from this document
+until every gate below is PASS and the user explicitly authorizes the promotion
+window.
 
 Mandatory warning for every operator or subagent:
 

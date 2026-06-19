@@ -1,10 +1,10 @@
 OpenA8DJ
 ========
 
-OpenA8DJ is an open-source macOS driver stack for the Native Instruments Audio
-8 DJ.
+OpenA8DJ is an open-source modern macOS driver stack for the Native Instruments
+Audio 8 DJ.
 
-Download page:
+Easy download page:
 
 https://github.com/fersantxez/OpenA8DJ/releases/latest
 
@@ -42,11 +42,13 @@ Install and use OpenA8DJ at your own risk.
 
 Current preview status:
 
-- Version: 0.3.25
+- Version: 0.4.0
+- Architecture: modern macOS C++ mainline, packaged as a Core Audio HAL preview
 - Core Audio device: Open Audio 8 DJ
 - Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Validated playback rates: 44.1 kHz and 48 kHz
 - Timecode/DVS input capture: exposed for Traktor validation
+- Legacy C line: preserved separately on the repository legacy branch
 - Windows: not included in this macOS release
 
 This build is not notarized.

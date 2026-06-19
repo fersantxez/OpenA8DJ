@@ -1985,3 +1985,110 @@ PASS/FAIL semantics:
 - Audit PASS means the external prerequisites were measured and classified.
 - It is not product readiness. It intentionally blocks Legacy/main promotion
   until external dependencies are clean and physical evidence exists.
+
+## Mainline No-Repeat Gate
+
+Purpose:
+
+- prevent the C++ line from repeating C mainline experiments that already failed
+  physical audio, CPU safety, or human listening;
+- force every new candidate to state whether it is preserving, deliberately
+  changing, or avoiding the known mainline behavior.
+
+Before loading a new HAL candidate for human or physical listening, confirm:
+
+- playback output start byte is 4, or a packet-level proof explains why the
+  documented start-byte-2 white-noise failure no longer applies;
+- the candidate does not rely on underrun/panic counters as the quality proof;
+- acceptance capture does not poll hot stream stats unless the test is about
+  observability overhead;
+- ISO grouping, OUT coalescing, queue depth, QoS, reusable completions, and
+  fixed-slot changes are tied to a specific IOUSBHost lifecycle hypothesis, not
+  tried as another blind matrix;
+- output-quality isolation has passed before duplex Timecode is used as a
+  product-readiness proxy;
+- iRig USB/CoreAudio readiness and idle capture health are valid before any
+  source-reference physical capture.
+
+Expected current result:
+
+- current C++ candidates fail this gate for product handoff because source-
+  reference playback capture failed and iRig is currently missing;
+- Timecode Vinyl responsiveness remains useful positive evidence, but only for
+  the input/control side.
+
+PASS/FAIL semantics:
+
+- PASS means the candidate has not repeated known rejected mainline paths and is
+  eligible for the next evidence gate.
+- FAIL means stop before human listening and revise the candidate or the
+  measurement route.
+
+## Mainline Flag Reuse Checklist
+
+Before a C++ candidate is built or loaded, classify every mainline-derived
+parameter it uses:
+
+- Product policy:
+  - topology `8 in / 8 out`, A/B/C/D;
+  - public buffer 512 default with 512-4096 range;
+  - output gain/headroom 0.50;
+  - big-endian I24 output, start byte 4;
+  - playback input-decode off, timecode input-decode on;
+  - USB zero timestamp off, explicit scheduling off, capture-paced lead 1;
+  - reset-style `AUDIO_PARAMS` before stream.
+- Diagnostic/tool-only:
+  - no-wake stats reads;
+  - player timing;
+  - mode-2 packing validation;
+  - simulated-output source-reference gate;
+  - cadence counters and stream snapshots outside the real-time path.
+- Blocked unless there is new evidence and a specific test plan:
+  - native I24;
+  - start byte other than 4;
+  - stream usage / flush touched output;
+  - `-O3`;
+  - ISO/QoS/coalescing/queue-depth sweeps;
+  - reusable completions / fast ISO config / legacy slot flag paths;
+  - keep-ISO-after-stop;
+  - hot-stat removal or atomic hot-counter rewrites.
+
+PASS/FAIL semantics:
+
+- PASS means every inherited flag or parameter has an evidence-backed category.
+- FAIL means the candidate contains an unexplained mainline-derived knob and
+  must not be loaded for human or physical listening.
+
+## Mandatory Sound-Quality Gate Before User Handoff
+
+Hard rule:
+
+- Never hand a build to the user as a candidate unless real sound-quality testing
+  has been run and produced good results.
+- The only exception is an explicit user request for an unqualified diagnostic
+  build. In that case the handoff must say "diagnostic only, sound quality not
+  validated" in plain language.
+
+Required minimum before any normal candidate handoff:
+
+- source/reference audio file or generated reference tone exists;
+- Audio 8 DJ output path is exercised by actual playback;
+- an external capture path records the result, normally iRig Stream or another
+  known-good non-Audio8 capture device;
+- captured WAV is compared against the original reference;
+- quality metrics pass for alignment, SNR/residual, clipping, click outliers,
+  lag jumps, obvious white noise, metallic coloration, and CPU/noise coupling;
+- idle capture and audio-stack health are clean before and after the run;
+- evidence path, installed hash, command, and PASS/FAIL result are written.
+
+If the capture route is unavailable:
+
+- do not send a human candidate;
+- report the blocker instead;
+- continue with offline or diagnostic work only.
+
+PASS/FAIL semantics:
+
+- PASS means the exact loaded/build artifact has produced good measured sound
+  quality through the physical capture route.
+- FAIL or BLOCKED means no human-quality candidate handoff is allowed.

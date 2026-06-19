@@ -1,10 +1,16 @@
 # OpenA8DJ 0.3.25 Release Notes
 
+Historical note: OpenA8DJ 0.4.0 is the release that promotes the modern C++
+macOS driver line to `main`. These 0.3.25 notes are kept only as historical
+pre-0.4.0 context.
+
 OpenA8DJ 0.3.25 is a macOS public preview for the Native Instruments Audio 8 DJ
 USB interface.
 
 ## Highlights
 
+- Restores the Traktor/DVS-facing Core Audio topology used as historical
+  context before the 0.4.0 C++ mainline promotion.
 - Restores the Traktor/DVS-facing Core Audio topology from the last
   timecode-capable public preview: 8 inputs / 8 outputs.
 - Exposes one 8-channel input stream with named Input A/B/C/D channel pairs,

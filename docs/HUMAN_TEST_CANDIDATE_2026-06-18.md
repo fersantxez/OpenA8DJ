@@ -450,3 +450,121 @@ Retest order:
 1. VLC playback on Audio 8.
 2. Traktor Scratch Control remains locked/responsive.
 3. ChatGPT dictation with MacBook microphone no longer produces pulse/noise.
+
+## 19:28 EDT Human Result And Candidate Blocked
+
+Decision: `OUTPUT1_START2_REJECTED_FOR_WHITE_NOISE`.
+
+Human result:
+
+- Beep/pulse artifact disappeared.
+- Traktor Scratch Control/Timecode Vinyl worked very well: immediate,
+  synchronized, responsive.
+- VLC and Traktor playback produced unpleasant white noise instead of usable
+  music.
+
+Automated follow-up:
+
+- The active candidate and all immediate output variants failed Audio 8 DJ ->
+  iRig Stream source-reference capture.
+- The worst rejected run was `output1-start2`:
+  `local-analysis/human-feedback/20260618T2306Z-output1-start2-irig-soundcheck`.
+- Follow-up rejected runs include `output1-start4`, `output4-start4`,
+  `output4-start4-iso64`, `output4-start4-mainlineflush`, default
+  output1/start4, and playback-profile output1/start4.
+
+New candidate handoff rule:
+
+- Do not send another candidate for human listening until it passes automated
+  playback validation: reference file or generated tone -> Audio 8 DJ output ->
+  iRig Stream capture -> comparison against the reference.
+- Clean counters, CoreAudio callbacks, and client output peak are insufficient.
+
+Current operational blocker:
+
+- iRig Stream is currently missing from CoreAudio and IOUSB.
+- OpenA8DJ HAL has been unloaded while iRig is missing.
+- No further soundcheck or candidate handoff is allowed until iRig is recovered
+  and idle capture is healthy.
+
+## 19:43 EDT No-Repeat Traktor Start4 Diagnostic Candidate Loaded
+
+Decision: `NO_REPEAT_TRAKTOR_START4_DIAGNOSTIC_RETEST_ACTIVE`.
+
+Why this candidate exists:
+
+- It applies the mainline no-repeat policy before another human test.
+- It avoids known bad/rejected knobs:
+  - no `start byte 2`;
+  - no `stream usage`;
+  - no `flush touched output`;
+  - no native I24;
+  - no `-O3`;
+  - no OUT coalescing or reused-completion flag path.
+- It preserves the Traktor-facing surface:
+  - one 8-channel input stream;
+  - four stereo output streams A/B/C/D;
+  - 8 input / 8 output CoreAudio surface;
+  - `timecode-vinyl` profile applied.
+
+Candidate built:
+
+- Bundle:
+  `build/OpenA8DJ-no-repeat-traktor-start4.driver`
+- Offline executable hash before install/codesign:
+  `df78999d97a6080ffaed276b4bcb5938b3016420489e72f94267b716a79c9c15`
+- Installed post-codesign hash:
+  `c1508c1cf60b292dfdc73931c322f84f6552835a745553c5eb8933e77e421354`
+
+Evidence:
+
+- Offline build report:
+  `build/hal-candidates/no-repeat-traktor-start4.json`
+- Mode-2 packing check:
+  `validate-mode2-output-packing.py --start-byte 4 --frames 512 --transfer-bytes 352 --gain 0.5 --byte-order big`
+  PASS with `check_errors=0` and `panic_flags=0`.
+- HAL safety load:
+  `local-analysis/hal-candidate-safety/20260618T234152Z-no-repeat-traktor-start4-load`
+  PASS and left loaded.
+- Finalization/profile evidence:
+  `local-analysis/human-test-candidate/20260618T234221Z-no-repeat-traktor-start4-finalize`
+  - `Open Audio 8 DJ` visible as `in=8 out=8` at 48 kHz;
+  - `timecode-vinyl` profile applied: input mode 0, software lock on,
+    input decode on, A/B/C/D source map normal;
+  - after settle: `audio_stack_health=PASS`, `coreaudiod=0.0%`,
+    `opena8dj_driver=0.0%`.
+- Audio 8 direct gate:
+  `local-analysis/human-test-candidate/20260618T234250Z-no-repeat-traktor-start4-audio8-direct`
+  PASS:
+  - `audio_io_test_status=0`;
+  - `audio_record_12_status=0`;
+  - `audio_record_78_status=0`;
+  - input 1/2 RMS `0.00184461`, peak `0.01049972`;
+  - input 7/8 RMS `0.00185905`, peak `0.00959599`;
+  - clipped frames `0`.
+
+Known blockers and claim boundary:
+
+- iRig Stream is still absent from CoreAudio and IOUSB. Current CoreAudio devices
+  are MacBook Air Microphone, MacBook Air Speakers, and Open Audio 8 DJ.
+- Therefore the required source-reference Audio 8 DJ output -> iRig Stream
+  capture gate could not be run.
+- This candidate is loaded for focused human diagnostic testing only:
+  1. first Traktor Scratch Control / Timecode Vinyl lock and responsiveness;
+  2. then VLC/ordinary playback check on output A;
+  3. stop if white noise, no output, metallic output, or MacBook microphone
+     side effects return.
+- No product readiness, audiophile quality, CPU superiority, or branch-promotion
+  claim is allowed from this load.
+
+Post-handoff correction:
+
+- This build was handed to the user without the mandatory real sound-quality
+  gate because the iRig/external capture route was unavailable.
+- That is not acceptable as a normal candidate handoff.
+- Reclassified status: unapproved diagnostic-only build, sound quality not
+  validated.
+- User-facing candidate approval: revoked.
+- Future rule: never pass a build as a candidate without passing source-reference
+  playback/capture quality metrics first, unless the user explicitly asks for an
+  unqualified diagnostic build.

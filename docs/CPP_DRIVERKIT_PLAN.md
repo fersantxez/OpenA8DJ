@@ -1,5 +1,10 @@
 # C++/DriverKit Plan
 
+Status update: this planning document is historical. The C++/DriverKit line has
+now been promoted to local `main` as OpenA8DJ 0.4.0, while the previous
+C/Objective-C line is preserved on `legacy`. Keep the phase notes below as
+project history and as guidance for future DriverKit/System Extension work.
+
 ## Phase 0: Isolation And Offline Core
 
 Exit criteria:

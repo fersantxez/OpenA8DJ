@@ -1,10 +1,24 @@
-# C++/DriverKit Architecture
+# Modern macOS C++/DriverKit Architecture
+
+## Status
+
+OpenA8DJ `main` is now the modern macOS C++ driver line. The current installable
+preview is packaged as a user-space Core Audio HAL driver backed by IOUSBHost
+USB transport, CoreMIDI endpoints, and an Audio 8 DJ control bridge. The
+DriverKit/AudioDriverKit shell remains the forward architecture for a future
+System Extension build when the full DriverKit SDK/signing path is available.
+
+The previous C/Objective-C implementation is preserved on the parallel
+`legacy` branch. Treat it as the historical Linux/CAIAQ-derived behavior
+reference and emergency baseline, not as the current user-facing mainline.
 
 ## Principle
 
 Greenfield shell, brownfield behavior.
 
-The C++ line is independent. It learns proven behavior from the C/Objective-C mainline and gates from Rust, but it does not inherit either runtime architecture blindly.
+The C++ line is independent. It learns proven behavior from the C/Objective-C
+legacy line and gates from Rust, but it does not inherit either runtime
+architecture blindly.
 
 ## Planes
 
@@ -35,6 +49,7 @@ The C++ line is independent. It learns proven behavior from the C/Objective-C ma
 ## Initial Components
 
 - `core/`: pure C++20, no macOS dependency.
+- `src/hal/`: current installable macOS Core Audio HAL driver path.
 - `driverkit/`: DriverKit/AudioDriverKit shell placeholder, not installed or activated.
 - `tools/`: future offline analyzers and evidence generators.
 - `scripts/`: future safe wrappers for offline gates.

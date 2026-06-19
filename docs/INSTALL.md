@@ -1,12 +1,14 @@
 # Installing OpenA8DJ
 
-OpenA8DJ installs a Core Audio HAL driver, a MIDI/control LaunchAgent, and two
-command-line tools.
+OpenA8DJ installs the modern macOS mainline driver for Audio 8 DJ: a user-space
+Core Audio HAL driver, a MIDI/control LaunchAgent, and two command-line tools.
+The DriverKit/AudioDriverKit redesign is the repository direction; the current
+public preview uses the HAL package path that has been physically validated.
 
 ## Two-click install
 
 1. Download the latest public preview DMG from
-   [GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases).
+   [GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases/latest).
 2. Open the DMG.
 3. Double-click the `OpenA8DJ-<version>.pkg` package inside the DMG.
 4. Follow the macOS Installer prompts.
@@ -27,7 +29,7 @@ Installed files:
 ## Verify
 
 After installation, macOS should show `Open Audio 8 DJ` as an audio device with
-8 inputs and 8 outputs in the 0.3.25 preview. The locally validated
+8 inputs and 8 outputs in the 0.4.0 preview. The locally validated
 playback/topology rates are:
 
 ```text
@@ -70,11 +72,17 @@ This unloads the MIDI bridge, removes installed files, and restarts Core Audio.
 
 ## Signing note
 
-Local and CI builds may be ad-hoc signed. The 0.3.25 public preview is published
+Local and CI builds may be ad-hoc signed. The 0.4.0 public preview is published
 from GitHub Releases but is not Developer ID signed or Apple-notarized, so macOS
 may ask you to approve an unidentified installer. A polished end-user release
 should use a Developer ID Installer certificate and Apple notarization so macOS
 Gatekeeper can verify the package without extra user steps.
+
+## Legacy C note
+
+The older C/Objective-C driver line is preserved on the `legacy` branch. That
+branch is kept for comparison and recovery. New users who want the current
+macOS driver should install the `main`/`0.4.0` release from GitHub Releases.
 
 ## Windows note
 
