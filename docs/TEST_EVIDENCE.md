@@ -5,9 +5,9 @@ macOS mainline.
 
 ## 2026-06-19 15:30 EDT - Canonical 0.5.0 repo cleanup and release packaging
 
-- Commit before changes: `0f5ea24`
-- Worktree: `/Users/fer/dev/audio8djcpp`
-- Branch at time: `codex/canonical-0.5-cleanup`
+- Commit under test: `be6d2a6`
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch at time: `main`
 - Hardware touched: no
 - Audio/CoreAudio touched: no
 - Driver installed/reloaded: no
@@ -59,10 +59,10 @@ Results:
 Checksums:
 
 ```text
-573012e43c65a9c27559f002a646bb5f542b8e0b195285e0dc3f5b2911f32a49  OpenA8DJ-0.5.0.dmg
-86ea9992682aae34c0439651f384e0a597decd9865171c554e69c248b334ee5a  OpenA8DJ-0.5.0.pkg
-daa8a60fe9e6bc9555ec54c9ef80b072e404daefa8cf2e3ff2199ef40424bccb  opena8dj-tools-0.5.0.dmg
-05d4904b85b733bcf2cf20e786698ab36c814555de79592724025db49724ffbb  opena8dj-tools-0.5.0.pkg
+afca883993a85bdf65468b23030897f5d05be4115ae687c2abbb7641dffa3c49  OpenA8DJ-0.5.0.dmg
+7b0b77bf623a2204d471a86805c36bbc7335abfce197012024d36210bfad0770  OpenA8DJ-0.5.0.pkg
+1c03ee1f6effeef913e172f8fcf07500a08d539784f8d7acaccba36081a03cb9  opena8dj-tools-0.5.0.dmg
+fbb066b8a991c2f298d2a3c009e755cc75fc5b52e2a5adfee32b317bbd490564  opena8dj-tools-0.5.0.pkg
 ```
 
 Scope note:
