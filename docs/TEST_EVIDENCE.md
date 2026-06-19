@@ -250,7 +250,7 @@ Conclusion:
 - Added `profile timecode-vinyl-low-noise` as a reversible control profile for
   this exact hardware-state experiment.
 
-## 2026-06-19 10:45 EDT - Low-latency scratch response candidate
+## 2026-06-19 10:45 EDT - Low-latency scratch response candidate - REJECTED
 
 - Worktree: `/Users/fer/dev/audio8djcpp`
 - Branch: `driverkit/cpp-redesign`
@@ -312,10 +312,72 @@ Input A: rmsL=0.00032448 rmsR=0.00035513
 Input B: rmsL=0.00032514 rmsR=0.00032882
 ```
 
+Rejection:
+
+- Human real-music playback test immediately reported degraded sound: bass
+  saturation and bad overall quality on the same "Cable Guy" track that had
+  sounded good on the previous low-noise/stable-latency build.
+- Live stream stats after the rejected build showed the failure mode:
+
+```text
+output-ring: 0 / target 192 frames
+outputUnderruns=21249
+outputActiveUnderruns=21249
+outputLateWriteFrames=21440
+outputLateWriteBatches=169
+```
+
 Conclusion:
 
-- The exact loaded local HAL now uses the low-noise DVS profile plus a low
-  startup/restart/target output timeline.
-- This should materially reduce scratch wake/response delay, but final
-  acceptance still requires human Traktor control-vinyl testing because the
-  DVS response loop includes Traktor's own buffer and timecode processing.
+- `192` output timeline frames is too aggressive for the current HAL transport
+  and is rejected as a product default.
+- Do not ship or publish the low-latency build until a different latency
+  approach preserves sound quality with zero active underruns and zero late
+  write batches under real music.
+
+## 2026-06-19 10:51 EDT - Roll back rejected low-latency build
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: yes, local HAL only
+- Playback: yes, one-second A-pair tone smoke
+
+Reason:
+
+- Restore the last known good sound-quality path after rejecting the 192-frame
+  scratch latency experiment.
+
+Change:
+
+```text
+HAL_OUTPUT_START_LATENCY_FRAMES=8192
+HAL_OUTPUT_RESTART_LATENCY_FRAMES=4096
+HAL_OUTPUT_TARGET_LATENCY_FRAMES=8192
+```
+
+Evidence directory:
+
+```text
+local-analysis/rollback-low-latency-bad-sound-20260619-105143
+```
+
+Observed after rollback tone smoke:
+
+```text
+output-ring: 8192 / target 8192 frames
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+outputLateWriteBatches=0
+playbackTransfersSubmitted=125
+playbackTransfersCompleted=125
+playbackTransferErrors=0
+```
+
+Conclusion:
+
+- The installed local HAL is back on the stable sound-quality latency profile
+  while keeping `timecode-vinyl-low-noise`.
+- Scratch responsiveness still needs a safer approach than shrinking the output
+  timeline to 192 frames.
