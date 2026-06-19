@@ -637,3 +637,89 @@ Conclusion:
 - Next optimization should target driver CPU and Timecode Vinyl responsiveness
   without regressing the now-working microphone/dictation state or the stable
   zero-underrun transport.
+
+## 2026-06-19 13:38 EDT - Timecode responsiveness input-latest candidate
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock during install/reload and
+  post-install checks
+- Driver installed/reloaded: yes, local HAL only
+- Playback/capture sound-quality run: no, this is a DVS input-latency candidate
+- Default devices changed: no
+- USB reset: no
+- System reboot: no
+
+Reason:
+
+- Human Traktor testing reported that Timecode Vinyl is usable and improving,
+  but still not reactive enough.
+- A previous attempt to lower scratch latency by shrinking the output timeline
+  to 192 frames caused bad sound and thousands of active underruns, so output
+  latency must not be reduced blindly.
+- The safer hypothesis is input-specific: the USB capture path writes decoded
+  input into a large FIFO ring, and CoreAudio reads from the oldest available
+  frames. If the ring accumulates backlog, Traktor receives stale timecode even
+  though transport counters remain clean.
+
+Code change under test:
+
+```text
+OPENA8DJ_INPUT_MAX_LATENCY_FRAMES=512
+```
+
+Behavior:
+
+- Before serving CoreAudio input, trim the input ring to the latest 512 frames.
+- If CoreAudio requests a larger buffer, preserve at least the requested frame
+  count.
+- Leave output timeline, output gain, routing, timecode profile, capture queue,
+  playback queue, and quality path unchanged.
+- Keep the new flag default-off in the Makefile and build/install it explicitly
+  as `hal-timecode-responsive-candidate`.
+
+Installed evidence:
+
+```text
+local-analysis/timecode-responsive-20260619-133751-install-input-latest512
+candidate_build_sha=3895a09bef120a174d0bafa3816c3549128263a1dff76b21a427f60ee9f53cd7
+installed_sha=3895a09bef120a174d0bafa3816c3549128263a1dff76b21a427f60ee9f53cd7
+```
+
+Validation:
+
+```text
+HAL smoke: PASS
+timecode_readiness_gate: PASS
+dvs_packet_input_decode: PASS
+hal_input_spsc_ring_contract: PASS
+audio_stack_health=PASS
+Open Audio 8 DJ visible: 8 in / 8 out @ 48000
+iRig Stream visible: 2 in / 2 out @ 48000
+input-mode: timecode-vinyl
+input-decode: on
+input-check-errors=0
+output-panic-flags=0
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+hardware lock: absent after install
+```
+
+Known gate status:
+
+- `opena8djcpp_hal_transport_runtime_gate` still fails. That is expected for
+  product/superiority claims because the transport path is not yet proven
+  better than mainline in same-session physical A/B tests.
+- This candidate is therefore a controlled human DVS responsiveness test, not
+  a CPU/audiophile superiority claim.
+
+Next operator check:
+
+- In Traktor, test whether scratch/timecode reaction feels closer to the hand.
+- Confirm that Mac microphone/dictation still works while the driver is loaded.
+- Confirm that no new output crackle, saturation, or white noise appears.
+- If responsiveness improves without regressions, keep the input-latest trim as
+  the next DVS baseline and tune the limit lower only with physical evidence.

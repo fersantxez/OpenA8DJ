@@ -74,6 +74,10 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_INPUT_DECODE_ACTIVE_GATING 0
 #endif
 
+#ifndef OPENA8DJ_INPUT_MAX_LATENCY_FRAMES
+#define OPENA8DJ_INPUT_MAX_LATENCY_FRAMES 0
+#endif
+
 #ifndef OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC
 #define OPENA8DJ_OUTPUT_ONLY_NO_CAPTURE_ISOC 0
 #endif
@@ -356,6 +360,7 @@ enum {
     kPlaybackQueueTarget = OPENA8DJ_PLAYBACK_QUEUE_TARGET,
     kPlaybackQueueMax = OPENA8DJ_PLAYBACK_QUEUE_TARGET * 2,
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
+    kInputMaxLatencyFrames = OPENA8DJ_INPUT_MAX_LATENCY_FRAMES,
     kRingFrames = 32768,
     kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
     kOutputStartLatencyFrames = OPENA8DJ_OUTPUT_START_LATENCY_FRAMES,
@@ -1402,9 +1407,22 @@ static void RingClear(FloatRing *ring)
 #endif
 }
 
-#if !OPENA8DJ_ENABLE_ELASTIC_OUTPUT && OPENA8DJ_ENABLE_OUTPUT_FIFO
 static void RingTrimToLatest(FloatRing *ring, uint32_t maxFrames)
 {
+    if (ring == NULL || maxFrames == 0) {
+        return;
+    }
+#if OPENA8DJ_INPUT_SPSC_RING
+    uint_fast64_t read = atomic_load_explicit(&ring->readCounter, memory_order_relaxed);
+    uint_fast64_t write = atomic_load_explicit(&ring->writeCounter, memory_order_acquire);
+    uint_fast64_t available = write >= read ? write - read : 0;
+    if (available > maxFrames) {
+        read = write - maxFrames;
+        atomic_store_explicit(&ring->readCounter, read, memory_order_release);
+        ring->readFrame = (uint32_t)(read % ring->capacityFrames);
+        ring->availableFrames = maxFrames;
+    }
+#else
     pthread_mutex_lock(&ring->mutex);
     if (ring->availableFrames > maxFrames) {
         uint32_t dropFrames = ring->availableFrames - maxFrames;
@@ -1412,8 +1430,8 @@ static void RingTrimToLatest(FloatRing *ring, uint32_t maxFrames)
         ring->availableFrames = maxFrames;
     }
     pthread_mutex_unlock(&ring->mutex);
-}
 #endif
+}
 
 static uint32_t RingWriteWithDropped(FloatRing *ring,
                                      const float *frames,
@@ -6717,6 +6735,13 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if (!decodeEnabled) {
         memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
         return 0;
+    }
+    if (kInputMaxLatencyFrames > 0) {
+        uint32_t maxFrames = kInputMaxLatencyFrames;
+        if (maxFrames < frames) {
+            maxFrames = frames;
+        }
+        RingTrimToLatest(&_inputRing, maxFrames);
     }
     return RingRead(&_inputRing, outInterleaved, frames, true);
 }
