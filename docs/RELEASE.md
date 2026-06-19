@@ -104,6 +104,12 @@ make dmg \
 Notarization is intentionally not automated in this repo because it requires
 team-specific credentials.
 
+Without this step, macOS Gatekeeper may block the PKG with a message saying
+Apple could not verify it is free of malware. That is expected for ad-hoc signed
+preview builds and must be documented in the README, install guide, DMG README,
+and release notes. Do not describe an ad-hoc signed preview as a polished
+one-click installer.
+
 ## GitHub release
 
 Attach these files to each macOS release:

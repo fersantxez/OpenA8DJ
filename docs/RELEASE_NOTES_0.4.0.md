@@ -86,7 +86,9 @@ Current branch roles are summarized in
 ## Known Limits
 
 - This release is not Apple-notarized and is not Developer ID Installer signed.
-  macOS may require approving the installer manually.
+  macOS may show a warning saying Apple could not verify the package. If the
+  dialog only offers `Move to Trash` and `Done`, click `Done`, then approve the
+  package from System Settings -> Privacy & Security -> Open Anyway.
 - Full physical DVS matrix validation still requires turntables/control vinyl:
   every input pair, vinyl mode, CD/line mode, channel order, and low-latency
   behavior.
@@ -107,6 +109,10 @@ OpenA8DJ-0.4.0-checksums.txt
 
 Open the DMG, run the package, and reconnect the Audio 8 DJ if it does not
 appear immediately.
+
+If Gatekeeper blocks the PKG, verify the checksum, then approve it from System
+Settings -> Privacy & Security. This manual step goes away only after Developer
+ID signing and Apple notarization are available.
 
 Uninstall:
 

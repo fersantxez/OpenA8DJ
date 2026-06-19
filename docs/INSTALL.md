@@ -18,6 +18,44 @@ Audio 8 DJ profiles such as `timecode-vinyl`.
 5. Unplug and reconnect the Audio 8 DJ if the device does not appear
    immediately.
 
+## If macOS blocks the package
+
+The current preview is ad-hoc signed but not Developer ID signed or
+Apple-notarized. On recent macOS versions, Gatekeeper may show:
+
+```text
+"OpenA8DJ-0.4.0.pkg" Not Opened
+Apple could not verify "OpenA8DJ-0.4.0.pkg" is free of malware.
+```
+
+If the dialog only offers `Move to Trash` and `Done`:
+
+1. Click `Done`.
+2. Do not click `Move to Trash`.
+3. Open System Settings.
+4. Go to Privacy & Security.
+5. In the Security section, find the blocked `OpenA8DJ-0.4.0.pkg` message.
+6. Click `Open Anyway`.
+7. Confirm the second warning, then continue with the installer.
+
+Only do this for the official GitHub release assets from this repository. Check
+the SHA-256 file before overriding Gatekeeper:
+
+```sh
+shasum -a 256 OpenA8DJ-0.4.0.dmg OpenA8DJ-0.4.0.pkg
+cat OpenA8DJ-0.4.0-checksums.txt
+```
+
+Advanced fallback for testers, after verifying the checksum:
+
+```sh
+xattr -dr com.apple.quarantine /path/to/OpenA8DJ-0.4.0.pkg
+open /path/to/OpenA8DJ-0.4.0.pkg
+```
+
+This is a preview workaround, not the final distribution experience. The final
+fix is Developer ID signing and Apple notarization.
+
 Installed files:
 
 ```text
@@ -77,9 +115,10 @@ This unloads the MIDI bridge, removes installed files, and restarts Core Audio.
 
 Local and CI builds may be ad-hoc signed. The 0.4.0 public preview is published
 from GitHub Releases but is not Developer ID signed or Apple-notarized, so macOS
-may ask you to approve an unidentified installer. A polished end-user release
-should use a Developer ID Installer certificate and Apple notarization so macOS
-Gatekeeper can verify the package without extra user steps.
+may block it until you approve it manually in Privacy & Security. A polished
+end-user release should use a Developer ID Installer certificate and Apple
+notarization so macOS Gatekeeper can verify the package without extra user
+steps.
 
 ## Historical branch note
 

@@ -38,8 +38,14 @@ Release assets are the only supported public binary downloads. GitHub Actions
 artifacts are temporary CI files and are not used for distribution.
 
 Important: the current preview package is ad-hoc signed but not yet Developer
-ID signed or Apple-notarized. macOS may require the usual unsigned-package
-approval step.
+ID signed or Apple-notarized. If macOS says Apple cannot verify the package and
+only offers `Move to Trash` or `Done`, choose `Done`, then open
+System Settings -> Privacy & Security and use `Open Anyway` for
+`OpenA8DJ-0.4.0.pkg`.
+
+The permanent fix is Apple Developer ID signing plus notarization. Until that is
+available, only install official release assets from this repository and verify
+the published checksum before overriding Gatekeeper.
 
 ## Modern macOS Architecture
 
@@ -116,7 +122,8 @@ Still open before calling this production-quality:
 - Continued physical USB scheduling and long-run audio-quality refinement
   against the `legacy` branch baseline.
 - 88.2/96 kHz production-quality validation.
-- Developer ID signing and Apple notarization for a polished end-user release.
+- Developer ID signing and Apple notarization so macOS opens the installer
+  without the manual Gatekeeper approval step.
 
 ## Install
 

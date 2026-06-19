@@ -14,9 +14,18 @@ Install:
 2. Follow the macOS Installer prompts.
 3. Reconnect the Audio 8 DJ if it does not appear immediately.
 
-If macOS blocks the installer because it is from an unidentified developer,
-open System Settings > Privacy & Security and approve it, or Control-click the
-package and choose Open. This preview is ad-hoc signed but not Apple-notarized.
+If macOS blocks the installer with:
+
+"OpenA8DJ-0.4.0.pkg" Not Opened
+Apple could not verify "OpenA8DJ-0.4.0.pkg" is free of malware.
+
+click Done, not Move to Trash. Then open System Settings > Privacy & Security,
+find the blocked OpenA8DJ package in the Security section, and choose
+Open Anyway.
+
+This preview is ad-hoc signed but not Developer ID signed or Apple-notarized.
+Only override Gatekeeper for official release assets from this repository, and
+verify the SHA-256 checksum first.
 
 The installer adds:
 
@@ -51,4 +60,5 @@ Current preview status:
 - Legacy C line: preserved separately on the repository legacy branch
 - Windows: not included in this macOS release
 
-This build is not notarized.
+This build is not notarized. The permanent fix is Developer ID signing plus
+Apple notarization.
