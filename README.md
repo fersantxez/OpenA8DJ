@@ -1,17 +1,22 @@
 # OpenA8DJ
 
 OpenA8DJ is the modern open-source macOS driver for the Native Instruments
-Audio 8 DJ USB audio interface. For older wording, this is the easy OS X-style
-installer path: download a DMG, open it, and run the bundled package.
+Audio 8 DJ USB audio interface. The public `main` branch is the macOS-native
+C++ driver line, packaged for the normal OS X/macOS installer flow: download a
+DMG, open it, and run the bundled package.
 
 The current `main` branch is the C++/DriverKit redesign line. It is built for
-modern macOS, ships as an easy DMG/PKG installer, and exposes `Open Audio 8 DJ`
-as a normal Core Audio device for DJ/audio applications.
+modern macOS using the macOS audio stack: Core Audio HAL for the current
+installable preview, IOUSBHost for USB transport, CoreMIDI for MIDI endpoints,
+and a DriverKit/AudioDriverKit path prepared for the future System Extension
+architecture. It ships as an easy DMG/PKG installer and exposes `Open Audio 8
+DJ` as a normal Core Audio device for DJ/audio applications.
 
 The old C/Objective-C driver line is preserved separately on the `legacy`
-branch. That branch keeps the historical Linux/CAIAQ-derived architecture,
-physical-test learnings, and rollback baseline. It is not the current
-user-facing driver line.
+branch. That branch keeps the historical C/Obj-C implementation, which was
+based on and inspired by Linux reverse-engineering work around the CAIAQ /
+`snd-usb-caiaq` Audio 8 DJ family, plus physical-test learnings and rollback
+baseline evidence. It is not the current user-facing driver line.
 
 ## Download For macOS / OS X
 
@@ -57,8 +62,9 @@ logging, UI, heavy diagnostics, and other non-audio control tasks.
 ## Legacy C Line
 
 The `legacy` branch preserves the previous C/Objective-C implementation. It is
-kept because it contains useful Linux/CAIAQ-derived USB behavior, packet
-handling history, physical-test evidence, and recovery knowledge.
+kept because it contains useful behavior learned from the Linux CAIAQ /
+`snd-usb-caiaq` reverse-engineering lineage, packet handling history,
+physical-test evidence, and recovery knowledge.
 
 New user-facing work should target `main`. Do not port code from `legacy`
 blindly; preserve behavior only when evidence shows it improves sound quality,

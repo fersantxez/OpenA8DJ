@@ -6,9 +6,11 @@ the Native Instruments Audio 8 DJ USB interface.
 ## Highlights
 
 - Promotes the C++/DriverKit redesign workstream to the repository mainline.
-  The previous C/Objective-C implementation is preserved on the `legacy`
-  branch for baseline comparison, emergency reference, and historical
-  Linux/CAIAQ-derived behavior.
+  The public `main` branch is now the modern macOS driver line.
+- Preserves the previous C/Objective-C implementation on the `legacy` branch
+  for baseline comparison, emergency reference, physical-test history, and
+  behavior learned from the Linux CAIAQ / `snd-usb-caiaq` reverse-engineering
+  lineage.
 - Provides an easy macOS download/install path through GitHub Releases:
   download the DMG, open it, and run the bundled PKG installer.
 - Uses a modern macOS user-space driver shape: Core Audio HAL for the current

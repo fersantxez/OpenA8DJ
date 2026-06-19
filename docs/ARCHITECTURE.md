@@ -3,14 +3,16 @@
 ## Status
 
 OpenA8DJ `main` is now the modern macOS C++ driver line. The current installable
-preview is packaged as a user-space Core Audio HAL driver backed by IOUSBHost
-USB transport, CoreMIDI endpoints, and an Audio 8 DJ control bridge. The
-DriverKit/AudioDriverKit shell remains the forward architecture for a future
-System Extension build when the full DriverKit SDK/signing path is available.
+preview is packaged as a macOS-native user-space Core Audio HAL driver backed
+by IOUSBHost USB transport, CoreMIDI endpoints, and an Audio 8 DJ control
+bridge. The DriverKit/AudioDriverKit shell remains the forward architecture for
+a future System Extension build when the full DriverKit SDK/signing path is
+available.
 
 The previous C/Objective-C implementation is preserved on the parallel
-`legacy` branch. Treat it as the historical Linux/CAIAQ-derived behavior
-reference and emergency baseline, not as the current user-facing mainline.
+`legacy` branch. Treat it as the historical C implementation informed by Linux
+CAIAQ / `snd-usb-caiaq` reverse-engineering behavior and as an emergency
+baseline, not as the current user-facing mainline.
 
 ## Principle
 
@@ -18,7 +20,9 @@ Greenfield shell, brownfield behavior.
 
 The C++ line is independent. It learns proven behavior from the C/Objective-C
 legacy line and gates from Rust, but it does not inherit either runtime
-architecture blindly.
+architecture blindly. The product architecture for new releases is macOS-first:
+Core Audio HAL now, DriverKit/AudioDriverKit as the forward system-extension
+path.
 
 ## Planes
 
