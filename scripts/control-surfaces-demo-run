@@ -1,0 +1,340 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+record_seconds=150
+ui_seconds=25
+timestamp="$(date +%Y%m%d-%H%M%S)"
+run_dir="local-analysis/control-surfaces-demo/${timestamp}"
+dry_run=0
+open_ui=1
+record_screen=1
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/control-surfaces-demo-run [options]
+
+Records a no-cable-change demo of the OpenA8DJ control surfaces.
+
+Options:
+  --dry-run          Print the planned steps without touching hardware.
+  --no-record        Skip internal screen recording; use an external recorder.
+  --no-ui           Skip opening the Control Center UI.
+  --seconds N       Screen recording duration, default 150.
+  --ui-seconds N    Seconds to keep the UI open, default 25.
+  --run-dir DIR     Output directory.
+  -h, --help        Show this help.
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dry-run) dry_run=1; shift ;;
+    --no-record) record_screen=0; shift ;;
+    --no-ui) open_ui=0; shift ;;
+    --seconds) record_seconds="$2"; shift 2 ;;
+    --ui-seconds) ui_seconds="$2"; shift 2 ;;
+    --run-dir) run_dir="$2"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+done
+
+cat > /tmp/opena8dj-control-surfaces-demo-plan.txt <<EOF
+OpenA8DJ control surfaces demo
+run_dir=$run_dir
+record_seconds=$record_seconds
+ui_seconds=$ui_seconds
+open_ui=$open_ui
+record_screen=$record_screen
+
+No-cable-change sequence:
+1. Build Control Center.
+2. Record screen to demo.mov.
+3. Show CLI discovery with list-profiles and --help.
+4. Write hardware-use log entry.
+5. Acquire shared hardware lock.
+6. Export original config.
+7. Apply playback-4out.
+8. Play the Close Encounters five-tone motif through A/B/C/D.
+9. Play a low-high-low frequency sweep through A/B/C/D.
+10. Export changed config.
+11. Restore original config.
+12. Open UI while lock is held, then close promptly.
+13. Restore original config again.
+14. Release lock.
+15. Confirm shared_hardware_lock=FREE.
+EOF
+
+if [ "$dry_run" = "1" ]; then
+  cat /tmp/opena8dj-control-surfaces-demo-plan.txt
+  exit 0
+fi
+
+mkdir -p "$run_dir"
+run_dir_abs="$(cd "$run_dir" && pwd -P)"
+demo_movie="$run_dir_abs/demo.mov"
+cp /tmp/opena8dj-control-surfaces-demo-plan.txt "$run_dir/demo-plan.txt"
+log_file="local-analysis/HARDWARE_USE_LOG_20260619_CONTROL_SURFACES.md"
+
+finish_log() {
+  local status="$?"
+  if [ -n "${log_file:-}" ] && [ -d "$run_dir" ]; then
+    {
+      printf '\n## Post-Use Entry - Control Surfaces Demo - %s\n\n' "$timestamp"
+      printf 'Exit code: `%s`\n\n' "$status"
+      printf 'Run directory:\n\n```text\n%s\n```\n\n' "$run_dir"
+      if [ -f "$demo_movie" ]; then
+        printf 'Recording:\n\n```text\n%s/demo.mov\n```\n\n' "$run_dir"
+      fi
+      if [ -f "$run_dir/lock-status-after.txt" ]; then
+        printf 'Lock status after demo:\n\n```text\n'
+        cat "$run_dir/lock-status-after.txt"
+        printf '```\n'
+      fi
+    } >> "$log_file"
+  fi
+}
+trap finish_log EXIT
+
+make tools-package build/audio-wav-play
+project_version="$(awk '/^VERSION :=/ { print $3; exit }' Makefile)"
+tools_pkg="build/opena8dj-tools-${project_version}.pkg"
+
+python3 - <<'PY' "$run_dir/close-encounters-five-tones.wav" "$run_dir/low-high-low-sweep.wav"
+import math
+import struct
+import sys
+import wave
+
+motif_path = sys.argv[1]
+sweep_path = sys.argv[2]
+rate = 48000
+
+def write_stereo_wav(path, frames):
+    with wave.open(path, "wb") as wav:
+        wav.setnchannels(2)
+        wav.setsampwidth(2)
+        wav.setframerate(rate)
+        wav.writeframes(b"".join(struct.pack("<hh", left, right) for left, right in frames))
+
+amp = 0.040
+note_seconds = 0.42
+gap_seconds = 0.055
+fade_seconds = 0.040
+
+# Close Encounters five-tone motif, common concert-pitch spelling:
+# D, E, C, C an octave lower, G.
+motif_notes = [293.66, 329.63, 261.63, 130.81, 196.00]
+frames = []
+for freq in motif_notes:
+    n = int(note_seconds * rate)
+    fade = int(fade_seconds * rate)
+    for i in range(n):
+        env = 1.0
+        if i < fade:
+            env = i / max(1, fade)
+        elif i > n - fade:
+            env = max(0.0, (n - i) / max(1, fade))
+        sample = amp * env * math.sin(2.0 * math.pi * freq * i / rate)
+        value = int(max(-1.0, min(1.0, sample)) * 32767)
+        frames.append((value, value))
+    for _ in range(int(gap_seconds * rate)):
+        frames.append((0, 0))
+write_stereo_wav(motif_path, frames)
+
+sweep_amp = 0.032
+sweep_seconds = 9.0
+fade_seconds = 0.08
+low = 35.0
+high = 16000.0
+sweep_frames = []
+phase = 0.0
+total = int(sweep_seconds * rate)
+fade = int(fade_seconds * rate)
+for i in range(total):
+    pos = i / max(1, total - 1)
+    if pos <= 0.5:
+        p = pos / 0.5
+        freq = low * ((high / low) ** p)
+    else:
+        p = (pos - 0.5) / 0.5
+        freq = high * ((low / high) ** p)
+    env = 1.0
+    if i < fade:
+        env = i / max(1, fade)
+    elif i > total - fade:
+        env = max(0.0, (total - i) / max(1, fade))
+    phase += 2.0 * math.pi * freq / rate
+    sample = sweep_amp * env * math.sin(phase)
+    value = int(max(-1.0, min(1.0, sample)) * 32767)
+    sweep_frames.append((value, value))
+write_stereo_wav(sweep_path, sweep_frames)
+
+print(motif_path)
+print(sweep_path)
+PY
+
+screencapture_help="$(screencapture -h 2>&1 || true)"
+if ! printf '%s\n' "$screencapture_help" | grep -q -- "-v"; then
+  echo "screencapture video mode is not available on this macOS build" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$log_file")"
+cat > "$run_dir/hardware-use-entry.txt" <<EOF
+## Pre-Use Entry - Control Surfaces Demo - ${timestamp}
+
+Objective:
+
+- Record a no-cable-change demo of the CLI and UI control surfaces.
+- Save original hardware config, apply playback-4out, restore original config.
+- Play the Close Encounters five-tone motif through output pairs A/B/C/D.
+- Play a low-high-low frequency sweep through output pairs A/B/C/D.
+- Open the UI only while the shared hardware lock is held.
+
+Run directory:
+
+\`\`\`text
+$run_dir
+\`\`\`
+
+Lock policy:
+
+- Acquire with scripts/shared-hardware-lock-run.
+- Release automatically when the locked command exits.
+- Restore original config with a shell trap.
+- Confirm shared_hardware_lock=FREE after completion.
+EOF
+
+cat "$run_dir/hardware-use-entry.txt" >> "$log_file"
+
+record_pid=""
+if [ "$record_screen" = "1" ]; then
+  screencapture -v -V "$record_seconds" -k "$demo_movie" > "$run_dir/screen-record.stdout" 2> "$run_dir/screen-record.stderr" &
+  record_pid=$!
+  sleep 2
+else
+  {
+    echo "screen_record_exit=external"
+    echo "screen_record_path=$demo_movie"
+    echo "screen_record_file=external"
+  } > "$run_dir/screen-record.result"
+fi
+
+section() {
+  printf '\n=== %s ===\n' "$1"
+}
+
+section "Demo plan"
+cat "$run_dir/demo-plan.txt"
+
+section "Hardware-use log entry written before live access"
+cat "$run_dir/hardware-use-entry.txt"
+
+section "Control-surfaces package payload"
+pkgutil --payload-files "$tools_pkg" | tee "$run_dir/control-surfaces-pkg-payload.txt"
+
+section "CLI preset discovery"
+./build/opena8dj-control list-profiles | tee "$run_dir/list-profiles.txt"
+
+section "CLI help"
+./build/opena8dj-control --help 2>&1 | tee "$run_dir/help.txt"
+
+ui_flag="$open_ui"
+export OPENA8DJ_DEMO_OPEN_UI="$ui_flag"
+export OPENA8DJ_DEMO_RUN_DIR="$run_dir"
+export OPENA8DJ_DEMO_UI_SECONDS="$ui_seconds"
+
+section "Entering shared hardware lock"
+scripts/shared-hardware-lock-run \
+  --gate control-surfaces-demo \
+  --run-dir "$run_dir/lock" \
+  --wait-lock 0 \
+  -- bash -lc '
+    set -euo pipefail
+    run_dir="$OPENA8DJ_DEMO_RUN_DIR"
+    original="$run_dir/original.json"
+    ./build/opena8dj-control export-config "$original"
+    restore() {
+      ./build/opena8dj-control import-config "$original" > "$run_dir/restore-trap.txt" 2> "$run_dir/restore-trap.stderr" || true
+    }
+    trap restore EXIT
+
+    ./build/opena8dj-control > "$run_dir/current-state.txt"
+    ./build/opena8dj-control apply-preset playback-4out > "$run_dir/playback-4out.apply.txt"
+    {
+      echo "Playing Close Encounters five-tone motif through output pairs A/B/C/D"
+      for pair in A B C D; do
+        echo "motif_pair=$pair"
+        ./build/audio-wav-play "$run_dir/close-encounters-five-tones.wav" "$pair"
+        sleep 0.2
+      done
+      echo "Playing low-high-low frequency sweep through output pairs A/B/C/D"
+      for pair in A B C D; do
+        echo "sweep_pair=$pair"
+        ./build/audio-wav-play "$run_dir/low-high-low-sweep.wav" "$pair"
+        sleep 0.2
+      done
+    } > "$run_dir/audio-playback.txt" 2>&1
+    ./build/opena8dj-control export-config "$run_dir/playback-4out.json"
+    ./build/opena8dj-control import-config "$original" > "$run_dir/restore-explicit.txt"
+    ./build/opena8dj-control export-config "$run_dir/restored.json"
+
+    if [ "${OPENA8DJ_DEMO_OPEN_UI:-1}" = "1" ]; then
+      (
+        sleep "${OPENA8DJ_DEMO_UI_SECONDS:-25}"
+        osascript -e "tell application id \"org.opena8dj.ControlCenter\" to quit" >/dev/null 2>&1 || true
+      ) &
+      open -W build/OpenA8DJControlCenter.app
+    fi
+
+    ./build/opena8dj-control import-config "$original" > "$run_dir/final-restore.txt"
+    trap - EXIT
+    ./build/opena8dj-control > "$run_dir/final-state.txt"
+  '
+
+section "Locked command result"
+cat "$run_dir/lock/result.txt"
+
+section "Original live state"
+cat "$run_dir/current-state.txt"
+
+section "Applied playback-4out"
+cat "$run_dir/playback-4out.apply.txt"
+
+section "Audio playback demo"
+cat "$run_dir/audio-playback.txt"
+
+section "Restored final state"
+cat "$run_dir/final-state.txt"
+
+./scripts/shared-hardware-lock-status > "$run_dir/lock-status-after.txt"
+section "Shared hardware lock after demo"
+cat "$run_dir/lock-status-after.txt"
+
+if [ "$record_screen" = "1" ]; then
+  record_rc=0
+  if [ -n "$record_pid" ] && kill -0 "$record_pid" 2>/dev/null; then
+    wait "$record_pid" || record_rc=$?
+  fi
+  {
+    echo "screen_record_exit=$record_rc"
+    echo "screen_record_path=$demo_movie"
+    if [ -s "$demo_movie" ]; then
+      echo "screen_record_file=present"
+    else
+      echo "screen_record_file=missing"
+    fi
+  } > "$run_dir/screen-record.result"
+
+  if [ "$record_rc" != "0" ] || [ ! -s "$demo_movie" ]; then
+    echo "screen recording failed; see $run_dir/screen-record.stderr" >&2
+    exit 1
+  fi
+fi
+
+echo "control_surfaces_demo=READY"
+echo "run_dir=$run_dir"
+echo "video=$run_dir/demo.mov"
