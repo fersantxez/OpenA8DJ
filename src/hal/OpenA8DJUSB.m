@@ -2002,7 +2002,7 @@ static uint8_t Mode2CheckByte(uint32_t stream, NSUInteger byteIndex)
     return (uint8_t)((stream << 1) | ((~group) & 1));
 }
 
-static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
+static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(true);
 
 @class OpenA8DJIsoTransfer;
 

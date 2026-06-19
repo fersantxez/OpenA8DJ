@@ -69,3 +69,65 @@ We'll review the details you provided and contact you soon.
 The account owner must wait for Apple acceptance and complete any remaining
 payment or verification before Developer ID certificates and notarization
 credentials can exist on this machine.
+
+## 2026-06-19 10:28 EDT - Unity gain and Timecode Vinyl input restore
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: yes, local HAL install only
+- GitHub release assets replaced: no
+
+Reason:
+
+- Human Traktor testing reported bass saturation and general output saturation.
+- Traktor Timecode Vinyl scope showed no signal.
+- Local control state before the fix showed `input-mode: timecode-vinyl` but
+  `input-decode: off`.
+
+Changes under test:
+
+```text
+HAL_OUTPUT_GAIN default: 1.50f -> 1.00f
+gInputDecodeEnabledPreference default: false -> true
+```
+
+Commands/evidence:
+
+```sh
+make -B hal install-hal
+/usr/local/bin/opena8dj-control profile timecode-vinyl
+./build/audio-input-meter 5
+./scripts/run-soundcheck --skip-build --music-file ".../Cable Guy - Dj Deep (Original Mix).mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --capture-device "iRig Stream" --capture-channels 1,2
+./scripts/run-channel-matrix-gate --run-physical --pair A --rate 48000 --seconds 4 --peak 0.25 --capture-device "iRig Stream" --capture-channels 1,2
+```
+
+Evidence directory:
+
+```text
+local-analysis/unity-gain-fix-20260619-102845
+```
+
+Results:
+
+- Installed HAL hash after unity gain + DVS input fix:
+  `3b55a7d11b9efa401208e9addaa7e137ba0ddb329d91d561b22b3e00d883605d`
+- `opena8dj-control profile timecode-vinyl` reports `input-decode: on`.
+- `audio-input-meter` no longer reports all-zero inputs; A/B/C/D show input
+  energy after decode is enabled.
+- Unity-gain Cable Guy soundcheck no longer clips the iRig capture:
+  `capture_clipped_frames=0`.
+- The same music soundcheck still fails quality thresholds, so this is not a
+  release-quality claim.
+- Unity-gain pair-A tone matrix passes physical channel-separation gate:
+  `capture_clipped_frames=0`, `left_to_right_leakage_db=-61.99`,
+  `right_to_left_leakage_db=-61.14`.
+
+Conclusion:
+
+- Saturation risk from the previous 1.5x default output gain is reduced.
+- Timecode Vinyl silence caused by `input-decode: off` is corrected in the
+  loaded local HAL by explicitly enabling the profile and by making decode
+  default-on for future loads.
+- Do not replace GitHub release assets until the real-music iRig quality gate
+  passes.
