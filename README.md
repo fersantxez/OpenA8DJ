@@ -14,8 +14,47 @@ that made the Audio 8 DJ a classic piece of DJ hardware. The goal is simple:
 let useful hardware keep working instead of becoming e-waste because the
 original driver no longer fits current macOS.
 
-If you only want to try the driver, download the DMG, open it, and run the
-bundled package.
+## Current Signing Status
+
+OpenA8DJ 0.4.0 is not yet Developer ID signed or Apple-notarized. We are in the
+Apple Developer enrollment/signing process, but until that is complete macOS
+may reject the installer when you double-click it in Finder.
+
+This does not mean the GitHub file changed or came from somewhere else. It
+means Apple has not yet verified this independent open-source driver with a
+Developer ID certificate and notarization ticket.
+
+Temporary manual install, for testers who understand the risk:
+
+1. Download the PKG and checksum file from the official GitHub release:
+
+   ```sh
+   curl -L -O https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0.pkg
+   curl -L -O https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0-checksums.txt
+   ```
+
+2. Verify that the downloaded package matches the published checksum:
+
+   ```sh
+   shasum -a 256 OpenA8DJ-0.4.0.pkg
+   grep OpenA8DJ-0.4.0.pkg OpenA8DJ-0.4.0-checksums.txt
+   ```
+
+   The two SHA-256 values must match. Do not install if they differ.
+
+3. Install with macOS Installer from Terminal:
+
+   ```sh
+   sudo installer -pkg OpenA8DJ-0.4.0.pkg -target /
+   ```
+
+4. Reconnect the Audio 8 DJ if it does not appear immediately.
+
+The command-line install is the same route used by the maintainer to test the
+current GitHub package on macOS while Apple signing is pending. It is a preview
+workaround, not the final distribution experience. Once Developer ID signing and
+notarization are complete, the normal DMG/PKG double-click install should work
+without this manual step.
 
 ## Download For macOS / OS X
 
@@ -26,7 +65,7 @@ Most users should install OpenA8DJ from the latest macOS disk image:
 - [OpenA8DJ-0.4.0.pkg](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0.pkg)
 - [OpenA8DJ-0.4.0-checksums.txt](https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0-checksums.txt)
 
-Install:
+Normal install, once macOS allows the package:
 
 1. Download `OpenA8DJ-0.4.0.dmg`.
 2. Open the DMG.

@@ -56,6 +56,38 @@ open /path/to/OpenA8DJ-0.4.0.pkg
 This is a preview workaround, not the final distribution experience. The final
 fix is Developer ID signing and Apple notarization.
 
+## Manual Terminal install while signing is pending
+
+If Finder refuses to open the package, testers can install the official GitHub
+PKG from Terminal after verifying the checksum. This is how the current GitHub
+package was installed locally for validation while Apple Developer ID signing
+is pending.
+
+Download:
+
+```sh
+curl -L -O https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0.pkg
+curl -L -O https://github.com/fersantxez/OpenA8DJ/releases/download/v0.4.0/OpenA8DJ-0.4.0-checksums.txt
+```
+
+Verify:
+
+```sh
+shasum -a 256 OpenA8DJ-0.4.0.pkg
+grep OpenA8DJ-0.4.0.pkg OpenA8DJ-0.4.0-checksums.txt
+```
+
+The SHA-256 value printed by `shasum` must match the value in the checksum
+file. Do not install if it differs.
+
+Install:
+
+```sh
+sudo installer -pkg OpenA8DJ-0.4.0.pkg -target /
+```
+
+Reconnect the Audio 8 DJ if it does not appear immediately.
+
 Installed files:
 
 ```text
