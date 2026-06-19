@@ -68,6 +68,9 @@ RELEASE_NOTES := docs/RELEASE_NOTES_$(VERSION).md
 SIGN_IDENTITY ?= -
 PKG_SIGN_IDENTITY ?=
 DMG_SIGN_IDENTITY ?=
+NOTARY_PROFILE ?= OpenA8DJNotary
+CODESIGN_TIMESTAMP ?= --timestamp=none
+CODESIGN_OPTIONS ?=
 HAL_DIAGNOSTIC ?= 0
 HAL_DIAGNOSTIC_DIR_DEFAULT ?= /tmp
 HAL_OUTPUT_GAIN ?= 1.50f
@@ -190,7 +193,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic sign-hal install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist FORCE
+.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic sign-hal sign-tools install-hal install-midid install-tools smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package dmg checksums dist release-signed notarize verify-signed-release FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -355,7 +358,11 @@ $(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_FLAGS_STAMP)
 endif
 
 sign-hal: $(HAL_BIN)
-	codesign --force --sign "$(SIGN_IDENTITY)" --timestamp=none $(HAL_BUNDLE)
+	codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(HAL_BUNDLE)"
+
+sign-tools: $(CONTROL_TOOL) $(MIDI_BRIDGE)
+	codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(CONTROL_TOOL)"
+	codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(MIDI_BRIDGE)"
 
 $(HAL_SMOKE): $(HAL_SMOKE_SRC)
 	@mkdir -p build
@@ -550,7 +557,7 @@ install-hal: sign-hal
 	sudo rm -rf /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 	sudo cp -R $(HAL_BUNDLE) /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 	sudo xattr -cr /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-	sudo codesign --force --sign "$(SIGN_IDENTITY)" --timestamp=none /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+	sudo codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 	sudo killall coreaudiod || true
 
 install-tools: $(CONTROL_TOOL)
@@ -568,7 +575,7 @@ install-midid: $(MIDI_BRIDGE) $(LAUNCH_AGENT_PLIST)
 	launchctl bootstrap gui/$$(id -u) /Library/LaunchAgents/org.opena8dj.midid.plist
 	launchctl kickstart -k gui/$$(id -u)/org.opena8dj.midid
 
-package: all sign-hal
+package: all sign-hal sign-tools
 	rm -rf $(PKG_ROOT)
 	install -d "$(PKG_ROOT)/Library/Audio/Plug-Ins/HAL"
 	COPYFILE_DISABLE=1 cp -R "$(HAL_BUNDLE)" "$(PKG_ROOT)/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
@@ -607,6 +614,18 @@ checksums: dmg
 	(cd build && shasum -a 256 "OpenA8DJ-$(VERSION).dmg" "OpenA8DJ-$(VERSION).pkg" > "OpenA8DJ-$(VERSION)-checksums.txt")
 
 dist: checksums
+
+release-signed:
+	@test "$(SIGN_IDENTITY)" != "-" || (echo "SIGN_IDENTITY must be a Developer ID Application identity" >&2; exit 2)
+	@test -n "$(PKG_SIGN_IDENTITY)" || (echo "PKG_SIGN_IDENTITY must be a Developer ID Installer identity" >&2; exit 2)
+	@test -n "$(DMG_SIGN_IDENTITY)" || (echo "DMG_SIGN_IDENTITY must be a Developer ID Application identity" >&2; exit 2)
+	$(MAKE) dist CODESIGN_TIMESTAMP=--timestamp CODESIGN_OPTIONS="--options runtime"
+
+notarize:
+	VERSION="$(VERSION)" PKG="$(PKG)" DMG="$(DMG)" CHECKSUMS="$(CHECKSUMS)" NOTARY_PROFILE="$(NOTARY_PROFILE)" ./scripts/notarize-release
+
+verify-signed-release:
+	VERSION="$(VERSION)" PKG="$(PKG)" DMG="$(DMG)" CHECKSUMS="$(CHECKSUMS)" HAL_BUNDLE="$(HAL_BUNDLE)" CONTROL_TOOL="$(CONTROL_TOOL)" MIDI_BRIDGE="$(MIDI_BRIDGE)" ./scripts/verify-signed-release
 
 probe: $(TOOL)
 	./$(TOOL)

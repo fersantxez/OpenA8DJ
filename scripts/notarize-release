@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+version="${VERSION:-0.4.0}"
+pkg="${PKG:-build/OpenA8DJ-${version}.pkg}"
+dmg="${DMG:-build/OpenA8DJ-${version}.dmg}"
+checksums="${CHECKSUMS:-build/OpenA8DJ-${version}-checksums.txt}"
+profile="${NOTARY_PROFILE:-OpenA8DJNotary}"
+
+require_file() {
+  local path="$1"
+  if [[ ! -f "$path" ]]; then
+    printf 'missing required release artifact: %s\n' "$path" >&2
+    exit 2
+  fi
+}
+
+require_tool() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'missing required tool: %s\n' "$1" >&2
+    exit 2
+  fi
+}
+
+require_file "$pkg"
+require_file "$dmg"
+require_tool xcrun
+require_tool shasum
+
+printf 'Submitting package to Apple notarization: %s\n' "$pkg"
+xcrun notarytool submit "$pkg" --keychain-profile "$profile" --wait
+xcrun stapler staple "$pkg"
+xcrun stapler validate "$pkg"
+
+printf 'Submitting disk image to Apple notarization: %s\n' "$dmg"
+xcrun notarytool submit "$dmg" --keychain-profile "$profile" --wait
+xcrun stapler staple "$dmg"
+xcrun stapler validate "$dmg"
+
+(
+  cd "$(dirname "$checksums")"
+  shasum -a 256 "$(basename "$dmg")" "$(basename "$pkg")" > "$(basename "$checksums")"
+)
+
+printf 'Notarized, stapled, and checksummed release artifacts:\n'
+printf '  %s\n' "$pkg"
+printf '  %s\n' "$dmg"
+printf '  %s\n' "$checksums"

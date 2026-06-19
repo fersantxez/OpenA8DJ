@@ -47,6 +47,27 @@ The preview package may be ad-hoc signed unless signing identities are supplied.
 A polished end-user release requires Developer ID signing and Apple
 notarization.
 
+## Build The Official Signed Release
+
+Official GitHub release binaries must be signed and notarized before upload.
+This requires an active Apple Developer Program team, a `Developer ID
+Application` certificate, a `Developer ID Installer` certificate, and a local
+`notarytool` keychain profile.
+
+```sh
+make clean
+make release-signed \
+  SIGN_IDENTITY="Developer ID Application: Example Team (TEAMID)" \
+  PKG_SIGN_IDENTITY="Developer ID Installer: Example Team (TEAMID)" \
+  DMG_SIGN_IDENTITY="Developer ID Application: Example Team (TEAMID)"
+make notarize NOTARY_PROFILE=OpenA8DJNotary
+make verify-signed-release
+```
+
+Do not upload the DMG/PKG as an official end-user release unless
+`make verify-signed-release` passes. A build that merely compiles or packages is
+not enough.
+
 ## C++ Offline Build
 
 Use CMake for pure C++ contracts and the DriverKit shell:

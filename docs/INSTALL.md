@@ -120,6 +120,11 @@ end-user release should use a Developer ID Installer certificate and Apple
 notarization so macOS Gatekeeper can verify the package without extra user
 steps.
 
+When an official signed release is available, the manual Privacy & Security
+override should not be needed. The release maintainer must build with
+`make release-signed`, notarize with Apple, staple the tickets, and pass
+`make verify-signed-release` before replacing the GitHub assets.
+
 ## Historical branch note
 
 The older C/Objective-C driver line is preserved on the `legacy` branch. That

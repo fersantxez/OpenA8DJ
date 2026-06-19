@@ -62,3 +62,7 @@ Current preview status:
 
 This build is not notarized. The permanent fix is Developer ID signing plus
 Apple notarization.
+
+Maintainers must not publish a replacement end-user DMG/PKG unless the artifacts
+were built with Developer ID identities, notarized by Apple, stapled, and passed
+the repository signed-release verification gate.

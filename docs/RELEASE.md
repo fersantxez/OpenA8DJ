@@ -85,24 +85,64 @@ You can also pass a local signing identity with `SIGN_IDENTITY`.
 
 ## Signing for public distribution
 
-Public release needs:
+Public release needs an active Apple Developer Program membership. Logging in
+with an Apple ID is not enough; Apple must complete enrollment and make the
+Developer ID certificate types available for the team.
+
+Required Apple assets:
 
 - Developer ID Application identity for the HAL bundle
 - Developer ID Installer identity for the PKG
-- Apple notarization
-- stapling of notarization tickets
+- Apple notarization credentials stored locally with `notarytool`
+- stapled notarization tickets for both PKG and DMG
+
+Create the notarization profile once on the release Mac. Prefer an App Store
+Connect API key for automation; an app-specific password also works for a
+single maintainer account:
+
+```sh
+xcrun notarytool store-credentials OpenA8DJNotary \
+  --apple-id "<apple-id>" \
+  --team-id "<TEAMID>" \
+  --password "<app-specific-password>"
+```
+
+Do not commit Apple IDs, app-specific passwords, API keys, `.p8` files, or
+keychain exports.
 
 Example:
 
 ```sh
-make dmg \
+make clean
+make release-signed \
   SIGN_IDENTITY="Developer ID Application: Example Team (TEAMID)" \
   PKG_SIGN_IDENTITY="Developer ID Installer: Example Team (TEAMID)" \
   DMG_SIGN_IDENTITY="Developer ID Application: Example Team (TEAMID)"
+make notarize NOTARY_PROFILE=OpenA8DJNotary
+make verify-signed-release
 ```
 
-Notarization is intentionally not automated in this repo because it requires
-team-specific credentials.
+`make release-signed` blocks if the Developer ID identities are not supplied.
+`make notarize` submits the PKG and DMG to Apple, waits for the result, staples
+both tickets, and regenerates checksums. `make verify-signed-release` is the
+release gate: it checks Developer ID Application signatures on the HAL bundle
+and packaged tools, Developer ID Installer signature on the PKG, Gatekeeper
+assessment, stapled tickets, and checksums.
+
+Current local blocker observed during the Apple enrollment attempt:
+
+```text
+0 valid codesigning identities found
+No Keychain password item found for profile: OpenA8DJNotary
+```
+
+The browser session is authenticated as an Apple ID, but Apple is still asking
+for legal name, phone number, and address to complete Developer Program
+enrollment. That page transmits personal/legal data to Apple and must be
+completed by the account owner. After enrollment is accepted and payment is
+complete, create/download the Developer ID Application and Developer ID
+Installer certificates, then store notarization credentials and rerun the
+official release commands above.
 
 Without this step, macOS Gatekeeper may block the PKG with a message saying
 Apple could not verify it is free of malware. That is expected for ad-hoc signed

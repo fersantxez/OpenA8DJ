@@ -47,6 +47,10 @@ The permanent fix is Apple Developer ID signing plus notarization. Until that is
 available, only install official release assets from this repository and verify
 the published checksum before overriding Gatekeeper.
 
+Maintainer note: official end-user binaries must be built with
+`make release-signed`, notarized with Apple, stapled, and accepted by
+`make verify-signed-release` before replacing GitHub release assets.
+
 ## Modern macOS Architecture
 
 The public `main` branch is now the current macOS driver line. It uses a
