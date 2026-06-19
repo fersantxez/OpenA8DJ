@@ -381,3 +381,221 @@ Conclusion:
   while keeping `timecode-vinyl-low-noise`.
 - Scratch responsiveness still needs a safer approach than shrinking the output
   timeline to 192 frames.
+
+## 2026-06-19 12:31 EDT - Shared hardware lock policy update
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: no
+- Playback/capture: no
+- Driver installed/reloaded: no
+
+Reason:
+
+- Control Center is now being developed in parallel and may run its own
+  hardware checks.
+- Hardware access must be generous: release the global lock whenever Codex is
+  compiling, editing, analyzing saved evidence, reading logs, packaging, or
+  writing documentation.
+
+Policy recorded:
+
+```text
+Acquire the hardware lock as late as possible.
+Release it as soon as playback, capture, install/reload, Core Audio recovery,
+USB access, or Traktor interaction is complete.
+Treat Control Center and other OpenA8DJ tools as legitimate lock owners.
+Do not steal or clean a live lock; only clean it if the recorded owner PID is
+provably dead.
+```
+
+Current lock check:
+
+```text
+$HOME/.opena8dj/hardware-gate.lock absent
+```
+
+## 2026-06-19 12:35 EDT - Preopen responsiveness candidate
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock only during install and
+  physical playback/capture windows
+- Playback/capture: yes, iRig Stream capture from Audio 8 DJ output B
+- Driver installed/reloaded: yes, local HAL only
+
+Reason:
+
+- Previous physical route tests could fail cold because CoreAudio did not
+  deliver the first playback callback until roughly 4.26 seconds after
+  `AudioDeviceStart`.
+- The warm second run passed because USB remained open briefly after stop.
+
+Candidate flags now promoted to Makefile defaults:
+
+```text
+HAL_OUTPUT_GAIN=0.75f
+HAL_BACKGROUND_PREOPEN_ON_INIT=1
+HAL_STOP_GRACE_USEC=10000000
+HAL_STOP_ISOC_ON_STOP=1
+HAL_RESET_AUDIO_PARAMS_BEFORE_STREAM=0
+HAL_AUDIO_PARAMS_RESET_WAIT_FOR_REPLY=0
+HAL_STREAM_USAGE=1
+HAL_IGNORE_OUTPUT_SAMPLE_TIME=1
+```
+
+Installed signed HAL hash:
+
+```text
+e4b473357bd6f18fb30e427ce2e8fc78696652b7564683a2a453d54f79a95c88
+```
+
+Evidence:
+
+```text
+local-analysis/live-stabilize-20260619-123318-install-preopen-gain075
+local-analysis/channel-matrix/live-stabilize-20260619-123342-routeB-preopen-coldstart
+local-analysis/live-stabilize-20260619-123403-music-routeB-preopen-gain075-cable-guy
+```
+
+Results:
+
+```text
+route B first_callback_seconds: 0.023052
+route B tone matrix: PASS
+left_to_right_leakage_db: -59.44
+right_to_left_leakage_db: -61.90
+capture_clipped_frames: 0
+
+Cable Guy first_callback_seconds: 0.021345
+Cable Guy quality_alignment_score: 0.952548
+Cable Guy capture_clipped_frames: 0
+Cable Guy outputUnderruns: 0
+Cable Guy outputActiveUnderruns: 0
+Cable Guy outputLateWriteFrames: 0
+post-run audio_stack_health: PASS
+post-run hardware lock: absent
+```
+
+Comparison against same-session direct USB reference:
+
+```text
+direct USB quality_alignment_score: 0.952811
+preopen HAL quality_alignment_score: 0.952548
+```
+
+Conclusion:
+
+- Preopen fixes the measurable cold-start delay without leaving the audio stack
+  hot and without retaining the hardware lock outside the physical action.
+- Route B is physically validated with strong channel separation.
+- The iRig real-music absolute audiophile gate still fails because the direct
+  USB reference also fails the same strict threshold on this analog route.
+- This is an improved functional/stability candidate, not an audiophile
+  superiority claim over the hardware/direct USB path.
+
+## 2026-06-19 12:44 EDT - Final integrated installed load for human test
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock during install and physical
+  playback/capture windows
+- Playback/capture: yes, Audio 8 DJ output B into iRig Stream capture
+- Driver installed/reloaded: yes, local HAL only
+- Default devices changed: no
+- USB reset: no
+- System reboot: no
+
+Installed HAL:
+
+```text
+/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+installed_sha=e4b473357bd6f18fb30e427ce2e8fc78696652b7564683a2a453d54f79a95c88
+Signature=adhoc
+TeamIdentifier=not set
+```
+
+Final runtime profile:
+
+```text
+input-mode:        0 (timecode-vinyl)
+gnd-vinyl:         off
+software-lock:     on
+input-decode:      on
+input-transform:   A=normal B=normal C=normal D=normal
+input-source:      A=A B=B C=C D=D
+```
+
+Evidence:
+
+```text
+local-analysis/final-integrated-20260619-124320-install-current
+local-analysis/final-integrated-20260619-124408-installed-routeB-cable-guy-start-calibrated
+local-analysis/final-integrated-20260619-124211-idle-irig-cpu-noise
+local-analysis/direct-usb-soundcheck/20260619-122914-direct-usb-pairB-cable-guy-post-recover-reference/reanalysis-analyze-soundcheck-capture-current-thresholds.json
+```
+
+Final installed soundcheck:
+
+```text
+SOUNDCHECK B 48000/512: PASS
+source=Cable Guy - Dj Deep (Original Mix).mp3
+mode=start
+first_callback_seconds=0.021167
+first_energy_record_seconds=0.040000
+quality_alignment_score=0.946549
+analog_snr_db=8.47
+quiet_mid_band_noise_dbfs=-40.80
+mid_band_cpu_corr=0.289631
+capture_clipped_frames=0
+outputUnderruns=0
+outputActiveUnderruns=0
+outputLateWriteFrames=0
+playbackTransferErrors=0
+captureStatusFailures=0
+audio_stack_health=PASS
+```
+
+Idle CPU-noise check:
+
+```text
+low load:   rms=0.00052401 peak=0.00619507 clipped=0
+CPU stress: rms=0.00046297 peak=0.00491333 clipped=0
+```
+
+Direct-reference calibration:
+
+```text
+Direct USB reanalysis also reports high click outliers on the same iRig route:
+left_click_outliers=165
+right_click_outliers=244
+quality_alignment_score=0.949624
+capture_clipped_frames=0
+
+Final HAL run:
+left_click_outliers=173
+right_click_outliers=241
+quality_alignment_score=0.946549
+capture_clipped_frames=0
+```
+
+Timecode Vinyl status:
+
+- Previous confirmed failure mode: `input-mode: timecode-vinyl` with
+  `input-decode: off`; Traktor saw no scope signal.
+- Corrected state: `profile timecode-vinyl-low-noise` leaves `input-decode: on`
+  and input A/B/C/D are nonzero in `audio-input-meter`.
+- Human feedback on this corrected family of builds confirmed Timecode Vinyl
+  synchronized and scratch control was responsive.
+
+Conclusion:
+
+- This is the installed human-test load.
+- It combines the stable 8192-frame output timeline, reduced 0.75 output gain,
+  preopen responsiveness, strict idle digital silence, and the low-noise
+  timecode profile with input decode on.
+- It does not prove final audiophile superiority over every reference path.
+  It is ready for the next human listening/Traktor pass because the exact
+  installed artifact passed the calibrated iRig soundcheck and has no driver
+  underruns, no clipping, no transfer errors, and no measurable idle CPU-noise
+  increase in the iRig capture.

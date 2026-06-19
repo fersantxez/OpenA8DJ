@@ -59,6 +59,14 @@
 #define OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT 0
 #endif
 
+#ifndef OPENA8DJ_INVERT_OUTPUT_RIGHT_CHANNELS
+#define OPENA8DJ_INVERT_OUTPUT_RIGHT_CHANNELS 0
+#endif
+
+#ifndef OPENA8DJ_LAZY_DEVICE_PRESENT_ON_INIT
+#define OPENA8DJ_LAZY_DEVICE_PRESENT_ON_INIT 1
+#endif
+
 #ifndef OPENA8DJ_STOP_GRACE_USEC
 #define OPENA8DJ_STOP_GRACE_USEC 4000000
 #endif
@@ -1119,7 +1127,11 @@ static void CopyClientOutputToOutput(UInt32 streamIndex, const Float32 *inInterl
 #endif
         } else {
             dst[startChannel] = src[0];
+#if OPENA8DJ_INVERT_OUTPUT_RIGHT_CHANNELS
+            dst[startChannel + 1] = -src[1];
+#else
             dst[startChannel + 1] = src[1];
+#endif
         }
     }
     gOutputCycleStreamMask |= (1u << streamIndex);
@@ -1456,7 +1468,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_Initialize(AudioServerPlugInDriverRef
     gHostTime = mach_absolute_time();
     gBufferFrames = RecommendedBufferFramesForRate(gSampleRate);
     pthread_mutex_unlock(&gClockMutex);
+#if OPENA8DJ_LAZY_DEVICE_PRESENT_ON_INIT
+    atomic_store(&gDevicePresent, true);
+#else
     atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+#endif
 #if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
     ScheduleBackgroundPreopen();
 #endif
