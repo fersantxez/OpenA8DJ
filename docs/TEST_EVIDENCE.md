@@ -192,3 +192,60 @@ Conclusion:
   silence. Further mitigation should be a separate low-noise transport
   experiment that reduces idle USB transfer activity only if it does not break
   Timecode Vinyl input capture or fast playback start.
+
+## 2026-06-19 10:41 EDT - Timecode Vinyl low-noise ground-lift A/B
+
+- Worktree: `/Users/fer/dev/audio8djcpp`
+- Branch: `driverkit/cpp-redesign`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: no
+- Playback: no
+- Capture: no new external capture; Core Audio input meter used
+
+Reason:
+
+- Human headphone test still reported computer/CPU-like noise after idle
+  playback traffic was gated off.
+- Live stream stats showed playback transfers parked in silence while capture
+  stayed active for Timecode Vinyl, so the remaining likely mitigations are
+  analog/control-state related or capture-traffic related.
+
+Command/evidence:
+
+```sh
+/usr/local/bin/opena8dj-control gnd-vinyl off
+./build/audio-input-meter 4
+/usr/local/bin/opena8dj-control stream-stats
+```
+
+Evidence directory:
+
+```text
+local-analysis/cpu-noise-groundlift-ab-20260619-104123
+```
+
+Observed state after change:
+
+```text
+input-mode: 0 (timecode-vinyl)
+gnd-vinyl: off
+software-lock: on
+input-decode: on
+playbackSubmitAttempts: unchanged at 249 during silence
+captureSubmitAttempts: still increasing for DVS
+```
+
+Input smoke after `gnd-vinyl off`:
+
+```text
+Input A: rmsL=0.00057953 rmsR=0.00060759
+Input B: rmsL=0.00057249 rmsR=0.00058633
+```
+
+Conclusion:
+
+- `gnd-vinyl off` does not disable the Timecode Vinyl input surface.
+- Audible improvement still requires human/headphone confirmation because the
+  previous iRig idle route did not reproduce the headphone CPU-noise symptom.
+- Added `profile timecode-vinyl-low-noise` as a reversible control profile for
+  this exact hardware-state experiment.

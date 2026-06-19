@@ -542,6 +542,18 @@ static bool ApplyProfile(const char *name, OpenA8DJControlPayload *state)
         ResetInputTransforms(state);
         return true;
     }
+    if (strcmp(name, "timecode-vinyl-low-noise") == 0 ||
+        strcmp(name, "tc-vinyl-low-noise") == 0 ||
+        strcmp(name, "dvs-low-noise") == 0) {
+        state->inputMode = 0;
+        state->gndLiftTCVinyl = 0;
+        state->gndLiftTCCDLine = 0;
+        state->gndLiftPhono = 0;
+        state->softwareLock = 1;
+        state->inputDecodeEnabled = 1;
+        ResetInputTransforms(state);
+        return true;
+    }
     if (strcmp(name, "timecode-cd-line") == 0 ||
         strcmp(name, "timecode-cd") == 0 ||
         strcmp(name, "cd-line") == 0 ||
@@ -1643,7 +1655,7 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "  %s transfer-ledger [count] [--from sequence] [--all]\n", argv0);
-    fprintf(stderr, "  %s profile playback|timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
+    fprintf(stderr, "  %s profile playback|timecode-vinyl|timecode-vinyl-low-noise|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
     fprintf(stderr, "  %s gnd-vinyl on|off\n", argv0);
     fprintf(stderr, "  %s gnd-cd-line on|off\n", argv0);

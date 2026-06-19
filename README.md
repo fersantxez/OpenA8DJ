@@ -245,6 +245,17 @@ For vinyl timecode testing, put the interface in the hardware DVS profile first:
 /usr/local/bin/opena8dj-control profile timecode-vinyl
 ```
 
+If the turntable/headphone route exposes computer/CPU-like background noise
+while DVS is otherwise working, use the reversible low-noise variant:
+
+```sh
+/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
+```
+
+This keeps Timecode Vinyl input decode active, but leaves the vinyl ground-lift
+flag off. Validate the Traktor scope after changing it; if the scope degrades,
+return to `profile timecode-vinyl`.
+
 Use [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the DVS validation
 plan.
 

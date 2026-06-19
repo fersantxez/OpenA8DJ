@@ -232,6 +232,14 @@ typedef void (^OpenA8DJIsoCompletionHandler)(IOReturn status,
 #define OPENA8DJ_STRICT_IDLE_SILENCE 0
 #endif
 
+#ifndef OPENA8DJ_IDLE_PLAYBACK_GATE
+#define OPENA8DJ_IDLE_PLAYBACK_GATE 0
+#endif
+
+#ifndef OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD
+#define OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD 0.000001f
+#endif
+
 #ifndef OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS
 #define OPENA8DJ_ENABLE_OUTPUT_AMPLITUDE_STATS 0
 #endif
@@ -2286,6 +2294,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     bool _outputFrameLoaded;
     bool _outputPlaybackPrimed;
     bool _outputHasStartedPlayback;
+    atomic_bool _idlePlaybackGateActive;
     uint64_t _outputFramesServed;
     float _outputLastFrame[kChannels];
     bool _outputLastFrameValid;
@@ -2420,6 +2429,7 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         atomic_init(&_inputSourceMap, kInputSourceIdentityMap);
         atomic_init(&_inputDecodeEnabled, atomic_load(&gInputDecodeEnabledPreference));
         atomic_init(&_inputDecodeActive, false);
+        atomic_init(&_idlePlaybackGateActive, true);
         atomic_init(&_playbackUseExplicitScheduling, true);
         atomic_init(&_playbackScheduleFailureStreak, 0);
         atomic_init(&_playbackTransfersInFlight, 0);
@@ -5980,6 +5990,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     _outputFrameLoaded = false;
     _outputPlaybackPrimed = false;
     _outputHasStartedPlayback = false;
+    atomic_store(&_idlePlaybackGateActive, true);
     _outputLastFrameValid = false;
     _outputReplayRunFrames = 0;
     _outputElasticCorrectionCountdown = 0;
@@ -6189,6 +6200,11 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if (!atomic_load(&_streaming) || _playbackPipe == nil || requests == NULL || count == 0) {
         return NO;
     }
+#if OPENA8DJ_IDLE_PLAYBACK_GATE
+    if (atomic_load(&_idlePlaybackGateActive)) {
+        return YES;
+    }
+#endif
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     atomic_fetch_add(&_cadenceDiagnostics.playbackQueueAttempts, 1);
 #endif
@@ -6732,17 +6748,30 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if (channels != kChannels || inInterleaved == NULL) {
         return;
     }
+    float peak = 0.0f;
+    for (uint32_t frame = 0; frame < frames; frame++) {
+        for (uint32_t channel = 0; channel < channels; channel++) {
+            float value = fabsf(inInterleaved[(size_t)frame * channels + channel]);
+            if (value > peak) {
+                peak = value;
+            }
+        }
+    }
+#if OPENA8DJ_IDLE_PLAYBACK_GATE
+    if (peak <= OPENA8DJ_IDLE_PLAYBACK_GATE_THRESHOLD) {
+        if (!atomic_exchange(&_idlePlaybackGateActive, true)) {
+            [self softResetPlaybackPipelineWithScheduleReset:NO];
+        }
+        return;
+    }
+    atomic_store(&_idlePlaybackGateActive, false);
+#endif
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self appendDiagnosticFrames:&_diagnosticWrittenBuffer counter:&_diagnosticWrittenFrames frames:inInterleaved count:frames];
 #endif
 #if OPENA8DJ_ENABLE_TRACE
-    for (uint32_t frame = 0; frame < frames; frame++) {
-        for (uint32_t channel = 0; channel < channels; channel++) {
-            float value = fabsf(inInterleaved[(size_t)frame * channels + channel]);
-            if (value > _debugOutputPeak) {
-                _debugOutputPeak = value;
-            }
-        }
+    if (peak > _debugOutputPeak) {
+        _debugOutputPeak = peak;
     }
 #endif
     int64_t startFrame = 0;

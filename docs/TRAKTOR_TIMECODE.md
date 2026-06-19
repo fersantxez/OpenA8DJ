@@ -48,6 +48,26 @@ input-mode: 0 (timecode-vinyl)
 software-lock: on
 ```
 
+If the physical rig has audible computer/CPU-like background noise in the
+headphones while the Traktor scope is otherwise stable, test the reversible
+low-noise profile:
+
+```sh
+/usr/local/bin/opena8dj-control profile timecode-vinyl-low-noise
+```
+
+Expected state for that variant:
+
+```text
+input-mode: 0 (timecode-vinyl)
+gnd-vinyl: off
+software-lock: on
+input-decode: on
+```
+
+Keep this only if the Traktor scope remains stable and the audible noise drops.
+If timecode signal quality gets worse, switch back to `profile timecode-vinyl`.
+
 4. Set Traktor to use `Open Audio 8 DJ`.
 
 5. Validate at 44.1 kHz and 48 kHz.
