@@ -48,6 +48,8 @@ Current status:
 - Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Primary validated playback rates: 44.1 kHz and 48 kHz
 - Traktor Timecode Vinyl: vinyl input path active by default
+- Stable sound profile: CPU pool profile validated with iRig Stream and human
+  listening on 2026-06-20
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
 - Legacy C line: preserved separately on the repository legacy branch
 - Windows/Linux: experimental platform areas, not included in this macOS driver
@@ -56,4 +58,7 @@ After install, open Audio MIDI Setup and confirm Open Audio 8 DJ appears with 8
 inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once, then
 reopen the audio app.
 
-The permanent distribution goal is Developer ID signing plus Apple notarization.
+Apple Developer Program membership is active, but this Mac still needs local
+Developer ID Application and Developer ID Installer certificates plus
+notarization credentials before the release can become a normal signed and
+notarized one-click installer.

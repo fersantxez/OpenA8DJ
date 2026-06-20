@@ -129,25 +129,18 @@ release gate: it checks Developer ID Application signatures on the HAL bundle
 and packaged tools, Developer ID Installer signature on the PKG, Gatekeeper
 assessment, stapled tickets, and checksums.
 
-Current local blocker observed during the Apple enrollment attempt:
+Current local blocker observed after Apple Developer Program membership became
+active on 2026-06-20:
 
 ```text
 0 valid codesigning identities found
 No Keychain password item found for profile: OpenA8DJNotary
 ```
 
-The browser session is authenticated as an Apple ID and the Developer Program
-enrollment form has been submitted. Apple currently shows:
-
-```text
-Thank you for your submission.
-We'll review the details you provided and contact you soon.
-```
-
-After Apple accepts enrollment and any payment/verification is complete,
+Apple Developer Program membership is active. The next required step is to
 create/download the Developer ID Application and Developer ID Installer
-certificates, then store notarization credentials and rerun the official
-release commands above.
+certificates, install them in the local keychain, store notarization credentials,
+and rerun the official release commands above.
 
 Without this step, macOS Gatekeeper may block the PKG with a message saying
 Apple could not verify it is free of malware. That is expected for ad-hoc signed

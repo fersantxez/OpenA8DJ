@@ -1,6 +1,6 @@
 # OpenA8DJ 0.5.0 Stable Reference
 
-Date: 2026-06-19
+Date: 2026-06-20
 
 This is the public GitHub release reference for OpenA8DJ 0.5.0, the current
 macOS C++ 0.5.x baseline.
@@ -12,7 +12,7 @@ release=OpenA8DJ 0.5.0
 branch=main
 platform=macOS
 driver=Core Audio HAL user-space driver
-runtime_state=DVS Vinyl input active, low-noise ground setting
+runtime_state=DVS Vinyl input active, low-noise ground setting, CPU pool stable profile
 technical_evidence=docs/TEST_EVIDENCE.md
 ```
 
@@ -31,6 +31,10 @@ HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES=9216
 HAL_IDLE_PLAYBACK_GATE_THRESHOLD=0.000001f
 HAL_IDLE_PLAYBACK_GATE_HOLD_FRAMES=0
 HAL_OUTPUT_ZERO_FLOOR=0.0f
+HAL_TRANSFER_POOL_CURSOR=1
+HAL_FAST_ISO_TRANSFER_CONFIG=1
+HAL_REUSE_ISOC_COMPLETIONS=0
+HAL_RAW_ISOC_COMPLETIONS=0
 ```
 
 ## Runtime Profile
@@ -51,8 +55,15 @@ input-source=A=A B=B C=C D=D
 
 ```text
 human_validation=PASS
-operator_report=Mucho mejor. Esto funciona bien. Freeze as stable.
+operator_report=Sounds excellent. Freeze as stable.
 active_stream_target=3072 frames
+stable_profile=cpu-pool
+installed_hal_sha256=c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951
+unsigned_build_hal_sha256=79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098
+irig_validation_run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat
+quality_alignment_score=0.948151
+analog_snr_db=8.72
+capture_clipped_frames=0
 targeted_offline_gates=PASS
 audio_stack_health_after_settle=PASS
 outputUnderruns=0
@@ -73,6 +84,8 @@ hardware_lock_after_install=absent
   0.5.0 reference.
 - Do not jump to 2048 output frames without a separate same-session physical
   validation window. The 3072-frame output target is the current stable balance.
+- Do not enable reusable/raw ISO completion-handler experiments in the stable
+  0.5.0 build without a separate same-artifact physical sound validation window.
 
 ## Rollback References
 

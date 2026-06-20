@@ -2,7 +2,7 @@
 
 OpenA8DJ `main` builds the modern macOS driver line.
 
-The current public preview uses:
+The current stable 0.5.0 line uses:
 
 - a Core Audio HAL bundle for the installable macOS driver;
 - IOUSBHost for Audio 8 DJ USB transport;
@@ -29,6 +29,15 @@ build/audio-pair-tone
 build/midi-list
 ```
 
+The default HAL build is the frozen 0.5.0 CPU pool profile:
+
+```text
+HAL_TRANSFER_POOL_CURSOR=1
+HAL_FAST_ISO_TRANSFER_CONFIG=1
+HAL_REUSE_ISOC_COMPLETIONS=0
+HAL_RAW_ISOC_COMPLETIONS=0
+```
+
 ## Build The Installer
 
 ```sh
@@ -46,7 +55,7 @@ build/OpenA8DJ-<version>-checksums.txt
 ```
 
 Artifacts produced by `make dist` without release signing identities are
-unsigned preview artifacts. They are not Developer ID signed and not
+unsigned local release artifacts. They are not Developer ID signed and not
 Apple-notarized. macOS Gatekeeper will likely block them unless manually
 approved after checksum verification.
 
@@ -56,6 +65,11 @@ The long-term official release path is Developer ID signing and Apple
 notarization. This requires an active Apple Developer Program team, a
 `Developer ID Application` certificate, a `Developer ID Installer` certificate,
 and a local `notarytool` keychain profile.
+
+As of 2026-06-20, Apple Developer Program membership is active. This Mac still
+reports `0 valid identities found`, so release signing remains blocked until
+the Developer ID Application and Developer ID Installer certificates are
+created/downloaded and installed in the local keychain.
 
 ```sh
 make clean

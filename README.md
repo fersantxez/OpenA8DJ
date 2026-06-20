@@ -132,13 +132,15 @@ OpenA8DJ 0.5.0 is the current macOS driver baseline.
 - Traktor output routing for decks A/B/C/D
 - Traktor Timecode Vinyl input enabled by default, using the low-noise validated
   state
+- CPU pool transport profile frozen as the stable 0.5.0 sound profile after
+  iRig Stream validation and human listening sign-off
 - Control bridge for input mode, ground-lift, software lock, routing transforms,
   stream statistics, and diagnostic state
 - Optional Control Center and command-line tools for support workflows
 
-The current release is meant to be useful, testable, and recoverable. It is not
-claimed to be perfect. Please report hardware results, regressions, routing
-issues, and timecode findings through GitHub Issues.
+The current release is stable for the validated macOS Audio 8 DJ workflow. It
+is not claimed to be perfect. Please report hardware results, regressions,
+routing issues, and timecode findings through GitHub Issues.
 
 For a public, non-internal summary of what was validated, see
 [docs/PUBLIC_VALIDATION_SUMMARY.md](docs/PUBLIC_VALIDATION_SUMMARY.md).
@@ -237,6 +239,11 @@ build/OpenA8DJ-0.5.0-checksums.txt
 Release maintainers should use Developer ID identities, notarize the artifacts,
 staple notarization tickets, and run the signed-release verification gate before
 replacing public GitHub assets.
+
+Apple Developer Program membership is active, but this Mac currently has no
+Developer ID Application or Developer ID Installer identity installed. Until
+those identities and a `notarytool` profile exist locally, release artifacts
+remain unsigned/not-notarized and need the manual approval path described above.
 
 ## Contributing
 

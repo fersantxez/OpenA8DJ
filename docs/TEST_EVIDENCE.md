@@ -1635,3 +1635,143 @@ Follow-up result:
   change explicitly supersedes it.
 - Stable reference document:
   `docs/STABLE_0.5.0_REFERENCE.md`.
+
+## 2026-06-20 12:04 EDT - 0.5.0 CPU pool stable freeze
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Hardware touched: yes, with hardware/audio lock
+- Driver installed/reloaded: already installed CPU pool HAL, no package
+  execution during the repeat validation
+- USB reset/default-device change/system reboot/Traktor launch: no
+
+Stable freeze decision:
+
+```text
+release=OpenA8DJ 0.5.0
+stable_profile=cpu-pool
+installed_hal_sha256=c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951
+unsigned_build_hal_sha256=79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098
+```
+
+Physical validation:
+
+```text
+run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat
+route=Open Audio 8 DJ pair B -> iRig Stream channels 1,2
+source=Cable Guy - Dj Deep (Original Mix).mp3
+result=PASS
+quality_alignment_score=0.948151
+analog_snr_db=8.72
+mid_band_1000_5000_residual_ratio=1.512976
+high_band_5000_12000_residual_ratio=1.405052
+quiet_mid_band_noise_dbfs=-39.90
+mid_band_cpu_corr=0.253938
+click_outliers=178
+lag_jumps_gt_2_frames=22
+capture_clipped_frames=0
+opena8dj_driver_avg_cpu=5.470%
+opena8dj_driver_max_cpu=6.300%
+coreaudiod_avg_cpu=2.674%
+coreaudiod_max_cpu=8.700%
+audio_stack_health_after=PASS
+hardware_lock_after=absent
+```
+
+Human listening result:
+
+```text
+PASS
+```
+
+Follow-up:
+
+- The default Makefile HAL profile now enables the CPU pool cursor and fast ISO
+  transfer configuration path.
+- Reusable/raw ISO completion-handler experiments remain default-off.
+- Further CPU/audio transport changes must pass same-artifact physical sound
+  validation before replacing this stable reference.
+
+## 2026-06-20 12:17 EDT - Apple Developer Program active, signing still locally blocked
+
+Gmail evidence:
+
+- Apple Developer welcome email received on 2026-06-20 confirming Apple
+  Developer Program membership.
+- Auto-renewal email received on 2026-06-20.
+- Apple Store order email received on 2026-06-20 for Apple Developer Program
+  membership for one year.
+
+Local signing check:
+
+```text
+security find-identity -v -p codesigning
+0 valid identities found
+```
+
+Tooling state:
+
+```text
+codesign=available
+notarytool=available
+Developer ID Application identity=missing
+Developer ID Installer identity=missing
+OpenA8DJNotary keychain profile=not yet stored
+```
+
+Conclusion:
+
+- Apple Developer Program membership is active.
+- Signed/notarized 0.5.0 replacement assets are blocked until Developer ID
+  certificates are created/downloaded and installed locally, and notarization
+  credentials are stored with `notarytool`.
+- Do not describe any current asset as Developer ID signed or Apple-notarized
+  until `make verify-signed-release` passes.
+
+## 2026-06-20 12:29 EDT - Frozen 0.5.0 unsigned package build
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Hardware touched: no
+- Driver installed/reloaded: no
+- Package executed: no
+
+Commands:
+
+```sh
+make hal-cpu-pool-candidate
+ctest --test-dir build/cmake-release --output-on-failure
+make dist
+hdiutil verify build/OpenA8DJ-0.5.0.dmg
+hdiutil verify build/opena8dj-tools-0.5.0.dmg
+make verify-signed-release
+```
+
+Results:
+
+- `make hal-cpu-pool-candidate`: PASS.
+- Stable default HAL SHA-256 after restore:
+  `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098`.
+- Candidate copy SHA-256:
+  `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098`.
+- `ctest`: PASS, 89/89 tests.
+- `make dist`: PASS.
+- `hdiutil verify`: PASS for both DMGs.
+- `make verify-signed-release`: expected FAIL, because the local artifacts are
+  ad-hoc signed and not Developer ID signed.
+
+Frozen unsigned/ad-hoc asset hashes:
+
+```text
+37d9fbd34e0fa76743bad568b62e722775269956479bfbe96f8137b55941f0cd  OpenA8DJ-0.5.0.dmg
+f7b629a04eec1e37a58de806587a6c730bc6e86d4a1e5065b182839a0a2e9265  OpenA8DJ-0.5.0.pkg
+c6bb68a41661ae7c3c617069d66a5b8a1a8fbb622afd978a5d4724a677665172  opena8dj-tools-0.5.0.dmg
+17fd67f67d1d70f26faea5d16f28af9a204b27adcdfe42bab674d2f8dd8a4221  opena8dj-tools-0.5.0.pkg
+```
+
+Expected signed-release verifier failure:
+
+```text
+HAL bundle is not signed with a Developer ID Application certificate.
+Signature=adhoc
+TeamIdentifier=not set
+```

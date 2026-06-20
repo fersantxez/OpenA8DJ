@@ -2205,6 +2205,7 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(true);
 @property(nonatomic) NSUInteger capacityBytes;
 @property(nonatomic) NSUInteger capacityTransactions;
 @property(nonatomic) BOOL configured;
+@property(nonatomic) uint64_t layoutSignature;
 @property(nonatomic) BOOL pooled;
 @property(nonatomic) BOOL inUse;
 @property(nonatomic) NSUInteger slotIndex;
@@ -2224,6 +2225,24 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(true);
 @implementation OpenA8DJIsoTransfer
 @end
 
+static uint64_t IsoTransferLayoutSignature(const uint32_t *requests,
+                                           NSUInteger count,
+                                           NSUInteger *dataLengthOut)
+{
+    uint64_t signature = 1469598103934665603ull ^ (uint64_t)count;
+    NSUInteger dataLength = 0;
+    for (NSUInteger index = 0; index < count; index++) {
+        uint32_t request = requests[index];
+        signature ^= ((uint64_t)request << 32) ^ (uint64_t)index ^ (uint64_t)dataLength;
+        signature *= 1099511628211ull;
+        dataLength += request;
+    }
+    if (dataLengthOut != NULL) {
+        *dataLengthOut = dataLength;
+    }
+    return signature;
+}
+
 static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *requests, NSUInteger count)
 {
     if (transfer == nil || requests == NULL || count == 0 || count > transfer.capacityTransactions) {
@@ -2231,9 +2250,7 @@ static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *
     }
 
     NSUInteger dataLength = 0;
-    for (NSUInteger index = 0; index < count; index++) {
-        dataLength += requests[index];
-    }
+    uint64_t layoutSignature = IsoTransferLayoutSignature(requests, count, &dataLength);
     if (dataLength > transfer.capacityBytes) {
         return NO;
     }
@@ -2242,22 +2259,8 @@ static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *
 #if OPENA8DJ_FAST_ISO_TRANSFER_CONFIG
     BOOL sameLayout = transfer.transactionCount == count &&
         transfer.data.length == dataLength &&
-        transfer.transactions.length == sizeof(IOUSBHostIsochronousTransaction) * count;
-    if (transfer.configured && sameLayout) {
-        BOOL reusableLayout = YES;
-        uint32_t offset = 0;
-        for (NSUInteger index = 0; index < count; index++) {
-            if (transactions[index].requestCount != requests[index] ||
-                transactions[index].offset != offset) {
-                reusableLayout = NO;
-                break;
-            }
-            offset += requests[index];
-        }
-        if (!reusableLayout) {
-            sameLayout = NO;
-        }
-    }
+        transfer.transactions.length == sizeof(IOUSBHostIsochronousTransaction) * count &&
+        transfer.layoutSignature == layoutSignature;
     if (transfer.configured && sameLayout) {
         for (NSUInteger index = 0; index < count; index++) {
             transactions[index].status = kIOReturnInvalid;
@@ -2284,6 +2287,7 @@ static BOOL ConfigureIsoTransfer(OpenA8DJIsoTransfer *transfer, const uint32_t *
         transactions[index].options = IOUSBHostIsochronousTransactionOptionsNone;
         offset += requests[index];
     }
+    transfer.layoutSignature = layoutSignature;
     transfer.configured = YES;
 
     return YES;

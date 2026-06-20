@@ -44,6 +44,9 @@ file. Do not install if it differs.
 
 ## Normal Install
 
+Once the release is Developer ID signed and Apple-notarized, this is the normal
+non-technical install path:
+
 1. Open `OpenA8DJ-0.5.0.dmg`.
 2. Double-click `OpenA8DJ-0.5.0.pkg`.
 3. Follow the macOS Installer prompts.
@@ -76,8 +79,13 @@ Terminal fallback after checksum verification:
 sudo installer -pkg OpenA8DJ-0.5.0.pkg -target /
 ```
 
-This is an unsigned-preview workaround, not the final distribution experience.
+This is an unsigned-release workaround, not the final distribution experience.
 The final fix is Developer ID signing and Apple notarization.
+
+Current signing status for maintainers: Apple Developer Program membership is
+active, but this Mac still needs Developer ID Application and Developer ID
+Installer certificates plus a stored `notarytool` profile before signed,
+notarized release assets can be produced.
 
 ## Installed Files
 

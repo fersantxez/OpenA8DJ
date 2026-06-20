@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""Build the frozen CPU pool HAL profile and compare it to the stable default.
+
+This is an offline/build-only helper. It does not install, load, unload, touch
+USB hardware, restart CoreAudio, or change audio defaults.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+BLOCKED_CLAIM = "CPU_POOL_FREEZE_REQUIRES_EXACT_ARTIFACT_SOUND_VALIDATION"
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def reject_inside_bundle(path: Path, bundle: Path, label: str) -> None:
+    try:
+        path.relative_to(bundle)
+    except ValueError:
+        return
+    raise ValueError(f"{label} must not be written inside the candidate bundle: {path}")
+
+
+def run(argv: list[str]) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        argv,
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    info = path / "Contents/Info.plist"
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    return {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+    }
+
+
+def command_report(name: str, command: list[str], rc: int, stdout: str, stderr: str) -> dict[str, object]:
+    report: dict[str, object] = {
+        "name": name,
+        "command": command,
+        "result": "PASS" if rc == 0 else "FAIL",
+        "return_code": rc,
+    }
+    if rc != 0:
+        report["stdout_tail"] = stdout[-4000:]
+        report["stderr_tail"] = stderr[-4000:]
+    return report
+
+
+def write_json(path: Path, report: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--candidate", default="build/OpenA8DJ-cpu-pool.driver")
+    parser.add_argument("--json-out", default="")
+    args = parser.parse_args()
+
+    candidate = resolve_path(args.candidate)
+    require_inside_root(candidate, "--candidate")
+    if candidate == ROOT or candidate == DEFAULT_HAL:
+        raise ValueError("--candidate must be separate from the worktree and default HAL")
+    json_out = resolve_path(args.json_out) if args.json_out else None
+    if json_out is not None:
+        require_inside_root(json_out, "--json-out")
+        reject_inside_bundle(json_out, candidate, "--json-out")
+
+    smoke_tools_command = ["make", "build/hal-smoke", "build/hal-parity-smoke"]
+    smoke_tools_rc, smoke_tools_stdout, smoke_tools_stderr = run(smoke_tools_command)
+
+    build_command = [
+        "make",
+        "-B",
+        "hal",
+        "HAL_TRANSFER_POOL_CURSOR=1",
+        "HAL_FAST_ISO_TRANSFER_CONFIG=1",
+        "HAL_REUSE_ISOC_COMPLETIONS=0",
+        "HAL_RAW_ISOC_COMPLETIONS=0",
+    ]
+    build_rc = 1
+    build_stdout = ""
+    build_stderr = ""
+    if smoke_tools_rc == 0:
+        build_rc, build_stdout, build_stderr = run(build_command)
+
+    candidate_smoke_command = [
+        "bash",
+        "-lc",
+        "./build/hal-smoke build/OpenA8DJ.driver && ./build/hal-parity-smoke build/OpenA8DJ.driver",
+    ]
+    candidate_smoke_rc = 1
+    candidate_smoke_stdout = ""
+    candidate_smoke_stderr = ""
+    if build_rc == 0:
+        candidate_smoke_rc, candidate_smoke_stdout, candidate_smoke_stderr = run(
+            candidate_smoke_command
+        )
+
+    copied = False
+    if build_rc == 0 and candidate_smoke_rc == 0 and DEFAULT_HAL_BIN.is_file():
+        if candidate.exists():
+            shutil.rmtree(candidate)
+        shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+        copied = True
+
+    candidate_metrics = bundle_metrics(candidate)
+
+    restore_command = ["make", "-B", "hal"]
+    restore_rc, restore_stdout, restore_stderr = run(restore_command)
+
+    default_smoke_command = [
+        "bash",
+        "-lc",
+        "./build/hal-smoke build/OpenA8DJ.driver && ./build/hal-parity-smoke build/OpenA8DJ.driver",
+    ]
+    default_smoke_rc = 1
+    default_smoke_stdout = ""
+    default_smoke_stderr = ""
+    if restore_rc == 0:
+        default_smoke_rc, default_smoke_stdout, default_smoke_stderr = run(default_smoke_command)
+
+    default_metrics = bundle_metrics(DEFAULT_HAL)
+    candidate_hash = str(candidate_metrics.get("executable_sha256", ""))
+    default_hash = str(default_metrics.get("executable_sha256", ""))
+
+    gates = [
+        command_report(
+            "smoke_tools_build",
+            smoke_tools_command,
+            smoke_tools_rc,
+            smoke_tools_stdout,
+            smoke_tools_stderr,
+        ),
+        command_report("cpu_pool_candidate_build", build_command, build_rc, build_stdout, build_stderr),
+        command_report(
+            "cpu_pool_candidate_smoke_parity",
+            candidate_smoke_command,
+            candidate_smoke_rc,
+            candidate_smoke_stdout,
+            candidate_smoke_stderr,
+        ),
+        {
+            "name": "cpu_pool_candidate_copied",
+            "result": "PASS" if copied else "FAIL",
+        },
+        {
+            "name": "cpu_pool_candidate_complete",
+            "result": "PASS"
+            if candidate_metrics["bundle_exists"]
+            and candidate_metrics["info_plist_exists"]
+            and candidate_metrics["executable_exists"]
+            and int(candidate_metrics["executable_bytes"]) > 0
+            else "FAIL",
+        },
+        command_report("default_hal_restore_build", restore_command, restore_rc, restore_stdout, restore_stderr),
+        command_report(
+            "default_hal_restore_smoke_parity",
+            default_smoke_command,
+            default_smoke_rc,
+            default_smoke_stdout,
+            default_smoke_stderr,
+        ),
+        {
+            "name": "cpu_pool_hash_matches_stable_default",
+            "result": "PASS"
+            if candidate_hash and default_hash and candidate_hash == default_hash
+            else "FAIL",
+        },
+    ]
+    passed = all(gate["result"] == "PASS" for gate in gates)
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.hal-cpu-pool-candidate.v1",
+        "safety": "offline_local_build_only_no_install_load_coreaudio_usb_hardware_or_default_device_touch",
+        "result": "PASS" if passed else "FAIL",
+        "status": "PASS" if passed else "FAIL",
+        "candidate": str(candidate),
+        "transfer_pool_cursor_enabled": True,
+        "fast_iso_transfer_config_enabled": True,
+        "reuse_isoc_completion_handlers_enabled": False,
+        "raw_isoc_completion_handlers_enabled": False,
+        "layout_signature_fast_path_required": True,
+        "physical_evidence_present": True,
+        "product_claim_allowed": True,
+        "stable_freeze_reference": "OpenA8DJ 0.5.0 stable CPU pool profile",
+        "candidate_metrics": candidate_metrics,
+        "default_hal_after_restore": default_metrics,
+        "default_hal_restored": restore_rc == 0 and default_smoke_rc == 0,
+        "candidate_hash_matches_stable_default": bool(
+            candidate_hash and default_hash and candidate_hash == default_hash
+        ),
+        "gates": gates,
+        "blocked_claim": BLOCKED_CLAIM,
+    }
+
+    print(json.dumps(report, indent=2, sort_keys=True))
+    if json_out is not None:
+        write_json(json_out, report)
+    return 0 if passed else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

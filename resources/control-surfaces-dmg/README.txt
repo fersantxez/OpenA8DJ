@@ -41,3 +41,7 @@ Product names are used only to identify compatibility.
 OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
 Apple-notarized. macOS Gatekeeper will likely block them unless manually
 approved after checksum verification.
+
+Apple Developer Program membership is active, but the release Mac still needs
+local Developer ID certificates and notarization credentials before these tools
+can be shipped as signed and notarized assets.
