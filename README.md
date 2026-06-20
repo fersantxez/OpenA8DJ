@@ -165,8 +165,11 @@ Please use GitHub Issues:
 - [Request a feature](https://github.com/fersantxez/OpenA8DJ/issues/new?template=feature_request.yml)
 - [View open issues](https://github.com/fersantxez/OpenA8DJ/issues)
 
+Contributor documentation starts at
+[docs/project/contributing.md](docs/project/contributing.md).
+
 ## Follow Development
 
 If you want to understand the architecture, validation process, roadmap,
-experimental branches, or maintainer state, start with
+contribution workflow, or experimental branches, start with
 [docs/README.md](docs/README.md).

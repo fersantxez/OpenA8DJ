@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
   const auto hal_source = read_file(root / "src/hal/OpenA8DJUSB.m");
   const auto script = read_file(root / "scripts/build-hal-cpu-pool-candidate");
   const auto investigation =
-      read_file(root / "docs/state/investigations/cpu-optimization-2026-06-19.md");
+      read_file(root / "docs/memories/investigations/cpu-optimization-2026-06-19.md");
 
   const bool sources_present =
       !makefile.empty() && !hal_source.empty() && !script.empty() && !investigation.empty();

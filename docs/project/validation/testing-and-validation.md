@@ -37,6 +37,7 @@ Readable summaries live in:
 - [Public validation summary](../public-validation-summary.md)
 - [Measurement methodology](measurement-methodology.md)
 
-Detailed logs, rejected experiments, local paths, and build names live in:
+Detailed logs, rejected experiments, local paths, and build names live in
+maintainer memories:
 
-- [State evidence](../../state/evidence/test-evidence.md)
+- [Detailed evidence](../../memories/evidence/test-evidence.md)

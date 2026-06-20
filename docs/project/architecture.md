@@ -57,7 +57,8 @@ path.
 - `driverkit/`: DriverKit/AudioDriverKit shell placeholder, not installed or activated.
 - `tools/`: future offline analyzers and evidence generators.
 - `scripts/`: future safe wrappers for offline gates.
-- `docs/`: user, contributor, reference, and maintainer-state documents.
+- `docs/`: user, contributor, reference, validation, and project-memory
+  documents.
 
 ## Current Core Model
 

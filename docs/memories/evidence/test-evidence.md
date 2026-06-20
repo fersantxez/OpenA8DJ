@@ -1704,7 +1704,7 @@ Follow-up result:
 - This state is the local `0.5.0` stable reference until a later release-prep
   change explicitly supersedes it.
 - Stable reference document:
-  `docs/state/current-release-state.md`.
+  `docs/memories/current-release-state.md`.
 
 ## 2026-06-20 12:04 EDT - 0.5.0 CPU pool stable freeze
 

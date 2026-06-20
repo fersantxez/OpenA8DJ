@@ -75,4 +75,5 @@ run and was accepted as the stable 0.5.0 sound baseline.
 ## Detailed Evidence
 
 Technical logs, detailed build names, rejected experiments, and command-level
-evidence are kept in [state evidence](../state/evidence/test-evidence.md).
+evidence are kept in
+[maintainer memories](../memories/evidence/test-evidence.md).

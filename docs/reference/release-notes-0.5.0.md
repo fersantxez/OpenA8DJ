@@ -9,7 +9,8 @@ is the reference build for the public 0.5.x line.
 - Default runtime state: DVS Vinyl input active with the validated low-noise
   ground setting
 - Stable build profile: CPU pool transport profile
-- Technical evidence: see [state evidence](../state/evidence/test-evidence.md)
+- User validation summary: see
+  [public validation summary](../project/public-validation-summary.md)
 
 ## What Changed Since 0.4.0
 
@@ -20,8 +21,8 @@ is the reference build for the public 0.5.x line.
 - The driver keeps the 8-input / 8-output Traktor-facing surface.
 - The stable DVS input profile keeps digital input gain, input gate, destructive
   input trimming, and channel transforms off.
-- The stable build now enables the CPU pool cursor and fast ISO transfer
-  configuration path validated on the loaded artifact.
+- The stable build uses the CPU pool transport profile accepted during physical
+  playback validation and human listening.
 
 ## Confirmed Stable Behavior
 
@@ -29,37 +30,21 @@ is the reference build for the public 0.5.x line.
   and stable enough to freeze as the release reference.
 - Human listening on 2026-06-20 accepted the CPU pool profile as the 0.5.0
   stable sound profile.
-- The exact loaded HAL executable accepted by listening had SHA-256
-  `c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951`.
-- The unsigned build executable before ad-hoc signing had SHA-256
-  `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098`.
-- Same-artifact iRig Stream validation passed on pair B with
-  `quality_alignment_score=0.948151`, `analog_snr_db=8.72`, and
-  `capture_clipped_frames=0`.
-- Targeted offline gates passed:
-  - `opena8djcpp_timecode_readiness_gate`
-  - `opena8djcpp_dvs_packet_input_decode`
-  - `opena8djcpp_soundcheck_wav_quality`
-  - `opena8djcpp_audiophile_tone_gate`
-  - HAL safety gate
-- Post-install counters were clean:
-  - `outputUnderruns=0`
-  - `outputActiveUnderruns=0`
-  - `outputLateWriteFrames=0`
-  - `playbackTransferErrors=0`
-  - `captureStatusFailures=0`
-  - `outputPanicFlags=0`
+- Same-artifact iRig Stream validation passed on output pair B with real music
+  and no clipped capture frames in the recorded validation run.
+- Offline audio, routing, timecode-readiness, and HAL safety checks passed.
+- Post-install runtime counters were clean during the validation run.
 
-## Rejected Experiments
+## Limits
 
-- `HAL_INPUT_MAX_LATENCY_FRAMES=512` regressed Traktor calibration and must not
-  be used as the DVS latency fix.
-- Digital timecode input gain and timecode input gate are not part of the stable
-  DVS Vinyl state.
-- More aggressive output latency reduction below 3072 frames needs a separate
-  physical validation window before it can replace this reference.
-- Reusable/raw ISO completion-handler experiments are not part of the stable
-  0.5.0 freeze.
+- Digital timecode input gain and timecode input gate are not part of the
+  normal DVS Vinyl state.
+- More aggressive latency reductions need separate physical validation before
+  they can replace this reference.
+- Windows, Linux, Rust, and DriverKit work remains experimental unless a future
+  release note says otherwise.
+- Detailed engineering evidence and rejected experiments are preserved in
+  [maintainer memories](../memories/evidence/test-evidence.md).
 
 ## Release Assets
 
