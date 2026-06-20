@@ -33,7 +33,7 @@ restart Core Audio, play sound, record sound, or touch physical hardware.
 
 ## Package Checks
 
-For every release candidate:
+For every release build under validation:
 
 - Build `OpenA8DJ-<version>.dmg`.
 - Build `OpenA8DJ-<version>.pkg`.
@@ -68,7 +68,7 @@ If the lock is occupied:
 - report the desired window, duration, actions, and evidence directory.
 
 When a test finishes, release the lock immediately. Do not keep the lock while
-waiting for user input, reading logs, doing offline analysis, or writing docs.
+paused for user input, reading logs, doing offline analysis, or writing docs.
 Development work must be hardware-generous: compile, edit, inspect logs,
 analyze captures, update docs, package artifacts, and compare offline evidence
 without holding the lock. Acquire it as late as possible and release it as soon
@@ -79,18 +79,18 @@ Traktor interaction is complete.
 
 Before handing a build to a human listener:
 
-1. Install or load the exact candidate artifact under lock.
+1. Install or load the exact artifact under lock.
 2. Verify `Open Audio 8 DJ` enumerates as 8 inputs / 8 outputs.
 3. Verify MIDI endpoints are present.
 4. Play a saved WAV or generated tone through Audio 8 DJ.
 5. Capture the Audio 8 DJ output through the approved external capture route.
 6. Compare captured audio against the original WAV/tone reference.
 7. Record CPU/resource counters from the same run.
-8. Save all evidence under `local-analysis/`.
-9. Mark the build as candidate-only if the evidence is clean; otherwise keep it
+8. Save all evidence under `<evidence-dir>/`.
+9. Mark the build as validation-only if the evidence is clean; otherwise keep it
    diagnostic-only.
 
-Do not hand over a normal candidate if the exact loaded build has not passed a
+Do not hand over a normal listening build if the exact loaded build has not passed a
 real sound-quality check.
 
 ## Traktor / Timecode Check

@@ -6,7 +6,7 @@ macOS mainline.
 This is a technical evidence log. It intentionally contains internal build
 target names, local evidence paths, rejected experiments, and command-level
 details that are too noisy for public release notes. For the external-facing
-summary, see `docs/PUBLIC_VALIDATION_SUMMARY.md`.
+summary, see [public validation summary](../../project/public-validation-summary.md).
 
 ## 2026-06-19 17:01 EDT - Main package fix, DVS default, Control Center, and calibrated soundcheck
 
@@ -205,6 +205,76 @@ HAL bundle is not signed with a Developer ID Application certificate.
 Signature=adhoc
 TeamIdentifier=not set
 ```
+
+## 2026-06-20 14:01 EDT - Developer ID signing and notarization submission
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Hardware touched: no
+- Driver installed/reloaded: no
+- Package executed: no
+
+Local credential state:
+
+```text
+Developer ID Application: Fernando Sanchez (D3KWK7MN3Y)
+Developer ID Installer: Fernando Sanchez (D3KWK7MN3Y)
+OpenA8DJNotary keychain profile: stored and validated
+```
+
+Build commands:
+
+```sh
+make clean
+make release-signed \
+  SIGN_IDENTITY="Developer ID Application: Fernando Sanchez (D3KWK7MN3Y)" \
+  PKG_SIGN_IDENTITY="Developer ID Installer: Fernando Sanchez (D3KWK7MN3Y)" \
+  DMG_SIGN_IDENTITY="Developer ID Application: Fernando Sanchez (D3KWK7MN3Y)"
+bash -n scripts/notarize-release scripts/verify-signed-release
+cmake -S . -B build/cmake-release
+cmake --build build/cmake-release
+ctest --test-dir build/cmake-release --output-on-failure
+```
+
+Signing verification before notarization:
+
+```text
+build/OpenA8DJ.driver: valid on disk
+build/OpenA8DJ.driver: satisfies its Designated Requirement
+build/OpenA8DJControlCenter.app: valid on disk
+build/OpenA8DJControlCenter.app: satisfies its Designated Requirement
+OpenA8DJ-0.5.0.pkg: signed by Developer ID Installer
+opena8dj-tools-0.5.0.pkg: signed by Developer ID Installer
+ctest: PASS, 88/88 tests
+```
+
+Current Developer ID signed artifact hashes:
+
+```text
+faa8f357c2feb67b456dcd2e784ed8d37385e92f91057d5528e29b6bd22302b5  OpenA8DJ-0.5.0.pkg
+c3f8f4c661cf897b805d27b2da4bfae6104a9901cd5733de0f46de88e53e447c  OpenA8DJ-0.5.0.dmg
+1dc6851fe6d5be9e7bb29fdfa83be706266a47f743e1492062e2c038a5d54ed8  opena8dj-tools-0.5.0.pkg
+f880e884b158a94c04691e00e259f2610ebdfdf56a7bf433aee43fcd2acf2db6  opena8dj-tools-0.5.0.dmg
+```
+
+Apple notary submissions:
+
+```text
+900d52a7-e153-42ac-a827-a5763cd6fc85  OpenA8DJ-0.5.0.pkg  In Progress
+1feefd07-6918-4d9d-a621-15511ce815fb  OpenA8DJ-0.5.0.dmg  In Progress
+5e4bb7c8-3de1-4b58-98ab-27ebde2b188c  opena8dj-tools-0.5.0.pkg  Accepted and stapled
+9ab1b493-1a32-4674-aede-863f25a9242c  opena8dj-tools-0.5.0.dmg  Accepted and stapled
+6c89683d-1ba2-4f9a-bda6-2bd6716f8ff6  OpenA8DJ.driver diagnostic ZIP  Accepted
+```
+
+Current blocker:
+
+- Apple notary service still reports the final driver PKG and DMG submissions
+  as `In Progress`.
+- The tools PKG/DMG are accepted and stapled.
+- The HAL bundle itself validates as `Notarized Developer ID`.
+- Do not upload replacement public assets until Apple returns `Accepted`,
+  stapling succeeds, checksums are regenerated, and `make verify-signed-release`
+  passes.
 
 Generated ad-hoc preview artifact hashes from this run:
 
@@ -1634,7 +1704,7 @@ Follow-up result:
 - This state is the local `0.5.0` stable reference until a later release-prep
   change explicitly supersedes it.
 - Stable reference document:
-  `docs/STABLE_0.5.0_REFERENCE.md`.
+  `docs/state/current-release-state.md`.
 
 ## 2026-06-20 12:04 EDT - 0.5.0 CPU pool stable freeze
 

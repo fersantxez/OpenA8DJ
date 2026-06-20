@@ -6,16 +6,14 @@ OpenA8DJ 0.5.0 is the current macOS C++ baseline for the Native Instruments
 Audio 8 DJ. It is an independent preservation project and is not affiliated
 with, endorsed by, sponsored by, or certified by Native Instruments.
 
-## Signing Status
+## Download Safety
 
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification.
+Use only the files attached to this repository's GitHub Releases page. Match
+downloads against the checksum file shipped with the same release.
 
-Apple Developer Program membership is active as of 2026-06-20. The remaining
-release blocker is local signing setup: this Mac has no Developer ID
-Application identity, no Developer ID Installer identity, and no stored
-`notarytool` profile yet.
+Maintainers must not describe replacement binary assets as Developer ID signed
+or Apple-notarized unless the exact published files have passed the signed
+release verifier.
 
 ## What Was Tested
 
@@ -44,10 +42,6 @@ Application identity, no Developer ID Installer identity, and no stored
   bridge, C++ core, and macOS control tools.
 - User workflow validated: Traktor/timecode-oriented DVS Vinyl state and A/B/C/D
   deck routing surface.
-- Stable loaded HAL executable SHA-256:
-  `c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951`.
-- Unsigned stable build executable SHA-256 before ad-hoc signing:
-  `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098`.
 
 ## Validated Rates
 
@@ -62,8 +56,6 @@ audio app.
 
 ## Not Yet Claimed
 
-- The 0.5.0 assets are not Developer ID signed.
-- The 0.5.0 assets are not Apple-notarized.
 - Windows, Linux, and Rust branches are experimental and not validated release
   branches.
 - DriverKit/AudioDriverKit is scaffolding for a future System Extension path,
@@ -75,36 +67,12 @@ audio app.
 
 ## Stable 0.5.0 Sound Validation
 
-Latest same-artifact physical validation before human listening:
-
-```text
-run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat
-route=Open Audio 8 DJ pair B -> iRig Stream channels 1,2
-source=Cable Guy - Dj Deep (Original Mix).mp3
-result=PASS
-quality_alignment_score=0.948151
-analog_snr_db=8.72
-capture_clipped_frames=0
-opena8dj_driver_avg_cpu=5.470%
-opena8dj_driver_max_cpu=6.300%
-audio_stack_health_after=PASS
-hardware_lock_after=absent
-```
-
-## Frozen 0.5.0 Asset Hashes From Current Main
-
-These hashes describe the locally rebuilt 0.5.0 replacement asset set after the
-tools package install-location fix. Published downloads should always be checked
-against the `OpenA8DJ-0.5.0-checksums.txt` asset shipped with the same release.
-
-```text
-37d9fbd34e0fa76743bad568b62e722775269956479bfbe96f8137b55941f0cd  OpenA8DJ-0.5.0.dmg
-f7b629a04eec1e37a58de806587a6c730bc6e86d4a1e5065b182839a0a2e9265  OpenA8DJ-0.5.0.pkg
-c6bb68a41661ae7c3c617069d66a5b8a1a8fbb622afd978a5d4724a677665172  opena8dj-tools-0.5.0.dmg
-17fd67f67d1d70f26faea5d16f28af9a204b27adcdfe42bab674d2f8dd8a4221  opena8dj-tools-0.5.0.pkg
-```
+The 0.5.0 sound profile was validated with real music, Audio 8 DJ analog output,
+external iRig Stream capture, automated WAV comparison, and human listening.
+The accepted profile had no clipped capture frames in the recorded validation
+run and was accepted as the stable 0.5.0 sound baseline.
 
 ## Detailed Evidence
 
-Technical logs, internal build names, rejected experiments, and command-level
-evidence are kept in `docs/TEST_EVIDENCE.md`.
+Technical logs, detailed build names, rejected experiments, and command-level
+evidence are kept in [state evidence](../state/evidence/test-evidence.md).

@@ -87,5 +87,5 @@ Input mode mapping:
 - Timecode depends on the physical input path, cartridge, turntable, cable, and
   Traktor setup, not just the driver.
 - 88.2 and 96 kHz require separate production-quality validation.
-- Unsigned preview packages may require manual macOS approval until Developer
-  ID signing and notarization are complete.
+- Use only GitHub Release downloads and verify checksums if anything looks
+  unusual.

@@ -31,7 +31,7 @@ The first implementation is in the repo:
   - samples Core Audio, driver, UI, player, recorder, Spotify, and Traktor CPU
   - can add an opt-in CPU stress phase while capture is running
   - writes `summary.txt`, `metrics.json`, logs, and captured WAVs under
-    `local-analysis/soundcheck/<run-id>/`
+    `<evidence-dir>/soundcheck/<run-id>/`
 
 Make targets:
 
@@ -100,7 +100,7 @@ If `ffmpeg` is installed, the harness can use it as a fallback for formats that
 AudioToolbox does not decode.
 
 The original file is read-only. The harness writes temporary normalized WAV
-fixtures under `local-analysis/soundcheck/<run-id>/`, which is already ignored
+fixtures under `<evidence-dir>/soundcheck/<run-id>/`, which is already ignored
 by git.
 
 ## Music selection
@@ -178,7 +178,7 @@ This is the correct gate when no real sound should be produced. The script
 It writes:
 
 ```text
-local-analysis/simulated-output/<run-id>/
+<evidence-dir>/simulated-output/<run-id>/
   fixture/reference.wav
   simulated-output-packed-usb.raw
   simulated-output-decoded.wav
@@ -262,7 +262,7 @@ scripts/run-soundcheck \
 Outputs:
 
 ```text
-local-analysis/soundcheck/2026-06-12T101530/
+<evidence-dir>/soundcheck/2026-06-12T101530/
   source.json
   reference.wav
   captured.wav
@@ -303,7 +303,7 @@ For a full regression pass, run:
 - one sweep/impulse set
 - at least three real-music excerpts: dense, transient, wideband
 
-For a fast pass before a listening handoff, run:
+For a fast pass before a human listening session, run:
 
 - pair A only
 - 48000 Hz / 512 frames
@@ -380,7 +380,7 @@ The key files for this failure mode are:
 5. Produce a clear report.
    - `summary.txt` for humans.
    - `metrics.json` for regression comparisons.
-   - Keep all generated audio under `local-analysis/`.
+   - Keep all generated audio under `<evidence-dir>/`.
 
 ## Limitations
 

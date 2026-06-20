@@ -27,7 +27,8 @@ re-apply the default vinyl state. Normal users should use Control Center.
 Documentation:
 
 - CONTROL_SURFACES_USER_GUIDE.md in this disk image.
-- CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md in this disk image.
+- TRAKTOR_TIMECODE.md in this disk image.
+- CABLING.md in this disk image.
 - /Library/Documentation/OpenA8DJ/ControlSurfaces after install.
 
 Uninstall:
@@ -38,10 +39,5 @@ OpenA8DJ is an independent, open-source preservation project. It is not
 affiliated with, endorsed by, sponsored by, or certified by Native Instruments.
 Product names are used only to identify compatibility.
 
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification.
-
-Apple Developer Program membership is active, but the release Mac still needs
-local Developer ID certificates and notarization credentials before these tools
-can be shipped as signed and notarized assets.
+Use the OpenA8DJ files attached to the GitHub Release. Do not install copies
+from mirrors or unknown download sites.

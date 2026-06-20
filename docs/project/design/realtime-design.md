@@ -9,7 +9,7 @@ observable without doing unsafe work in the real-time path.
 
 The data plane covers:
 
-- Core Audio input/output callback handoff.
+- Core Audio input/output callback transfer.
 - Float32 8-channel interleaved host buffers.
 - 24-bit CAIAQ USB input decode and output pack.
 - Isochronous capture/playback transfer recycling.
@@ -435,7 +435,7 @@ USB-facing prepared slot ownership:
 - Transport backend work:
   - prepare capture and playback slots before streaming;
   - own steady-state completion/requeue outside the HAL callback;
-  - preserve one-completion-period cadence unless a future physical candidate
+  - preserve one-completion-period cadence unless a future physical test build
     proves a different cadence beats quality and CPU gates;
   - publish ordered timestamps and channel-stable frame batches to the rings.
 
@@ -570,7 +570,7 @@ Offline gate:
 
 This still does not submit real USB requests. It proves the runtime shell must
 preserve the low-CPU submit plan before a DriverKit/USBDriverKit adapter is
-allowed to become a hardware candidate.
+allowed to become a hardware test build.
 
 ## DriverKit USB Request Lifecycle Boundary
 
@@ -661,13 +661,13 @@ Offline gate:
   completions, stale completions, and live requests at snapshot must all be
   zero.
 
-This binding is the contract for the next HAL opt-in candidate. It must be
+This binding is the contract for the next HAL opt-in test build. It must be
 inserted before the real submit boundary, around the playback refill decision,
 while `submitPlaybackTransfer` remains the submit/observability boundary.
 
-## HAL Playback Scheduler Candidate Boundary
+## HAL Playback Scheduler Test Boundary
 
-The default-off HAL candidate preserves the real-time rule learned from failed
+The default-off HAL test build preserves the real-time rule learned from failed
 physical variants: do not reduce capture cadence before a same-session A/B
 proves it is safe.
 
@@ -683,5 +683,5 @@ Implementation constraints:
 - stream stats must expose prepared runtime submit/completion counters so the
   physical A/B can compare CPU/resource behavior against mainline.
 
-The candidate is build-only until a hardware lock window explicitly installs or
+The test build is build-only until a hardware lock window explicitly installs or
 loads it.

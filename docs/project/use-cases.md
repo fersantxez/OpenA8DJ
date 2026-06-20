@@ -1,9 +1,9 @@
-# Audio 8 DJ Use-Case Implementation Plan
+# Audio 8 DJ Use Cases
 
-This plan turns the Audio 8 DJ hardware dossier into an implementation roadmap.
-It is intentionally staged: first make the hardware safe and observable, then
-add user-facing configuration, then broaden to advanced routing and production
-packaging.
+This document maps the main ways people use the Audio 8 DJ and how OpenA8DJ
+supports or plans to support them. It is intentionally staged: first keep the
+hardware safe and observable, then make normal configuration simple, then
+broaden to advanced routing and production packaging.
 
 ## Guiding Rule
 
@@ -224,7 +224,7 @@ Implementation steps:
 2. Add RIAA/phono sanity test with known vinyl or test record if available.
 3. Add recording preset in Control Center.
 4. Add gain/clipping monitor.
-5. Add "vinyl archive" recording helper or handoff to DAW.
+5. Add "vinyl archive" recording helper or export workflow for a DAW.
 
 Control Center functionality:
 

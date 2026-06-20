@@ -14,10 +14,16 @@ Native Instruments. It does not include Native Instruments driver binaries,
 firmware, installers, logos, or proprietary payloads. Product names are used
 only to identify compatible hardware and software.
 
+## Support The Project
+
+OpenA8DJ is independent and non-profit. If this helps you keep an Audio 8 DJ in
+use, you can support the maintainer here:
+
+[Buy me a coffee](https://ko-fi.com/fersantxez)
+
 ## Download For macOS
 
-The canonical OpenA8DJ line is the macOS C++ driver stack. Start here if you
-want to use an Audio 8 DJ on a Mac.
+Start here if you want to use an Audio 8 DJ on a Mac.
 
 - [Latest release](https://github.com/fersantxez/OpenA8DJ/releases/latest)
 - `OpenA8DJ-0.5.0.dmg`: main driver installer
@@ -29,60 +35,21 @@ want to use an Audio 8 DJ on a Mac.
 Release assets are the only supported public binary downloads. GitHub Actions
 artifacts are temporary build files and are not used as end-user distribution.
 
-## Signing Status
-
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification. macOS may show a warning such as:
-
-```text
-"OpenA8DJ-0.5.0.pkg" Not Opened
-Apple could not verify "OpenA8DJ-0.5.0.pkg" is free of malware.
-```
-
-This means Apple has not notarized this independent driver package. It does not
-by itself mean the file changed or came from somewhere else.
-
-Use only official GitHub release assets from this repository and verify the
-checksum before approving any blocked installer:
-
-```sh
-shasum -a 256 OpenA8DJ-0.5.0.pkg
-grep OpenA8DJ-0.5.0.pkg OpenA8DJ-0.5.0-checksums.txt
-```
-
-The two SHA-256 values must match. Do not install if they differ.
-
-If Finder blocks the package, the current manual install path is:
-
-```sh
-sudo installer -pkg OpenA8DJ-0.5.0.pkg -target /
-```
-
-Alternatively, click `Done`, open System Settings -> Privacy & Security, find
-the blocked OpenA8DJ package, and choose `Open Anyway`.
-
-The permanent distribution goal is Developer ID signing plus Apple notarization
-so the normal double-click DMG/PKG install works without this manual approval.
-
 ## Install
-
-### Simple Step-By-Step Install
 
 1. Open the [latest release](https://github.com/fersantxez/OpenA8DJ/releases/latest).
 2. Download `OpenA8DJ-0.5.0.dmg`.
 3. Open the downloaded DMG file.
 4. Double-click `OpenA8DJ-0.5.0.pkg`.
 5. Follow the macOS Installer prompts.
-6. If macOS blocks the installer, click `Done`, open System Settings, go to
-   Privacy & Security, and choose `Open Anyway` for OpenA8DJ.
+6. Restart the audio app if it was already open.
 7. Reconnect the Audio 8 DJ if it does not appear immediately.
 
 After install, open Audio MIDI Setup and confirm `Open Audio 8 DJ` appears with
 8 inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once,
 then reopen the audio app.
 
-### Basic Use After Install
+## Basic Use
 
 1. Connect the Audio 8 DJ by USB.
 2. Open Audio MIDI Setup.
@@ -101,24 +68,20 @@ then reopen the audio app.
 If anything looks wrong, unplug and reconnect the Audio 8 DJ once, then reopen
 the audio app.
 
-Installed files:
+Detailed install, uninstall, and troubleshooting notes are in the
+[macOS install guide](docs/user/install.md).
 
-```text
-/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-/Library/LaunchAgents/org.opena8dj.midid.plist
-/usr/local/bin/opena8dj-control
-/usr/local/bin/opena8dj-midid
-/usr/local/bin/opena8dj-uninstall
-/Library/Documentation/OpenA8DJ
-```
+## Verify A Download
 
-Uninstall:
+The release includes a checksum file. This step is optional for normal users,
+but useful if you want to confirm a download:
 
 ```sh
-sudo /usr/local/bin/opena8dj-uninstall
+shasum -a 256 OpenA8DJ-0.5.0.pkg
+grep OpenA8DJ-0.5.0.pkg OpenA8DJ-0.5.0-checksums.txt
 ```
 
-Detailed install notes are in [docs/INSTALL.md](docs/INSTALL.md).
+The two SHA-256 values must match. Do not install if they differ.
 
 ## What Works In 0.5.0
 
@@ -142,25 +105,8 @@ The current release is stable for the validated macOS Audio 8 DJ workflow. It
 is not claimed to be perfect. Please report hardware results, regressions,
 routing issues, and timecode findings through GitHub Issues.
 
-For a public, non-internal summary of what was validated, see
-[docs/PUBLIC_VALIDATION_SUMMARY.md](docs/PUBLIC_VALIDATION_SUMMARY.md).
-
-## Modern macOS Architecture
-
-The `main` branch is the macOS product line. It is built around a modern
-user-space macOS stack:
-
-- Core Audio HAL plug-in for the current installable driver
-- IOUSBHost transport for the Audio 8 DJ USB interface
-- CoreMIDI bridge for MIDI I/O
-- C++ core contracts for packet layout, channel topology, routing, timecode
-  policy, buffer policy, and metrics
-- macOS tooling for profile control, diagnostics, installation, and validation
-- DriverKit/AudioDriverKit scaffolding as the forward System Extension path
-
-The older macOS kernel-extension audio model is not the project direction. The
-real-time audio path is kept separate from installation, UI, logging, heavy
-diagnostics, and other non-audio work.
+For a readable summary of what was validated, see the
+[public validation summary](docs/project/public-validation-summary.md).
 
 ## Traktor And Timecode Vinyl
 
@@ -173,7 +119,8 @@ vinyl use.
 If you want to confirm or re-apply the normal vinyl state, open
 `OpenA8DJ Control Center.app`, choose `DVS Vinyl`, and click `Apply`.
 
-See [docs/TRAKTOR_TIMECODE.md](docs/TRAKTOR_TIMECODE.md) for the DVS checklist.
+See [Traktor and Timecode Vinyl](docs/user/traktor-timecode.md) for the DVS
+checklist.
 
 ## Tools And Control Center
 
@@ -192,58 +139,14 @@ Use Control Center for normal options. The command-line control tool is still
 installed for maintainers and diagnostics, but non-technical users should not
 need it.
 
-## Experimental Platforms
+## More Help
 
-macOS `main` plus GitHub Releases are the only user-facing driver line.
-
-Windows, Linux, and Rust branches are public for research and continuity only.
-They are not validated release branches, and they should not be assumed to work
-without platform-specific testing.
-
-- Windows: `windows/rebuild-surface` is experimental and not validated.
-- Linux: `linux/full-driver-agent` is experimental and not validated.
-- Rust: `rust/modular-core-spike` is a lab/oracle branch, not the macOS runtime.
-- Feedback is welcome, especially hardware reports and reproducible logs.
-
-See [docs/PLATFORM_SUPPORT.md](docs/PLATFORM_SUPPORT.md) for the current matrix.
-
-## Legacy And Research Branches
-
-The old C/Objective-C implementation is preserved on the `legacy` branch as a
-historical reference. It captured useful reverse-engineering and physical-test
-knowledge, including behavior inspired by Linux CAIAQ / `snd-usb-caiaq` work,
-but it is not the recommended user-facing driver.
-
-The Rust work is kept as an experimental lab/oracle branch. It may help with
-tests, metrics, analyzers, and future ideas, but it is not the runtime direction
-of the macOS `main` branch.
-
-## Build From Source
-
-```sh
-make clean
-make all
-make dist
-```
-
-Generated local artifacts:
-
-```text
-build/OpenA8DJ-0.5.0.pkg
-build/OpenA8DJ-0.5.0.dmg
-build/opena8dj-tools-0.5.0.pkg
-build/opena8dj-tools-0.5.0.dmg
-build/OpenA8DJ-0.5.0-checksums.txt
-```
-
-Release maintainers should use Developer ID identities, notarize the artifacts,
-staple notarization tickets, and run the signed-release verification gate before
-replacing public GitHub assets.
-
-Apple Developer Program membership is active, but this Mac currently has no
-Developer ID Application or Developer ID Installer identity installed. Until
-those identities and a `notarytool` profile exist locally, release artifacts
-remain unsigned/not-notarized and need the manual approval path described above.
+- [Quick start](docs/user/quick-start.md)
+- [Install guide](docs/user/install.md)
+- [Traktor and Timecode Vinyl](docs/user/traktor-timecode.md)
+- [Control Center](docs/user/control-center.md)
+- [Troubleshooting](docs/user/troubleshooting.md)
+- [Uninstall](docs/user/uninstall.md)
 
 ## Contributing
 
@@ -262,5 +165,8 @@ Please use GitHub Issues:
 - [Request a feature](https://github.com/fersantxez/OpenA8DJ/issues/new?template=feature_request.yml)
 - [View open issues](https://github.com/fersantxez/OpenA8DJ/issues)
 
-If you want to thank the maintainer, you can
-[buy me a coffee](https://ko-fi.com/fersantxez).
+## Follow Development
+
+If you want to understand the architecture, validation process, roadmap,
+experimental branches, or maintainer state, start with
+[docs/README.md](docs/README.md).

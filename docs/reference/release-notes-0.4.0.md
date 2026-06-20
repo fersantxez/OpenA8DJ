@@ -84,7 +84,7 @@ Final local checks for this release line:
 - 44.1 kHz and 48 kHz playback validated locally.
 
 Current branch roles are summarized in
-[`docs/CURRENT_BRANCH_STATUS.md`](CURRENT_BRANCH_STATUS.md).
+[current branch status](../state/current-branch-status.md).
 
 ## Known Limits
 

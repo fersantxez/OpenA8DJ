@@ -9,7 +9,7 @@ is the reference build for the public 0.5.x line.
 - Default runtime state: DVS Vinyl input active with the validated low-noise
   ground setting
 - Stable build profile: CPU pool transport profile
-- Technical evidence: see `docs/TEST_EVIDENCE.md`
+- Technical evidence: see [state evidence](../state/evidence/test-evidence.md)
 
 ## What Changed Since 0.4.0
 
@@ -76,13 +76,10 @@ opena8dj-tools-0.5.0.pkg
 `opena8dj-tools-0.5.0.pkg` is the optional direct installer for the Control
 Center and support tools. It does not replace the HAL driver package.
 
-## Signing Status
+## Download Safety
 
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification.
+Download OpenA8DJ only from this repository's GitHub Releases page. The release
+includes SHA-256 checksums so users can confirm that the downloaded files match
+the published assets.
 
-The Apple Developer Program membership is active as of 2026-06-20, but this
-Mac still has no local Developer ID Application or Developer ID Installer
-identity installed. Do not call replacement assets signed/notarized until
-`make verify-signed-release` passes.
+Do not install copies from mirrors, chat attachments, or unknown download sites.

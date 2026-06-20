@@ -142,11 +142,11 @@ Acceptance:
 - Control changes update the hardware LEDs/state and survive driver restart
   where expected.
 
-## Priority 5: installation and signing
+## Priority 5: Installation And Signing
 
-The current PKG/DMG is useful for public preview testing. The production target should be
-a signed app bundle containing a DriverKit system extension, plus a DMG or PKG
-wrapper for distribution.
+The current PKG/DMG path is the installable macOS release path for the 0.5.x
+line. The longer-term production target is a signed app bundle containing a
+DriverKit system extension, plus a DMG or PKG wrapper for distribution.
 
 Actions:
 

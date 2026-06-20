@@ -2,11 +2,11 @@
 
 ## Status
 
-OpenA8DJ `main` is now the modern macOS C++ driver line. The current installable
-preview is packaged as a macOS-native user-space Core Audio HAL driver backed
-by IOUSBHost USB transport, CoreMIDI endpoints, and an Audio 8 DJ control
-bridge. The DriverKit/AudioDriverKit shell remains the forward architecture for
-a future System Extension build when the full DriverKit SDK/signing path is
+OpenA8DJ `main` is the modern macOS C++ driver line. The current public release
+is packaged as a macOS-native user-space Core Audio HAL driver backed by
+IOUSBHost USB transport, CoreMIDI endpoints, and an Audio 8 DJ control bridge.
+The DriverKit/AudioDriverKit shell remains the forward architecture for a
+future System Extension build when the full DriverKit SDK/signing path is
 available.
 
 The previous C/Objective-C implementation is preserved on the parallel
@@ -57,7 +57,7 @@ path.
 - `driverkit/`: DriverKit/AudioDriverKit shell placeholder, not installed or activated.
 - `tools/`: future offline analyzers and evidence generators.
 - `scripts/`: future safe wrappers for offline gates.
-- `docs/`: living architecture and readiness documents.
+- `docs/`: user, contributor, reference, and maintainer-state documents.
 
 ## Current Core Model
 

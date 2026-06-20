@@ -1,12 +1,11 @@
-# Installing OpenA8DJ On macOS
+# Install OpenA8DJ On macOS
 
 OpenA8DJ is an independent open-source preservation driver for the Native
 Instruments Audio 8 DJ. It is not affiliated with, endorsed by, sponsored by,
 or certified by Native Instruments.
 
-This guide installs the current macOS package: a user-space Core Audio HAL
-driver, MIDI support, and the control tools needed to switch Audio 8 DJ
-profiles such as `timecode-vinyl`.
+This guide installs the current macOS package: the OpenA8DJ audio driver, MIDI
+support, and the optional Control Center tools.
 
 ## Download
 
@@ -27,12 +26,12 @@ opena8dj-tools-0.5.0.pkg
 ```
 
 Use the `OpenA8DJ` package for the driver. Use the separate `opena8dj-tools`
-package only when you want the optional Control Center/support tools without
-reinstalling the driver.
+package when you also want the optional Control Center app.
 
 ## Verify The Download
 
-Before overriding any macOS security prompt, verify the checksum:
+The public release includes a checksum file. Verification is optional for a
+normal install, but recommended if you want to confirm the download:
 
 ```sh
 shasum -a 256 OpenA8DJ-0.5.0.pkg
@@ -44,19 +43,21 @@ file. Do not install if it differs.
 
 ## Normal Install
 
-Once the release is Developer ID signed and Apple-notarized, this is the normal
-non-technical install path:
+This is the normal non-technical install path for the public GitHub release:
 
 1. Open `OpenA8DJ-0.5.0.dmg`.
 2. Double-click `OpenA8DJ-0.5.0.pkg`.
 3. Follow the macOS Installer prompts.
-4. Reconnect the Audio 8 DJ if it does not appear immediately.
+4. Restart the audio app if it was already open.
+5. Reconnect the Audio 8 DJ if it does not appear immediately.
 
-## If macOS Blocks The Package
+## If macOS Shows A Security Warning
 
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification. Recent macOS versions may show:
+Use only the GitHub Release download from this repository. If macOS shows a
+security warning for a file downloaded somewhere else, stop and download the
+release again from GitHub.
+
+Recent macOS versions may show a warning like:
 
 ```text
 "OpenA8DJ-0.5.0.pkg" Not Opened
@@ -73,19 +74,7 @@ If the dialog only offers `Move to Trash` and `Done`:
 6. Click `Open Anyway`.
 7. Confirm the second warning, then continue with the installer.
 
-Terminal fallback after checksum verification:
-
-```sh
-sudo installer -pkg OpenA8DJ-0.5.0.pkg -target /
-```
-
-This is an unsigned-release workaround, not the final distribution experience.
-The final fix is Developer ID signing and Apple notarization.
-
-Current signing status for maintainers: Apple Developer Program membership is
-active, but this Mac still needs Developer ID Application and Developer ID
-Installer certificates plus a stored `notarytool` profile before signed,
-notarized release assets can be produced.
+Normal users should not need Terminal for the GitHub release installer.
 
 ## Installed Files
 
@@ -129,7 +118,10 @@ Open Audio 8 DJ MIDI In
 Open Audio 8 DJ MIDI Out
 ```
 
-Useful local checks from a source checkout:
+## Advanced Support Checks
+
+These checks are for support and development from a source checkout. Normal
+users do not need them for installation.
 
 ```sh
 ./build/audio-inspect
@@ -138,9 +130,8 @@ Useful local checks from a source checkout:
 ./build/midi-list
 ```
 
-Optional installed control check: open `/Applications/OpenA8DJ Control
-Center.app`, choose `DVS Vinyl`, and confirm the hardware state shows input
-decode on.
+Optional Control Center check: open `/Applications/OpenA8DJ Control
+Center.app`, choose `DVS Vinyl`, and confirm it shows the normal vinyl profile.
 
 ## Traktor / Timecode Vinyl
 
@@ -165,18 +156,10 @@ Optional tools uninstall:
 sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
 ```
 
-## Signing Note For Maintainers
+## More Help
 
-Local and CI builds can be ad-hoc signed. A polished end-user release should
-use a Developer ID Installer certificate and Apple notarization so macOS
-Gatekeeper can verify the package without extra user steps.
-
-Release maintainers must build with Developer ID identities, notarize with
-Apple, staple the tickets, and pass the signed-release verification gate before
-claiming that the public assets are officially signed/notarized.
-
-## Historical Branch Note
-
-The older C/Objective-C driver line is preserved on the `legacy` branch for
-reference. New users who want the current macOS driver should install the
-latest 0.5.x release from GitHub Releases.
+- [Quick start](quick-start.md)
+- [Traktor and Timecode Vinyl](traktor-timecode.md)
+- [Control Center](control-center.md)
+- [Troubleshooting](troubleshooting.md)
+- [Uninstall](uninstall.md)

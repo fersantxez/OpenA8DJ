@@ -4,6 +4,8 @@ set -euo pipefail
 version="${VERSION:-0.5.0}"
 pkg="${PKG:-build/OpenA8DJ-${version}.pkg}"
 dmg="${DMG:-build/OpenA8DJ-${version}.dmg}"
+tools_pkg="${TOOLS_PKG:-build/opena8dj-tools-${version}.pkg}"
+tools_dmg="${TOOLS_DMG:-build/opena8dj-tools-${version}.dmg}"
 checksums="${CHECKSUMS:-build/OpenA8DJ-${version}-checksums.txt}"
 profile="${NOTARY_PROFILE:-OpenA8DJNotary}"
 
@@ -24,25 +26,36 @@ require_tool() {
 
 require_file "$pkg"
 require_file "$dmg"
+require_file "$tools_pkg"
+require_file "$tools_dmg"
 require_tool xcrun
 require_tool shasum
 
-printf 'Submitting package to Apple notarization: %s\n' "$pkg"
-xcrun notarytool submit "$pkg" --keychain-profile "$profile" --wait
-xcrun stapler staple "$pkg"
-xcrun stapler validate "$pkg"
+notarize_and_staple() {
+  local artifact="$1"
+  printf 'Submitting artifact to Apple notarization: %s\n' "$artifact"
+  xcrun notarytool submit "$artifact" --keychain-profile "$profile" --wait
+  xcrun stapler staple "$artifact"
+  xcrun stapler validate "$artifact"
+}
 
-printf 'Submitting disk image to Apple notarization: %s\n' "$dmg"
-xcrun notarytool submit "$dmg" --keychain-profile "$profile" --wait
-xcrun stapler staple "$dmg"
-xcrun stapler validate "$dmg"
+notarize_and_staple "$pkg"
+notarize_and_staple "$dmg"
+notarize_and_staple "$tools_pkg"
+notarize_and_staple "$tools_dmg"
 
 (
   cd "$(dirname "$checksums")"
-  shasum -a 256 "$(basename "$dmg")" "$(basename "$pkg")" > "$(basename "$checksums")"
+  shasum -a 256 \
+    "$(basename "$dmg")" \
+    "$(basename "$pkg")" \
+    "$(basename "$tools_dmg")" \
+    "$(basename "$tools_pkg")" > "$(basename "$checksums")"
 )
 
 printf 'Notarized, stapled, and checksummed release artifacts:\n'
 printf '  %s\n' "$pkg"
 printf '  %s\n' "$dmg"
+printf '  %s\n' "$tools_pkg"
+printf '  %s\n' "$tools_dmg"
 printf '  %s\n' "$checksums"

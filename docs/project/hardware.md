@@ -7,9 +7,9 @@ validated in this repository.
 ## Source Baseline
 
 - Local NI driver documentation:
-  `local-analysis/audio8dj-2.8.0/payload-files/Applications/Native Instruments/Audio 8 DJ Driver/Documentation/Audio 8 DJ Manual English.pdf`
-- Existing project map: `docs/AUDIO8DJ_CONNECTORS_AND_CAPTURE.md`
-- Existing timecode map: `docs/TRAKTOR_TIMECODE.md`
+  `<evidence-dir>/audio8dj-2.8.0/payload-files/Applications/Native Instruments/Audio 8 DJ Driver/Documentation/Audio 8 DJ Manual English.pdf`
+- Cable and routing map: [Cable and routing options](cabling.md)
+- Timecode map: [Traktor and Timecode Vinyl](../user/traktor-timecode.md)
 - Current OpenA8DJ channel names: `src/hal/OpenA8DJHAL.c`
 - Current OpenA8DJ USB identity and endpoints: `src/hal/OpenA8DJUSB.m`
 - Public manual mirror used only as a readable cross-check:
@@ -257,5 +257,5 @@ than a normal class-compliant USB audio configuration.
   and low-latency stability.
 - A playback-only build can pass output gates while still being incomplete for
   DVS. Timecode readiness requires input quality and physical scope behavior.
-- A normal candidate handoff still requires real sound-quality evidence for the
+- A normal listening build still requires real sound-quality evidence for the
   exact loaded artifact, not just correct USB/Core Audio enumeration.

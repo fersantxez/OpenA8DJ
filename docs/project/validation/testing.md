@@ -45,7 +45,7 @@ extended validation targets until release notes say otherwise.
 
 ## Sound Quality
 
-Do not offer a normal listening candidate until the exact loaded artifact has
+Do not offer a normal listening build until the exact loaded artifact has
 passed a real sound-quality check.
 
 Minimum physical check:
@@ -54,7 +54,7 @@ Minimum physical check:
 2. Capture the output through the approved external capture route.
 3. Compare capture against the original reference.
 4. Record CPU/resource counters from the same run.
-5. Save the evidence under `local-analysis/`.
+5. Save the evidence under `<evidence-dir>/`.
 
 If this fails, the build is diagnostic-only.
 

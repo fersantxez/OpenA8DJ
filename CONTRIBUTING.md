@@ -18,5 +18,6 @@ Use public facts, live hardware testing, and original implementation work. If a
 change depends on information from another project, document the source and keep
 the implementation independent.
 
-Before opening a pull request, read [docs/LEGAL.md](docs/LEGAL.md) and make
-sure the release/publication policy still holds.
+Before opening a pull request, read
+[docs/reference/legal.md](docs/reference/legal.md) and make sure the
+release/publication policy still holds.

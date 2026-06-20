@@ -83,7 +83,7 @@ The panel is an end-user UI and does not acquire the development lock itself.
 For locked engineering work, prefer the CLI through:
 
 ```sh
-scripts/shared-hardware-lock-run --gate control-surface-work --run-dir local-analysis/... -- ./build/opena8dj-control ...
+scripts/shared-hardware-lock-run --gate control-surface-work --run-dir <evidence-dir>/... -- ./build/opena8dj-control ...
 ```
 
 ## Open The Panel
@@ -383,7 +383,7 @@ Save config -> Apply diagnostics preset -> Run one measurement -> Restore config
 Recommended wrapper:
 
 ```sh
-scripts/shared-hardware-lock-run --gate engineering-diagnostics --run-dir local-analysis/... -- bash -lc '
+scripts/shared-hardware-lock-run --gate engineering-diagnostics --run-dir <evidence-dir>/... -- bash -lc '
   ./build/opena8dj-control export-config original.json
   trap "./build/opena8dj-control import-config original.json" EXIT
   ./build/opena8dj-control apply-preset engineering-diagnostics

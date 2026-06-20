@@ -13,19 +13,8 @@ Install:
 2. Follow the macOS Installer prompts.
 3. Reconnect the Audio 8 DJ if it does not appear immediately.
 
-If macOS blocks the installer with:
-
-"OpenA8DJ-0.5.0.pkg" Not Opened
-Apple could not verify "OpenA8DJ-0.5.0.pkg" is free of malware.
-
-click Done, not Move to Trash. Then open System Settings > Privacy & Security,
-find the blocked OpenA8DJ package in the Security section, and choose
-Open Anyway.
-
-OpenA8DJ 0.5.0 release assets are unsigned, not Developer ID signed, and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification. Only override Gatekeeper for official
-release assets from this repository, and verify the SHA-256 checksum first.
+Use the OpenA8DJ files attached to the GitHub Release. Do not install copies
+from mirrors or unknown download sites.
 
 The installer adds:
 
@@ -51,14 +40,10 @@ Current status:
 - Stable sound profile: CPU pool profile validated with iRig Stream and human
   listening on 2026-06-20
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
-- Legacy C line: preserved separately on the repository legacy branch
 - Windows/Linux: experimental platform areas, not included in this macOS driver
 
 After install, open Audio MIDI Setup and confirm Open Audio 8 DJ appears with 8
 inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once, then
 reopen the audio app.
 
-Apple Developer Program membership is active, but this Mac still needs local
-Developer ID Application and Developer ID Installer certificates plus
-notarization credentials before the release can become a normal signed and
-notarized one-click installer.
+For more help, open the GitHub README or docs/user/install.md in the repository.

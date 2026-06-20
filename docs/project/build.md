@@ -54,22 +54,17 @@ build/opena8dj-tools-<version>.dmg
 build/OpenA8DJ-<version>-checksums.txt
 ```
 
-Artifacts produced by `make dist` without release signing identities are
-unsigned local release artifacts. They are not Developer ID signed and not
-Apple-notarized. macOS Gatekeeper will likely block them unless manually
-approved after checksum verification.
+Artifacts produced by `make dist` without release signing identities are local
+build artifacts, not public release assets. Use `make release-signed`,
+`make notarize`, and `make verify-signed-release` for replacement GitHub
+release downloads.
 
 ## Build The Official Signed Release
 
-The long-term official release path is Developer ID signing and Apple
-notarization. This requires an active Apple Developer Program team, a
+The official release path is Developer ID signing and Apple notarization. This
+requires an active Apple Developer Program team, a
 `Developer ID Application` certificate, a `Developer ID Installer` certificate,
 and a local `notarytool` keychain profile.
-
-As of 2026-06-20, Apple Developer Program membership is active. This Mac still
-reports `0 valid identities found`, so release signing remains blocked until
-the Developer ID Application and Developer ID Installer certificates are
-created/downloaded and installed in the local keychain.
 
 ```sh
 make clean
@@ -127,4 +122,4 @@ sudo /usr/local/bin/opena8dj-uninstall
 ```
 
 Hardware/audio validation requires the global lock described in
-[`TEST_PLAN.md`](TEST_PLAN.md).
+[the test plan](validation/test-plan.md).

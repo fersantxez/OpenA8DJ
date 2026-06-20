@@ -4,10 +4,13 @@ set -euo pipefail
 version="${VERSION:-0.5.0}"
 pkg="${PKG:-build/OpenA8DJ-${version}.pkg}"
 dmg="${DMG:-build/OpenA8DJ-${version}.dmg}"
+tools_pkg="${TOOLS_PKG:-build/opena8dj-tools-${version}.pkg}"
+tools_dmg="${TOOLS_DMG:-build/opena8dj-tools-${version}.dmg}"
 checksums="${CHECKSUMS:-build/OpenA8DJ-${version}-checksums.txt}"
 hal_bundle="${HAL_BUNDLE:-build/OpenA8DJ.driver}"
 control_tool="${CONTROL_TOOL:-build/opena8dj-control}"
 midi_bridge="${MIDI_BRIDGE:-build/opena8dj-midid}"
+control_center_app="${CONTROL_CENTER_APP:-build/OpenA8DJControlCenter.app}"
 
 require_file() {
   local path="$1"
@@ -19,10 +22,13 @@ require_file() {
 
 require_file "$pkg"
 require_file "$dmg"
+require_file "$tools_pkg"
+require_file "$tools_dmg"
 require_file "$checksums"
 require_file "$hal_bundle"
 require_file "$control_tool"
 require_file "$midi_bridge"
+require_file "$control_center_app"
 
 tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/opena8dj-verify-signed-release.XXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -31,10 +37,12 @@ printf 'Verifying code signatures for packaged executables...\n'
 codesign --verify --deep --strict --verbose=2 "$hal_bundle"
 codesign --verify --strict --verbose=2 "$control_tool"
 codesign --verify --strict --verbose=2 "$midi_bridge"
+codesign --verify --deep --strict --verbose=2 "$control_center_app"
 
 codesign -dv --verbose=4 "$hal_bundle" >"$tmpdir/hal.codesign.txt" 2>&1 || true
 codesign -dv --verbose=4 "$control_tool" >"$tmpdir/control.codesign.txt" 2>&1 || true
 codesign -dv --verbose=4 "$midi_bridge" >"$tmpdir/midid.codesign.txt" 2>&1 || true
+codesign -dv --verbose=4 "$control_center_app" >"$tmpdir/control-center.codesign.txt" 2>&1 || true
 
 if ! grep -q 'Authority=Developer ID Application:' "$tmpdir/hal.codesign.txt"; then
   printf 'HAL bundle is not signed with a Developer ID Application certificate.\n' >&2
@@ -54,6 +62,12 @@ if ! grep -q 'Authority=Developer ID Application:' "$tmpdir/midid.codesign.txt";
   exit 3
 fi
 
+if ! grep -q 'Authority=Developer ID Application:' "$tmpdir/control-center.codesign.txt"; then
+  printf 'OpenA8DJ Control Center is not signed with a Developer ID Application certificate.\n' >&2
+  cat "$tmpdir/control-center.codesign.txt" >&2
+  exit 3
+fi
+
 printf 'Verifying installer package signature...\n'
 pkgutil --check-signature "$pkg" >"$tmpdir/pkgutil.txt"
 cat "$tmpdir/pkgutil.txt"
@@ -62,11 +76,22 @@ if ! grep -q 'Developer ID Installer' "$tmpdir/pkgutil.txt"; then
   exit 3
 fi
 
+pkgutil --check-signature "$tools_pkg" >"$tmpdir/tools-pkgutil.txt"
+cat "$tmpdir/tools-pkgutil.txt"
+if ! grep -q 'Developer ID Installer' "$tmpdir/tools-pkgutil.txt"; then
+  printf 'Tools PKG is not signed with a Developer ID Installer certificate.\n' >&2
+  exit 3
+fi
+
 printf 'Verifying Gatekeeper assessment and stapled tickets...\n'
 spctl -a -vv -t install "$pkg"
 xcrun stapler validate "$pkg"
 spctl -a -vv -t open --context context:primary-signature "$dmg"
 xcrun stapler validate "$dmg"
+spctl -a -vv -t install "$tools_pkg"
+xcrun stapler validate "$tools_pkg"
+spctl -a -vv -t open --context context:primary-signature "$tools_dmg"
+xcrun stapler validate "$tools_dmg"
 
 printf 'Verifying release checksums...\n'
 (

@@ -74,13 +74,14 @@ CONTROL_DMG_ROOT := build/control-dmgroot
 CONTROL_DMG := build/opena8dj-tools-$(VERSION).dmg
 CONTROL_DMG_README := resources/control-surfaces-dmg/README.txt
 CHECKSUMS := build/OpenA8DJ-$(VERSION)-checksums.txt
-RELEASE_NOTES := docs/RELEASE_NOTES_$(VERSION).md
+RELEASE_NOTES := docs/reference/release-notes-$(VERSION).md
 SIGN_IDENTITY ?= -
 PKG_SIGN_IDENTITY ?=
 DMG_SIGN_IDENTITY ?=
 NOTARY_PROFILE ?= OpenA8DJNotary
 CODESIGN_TIMESTAMP ?= --timestamp=none
 CODESIGN_OPTIONS ?=
+HAL_STAPLE_AFTER_SIGN ?= 0
 HAL_DIAGNOSTIC ?= 0
 HAL_DIAGNOSTIC_DIR_DEFAULT ?= /tmp
 HAL_OUTPUT_GAIN ?= 0.75f
@@ -497,7 +498,9 @@ $(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_FLAGS_STAMP)
 endif
 
 sign-hal: $(HAL_BIN)
+	rm -rf "$(HAL_BUNDLE)/Contents/_CodeSignature"
 	codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(HAL_BUNDLE)"
+	if [ "$(HAL_STAPLE_AFTER_SIGN)" = "1" ]; then xcrun stapler staple "$(HAL_BUNDLE)"; xcrun stapler validate "$(HAL_BUNDLE)"; fi
 
 sign-tools: $(CONTROL_TOOL) $(MIDI_BRIDGE)
 	codesign --force --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(CONTROL_TOOL)"
@@ -703,7 +706,7 @@ $(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_T
 	cp "$(CONTROL_CENTER_PLIST)" "$(CONTROL_CENTER_APP)/Contents/Info.plist"
 	cp "$(CONTROL_TOOL)" "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
 	xcrun swiftc -parse-as-library -O -framework SwiftUI -framework AppKit -o "$(CONTROL_CENTER_APP)/Contents/MacOS/OpenA8DJControlCenter" "$(CONTROL_CENTER_SRC)"
-	codesign --force --deep --sign - "$(CONTROL_CENTER_APP)"
+	codesign --force --deep --sign "$(SIGN_IDENTITY)" $(CODESIGN_TIMESTAMP) $(CODESIGN_OPTIONS) "$(CONTROL_CENTER_APP)"
 
 control-center: $(CONTROL_CENTER_APP)
 
@@ -738,9 +741,9 @@ install-control-surfaces: $(CONTROL_CENTER_APP)
 	sudo install -m 755 $(CONTROL_TOOL) /usr/local/bin/opena8dj-control
 	sudo rm -rf "/Applications/OpenA8DJ Control Center.app"
 	COPYFILE_DISABLE=1 sudo cp -R "$(CONTROL_CENTER_APP)" "/Applications/OpenA8DJ Control Center.app"
-	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md /Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md
-	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md /Library/Documentation/OpenA8DJ/ControlSurfaces/DEMO_RUNBOOK_2026-06-19.md
-	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACE_VERIFICATION_2026-06-19.md /Library/Documentation/OpenA8DJ/ControlSurfaces/VERIFICATION_2026-06-19.md
+	sudo install -m 644 docs/user/control-center.md /Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md
+	sudo install -m 644 docs/user/traktor-timecode.md /Library/Documentation/OpenA8DJ/ControlSurfaces/TRAKTOR_TIMECODE.md
+	sudo install -m 644 docs/project/cabling.md /Library/Documentation/OpenA8DJ/ControlSurfaces/CABLING.md
 	sudo install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
 	sudo xattr -cr "/Applications/OpenA8DJ Control Center.app" /Library/Documentation/OpenA8DJ/ControlSurfaces 2>/dev/null || true
 
@@ -768,7 +771,7 @@ package: all sign-hal sign-tools
 	install -d "$(PKG_ROOT)/Library/Documentation/OpenA8DJ"
 	install -m 644 LICENSE "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LICENSE"
 	install -m 644 NOTICE.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/NOTICE.md"
-	install -m 644 docs/LEGAL.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
+	install -m 644 docs/reference/legal.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/BRAND_POLICY.md"
 	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/RELEASE_NOTES.md"; fi
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
@@ -784,12 +787,12 @@ control-surfaces-package: $(CONTROL_CENTER_APP)
 	install -d "$(CONTROL_PKG_ROOT)/usr/local/bin"
 	install -m 755 "$(CONTROL_TOOL)" "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-control"
 	install -d "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces"
-	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md"
-	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/DEMO_RUNBOOK_2026-06-19.md"
-	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACE_VERIFICATION_2026-06-19.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/VERIFICATION_2026-06-19.md"
+	install -m 644 docs/user/control-center.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md"
+	install -m 644 docs/user/traktor-timecode.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/TRAKTOR_TIMECODE.md"
+	install -m 644 docs/project/cabling.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/CABLING.md"
 	install -m 644 LICENSE "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LICENSE"
 	install -m 644 NOTICE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/NOTICE.md"
-	install -m 644 docs/LEGAL.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LEGAL.md"
+	install -m 644 docs/reference/legal.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/BRAND_POLICY.md"
 	install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh"
 	chmod +x "$(CONTROL_PKG_SCRIPTS)/preinstall" "$(CONTROL_PKG_SCRIPTS)/postinstall" "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh"
@@ -809,7 +812,7 @@ dmg: package $(DMG_README)
 	install -m 644 "$(DMG_README)" "$(DMG_ROOT)/README.txt"
 	install -m 644 LICENSE "$(DMG_ROOT)/LICENSE"
 	install -m 644 NOTICE.md "$(DMG_ROOT)/NOTICE.md"
-	install -m 644 docs/LEGAL.md "$(DMG_ROOT)/LEGAL.md"
+	install -m 644 docs/reference/legal.md "$(DMG_ROOT)/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(DMG_ROOT)/BRAND_POLICY.md"
 	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(DMG_ROOT)/RELEASE_NOTES.md"; fi
 	hdiutil create -volname "OpenA8DJ $(VERSION)" -srcfolder "$(DMG_ROOT)" -ov -format UDZO "$(DMG)"
@@ -820,11 +823,12 @@ control-surfaces-dmg: control-surfaces-package $(CONTROL_DMG_README)
 	install -d "$(CONTROL_DMG_ROOT)"
 	install -m 644 "$(CONTROL_PKG)" "$(CONTROL_DMG_ROOT)/opena8dj-tools-$(VERSION).pkg"
 	install -m 644 "$(CONTROL_DMG_README)" "$(CONTROL_DMG_ROOT)/README.txt"
-	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md "$(CONTROL_DMG_ROOT)/CONTROL_SURFACES_USER_GUIDE.md"
-	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md "$(CONTROL_DMG_ROOT)/CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md"
+	install -m 644 docs/user/control-center.md "$(CONTROL_DMG_ROOT)/CONTROL_SURFACES_USER_GUIDE.md"
+	install -m 644 docs/user/traktor-timecode.md "$(CONTROL_DMG_ROOT)/TRAKTOR_TIMECODE.md"
+	install -m 644 docs/project/cabling.md "$(CONTROL_DMG_ROOT)/CABLING.md"
 	install -m 644 LICENSE "$(CONTROL_DMG_ROOT)/LICENSE"
 	install -m 644 NOTICE.md "$(CONTROL_DMG_ROOT)/NOTICE.md"
-	install -m 644 docs/LEGAL.md "$(CONTROL_DMG_ROOT)/LEGAL.md"
+	install -m 644 docs/reference/legal.md "$(CONTROL_DMG_ROOT)/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(CONTROL_DMG_ROOT)/BRAND_POLICY.md"
 	hdiutil create -volname "opena8dj-tools $(VERSION)" -srcfolder "$(CONTROL_DMG_ROOT)" -ov -format UDZO "$(CONTROL_DMG)"
 	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(CONTROL_DMG)"; fi

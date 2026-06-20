@@ -5,6 +5,27 @@ Date: 2026-06-19
 Purpose: preserve the current repository/release state and hand off the
 external audit findings to the next implementation-planning agent.
 
+## 2026-06-20 Status Update
+
+This document is historical audit handoff evidence. The original findings below
+were used to clean up the public 0.5.0 release surface.
+
+Current follow-up status:
+
+- `main` has since moved beyond the commit recorded in this handoff.
+- OpenA8DJ 0.5.0 is the canonical macOS C++ stable baseline.
+- Apple Developer Program membership is active.
+- Local Developer ID Application and Developer ID Installer certificates are
+  installed.
+- The `OpenA8DJNotary` keychain profile is stored and validated.
+- Replacement 0.5.0 assets have been rebuilt with Developer ID signatures.
+- Apple notarization submissions are pending service completion before public
+  replacement assets can be uploaded.
+
+Do not treat the older unsigned-release wording below as the current desired
+public documentation state. It is retained to show what the external audit
+asked the project to correct.
+
 ## Current Public State
 
 - Repository: `https://github.com/fersantxez/OpenA8DJ`

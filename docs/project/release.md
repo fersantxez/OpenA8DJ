@@ -45,9 +45,9 @@ ps -o %cpu,%mem,pid,comm -p $(pgrep coreaudiod | head -1)
 ```
 
 For Traktor Scratch/timecode validation, use
-`docs/TRAKTOR_TIMECODE.md`. Mark a release as fully DVS-ready only after the
-physical input pairs, vinyl profile, CD/line profile, and `input-mode` values
-have been verified.
+[Traktor and Timecode Vinyl](../user/traktor-timecode.md). Mark a release as
+fully DVS-ready only after the physical input pairs, vinyl profile, CD/line
+profile, and `input-mode` values have been verified.
 
 Treat 88.2/96 kHz as extended validation. Do not advertise those rates as
 production-ready until they pass the same listening, routing, and loopback tests
@@ -55,8 +55,8 @@ as 44.1/48 kHz.
 
 ## Legal/provenance gate
 
-Before attaching any artifact to a public release, complete the publication
-policy in `docs/LEGAL.md`:
+Before attaching any artifact to a public release, complete the
+[legal and publication policy](../reference/legal.md):
 
 - confirm the release is MIT-licensed and includes `LICENSE`, `NOTICE.md`, and
   `BRAND_POLICY.md`;
@@ -123,30 +123,17 @@ make verify-signed-release
 ```
 
 `make release-signed` blocks if the Developer ID identities are not supplied.
-`make notarize` submits the PKG and DMG to Apple, waits for the result, staples
-both tickets, and regenerates checksums. `make verify-signed-release` is the
-release gate: it checks Developer ID Application signatures on the HAL bundle
-and packaged tools, Developer ID Installer signature on the PKG, Gatekeeper
-assessment, stapled tickets, and checksums.
+`make notarize` submits the driver PKG/DMG and the tools PKG/DMG to Apple, waits
+for the result, staples tickets, and regenerates checksums. `make
+verify-signed-release` is the release gate: it checks Developer ID Application
+signatures on the HAL bundle, command-line tools, and Control Center app;
+Developer ID Installer signatures on both PKGs; Gatekeeper assessment; stapled
+tickets; and checksums.
 
-Current local blocker observed after Apple Developer Program membership became
-active on 2026-06-20:
-
-```text
-0 valid codesigning identities found
-No Keychain password item found for profile: OpenA8DJNotary
-```
-
-Apple Developer Program membership is active. The next required step is to
-create/download the Developer ID Application and Developer ID Installer
-certificates, install them in the local keychain, store notarization credentials,
-and rerun the official release commands above.
-
-Without this step, macOS Gatekeeper may block the PKG with a message saying
-Apple could not verify it is free of malware. That is expected for ad-hoc signed
-preview builds and must be documented in the README, install guide, DMG README,
-and release notes. Do not describe an ad-hoc signed preview as a polished
-one-click installer.
+Do not upload replacement public assets until Apple returns `Accepted`,
+stapling succeeds, and `make verify-signed-release` passes. Current
+maintainer-facing signing state belongs in
+[notarization state](../state/notarization-state.md).
 
 ## GitHub release
 

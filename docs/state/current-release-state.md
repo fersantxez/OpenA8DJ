@@ -13,7 +13,7 @@ branch=main
 platform=macOS
 driver=Core Audio HAL user-space driver
 runtime_state=DVS Vinyl input active, low-noise ground setting, CPU pool stable profile
-technical_evidence=docs/TEST_EVIDENCE.md
+technical_evidence=docs/state/evidence/test-evidence.md
 ```
 
 ## Build Profile

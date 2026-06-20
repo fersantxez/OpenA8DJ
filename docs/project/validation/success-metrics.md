@@ -33,7 +33,7 @@ Offline gates must pass before packaging or human testing:
 
 ## Physical Sound Quality Gates
 
-A candidate can be offered for human listening only after the exact loaded
+A build can be offered for human listening only after the exact loaded
 artifact has been validated with real sound-quality evidence, unless it is
 explicitly labeled diagnostic-only.
 
@@ -61,7 +61,7 @@ the sound-quality evidence:
 - Driver CPU p95 recorded.
 - `coreaudiod` CPU p95 recorded.
 - No sustained audio-stack CPU runaway.
-- Start latency and first-callback latency recorded for release candidates.
+- Start latency and first-callback latency recorded for release build under validations.
 - Jitter or scheduling discontinuity counters recorded for transport changes.
 
 The current goal is stable, clean audio first. CPU reductions are accepted only
