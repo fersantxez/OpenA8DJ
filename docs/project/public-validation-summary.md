@@ -16,7 +16,7 @@ or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
 Current signing status for the replacement 0.5.0 assets rebuilt from commit
-`86bd027`, checked on 2026-06-21T15:19Z:
+`86bd027`, checked on 2026-06-21T15:38Z:
 
 - `OpenA8DJ-0.5.0.pkg` is in Apple notarization review.
 - `OpenA8DJ-0.5.0.dmg` is in Apple notarization review.
@@ -27,6 +27,21 @@ Current signing status for the replacement 0.5.0 assets rebuilt from commit
   validated through the GitHub-downloaded install flow.
 - Earlier partial Apple acceptances belong to older containers and are no
   longer final publication candidates after the documentation reorganization.
+
+Current local installer validation, completed on 2026-06-21:
+
+- Rebuilt local signed DMGs from the current publication artifact set installed
+  successfully with the documented `sudo installer` fallback.
+- The installed driver, tools, MIDI bridge, Control Center app, package
+  receipts, and code signatures were verified on disk.
+- `Open Audio 8 DJ` appeared in Core Audio as an 8-input / 8-output device at
+  48 kHz, and the MIDI input/output endpoints appeared.
+- Physical A/B output routing passed external-capture checks.
+- A calibrated real-music external-capture soundcheck passed on the installed
+  artifact after isolating the capture path from other audio apps.
+- This is not yet the final public GitHub-download validation; that still waits
+  for Apple acceptance, stapling, checksum regeneration, release upload, and a
+  fresh install test from the GitHub assets.
 
 ## What Was Tested
 
@@ -88,5 +103,4 @@ run and was accepted as the stable 0.5.0 sound baseline.
 ## Detailed Evidence
 
 Technical logs, detailed build names, rejected experiments, and command-level
-evidence are kept in
-[maintainer state](../../docs-state/evidence/test-evidence.md).
+evidence are kept in [maintainer state](../../docs-state/evidence/test-evidence.md).

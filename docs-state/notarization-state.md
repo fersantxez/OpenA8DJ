@@ -31,7 +31,7 @@ Pre-staple SHA-256 hashes:
 42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T15:19Z:
+Latest Apple notarization status checked on 2026-06-21T15:38Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg

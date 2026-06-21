@@ -75,6 +75,35 @@ outputPanicFlags=0
 hardware_lock_after_install=absent
 ```
 
+## Latest Local Installer Validation
+
+```text
+date=2026-06-21
+repo_commit=2cb606a
+artifact_source_commit=86bd027
+evidence=local-analysis/local-install-e2e-20260621-112707
+install_source=local rebuilt signed DMGs
+install_mode=sudo installer from mounted DMGs
+driver_install=PASS
+tools_install=PASS
+installed_signatures=PASS
+core_audio_visibility=Open Audio 8 DJ, 8 input / 8 output channels at 48 kHz
+midi_visibility=Open Audio 8 DJ MIDI In/Out present
+control_tool=PASS
+audio_stack_health_final=PASS
+physical_route_A=PASS
+physical_route_B=PASS
+real_music_soundcheck=PASS
+quality_alignment_score=0.950734
+analog_snr_db=8.92
+capture_clipped_frames=0
+hardware_lock_after=absent
+```
+
+This was a local installer cycle from rebuilt signed artifacts. It does not
+replace the final public validation from GitHub-downloaded, notarized, stapled
+release assets.
+
 ## Important Rejections
 
 - Do not use `HAL_INPUT_MAX_LATENCY_FRAMES=512` for DVS latency. It caused

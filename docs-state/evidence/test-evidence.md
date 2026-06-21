@@ -1974,22 +1974,22 @@ Apple notarization submissions and latest status:
 OpenA8DJ-0.5.0.pkg
   id: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
   created: 2026-06-21T15:19:32.714Z
-  status at 2026-06-21T15:19Z: In Progress
+  status at 2026-06-21T15:38Z: In Progress
 
 OpenA8DJ-0.5.0.dmg
   id: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
   created: 2026-06-21T15:19:32.470Z
-  status at 2026-06-21T15:19Z: In Progress
+  status at 2026-06-21T15:38Z: In Progress
 
 opena8dj-tools-0.5.0.pkg
   id: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
   created: 2026-06-21T15:19:32.432Z
-  status at 2026-06-21T15:19Z: In Progress
+  status at 2026-06-21T15:38Z: In Progress
 
 opena8dj-tools-0.5.0.dmg
   id: dca61499-b3f5-46fd-93b8-ee63f4868942
   created: 2026-06-21T15:19:32.421Z
-  status at 2026-06-21T15:19Z: In Progress
+  status at 2026-06-21T15:38Z: In Progress
 ```
 
 Current conclusion:
@@ -2001,3 +2001,134 @@ Current conclusion:
 - Do not upload replacement GitHub release assets until all four exact
   containers are accepted, stapled, checksummed, and `make verify-signed-release`
   passes on the stapled files.
+
+## 2026-06-21 15:38 UTC - Local installer E2E from rebuilt signed DMGs passed
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Current repo commit during validation: `2cb606a`
+- Packaged artifact source commit: `86bd027`
+- Evidence root:
+  `local-analysis/local-install-e2e-20260621-112707`
+- Hardware touched: yes, under the shared hardware lock except for one
+  documented accidental short tone when probing an old helper's help mode.
+- Driver installed/reloaded: yes, through the local driver DMG package.
+- Tools installed: yes, through the local tools DMG package.
+- Package source: rebuilt local signed DMGs, not GitHub release downloads.
+- Installation mode: `sudo installer` from the mounted DMGs.
+- CoreAudio restart: yes, via the project uninstall/install scripts.
+- Default audio device changed: no.
+- Traktor launch by Codex: no. A previously running Traktor process was closed
+  before the final isolated sound validation because it was contaminating the
+  external capture.
+
+Local artifacts installed:
+
+```text
+OpenA8DJ-0.5.0.dmg
+  sha256: 1f35cae55709bfcd964863fde46af7c35e841db27803582fdf3851ea975671b4
+OpenA8DJ-0.5.0.pkg
+  sha256: 2bbec9fca54679dff0a8096307c74d72b106d0b8249a654ed6d8a5a4712c9847
+opena8dj-tools-0.5.0.dmg
+  sha256: 63d2bbce75402a3627b651b208909da2e318f047443559b6d842159432802bb3
+opena8dj-tools-0.5.0.pkg
+  sha256: 42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf
+```
+
+Installer and installed-state checks:
+
+```text
+install-driver-from-dmg.log: installer: The install was successful.
+install-tools-from-dmg.log: installer: The install was successful.
+pkg receipts: org.opena8dj.driver, org.opena8dj.tools
+installed HAL: /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+installed app: /Applications/OpenA8DJ Control Center.app
+installed CLI: /usr/local/bin/opena8dj-control
+installed MIDI bridge: /usr/local/bin/opena8dj-midid
+installed uninstall tool: /usr/local/bin/opena8dj-uninstall
+codesign installed HAL: PASS
+codesign installed Control Center: PASS
+codesign installed control CLI: PASS
+codesign installed MIDI bridge: PASS
+```
+
+Installed binary hashes:
+
+```text
+HAL executable:
+  2fdbd49723b200c8c56577b88dba395f65ff5c86ebc1e81c23b0d138193aae10
+opena8dj-control:
+  f2355b8f3d88d5a5ffdb1f876e41a9055ca38fa00c7a9f97591fd1b3afe18f09
+opena8dj-midid:
+  c5f856d68a13a42d257afe6e1069d3e7d78afb4106f67af1e58e629b9b108cb5
+OpenA8DJ Control Center binary:
+  f0c3bf9982b13e63068371ee0d2365a21faf1b1e7ae68c1eddebe18ea9740fd2
+```
+
+Device and tools checks after install:
+
+```text
+audio_stack_health_after_install=PASS
+audio_stack_health_final=PASS
+final_total_watched_cpu_pct=0.0
+final_max_label_cpu_pct=0.0
+Open Audio 8 DJ visible in Core Audio: yes, 8 inputs / 8 outputs at 48 kHz
+Open Audio 8 DJ MIDI In/Out visible: yes
+opena8dj-control list-profiles: PASS
+opena8dj-control export-config: PASS
+active preset: traktor-dvs-vinyl
+input mode: timecode-vinyl
+software lock: true
+hardware lock after run: free
+```
+
+Physical sound validation:
+
+```text
+channel_matrix_pair_A: PASS, no clipped frames
+channel_matrix_pair_B: PASS, no clipped frames
+channel_matrix_pair_B_left_to_right_leakage_db=-61.08
+channel_matrix_pair_B_right_to_left_leakage_db=-63.02
+channel_matrix_pair_C: no useful correlated capture on this capture cabling
+channel_matrix_pair_D: no useful correlated capture on this capture cabling
+```
+
+The first real-music soundcheck attempts failed because the external capture
+was not isolated:
+
+- One run clipped the capture.
+- One run had another audio app active during the pre-roll/capture window.
+- Those runs are retained under the evidence root as failed setup attempts, not
+  release-quality failures.
+
+Final isolated real-music soundcheck:
+
+```text
+run_dir=local-analysis/local-install-e2e-20260621-112707/soundcheck-pairB-minus10-isolated
+result=PASS
+pair=B
+rate=48000
+buffer=512
+mode=start
+quality_alignment_score=0.950734
+analog_snr_db=8.92
+mid_band_1000_5000_residual_ratio=1.492110
+high_band_5000_12000_residual_ratio=1.372816
+quiet_mid_band_noise_dbfs=-38.22
+click_outliers=179
+lag_jumps_gt_2_frames=20
+capture_clipped_frames=0
+post_soundcheck_audio_stack_health=PASS
+```
+
+Conclusion:
+
+- The rebuilt local signed driver/tools installers install successfully from
+  their DMGs on this machine.
+- The installed HAL, tools, MIDI bridge, Control Center, receipts, signatures,
+  Core Audio device, and MIDI endpoints are present and valid.
+- The installed artifact passed a real-music external-capture soundcheck after
+  isolating the capture path, plus physical A/B route checks.
+- This is a local installer validation. It does not replace the required final
+  GitHub-downloaded public-artifact validation after Apple notarization,
+  stapling, checksum regeneration, and release upload.
