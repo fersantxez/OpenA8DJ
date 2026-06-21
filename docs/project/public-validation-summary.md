@@ -15,6 +15,17 @@ Maintainers must not describe replacement binary assets as Developer ID signed
 or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
+Current signing status for the replacement 0.5.0 assets, checked on
+2026-06-21T15:04Z:
+
+- Apple accepted `OpenA8DJ-0.5.0.dmg`.
+- Apple accepted `opena8dj-tools-0.5.0.pkg`.
+- `OpenA8DJ-0.5.0.pkg` and `opena8dj-tools-0.5.0.dmg` are still in Apple
+  notarization review.
+- Treat the public release as fully notarized only after all four files are
+  accepted, stapled, checksummed, verified, uploaded to GitHub Releases, and
+  validated through the GitHub-downloaded install flow.
+
 ## What Was Tested
 
 - macOS Core Audio HAL driver loads as `Open Audio 8 DJ`.

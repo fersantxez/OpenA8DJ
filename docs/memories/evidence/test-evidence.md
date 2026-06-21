@@ -1863,8 +1863,8 @@ Reason for rebuild:
   capture device.
 - The rebuilt release artifacts supersede all older 0.5.0 notarization
   submissions for publication.
-- Later evidence-only edits under `docs/memories` do not change package or DMG
-  bytes.
+- Later documentation-only edits outside `docs/reference` and `resources/dmg`
+  do not change package or DMG bytes.
 
 Local verification before Apple submission:
 
@@ -1896,27 +1896,28 @@ Apple notarization submissions and latest status:
 OpenA8DJ-0.5.0.pkg
   id: e157be38-1542-40c1-8cb9-310564101890
   created: 2026-06-21T02:21:19.849Z
-  status at 2026-06-21T04:41Z: In Progress
+  status at 2026-06-21T15:04Z: In Progress
 
 OpenA8DJ-0.5.0.dmg
   id: dc39b66f-3a77-4033-80de-c447bcfb0f2d
   created: 2026-06-21T02:21:18.420Z
-  status at 2026-06-21T04:41Z: Accepted
+  status at 2026-06-21T15:04Z: Accepted
 
 opena8dj-tools-0.5.0.pkg
   id: e698ed76-1aff-49fb-b63a-c26d0661be20
   created: 2026-06-21T02:21:18.333Z
-  status at 2026-06-21T04:41Z: Accepted
+  status at 2026-06-21T15:04Z: Accepted
 
 opena8dj-tools-0.5.0.dmg
   id: 66cef6ca-a7ee-4a04-b17a-bd8017acd9d8
   created: 2026-06-21T02:21:18.617Z
-  status at 2026-06-21T04:41Z: In Progress
+  status at 2026-06-21T15:04Z: In Progress
 ```
 
 Current conclusion:
 
 - Apple has accepted two of the four final containers.
+- Accepted: `OpenA8DJ-0.5.0.dmg` and `opena8dj-tools-0.5.0.pkg`.
 - The driver PKG and tools DMG are still waiting on Apple notarization.
 - No user action is currently required unless Apple rejects one of those
   submissions.

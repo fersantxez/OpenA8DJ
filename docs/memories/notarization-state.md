@@ -17,9 +17,9 @@ signed with the Developer ID Application and Developer ID Installer
 certificates, locally verified, and submitted to Apple on
 2026-06-21T02:21Z.
 
-Later edits that touch only `docs/memories` evidence files do not change the
-bytes inside the release packages or DMGs. Do not restart notarization solely
-for a memories-only evidence update.
+Later documentation-only edits outside `docs/reference` and `resources/dmg` do
+not change the bytes inside the release packages or DMGs. Do not restart
+notarization solely for a non-packaged documentation update.
 
 Pre-staple SHA-256 hashes:
 
@@ -30,7 +30,7 @@ Pre-staple SHA-256 hashes:
 377883acc5fb68dfe7852258d5019c26c5b2b9b15565188b8a7d6500d05b7d0f  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T04:41Z:
+Latest Apple notarization status checked on 2026-06-21T15:04Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg
@@ -52,6 +52,16 @@ opena8dj-tools-0.5.0.dmg
 
 No package was installed, no driver was loaded, no hardware was touched, and no
 CoreAudio restart was performed for this signing/notarization rebuild.
+
+Accepted by Apple so far:
+
+- `OpenA8DJ-0.5.0.dmg`
+- `opena8dj-tools-0.5.0.pkg`
+
+Still waiting on Apple:
+
+- `OpenA8DJ-0.5.0.pkg`
+- `opena8dj-tools-0.5.0.dmg`
 
 ## Stale Submissions
 
