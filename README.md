@@ -56,6 +56,9 @@ After installation, select `Open Audio 8 DJ` in Audio MIDI Setup, Traktor, or
 your audio application. If macOS blocks the package, or if you want checksum
 verification, see the [install guide](docs/user/install.md).
 
+If the macOS Installer app fails after the package is opened, the install guide
+also includes a `sudo installer` fallback for the same downloaded package.
+
 ## Use
 
 Typical output routing:

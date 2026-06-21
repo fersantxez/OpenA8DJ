@@ -76,6 +76,32 @@ If the dialog only offers `Move to Trash` and `Done`:
 
 Normal users should not need Terminal for the GitHub release installer.
 
+## If The Installer Fails
+
+If the package opens but macOS Installer reports an install error, verify the
+checksum first, then install the same downloaded package from Terminal:
+
+```sh
+sudo installer -pkg "$HOME/Downloads/OpenA8DJ-0.5.0.pkg" -target /
+```
+
+If you opened the DMG and did not download the direct PKG, use the mounted DMG
+path instead:
+
+```sh
+sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
+```
+
+For the optional Control Center tools:
+
+```sh
+sudo installer -pkg "$HOME/Downloads/opena8dj-tools-0.5.0.pkg" -target /
+sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -target /
+```
+
+Use only one tools command: the first one for the direct PKG download, or the
+second one for the package inside the opened DMG.
+
 ## Installed Files
 
 ```text

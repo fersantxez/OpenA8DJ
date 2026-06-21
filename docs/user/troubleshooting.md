@@ -25,6 +25,24 @@ If macOS shows a warning for the GitHub release:
 5. Click `Open Anyway`.
 6. Confirm and continue the installer.
 
+## Installer Reports An Error
+
+If the package opens but macOS Installer reports an install error, verify the
+download checksum and use the Terminal fallback for the same package:
+
+```sh
+sudo installer -pkg "$HOME/Downloads/OpenA8DJ-0.5.0.pkg" -target /
+```
+
+If you opened the DMG instead of downloading the direct PKG:
+
+```sh
+sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
+```
+
+For the optional Control Center tools, use the same pattern with
+`opena8dj-tools-0.5.0.pkg`.
+
 ## Traktor Does Not Calibrate Timecode Vinyl
 
 1. Confirm `Open Audio 8 DJ` is selected as the audio device.
