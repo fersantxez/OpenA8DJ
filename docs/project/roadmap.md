@@ -17,8 +17,8 @@ comparison, and recovery.
   after the capture-paced USB transport work.
 - Traktor buffer-size selection no longer reports the invalid sentinel value
   seen in earlier builds.
-- Physical iRig loopback gates now include tone sideband checks, music residual
-  checks, click outlier checks, and Core Audio CPU guards.
+- Physical loopback gates now include tone sideband checks, music residual
+  checks, click outlier checks, real-time recording, and Core Audio CPU guards.
 - Output C/D are exposed and still need the final physical mixer pass.
 - Core Audio input channels are restored; the full vinyl/CD-line physical
   matrix remains open.

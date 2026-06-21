@@ -32,6 +32,10 @@ human-readable project docs changed. Rebuild, re-sign, re-submit, staple, and
 verify the four release assets from the final committed tree before uploading
 replacements to GitHub Releases.
 
+The later public wording cleanup that removes the named capture-device reference
+from release notes and DMG text also changes packaged files. Any submissions
+created before that cleanup are stale for publication.
+
 Do not upload replacement public assets until:
 
 1. Apple returns `Accepted` for the exact release containers.

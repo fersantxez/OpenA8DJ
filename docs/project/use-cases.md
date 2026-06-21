@@ -247,7 +247,7 @@ Use cases:
 - Mixer REC OUT into C/D.
 - Mixer BOOTH/second master into C/D.
 - Record DJ set while playing through A/B.
-- External capture fallback when iRig is absent, once Audio 8 input is validated.
+- External capture fallback, once Audio 8 input is validated.
 
 Card configuration:
 

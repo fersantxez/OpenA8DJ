@@ -22,7 +22,7 @@ CPU pool is now the frozen 0.5.0 stable build profile.
 The original investigation started conservatively and did not claim product
 readiness from offline evidence alone. After that, the exact CPU pool artifact
 was installed under an explicitly authorized hardware window, validated through
-iRig Stream with real music, left loaded, and then accepted by human listening.
+external capture interface with real music, left loaded, and then accepted by human listening.
 
 The frozen 0.5.0 stable profile enables:
 
@@ -75,9 +75,9 @@ Implementation verification:
 - `scripts/audio-stack-health`: PASS after the build-only work.
 - Hardware lock: absent/free after the build-only work.
 
-## iRig Physical Soundcheck Update
+## external capture Physical Soundcheck Update
 
-Additional iRig sound checks were run after the build-only CPU candidate work.
+Additional external capture sound checks were run after the build-only CPU candidate work.
 These checks exercised the currently installed and loaded HAL, not the CPU pool
 candidate, because the CPU pool candidate was not installed or loaded.
 
@@ -89,25 +89,25 @@ Installed HAL under test:
 - Executable SHA256:
   `8b9c837d30dcf8b214edf1cd9944b0f34b97ff6fee1589823c8fce64d4ffb230`
 
-iRig evidence:
+external capture evidence:
 
 - `local-analysis/soundcheck/20260619T223643-irig-cpu-pool-audio-check`
-  - Pair B, iRig Stream channels 1,2, random selected source.
+  - Pair B, external capture interface channels 1,2, random selected source.
   - Result: FAIL.
   - `quality_alignment_score=0.636251`, `analog_snr_db=-4.05`,
     `capture_clipped_frames=0`.
 - `local-analysis/channel-matrix/20260619T223820-irig-pairB-matrix`
-  - Pair B decorrelated tone matrix through iRig Stream channels 1,2.
+  - Pair B decorrelated tone matrix through external capture interface channels 1,2.
   - Result: tone matrix PASS.
   - `left_to_right_leakage_db=-74.37`, `right_to_left_leakage_db=-62.52`,
     `capture_clipped_frames=0`.
-  - Interpretation: the physical B-to-iRig route is live and channel-separated,
+  - Interpretation: the physical B-to-external-capture route is live and channel-separated,
     but the linear residual diagnostic still warns about unmodelled physical
     residual.
 - `local-analysis/soundcheck/20260619T223900-irig-cable-guy-pairB-current-hal`
-  - Pair B, iRig Stream channels 1,2, known comparable source
+  - Pair B, external capture interface channels 1,2, known comparable source
     `Cable Guy - Dj Deep (Original Mix).mp3`.
-  - Result: PASS against calibrated iRig thresholds.
+  - Result: PASS against calibrated external capture thresholds.
   - `quality_alignment_score=0.949537`, `analog_snr_db=8.61`,
     `mid_band_1000_5000_residual_ratio=1.502375`,
     `high_band_5000_12000_residual_ratio=1.404521`,
@@ -125,12 +125,12 @@ Post-run state:
 This does not validate the CPU pool candidate's sound quality. To validate that
 candidate, the exact `build/OpenA8DJ-cpu-pool.driver` artifact must be installed
 or loaded under an explicitly authorized hardware A/B window, then compared
-against the installed baseline using the same iRig route.
+against the installed baseline using the same external capture route.
 
-## CPU Pool Candidate Install + iRig Validation
+## CPU Pool Candidate Install + external capture Validation
 
 The CPU pool candidate was later installed under an explicitly authorized
-hardware window and tested through the same iRig pair B route.
+hardware window and tested through the same external capture pair B route.
 
 Evidence directory:
 
@@ -149,13 +149,13 @@ Install details:
 - CoreAudio was restarted after HAL replacement.
 - The candidate was left installed after the passing soundcheck.
 
-iRig candidate soundcheck:
+external capture candidate soundcheck:
 
 - Run directory:
   `local-analysis/physical-cpu-candidate-ab/20260620T120032-cpu-pool-install-irig/soundcheck-candidate`
-- Pair B, iRig Stream channels 1,2, known comparable source
+- Pair B, external capture interface channels 1,2, known comparable source
   `Cable Guy - Dj Deep (Original Mix).mp3`.
-- Result: PASS against calibrated iRig thresholds.
+- Result: PASS against calibrated external capture thresholds.
 - `quality_alignment_score=0.949423`, `analog_snr_db=8.78`,
   `mid_band_1000_5000_residual_ratio=1.522984`,
   `high_band_5000_12000_residual_ratio=1.408289`,
@@ -163,7 +163,7 @@ iRig candidate soundcheck:
   `click_outliers=184`, `lag_jumps_gt_2_frames=20`,
   `capture_clipped_frames=0`.
 
-CPU profile comparison against the immediately prior installed-HAL iRig run:
+CPU profile comparison against the immediately prior installed-HAL external capture run:
 
 - Prior installed HAL, same source/route:
   - `opena8dj_driver` average CPU: `6.522%`
@@ -199,16 +199,16 @@ release=OpenA8DJ 0.5.0
 stable_profile=cpu-pool
 installed_hal_sha256=c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951
 unsigned_build_hal_sha256=79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098
-validated_route=Open Audio 8 DJ pair B -> iRig Stream channels 1,2
+validated_route=Open Audio 8 DJ pair B -> external capture interface channels 1,2
 validated_source=Cable Guy - Dj Deep (Original Mix).mp3
 human_listening_result=PASS
 ```
 
-Second same-artifact iRig pass before user listening:
+Second same-artifact external capture pass before user listening:
 
 - Run directory:
   `local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat`
-- Result: PASS against calibrated iRig thresholds.
+- Result: PASS against calibrated external capture thresholds.
 - `quality_alignment_score=0.948151`, `analog_snr_db=8.72`,
   `mid_band_1000_5000_residual_ratio=1.512976`,
   `high_band_5000_12000_residual_ratio=1.405052`,

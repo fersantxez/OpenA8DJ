@@ -250,8 +250,8 @@ than a normal class-compliant USB audio configuration.
 - Do not feed mixer line outputs into phono inputs. That path has the wrong gain
   and RIAA treatment.
 - Do not use the MacBook mic or software loopback as release-quality proof of
-  Audio 8 DJ analog output. Use a separate known-good capture interface such as
-  iRig Stream when available.
+  Audio 8 DJ analog output. Use a separate known-good capture interface and
+  real-time recording.
 - A complete Traktor validation must cover A/B input modes, A/B output routing,
   C/D auxiliary routing, ground-lift behavior, software lock, MIDI visibility,
   and low-latency stability.

@@ -30,8 +30,8 @@ is the reference build for the public 0.5.x line.
   and stable enough to freeze as the release reference.
 - Human listening on 2026-06-20 accepted the CPU pool profile as the 0.5.0
   stable sound profile.
-- Same-artifact iRig Stream validation passed on output pair B with real music
-  and no clipped capture frames in the recorded validation run.
+- Same-artifact real-time capture validation passed on output pair B with real
+  music and no clipped capture frames in the recorded validation run.
 - Offline audio, routing, timecode-readiness, and HAL safety checks passed.
 - Post-install runtime counters were clean during the validation run.
 

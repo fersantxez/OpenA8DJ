@@ -29,14 +29,14 @@ release verifier.
 - Offline C++ tests pass.
 - HAL smoke and parity checks pass.
 - Physical playback/capture validation passed on the installed artifact using
-  real music through the Audio 8 DJ and an iRig Stream capture path.
+  real music through the Audio 8 DJ and real-time external recording.
 - Human listening accepted the installed CPU pool profile as the stable 0.5.0
   sound profile.
 
 ## Hardware And Software Used
 
 - Hardware under test: Native Instruments Audio 8 DJ.
-- Capture path for physical sound validation: iRig Stream.
+- Capture path for physical sound validation: real-time external recording.
 - Host platform: macOS.
 - Main software path: Core Audio HAL plug-in, IOUSBHost transport, CoreMIDI
   bridge, C++ core, and macOS control tools.
@@ -68,7 +68,7 @@ audio app.
 ## Stable 0.5.0 Sound Validation
 
 The 0.5.0 sound profile was validated with real music, Audio 8 DJ analog output,
-external iRig Stream capture, automated WAV comparison, and human listening.
+real-time external recording, automated WAV comparison, and human listening.
 The accepted profile had no clipped capture frames in the recorded validation
 run and was accepted as the stable 0.5.0 sound baseline.
 

@@ -24,8 +24,8 @@ context. If full physical capture is not available, say that plainly.
 ## Physical Capture Method
 
 The preferred validation path uses real music through the Audio 8 DJ and records
-the analog output with an external capture device. For the 0.5.0 freeze, the
-validated route used an iRig Stream capture path.
+the analog output in real time with an external capture path. For the 0.5.0
+freeze, the accepted sound profile used that live-recording method.
 
 The captured WAV is compared against the source using alignment, residual,
 clipping, click, and timing checks. Human listening remains the final arbiter.

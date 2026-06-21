@@ -29,7 +29,7 @@ What changed:
 - Removed Terminal commands from the normal user-facing vinyl flow. Normal
   options are handled through Control Center.
 - Exposed all soundcheck analyzer thresholds through `make soundcheck`.
-- Added `make soundcheck-irig-calibrated` for the same iRig Stream physical
+- Added `make soundcheck-irig-calibrated` for the same external capture interface physical
   validation route used by the accepted 0.5.0 sound-quality reference.
 
 Commands run:
@@ -43,7 +43,7 @@ scripts/audio-stack-health
 OPENA8DJ_CONTROL_NO_WAKE=1 /usr/local/bin/opena8dj-control export-config /tmp/opena8dj-installed-config-final.json
 make soundcheck-irig-calibrated \
   SOUNDCHECK_MUSIC="/Users/fer/Music/DJ/000_santxez_spring_25_select/Cable Guy - Dj Deep (Original Mix).mp3" \
-  SOUNDCHECK_CAPTURE="iRig Stream" \
+  SOUNDCHECK_CAPTURE="external capture interface" \
   SOUNDCHECK_CAPTURE_CHANNELS=1,2
 make smoke-hal parity-smoke-hal
 ```
@@ -331,8 +331,8 @@ Commands/evidence:
 make -B hal install-hal
 /usr/local/bin/opena8dj-control profile timecode-vinyl
 ./build/audio-input-meter 5
-./scripts/run-soundcheck --skip-build --music-file ".../Cable Guy - Dj Deep (Original Mix).mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --capture-device "iRig Stream" --capture-channels 1,2
-./scripts/run-channel-matrix-gate --run-physical --pair A --rate 48000 --seconds 4 --peak 0.25 --capture-device "iRig Stream" --capture-channels 1,2
+./scripts/run-soundcheck --skip-build --music-file ".../Cable Guy - Dj Deep (Original Mix).mp3" --pair A --rate 48000 --buffer 512 --seconds 12 --mode dense --capture-device "external capture interface" --capture-channels 1,2
+./scripts/run-channel-matrix-gate --run-physical --pair A --rate 48000 --seconds 4 --peak 0.25 --capture-device "external capture interface" --capture-channels 1,2
 ```
 
 Evidence directory:
@@ -348,7 +348,7 @@ Results:
 - `opena8dj-control profile timecode-vinyl` reports `input-decode: on`.
 - `audio-input-meter` no longer reports all-zero inputs; A/B/C/D show input
   energy after decode is enabled.
-- Unity-gain Cable Guy soundcheck no longer clips the iRig capture:
+- Unity-gain Cable Guy soundcheck no longer clips the external capture:
   `capture_clipped_frames=0`.
 - The same music soundcheck still fails quality thresholds, so this is not a
   release-quality claim.
@@ -362,7 +362,7 @@ Conclusion:
 - Timecode Vinyl silence caused by `input-decode: off` is corrected in the
   loaded local HAL by explicitly enabling the profile and by making decode
   default-on for future loads.
-- Do not replace GitHub release assets until the real-music iRig quality gate
+- Do not replace GitHub release assets until the real-music external capture quality gate
   passes.
 
 ## 2026-06-19 10:33 EDT - Idle CPU-noise investigation
@@ -372,7 +372,7 @@ Conclusion:
 - Hardware touched: yes, with hardware/audio lock
 - Driver installed/reloaded: no
 - Playback: no
-- Capture: yes, iRig Stream idle capture
+- Capture: yes, external capture interface idle capture
 
 Reason:
 
@@ -383,9 +383,9 @@ Commands/evidence:
 
 ```sh
 /usr/local/bin/opena8dj-control stream-stats
-./build/audio-record 8 idle-low-load.wav "iRig Stream" 1,2
+./build/audio-record 8 idle-low-load.wav "external capture interface" 1,2
 yes >/dev/null & ...  # temporary CPU load
-./build/audio-record 8 idle-high-load.wav "iRig Stream" 1,2
+./build/audio-record 8 idle-high-load.wav "external capture interface" 1,2
 /usr/local/bin/opena8dj-control stream-stats
 ```
 
@@ -405,7 +405,7 @@ output clipped=0
 outputActiveUnderruns=0
 ```
 
-iRig idle capture:
+external capture idle capture:
 
 ```text
 low load:  rms=0.00160015 peak=0.00869751 clipped=0
@@ -416,11 +416,11 @@ Conclusion:
 
 - The current evidence does not show non-zero digital output samples during
   idle; the HAL reports digital silence.
-- The iRig route did not reproduce a CPU-load-correlated noise increase in
+- The external capture route did not reproduce a CPU-load-correlated noise increase in
   this short capture. The high-load capture was quieter than the low-load
   capture.
 - The headphone noise may be analog coupling, USB bus/power/ground noise, or a
-  route not captured by the iRig loopback path.
+  route not captured by the external capture loopback path.
 - Safe mitigations already loaded: unity output gain and strict idle digital
   silence. Further mitigation should be a separate low-noise transport
   experiment that reduces idle USB transfer activity only if it does not break
@@ -479,7 +479,7 @@ Conclusion:
 
 - `gnd-vinyl off` does not disable the Timecode Vinyl input surface.
 - Audible improvement still requires human/headphone confirmation because the
-  previous iRig idle route did not reproduce the headphone CPU-noise symptom.
+  previous external capture idle route did not reproduce the headphone CPU-noise symptom.
 - Added `profile timecode-vinyl-low-noise` as a reversible control profile for
   this exact hardware-state experiment.
 
@@ -654,7 +654,7 @@ $HOME/.opena8dj/hardware-gate.lock absent
 - Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock only during install and
   physical playback/capture windows
-- Playback/capture: yes, iRig Stream capture from Audio 8 DJ output B
+- Playback/capture: yes, external capture interface capture from Audio 8 DJ output B
 - Driver installed/reloaded: yes, local HAL only
 
 Reason:
@@ -722,7 +722,7 @@ Conclusion:
 - Preopen fixes the measurable cold-start delay without leaving the audio stack
   hot and without retaining the hardware lock outside the physical action.
 - Route B is physically validated with strong channel separation.
-- The iRig real-music absolute audiophile gate still fails because the direct
+- The external capture real-music absolute audiophile gate still fails because the direct
   USB reference also fails the same strict threshold on this analog route.
 - This is an improved functional/stability candidate, not an audiophile
   superiority claim over the hardware/direct USB path.
@@ -733,7 +733,7 @@ Conclusion:
 - Branch at time: pre-main C++ integration branch
 - Hardware touched: yes, with hardware/audio lock during install and physical
   playback/capture windows
-- Playback/capture: yes, Audio 8 DJ output B into iRig Stream capture
+- Playback/capture: yes, Audio 8 DJ output B into external capture interface capture
 - Driver installed/reloaded: yes, local HAL only
 - Default devices changed: no
 - USB reset: no
@@ -799,7 +799,7 @@ CPU stress: rms=0.00046297 peak=0.00491333 clipped=0
 Direct-reference calibration:
 
 ```text
-Direct USB reanalysis also reports high click outliers on the same iRig route:
+Direct USB reanalysis also reports high click outliers on the same external capture route:
 left_click_outliers=165
 right_click_outliers=244
 quality_alignment_score=0.949624
@@ -829,9 +829,9 @@ Conclusion:
   timecode profile with input decode on.
 - It does not prove final audiophile superiority over every reference path.
   It is ready for the next human listening/Traktor pass because the exact
-  installed artifact passed the calibrated iRig soundcheck and has no driver
+  installed artifact passed the calibrated external capture soundcheck and has no driver
   underruns, no clipping, no transfer errors, and no measurable idle CPU-noise
-  increase in the iRig capture.
+  increase in the external capture.
 
 ## 2026-06-19 13:33 EDT - Human test feedback during Traktor session
 
@@ -928,7 +928,7 @@ dvs_packet_input_decode: PASS
 hal_input_spsc_ring_contract: PASS
 audio_stack_health=PASS
 Open Audio 8 DJ visible: 8 in / 8 out @ 48000
-iRig Stream visible: 2 in / 2 out @ 48000
+external capture interface visible: 2 in / 2 out @ 48000
 input-mode: timecode-vinyl
 input-decode: on
 input-check-errors=0
@@ -1030,7 +1030,7 @@ opena8dj_driver.cpu_pct=0.0
 Physical validation status:
 
 ```text
-requested_soundcheck=route B, Cable Guy, iRig Stream capture, 48 kHz, 512 frames
+requested_soundcheck=route B, Cable Guy, external capture interface capture, 48 kHz, 512 frames
 run_dir=local-analysis/low-noise-20260619-135132-routeB-cable-guy
 result=FAIL
 quality_alignment_score=0.135231
@@ -1048,7 +1048,7 @@ playbackTransferErrors=0
 Readiness statement:
 
 - This build is rejected for human-test handoff. It passes offline gates, but
-  the exact installed artifact failed the required external iRig sound-quality
+  the exact installed artifact failed the required external external capture sound-quality
   capture.
 - The aggressive threshold/hold combination must not be promoted. The next
   low-noise candidate should either use the known-good idle threshold or prove
@@ -1062,7 +1062,7 @@ stable_rollback_run=local-analysis/stable-rollback-20260619-135326-routeB-cable-
 stable_rollback_result=FAIL
 wide_lag_reanalysis_alignment=0.95026155
 wide_lag_reanalysis_quiet_mid_band_noise_dbfs=-33.30
-route_matrix_pairB=strongest iRig route
+route_matrix_pairB=strongest external capture route
 route_matrix_pairC=near silence
 route_matrix_pairD=near silence
 observed_traktor_process=running, about 56 percent CPU
@@ -1070,10 +1070,10 @@ observed_traktor_process=running, about 56 percent CPU
 
 Interpretation:
 
-- The route map shows output pair B is physically reaching the iRig, but the
+- The route map shows output pair B is physically reaching the external capture, but the
   music soundcheck has large pre-existing energy/noise before playback starts.
 - Traktor was still running during the failed quality run and can contaminate
-  the analog capture because the iRig records the physical output mix, not just
+  the analog capture because the the external recorder captures the physical output mix, not just
   the test process.
 - A clean quality decision requires a quiesced audio environment: no Traktor,
   VLC, Spotify, Control Center hardware demo, or other Audio 8 client during
@@ -1212,7 +1212,7 @@ Recovery:
 rollback_sha256=aae519c6d3b0d068b5cbf1d121c2de95f1288ed5ebeb98d69b4531859a018122
 profile_after_rollback=timecode-vinyl-low-noise
 Open_Audio_8_DJ_visible=yes, 8 in / 8 out, 48000 Hz
-iRig_Stream_visible=yes, 2 in / 2 out, 48000 Hz
+external_capture_interface_visible=yes, 2 in / 2 out, 48000 Hz
 lock_after_recovery=absent
 ```
 
@@ -1728,7 +1728,7 @@ Physical validation:
 
 ```text
 run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat
-route=Open Audio 8 DJ pair B -> iRig Stream channels 1,2
+route=Open Audio 8 DJ pair B -> external capture interface channels 1,2
 source=Cable Guy - Dj Deep (Original Mix).mp3
 result=PASS
 quality_alignment_score=0.948151

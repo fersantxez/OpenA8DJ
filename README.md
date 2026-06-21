@@ -83,7 +83,7 @@ The 0.5.0 baseline was validated with:
 - macOS package and signature checks;
 - Audio MIDI Setup visibility as an 8-in/8-out device;
 - CoreMIDI endpoint checks;
-- real-music playback through Audio 8 DJ with iRig Stream capture;
+- real-music playback through Audio 8 DJ with real-time external capture;
 - human listening sign-off on the installed artifact.
 
 See the [public validation summary](docs/project/public-validation-summary.md)

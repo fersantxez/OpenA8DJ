@@ -37,8 +37,8 @@ Current status:
 - Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Primary validated playback rates: 44.1 kHz and 48 kHz
 - Traktor Timecode Vinyl: vinyl input path active by default
-- Stable sound profile: CPU pool profile validated with iRig Stream and human
-  listening on 2026-06-20
+- Stable sound profile: CPU pool profile validated with real-time external
+  recording and human listening on 2026-06-20
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
 - Windows/Linux: experimental platform areas, not included in this macOS driver
 
