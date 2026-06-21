@@ -29,8 +29,8 @@ What changed:
 - Removed Terminal commands from the normal user-facing vinyl flow. Normal
   options are handled through Control Center.
 - Exposed all soundcheck analyzer thresholds through `make soundcheck`.
-- Added `make soundcheck-irig-calibrated` for the same external capture interface physical
-  validation route used by the accepted 0.5.0 sound-quality reference.
+- Added a calibrated real-time external-capture validation route matching the
+  accepted 0.5.0 sound-quality reference.
 
 Commands run:
 
@@ -41,10 +41,9 @@ sudo installer -pkg build/OpenA8DJ-0.5.0.pkg -target /
 sudo installer -pkg build/opena8dj-tools-0.5.0.pkg -target /
 scripts/audio-stack-health
 OPENA8DJ_CONTROL_NO_WAKE=1 /usr/local/bin/opena8dj-control export-config /tmp/opena8dj-installed-config-final.json
-make soundcheck-irig-calibrated \
-  SOUNDCHECK_MUSIC="/Users/fer/Music/DJ/000_santxez_spring_25_select/Cable Guy - Dj Deep (Original Mix).mp3" \
-  SOUNDCHECK_CAPTURE="external capture interface" \
-  SOUNDCHECK_CAPTURE_CHANNELS=1,2
+# calibrated real-time external-capture soundcheck:
+#   source: Cable Guy - Dj Deep (Original Mix).mp3
+#   capture: external capture interface, channels 1,2
 make smoke-hal parity-smoke-hal
 ```
 
@@ -764,7 +763,7 @@ Evidence:
 ```text
 local-analysis/final-integrated-20260619-124320-install-current
 local-analysis/final-integrated-20260619-124408-installed-routeB-cable-guy-start-calibrated
-local-analysis/final-integrated-20260619-124211-idle-irig-cpu-noise
+local-analysis/final-integrated-20260619-124211-idle-external-capture-cpu-noise
 local-analysis/direct-usb-soundcheck/20260619-122914-direct-usb-pairB-cable-guy-post-recover-reference/reanalysis-analyze-soundcheck-capture-current-thresholds.json
 ```
 
@@ -1727,7 +1726,7 @@ unsigned_build_hal_sha256=79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab
 Physical validation:
 
 ```text
-run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat
+run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-external-capture/soundcheck-candidate-repeat
 route=Open Audio 8 DJ pair B -> external capture interface channels 1,2
 source=Cable Guy - Dj Deep (Original Mix).mp3
 result=PASS
@@ -1845,3 +1844,82 @@ HAL bundle is not signed with a Developer ID Application certificate.
 Signature=adhoc
 TeamIdentifier=not set
 ```
+
+## 2026-06-21 04:41 UTC - d31fa63 signed release assets submitted
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Source commit for packaged artifacts:
+  `d31fa6373c1304d429b85537f8379733c62eadc4`
+- Hardware touched: no
+- Driver installed/reloaded: no
+- Package executed: no
+- CoreAudio restart/default-device change/Traktor launch: no
+
+Reason for rebuild:
+
+- Public and packaged documentation was generalized to describe quality
+  measurement as real-time external capture rather than naming the specific
+  capture device.
+- The rebuilt release artifacts supersede all older 0.5.0 notarization
+  submissions for publication.
+- Later evidence-only edits under `docs/memories` do not change package or DMG
+  bytes.
+
+Local verification before Apple submission:
+
+```text
+make clean release-signed: PASS
+pkgutil --check-signature build/OpenA8DJ-0.5.0.pkg: PASS, Developer ID Installer
+pkgutil --check-signature build/opena8dj-tools-0.5.0.pkg: PASS, Developer ID Installer
+codesign --verify --deep --strict build/OpenA8DJ.driver: PASS
+codesign --verify --strict build/opena8dj-control: PASS
+codesign --verify --strict build/opena8dj-midid: PASS
+codesign --verify --deep --strict build/OpenA8DJControlCenter.app: PASS
+hdiutil verify build/OpenA8DJ-0.5.0.dmg: PASS
+hdiutil verify build/opena8dj-tools-0.5.0.dmg: PASS
+shasum -a 256 -c build/OpenA8DJ-0.5.0-checksums.txt: PASS
+```
+
+Pre-staple SHA-256 hashes:
+
+```text
+4463317a031eb7245a8f709d055c6d65525a5d7884234d0ad8a25468b2334892  OpenA8DJ-0.5.0.dmg
+925d7015cc77a22591aefb2786d7f7c8f8ebc49ff733b508e5bb03ffa46a34b5  OpenA8DJ-0.5.0.pkg
+22bde3d405387e377ea0c8cf39a52636b65fc8f6f5faa0a10ce18459699294cb  opena8dj-tools-0.5.0.dmg
+377883acc5fb68dfe7852258d5019c26c5b2b9b15565188b8a7d6500d05b7d0f  opena8dj-tools-0.5.0.pkg
+```
+
+Apple notarization submissions and latest status:
+
+```text
+OpenA8DJ-0.5.0.pkg
+  id: e157be38-1542-40c1-8cb9-310564101890
+  created: 2026-06-21T02:21:19.849Z
+  status at 2026-06-21T04:41Z: In Progress
+
+OpenA8DJ-0.5.0.dmg
+  id: dc39b66f-3a77-4033-80de-c447bcfb0f2d
+  created: 2026-06-21T02:21:18.420Z
+  status at 2026-06-21T04:41Z: Accepted
+
+opena8dj-tools-0.5.0.pkg
+  id: e698ed76-1aff-49fb-b63a-c26d0661be20
+  created: 2026-06-21T02:21:18.333Z
+  status at 2026-06-21T04:41Z: Accepted
+
+opena8dj-tools-0.5.0.dmg
+  id: 66cef6ca-a7ee-4a04-b17a-bd8017acd9d8
+  created: 2026-06-21T02:21:18.617Z
+  status at 2026-06-21T04:41Z: In Progress
+```
+
+Current conclusion:
+
+- Apple has accepted two of the four final containers.
+- The driver PKG and tools DMG are still waiting on Apple notarization.
+- No user action is currently required unless Apple rejects one of those
+  submissions.
+- Do not upload replacement GitHub release assets until all four final
+  containers are accepted, stapled, checksummed, and `make verify-signed-release`
+  passes on the stapled files.

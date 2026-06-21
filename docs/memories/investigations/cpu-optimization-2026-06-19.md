@@ -91,12 +91,12 @@ Installed HAL under test:
 
 external capture evidence:
 
-- `local-analysis/soundcheck/20260619T223643-irig-cpu-pool-audio-check`
+- `local-analysis/soundcheck/20260619T223643-external-capture-cpu-pool-audio-check`
   - Pair B, external capture interface channels 1,2, random selected source.
   - Result: FAIL.
   - `quality_alignment_score=0.636251`, `analog_snr_db=-4.05`,
     `capture_clipped_frames=0`.
-- `local-analysis/channel-matrix/20260619T223820-irig-pairB-matrix`
+- `local-analysis/channel-matrix/20260619T223820-external-capture-pairB-matrix`
   - Pair B decorrelated tone matrix through external capture interface channels 1,2.
   - Result: tone matrix PASS.
   - `left_to_right_leakage_db=-74.37`, `right_to_left_leakage_db=-62.52`,
@@ -104,7 +104,7 @@ external capture evidence:
   - Interpretation: the physical B-to-external-capture route is live and channel-separated,
     but the linear residual diagnostic still warns about unmodelled physical
     residual.
-- `local-analysis/soundcheck/20260619T223900-irig-cable-guy-pairB-current-hal`
+- `local-analysis/soundcheck/20260619T223900-external-capture-cable-guy-pairB-current-hal`
   - Pair B, external capture interface channels 1,2, known comparable source
     `Cable Guy - Dj Deep (Original Mix).mp3`.
   - Result: PASS against calibrated external capture thresholds.
@@ -134,7 +134,7 @@ hardware window and tested through the same external capture pair B route.
 
 Evidence directory:
 
-`local-analysis/physical-cpu-candidate-ab/20260620T120032-cpu-pool-install-irig`
+`local-analysis/physical-cpu-candidate-ab/20260620T120032-cpu-pool-install-external-capture`
 
 Install details:
 
@@ -152,7 +152,7 @@ Install details:
 external capture candidate soundcheck:
 
 - Run directory:
-  `local-analysis/physical-cpu-candidate-ab/20260620T120032-cpu-pool-install-irig/soundcheck-candidate`
+  `local-analysis/physical-cpu-candidate-ab/20260620T120032-cpu-pool-install-external-capture/soundcheck-candidate`
 - Pair B, external capture interface channels 1,2, known comparable source
   `Cable Guy - Dj Deep (Original Mix).mp3`.
 - Result: PASS against calibrated external capture thresholds.
@@ -207,7 +207,7 @@ human_listening_result=PASS
 Second same-artifact external capture pass before user listening:
 
 - Run directory:
-  `local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-irig/soundcheck-candidate-repeat`
+  `local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-external-capture/soundcheck-candidate-repeat`
 - Result: PASS against calibrated external capture thresholds.
 - `quality_alignment_score=0.948151`, `analog_snr_db=8.72`,
   `mid_band_1000_5000_residual_ratio=1.512976`,
