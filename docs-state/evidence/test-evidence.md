@@ -1924,3 +1924,80 @@ Current conclusion:
 - Do not upload replacement GitHub release assets until all four final
   containers are accepted, stapled, checksummed, and `make verify-signed-release`
   passes on the stapled files.
+
+## 2026-06-21 15:19 UTC - 86bd027 signed release assets submitted
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Source commit for packaged artifacts:
+  `86bd0274f57c9eed231e9533c0c5a8e8f4cd30b5`
+- Hardware touched: no
+- Driver installed/reloaded: no
+- Package executed: no
+- CoreAudio restart/default-device change/Traktor launch: no
+
+Reason for rebuild:
+
+- Documentation was reorganized so human-readable documentation remains under
+  `docs/` and maintainer continuity/state lives under top-level `docs-state/`.
+- `docs/reference/release-notes-0.5.0.md` changed, and that file is packaged
+  into the driver PKG/DMG, so the previous d31fa63 Apple submissions are stale
+  for publication even where Apple accepted them.
+
+Local verification before Apple submission:
+
+```text
+make clean release-signed: PASS
+pkgutil --check-signature build/OpenA8DJ-0.5.0.pkg: PASS, Developer ID Installer
+pkgutil --check-signature build/opena8dj-tools-0.5.0.pkg: PASS, Developer ID Installer
+codesign --verify --deep --strict build/OpenA8DJ.driver: PASS
+codesign --verify --deep --strict build/OpenA8DJControlCenter.app: PASS
+codesign --verify build/OpenA8DJ-0.5.0.dmg: PASS
+codesign --verify build/opena8dj-tools-0.5.0.dmg: PASS
+hdiutil verify build/OpenA8DJ-0.5.0.dmg: PASS
+hdiutil verify build/opena8dj-tools-0.5.0.dmg: PASS
+shasum -a 256 -c build/OpenA8DJ-0.5.0-checksums.txt: PASS
+```
+
+Pre-staple SHA-256 hashes:
+
+```text
+1f35cae55709bfcd964863fde46af7c35e841db27803582fdf3851ea975671b4  OpenA8DJ-0.5.0.dmg
+2bbec9fca54679dff0a8096307c74d72b106d0b8249a654ed6d8a5a4712c9847  OpenA8DJ-0.5.0.pkg
+63d2bbce75402a3627b651b208909da2e318f047443559b6d842159432802bb3  opena8dj-tools-0.5.0.dmg
+42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf  opena8dj-tools-0.5.0.pkg
+```
+
+Apple notarization submissions and latest status:
+
+```text
+OpenA8DJ-0.5.0.pkg
+  id: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
+  created: 2026-06-21T15:19:32.714Z
+  status at 2026-06-21T15:19Z: In Progress
+
+OpenA8DJ-0.5.0.dmg
+  id: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
+  created: 2026-06-21T15:19:32.470Z
+  status at 2026-06-21T15:19Z: In Progress
+
+opena8dj-tools-0.5.0.pkg
+  id: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
+  created: 2026-06-21T15:19:32.432Z
+  status at 2026-06-21T15:19Z: In Progress
+
+opena8dj-tools-0.5.0.dmg
+  id: dca61499-b3f5-46fd-93b8-ee63f4868942
+  created: 2026-06-21T15:19:32.421Z
+  status at 2026-06-21T15:19Z: In Progress
+```
+
+Current conclusion:
+
+- All four rebuilt 86bd027 containers are submitted to Apple and currently in
+  progress.
+- No user action is currently required unless Apple rejects one of those
+  submissions.
+- Do not upload replacement GitHub release assets until all four exact
+  containers are accepted, stapled, checksummed, and `make verify-signed-release`
+  passes on the stapled files.

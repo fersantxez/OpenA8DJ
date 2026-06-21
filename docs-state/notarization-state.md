@@ -11,65 +11,54 @@ named `OpenA8DJNotary`.
 ## Current 0.5.0 Publication Attempt
 
 The current publication artifacts were rebuilt from source commit
-`d31fa6373c1304d429b85537f8379733c62eadc4` after the public documentation was
-generalized to avoid naming the external real-time capture device. They were
-signed with the Developer ID Application and Developer ID Installer
-certificates, locally verified, and submitted to Apple on
-2026-06-21T02:21Z.
+`86bd0274f57c9eed231e9533c0c5a8e8f4cd30b5` after the documentation
+reorganization moved maintainer continuity notes to top-level `docs-state` and
+updated packaged release notes. They were signed with the Developer ID
+Application and Developer ID Installer certificates, locally verified, and
+submitted to Apple on 2026-06-21T15:19Z.
 
-Later documentation-only edits outside `docs/reference` and `resources/dmg` do
-not change the bytes inside the release packages or DMGs. Do not restart
-notarization solely for a non-packaged documentation update.
-
-The documentation reorganization that moved maintainer continuity notes to
-top-level `docs-state` also updates `docs/reference/release-notes-0.5.0.md`.
-Because that file is packaged into the public driver DMG/PKG, the Apple
-submissions below are not final publication containers for the reorganized
-repository state. Continue monitoring them as evidence of Apple acceptance
-behavior, but rebuild, sign, notarize, staple, checksum, verify, and upload new
-release assets from the current committed tree before claiming the public
-release is final.
+Later documentation-only edits outside `docs/reference`,
+`resources/dmg`, and `resources/control-surfaces-dmg` do not change the bytes
+inside the release packages or DMGs. Do not restart notarization solely for a
+non-packaged documentation update.
 
 Pre-staple SHA-256 hashes:
 
 ```text
-4463317a031eb7245a8f709d055c6d65525a5d7884234d0ad8a25468b2334892  OpenA8DJ-0.5.0.dmg
-925d7015cc77a22591aefb2786d7f7c8f8ebc49ff733b508e5bb03ffa46a34b5  OpenA8DJ-0.5.0.pkg
-22bde3d405387e377ea0c8cf39a52636b65fc8f6f5faa0a10ce18459699294cb  opena8dj-tools-0.5.0.dmg
-377883acc5fb68dfe7852258d5019c26c5b2b9b15565188b8a7d6500d05b7d0f  opena8dj-tools-0.5.0.pkg
+1f35cae55709bfcd964863fde46af7c35e841db27803582fdf3851ea975671b4  OpenA8DJ-0.5.0.dmg
+2bbec9fca54679dff0a8096307c74d72b106d0b8249a654ed6d8a5a4712c9847  OpenA8DJ-0.5.0.pkg
+63d2bbce75402a3627b651b208909da2e318f047443559b6d842159432802bb3  opena8dj-tools-0.5.0.dmg
+42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T15:15Z:
+Latest Apple notarization status checked on 2026-06-21T15:19Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg
-  submission: e157be38-1542-40c1-8cb9-310564101890
+  submission: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
   status: In Progress
 
 OpenA8DJ-0.5.0.dmg
-  submission: dc39b66f-3a77-4033-80de-c447bcfb0f2d
-  status: Accepted
+  submission: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
+  status: In Progress
 
 opena8dj-tools-0.5.0.pkg
-  submission: e698ed76-1aff-49fb-b63a-c26d0661be20
-  status: Accepted
+  submission: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
+  status: In Progress
 
 opena8dj-tools-0.5.0.dmg
-  submission: 66cef6ca-a7ee-4a04-b17a-bd8017acd9d8
+  submission: dca61499-b3f5-46fd-93b8-ee63f4868942
   status: In Progress
 ```
 
 No package was installed, no driver was loaded, no hardware was touched, and no
 CoreAudio restart was performed for this signing/notarization rebuild.
 
-Accepted by Apple so far:
-
-- `OpenA8DJ-0.5.0.dmg`
-- `opena8dj-tools-0.5.0.pkg`
-
 Still waiting on Apple:
 
 - `OpenA8DJ-0.5.0.pkg`
+- `OpenA8DJ-0.5.0.dmg`
+- `opena8dj-tools-0.5.0.pkg`
 - `opena8dj-tools-0.5.0.dmg`
 
 ## Stale Submissions
@@ -84,7 +73,17 @@ opena8dj-tools-0.5.0.dmg: 9ab1b493-1a32-4674-aede-863f25a9242c
 The internal HAL diagnostic submission was accepted, and
 `build/OpenA8DJ.driver` validated as Notarized Developer ID.
 
-All release-container submissions created before commit `d31fa63` are stale for
+The d31fa63 release-container submissions are also stale for publication after
+the docs-state reorganization, even though Apple had accepted two of them:
+
+```text
+OpenA8DJ-0.5.0.pkg: e157be38-1542-40c1-8cb9-310564101890
+OpenA8DJ-0.5.0.dmg: dc39b66f-3a77-4033-80de-c447bcfb0f2d
+opena8dj-tools-0.5.0.pkg: e698ed76-1aff-49fb-b63a-c26d0661be20
+opena8dj-tools-0.5.0.dmg: 66cef6ca-a7ee-4a04-b17a-bd8017acd9d8
+```
+
+All release-container submissions created before commit `86bd027` are stale for
 publication, even if Apple later reports `Accepted`, because packaged release
 notes or DMG text changed after those submissions.
 

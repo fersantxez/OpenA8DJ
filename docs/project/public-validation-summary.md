@@ -15,20 +15,18 @@ Maintainers must not describe replacement binary assets as Developer ID signed
 or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
-Current signing status for the replacement 0.5.0 assets, checked on
-2026-06-21T15:15Z:
+Current signing status for the replacement 0.5.0 assets rebuilt from commit
+`86bd027`, checked on 2026-06-21T15:19Z:
 
-- Apple accepted `OpenA8DJ-0.5.0.dmg`.
-- Apple accepted `opena8dj-tools-0.5.0.pkg`.
-- `OpenA8DJ-0.5.0.pkg` and `opena8dj-tools-0.5.0.dmg` are still in Apple
-  notarization review.
+- `OpenA8DJ-0.5.0.pkg` is in Apple notarization review.
+- `OpenA8DJ-0.5.0.dmg` is in Apple notarization review.
+- `opena8dj-tools-0.5.0.pkg` is in Apple notarization review.
+- `opena8dj-tools-0.5.0.dmg` is in Apple notarization review.
 - Treat the public release as fully notarized only after all four files are
   accepted, stapled, checksummed, verified, uploaded to GitHub Releases, and
   validated through the GitHub-downloaded install flow.
-- The accepted files above were built before the latest documentation
-  reorganization. Because the packaged release notes changed, final public
-  replacement assets must be rebuilt and notarized again from the current tree
-  before publication.
+- Earlier partial Apple acceptances belong to older containers and are no
+  longer final publication candidates after the documentation reorganization.
 
 ## What Was Tested
 
