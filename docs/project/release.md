@@ -133,7 +133,7 @@ tickets; and checksums.
 Do not upload replacement public assets until Apple returns `Accepted`,
 stapling succeeds, and `make verify-signed-release` passes. Current
 maintainer-facing signing state belongs in
-[notarization state](../memories/notarization-state.md).
+[notarization state](../../docs-state/notarization-state.md).
 
 ## GitHub release
 

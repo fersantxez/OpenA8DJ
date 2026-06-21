@@ -1,4 +1,4 @@
-# Project Memories
+# Project State And Memories
 
 This directory is for maintainers and future LLM agents. It preserves continuity
 material that is useful for resuming work, auditing decisions, or reconstructing
@@ -7,10 +7,10 @@ why a release was made.
 It is intentionally not the public documentation path. If you are trying to use
 OpenA8DJ or understand the project for the first time, start here instead:
 
-- [Documentation index](../README.md)
-- [Project documentation](../project/README.md)
-- [Architecture](../project/architecture.md)
-- [Testing and validation](../project/validation/testing-and-validation.md)
+- [Documentation index](../docs/README.md)
+- [Project documentation](../docs/project/README.md)
+- [Architecture](../docs/project/architecture.md)
+- [Testing and validation](../docs/project/validation/testing-and-validation.md)
 
 ## What Belongs Here
 

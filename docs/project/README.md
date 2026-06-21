@@ -59,8 +59,8 @@ The public release line is macOS C++ on `main`. Historical and experimental
 work is documented separately in
 [Legacy and research branches](legacy-and-research-branches.md).
 
-## Maintainer Memories
+## Maintainer State
 
 Raw transfer notes, detailed logs, rejected experiments, local paths, and
-notarization state live in [project memories](../memories/README.md). They are
+notarization state live in [project state](../../docs-state/README.md). They are
 kept for continuity, not as the normal reading path.

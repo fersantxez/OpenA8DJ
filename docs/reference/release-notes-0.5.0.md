@@ -43,8 +43,8 @@ is the reference build for the public 0.5.x line.
   they can replace this reference.
 - Windows, Linux, Rust, and DriverKit work remains experimental unless a future
   release note says otherwise.
-- Detailed engineering evidence and rejected experiments are preserved in
-  [maintainer memories](../memories/evidence/test-evidence.md).
+- Detailed engineering evidence and rejected experiments are preserved in the
+  repository's top-level `docs-state` directory.
 
 ## Release Assets
 

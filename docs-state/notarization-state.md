@@ -21,6 +21,15 @@ Later documentation-only edits outside `docs/reference` and `resources/dmg` do
 not change the bytes inside the release packages or DMGs. Do not restart
 notarization solely for a non-packaged documentation update.
 
+The documentation reorganization that moved maintainer continuity notes to
+top-level `docs-state` also updates `docs/reference/release-notes-0.5.0.md`.
+Because that file is packaged into the public driver DMG/PKG, the Apple
+submissions below are not final publication containers for the reorganized
+repository state. Continue monitoring them as evidence of Apple acceptance
+behavior, but rebuild, sign, notarize, staple, checksum, verify, and upload new
+release assets from the current committed tree before claiming the public
+release is final.
+
 Pre-staple SHA-256 hashes:
 
 ```text
@@ -30,7 +39,7 @@ Pre-staple SHA-256 hashes:
 377883acc5fb68dfe7852258d5019c26c5b2b9b15565188b8a7d6500d05b7d0f  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T15:04Z:
+Latest Apple notarization status checked on 2026-06-21T15:15Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg

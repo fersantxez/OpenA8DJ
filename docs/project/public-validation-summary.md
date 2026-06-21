@@ -16,7 +16,7 @@ or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
 Current signing status for the replacement 0.5.0 assets, checked on
-2026-06-21T15:04Z:
+2026-06-21T15:15Z:
 
 - Apple accepted `OpenA8DJ-0.5.0.dmg`.
 - Apple accepted `opena8dj-tools-0.5.0.pkg`.
@@ -25,6 +25,10 @@ Current signing status for the replacement 0.5.0 assets, checked on
 - Treat the public release as fully notarized only after all four files are
   accepted, stapled, checksummed, verified, uploaded to GitHub Releases, and
   validated through the GitHub-downloaded install flow.
+- The accepted files above were built before the latest documentation
+  reorganization. Because the packaged release notes changed, final public
+  replacement assets must be rebuilt and notarized again from the current tree
+  before publication.
 
 ## What Was Tested
 
@@ -87,4 +91,4 @@ run and was accepted as the stable 0.5.0 sound baseline.
 
 Technical logs, detailed build names, rejected experiments, and command-level
 evidence are kept in
-[maintainer memories](../memories/evidence/test-evidence.md).
+[maintainer state](../../docs-state/evidence/test-evidence.md).

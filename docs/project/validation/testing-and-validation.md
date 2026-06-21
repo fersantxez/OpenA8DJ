@@ -38,6 +38,6 @@ Readable summaries live in:
 - [Measurement methodology](measurement-methodology.md)
 
 Detailed logs, rejected experiments, local paths, and build names live in
-maintainer memories:
+maintainer state:
 
-- [Detailed evidence](../../memories/evidence/test-evidence.md)
+- [Detailed evidence](../../../docs-state/evidence/test-evidence.md)

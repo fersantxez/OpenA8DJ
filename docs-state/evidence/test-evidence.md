@@ -6,7 +6,7 @@ macOS mainline.
 This is a technical evidence log. It intentionally contains internal build
 target names, local evidence paths, rejected experiments, and command-level
 details that are too noisy for public release notes. For the external-facing
-summary, see [public validation summary](../../project/public-validation-summary.md).
+summary, see [public validation summary](../../docs/project/public-validation-summary.md).
 
 ## 2026-06-19 17:01 EDT - Main package fix, DVS default, Control Center, and calibrated soundcheck
 
@@ -1703,7 +1703,7 @@ Follow-up result:
 - This state is the local `0.5.0` stable reference until a later release-prep
   change explicitly supersedes it.
 - Stable reference document:
-  `docs/memories/current-release-state.md`.
+  `docs-state/current-release-state.md`.
 
 ## 2026-06-20 12:04 EDT - 0.5.0 CPU pool stable freeze
 

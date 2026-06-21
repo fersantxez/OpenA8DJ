@@ -10,7 +10,7 @@ Instruments Audio 8 DJ. The current public driver line is the macOS C++ line on
 This documentation is organized for human readers first. The main `docs`
 folders explain installation, architecture, validation, release policy, and
 contribution workflows. Raw handoffs and machine-readable continuity notes are
-kept separately in `docs/memories`.
+kept outside this tree in [`docs-state`](../docs-state/README.md).
 
 ## If You Just Want To Use It
 
@@ -66,13 +66,11 @@ validation documents for the kind of change you want to make:
   plan used to decide whether a build is ready for people.
 - `reference/`: stable reference material such as release notes and legal
   policy.
-- `memories/`: raw continuity notes for maintainers and future LLM agents. This
-  is intentionally not the starting point for users or new contributors.
 
-## Project Memories
+## Project State
 
 Handoffs, raw test evidence, internal investigations, date-stamped runbooks,
-and notarization state live in [docs/memories](memories/README.md). Those files
+and notarization state live in [docs-state](../docs-state/README.md). Those files
 are preserved because they are useful for maintenance and future agents, but
 they may contain old wording, rejected experiments, local paths, and internal
 process details.

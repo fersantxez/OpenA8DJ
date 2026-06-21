@@ -102,6 +102,7 @@ and [release notes](docs/reference/release-notes-0.5.0.md).
 - [Architecture](docs/project/architecture.md)
 - [Contributing](docs/project/contributing.md)
 - [Release process](docs/project/release.md)
+- [Development state and maintainer notes](docs-state/README.md)
 
 ## Contributing
 

@@ -56,9 +56,9 @@ User-facing pages should explain what to do, what should happen, and what to try
 if it does not work.
 
 Internal handoffs, raw evidence, date-stamped state, and local investigation
-notes belong in [project memories](../memories/README.md). If a memory becomes
+notes belong in [project state](../../docs-state/README.md). If state becomes
 important for users or contributors, rewrite it into a clean page rather than
-linking people directly to raw state.
+linking people directly to raw notes.
 
 ## Branches
 

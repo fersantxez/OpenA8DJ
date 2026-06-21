@@ -83,8 +83,8 @@ Final local checks for this release line:
   `big`.
 - 44.1 kHz and 48 kHz playback validated locally.
 
-Current branch roles are summarized in
-[current branch status](../memories/current-branch-status.md).
+Current branch roles are summarized in the repository's top-level
+`docs-state/current-branch-status.md` file.
 
 ## Known Limits
 
