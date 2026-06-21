@@ -1974,28 +1974,29 @@ Apple notarization submissions and latest status:
 OpenA8DJ-0.5.0.pkg
   id: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
   created: 2026-06-21T15:19:32.714Z
-  status at 2026-06-21T15:38Z: In Progress
+  status at 2026-06-21T15:55Z: In Progress
 
 OpenA8DJ-0.5.0.dmg
   id: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
   created: 2026-06-21T15:19:32.470Z
-  status at 2026-06-21T15:38Z: In Progress
+  status at 2026-06-21T15:55Z: Accepted
 
 opena8dj-tools-0.5.0.pkg
   id: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
   created: 2026-06-21T15:19:32.432Z
-  status at 2026-06-21T15:38Z: In Progress
+  status at 2026-06-21T15:55Z: In Progress
 
 opena8dj-tools-0.5.0.dmg
   id: dca61499-b3f5-46fd-93b8-ee63f4868942
   created: 2026-06-21T15:19:32.421Z
-  status at 2026-06-21T15:38Z: In Progress
+  status at 2026-06-21T15:55Z: In Progress
 ```
 
 Current conclusion:
 
-- All four rebuilt 86bd027 containers are submitted to Apple and currently in
-  progress.
+- All four rebuilt 86bd027 containers are submitted to Apple.
+- Apple has accepted the current `OpenA8DJ-0.5.0.dmg`.
+- The current driver PKG, tools PKG, and tools DMG are still in progress.
 - No user action is currently required unless Apple rejects one of those
   submissions.
 - Do not upload replacement GitHub release assets until all four exact

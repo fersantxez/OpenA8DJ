@@ -16,15 +16,16 @@ or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
 Current signing status for the replacement 0.5.0 assets rebuilt from commit
-`86bd027`, checked on 2026-06-21T15:38Z:
+`86bd027`, checked on 2026-06-21T15:55Z:
 
 - `OpenA8DJ-0.5.0.pkg` is in Apple notarization review.
-- `OpenA8DJ-0.5.0.dmg` is in Apple notarization review.
+- `OpenA8DJ-0.5.0.dmg` has been accepted by Apple for this current publication attempt.
 - `opena8dj-tools-0.5.0.pkg` is in Apple notarization review.
 - `opena8dj-tools-0.5.0.dmg` is in Apple notarization review.
 - Treat the public release as fully notarized only after all four files are
   accepted, stapled, checksummed, verified, uploaded to GitHub Releases, and
-  validated through the GitHub-downloaded install flow.
+  validated through the GitHub-downloaded install flow. The current driver DMG
+  acceptance is partial and is not enough for publication by itself.
 - Earlier partial Apple acceptances belong to older containers and are no
   longer final publication candidates after the documentation reorganization.
 

@@ -31,7 +31,7 @@ Pre-staple SHA-256 hashes:
 42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T15:38Z:
+Latest Apple notarization status checked on 2026-06-21T15:55Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg
@@ -40,7 +40,7 @@ OpenA8DJ-0.5.0.pkg
 
 OpenA8DJ-0.5.0.dmg
   submission: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
-  status: In Progress
+  status: Accepted
 
 opena8dj-tools-0.5.0.pkg
   submission: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
@@ -54,10 +54,13 @@ opena8dj-tools-0.5.0.dmg
 No package was installed, no driver was loaded, no hardware was touched, and no
 CoreAudio restart was performed for this signing/notarization rebuild.
 
+Accepted by Apple for this current publication attempt:
+
+- `OpenA8DJ-0.5.0.dmg`
+
 Still waiting on Apple:
 
 - `OpenA8DJ-0.5.0.pkg`
-- `OpenA8DJ-0.5.0.dmg`
 - `opena8dj-tools-0.5.0.pkg`
 - `opena8dj-tools-0.5.0.dmg`
 
