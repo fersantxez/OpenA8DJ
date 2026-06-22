@@ -92,6 +92,31 @@ Current helper commands:
 ./scripts/candidate-status
 ```
 
+## Linux Agent
+
+The visible Linux implementation agent lives at:
+
+```text
+agents/linux-driver-agent/
+```
+
+It should work from its own branch/worktree:
+
+```text
+linux/full-driver-agent
+../opena8dj-linux-agent
+```
+
+Use:
+
+```sh
+./scripts/bootstrap-linux-driver-agent
+```
+
+The Linux agent follows the same hardware lock rules whenever it touches the
+shared Audio 8 DJ, USB bus, physical capture route, or CPU/audio-sensitive test
+window.
+
 Current safety behavior:
 
 - Compound gates export inherited lock state to child gates, so a full quality

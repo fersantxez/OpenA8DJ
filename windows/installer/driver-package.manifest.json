@@ -1,0 +1,50 @@
+{
+  "product": "OpenA8DJ Windows Driver",
+  "package_id": "org.opena8dj.windows.driver",
+  "owner": "windows",
+  "installs_driver_store": true,
+  "installs_user_tools": false,
+  "requires_admin": true,
+  "requires_hardware_lock_for_install": true,
+  "hardware_ids": [
+    "USB\\VID_17CC&PID_1978"
+  ],
+  "payload": [
+    "OpenA8DJUsb.inf",
+    "OpenA8DJUsb.sys",
+    "OpenA8DJUsb.cat"
+  ],
+  "required_support_payload": [
+    "install-driver.ps1 or production driver installer",
+    "uninstall-driver.ps1 or production uninstall path",
+    "verify-driver.ps1 or production verification report",
+    "README-FIRST.txt",
+    "installer-manifest.json",
+    "signing-manifest.json",
+    "SHA256 hashes",
+    "readiness label and limitations"
+  ],
+  "dev_payload": [
+    "OpenA8DJUsb-TestCertificate.cer",
+    "OpenA8DJUsb.pdb"
+  ],
+  "install_method": {
+    "development": "windows/scripts/install-driver.ps1",
+    "production": "bootstrapper calling Windows driver install API or pnputil"
+  },
+  "verification": [
+    "catalog_signature_valid",
+    "driver_store_has_opena8dj",
+    "connected_audio8dj_usbdevice",
+    "opena8djctl_surface",
+    "opena8djctl_diagnostics",
+    "hardware_lock_released"
+  ],
+  "public_release_gate": [
+    "microsoft_signed_catalog",
+    "clean_install_windows_10_22h2_x64",
+    "clean_install_windows_11_current_x64",
+    "uninstall_reinstall_upgrade_pass",
+    "reboot_hotplug_pass"
+  ]
+}

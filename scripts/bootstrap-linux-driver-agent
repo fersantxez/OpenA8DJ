@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+branch="${1:-linux/full-driver-agent}"
+worktree="${2:-../opena8dj-linux-agent}"
+
+cat <<EOF
+OpenA8DJ Linux Driver Agent bootstrap
+
+This helper prepares a visible parallel worktree for the Linux agent.
+It does not touch hardware.
+
+Branch:   $branch
+Worktree: $worktree
+
+Recommended launch steps:
+
+  git worktree add -b "$branch" "$worktree"
+  cd "$worktree"
+  export AUDIO_GATE_LOCK_ROOT="\$HOME/.opena8dj/hardware-gate.lock"
+
+Then start a separate Codex/session in that worktree and give it:
+
+  agents/linux-driver-agent/PROMPT.md
+  agents/linux-driver-agent/IMPLEMENTATION_CONTRACT.md
+
+If the branch already exists, use:
+
+  git worktree add "$worktree" "$branch"
+
+The Linux agent must keep Linux work isolated and must not destabilize macOS.
+EOF
