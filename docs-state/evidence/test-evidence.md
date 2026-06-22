@@ -1998,8 +1998,8 @@ Current conclusion:
 - All four final containers were stapled.
 - The checksum file was regenerated from the stapled files.
 - `make verify-signed-release` passed on the exact final stapled artifacts.
-- The remaining release gate is the GitHub-downloaded public install validation
-  after uploading these final assets to release `v0.5.0`.
+- The final assets were uploaded to GitHub release `v0.5.0`.
+- The GitHub-downloaded public install validation passed on 2026-06-22.
 
 ## 2026-06-22 06:24 UTC - 86bd027 release assets accepted, stapled, and verified
 
@@ -2047,6 +2047,142 @@ checksum consistency for all four public artifacts: PASS
 This is the final local signed/notarized/stapled artifact gate. It does not
 replace the required end-user installation validation from the GitHub-downloaded
 release assets after upload.
+
+## 2026-06-22 06:32 UTC - GitHub-downloaded public install validation passed
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Current repo commit during validation: `dde7afd`
+- Packaged artifact source commit: `86bd027`
+- GitHub release: `https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0`
+- Evidence root:
+  `local-analysis/github-install-e2e-20260622T063225Z`
+- Download location: `~/Downloads`
+- Hardware/USB touched: no
+- Physical playback/capture repeated: no
+- CoreAudio restart: yes, during pre-install cleanup only, via the project
+  uninstaller.
+
+Downloaded public artifacts:
+
+```text
+OpenA8DJ-0.5.0.dmg
+OpenA8DJ-0.5.0.pkg
+OpenA8DJ-0.5.0-checksums.txt
+opena8dj-tools-0.5.0.dmg
+opena8dj-tools-0.5.0.pkg
+```
+
+Download and trust checks:
+
+```text
+(cd ~/Downloads && shasum -a 256 -c OpenA8DJ-0.5.0-checksums.txt): PASS
+xcrun stapler validate ~/Downloads/OpenA8DJ-0.5.0.pkg: PASS
+xcrun stapler validate ~/Downloads/OpenA8DJ-0.5.0.dmg: PASS
+xcrun stapler validate ~/Downloads/opena8dj-tools-0.5.0.pkg: PASS
+xcrun stapler validate ~/Downloads/opena8dj-tools-0.5.0.dmg: PASS
+pkgutil --check-signature direct driver/tools PKGs: PASS, Developer ID Installer
+spctl direct driver/tools PKGs: accepted
+spctl direct driver/tools DMGs with primary-signature context: accepted
+pkgutil --check-signature mounted driver/tools PKGs: PASS, Developer ID Installer
+spctl mounted driver/tools PKGs: accepted
+```
+
+The mounted PKGs inside the stapled DMGs do not carry their own stapled tickets,
+but Gatekeeper accepted them and the separately published direct PKG downloads
+are stapled and accepted.
+
+Installer flow:
+
+```text
+normal_installer_opened_driver=yes
+normal_installer_opened_tools=yes
+sudo_fallback_used=yes
+driver_install_from_mounted_public_dmg=PASS
+tools_install_from_mounted_public_dmg=PASS
+```
+
+The normal macOS Installer app opened both mounted public packages without a
+Gatekeeper block. Unattended automation could not complete the GUI clicks, so
+the documented `sudo installer` fallback was used with the same mounted public
+packages.
+
+Installed-state checks:
+
+```text
+pkg receipts: org.opena8dj.driver, org.opena8dj.tools
+installed HAL: /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+installed app: /Applications/OpenA8DJ Control Center.app
+installed CLI: /usr/local/bin/opena8dj-control
+installed MIDI bridge: /usr/local/bin/opena8dj-midid
+installed uninstall tool: /usr/local/bin/opena8dj-uninstall
+installed LaunchAgent: /Library/LaunchAgents/org.opena8dj.midid.plist
+installed documentation: /Library/Documentation/OpenA8DJ
+codesign installed HAL: PASS
+codesign installed Control Center: PASS
+codesign installed control CLI: PASS
+codesign installed MIDI bridge: PASS
+```
+
+Installed binary hashes:
+
+```text
+HAL executable:
+  2fdbd49723b200c8c56577b88dba395f65ff5c86ebc1e81c23b0d138193aae10
+opena8dj-control:
+  f2355b8f3d88d5a5ffdb1f876e41a9055ca38fa00c7a9f97591fd1b3afe18f09
+opena8dj-midid:
+  c5f856d68a13a42d257afe6e1069d3e7d78afb4106f67af1e58e629b9b108cb5
+OpenA8DJ Control Center binary:
+  f0c3bf9982b13e63068371ee0d2365a21faf1b1e7ae68c1eddebe18ea9740fd2
+```
+
+Device, MIDI, and app checks:
+
+```text
+Open Audio 8 DJ visible in Core Audio: yes, 8 inputs / 8 outputs at 48 kHz
+Open Audio 8 DJ audio inspect: PASS, A/B/C/D input and output channel names
+Open Audio 8 DJ MIDI In/Out visible: yes
+opena8dj-control list-profiles: PASS
+opena8dj-control export-config: PASS
+active preset: traktor-dvs-vinyl
+input mode: timecode-vinyl
+software lock: true
+Control Center app present: yes
+midid LaunchAgent state: running
+audio_stack_health=PASS
+total_watched_cpu_pct=5.4
+process.opena8dj_driver.cpu_pct=0.1
+```
+
+Documentation checks:
+
+- `/Library/Documentation/OpenA8DJ` contains the packaged release notes,
+  ControlSurfaces docs, and uninstall scripts.
+- `docs/user/install.md` documents checksum verification, normal DMG/PKG
+  install flow, the direct and mounted-package `sudo installer` fallbacks,
+  installed file checks, Audio MIDI Setup visibility, MIDI endpoint checks,
+  Control Center checks, and uninstall steps.
+- `docs/user/uninstall.md` documents the uninstall commands used for cleanup.
+
+Physical sound note:
+
+The GitHub-download validation did not repeat physical playback/capture because
+the installed binary hashes match the same signed-DMG build that already passed
+physical A/B route checks and the isolated real-music external-capture
+soundcheck. No USB or hardware handling was needed for this public install
+gate.
+
+Conclusion:
+
+- The exact uploaded GitHub release assets are signed, notarized, stapled where
+  expected, checksum-consistent, accepted by Gatekeeper, and installable by the
+  documented user flow.
+- The normal Installer path opened without Gatekeeper blocking. The documented
+  `sudo installer` fallback was needed only to complete unattended validation.
+- The installed driver, tools, MIDI bridge, Control Center, receipts,
+  signatures, Core Audio device, MIDI endpoints, LaunchAgent, and user docs are
+  present and valid.
 
 ## 2026-06-21 15:38 UTC - Local installer E2E from rebuilt signed DMGs passed
 
@@ -2175,6 +2311,7 @@ Conclusion:
   Core Audio device, and MIDI endpoints are present and valid.
 - The installed artifact passed a real-music external-capture soundcheck after
   isolating the capture path, plus physical A/B route checks.
-- This is a local installer validation. It does not replace the required final
-  GitHub-downloaded public-artifact validation after Apple notarization,
-  stapling, checksum regeneration, and release upload.
+- This local installer validation remains the physical sound-quality evidence
+  for the release build. The final GitHub-downloaded public-artifact validation
+  above confirms the uploaded assets install to the same binary hashes and pass
+  the end-user install checks.

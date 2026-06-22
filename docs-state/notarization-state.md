@@ -66,9 +66,31 @@ c0cce3bda690581d6ef6ebde96758ee47f05c38e4fd93afc30fed6ff5a79bce2  OpenA8DJ-0.5.0
 e1bda7fdba18e48b74516ef0d1fd6cde10a0f21be481d388fdfe780472bae54c  opena8dj-tools-0.5.0.pkg
 ```
 
-`make verify-signed-release` passed on the final stapled files. The remaining
-release gate is the GitHub-downloaded end-user installation validation after the
-assets are uploaded to release `v0.5.0`.
+`make verify-signed-release` passed on the final stapled files. The final files
+were uploaded to GitHub release `v0.5.0`, then downloaded into `~/Downloads`
+and validated through the end-user installation flow on 2026-06-22T06:32Z.
+
+GitHub-downloaded install validation summary:
+
+```text
+release: https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0
+evidence: local-analysis/github-install-e2e-20260622T063225Z
+download_checksums: PASS
+direct PKG stapled-ticket validation: PASS
+DMG stapled-ticket validation: PASS
+Gatekeeper assessment for direct PKGs and DMGs: PASS
+normal Installer app opened both mounted PKGs: yes
+sudo installer fallback used after GUI open: yes
+driver install from mounted public DMG: PASS
+tools install from mounted public DMG: PASS
+installed receipts/files/code signatures: PASS
+Core Audio visibility: Open Audio 8 DJ, 8 inputs / 8 outputs at 48 kHz
+MIDI visibility: Open Audio 8 DJ MIDI In/Out present
+Control Center and CLI presence: PASS
+audio stack health after install: PASS
+CoreAudio restart: uninstall only, via the project uninstaller
+USB/hardware touched: no
+```
 
 ## Stale Submissions
 
@@ -96,8 +118,8 @@ All release-container submissions created before commit `86bd027` are stale for
 publication, even if Apple later reports `Accepted`, because packaged release
 notes or DMG text changed after those submissions.
 
-Do not call the release complete until:
+Release completion checklist:
 
-1. The final stapled files are uploaded to GitHub release `v0.5.0`.
-2. The GitHub-downloaded assets pass the end-user install validation.
-3. The final public validation evidence is committed and pushed.
+1. The final stapled files were uploaded to GitHub release `v0.5.0`.
+2. The GitHub-downloaded assets passed the end-user install validation.
+3. The final public validation evidence is recorded in this repository.

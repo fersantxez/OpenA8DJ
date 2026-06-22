@@ -25,12 +25,32 @@ Current signing status for the replacement 0.5.0 assets rebuilt from commit
   `make verify-signed-release` passed on the exact final stapled artifacts.
 - Final stapled hashes are recorded in the release checksum file:
   `build/OpenA8DJ-0.5.0-checksums.txt`.
-- The public release is still not marked complete until these exact files are
-  uploaded to GitHub Releases and pass the GitHub-downloaded install flow.
+- These exact files were uploaded to GitHub Releases and passed the
+  GitHub-downloaded install flow on 2026-06-22.
 - Earlier partial Apple acceptances belong to older containers and are no longer
   final publication candidates after the documentation reorganization.
 
-Current local installer validation, completed on 2026-06-21:
+Current public install validation, completed on 2026-06-22:
+
+- Downloaded the published `v0.5.0` GitHub release assets into `~/Downloads`
+  and matched them against the published checksum file.
+- Verified stapled tickets and Gatekeeper acceptance for the public DMGs and
+  direct PKG downloads.
+- Opened both mounted public PKGs with the normal macOS Installer app; no
+  Gatekeeper block occurred.
+- Used the documented `sudo installer` fallback to complete unattended
+  validation after confirming the normal Installer app path opened.
+- The installed driver, tools, MIDI bridge, Control Center app, package
+  receipts, LaunchAgent, and code signatures were verified on disk.
+- `Open Audio 8 DJ` appeared in Core Audio as an 8-input / 8-output device at
+  48 kHz, and the MIDI input/output endpoints appeared.
+- Control Center and `opena8dj-control` were present and functional.
+- Audio stack health passed after install.
+- CoreAudio was restarted only during the pre-install uninstall path, via the
+  project uninstaller. No USB/hardware was physically touched for this public
+  download validation.
+
+Local installer validation, completed on 2026-06-21:
 
 - Rebuilt local signed DMGs from the current publication artifact set installed
   successfully with the documented `sudo installer` fallback.
@@ -41,8 +61,9 @@ Current local installer validation, completed on 2026-06-21:
 - Physical A/B output routing passed external-capture checks.
 - A calibrated real-music external-capture soundcheck passed on the installed
   artifact after isolating the capture path from other audio apps.
-- This is not yet the final public GitHub-download validation; that still waits
-  for release upload and a fresh install test from the GitHub assets.
+- The public GitHub-download validation above confirms the published files
+  install and expose the same installed binary hashes as this local
+  sound-validated build.
 
 ## What Was Tested
 
@@ -89,8 +110,9 @@ audio app.
   branches.
 - DriverKit/AudioDriverKit is scaffolding for a future System Extension path,
   not the active 0.5.0 runtime.
-- More aggressive latency reductions below the 0.5.0 baseline need separate
-  same-session physical validation before replacing this release reference.
+- More aggressive latency reductions below the published 0.5.0 baseline need
+  separate same-session physical validation before replacing this release
+  reference.
 - Further CPU transport experiments need separate same-artifact physical sound
   validation before replacing the frozen 0.5.0 profile.
 

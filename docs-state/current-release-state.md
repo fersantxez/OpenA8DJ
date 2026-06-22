@@ -1,6 +1,6 @@
 # OpenA8DJ 0.5.0 Stable Reference
 
-Date: 2026-06-20
+Date: 2026-06-22
 
 This is the public GitHub release reference for OpenA8DJ 0.5.0, the current
 macOS C++ 0.5.x baseline.
@@ -75,6 +75,47 @@ outputPanicFlags=0
 hardware_lock_after_install=absent
 ```
 
+## Latest Public GitHub Install Validation
+
+```text
+date=2026-06-22
+repo_commit=dde7afd
+artifact_source_commit=86bd027
+release=https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0
+evidence=local-analysis/github-install-e2e-20260622T063225Z
+download_location=~/Downloads
+install_source=GitHub release v0.5.0 public DMGs and PKGs
+download_checksums=PASS
+stapled_tickets_direct_pkgs_and_dmgs=PASS
+gatekeeper_direct_pkgs_and_dmgs=PASS
+normal_installer_opened_driver=yes
+normal_installer_opened_tools=yes
+sudo_fallback_used=yes
+driver_install=PASS
+tools_install=PASS
+installed_receipts=org.opena8dj.driver, org.opena8dj.tools
+installed_signatures=PASS
+core_audio_visibility=Open Audio 8 DJ, 8 input / 8 output channels at 48 kHz
+midi_visibility=Open Audio 8 DJ MIDI In/Out present
+control_center=PASS
+control_tool=PASS
+midid_launch_agent=PASS
+audio_stack_health=PASS
+coreaudio_restart=uninstall only, via project uninstaller
+hardware_usb_touched=no
+physical_playback_capture=not repeated for public download validation
+installed_hal_sha256=2fdbd49723b200c8c56577b88dba395f65ff5c86ebc1e81c23b0d138193aae10
+installed_control_cli_sha256=f2355b8f3d88d5a5ffdb1f876e41a9055ca38fa00c7a9f97591fd1b3afe18f09
+installed_midid_sha256=c5f856d68a13a42d257afe6e1069d3e7d78afb4106f67af1e58e629b9b108cb5
+installed_control_center_sha256=f0c3bf9982b13e63068371ee0d2365a21faf1b1e7ae68c1eddebe18ea9740fd2
+```
+
+The public download validation did not repeat the physical playback/capture
+soundcheck because the installed binary hashes matched the locally installed
+signed-DMG build that already passed physical route checks and isolated
+real-music external capture. No USB/hardware handling was needed for the public
+download install gate.
+
 ## Latest Local Installer Validation
 
 ```text
@@ -100,9 +141,10 @@ capture_clipped_frames=0
 hardware_lock_after=absent
 ```
 
-This was a local installer cycle from rebuilt signed artifacts. It does not
-replace the final public validation from GitHub-downloaded, notarized, stapled
-release assets.
+This was the same signed artifact family before GitHub upload. It is retained
+as the physical sound-quality evidence for the public build, and the public
+download validation above confirms the published files install to matching
+binary hashes.
 
 ## Important Rejections
 
