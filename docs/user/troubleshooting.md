@@ -28,20 +28,18 @@ If macOS shows a warning for the GitHub release:
 ## Installer Reports An Error
 
 If the package opens but macOS Installer reports an install error, verify the
-download checksum and use the Terminal fallback for the same package:
-
-```sh
-sudo installer -pkg "$HOME/Downloads/OpenA8DJ-0.5.0.pkg" -target /
-```
-
-If you opened the DMG instead of downloading the direct PKG:
+download checksum and use the Terminal fallback for the package inside the
+mounted DMG:
 
 ```sh
 sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
 ```
 
-For the optional Control Center tools, use the same pattern with
-`opena8dj-tools-0.5.0.pkg`.
+For the optional Control Center tools, use:
+
+```sh
+sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -target /
+```
 
 ## Traktor Does Not Calibrate Timecode Vinyl
 

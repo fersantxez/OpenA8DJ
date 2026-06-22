@@ -15,29 +15,30 @@ Maintainers must not describe replacement binary assets as Developer ID signed
 or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
-Current signing status for the replacement 0.5.0 assets rebuilt from commit
-`86bd027`, checked on 2026-06-22T06:24Z:
+Current signing status for the replacement 0.5.0 artifacts rebuilt from commit
+`86bd027`, checked on 2026-06-22:
 
 - Apple accepted all four current publication files:
   `OpenA8DJ-0.5.0.pkg`, `OpenA8DJ-0.5.0.dmg`,
   `opena8dj-tools-0.5.0.pkg`, and `opena8dj-tools-0.5.0.dmg`.
 - All four files were stapled, the checksum file was regenerated, and
   `make verify-signed-release` passed on the exact final stapled artifacts.
-- Final stapled hashes are recorded in the release checksum file:
-  `build/OpenA8DJ-0.5.0-checksums.txt`.
-- These exact files were uploaded to GitHub Releases and passed the
-  GitHub-downloaded install flow on 2026-06-22.
+- The public GitHub release was corrected to DMG-only distribution:
+  `OpenA8DJ-0.5.0.dmg`, `opena8dj-tools-0.5.0.dmg`, and
+  `OpenA8DJ-0.5.0-checksums.txt`.
+- The published checksum file covers the two public DMGs.
+- The downloaded public DMGs passed the GitHub-downloaded install flow on
+  2026-06-22.
 - Earlier partial Apple acceptances belong to older containers and are no longer
   final publication candidates after the documentation reorganization.
 
 Current public install validation, completed on 2026-06-22:
 
-- Downloaded the published `v0.5.0` GitHub release assets into `~/Downloads`
+- Downloaded the published `v0.5.0` GitHub DMG assets into `~/Downloads`
   and matched them against the published checksum file.
-- Verified stapled tickets and Gatekeeper acceptance for the public DMGs and
-  direct PKG downloads.
-- Opened both mounted public PKGs with the normal macOS Installer app; no
-  Gatekeeper block occurred.
+- Verified stapled tickets and Gatekeeper acceptance for the public DMGs.
+- Opened the packages inside both mounted public DMGs with the normal macOS
+  Installer app; no Gatekeeper block occurred.
 - Used the documented `sudo installer` fallback to complete unattended
   validation after confirming the normal Installer app path opened.
 - The installed driver, tools, MIDI bridge, Control Center app, package

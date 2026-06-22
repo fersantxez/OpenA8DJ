@@ -76,10 +76,10 @@ GitHub-downloaded install validation summary:
 release: https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0
 evidence: local-analysis/github-install-e2e-20260622T063225Z
 download_checksums: PASS
-direct PKG stapled-ticket validation: PASS
 DMG stapled-ticket validation: PASS
-Gatekeeper assessment for direct PKGs and DMGs: PASS
-normal Installer app opened both mounted PKGs: yes
+Gatekeeper assessment for public DMGs: PASS
+mounted DMG package signature and Gatekeeper assessment: PASS
+normal Installer app opened both packages inside mounted DMGs: yes
 sudo installer fallback used after GUI open: yes
 driver install from mounted public DMG: PASS
 tools install from mounted public DMG: PASS
@@ -120,6 +120,6 @@ notes or DMG text changed after those submissions.
 
 Release completion checklist:
 
-1. The final stapled files were uploaded to GitHub release `v0.5.0`.
+1. The final stapled DMG files were uploaded to GitHub release `v0.5.0`.
 2. The GitHub-downloaded assets passed the end-user install validation.
 3. The final public validation evidence is recorded in this repository.

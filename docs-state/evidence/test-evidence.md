@@ -1998,8 +1998,9 @@ Current conclusion:
 - All four final containers were stapled.
 - The checksum file was regenerated from the stapled files.
 - `make verify-signed-release` passed on the exact final stapled artifacts.
-- The final assets were uploaded to GitHub release `v0.5.0`.
-- The GitHub-downloaded public install validation passed on 2026-06-22.
+- The public GitHub release now exposes DMG-only end-user downloads:
+  `OpenA8DJ-0.5.0.dmg`, `opena8dj-tools-0.5.0.dmg`, and the checksum file.
+- The GitHub-downloaded public DMG install validation passed on 2026-06-22.
 
 ## 2026-06-22 06:24 UTC - 86bd027 release assets accepted, stapled, and verified
 
@@ -2067,30 +2068,24 @@ Downloaded public artifacts:
 
 ```text
 OpenA8DJ-0.5.0.dmg
-OpenA8DJ-0.5.0.pkg
 OpenA8DJ-0.5.0-checksums.txt
 opena8dj-tools-0.5.0.dmg
-opena8dj-tools-0.5.0.pkg
 ```
 
 Download and trust checks:
 
 ```text
 (cd ~/Downloads && shasum -a 256 -c OpenA8DJ-0.5.0-checksums.txt): PASS
-xcrun stapler validate ~/Downloads/OpenA8DJ-0.5.0.pkg: PASS
 xcrun stapler validate ~/Downloads/OpenA8DJ-0.5.0.dmg: PASS
-xcrun stapler validate ~/Downloads/opena8dj-tools-0.5.0.pkg: PASS
 xcrun stapler validate ~/Downloads/opena8dj-tools-0.5.0.dmg: PASS
-pkgutil --check-signature direct driver/tools PKGs: PASS, Developer ID Installer
-spctl direct driver/tools PKGs: accepted
 spctl direct driver/tools DMGs with primary-signature context: accepted
-pkgutil --check-signature mounted driver/tools PKGs: PASS, Developer ID Installer
-spctl mounted driver/tools PKGs: accepted
+pkgutil --check-signature packages inside mounted driver/tools DMGs: PASS, Developer ID Installer
+spctl packages inside mounted driver/tools DMGs: accepted
 ```
 
 The mounted PKGs inside the stapled DMGs do not carry their own stapled tickets,
-but Gatekeeper accepted them and the separately published direct PKG downloads
-are stapled and accepted.
+but their signatures are trusted by Apple notary service and Gatekeeper accepted
+them from the mounted public DMGs.
 
 Installer flow:
 

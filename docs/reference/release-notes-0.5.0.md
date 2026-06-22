@@ -52,14 +52,12 @@ Expected public assets:
 
 ```text
 OpenA8DJ-0.5.0.dmg
-OpenA8DJ-0.5.0.pkg
 OpenA8DJ-0.5.0-checksums.txt
 opena8dj-tools-0.5.0.dmg
-opena8dj-tools-0.5.0.pkg
 ```
 
-`opena8dj-tools-0.5.0.pkg` is the optional direct installer for the Control
-Center and support tools. It does not replace the HAL driver package.
+`opena8dj-tools-0.5.0.dmg` is the optional installer image for the Control
+Center and support tools. It does not replace the HAL driver image.
 
 ## Download Safety
 

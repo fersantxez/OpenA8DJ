@@ -19,14 +19,12 @@ For OpenA8DJ 0.5.0, the expected public assets are:
 
 ```text
 OpenA8DJ-0.5.0.dmg
-OpenA8DJ-0.5.0.pkg
 OpenA8DJ-0.5.0-checksums.txt
 opena8dj-tools-0.5.0.dmg
-opena8dj-tools-0.5.0.pkg
 ```
 
-Use the `OpenA8DJ` package for the driver. Use the separate `opena8dj-tools`
-package when you also want the optional Control Center app.
+Use the `OpenA8DJ` DMG for the driver. Use the separate `opena8dj-tools` DMG
+when you also want the optional Control Center app.
 
 ## Verify The Download
 
@@ -34,8 +32,8 @@ The public release includes a checksum file. Verification is optional for a
 normal install, but recommended if you want to confirm the download:
 
 ```sh
-shasum -a 256 OpenA8DJ-0.5.0.pkg
-grep OpenA8DJ-0.5.0.pkg OpenA8DJ-0.5.0-checksums.txt
+shasum -a 256 OpenA8DJ-0.5.0.dmg
+grep OpenA8DJ-0.5.0.dmg OpenA8DJ-0.5.0-checksums.txt
 ```
 
 The SHA-256 value printed by `shasum` must match the value in the checksum
@@ -79,14 +77,7 @@ Normal users should not need Terminal for the GitHub release installer.
 ## If The Installer Fails
 
 If the package opens but macOS Installer reports an install error, verify the
-checksum first, then install the same downloaded package from Terminal:
-
-```sh
-sudo installer -pkg "$HOME/Downloads/OpenA8DJ-0.5.0.pkg" -target /
-```
-
-If you opened the DMG and did not download the direct PKG, use the mounted DMG
-path instead:
+checksum first, then install the package from the mounted DMG path:
 
 ```sh
 sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
@@ -95,12 +86,8 @@ sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
 For the optional Control Center tools:
 
 ```sh
-sudo installer -pkg "$HOME/Downloads/opena8dj-tools-0.5.0.pkg" -target /
 sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -target /
 ```
-
-Use only one tools command: the first one for the direct PKG download, or the
-second one for the package inside the opened DMG.
 
 ## Installed Files
 

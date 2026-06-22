@@ -38,9 +38,7 @@ Use the [latest GitHub release](https://github.com/fersantxez/OpenA8DJ/releases/
 Release assets:
 
 - `OpenA8DJ-0.5.0.dmg`: driver installer
-- `OpenA8DJ-0.5.0.pkg`: direct driver package
 - `opena8dj-tools-0.5.0.dmg`: optional Control Center and support tools
-- `opena8dj-tools-0.5.0.pkg`: direct tools package
 - `OpenA8DJ-0.5.0-checksums.txt`: SHA-256 checksums
 
 GitHub Actions artifacts are not release downloads.
@@ -57,7 +55,8 @@ your audio application. If macOS blocks the package, or if you want checksum
 verification, see the [install guide](docs/user/install.md).
 
 If the macOS Installer app fails after the package is opened, the install guide
-also includes a `sudo installer` fallback for the same downloaded package.
+also includes a `sudo installer` fallback for the package inside the same
+mounted DMG.
 
 ## Use
 
