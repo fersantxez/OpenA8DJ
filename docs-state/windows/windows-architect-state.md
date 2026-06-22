@@ -6,6 +6,11 @@ Branch audited: `windows/rebuild-surface`
 Workspace: `/Users/fer/dev/opena8dj`
 Hardware use in this pass: none
 
+Follow-up: the design was finalized in
+`docs-state/windows/windows-final-design-and-implementation-plan.md`. Treat this
+file as the audit baseline and the final-design document as the implementation
+contract.
+
 ## Status Label
 
 Windows is an experimental implementation track only.
