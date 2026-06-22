@@ -1,6 +1,6 @@
 # OpenA8DJ 0.5.0 Public Validation Summary
 
-Date: 2026-06-20
+Date: 2026-06-22
 
 OpenA8DJ 0.5.0 is the current macOS C++ baseline for the Native Instruments
 Audio 8 DJ. It is an independent preservation project and is not affiliated
@@ -16,18 +16,19 @@ or Apple-notarized unless the exact published files have passed the signed
 release verifier.
 
 Current signing status for the replacement 0.5.0 assets rebuilt from commit
-`86bd027`, checked on 2026-06-21T15:55Z:
+`86bd027`, checked on 2026-06-22T06:24Z:
 
-- `OpenA8DJ-0.5.0.pkg` is in Apple notarization review.
-- `OpenA8DJ-0.5.0.dmg` has been accepted by Apple for this current publication attempt.
-- `opena8dj-tools-0.5.0.pkg` is in Apple notarization review.
-- `opena8dj-tools-0.5.0.dmg` is in Apple notarization review.
-- Treat the public release as fully notarized only after all four files are
-  accepted, stapled, checksummed, verified, uploaded to GitHub Releases, and
-  validated through the GitHub-downloaded install flow. The current driver DMG
-  acceptance is partial and is not enough for publication by itself.
-- Earlier partial Apple acceptances belong to older containers and are no
-  longer final publication candidates after the documentation reorganization.
+- Apple accepted all four current publication files:
+  `OpenA8DJ-0.5.0.pkg`, `OpenA8DJ-0.5.0.dmg`,
+  `opena8dj-tools-0.5.0.pkg`, and `opena8dj-tools-0.5.0.dmg`.
+- All four files were stapled, the checksum file was regenerated, and
+  `make verify-signed-release` passed on the exact final stapled artifacts.
+- Final stapled hashes are recorded in the release checksum file:
+  `build/OpenA8DJ-0.5.0-checksums.txt`.
+- The public release is still not marked complete until these exact files are
+  uploaded to GitHub Releases and pass the GitHub-downloaded install flow.
+- Earlier partial Apple acceptances belong to older containers and are no longer
+  final publication candidates after the documentation reorganization.
 
 Current local installer validation, completed on 2026-06-21:
 
@@ -41,8 +42,7 @@ Current local installer validation, completed on 2026-06-21:
 - A calibrated real-music external-capture soundcheck passed on the installed
   artifact after isolating the capture path from other audio apps.
 - This is not yet the final public GitHub-download validation; that still waits
-  for Apple acceptance, stapling, checksum regeneration, release upload, and a
-  fresh install test from the GitHub assets.
+  for release upload and a fresh install test from the GitHub assets.
 
 ## What Was Tested
 

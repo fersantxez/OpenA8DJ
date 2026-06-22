@@ -31,12 +31,12 @@ Pre-staple SHA-256 hashes:
 42e04f560201d4aeed61a68841540149dd458e793782e5f271cc7d1e23535faf  opena8dj-tools-0.5.0.pkg
 ```
 
-Latest Apple notarization status checked on 2026-06-21T15:55Z:
+Latest Apple notarization status checked on 2026-06-22T06:23Z:
 
 ```text
 OpenA8DJ-0.5.0.pkg
   submission: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
-  status: In Progress
+  status: Accepted
 
 OpenA8DJ-0.5.0.dmg
   submission: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
@@ -44,25 +44,31 @@ OpenA8DJ-0.5.0.dmg
 
 opena8dj-tools-0.5.0.pkg
   submission: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
-  status: In Progress
+  status: Accepted
 
 opena8dj-tools-0.5.0.dmg
   submission: dca61499-b3f5-46fd-93b8-ee63f4868942
-  status: In Progress
+  status: Accepted
 ```
 
 No package was installed, no driver was loaded, no hardware was touched, and no
 CoreAudio restart was performed for this signing/notarization rebuild.
 
-Accepted by Apple for this current publication attempt:
+All four current publication containers were accepted by Apple, stapled, and
+verified locally on 2026-06-22T06:24Z.
 
-- `OpenA8DJ-0.5.0.dmg`
+Final stapled SHA-256 hashes:
 
-Still waiting on Apple:
+```text
+c0cce3bda690581d6ef6ebde96758ee47f05c38e4fd93afc30fed6ff5a79bce2  OpenA8DJ-0.5.0.dmg
+9c9f92a2e1e9ae376bd2c4991382d98e866cdcdef5fa552f4bc485c420e7c68d  OpenA8DJ-0.5.0.pkg
+175ac55752d8c46af9d19503e3f2f04b99478b9921d1808cf8c74093aa811827  opena8dj-tools-0.5.0.dmg
+e1bda7fdba18e48b74516ef0d1fd6cde10a0f21be481d388fdfe780472bae54c  opena8dj-tools-0.5.0.pkg
+```
 
-- `OpenA8DJ-0.5.0.pkg`
-- `opena8dj-tools-0.5.0.pkg`
-- `opena8dj-tools-0.5.0.dmg`
+`make verify-signed-release` passed on the final stapled files. The remaining
+release gate is the GitHub-downloaded end-user installation validation after the
+assets are uploaded to release `v0.5.0`.
 
 ## Stale Submissions
 
@@ -90,10 +96,8 @@ All release-container submissions created before commit `86bd027` are stale for
 publication, even if Apple later reports `Accepted`, because packaged release
 notes or DMG text changed after those submissions.
 
-Do not upload replacement public assets until:
+Do not call the release complete until:
 
-1. Apple returns `Accepted` for the exact release containers.
-2. Stapling succeeds for the final PKG and DMG files.
-3. `make verify-signed-release` passes.
-4. The checksum file is regenerated from the final stapled files.
-5. The GitHub-downloaded assets pass the end-user install validation.
+1. The final stapled files are uploaded to GitHub release `v0.5.0`.
+2. The GitHub-downloaded assets pass the end-user install validation.
+3. The final public validation evidence is committed and pushed.

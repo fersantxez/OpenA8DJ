@@ -1974,34 +1974,79 @@ Apple notarization submissions and latest status:
 OpenA8DJ-0.5.0.pkg
   id: cdd4e4c2-192b-40c8-89ed-5e79d54f62f7
   created: 2026-06-21T15:19:32.714Z
-  status at 2026-06-21T15:55Z: In Progress
+  status at 2026-06-22T06:23Z: Accepted
 
 OpenA8DJ-0.5.0.dmg
   id: 9ea2fe39-b4df-4ddb-b80c-3ef517361133
   created: 2026-06-21T15:19:32.470Z
-  status at 2026-06-21T15:55Z: Accepted
+  status at 2026-06-22T06:23Z: Accepted
 
 opena8dj-tools-0.5.0.pkg
   id: 5a8cdde2-7788-4058-a8c8-28c7fd5be95e
   created: 2026-06-21T15:19:32.432Z
-  status at 2026-06-21T15:55Z: In Progress
+  status at 2026-06-22T06:23Z: Accepted
 
 opena8dj-tools-0.5.0.dmg
   id: dca61499-b3f5-46fd-93b8-ee63f4868942
   created: 2026-06-21T15:19:32.421Z
-  status at 2026-06-21T15:55Z: In Progress
+  status at 2026-06-22T06:23Z: Accepted
 ```
 
 Current conclusion:
 
-- All four rebuilt 86bd027 containers are submitted to Apple.
-- Apple has accepted the current `OpenA8DJ-0.5.0.dmg`.
-- The current driver PKG, tools PKG, and tools DMG are still in progress.
-- No user action is currently required unless Apple rejects one of those
-  submissions.
-- Do not upload replacement GitHub release assets until all four exact
-  containers are accepted, stapled, checksummed, and `make verify-signed-release`
-  passes on the stapled files.
+- Apple accepted all four rebuilt 86bd027 publication containers.
+- All four final containers were stapled.
+- The checksum file was regenerated from the stapled files.
+- `make verify-signed-release` passed on the exact final stapled artifacts.
+- The remaining release gate is the GitHub-downloaded public install validation
+  after uploading these final assets to release `v0.5.0`.
+
+## 2026-06-22 06:24 UTC - 86bd027 release assets accepted, stapled, and verified
+
+- Worktree: `/private/tmp/opena8dj-main-merge`
+- Branch: `codex/cpu-optimization-investigation`
+- Source commit for packaged artifacts:
+  `86bd0274f57c9eed231e9533c0c5a8e8f4cd30b5`
+- Current repo commit during verification: `e2139aa`
+- Hardware touched: no
+- Driver installed/reloaded: no
+- Package executed: no
+- CoreAudio restart/default-device change/Traktor launch: no
+
+Final stapled SHA-256 hashes:
+
+```text
+c0cce3bda690581d6ef6ebde96758ee47f05c38e4fd93afc30fed6ff5a79bce2  OpenA8DJ-0.5.0.dmg
+9c9f92a2e1e9ae376bd2c4991382d98e866cdcdef5fa552f4bc485c420e7c68d  OpenA8DJ-0.5.0.pkg
+175ac55752d8c46af9d19503e3f2f04b99478b9921d1808cf8c74093aa811827  opena8dj-tools-0.5.0.dmg
+e1bda7fdba18e48b74516ef0d1fd6cde10a0f21be481d388fdfe780472bae54c  opena8dj-tools-0.5.0.pkg
+```
+
+Final release verification:
+
+```text
+xcrun stapler staple build/OpenA8DJ-0.5.0.pkg: PASS
+xcrun stapler staple build/OpenA8DJ-0.5.0.dmg: PASS
+xcrun stapler staple build/opena8dj-tools-0.5.0.pkg: PASS
+xcrun stapler staple build/opena8dj-tools-0.5.0.dmg: PASS
+(cd build && shasum -a 256 -c OpenA8DJ-0.5.0-checksums.txt): PASS
+make verify-signed-release: PASS
+```
+
+Verifier coverage:
+
+```text
+packaged executable code signatures: PASS
+Developer ID Installer signatures on both PKGs: PASS
+Apple notary trust on both PKGs: PASS
+Gatekeeper assessment for both PKGs and both DMGs: PASS
+stapled-ticket validation for both PKGs and both DMGs: PASS
+checksum consistency for all four public artifacts: PASS
+```
+
+This is the final local signed/notarized/stapled artifact gate. It does not
+replace the required end-user installation validation from the GitHub-downloaded
+release assets after upload.
 
 ## 2026-06-21 15:38 UTC - Local installer E2E from rebuilt signed DMGs passed
 
