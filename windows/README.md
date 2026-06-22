@@ -120,6 +120,12 @@ Windows surface contract and the offline user-mode audio-engine prototype:
 windows/tests/run_offline_tests.py
 ```
 
+On Windows, use the PowerShell runner:
+
+```powershell
+.\windows\tests\run-offline-tests.ps1
+```
+
 Passing this runner means the source contracts are internally consistent. It
 does not prove Windows installability, endpoint enumeration, Traktor behavior,
 MIDI, USB streaming, CPU/DPC behavior, or sound quality.

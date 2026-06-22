@@ -26,6 +26,7 @@ not a Windows release candidate
 - `windows/tests/audio_engine_contract_test.c`
 - `windows/tests/validate_windows_surface_contract.py`
 - `windows/tests/run_offline_tests.py`
+- `windows/tests/run-offline-tests.ps1`
 
 The audio engine is intentionally user-mode/offline prototype code. It models
 the shared engine contract that ACX/WASAPI and ASIO should later use, but it is
@@ -51,6 +52,8 @@ Implemented contract checks:
 - The CLI usage string no longer advertises 88.2/96 kHz as normally selectable.
 - The offline engine compiles with Clang on macOS and passes deterministic ring
   and sample-conversion tests.
+- The Windows PowerShell runner can compile and execute the same offline C
+  contract on a Windows host with Python and either clang or MSVC available.
 
 ## Verified Here
 
