@@ -3,11 +3,14 @@
 
 # Build and release artifacts
 build/
-dist/
+dist/*
 *.pkg
 *.dmg
 *.zip
 *.tar.gz
+!dist/linux/
+!dist/linux/experimental/
+!dist/linux/experimental/**
 
 # Local logs and traces
 *.log

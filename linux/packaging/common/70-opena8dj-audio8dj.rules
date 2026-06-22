@@ -1,0 +1,7 @@
+# OpenA8DJ Linux experimental udev rule for Native Instruments Audio 8 DJ.
+#
+# This rule only tags the device for local user access and identification.
+# It does not load drivers, bind/unbind USB, reset hardware, run playback,
+# run capture, or trigger validation.
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="17cc", ATTR{idProduct}=="1978", TAG+="uaccess", ENV{OPENA8DJ_AUDIO8DJ}="1"

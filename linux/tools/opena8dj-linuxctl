@@ -1,0 +1,665 @@
+#!/usr/bin/env python3
+"""Read-only Linux diagnostics for OpenA8DJ / Audio 8 DJ.
+
+This prototype intentionally avoids hardware-affecting actions. It reads local
+state and optional command output only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import platform
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+
+TOOL_VERSION = "0.1.0"
+READINESS_LABEL = "diagnostic only, sound quality not validated"
+USB_VENDOR = "17cc"
+USB_PRODUCT = "1978"
+DEFAULT_REPORT_DIR = "opena8dj-linux-report"
+MATCH_TERMS = (
+    "audio8dj",
+    "audio 8 dj",
+    "audio 8",
+    "open audio 8 dj",
+    "native instruments audio 8",
+)
+CONTROL_NAMES = {
+    "input-mode": "Current input mode",
+    "gnd-vinyl": "GND lift for TC Vinyl mode",
+    "gnd-cd-line": "GND lift for TC CD/Line mode",
+    "gnd-phono": "GND lift for phono mode",
+    "software-lock": "Software lock",
+}
+INPUT_MODE_VALUES = {
+    "timecode-vinyl": "0",
+    "timecode-cd-line": "1",
+    "phono": "2",
+    "0": "0",
+    "1": "1",
+    "2": "2",
+}
+BOOLEAN_VALUES = {
+    "on": "1",
+    "off": "0",
+    "1": "1",
+    "0": "0",
+    "true": "1",
+    "false": "0",
+}
+PROFILES = {
+    "playback-4out": {},
+    "traktor-dvs-vinyl": {
+        "input-mode": "timecode-vinyl",
+        "software-lock": "on",
+    },
+    "traktor-dvs-cd-line": {
+        "input-mode": "timecode-cd-line",
+        "software-lock": "on",
+    },
+    "phono-recording": {
+        "input-mode": "phono",
+    },
+    "line-recording": {
+        "input-mode": "timecode-cd-line",
+    },
+    "daw-multichannel": {},
+    "midi-bridge": {},
+}
+
+
+def read_text(path: str) -> dict[str, Any]:
+    p = Path(path)
+    if not p.exists():
+        return {"path": path, "available": False, "content": ""}
+    try:
+        return {
+            "path": path,
+            "available": True,
+            "content": p.read_text(encoding="utf-8", errors="replace"),
+        }
+    except OSError as exc:
+        return {
+            "path": path,
+            "available": False,
+            "error": str(exc),
+            "content": "",
+        }
+
+
+def run_command(args: list[str], timeout: float = 4.0) -> dict[str, Any]:
+    exe = shutil.which(args[0])
+    if exe is None:
+        return {
+            "command": args,
+            "available": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": f"{args[0]} not found",
+        }
+
+    try:
+        completed = subprocess.run(
+            [exe, *args[1:]],
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {
+            "command": args,
+            "available": True,
+            "timeout": timeout,
+            "returncode": None,
+            "stdout": exc.stdout or "",
+            "stderr": exc.stderr or "command timed out",
+        }
+    except OSError as exc:
+        return {
+            "command": args,
+            "available": True,
+            "returncode": None,
+            "stdout": "",
+            "stderr": str(exc),
+        }
+
+    return {
+        "command": args,
+        "available": True,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+    }
+
+
+def run_checked(args: list[str], timeout: float = 4.0) -> dict[str, Any]:
+    result = run_command(args, timeout=timeout)
+    if result.get("available") is False:
+        raise RuntimeError(result.get("stderr", f"{args[0]} not found"))
+    if result.get("returncode") != 0:
+        stderr = result.get("stderr") or result.get("stdout") or "command failed"
+        raise RuntimeError(stderr.strip())
+    return result
+
+
+def parse_proc_cards(content: str) -> list[dict[str, Any]]:
+    cards: list[dict[str, Any]] = []
+    lines = content.splitlines()
+    index_pattern = re.compile(r"^\s*(\d+)\s+\[([^\]]+)\]:\s*(.*)$")
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        match = index_pattern.match(line)
+        if not match:
+            i += 1
+            continue
+
+        description = ""
+        if i + 1 < len(lines) and lines[i + 1].startswith(" "):
+            description = lines[i + 1].strip()
+
+        cards.append(
+            {
+                "index": int(match.group(1)),
+                "id": match.group(2).strip(),
+                "summary": match.group(3).strip(),
+                "description": description,
+            }
+        )
+        i += 2
+
+    return cards
+
+
+def parse_proc_pcm(content: str) -> list[dict[str, Any]]:
+    devices: list[dict[str, Any]] = []
+    pattern = re.compile(r"^(\d+)-(\d+):\s+([^:]+):\s+([^:]+):\s+(.*)$")
+    for line in content.splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        devices.append(
+            {
+                "card_index": int(match.group(1)),
+                "device_index": int(match.group(2)),
+                "name": match.group(3).strip(),
+                "direction": match.group(4).strip(),
+                "details": match.group(5).strip(),
+            }
+        )
+    return devices
+
+
+def looks_like_audio8(text: str) -> bool:
+    folded = text.casefold()
+    return any(term in folded for term in MATCH_TERMS)
+
+
+def matching_cards(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    matches = []
+    for card in cards:
+        haystack = " ".join(
+            str(card.get(key, "")) for key in ("id", "summary", "description")
+        )
+        if looks_like_audio8(haystack):
+            matches.append(card)
+    return matches
+
+
+def resolve_card(card_arg: str | None, report: dict[str, Any] | None = None) -> str:
+    if card_arg:
+        return card_arg
+
+    if report is None:
+        report = collect(include_command_output=False, include_controls=False)
+
+    cards = report.get("audio8_matches", {}).get("cards", [])
+    if cards:
+        return str(cards[0]["index"])
+
+    return "Audio8DJ"
+
+
+def normalize_control_value(control: str, value: str) -> str:
+    folded = value.casefold()
+    if control == "input-mode":
+        if folded not in INPUT_MODE_VALUES:
+            allowed = ", ".join(sorted(INPUT_MODE_VALUES))
+            raise ValueError(f"invalid input-mode {value!r}; allowed: {allowed}")
+        return INPUT_MODE_VALUES[folded]
+
+    if control in {"gnd-vinyl", "gnd-cd-line", "gnd-phono", "software-lock"}:
+        if folded not in BOOLEAN_VALUES:
+            allowed = ", ".join(sorted(BOOLEAN_VALUES))
+            raise ValueError(f"invalid boolean value {value!r}; allowed: {allowed}")
+        return BOOLEAN_VALUES[folded]
+
+    raise ValueError(f"unknown control {control!r}")
+
+
+def amixer_cset(card: str, control: str, value: str) -> dict[str, Any]:
+    if control not in CONTROL_NAMES:
+        raise ValueError(f"unknown control {control!r}")
+    normalized = normalize_control_value(control, value)
+    return run_checked(
+        ["amixer", "-c", card, "cset", f"name={CONTROL_NAMES[control]}", normalized]
+    )
+
+
+def collect(include_command_output: bool, include_controls: bool) -> dict[str, Any]:
+    proc_cards = read_text("/proc/asound/cards")
+    proc_pcm = read_text("/proc/asound/pcm")
+    cards = parse_proc_cards(proc_cards.get("content", ""))
+    pcm_devices = parse_proc_pcm(proc_pcm.get("content", ""))
+    audio8_cards = matching_cards(cards)
+
+    commands: dict[str, Any] = {
+        "lsusb_audio8": run_command(["lsusb", "-d", f"{USB_VENDOR}:{USB_PRODUCT}"]),
+        "aplay_l": run_command(["aplay", "-l"]),
+        "arecord_l": run_command(["arecord", "-l"]),
+        "aconnect_l": run_command(["aconnect", "-l"]),
+    }
+
+    control_outputs: dict[str, Any] = {}
+    if include_controls:
+        for card in audio8_cards:
+            card_ref = str(card["index"])
+            control_outputs[f"card_{card_ref}_controls"] = run_command(
+                ["amixer", "-c", card_ref, "controls"]
+            )
+            control_outputs[f"card_{card_ref}_contents"] = run_command(
+                ["amixer", "-c", card_ref, "contents"]
+            )
+
+    if not include_command_output:
+        for command in commands.values():
+            command.pop("stdout", None)
+            command.pop("stderr", None)
+        for command in control_outputs.values():
+            command.pop("stdout", None)
+            command.pop("stderr", None)
+
+    return {
+        "tool": "opena8dj-linuxctl",
+        "tool_version": TOOL_VERSION,
+        "readiness_label": READINESS_LABEL,
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "python": platform.python_version(),
+        },
+        "usb_id": f"{USB_VENDOR}:{USB_PRODUCT}",
+        "proc_asound": {
+            "cards_available": proc_cards["available"],
+            "pcm_available": proc_pcm["available"],
+            "cards": cards,
+            "pcm_devices": pcm_devices,
+        },
+        "audio8_matches": {
+            "cards": audio8_cards,
+            "found_by_proc_asound": bool(audio8_cards),
+            "found_by_lsusb": bool(commands["lsusb_audio8"].get("stdout", "").strip()),
+        },
+        "commands": commands,
+        "controls": control_outputs,
+        "tests_not_run": [
+            "module build",
+            "module load",
+            "driver bind or unbind",
+            "USB reset",
+            "playback",
+            "capture",
+            "physical audio quality validation",
+            "human listening",
+        ],
+    }
+
+
+def print_text_status(report: dict[str, Any]) -> None:
+    print("OpenA8DJ Linux status")
+    print(f"readiness: {report['readiness_label']}")
+    print(f"host: {report['platform']['system']} {report['platform']['release']}")
+    print(f"usb id: {report['usb_id']}")
+    print()
+
+    cards = report["audio8_matches"]["cards"]
+    if cards:
+        print("Audio 8 DJ ALSA card candidates:")
+        for card in cards:
+            print(
+                f"  card {card['index']} [{card['id']}]: "
+                f"{card['summary']} {card['description']}".strip()
+            )
+    else:
+        print("Audio 8 DJ ALSA card candidates: none found")
+
+    lsusb = report["commands"]["lsusb_audio8"]
+    if lsusb.get("available") is False:
+        print("USB check: lsusb unavailable")
+    elif lsusb.get("returncode") == 0:
+        print("USB check: matching 17cc:1978 device reported by lsusb")
+    else:
+        print("USB check: no matching 17cc:1978 device reported by lsusb")
+
+    print()
+    print("No playback, capture, module load, USB reset, or mixer writes were run.")
+
+
+def command_status(args: argparse.Namespace) -> int:
+    report = collect(include_command_output=args.json, include_controls=args.controls)
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print_text_status(report)
+    return 0
+
+
+def command_diagnostics(args: argparse.Namespace) -> int:
+    report = collect(include_command_output=True, include_controls=args.controls)
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print_text_status(report)
+        print()
+        print("Use --json for full command output.")
+    return 0
+
+
+def command_controls(args: argparse.Namespace) -> int:
+    report = collect(include_command_output=False, include_controls=False)
+    card = resolve_card(args.card, report)
+    controls = {
+        "card": card,
+        "readiness_label": READINESS_LABEL,
+        "known_controls": CONTROL_NAMES,
+        "amixer_controls": run_command(["amixer", "-c", card, "controls"]),
+        "amixer_contents": run_command(["amixer", "-c", card, "contents"]),
+    }
+    if args.json:
+        print(json.dumps(controls, indent=2, sort_keys=True))
+    else:
+        print(f"OpenA8DJ controls for ALSA card {card}")
+        print(f"readiness: {READINESS_LABEL}")
+        print()
+        if controls["amixer_controls"].get("returncode") == 0:
+            print(controls["amixer_controls"]["stdout"].rstrip())
+        else:
+            print(controls["amixer_controls"].get("stderr", "amixer controls failed"))
+    return 0
+
+
+def command_list_profiles(args: argparse.Namespace) -> int:
+    payload = {
+        "readiness_label": READINESS_LABEL,
+        "profiles": PROFILES,
+        "note": "Profiles change ALSA controls only when apply-profile is run with --yes.",
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("OpenA8DJ Linux profiles")
+        print(f"readiness: {READINESS_LABEL}")
+        for name, changes in PROFILES.items():
+            if changes:
+                pairs = ", ".join(f"{key}={value}" for key, value in changes.items())
+            else:
+                pairs = "no hardware-control changes"
+            print(f"  {name}: {pairs}")
+    return 0
+
+
+def command_apply_profile(args: argparse.Namespace) -> int:
+    if args.profile not in PROFILES:
+        raise SystemExit(f"unknown profile {args.profile!r}")
+
+    report = collect(include_command_output=False, include_controls=False)
+    card = resolve_card(args.card, report)
+    changes = PROFILES[args.profile]
+
+    if not args.yes:
+        print(f"Profile {args.profile} for ALSA card {card}")
+        if changes:
+            for control, value in changes.items():
+                print(f"  would set {control}={value}")
+        else:
+            print("  no hardware-control changes")
+        print()
+        print("No changes made. Re-run with --yes to apply.")
+        return 0
+
+    results = []
+    for control, value in changes.items():
+        results.append(
+            {
+                "control": control,
+                "value": value,
+                "result": amixer_cset(card, control, value),
+            }
+        )
+
+    payload = {
+        "profile": args.profile,
+        "card": card,
+        "readiness_label": READINESS_LABEL,
+        "applied": True,
+        "changes": list(changes.items()),
+        "results": results,
+    }
+
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Applied profile {args.profile} to ALSA card {card}")
+        print(READINESS_LABEL)
+    return 0
+
+
+def command_set_control(args: argparse.Namespace) -> int:
+    if not args.yes:
+        print(
+            f"No changes made. Re-run with --yes to set {args.control}={args.value}."
+        )
+        return 0
+
+    report = collect(include_command_output=False, include_controls=False)
+    card = resolve_card(args.card, report)
+    result = amixer_cset(card, args.control, args.value)
+    payload = {
+        "card": card,
+        "control": args.control,
+        "value": args.value,
+        "readiness_label": READINESS_LABEL,
+        "result": result,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"Set {args.control}={args.value} on ALSA card {card}")
+        print(READINESS_LABEL)
+    return 0
+
+
+def command_verify(args: argparse.Namespace) -> int:
+    report_dir = Path(args.report_dir or DEFAULT_REPORT_DIR)
+    report_dir.mkdir(parents=True, exist_ok=True)
+
+    report = collect(include_command_output=True, include_controls=args.controls)
+    diagnostics_path = report_dir / "diagnostics.json"
+    summary_path = report_dir / "summary.txt"
+    diagnostics_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    summary_path.write_text(
+        "\n".join(
+            [
+                "OpenA8DJ Linux verify report",
+                f"readiness: {READINESS_LABEL}",
+                f"host: {report['platform']['system']} {report['platform']['release']}",
+                f"usb id: {report['usb_id']}",
+                f"audio8 card candidates: {len(report['audio8_matches']['cards'])}",
+                "hardware-affecting tests run: none",
+                "physical sound validation: not run",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "report_dir": str(report_dir),
+                    "diagnostics": str(diagnostics_path),
+                    "summary": str(summary_path),
+                    "readiness_label": READINESS_LABEL,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Wrote read-only verify report to {report_dir}")
+        print(READINESS_LABEL)
+    return 0
+
+
+def command_version(args: argparse.Namespace) -> int:
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "tool": "opena8dj-linuxctl",
+                    "tool_version": TOOL_VERSION,
+                    "readiness_label": READINESS_LABEL,
+                    "driver_channel": "in-kernel snd-usb-caiaq",
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"opena8dj-linuxctl {TOOL_VERSION}")
+        print(READINESS_LABEL)
+    return 0
+
+
+def command_self_test(args: argparse.Namespace) -> int:
+    report = collect(include_command_output=False, include_controls=False)
+    checks = {
+        "has_readiness_label": report["readiness_label"] == READINESS_LABEL,
+        "does_not_require_linux_proc": True,
+        "does_not_run_hardware_actions": True,
+        "profiles_have_known_controls": all(
+            control in CONTROL_NAMES
+            for changes in PROFILES.values()
+            for control in changes
+        ),
+    }
+    ok = all(checks.values())
+    payload = {
+        "tool": "opena8dj-linuxctl",
+        "self_test": checks,
+        "ok": ok,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print("opena8dj-linuxctl self-test")
+        for name, value in checks.items():
+            print(f"{name}: {'ok' if value else 'fail'}")
+    return 0 if ok else 1
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="opena8dj-linuxctl",
+        description="Read-only Linux diagnostics for OpenA8DJ / Audio 8 DJ.",
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    status = subparsers.add_parser("status", help="show read-only status")
+    status.add_argument("--json", action="store_true", help="emit JSON")
+    status.add_argument(
+        "--controls",
+        action="store_true",
+        help="also read ALSA controls for matching cards",
+    )
+    status.set_defaults(func=command_status)
+
+    diagnostics = subparsers.add_parser(
+        "diagnostics", help="show read-only diagnostics"
+    )
+    diagnostics.add_argument("--json", action="store_true", help="emit JSON")
+    diagnostics.add_argument(
+        "--controls",
+        action="store_true",
+        help="also read ALSA controls for matching cards",
+    )
+    diagnostics.set_defaults(func=command_diagnostics)
+
+    controls = subparsers.add_parser("controls", help="show ALSA controls")
+    controls.add_argument("--json", action="store_true", help="emit JSON")
+    controls.add_argument("--card", help="ALSA card index or id")
+    controls.set_defaults(func=command_controls)
+
+    list_profiles = subparsers.add_parser(
+        "list-profiles", help="list OpenA8DJ Linux profiles"
+    )
+    list_profiles.add_argument("--json", action="store_true", help="emit JSON")
+    list_profiles.set_defaults(func=command_list_profiles)
+
+    apply_profile = subparsers.add_parser(
+        "apply-profile", help="apply a profile with explicit confirmation"
+    )
+    apply_profile.add_argument("profile", choices=sorted(PROFILES))
+    apply_profile.add_argument("--card", help="ALSA card index or id")
+    apply_profile.add_argument("--yes", action="store_true", help="apply changes")
+    apply_profile.add_argument("--json", action="store_true", help="emit JSON")
+    apply_profile.set_defaults(func=command_apply_profile)
+
+    set_control = subparsers.add_parser(
+        "set-control", help="set one known Audio 8 DJ ALSA control"
+    )
+    set_control.add_argument("control", choices=sorted(CONTROL_NAMES))
+    set_control.add_argument("value")
+    set_control.add_argument("--card", help="ALSA card index or id")
+    set_control.add_argument("--yes", action="store_true", help="apply changes")
+    set_control.add_argument("--json", action="store_true", help="emit JSON")
+    set_control.set_defaults(func=command_set_control)
+
+    verify = subparsers.add_parser("verify", help="write a read-only report")
+    verify.add_argument("--report-dir", help="directory for report output")
+    verify.add_argument("--controls", action="store_true", help="read ALSA controls")
+    verify.add_argument("--json", action="store_true", help="emit JSON")
+    verify.set_defaults(func=command_verify)
+
+    version = subparsers.add_parser("version", help="show tool version")
+    version.add_argument("--json", action="store_true", help="emit JSON")
+    version.set_defaults(func=command_version)
+
+    self_test = subparsers.add_parser("self-test", help="run offline self-test")
+    self_test.add_argument("--json", action="store_true", help="emit JSON")
+    self_test.set_defaults(func=command_self_test)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

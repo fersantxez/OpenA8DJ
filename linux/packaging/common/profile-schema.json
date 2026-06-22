@@ -1,0 +1,49 @@
+{
+  "readiness_label": "diagnostic only, sound quality not validated",
+  "driver_channel": "in-kernel snd-usb-caiaq",
+  "controls": {
+    "input-mode": {
+      "alsa_name": "Current input mode",
+      "values": {
+        "timecode-vinyl": 0,
+        "timecode-cd-line": 1,
+        "phono": 2
+      }
+    },
+    "gnd-vinyl": {
+      "alsa_name": "GND lift for TC Vinyl mode",
+      "values": ["off", "on"]
+    },
+    "gnd-cd-line": {
+      "alsa_name": "GND lift for TC CD/Line mode",
+      "values": ["off", "on"]
+    },
+    "gnd-phono": {
+      "alsa_name": "GND lift for phono mode",
+      "values": ["off", "on"]
+    },
+    "software-lock": {
+      "alsa_name": "Software lock",
+      "values": ["off", "on"]
+    }
+  },
+  "profiles": {
+    "playback-4out": {},
+    "traktor-dvs-vinyl": {
+      "input-mode": "timecode-vinyl",
+      "software-lock": "on"
+    },
+    "traktor-dvs-cd-line": {
+      "input-mode": "timecode-cd-line",
+      "software-lock": "on"
+    },
+    "phono-recording": {
+      "input-mode": "phono"
+    },
+    "line-recording": {
+      "input-mode": "timecode-cd-line"
+    },
+    "daw-multichannel": {},
+    "midi-bridge": {}
+  }
+}
