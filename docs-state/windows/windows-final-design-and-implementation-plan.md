@@ -5,6 +5,9 @@ Branch: `windows/rebuild-surface`
 Status: final design for implementation, Windows remains experimental
 Hardware use in this pass: none
 
+Implementation progress is tracked in
+`docs-state/windows/windows-implementation-progress.md`.
+
 ## Final Decision
 
 The Windows line is finalized as an ACX-first, KMDF/WDF USB, evidence-gated

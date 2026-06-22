@@ -88,6 +88,99 @@ static const char *InputModeName(UCHAR mode)
     }
 }
 
+static const char *ComponentStateName(ULONG state)
+{
+    switch (state) {
+    case OPENA8DJ_COMPONENT_ABSENT:
+        return "absent";
+    case OPENA8DJ_COMPONENT_PLANNED:
+        return "planned";
+    case OPENA8DJ_COMPONENT_STUB:
+        return "stub";
+    case OPENA8DJ_COMPONENT_READY:
+        return "ready";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *EndpointModelName(ULONG model)
+{
+    switch (model) {
+    case OPENA8DJ_ENDPOINT_MODEL_NONE:
+        return "none";
+    case OPENA8DJ_ENDPOINT_MODEL_SINGLE_8CH:
+        return "single-8ch";
+    case OPENA8DJ_ENDPOINT_MODEL_FOUR_STEREO_PAIRS:
+        return "four-stereo-pairs";
+    case OPENA8DJ_ENDPOINT_MODEL_DUAL_PROTOTYPE:
+        return "dual-prototype";
+    default:
+        return "unknown";
+    }
+}
+
+static const char *DirectionName(ULONG direction)
+{
+    switch (direction) {
+    case OPENA8DJ_CHANNEL_DIRECTION_RENDER:
+        return "render";
+    case OPENA8DJ_CHANNEL_DIRECTION_CAPTURE:
+        return "capture";
+    default:
+        return "unknown";
+    }
+}
+
+static void PrintRateFlags(ULONG flags)
+{
+    BOOL printed = FALSE;
+
+    if (flags & OPENA8DJ_RATE_FLAG_44100) {
+        printf("%s44100", printed ? ", " : "");
+        printed = TRUE;
+    }
+    if (flags & OPENA8DJ_RATE_FLAG_48000) {
+        printf("%s48000", printed ? ", " : "");
+        printed = TRUE;
+    }
+    if (flags & OPENA8DJ_RATE_FLAG_88200) {
+        printf("%s88200", printed ? ", " : "");
+        printed = TRUE;
+    }
+    if (flags & OPENA8DJ_RATE_FLAG_96000) {
+        printf("%s96000", printed ? ", " : "");
+        printed = TRUE;
+    }
+    if (!printed) {
+        printf("none");
+    }
+}
+
+static void PrintSurface(const OPENA8DJ_WINDOWS_SURFACE *surface)
+{
+    printf("OpenA8DJ Windows surface\n");
+    printf("  api-version:       %lu\n", surface->ApiVersion);
+    printf("  driver-model:      %s\n", surface->DriverModel);
+    printf("  audio-model:       %s\n", surface->AudioModel);
+    printf("  streaming-model:   %s\n", surface->StreamingModel);
+    printf("  safety-policy:     %s\n", surface->SafetyPolicy);
+    printf("  endpoint-model:    %s\n", EndpointModelName(surface->EndpointModel));
+    printf("  stable-rates:      ");
+    PrintRateFlags(surface->StableSampleRateFlags);
+    printf("\n");
+    printf("  planned-rates:     ");
+    PrintRateFlags(surface->PlannedSampleRateFlags);
+    printf("\n");
+    printf("  usb-transport:     %s\n", ComponentStateName(surface->UsbTransportState));
+    printf("  controls:          %s\n", ComponentStateName(surface->ControlState));
+    printf("  audio-endpoints:   %s\n", ComponentStateName(surface->AudioEndpointState));
+    printf("  isoch-engine:      %s\n", ComponentStateName(surface->IsochronousEngineState));
+    printf("  midi:              %s\n", ComponentStateName(surface->MidiState));
+    printf("  asio:              %s\n", ComponentStateName(surface->AsioState));
+    printf("  flags:             0x%08lx\n", surface->SurfaceFlags);
+}
+
 static void PrintControlState(const OPENA8DJ_CONTROL_STATE *state)
 {
     printf("Audio 8 DJ controls\n");
@@ -101,6 +194,7 @@ static void PrintControlState(const OPENA8DJ_CONTROL_STATE *state)
 static void PrintCapabilities(const OPENA8DJ_CAPABILITIES *capabilities)
 {
     DWORD i;
+    BOOL printedRate = FALSE;
 
     printf("OpenA8DJ Windows capabilities\n");
     printf("  api-version:       %lu\n", capabilities->ApiVersion);
@@ -115,13 +209,20 @@ static void PrintCapabilities(const OPENA8DJ_CAPABILITIES *capabilities)
            capabilities->DefaultBufferFrames);
     printf("  sample-rates:      ");
     for (i = 0; i < OPENA8DJ_SAMPLE_RATE_COUNT; i++) {
-        printf("%s%lu", i == 0 ? "" : ", ", capabilities->SampleRates[i]);
+        if (capabilities->SampleRates[i] == 0) {
+            continue;
+        }
+        printf("%s%lu", printedRate ? ", " : "", capabilities->SampleRates[i]);
+        printedRate = TRUE;
+    }
+    if (!printedRate) {
+        printf("none");
     }
     printf("\n");
     printf("  experimental:      %s\n", capabilities->Experimental ? "yes" : "no");
     printf("  audio-endpoint:    %s\n", capabilities->WindowsAudioEndpointExposed ? "yes" : "not-yet");
     printf("  usb-transport:     %s\n", capabilities->UsbTransportReady ? "ready" : "not-ready");
-    printf("  controls:          %s\n", capabilities->ControlsReady ? "ready" : "not-ready");
+    printf("  controls-hardware: %s\n", capabilities->ControlsReady ? "ready" : "not-ready");
     printf("  midi-driver:       %s\n", capabilities->MidiReady ? "ready" : "not-yet");
     for (i = 0; i < OPENA8DJ_STEREO_PAIRS; i++) {
         printf("  input-pair-%lu:      %s\n", i + 1, capabilities->InputPairNames[i]);
@@ -144,12 +245,53 @@ static void PrintStreamState(const OPENA8DJ_STREAM_STATE *state)
 {
     printf("Stream state\n");
     printf("  streaming:         %s\n", state->Streaming ? "yes" : "no");
+    printf("  engine-ready:      %s\n", state->StreamingEngineReady ? "yes" : "no");
     printf("  sample-rate:       %lu\n", state->SampleRate);
     printf("  buffer-frames:     %lu\n", state->BufferFrames);
     printf("  render-frames:     %llu\n", state->RenderFramesSubmitted);
     printf("  capture-frames:    %llu\n", state->CaptureFramesDelivered);
     printf("  underruns:         %llu\n", state->UsbUnderruns);
     printf("  overruns:          %llu\n", state->UsbOverruns);
+    printf("  usb-in-packets:    %llu\n", state->UsbInPacketsCompleted);
+    printf("  usb-out-packets:   %llu\n", state->UsbOutPacketsCompleted);
+    printf("  packet-errors:     %llu\n", state->UsbPacketErrors);
+    printf("  late-completions:  %llu\n", state->LateCompletions);
+}
+
+static void PrintTopology(const OPENA8DJ_TOPOLOGY *topology)
+{
+    DWORD i;
+
+    printf("OpenA8DJ Windows topology\n");
+    printf("  api-version:       %lu\n", topology->ApiVersion);
+    printf("  endpoint-model:    %s\n", EndpointModelName(topology->EndpointModel));
+    printf("  render-endpoints:  %lu\n", topology->RenderEndpointCount);
+    printf("  capture-endpoints: %lu\n", topology->CaptureEndpointCount);
+    printf("  render-channels:   %lu\n", topology->RenderChannelCount);
+    printf("  capture-channels:  %lu\n", topology->CaptureChannelCount);
+    printf("  render-name:       %s\n", topology->RenderEndpointName);
+    printf("  capture-name:      %s\n", topology->CaptureEndpointName);
+    for (i = 0; i < OPENA8DJ_TOTAL_CHANNELS; i++) {
+        printf("  channel-%02lu:       %-7s pair=%lu pair-channel=%lu name=%s\n",
+               i + 1,
+               DirectionName(topology->Channels[i].Direction),
+               topology->Channels[i].PairIndex + 1,
+               topology->Channels[i].PairChannelIndex + 1,
+               topology->Channels[i].Name);
+    }
+}
+
+static void PrintDiagnostics(const OPENA8DJ_DIAGNOSTICS *diagnostics)
+{
+    printf("OpenA8DJ Windows diagnostics\n");
+    printf("  api-version:       %lu\n", diagnostics->ApiVersion);
+    printf("  start-requests:    %llu\n", diagnostics->StartRequests);
+    printf("  rejected-starts:   %llu\n", diagnostics->RejectedStartRequests);
+    printf("  stop-requests:     %llu\n", diagnostics->StopRequests);
+    printf("  format-changes:    %llu\n", diagnostics->FormatChanges);
+    printf("  control-writes:    %llu\n", diagnostics->ControlWrites);
+    printf("  profile-applies:   %llu\n", diagnostics->ProfileApplies);
+    PrintStreamState(&diagnostics->StreamState);
 }
 
 static BOOL ParseBool(const char *text, UCHAR *value)
@@ -208,6 +350,9 @@ static void Usage(const char *argv0)
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "  %s\n", argv0);
     fprintf(stderr, "  %s status\n", argv0);
+    fprintf(stderr, "  %s surface\n", argv0);
+    fprintf(stderr, "  %s topology\n", argv0);
+    fprintf(stderr, "  %s diagnostics\n", argv0);
     fprintf(stderr, "  %s caps\n", argv0);
     fprintf(stderr, "  %s format\n", argv0);
     fprintf(stderr, "  %s stream\n", argv0);
@@ -217,7 +362,7 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s gnd-cd-line on|off\n", argv0);
     fprintf(stderr, "  %s gnd-phono on|off\n", argv0);
     fprintf(stderr, "  %s software-lock on|off\n", argv0);
-    fprintf(stderr, "  %s set-format 44100|48000|88200|96000 15..4096\n", argv0);
+    fprintf(stderr, "  %s set-format 44100|48000 15..4096\n", argv0);
     fprintf(stderr, "  %s start|stop\n", argv0);
 }
 
@@ -245,20 +390,63 @@ int main(int argc, char **argv)
     }
 
     if (argc == 1 || strcmp(argv[1], "status") == 0) {
+        OPENA8DJ_WINDOWS_SURFACE surface;
         OPENA8DJ_CAPABILITIES caps;
         OPENA8DJ_AUDIO_FORMAT format;
         OPENA8DJ_STREAM_STATE stream;
 
+        ZeroMemory(&surface, sizeof(surface));
         ZeroMemory(&caps, sizeof(caps));
         ZeroMemory(&format, sizeof(format));
         ZeroMemory(&stream, sizeof(stream));
+        (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_SURFACE, NULL, 0, &surface, sizeof(surface));
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_CAPABILITIES, NULL, 0, &caps, sizeof(caps));
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_AUDIO_FORMAT, NULL, 0, &format, sizeof(format));
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_STREAM_STATE, NULL, 0, &stream, sizeof(stream));
+        PrintSurface(&surface);
         PrintCapabilities(&caps);
         PrintFormat(&format);
         PrintControlState(&controls);
         PrintStreamState(&stream);
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "surface") == 0) {
+        OPENA8DJ_WINDOWS_SURFACE surface;
+        ZeroMemory(&surface, sizeof(surface));
+        if (!DeviceIo(device, IOCTL_OPENA8DJ_GET_SURFACE, NULL, 0, &surface, sizeof(surface))) {
+            fprintf(stderr, "Could not read Windows surface: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
+        PrintSurface(&surface);
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "topology") == 0) {
+        OPENA8DJ_TOPOLOGY topology;
+        ZeroMemory(&topology, sizeof(topology));
+        if (!DeviceIo(device, IOCTL_OPENA8DJ_GET_TOPOLOGY, NULL, 0, &topology, sizeof(topology))) {
+            fprintf(stderr, "Could not read topology: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
+        PrintTopology(&topology);
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "diagnostics") == 0) {
+        OPENA8DJ_DIAGNOSTICS diagnostics;
+        ZeroMemory(&diagnostics, sizeof(diagnostics));
+        if (!DeviceIo(device, IOCTL_OPENA8DJ_GET_DIAGNOSTICS, NULL, 0, &diagnostics, sizeof(diagnostics))) {
+            fprintf(stderr, "Could not read diagnostics: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
+        PrintDiagnostics(&diagnostics);
         CloseHandle(device);
         return 0;
     }

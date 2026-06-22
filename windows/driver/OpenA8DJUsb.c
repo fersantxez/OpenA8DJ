@@ -1,11 +1,9 @@
 #include <initguid.h>
 #include "OpenA8DJUsb.h"
 
-static const ULONG kOpenA8DJSampleRates[OPENA8DJ_SAMPLE_RATE_COUNT] = {
+static const ULONG kOpenA8DJStableSampleRates[OPENA8DJ_STABLE_SAMPLE_RATE_COUNT] = {
     44100,
-    48000,
-    88200,
-    96000
+    48000
 };
 
 static VOID
@@ -30,6 +28,17 @@ OpenA8DJ_CopyString(_Out_writes_(OPENA8DJ_CHANNEL_NAME_LENGTH) CHAR *Destination
 }
 
 static VOID
+OpenA8DJ_CopyFixedString(_Out_writes_(Length) CHAR *Destination, _In_ SIZE_T Length, _In_z_ const CHAR *Source)
+{
+    SIZE_T index;
+
+    RtlZeroMemory(Destination, Length);
+    for (index = 0; index + 1 < Length && Source[index] != '\0'; index++) {
+        Destination[index] = Source[index];
+    }
+}
+
+static VOID
 OpenA8DJ_InitializeDefaults(_Inout_ POPENA8DJ_DEVICE_CONTEXT Context)
 {
     RtlZeroMemory(Context->RawControlState, sizeof(Context->RawControlState));
@@ -49,8 +58,16 @@ OpenA8DJ_InitializeDefaults(_Inout_ POPENA8DJ_DEVICE_CONTEXT Context)
 
     RtlZeroMemory(&Context->StreamState, sizeof(Context->StreamState));
     Context->StreamState.Size = sizeof(Context->StreamState);
+    Context->StreamState.StreamingEngineReady = FALSE;
     Context->StreamState.SampleRate = Context->CurrentFormat.SampleRate;
     Context->StreamState.BufferFrames = Context->CurrentFormat.BufferFrames;
+
+    Context->StartRequests = 0;
+    Context->RejectedStartRequests = 0;
+    Context->StopRequests = 0;
+    Context->FormatChanges = 0;
+    Context->ControlWrites = 0;
+    Context->ProfileApplies = 0;
 }
 
 static BOOLEAN
@@ -58,8 +75,8 @@ OpenA8DJ_IsSupportedSampleRate(_In_ ULONG SampleRate)
 {
     ULONG index;
 
-    for (index = 0; index < OPENA8DJ_SAMPLE_RATE_COUNT; index++) {
-        if (kOpenA8DJSampleRates[index] == SampleRate) {
+    for (index = 0; index < OPENA8DJ_STABLE_SAMPLE_RATE_COUNT; index++) {
+        if (kOpenA8DJStableSampleRates[index] == SampleRate) {
             return TRUE;
         }
     }
@@ -122,6 +139,7 @@ OpenA8DJ_StoreControlState(
     OpenA8DJ_SetRawFlag(&Context->RawControlState[3], (UCHAR)(1u << 1), ControlState->GndLiftTCCDLine != 0);
     OpenA8DJ_SetRawFlag(&Context->RawControlState[3], (UCHAR)(1u << 2), ControlState->GndLiftPhono != 0);
     OpenA8DJ_SetRawFlag(&Context->RawControlState[5], (UCHAR)(1u << 0), ControlState->SoftwareLock != 0);
+    Context->ControlWrites++;
 
     return STATUS_SUCCESS;
 }
@@ -160,6 +178,7 @@ OpenA8DJ_ApplyProfile(
     }
 
     OpenA8DJ_StoreControlState(Context, &state);
+    Context->ProfileApplies++;
     OpenA8DJ_LoadControlState(Context, ControlState);
     return STATUS_SUCCESS;
 }
@@ -189,10 +208,10 @@ OpenA8DJ_FillCapabilities(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ
                                       Context->IsoInPipe != NULL &&
                                       Context->IsoOutPipe != NULL;
     Capabilities->MidiReady = FALSE;
-    Capabilities->ControlsReady = TRUE;
+    Capabilities->ControlsReady = FALSE;
 
-    for (index = 0; index < OPENA8DJ_SAMPLE_RATE_COUNT; index++) {
-        Capabilities->SampleRates[index] = kOpenA8DJSampleRates[index];
+    for (index = 0; index < OPENA8DJ_STABLE_SAMPLE_RATE_COUNT; index++) {
+        Capabilities->SampleRates[index] = kOpenA8DJStableSampleRates[index];
     }
 
     OpenA8DJ_CopyString(Capabilities->InputPairNames[0], "Input A L/R");
@@ -203,6 +222,112 @@ OpenA8DJ_FillCapabilities(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ
     OpenA8DJ_CopyString(Capabilities->OutputPairNames[1], "Output B L/R");
     OpenA8DJ_CopyString(Capabilities->OutputPairNames[2], "Output C L/R");
     OpenA8DJ_CopyString(Capabilities->OutputPairNames[3], "Output D L/R");
+}
+
+static VOID
+OpenA8DJ_FillSurface(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ_WINDOWS_SURFACE Surface)
+{
+    RtlZeroMemory(Surface, sizeof(*Surface));
+    Surface->Size = sizeof(*Surface);
+    Surface->ApiVersion = OPENA8DJ_DRIVER_API_VERSION;
+    Surface->SurfaceFlags = OPENA8DJ_SURFACE_FLAG_EXPERIMENTAL;
+    Surface->StableSampleRateFlags = OPENA8DJ_RATE_FLAG_44100 | OPENA8DJ_RATE_FLAG_48000;
+    Surface->PlannedSampleRateFlags = OPENA8DJ_RATE_FLAG_88200 | OPENA8DJ_RATE_FLAG_96000;
+    Surface->AudioEndpointState = OPENA8DJ_COMPONENT_PLANNED;
+    Surface->UsbTransportState = (Context->BulkOutPipe != NULL &&
+                                  Context->BulkInPipe != NULL &&
+                                  Context->IsoInPipe != NULL &&
+                                  Context->IsoOutPipe != NULL) ?
+                                  OPENA8DJ_COMPONENT_READY : OPENA8DJ_COMPONENT_STUB;
+    Surface->IsochronousEngineState = OPENA8DJ_COMPONENT_PLANNED;
+    Surface->MidiState = OPENA8DJ_COMPONENT_PLANNED;
+    Surface->ControlState = OPENA8DJ_COMPONENT_STUB;
+    Surface->AsioState = OPENA8DJ_COMPONENT_PLANNED;
+    Surface->EndpointModel = OPENA8DJ_ENDPOINT_MODEL_DUAL_PROTOTYPE;
+    if (Surface->UsbTransportState == OPENA8DJ_COMPONENT_READY) {
+        Surface->SurfaceFlags |= OPENA8DJ_SURFACE_FLAG_USB_TRANSPORT;
+    }
+    OpenA8DJ_CopyFixedString(Surface->DriverModel,
+                             OPENA8DJ_SURFACE_NAME_LENGTH,
+                             "KMDF USB function driver surface v2");
+    OpenA8DJ_CopyFixedString(Surface->AudioModel,
+                             OPENA8DJ_SURFACE_NAME_LENGTH,
+                             "ACX 1.1 planned; no Windows audio endpoint yet");
+    OpenA8DJ_CopyFixedString(Surface->StreamingModel,
+                             OPENA8DJ_SURFACE_NAME_LENGTH,
+                             "capture-paced CAIAQ isochronous engine planned");
+    OpenA8DJ_CopyFixedString(Surface->SafetyPolicy,
+                             OPENA8DJ_SURFACE_NAME_LENGTH,
+                             "start rejected; controls are local-only diagnostics");
+}
+
+static VOID
+OpenA8DJ_FillChannel(
+    _Out_ POPENA8DJ_CHANNEL_DESCRIPTOR Channel,
+    _In_ ULONG Direction,
+    _In_ ULONG ChannelIndex,
+    _In_ ULONG PairIndex,
+    _In_ ULONG PairChannelIndex,
+    _In_z_ const CHAR *Name)
+{
+    RtlZeroMemory(Channel, sizeof(*Channel));
+    Channel->Size = sizeof(*Channel);
+    Channel->Direction = Direction;
+    Channel->ChannelIndex = ChannelIndex;
+    Channel->PairIndex = PairIndex;
+    Channel->PairChannelIndex = PairChannelIndex;
+    OpenA8DJ_CopyString(Channel->Name, Name);
+}
+
+static VOID
+OpenA8DJ_FillTopology(_Out_ POPENA8DJ_TOPOLOGY Topology)
+{
+    RtlZeroMemory(Topology, sizeof(*Topology));
+    Topology->Size = sizeof(*Topology);
+    Topology->ApiVersion = OPENA8DJ_DRIVER_API_VERSION;
+    Topology->EndpointModel = OPENA8DJ_ENDPOINT_MODEL_DUAL_PROTOTYPE;
+    Topology->RenderEndpointCount = 4;
+    Topology->CaptureEndpointCount = 4;
+    Topology->RenderChannelCount = OPENA8DJ_OUTPUT_CHANNELS;
+    Topology->CaptureChannelCount = OPENA8DJ_INPUT_CHANNELS;
+    OpenA8DJ_CopyFixedString(Topology->RenderEndpointName,
+                             OPENA8DJ_ENDPOINT_NAME_LENGTH,
+                             "Open Audio 8 DJ Output A/B/C/D");
+    OpenA8DJ_CopyFixedString(Topology->CaptureEndpointName,
+                             OPENA8DJ_ENDPOINT_NAME_LENGTH,
+                             "Open Audio 8 DJ Input A/B/C/D");
+
+    OpenA8DJ_FillChannel(&Topology->Channels[0], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 0, 0, 0, "Output A Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[1], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 1, 0, 1, "Output A Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[2], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 2, 1, 0, "Output B Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[3], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 3, 1, 1, "Output B Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[4], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 4, 2, 0, "Output C Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[5], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 5, 2, 1, "Output C Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[6], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 6, 3, 0, "Output D Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[7], OPENA8DJ_CHANNEL_DIRECTION_RENDER, 7, 3, 1, "Output D Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[8], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 0, 0, 0, "Input A Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[9], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 1, 0, 1, "Input A Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[10], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 2, 1, 0, "Input B Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[11], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 3, 1, 1, "Input B Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[12], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 4, 2, 0, "Input C Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[13], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 5, 2, 1, "Input C Right");
+    OpenA8DJ_FillChannel(&Topology->Channels[14], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 6, 3, 0, "Input D Left");
+    OpenA8DJ_FillChannel(&Topology->Channels[15], OPENA8DJ_CHANNEL_DIRECTION_CAPTURE, 7, 3, 1, "Input D Right");
+}
+
+static VOID
+OpenA8DJ_FillDiagnostics(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ_DIAGNOSTICS Diagnostics)
+{
+    RtlZeroMemory(Diagnostics, sizeof(*Diagnostics));
+    Diagnostics->Size = sizeof(*Diagnostics);
+    Diagnostics->ApiVersion = OPENA8DJ_DRIVER_API_VERSION;
+    Diagnostics->StartRequests = Context->StartRequests;
+    Diagnostics->RejectedStartRequests = Context->RejectedStartRequests;
+    Diagnostics->StopRequests = Context->StopRequests;
+    Diagnostics->FormatChanges = Context->FormatChanges;
+    Diagnostics->ControlWrites = Context->ControlWrites;
+    Diagnostics->ProfileApplies = Context->ProfileApplies;
+    Diagnostics->StreamState = Context->StreamState;
 }
 
 static NTSTATUS
@@ -540,6 +665,7 @@ OpenA8DJ_EvtIoDeviceControl(
             context->CurrentFormat.Size = sizeof(context->CurrentFormat);
             context->StreamState.SampleRate = context->CurrentFormat.SampleRate;
             context->StreamState.BufferFrames = context->CurrentFormat.BufferFrames;
+            context->FormatChanges++;
             status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_AUDIO_FORMAT), (PVOID *)&outputFormat);
         }
         if (NT_SUCCESS(status)) {
@@ -549,17 +675,22 @@ OpenA8DJ_EvtIoDeviceControl(
     } else if (IoControlCode == IOCTL_OPENA8DJ_START_STREAMING) {
         POPENA8DJ_STREAM_STATE streamState = NULL;
 
-        context->StreamState.Streaming = TRUE;
+        context->StartRequests++;
+        context->StreamState.Streaming = FALSE;
+        context->StreamState.StreamingEngineReady = FALSE;
         context->StreamState.SampleRate = context->CurrentFormat.SampleRate;
         context->StreamState.BufferFrames = context->CurrentFormat.BufferFrames;
         status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_STREAM_STATE), (PVOID *)&streamState);
         if (NT_SUCCESS(status)) {
             *streamState = context->StreamState;
             bytesReturned = sizeof(*streamState);
+            context->RejectedStartRequests++;
+            status = STATUS_NOT_SUPPORTED;
         }
     } else if (IoControlCode == IOCTL_OPENA8DJ_STOP_STREAMING) {
         POPENA8DJ_STREAM_STATE streamState = NULL;
 
+        context->StopRequests++;
         context->StreamState.Streaming = FALSE;
         status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_STREAM_STATE), (PVOID *)&streamState);
         if (NT_SUCCESS(status)) {
@@ -573,6 +704,30 @@ OpenA8DJ_EvtIoDeviceControl(
         if (NT_SUCCESS(status)) {
             *streamState = context->StreamState;
             bytesReturned = sizeof(*streamState);
+        }
+    } else if (IoControlCode == IOCTL_OPENA8DJ_GET_SURFACE) {
+        POPENA8DJ_WINDOWS_SURFACE surface = NULL;
+
+        status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_WINDOWS_SURFACE), (PVOID *)&surface);
+        if (NT_SUCCESS(status)) {
+            OpenA8DJ_FillSurface(context, surface);
+            bytesReturned = sizeof(*surface);
+        }
+    } else if (IoControlCode == IOCTL_OPENA8DJ_GET_TOPOLOGY) {
+        POPENA8DJ_TOPOLOGY topology = NULL;
+
+        status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_TOPOLOGY), (PVOID *)&topology);
+        if (NT_SUCCESS(status)) {
+            OpenA8DJ_FillTopology(topology);
+            bytesReturned = sizeof(*topology);
+        }
+    } else if (IoControlCode == IOCTL_OPENA8DJ_GET_DIAGNOSTICS) {
+        POPENA8DJ_DIAGNOSTICS diagnostics = NULL;
+
+        status = OpenA8DJ_RetrieveOutput(Request, sizeof(OPENA8DJ_DIAGNOSTICS), (PVOID *)&diagnostics);
+        if (NT_SUCCESS(status)) {
+            OpenA8DJ_FillDiagnostics(context, diagnostics);
+            bytesReturned = sizeof(*diagnostics);
         }
     }
 

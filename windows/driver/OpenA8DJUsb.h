@@ -26,6 +26,12 @@ typedef struct _OPENA8DJ_DEVICE_CONTEXT {
     UCHAR RawControlState[6];
     OPENA8DJ_AUDIO_FORMAT CurrentFormat;
     OPENA8DJ_STREAM_STATE StreamState;
+    ULONG64 StartRequests;
+    ULONG64 RejectedStartRequests;
+    ULONG64 StopRequests;
+    ULONG64 FormatChanges;
+    ULONG64 ControlWrites;
+    ULONG64 ProfileApplies;
 } OPENA8DJ_DEVICE_CONTEXT, *POPENA8DJ_DEVICE_CONTEXT;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(OPENA8DJ_DEVICE_CONTEXT, OpenA8DJGetDeviceContext)
