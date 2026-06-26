@@ -1,5 +1,18 @@
 # Windows 10/11 Support Plan
 
+## Current Warning - Windows Driver Is Not Usable
+
+The Windows driver workstream is **not available for use**. It is work in
+progress and has caused local Windows tablet hangs/reboots during Audio 8 DJ
+driver testing. Do not install, load, stream, run Traktor, run iRig quality
+tests, or perform unattended hardware tests with this driver on any machine
+that needs to stay stable.
+
+This warning supersedes earlier positive hardware evidence in this document.
+Those earlier notes are retained as historical debugging data only; they do not
+mean the Windows driver is safe, stable, production-ready, or tester-ready.
+See [WINDOWS_DRIVER_INCIDENT_2026-06-25.md](WINDOWS_DRIVER_INCIDENT_2026-06-25.md).
+
 OpenA8DJ 0.2.4 does not include a production Windows audio driver or Windows
 installer. The Windows workstream is experimental.
 
@@ -39,15 +52,131 @@ CAIAQ USB pipes, and exposes the OpenA8DJ experimental Windows surface contract:
   streaming, MIDI, and ASIO
 - topology and diagnostics IOCTLs
 
-The package also builds `opena8djctl.exe` for testers. Windows audio endpoint
-publication, MIDI publication, and sustained isochronous streaming still need
-implementation and real Windows 10/11 validation with the physical hardware.
-The v2 surface intentionally rejects `start` until the real isochronous engine
-exists, so the Windows side does not pretend to stream audio.
+The package also builds `opena8djctl.exe` for testers. The current Windows
+workstream now includes an ACX endpoint layer and capture-paced isochronous
+render/capture engine for the physical Audio 8 DJ. It has local hardware
+evidence for 8-channel playback through the mixer/iRig route and Traktor active
+playback smoke tests, but it is still experimental rather than production-ready.
+MIDI publication, ASIO, real hardware control writes, hotplug/sleep validation,
+long-run DPC/CPU gates, timecode validation, and a clean Windows install matrix
+remain incomplete.
 
-This is intentionally labeled experimental: it has been built and packaged, but
-not exhaustively tested in Windows. Bugs are expected and tester feedback is
-welcome.
+### Local API 24 evidence - 2026-06-25
+
+The local Windows tablet currently has the test-signed `OpenA8DJUsb`
+0.0.81/API 24 package installed for the Audio 8 DJ. The API 24 change makes
+control writes truthful: profiles update `input-mode` and `software-lock`, and
+diagnostics record raw control bytes plus write/readback status. Ground-lift
+bits are reported from hardware readback, but local hardware did not confirm
+independent ground-lift writes, so profiles preserve the readback ground state
+instead of claiming mutually exclusive ground flags.
+
+Current physical evidence:
+
+- `local-analysis/windows/pair-matrix-48k-api24-full-20260625`: 48 kHz full
+  output-pair matrix through mixer/iRig; no clipping or PortAudio status
+  events; driver underruns, overruns, packet errors, and late completions stayed
+  at zero.
+- `local-analysis/windows/pair-matrix-44k-api24-full-20260625`: same matrix at
+  44.1 kHz with the same zero driver error counters.
+- `local-analysis/windows/traktor-30min-api24-full-20260625`: 30-minute Traktor
+  factory-track run with iRig capture; `pass=true`, streaming stayed `yes`, 8
+  channels were active, all four render pairs advanced, and underrun/overrun,
+  packet-error, and late-completion deltas were zero. iRig capture had peak
+  0.0539, zero clipped/near-clipped frames, zero raw click outliers, and no
+  capture status events.
+- `local-analysis/windows/input-endpoint-api24-smoke-threshold-20260625`:
+  Audio 8 DJ input endpoint smoke for MME, DirectSound, and WASAPI. All 12
+  tested endpoints opened, delivered frames, and reported zero status events;
+  driver capture-frame counters advanced by 6,662,839 with zero underruns,
+  overruns, packet errors, and late completions. No endpoint crossed the
+  0.001 signal threshold, so this proves endpoint stability but not calibrated
+  timecode/input signal quality.
+- `local-analysis/windows/input-endpoint-api24-wdmks-diagnostic-20260625`:
+  WDM-KS diagnostic. MME, DirectSound, and WASAPI still opened; the four
+  WDM-KS input endpoints failed in PortAudio with `Failed to read capture
+  position register (IOCTL)`.
+- `local-analysis/windows-full-round-20260625`: follow-up full round on the
+  local tablet. Profiles, input-mode aliases, software lock, 44.1/48 kHz, and
+  128/256/512/1024/2048-frame format changes passed clean readback with zero
+  driver stream errors. 48 kHz and 44.1 kHz output-pair matrices plus a
+  48 kHz/256-frame all-pairs stress pass completed through the mixer/iRig route
+  with no PortAudio status events, no clipping, and zero driver underrun,
+  overrun, packet-error, or late-completion deltas. A 15-minute Traktor/iRig
+  run also passed with streaming `yes`, 8 channels, all four render pairs
+  advancing, zero driver error deltas, zero iRig clipped/near-clipped frames,
+  zero raw click outliers, and no iRig status events. During the same round,
+  standalone `gnd-vinyl off` failed readback with Windows error 1117, so
+  standalone `gnd-*` writes remain a known non-passing control variable.
+- `local-analysis/windows-ground-readback-matrix-20260625-064106`: control-only
+  ground-lift readback matrix. The driver and tool restored a safe baseline
+  after every case. The local hardware read byte 3 back as `03` across the
+  exercised combinations, so 24/48 requested combinations matched and 24/48
+  mismatched; no stream error counters moved.
+- `local-analysis/windows-control-classified-20260625-073937`: repeat
+  control-only matrix after adding mismatch classification. The 24 mismatches
+  are all requests for the phono ground bit, which the local hardware did not
+  confirm in readback; `unexpected_mismatches=0` and stream error cases stayed
+  at zero.
+- `local-analysis/windows-midi-endpoint-smoke-20260625-074506`: read-only
+  Windows `winmm` MIDI endpoint enumeration. The host reported zero MIDI input
+  devices, one output device (`Microsoft GS Wavetable Synth`), and zero
+  Audio 8 DJ/OpenA8DJ matching MIDI inputs or outputs. This turns the MIDI gap
+  into measured evidence rather than an untested assumption.
+- `local-analysis/windows-full-validation-midi-integration-20260625-074558`:
+  shortened validation runner pass proving the MIDI endpoint smoke is integrated
+  into the candidate-quality summary. `hard_regression_pass=True`; the MIDI gap
+  reports zero matching inputs and zero matching outputs.
+- `local-analysis/windows-asio-endpoint-smoke-20260625-075116`: read-only ASIO
+  registry enumeration. The host has two `Audio 8 DJ` ASIO registrations
+  pointing at the Native Instruments commercial ASIO DLL
+  `a8djasio64.dll`, but zero OpenA8DJ ASIO registrations. This does not validate
+  an OpenA8DJ ASIO path.
+- `local-analysis/windows-full-validation-asio-midi-integration-20260625-075132`:
+  shortened validation runner pass proving ASIO and MIDI endpoint evidence are
+  both included in the candidate-quality summary. `hard_regression_pass=True`;
+  OpenA8DJ ASIO matches remain zero.
+- `local-analysis/windows-version-preflight-20260625-075621`: read-only
+  source/package/loaded-driver version preflight. Source and packaged INF are
+  API 25 / `06/25/2026,0.0.83.0`, while the driver currently loaded on the
+  hardware is API 24.
+- `local-analysis/windows-full-validation-version-integration-20260625-075637`:
+  shortened validation runner pass proving version preflight is integrated into
+  candidate-quality summaries. It records `loaded_matches_source_api=False` and
+  keeps API 25 behavior as an explicit unvalidated gap until that package is
+  actually loaded.
+- Traktor active smoke artifacts produced after this point include
+  `top-process-samples.json` and `top_cpu_processes` in the Traktor
+  `summary.json`. Use those fields to attribute high tablet CPU to Traktor,
+  Codex/browser, the probes, or other host processes before changing driver
+  timing code. They also include `traktor-playback-gesture.json`; a passing
+  smoke must prove the automated load/play gesture produced render-pair
+  activity before the timed measurement.
+
+Known remaining caveat: Audio 8 DJ capture endpoints open through WASAPI/MME,
+but unattended local capture mostly measured silence or very low-level data
+because no known signal is currently cabled into the Audio 8 DJ inputs. WDM-KS
+input endpoints failed PortAudio open with a capture-position IOCTL error.
+Source package 0.0.83 removes `KSCATEGORY_REALTIME` publication for capture
+endpoints instead of advertising a WDM-KS capture path that ACX cannot satisfy
+with the legacy hardware position register. Treat physical output and Traktor
+playback as strong for this candidate; do not claim complete DVS/timecode input
+readiness until all Audio 8 DJ inputs are validated with a known signal.
+
+API 25 / 0.0.83 build note: a follow-up instrumentation build adds stream
+worker counters for iterations, capture/playback bytes, active render/capture
+masks, no-render iterations, and max per-iteration byte counts. The package
+keeps the audio data path unchanged and no longer publishes broken WDM-KS
+capture realtime interfaces. Local installation was intentionally not forced
+because Secure Boot is enabled and the install script refused to bind a
+test-signed kernel driver that Windows would reject with Code 52 / 0xC0000428.
+The currently loaded local driver therefore remains API 24 until the machine is
+booted/configured for test-signed driver loading or a Microsoft-signed package
+is available.
+
+Bugs are expected and tester feedback is welcome. Do not describe this branch
+as a fully functional public Windows driver until the validation matrix below is
+closed with current evidence.
 
 ## Target
 
@@ -124,12 +253,11 @@ Recommended architecture for the experimental Windows build:
    `USB\VID_17CC&PID_1978`.
 2. Implement the CAIAQ USB control and isochronous transport in a WDF-based USB
    component.
-3. Prototype Windows audio endpoint exposure using AVStream or another Windows
-   audio driver model suitable for a vendor-specific USB device.
-4. Evaluate PortCls/WaveRT after the experimental build confirms the bus/model fit;
-   Microsoft documents PortCls as the normal audio miniport path, but also
-   notes that PortCls port drivers are for system buses rather than external USB
-   buses.
+3. Continue the current ACX audio endpoint implementation for the vendor-specific
+   USB device while keeping the surface contract explicit about unsupported
+   features.
+4. Keep PortCls/WaveRT and ASIO as future compatibility/performance tracks after
+   the ACX/USB streaming path has stronger stability evidence.
 5. Keep the user-facing control panel/helper out of the streaming path. It can
    be a normal Win32 service or app once the driver exposes a stable control
    interface.
@@ -169,8 +297,8 @@ Windows 10/11 test machine.
 
 ### Phase 3: audio endpoints
 
-- Expose 4 stereo playback endpoints or one 8-channel endpoint, depending on
-  which layout Traktor handles best.
+- Expose the primary 8-channel playback endpoint and stereo A/B/C/D endpoints
+  that Traktor and Windows audio clients can open.
 - Expose 4 stereo capture endpoints for Input A/B/C/D.
 - Support 44.1 and 48 kHz first.
 - Implement buffer-size negotiation without invalid sentinel values.
@@ -210,6 +338,30 @@ Windows 10/11 test machine.
 - MIDI in/out loopback.
 - Sustained 30-minute playback and capture.
 - CPU and DPC latency under Traktor load.
+
+Local development evidence should be recorded under `local-analysis\windows*`
+with:
+
+- `windows\tests\run-a8dj-pair-matrix.ps1` for deterministic 8-channel physical
+  output checks through the iRig return path.
+- `windows\tests\run-irig-quality-probe.ps1` for a stereo reference/capture WAV
+  quality probe.
+- `windows\tests\run-traktor-active-smoke.ps1 -CaptureIrig` for Traktor-facing
+  active playback, driver diagnostics, CPU/process attribution samples, and
+  iRig capture metrics.
+
+The consolidated full runner records short hardware cooldowns in
+`cooldowns.log`. On the local tablet, isolated retests showed clean 48 kHz/512
+and 48 kHz/256 matrix behavior after host CPU cooled down, so back-to-back
+probe status events should be interpreted alongside driver counters and CPU
+evidence. The pair-matrix probe now retries a case once after a PortAudio
+status event and records `status_retry_attempts`; repeated status events remain
+failures.
+
+These probes deliberately avoid USB reset, Windows Audio restart, default-device
+changes, and unattended recovery of a missing iRig. A pass is strong local
+evidence for the tested route, not proof that MIDI, ASIO, timecode, hotplug,
+sleep/wake, or a clean-install Windows release is complete.
 
 ## Standalone Installer Direction
 

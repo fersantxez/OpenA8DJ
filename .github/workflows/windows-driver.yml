@@ -5,10 +5,12 @@ on:
   push:
     paths:
       - "windows/**"
+      - "docs/WINDOWS*.md"
       - ".github/workflows/windows-driver.yml"
   pull_request:
     paths:
       - "windows/**"
+      - "docs/WINDOWS*.md"
       - ".github/workflows/windows-driver.yml"
 
 jobs:
@@ -18,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [x64, ARM64]
+        platform: [x64]
 
     steps:
       - name: Check out
@@ -44,9 +46,28 @@ jobs:
         shell: pwsh
         run: .\windows\scripts\build-driver.ps1 -Configuration Release -Platform ${{ matrix.platform }}
 
+      - name: Check Microsoft signing readiness
+        shell: pwsh
+        run: .\windows\scripts\test-signing-readiness.ps1 -Configuration Release -Platform ${{ matrix.platform }} -SkipBuild
+
+      - name: Upload signing readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}-signing-readiness
+          path: local-analysis/windows/signing-readiness-*/
+
       - name: Upload unsigned driver package
-        if: ${{ github.event.repository.private }}
+        if: ${{ github.event.repository.private || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: OpenA8DJUsb-Windows-${{ matrix.platform }}
           path: windows/dist/Release/${{ matrix.platform }}/
+
+      - name: Upload attestation submission payload
+        if: ${{ github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}-attestation
+          path: |
+            windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation.cab
+            windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation-manifest.json

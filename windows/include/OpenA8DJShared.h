@@ -8,7 +8,7 @@ extern "C" {
 #define OPENA8DJ_CTL_BASE 0x800
 #endif
 
-#define OPENA8DJ_DRIVER_API_VERSION 2
+#define OPENA8DJ_DRIVER_API_VERSION 27
 
 #define OPENA8DJ_VENDOR_ID 0x17CC
 #define OPENA8DJ_PRODUCT_ID 0x1978
@@ -42,6 +42,7 @@ extern "C" {
 #define OPENA8DJ_ENDPOINT_MODEL_SINGLE_8CH 1
 #define OPENA8DJ_ENDPOINT_MODEL_FOUR_STEREO_PAIRS 2
 #define OPENA8DJ_ENDPOINT_MODEL_DUAL_PROTOTYPE 3
+#define OPENA8DJ_ENDPOINT_MODEL_PRIMARY_8CH_PLUS_STEREO 4
 
 #define OPENA8DJ_CHANNEL_DIRECTION_RENDER 0
 #define OPENA8DJ_CHANNEL_DIRECTION_CAPTURE 1
@@ -88,17 +89,108 @@ DEFINE_GUID(GUID_DEVINTERFACE_OPENA8DJ_USB,
     CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 11, METHOD_BUFFERED, FILE_READ_DATA)
 #define IOCTL_OPENA8DJ_GET_DIAGNOSTICS \
     CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 12, METHOD_BUFFERED, FILE_READ_DATA)
+#define IOCTL_OPENA8DJ_ISO_CAPTURE_SNAPSHOT \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 13, METHOD_BUFFERED, FILE_READ_DATA)
+#define IOCTL_OPENA8DJ_ISO_SILENCE_PULSE \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 14, METHOD_BUFFERED, FILE_READ_DATA)
+#define IOCTL_OPENA8DJ_APPLY_AUDIO_PARAMS \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 15, METHOD_BUFFERED, FILE_READ_DATA)
+#define IOCTL_OPENA8DJ_ISO_TONE_BURST \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 16, METHOD_BUFFERED, FILE_READ_DATA | FILE_WRITE_DATA)
+#define IOCTL_OPENA8DJ_GET_RENDER_TRACE \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 17, METHOD_BUFFERED, FILE_READ_DATA)
+#define IOCTL_OPENA8DJ_GET_USB_PLAYBACK_TRACE \
+    CTL_CODE(FILE_DEVICE_UNKNOWN, OPENA8DJ_CTL_BASE + 18, METHOD_BUFFERED, FILE_READ_DATA)
 
 typedef struct _OPENA8DJ_USB_INFO {
     ULONG Size;
     USHORT VendorId;
     USHORT ProductId;
+    UCHAR TotalInterfaceCount;
     UCHAR ConfiguredInterfaceCount;
+    UCHAR ConfiguredPipeCount;
+    UCHAR AlternateSettingCount;
+    UCHAR SelectedAlternateSetting;
+    ULONG Ep1ReaderConfigNtStatus;
+    ULONG Ep1ReaderStartNtStatus;
+    ULONG Ep1ReaderCompletions;
+    ULONG Ep1ReaderZeroReads;
+    ULONG Ep1ReaderBytes;
     BOOLEAN HasBulkOut;
     BOOLEAN HasBulkIn;
     BOOLEAN HasIsoIn;
     BOOLEAN HasIsoOut;
 } OPENA8DJ_USB_INFO, *POPENA8DJ_USB_INFO;
+
+#define OPENA8DJ_ISO_SNAPSHOT_PACKET_COUNT 5
+
+typedef struct _OPENA8DJ_ISO_PACKET_SNAPSHOT {
+    ULONG Offset;
+    ULONG RequestedLength;
+    ULONG CompletedLength;
+    ULONG UsbdStatus;
+} OPENA8DJ_ISO_PACKET_SNAPSHOT, *POPENA8DJ_ISO_PACKET_SNAPSHOT;
+
+typedef struct _OPENA8DJ_ISO_CAPTURE_SNAPSHOT {
+    ULONG Size;
+    ULONG NtStatus;
+    ULONG TransferBufferLength;
+    ULONG ErrorCount;
+    ULONG PacketCount;
+    ULONG MaximumPacketSize;
+    OPENA8DJ_ISO_PACKET_SNAPSHOT Packets[OPENA8DJ_ISO_SNAPSHOT_PACKET_COUNT];
+    UCHAR FirstBytes[32];
+} OPENA8DJ_ISO_CAPTURE_SNAPSHOT, *POPENA8DJ_ISO_CAPTURE_SNAPSHOT;
+
+typedef struct _OPENA8DJ_ISO_SILENCE_PULSE {
+    ULONG Size;
+    ULONG NtStatus;
+    ULONG PlaybackNtStatus;
+    ULONG PlaybackErrorCount;
+    ULONG PlaybackTransferBufferLength;
+    OPENA8DJ_ISO_CAPTURE_SNAPSHOT Capture;
+} OPENA8DJ_ISO_SILENCE_PULSE, *POPENA8DJ_ISO_SILENCE_PULSE;
+
+typedef struct _OPENA8DJ_ISO_TONE_BURST {
+    ULONG Size;
+    ULONG RequestedTransfers;
+    ULONG CompletedTransfers;
+    ULONG PairIndex;
+    ULONG AmplitudeQ15;
+    ULONG PacketBytes;
+    ULONG PeriodSamples;
+    ULONG NtStatus;
+    ULONG FirstCaptureNtStatus;
+    ULONG FirstPlaybackNtStatus;
+    ULONG LastCaptureNtStatus;
+    ULONG LastPlaybackNtStatus;
+    ULONG CaptureErrorCount;
+    ULONG PlaybackErrorCount;
+    ULONG PlaybackBytes;
+    OPENA8DJ_ISO_CAPTURE_SNAPSHOT LastCapture;
+} OPENA8DJ_ISO_TONE_BURST, *POPENA8DJ_ISO_TONE_BURST;
+
+typedef struct _OPENA8DJ_AUDIO_PARAMS_RESULT {
+    ULONG Size;
+    ULONG SampleRate;
+    UCHAR RateCode;
+    UCHAR Depth;
+    USHORT BytesPerPacket;
+    ULONG DeviceInfoWriteNtStatus;
+    ULONG DeviceInfoReadNtStatus;
+    ULONG DeviceInfoReplyLength;
+    UCHAR DeviceInfoReply[512];
+    ULONG ResetWriteNtStatus;
+    ULONG ResetReadNtStatus;
+    ULONG ResetNtStatus;
+    ULONG SetNtStatus;
+    ULONG SetWriteNtStatus;
+    ULONG SetReadNtStatus;
+    ULONG ResetReplyLength;
+    ULONG SetReplyLength;
+    UCHAR ResetReply[512];
+    UCHAR SetReply[512];
+} OPENA8DJ_AUDIO_PARAMS_RESULT, *POPENA8DJ_AUDIO_PARAMS_RESULT;
 
 typedef struct _OPENA8DJ_CAPABILITIES {
     ULONG Size;
@@ -211,8 +303,97 @@ typedef struct _OPENA8DJ_DIAGNOSTICS {
     ULONG64 FormatChanges;
     ULONG64 ControlWrites;
     ULONG64 ProfileApplies;
+    BOOLEAN ControlsHardwareReady;
+    BOOLEAN LastControlWriteMismatch;
+    UCHAR RawControlState[6];
+    UCHAR LastControlWriteRequest[6];
+    UCHAR LastControlWriteReadBack[6];
+    ULONG LastControlReadNtStatus;
+    ULONG LastControlWriteNtStatus;
+    ULONG LastControlReadbackNtStatus;
     OPENA8DJ_STREAM_STATE StreamState;
+    ULONG64 AcxCreateStreamCallbacks;
+    ULONG64 AcxPrepareCallbacks;
+    ULONG64 AcxReleaseCallbacks;
+    ULONG64 AcxRunCallbacks;
+    ULONG64 AcxPauseCallbacks;
+    ULONG64 AcxLatencyCallbacks;
+    ULONG64 AcxAllocatePacketCallbacks;
+    ULONG64 AcxFreePacketCallbacks;
+    ULONG64 AcxSetRenderPacketCallbacks;
+    ULONG64 AcxGetCurrentPacketCallbacks;
+    ULONG64 AcxGetCapturePacketCallbacks;
+    ULONG64 AcxGetPresentationPositionCallbacks;
+    ULONG64 AcxRtFramesRead;
+    ULONG64 AcxRtNonZeroFrames;
+    ULONG AcxRtPeakAbsS24;
+    ULONG64 AcxRtRenderPairNonZeroFrames[OPENA8DJ_STEREO_PAIRS];
+    ULONG AcxRtRenderPairPeakAbsS24[OPENA8DJ_STEREO_PAIRS];
+    ULONG64 AcxRtCapturePairNonZeroFrames[OPENA8DJ_STEREO_PAIRS];
+    ULONG AcxRtCapturePairPeakAbsS16[OPENA8DJ_STEREO_PAIRS];
+    ULONG AcxRtChannels;
+    ULONG AcxRtBlockAlign;
+    ULONG AcxRtBitsPerSample;
+    ULONG AcxRtIsFloat;
+    ULONG AcxRtPacketCount;
+    ULONG AcxRtPacketSize;
+    ULONG AcxRtFrameCount;
+    ULONG AcxLastSetRenderPacket;
+    ULONG AcxLastSetRenderFlags;
+    ULONG AcxLastSetRenderEosPacketLength;
+    ULONG64 StreamWorkerIterations;
+    ULONG64 StreamWorkerCaptureBytes;
+    ULONG64 StreamWorkerPlaybackBytes;
+    ULONG64 StreamWorkerNoRenderIterations;
+    ULONG StreamWorkerLastCaptureBytes;
+    ULONG StreamWorkerLastPlaybackBytes;
+    ULONG StreamWorkerLastRenderMask;
+    ULONG StreamWorkerLastCaptureMask;
+    ULONG StreamWorkerMaxCaptureBytes;
+    ULONG StreamWorkerMaxPlaybackBytes;
 } OPENA8DJ_DIAGNOSTICS, *POPENA8DJ_DIAGNOSTICS;
+
+#define OPENA8DJ_RENDER_TRACE_FRAME_COUNT 256
+
+typedef struct _OPENA8DJ_RENDER_TRACE_FRAME {
+    ULONG PairIndex;
+    ULONG RtChannels;
+    ULONG RtBlockAlign;
+    ULONG RtBitsPerSample;
+    ULONG RtFrameCursor;
+    ULONG RtFrameCount;
+    ULONG OutputByteInFrame;
+    ULONGLONG PositionBlocks;
+    LONG RawLeftS24;
+    LONG RawRightS24;
+    LONG OutputLeftS24;
+    LONG OutputRightS24;
+} OPENA8DJ_RENDER_TRACE_FRAME, *POPENA8DJ_RENDER_TRACE_FRAME;
+
+typedef struct _OPENA8DJ_RENDER_TRACE {
+    ULONG Size;
+    ULONG FrameCount;
+    ULONG WriteIndex;
+    ULONG ActiveRenderMask;
+    ULONG RtChannels;
+    ULONG RtBlockAlign;
+    ULONG RtBitsPerSample;
+    ULONG RtFrameCount;
+    ULONG64 WriteCount;
+    OPENA8DJ_RENDER_TRACE_FRAME Frames[OPENA8DJ_RENDER_TRACE_FRAME_COUNT];
+} OPENA8DJ_RENDER_TRACE, *POPENA8DJ_RENDER_TRACE;
+
+#define OPENA8DJ_USB_PLAYBACK_TRACE_BYTES 65536
+
+typedef struct _OPENA8DJ_USB_PLAYBACK_TRACE {
+    ULONG Size;
+    ULONG ByteCount;
+    ULONG FixedPacketBytes;
+    ULONG ActiveRenderMask;
+    ULONG WorkerLastPlaybackBytes;
+    ULONG64 WorkerIteration;
+    UCHAR Bytes[OPENA8DJ_USB_PLAYBACK_TRACE_BYTES];
+} OPENA8DJ_USB_PLAYBACK_TRACE, *POPENA8DJ_USB_PLAYBACK_TRACE;
 
 #ifdef __cplusplus
 }

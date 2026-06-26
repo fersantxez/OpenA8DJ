@@ -19,6 +19,23 @@ param(
 $ErrorActionPreference = "Stop"
 Import-Module (Join-Path $PSScriptRoot "OpenA8DJ.WindowsCommon.psm1") -Force
 
+function Add-OpenA8DJCertificateToStore {
+    param(
+        [Parameter(Mandatory = $true)][string]$CertificatePath,
+        [Parameter(Mandatory = $true)][System.Security.Cryptography.X509Certificates.StoreName]$StoreName,
+        [Parameter(Mandatory = $true)][System.Security.Cryptography.X509Certificates.StoreLocation]$StoreLocation
+    )
+
+    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($CertificatePath)
+    $store = [System.Security.Cryptography.X509Certificates.X509Store]::new($StoreName, $StoreLocation)
+    try {
+        $store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+        $store.Add($cert)
+    } finally {
+        $store.Close()
+    }
+}
+
 $repoRoot = Get-OpenA8DJRepoRoot
 if (-not $PackageDir) {
     $PackageDir = Join-Path $repoRoot "windows\dist\$Configuration\$Platform"
@@ -71,8 +88,8 @@ if ($PfxPath) {
 
     Export-Certificate -Cert $certificate -FilePath $certExportPath -Force | Out-Null
     Copy-Item -Path $certExportPath -Destination $legacyCertExportPath -Force
-    Import-Certificate -FilePath $certExportPath -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
-    Import-Certificate -FilePath $certExportPath -CertStoreLocation Cert:\CurrentUser\TrustedPublisher | Out-Null
+    Add-OpenA8DJCertificateToStore -CertificatePath $certExportPath -StoreName Root -StoreLocation CurrentUser
+    Add-OpenA8DJCertificateToStore -CertificatePath $certExportPath -StoreName TrustedPublisher -StoreLocation CurrentUser
     Write-Host "Signing catalog with CurrentUser certificate $($certificate.Thumbprint)"
     & $signTool sign /fd SHA256 /sha1 $certificate.Thumbprint /tr http://timestamp.digicert.com /td SHA256 $catPath
     if ($LASTEXITCODE -ne 0) {

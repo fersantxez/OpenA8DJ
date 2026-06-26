@@ -11,6 +11,15 @@ extern "C" {
 #define OPENA8DJ_ENGINE_INPUT_CHANNELS 8u
 #define OPENA8DJ_ENGINE_OUTPUT_CHANNELS 8u
 #define OPENA8DJ_ENGINE_STEREO_PAIRS 4u
+#define OPENA8DJ_ENGINE_STREAMS 4u
+#define OPENA8DJ_ENGINE_CHANNELS_PER_STREAM 2u
+#define OPENA8DJ_ENGINE_BYTES_PER_SAMPLE 3u
+#define OPENA8DJ_ENGINE_BYTES_PER_SAMPLE_USB 4u
+#define OPENA8DJ_ENGINE_MODE2_GROUP_BYTES \
+    (OPENA8DJ_ENGINE_STREAMS * OPENA8DJ_ENGINE_BYTES_PER_SAMPLE_USB)
+#define OPENA8DJ_ENGINE_MODE2_CHECK_OFFSET \
+    (OPENA8DJ_ENGINE_STREAMS * OPENA8DJ_ENGINE_CHANNELS_PER_STREAM)
+#define OPENA8DJ_ENGINE_OUTPUT_START_BYTE (OPENA8DJ_ENGINE_BYTES_PER_SAMPLE + 1u)
 #define OPENA8DJ_ENGINE_STABLE_RATE_44100 44100u
 #define OPENA8DJ_ENGINE_STABLE_RATE_48000 48000u
 #define OPENA8DJ_ENGINE_DEFAULT_RATE OPENA8DJ_ENGINE_STABLE_RATE_48000
@@ -56,6 +65,14 @@ typedef struct OPENA8DJ_AUDIO_ENGINE {
     size_t captureAvailableFrames;
 } OPENA8DJ_AUDIO_ENGINE;
 
+typedef struct OPENA8DJ_MODE2_OUTPUT_PACKER {
+    uint8_t outputFrameBytes[OPENA8DJ_ENGINE_STREAMS]
+                            [OPENA8DJ_ENGINE_CHANNELS_PER_STREAM * OPENA8DJ_ENGINE_BYTES_PER_SAMPLE];
+    size_t nextFrame;
+    uint8_t outputByteInFrame;
+    bool outputFrameLoaded;
+} OPENA8DJ_MODE2_OUTPUT_PACKER;
+
 bool OpenA8DJEngineIsStableSampleRate(uint32_t sampleRate);
 
 OPENA8DJ_ENGINE_CONFIG OpenA8DJEngineDefaultConfig(void);
@@ -96,6 +113,15 @@ size_t OpenA8DJEngineReadCapture(
 void OpenA8DJEnginePackS24BE(float sample, uint8_t out[3]);
 
 float OpenA8DJEngineUnpackS24BE(const uint8_t in[3]);
+
+void OpenA8DJEngineMode2PackerInit(OPENA8DJ_MODE2_OUTPUT_PACKER *packer);
+
+size_t OpenA8DJEnginePackMode2Output(
+    OPENA8DJ_MODE2_OUTPUT_PACKER *packer,
+    const float *interleavedFrames,
+    size_t frameCount,
+    uint8_t *out,
+    size_t outBytes);
 
 #ifdef __cplusplus
 }

@@ -281,3 +281,92 @@ OpenA8DJEngineUnpackS24BE(const uint8_t in[3])
     }
     return (float)sample / 8388608.0f;
 }
+
+static uint8_t
+OpenA8DJEngineMode2CheckByte(size_t stream, size_t byteIndex)
+{
+    size_t group = byteIndex / OPENA8DJ_ENGINE_MODE2_GROUP_BYTES;
+    return (uint8_t)((stream << 1u) | ((~group) & 1u));
+}
+
+void
+OpenA8DJEngineMode2PackerInit(OPENA8DJ_MODE2_OUTPUT_PACKER *packer)
+{
+    if (packer == NULL) {
+        return;
+    }
+    memset(packer, 0, sizeof(*packer));
+    packer->outputByteInFrame = (uint8_t)OPENA8DJ_ENGINE_OUTPUT_START_BYTE;
+}
+
+static void
+OpenA8DJEngineLoadMode2OutputFrame(
+    OPENA8DJ_MODE2_OUTPUT_PACKER *packer,
+    const float *interleavedFrames,
+    size_t frameCount)
+{
+    uint32_t stream;
+    float silence[OPENA8DJ_ENGINE_OUTPUT_CHANNELS];
+    const float *frame;
+
+    memset(silence, 0, sizeof(silence));
+    frame = silence;
+    if (interleavedFrames != NULL && packer->nextFrame < frameCount) {
+        frame = &interleavedFrames[packer->nextFrame * OPENA8DJ_ENGINE_OUTPUT_CHANNELS];
+        packer->nextFrame++;
+    }
+
+    for (stream = 0; stream < OPENA8DJ_ENGINE_STREAMS; stream++) {
+        OpenA8DJEnginePackS24BE(
+            frame[stream * OPENA8DJ_ENGINE_CHANNELS_PER_STREAM],
+            &packer->outputFrameBytes[stream][0]);
+        OpenA8DJEnginePackS24BE(
+            frame[stream * OPENA8DJ_ENGINE_CHANNELS_PER_STREAM + 1u],
+            &packer->outputFrameBytes[stream][OPENA8DJ_ENGINE_BYTES_PER_SAMPLE]);
+    }
+    packer->outputFrameLoaded = true;
+}
+
+size_t
+OpenA8DJEnginePackMode2Output(
+    OPENA8DJ_MODE2_OUTPUT_PACKER *packer,
+    const float *interleavedFrames,
+    size_t frameCount,
+    uint8_t *out,
+    size_t outBytes)
+{
+    size_t index = 0;
+
+    if (packer == NULL || out == NULL) {
+        return 0;
+    }
+
+    while (index < outBytes) {
+        size_t groupOffset = index % OPENA8DJ_ENGINE_MODE2_GROUP_BYTES;
+        uint32_t stream;
+
+        if (groupOffset == OPENA8DJ_ENGINE_MODE2_CHECK_OFFSET) {
+            for (stream = 0; stream < OPENA8DJ_ENGINE_STREAMS && index < outBytes; stream++) {
+                out[index] = OpenA8DJEngineMode2CheckByte(stream, index);
+                index++;
+            }
+            continue;
+        }
+
+        if (!packer->outputFrameLoaded || packer->outputByteInFrame == 0) {
+            OpenA8DJEngineLoadMode2OutputFrame(packer, interleavedFrames, frameCount);
+        }
+
+        for (stream = 0; stream < OPENA8DJ_ENGINE_STREAMS && index < outBytes; stream++) {
+            out[index] = packer->outputFrameBytes[stream][packer->outputByteInFrame];
+            index++;
+        }
+        packer->outputByteInFrame++;
+        if (packer->outputByteInFrame >=
+            OPENA8DJ_ENGINE_CHANNELS_PER_STREAM * OPENA8DJ_ENGINE_BYTES_PER_SAMPLE) {
+            packer->outputByteInFrame = 0;
+        }
+    }
+
+    return index;
+}

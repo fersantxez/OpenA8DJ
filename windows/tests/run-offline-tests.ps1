@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$outDir = Join-Path $repoRoot "windows\dist\offline-tests\$Configuration"
+$outDir = Join-Path $env:TEMP "OpenA8DJ\offline-tests\$Configuration\bin"
+$objDir = Join-Path $env:TEMP "OpenA8DJ\offline-tests\$Configuration\obj"
 $testExe = Join-Path $outDir "opena8dj-audio-engine-contract.exe"
 
 function Find-Python {
@@ -49,6 +50,7 @@ function Find-CCompiler {
 }
 
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+New-Item -ItemType Directory -Path $objDir -Force | Out-Null
 
 $python = Find-Python
 & $python.Path @($python.Args) "windows\tests\validate_windows_surface_contract.py"
@@ -75,6 +77,7 @@ if ($compiler.Kind -eq "clang") {
         /Iwindows\audio `
         windows\audio\OpenA8DJAudioEngine.c `
         windows\tests\audio_engine_contract_test.c `
+        /Fo"$objDir\" `
         /Fe:$testExe
 }
 

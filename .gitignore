@@ -4,6 +4,8 @@
 # Build and release artifacts
 build/
 dist/
+obj/
+*.obj
 *.pkg
 *.dmg
 *.zip
@@ -12,8 +14,15 @@ dist/
 # Local logs and traces
 *.log
 *.trace
+*.bin
+setup.inf
+setup.rpt
 local-analysis/
 old driver/
+
+# Python local state
+__pycache__/
+*.pyc
 
 # Xcode / macOS local state
 DerivedData/

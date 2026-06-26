@@ -48,8 +48,10 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)dist\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)obj\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OpenA8DJOutRoot Condition="'$(OpenA8DJOutRoot)'==''">$(SolutionDir)dist\</OpenA8DJOutRoot>
+    <OpenA8DJObjRoot Condition="'$(OpenA8DJObjRoot)'==''">$(SolutionDir)obj\</OpenA8DJObjRoot>
+    <OutDir>$(OpenA8DJOutRoot)$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(OpenA8DJObjRoot)$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>

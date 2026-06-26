@@ -3,6 +3,13 @@
 OpenA8DJ is an open-source macOS driver stack for the Native Instruments
 Audio 8 DJ USB audio interface.
 
+> **Windows driver warning:** the Windows driver workstream is **not available
+> for use**. It is work in progress, has caused local Windows tablet hangs and
+> reboots during Audio 8 DJ driver testing, and must be treated as unsafe for
+> normal installation, DJ use, or unattended testing. See
+> [docs/WINDOWS_DRIVER_INCIDENT_2026-06-25.md](docs/WINDOWS_DRIVER_INCIDENT_2026-06-25.md)
+> before touching the Windows driver.
+
 It currently ships as a Core Audio HAL driver with an IOUSBHost-based CAIAQ USB
 transport, a CoreMIDI bridge, an Audio 8 DJ control bridge, and a two-click macOS
 installer.

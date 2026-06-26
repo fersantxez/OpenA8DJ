@@ -28,6 +28,40 @@ FillFrame(float *buffer, size_t frame, size_t channels, float base)
     }
 }
 
+static int
+ExpectMode2SampleByte(
+    const uint8_t *mode2Out,
+    const uint8_t packedSamples[OPENA8DJ_ENGINE_OUTPUT_CHANNELS][3],
+    size_t byteIndex,
+    size_t sampleByte)
+{
+    size_t stream;
+
+    for (stream = 0; stream < OPENA8DJ_ENGINE_STREAMS; stream++) {
+        size_t leftChannel = stream * OPENA8DJ_ENGINE_CHANNELS_PER_STREAM;
+        size_t rightChannel = leftChannel + 1u;
+        uint8_t expected;
+
+        if (sampleByte < OPENA8DJ_ENGINE_BYTES_PER_SAMPLE) {
+            expected = packedSamples[leftChannel][sampleByte];
+        } else {
+            expected = packedSamples[rightChannel][sampleByte - OPENA8DJ_ENGINE_BYTES_PER_SAMPLE];
+        }
+        if (mode2Out[byteIndex + stream] != expected) {
+            fprintf(stderr,
+                    "FAIL:%s:%d:stream=%zu byte=%zu expected=0x%02x actual=0x%02x\n",
+                    __FILE__,
+                    __LINE__,
+                    stream,
+                    sampleByte,
+                    expected,
+                    mode2Out[byteIndex + stream]);
+            return 0;
+        }
+    }
+    return 1;
+}
+
 int
 main(void)
 {
@@ -40,6 +74,20 @@ main(void)
     float captureIn[5 * OPENA8DJ_ENGINE_INPUT_CHANNELS];
     float captureOut[4 * OPENA8DJ_ENGINE_INPUT_CHANNELS];
     uint8_t packed[3];
+    uint8_t packedChannels[2][OPENA8DJ_ENGINE_OUTPUT_CHANNELS][3];
+    OPENA8DJ_MODE2_OUTPUT_PACKER mode2;
+    uint8_t mode2Out[32];
+    uint8_t mode2FrameOut[44];
+    float mode2Frames[2][OPENA8DJ_ENGINE_OUTPUT_CHANNELS] = {
+        {
+            0.125f, -0.125f, 0.250f, -0.250f,
+            0.375f, -0.375f, 0.500f, -0.500f
+        },
+        {
+            -0.0625f, 0.0625f, -0.1875f, 0.1875f,
+            -0.3125f, 0.3125f, -0.4375f, 0.4375f
+        }
+    };
     size_t frame;
     size_t channel;
 
@@ -123,6 +171,50 @@ main(void)
     OpenA8DJEnginePackS24BE(0.5f, packed);
     EXPECT_TRUE(OpenA8DJEngineUnpackS24BE(packed) > 0.49f);
     EXPECT_TRUE(OpenA8DJEngineUnpackS24BE(packed) < 0.51f);
+
+    memset(mode2Out, 0xff, sizeof(mode2Out));
+    OpenA8DJEngineMode2PackerInit(&mode2);
+    EXPECT_TRUE(OpenA8DJEnginePackMode2Output(&mode2, NULL, 0, mode2Out, sizeof(mode2Out)) == sizeof(mode2Out));
+    for (channel = 0; channel < sizeof(mode2Out); channel++) {
+        size_t groupOffset = channel % OPENA8DJ_ENGINE_MODE2_GROUP_BYTES;
+        if (groupOffset >= OPENA8DJ_ENGINE_MODE2_CHECK_OFFSET &&
+            groupOffset < OPENA8DJ_ENGINE_MODE2_CHECK_OFFSET + OPENA8DJ_ENGINE_STREAMS) {
+            size_t group = channel / OPENA8DJ_ENGINE_MODE2_GROUP_BYTES;
+            size_t stream = groupOffset - OPENA8DJ_ENGINE_MODE2_CHECK_OFFSET;
+            uint8_t expected = (uint8_t)((stream << 1u) | ((~group) & 1u));
+            EXPECT_TRUE(mode2Out[channel] == expected);
+        } else {
+            EXPECT_TRUE(mode2Out[channel] == 0);
+        }
+    }
+
+    memset(mode2FrameOut, 0, sizeof(mode2FrameOut));
+    OpenA8DJEngineMode2PackerInit(&mode2);
+    EXPECT_TRUE(OpenA8DJEnginePackMode2Output(&mode2,
+                                             &mode2Frames[0][0],
+                                             2,
+                                             mode2FrameOut,
+                                             sizeof(mode2FrameOut)) == sizeof(mode2FrameOut));
+    for (frame = 0; frame < 2; frame++) {
+        for (channel = 0; channel < OPENA8DJ_ENGINE_OUTPUT_CHANNELS; channel++) {
+            OpenA8DJEnginePackS24BE(mode2Frames[frame][channel], packedChannels[frame][channel]);
+        }
+    }
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[0], 0, 4));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[0], 4, 5));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 12, 0));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 16, 1));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 20, 2));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 28, 3));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 32, 4));
+    EXPECT_TRUE(ExpectMode2SampleByte(mode2FrameOut, packedChannels[1], 36, 5));
+    for (channel = 0; channel < OPENA8DJ_ENGINE_STREAMS; channel++) {
+        size_t byteIndex = 40u + channel;
+        size_t group = byteIndex / OPENA8DJ_ENGINE_MODE2_GROUP_BYTES;
+        uint8_t expected = (uint8_t)((channel << 1u) | ((~group) & 1u));
+
+        EXPECT_TRUE(mode2FrameOut[byteIndex] == expected);
+    }
 
     printf("PASS: OpenA8DJ offline audio engine contract\n");
     return 0;

@@ -22,7 +22,10 @@
     <ProjectGuid>{57135ED7-A3B0-4E26-8018-C52BBA7B3979}</ProjectGuid>
     <RootNamespace>OpenA8DJUsb</RootNamespace>
     <TargetName>OpenA8DJUsb</TargetName>
+    <ACX_VERSION_MAJOR>1</ACX_VERSION_MAJOR>
+    <ACX_VERSION_MINOR>0</ACX_VERSION_MINOR>
     <KMDF_VERSION_MAJOR>1</KMDF_VERSION_MAJOR>
+    <KMDF_VERSION_MINOR>31</KMDF_VERSION_MINOR>
     <SupportsPackaging>false</SupportsPackaging>
     <RequiresPackageProject>false</RequiresPackageProject>
     <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
@@ -63,8 +66,10 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
-    <OutDir>$(SolutionDir)dist\$(Configuration)\$(Platform)\</OutDir>
-    <IntDir>$(SolutionDir)obj\$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
+    <OpenA8DJOutRoot Condition="'$(OpenA8DJOutRoot)'==''">$(SolutionDir)dist\</OpenA8DJOutRoot>
+    <OpenA8DJObjRoot Condition="'$(OpenA8DJObjRoot)'==''">$(SolutionDir)obj\</OpenA8DJObjRoot>
+    <OutDir>$(OpenA8DJOutRoot)$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(OpenA8DJObjRoot)$(Configuration)\$(Platform)\$(ProjectName)\</IntDir>
   </PropertyGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
@@ -82,11 +87,13 @@
     <ClCompile>
       <TreatWarningAsError>true</TreatWarningAsError>
       <WarningLevel>Level4</WarningLevel>
+      <AdditionalIncludeDirectories>$(DDK_INC_PATH)\acx\km\$(ACX_VERSION_MAJOR).$(ACX_VERSION_MINOR);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ACX_VERSION_MAJOR=$(ACX_VERSION_MAJOR);ACX_VERSION_MINOR=$(ACX_VERSION_MINOR);ACX_MINIMUM_VERSION_REQUIRED=$(ACX_VERSION_MINOR);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ExceptionHandling>
       </ExceptionHandling>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\usbd.lib</AdditionalDependencies>
+      <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\usbd.lib;$(DDK_LIB_PATH)\ks.lib;$(DDK_LIB_PATH)\acx\km\$(ACX_VERSION_MAJOR).$(ACX_VERSION_MINOR)\acxstub.lib</AdditionalDependencies>
     </Link>
     <DriverSign>
       <FileDigestAlgorithm>sha256</FileDigestAlgorithm>

@@ -11,10 +11,8 @@ def read_wav_mono(path):
         width = wav.getsampwidth()
         rate = wav.getframerate()
         frames = wav.readframes(wav.getnframes())
-    if width != 2:
-        raise SystemExit(f"unsupported sample width: {width * 8} bits")
     samples = []
-    scale = 32768.0
+    scale = float(1 << (width * 8 - 1))
     step = channels * width
     for offset in range(0, len(frames), step):
         acc = 0.0

@@ -27,7 +27,8 @@ $OutputDir = (Resolve-Path $OutputDir).Path
 $required = @(
     "OpenA8DJUsb.inf",
     "OpenA8DJUsb.sys",
-    "OpenA8DJUsb.cat"
+    "OpenA8DJUsb.cat",
+    "OpenA8DJUsb.pdb"
 )
 foreach ($name in $required) {
     $path = Join-Path $PackageDir $name
@@ -43,17 +44,26 @@ if (Test-Path $cabPath) {
     Remove-Item -Path $cabPath -Force
 }
 
+$driverFolderName = "OpenA8DJUsb-$Platform"
 $ddf = @(
     ".OPTION EXPLICIT",
+    ".Set CabinetFileCountThreshold=0",
+    ".Set FolderFileCountThreshold=0",
+    ".Set FolderSizeThreshold=0",
+    ".Set MaxCabinetSize=0",
+    ".Set MaxDiskFileCount=0",
+    ".Set MaxDiskSize=0",
+    ".Set CompressionType=MSZIP",
     ".Set CabinetNameTemplate=$cabName",
     ".Set DiskDirectoryTemplate=`"$($OutputDir.Replace('"', '""'))`"",
     ".Set Cabinet=on",
-    ".Set Compress=on"
+    ".Set Compress=on",
+    ".Set DestinationDir=$driverFolderName"
 )
 foreach ($name in $required) {
     $source = Join-Path $PackageDir $name
     $escapedSource = $source.Replace('"', '""')
-    $ddf += "`"$escapedSource`" $name"
+    $ddf += "`"$escapedSource`""
 }
 $ddf | Set-Content -Path $ddfPath -Encoding ASCII
 
@@ -70,6 +80,7 @@ $manifest = [ordered]@{
     package_dir = $PackageDir
     cab = $cabPath
     cab_sha256 = Get-OpenA8DJFileHashHex -Path $cabPath
+    cab_driver_folder = $driverFolderName
     files = foreach ($name in $required) {
         $path = Join-Path $PackageDir $name
         [ordered]@{
