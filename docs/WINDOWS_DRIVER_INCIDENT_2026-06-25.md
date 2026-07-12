@@ -104,3 +104,31 @@ Use this label for the Windows driver until the incident is resolved:
 ```text
 windows-driver: work in progress, not available for use, unstable, can hang/reboot host
 ```
+
+## 2026-07-12 Offline Hardening Follow-up
+
+The source was hardened offline in local commit `0602672` before any new
+hardware load:
+
+- removed persistent registry writes from ACX real-time callbacks;
+- added a `PASSIVE_LEVEL` guard to the remaining stage recorder;
+- added active-stream locking and `EX_RUNDOWN_REF` protection so the worker
+  cannot use an ACX stream context while its RT packet MDL is being freed.
+
+Verification completed without touching the device:
+
+- WDK Release x64 compile/link: 0 warnings, 0 errors;
+- `ApiValidator`: passed;
+- Windows surface and offline audio-engine contracts: passed;
+- `Inf2Cat`: passed with 0 errors and 0 warnings;
+- test certificate signing and catalog membership verification: passed;
+- attestation CAB export: passed.
+
+The patched package remains unvalidated at kernel runtime. The elevated
+attempt to enable test signing was rejected by Secure Boot with:
+`The value is protected by Secure Boot policy and cannot be modified or
+deleted.` A normal-boot installation therefore requires Microsoft attestation
+or HLK/WHQL signing; disabling Secure Boot is not an acceptable normal-user
+installation path. Do not install, bind, stream, or run Traktor/iRig tests from
+this package until that signing gate and a supervised runtime canary are
+complete.
