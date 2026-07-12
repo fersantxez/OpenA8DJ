@@ -166,9 +166,91 @@ typedef struct _OPENA8DJ_ACX_STREAM_CONTEXT {
     ULONGLONG PositionBlocks;
     ULONGLONG PositionQpc;
     ULONG RenderPrefillFramesRemaining;
+    EX_RUNDOWN_REF WorkerRundown;
+    BOOLEAN WorkerRundownCompleted;
 } OPENA8DJ_ACX_STREAM_CONTEXT, *POPENA8DJ_ACX_STREAM_CONTEXT;
 
 WDF_DECLARE_CONTEXT_TYPE_WITH_NAME(OPENA8DJ_ACX_STREAM_CONTEXT, OpenA8DJGetAcxStreamContext)
+
+static POPENA8DJ_ACX_STREAM_CONTEXT
+OpenA8DJ_AcquireActiveStream(
+    _In_ POPENA8DJ_DEVICE_CONTEXT Context,
+    _In_ volatile PVOID *Slot)
+{
+    KIRQL oldIrql;
+    POPENA8DJ_ACX_STREAM_CONTEXT streamContext;
+
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
+    streamContext = (POPENA8DJ_ACX_STREAM_CONTEXT)*Slot;
+    if (streamContext != NULL &&
+        !ExAcquireRundownProtection(&streamContext->WorkerRundown)) {
+        streamContext = NULL;
+    }
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+    return streamContext;
+}
+
+static VOID
+OpenA8DJ_ReleaseActiveStream(_In_ POPENA8DJ_ACX_STREAM_CONTEXT StreamContext)
+{
+    ExReleaseRundownProtection(&StreamContext->WorkerRundown);
+}
+
+static VOID
+OpenA8DJ_SetActiveStream(
+    _In_ POPENA8DJ_DEVICE_CONTEXT Context,
+    _In_ volatile PVOID *Slot,
+    _In_ POPENA8DJ_ACX_STREAM_CONTEXT StreamContext)
+{
+    KIRQL oldIrql;
+
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
+    *Slot = StreamContext;
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+}
+
+static VOID
+OpenA8DJ_ClearActiveStream(
+    _In_ POPENA8DJ_DEVICE_CONTEXT Context,
+    _In_ volatile PVOID *Slot,
+    _In_ POPENA8DJ_ACX_STREAM_CONTEXT StreamContext)
+{
+    KIRQL oldIrql;
+
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
+    if (*Slot == StreamContext) {
+        *Slot = NULL;
+    }
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+}
+
+static ULONG
+OpenA8DJ_GetActiveRenderMask(_In_ POPENA8DJ_DEVICE_CONTEXT Context)
+{
+    KIRQL oldIrql;
+    ULONG mask = 0;
+    ULONG pairIndex;
+
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
+    for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
+        if (Context->ActiveRenderStreams[pairIndex] != NULL) {
+            mask |= (1u << pairIndex);
+        }
+    }
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+    return mask;
+}
+
+static VOID
+OpenA8DJ_ClearAllActiveStreams(_In_ POPENA8DJ_DEVICE_CONTEXT Context)
+{
+    KIRQL oldIrql;
+
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
+    RtlZeroMemory((PVOID)Context->ActiveRenderStreams, sizeof(Context->ActiveRenderStreams));
+    RtlZeroMemory((PVOID)Context->ActiveCaptureStreams, sizeof(Context->ActiveCaptureStreams));
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+}
 
 #if OPENA8DJ_ENABLE_ASYNC_OUTPUT
 typedef struct _OPENA8DJ_ASYNC_ISO_OUTPUT_SLOT {
@@ -209,6 +291,10 @@ OpenA8DJ_RecordAcxStage(_In_ ULONG Stage, _In_ NTSTATUS Status)
 {
     UNICODE_STRING path;
     ULONG statusValue = (ULONG)Status;
+
+    if (KeGetCurrentIrql() != PASSIVE_LEVEL) {
+        return;
+    }
 
     RtlInitUnicodeString(&path, L"OpenA8DJUsbAcx\\Parameters");
     (VOID)RtlWriteRegistryValue(
@@ -300,6 +386,7 @@ OpenA8DJ_InitializeDefaults(_Inout_ POPENA8DJ_DEVICE_CONTEXT Context)
     Context->StreamWorkItem = NULL;
     RtlZeroMemory(Context->RenderCircuits, sizeof(Context->RenderCircuits));
     RtlZeroMemory(Context->CaptureCircuits, sizeof(Context->CaptureCircuits));
+    KeInitializeSpinLock(&Context->ActiveStreamLock);
     RtlZeroMemory((PVOID)Context->ActiveRenderStreams, sizeof(Context->ActiveRenderStreams));
     RtlZeroMemory((PVOID)Context->ActiveCaptureStreams, sizeof(Context->ActiveCaptureStreams));
     Context->StreamStopRequested = 1;
@@ -373,18 +460,22 @@ OpenA8DJ_InitializeDefaults(_Inout_ POPENA8DJ_DEVICE_CONTEXT Context)
 }
 
 static BOOLEAN
-OpenA8DJ_HasActiveAcxStreams(_In_ const OPENA8DJ_DEVICE_CONTEXT *Context)
+OpenA8DJ_HasActiveAcxStreams(_In_ POPENA8DJ_DEVICE_CONTEXT Context)
 {
+    KIRQL oldIrql;
+    BOOLEAN active = FALSE;
     ULONG pairIndex;
 
+    KeAcquireSpinLock(&Context->ActiveStreamLock, &oldIrql);
     for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
         if (Context->ActiveRenderStreams[pairIndex] != NULL ||
             Context->ActiveCaptureStreams[pairIndex] != NULL) {
-            return TRUE;
+            active = TRUE;
+            break;
         }
     }
-
-    return FALSE;
+    KeReleaseSpinLock(&Context->ActiveStreamLock, oldIrql);
+    return active;
 }
 
 static VOID
@@ -541,9 +632,15 @@ OpenA8DJ_EvtAcxStreamRun(
             streamContext->RenderPrefillFramesRemaining =
                 streamContext->IsRender ? OPENA8DJ_RT_RENDER_PREFILL_FRAMES : 0u;
             if (streamContext->IsRender) {
-                deviceContext->ActiveRenderStreams[streamContext->PairIndex] = streamContext;
+                OpenA8DJ_SetActiveStream(
+                    deviceContext,
+                    &deviceContext->ActiveRenderStreams[streamContext->PairIndex],
+                    streamContext);
             } else {
-                deviceContext->ActiveCaptureStreams[streamContext->PairIndex] = streamContext;
+                OpenA8DJ_SetActiveStream(
+                    deviceContext,
+                    &deviceContext->ActiveCaptureStreams[streamContext->PairIndex],
+                    streamContext);
             }
             InterlockedExchange(&deviceContext->StreamStopRequested, 0);
             if (InterlockedCompareExchange(&deviceContext->StreamWorkerActive, 1, 0) == 0) {
@@ -565,13 +662,15 @@ OpenA8DJ_EvtAcxStreamPause(
     if (streamContext->DeviceContext != NULL) {
         InterlockedIncrement64(&streamContext->DeviceContext->AcxPauseCallbacks);
         if (streamContext->IsRender) {
-            if (streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex] == streamContext) {
-                streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex] = NULL;
-            }
+            OpenA8DJ_ClearActiveStream(
+                streamContext->DeviceContext,
+                &streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex],
+                streamContext);
         } else {
-            if (streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex] == streamContext) {
-                streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex] = NULL;
-            }
+            OpenA8DJ_ClearActiveStream(
+                streamContext->DeviceContext,
+                &streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex],
+                streamContext);
         }
         if (!OpenA8DJ_HasActiveAcxStreams(streamContext->DeviceContext)) {
             InterlockedExchange(&streamContext->DeviceContext->StreamStopRequested, 1);
@@ -604,7 +703,6 @@ OpenA8DJ_EvtAcxStreamGetHwLatency(
     }
     *Delay = (ULONG)(((ULONGLONG)OPENA8DJ_HW_LATENCY_FRAMES * 10000000ull) / OPENA8DJ_DEFAULT_SAMPLE_RATE);
 #endif
-    OpenA8DJ_RecordAcxStage(420, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -631,12 +729,14 @@ OpenA8DJ_EvtAcxStreamAllocateRtPackets(
         InterlockedIncrement64(&streamContext->DeviceContext->AcxAllocatePacketCallbacks);
     }
     if (PacketCount == 0 || PacketCount > 2 || PacketSize == 0) {
-        OpenA8DJ_RecordAcxStage(421, STATUS_INVALID_PARAMETER);
         return STATUS_INVALID_PARAMETER;
     }
     if (PacketSize > (ULONG)(MAXULONG / PacketCount)) {
-        OpenA8DJ_RecordAcxStage(421, STATUS_INTEGER_OVERFLOW);
         return STATUS_INTEGER_OVERFLOW;
+    }
+    if (streamContext->WorkerRundownCompleted) {
+        ExReInitializeRundownProtection(&streamContext->WorkerRundown);
+        streamContext->WorkerRundownCompleted = FALSE;
     }
 
     rawBytes = PacketCount * PacketSize;
@@ -646,7 +746,6 @@ OpenA8DJ_EvtAcxStreamAllocateRtPackets(
         sizeof(ACX_RTPACKET) * PacketCount,
         OPENA8DJ_POOL_TAG);
     if (packets == NULL) {
-        OpenA8DJ_RecordAcxStage(421, STATUS_INSUFFICIENT_RESOURCES);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
 
@@ -662,7 +761,6 @@ OpenA8DJ_EvtAcxStreamAllocateRtPackets(
         MM_ALLOCATE_FULLY_REQUIRED);
     if (streamContext->RtMdl == NULL) {
         ExFreePoolWithTag(packets, OPENA8DJ_POOL_TAG);
-        OpenA8DJ_RecordAcxStage(421, STATUS_INSUFFICIENT_RESOURCES);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
     streamContext->RtKernelAddress = MmGetSystemAddressForMdlSafe(
@@ -673,7 +771,6 @@ OpenA8DJ_EvtAcxStreamAllocateRtPackets(
         ExFreePool(streamContext->RtMdl);
         streamContext->RtMdl = NULL;
         ExFreePoolWithTag(packets, OPENA8DJ_POOL_TAG);
-        OpenA8DJ_RecordAcxStage(421, STATUS_INSUFFICIENT_RESOURCES);
         return STATUS_INSUFFICIENT_RESOURCES;
     }
     RtlZeroMemory(streamContext->RtKernelAddress, totalBytes);
@@ -717,7 +814,6 @@ OpenA8DJ_EvtAcxStreamAllocateRtPackets(
     streamContext->RenderPrefillFramesRemaining = 0;
     *Packets = packets;
 
-    OpenA8DJ_RecordAcxStage(421, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -734,27 +830,22 @@ OpenA8DJ_EvtAcxStreamFreeRtPackets(
 
     streamContext = OpenA8DJGetAcxStreamContext(Stream);
     if (streamContext->DeviceContext != NULL) {
-        ULONG waitIndex;
-
         InterlockedIncrement64(&streamContext->DeviceContext->AcxFreePacketCallbacks);
-        if (streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex] == streamContext) {
-            streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex] = NULL;
-        }
-        if (streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex] == streamContext) {
-            streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex] = NULL;
-        }
+        OpenA8DJ_ClearActiveStream(
+            streamContext->DeviceContext,
+            &streamContext->DeviceContext->ActiveRenderStreams[streamContext->PairIndex],
+            streamContext);
+        OpenA8DJ_ClearActiveStream(
+            streamContext->DeviceContext,
+            &streamContext->DeviceContext->ActiveCaptureStreams[streamContext->PairIndex],
+            streamContext);
         if (!OpenA8DJ_HasActiveAcxStreams(streamContext->DeviceContext)) {
             InterlockedExchange(&streamContext->DeviceContext->StreamStopRequested, 1);
         }
-        for (waitIndex = 0;
-             waitIndex < 250u &&
-             InterlockedCompareExchange(&streamContext->DeviceContext->StreamWorkerActive, 0, 0) != 0 &&
-             !OpenA8DJ_HasActiveAcxStreams(streamContext->DeviceContext);
-             waitIndex++) {
-            LARGE_INTEGER delay;
-            delay.QuadPart = WDF_REL_TIMEOUT_IN_MS(1);
-            KeDelayExecutionThread(KernelMode, FALSE, &delay);
-        }
+    }
+    if (!streamContext->WorkerRundownCompleted) {
+        ExWaitForRundownProtectionRelease(&streamContext->WorkerRundown);
+        streamContext->WorkerRundownCompleted = TRUE;
     }
     if (streamContext->RtMdl != NULL) {
         MmFreePagesFromMdl(streamContext->RtMdl);
@@ -770,7 +861,6 @@ OpenA8DJ_EvtAcxStreamFreeRtPackets(
     streamContext->RtPacketSize = 0;
     streamContext->RtBufferBytes = 0;
     streamContext->RtFrameCount = 0;
-    OpenA8DJ_RecordAcxStage(422, STATUS_SUCCESS);
 }
 
 static NTSTATUS
@@ -792,7 +882,6 @@ OpenA8DJ_EvtAcxStreamSetRenderPacket(
         streamContext->DeviceContext->AcxLastSetRenderFlags = Flags;
         streamContext->DeviceContext->AcxLastSetRenderEosPacketLength = EosPacketLength;
     }
-    OpenA8DJ_RecordAcxStage(423, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -809,7 +898,6 @@ OpenA8DJ_EvtAcxStreamGetCurrentPacket(
         InterlockedIncrement64(&streamContext->DeviceContext->AcxGetCurrentPacketCallbacks);
     }
     *CurrentPacket = streamContext->CurrentPacket;
-    OpenA8DJ_RecordAcxStage(424, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -832,7 +920,6 @@ OpenA8DJ_EvtAcxStreamGetCapturePacket(
     *LastCapturePacket = streamContext->LastCompletedPacket;
     *QPCPacketStart = (ULONGLONG)qpc.QuadPart;
     *MoreData = FALSE;
-    OpenA8DJ_RecordAcxStage(425, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -855,7 +942,6 @@ OpenA8DJ_EvtAcxStreamGetPresentationPosition(
     *QPCPosition = streamContext->PositionQpc != 0 ?
         streamContext->PositionQpc :
         (ULONGLONG)qpc.QuadPart;
-    OpenA8DJ_RecordAcxStage(426, STATUS_SUCCESS);
     return STATUS_SUCCESS;
 }
 
@@ -947,6 +1033,8 @@ OpenA8DJ_EvtCircuitCreateStream(
     streamContext->Stream = stream;
     streamContext->IsRender = isRender;
     streamContext->PairIndex = pairIndex;
+    ExInitializeRundownProtection(&streamContext->WorkerRundown);
+    streamContext->WorkerRundownCompleted = FALSE;
     streamContext->RtChannels = AcxDataFormatGetChannelsCount(StreamFormat);
     streamContext->RtBlockAlign = AcxDataFormatGetBlockAlign(StreamFormat);
     streamContext->RtBitsPerSample = AcxDataFormatGetBitsPerSample(StreamFormat);
@@ -1459,9 +1547,6 @@ OpenA8DJ_FillDiagnostics(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ_
 static VOID
 OpenA8DJ_FillRenderTrace(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ_RENDER_TRACE Trace)
 {
-    ULONG index;
-    ULONG activeRenderMask = 0;
-
     RtlZeroMemory(Trace, sizeof(*Trace));
     Trace->Size = sizeof(*Trace);
     Trace->FrameCount = OPENA8DJ_RENDER_TRACE_FRAME_COUNT;
@@ -1471,12 +1556,7 @@ OpenA8DJ_FillRenderTrace(_In_ POPENA8DJ_DEVICE_CONTEXT Context, _Out_ POPENA8DJ_
     Trace->RtBlockAlign = Context->AcxRtBlockAlign;
     Trace->RtBitsPerSample = Context->AcxRtBitsPerSample;
     Trace->RtFrameCount = Context->AcxRtFrameCount;
-    for (index = 0; index < OPENA8DJ_STEREO_PAIRS; index++) {
-        if (Context->ActiveRenderStreams[index] != NULL) {
-            activeRenderMask |= (1u << index);
-        }
-    }
-    Trace->ActiveRenderMask = activeRenderMask;
+    Trace->ActiveRenderMask = OpenA8DJ_GetActiveRenderMask(Context);
     RtlCopyMemory(Trace->Frames, Context->RenderTraceFrames, sizeof(Trace->Frames));
 }
 
@@ -2563,20 +2643,25 @@ OpenA8DJ_FillMode2FromActiveRtRenders(
     _In_ ULONG Length)
 {
     ULONG index = 0;
-    POPENA8DJ_ACX_STREAM_CONTEXT primaryStream =
-        (POPENA8DJ_ACX_STREAM_CONTEXT)Context->ActiveRenderStreams[0];
+    ULONG pairIndex;
+    POPENA8DJ_ACX_STREAM_CONTEXT streams[OPENA8DJ_STEREO_PAIRS] = { NULL };
 
-    if (primaryStream != NULL &&
-        primaryStream->RtKernelAddress != NULL &&
-        primaryStream->RtFrameCount != 0 &&
-        primaryStream->RtChannels > 2u) {
-        OpenA8DJ_FillMode2FromRtRender(Buffer, Length, primaryStream);
-        return;
+    for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
+        streams[pairIndex] = OpenA8DJ_AcquireActiveStream(
+            Context,
+            &Context->ActiveRenderStreams[pairIndex]);
+    }
+
+    if (streams[0] != NULL &&
+        streams[0]->RtKernelAddress != NULL &&
+        streams[0]->RtFrameCount != 0 &&
+        streams[0]->RtChannels > 2u) {
+        OpenA8DJ_FillMode2FromRtRender(Buffer, Length, streams[0]);
+        goto release_streams;
     }
 
     for (index = 0; index < OPENA8DJ_STEREO_PAIRS; index++) {
-        POPENA8DJ_ACX_STREAM_CONTEXT streamContext =
-            (POPENA8DJ_ACX_STREAM_CONTEXT)Context->ActiveRenderStreams[index];
+        POPENA8DJ_ACX_STREAM_CONTEXT streamContext = streams[index];
 
         if (streamContext != NULL) {
             streamContext->RenderTransferFrameIndex = 0;
@@ -2585,7 +2670,6 @@ OpenA8DJ_FillMode2FromActiveRtRenders(
     index = 0;
     while (index < Length) {
         ULONG groupOffset = index % 16u;
-        ULONG pairIndex;
 
         if (groupOffset == 8u) {
             for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS && index < Length; pairIndex++) {
@@ -2596,8 +2680,7 @@ OpenA8DJ_FillMode2FromActiveRtRenders(
         }
 
         for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS && index < Length; pairIndex++) {
-            POPENA8DJ_ACX_STREAM_CONTEXT streamContext =
-                (POPENA8DJ_ACX_STREAM_CONTEXT)Context->ActiveRenderStreams[pairIndex];
+            POPENA8DJ_ACX_STREAM_CONTEXT streamContext = streams[pairIndex];
 
             if (streamContext != NULL &&
                 streamContext->RtKernelAddress != NULL &&
@@ -2617,8 +2700,7 @@ OpenA8DJ_FillMode2FromActiveRtRenders(
         }
 
         for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
-            POPENA8DJ_ACX_STREAM_CONTEXT streamContext =
-                (POPENA8DJ_ACX_STREAM_CONTEXT)Context->ActiveRenderStreams[pairIndex];
+            POPENA8DJ_ACX_STREAM_CONTEXT streamContext = streams[pairIndex];
 
             if (streamContext != NULL &&
                 streamContext->RtKernelAddress != NULL &&
@@ -2631,13 +2713,19 @@ OpenA8DJ_FillMode2FromActiveRtRenders(
         }
     }
     for (index = 0; index < OPENA8DJ_STEREO_PAIRS; index++) {
-        POPENA8DJ_ACX_STREAM_CONTEXT streamContext =
-            (POPENA8DJ_ACX_STREAM_CONTEXT)Context->ActiveRenderStreams[index];
+        POPENA8DJ_ACX_STREAM_CONTEXT streamContext = streams[index];
 
         if (streamContext != NULL &&
             streamContext->RtKernelAddress != NULL &&
             streamContext->RtFrameCount != 0) {
             OpenA8DJ_UpdateStreamPositionQpc(streamContext);
+        }
+    }
+
+release_streams:
+    for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
+        if (streams[pairIndex] != NULL) {
+            OpenA8DJ_ReleaseActiveStream(streams[pairIndex]);
         }
     }
 }
@@ -3370,7 +3458,9 @@ OpenA8DJ_EvtStreamWorkItem(_In_ WDFWORKITEM WorkItem)
         if (capturePayloadBytes != 0) {
             for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
                 POPENA8DJ_ACX_STREAM_CONTEXT activeCaptureStream =
-                    (POPENA8DJ_ACX_STREAM_CONTEXT)context->ActiveCaptureStreams[pairIndex];
+                    OpenA8DJ_AcquireActiveStream(
+                        context,
+                        &context->ActiveCaptureStreams[pairIndex]);
 
                 if (activeCaptureStream != NULL &&
                     activeCaptureStream->RtKernelAddress != NULL &&
@@ -3396,21 +3486,14 @@ OpenA8DJ_EvtStreamWorkItem(_In_ WDFWORKITEM WorkItem)
                         context->StreamState.CaptureFramesDelivered += framesWritten;
                     }
                 }
+                if (activeCaptureStream != NULL) {
+                    OpenA8DJ_ReleaseActiveStream(activeCaptureStream);
+                }
             }
         }
 
-        hasActiveRenderStream = FALSE;
-        for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
-            POPENA8DJ_ACX_STREAM_CONTEXT activeRenderStream =
-                (POPENA8DJ_ACX_STREAM_CONTEXT)context->ActiveRenderStreams[pairIndex];
-
-            if (activeRenderStream != NULL &&
-                activeRenderStream->RtKernelAddress != NULL &&
-                activeRenderStream->RtFrameCount != 0) {
-                hasActiveRenderStream = TRUE;
-                activeRenderMask |= (1u << pairIndex);
-            }
-        }
+        activeRenderMask = OpenA8DJ_GetActiveRenderMask(context);
+        hasActiveRenderStream = activeRenderMask != 0;
         if (hasActiveRenderStream) {
 #if OPENA8DJ_DEBUG_STREAM_TONE
             OPENA8DJ_MODE2_TONE_PACKER debugTonePacker;
@@ -3427,13 +3510,18 @@ OpenA8DJ_EvtStreamWorkItem(_In_ WDFWORKITEM WorkItem)
                 48);
             for (pairIndex = 0; pairIndex < OPENA8DJ_STEREO_PAIRS; pairIndex++) {
                 POPENA8DJ_ACX_STREAM_CONTEXT streamContext =
-                    (POPENA8DJ_ACX_STREAM_CONTEXT)context->ActiveRenderStreams[pairIndex];
+                    OpenA8DJ_AcquireActiveStream(
+                        context,
+                        &context->ActiveRenderStreams[pairIndex]);
 
                 if (streamContext != NULL &&
                     streamContext->RtKernelAddress != NULL &&
                     streamContext->RtFrameCount != 0) {
                     streamContext->PositionBlocks += debugFramesRendered;
                     OpenA8DJ_UpdateStreamPositionQpc(streamContext);
+                }
+                if (streamContext != NULL) {
+                    OpenA8DJ_ReleaseActiveStream(streamContext);
                 }
             }
 #else
@@ -3532,8 +3620,7 @@ OpenA8DJ_EvtStreamWorkItem(_In_ WDFWORKITEM WorkItem)
     ExFreePoolWithTag(captureTransferBuffer, OPENA8DJ_POOL_TAG);
     ExFreePoolWithTag(playbackBuffer, OPENA8DJ_POOL_TAG);
     context->StreamState.Streaming = FALSE;
-    RtlZeroMemory((PVOID)context->ActiveRenderStreams, sizeof(context->ActiveRenderStreams));
-    RtlZeroMemory((PVOID)context->ActiveCaptureStreams, sizeof(context->ActiveCaptureStreams));
+    OpenA8DJ_ClearAllActiveStreams(context);
     InterlockedExchange(&context->StreamWorkerActive, 0);
 }
 

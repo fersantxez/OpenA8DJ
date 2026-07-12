@@ -31,6 +31,7 @@ typedef struct _OPENA8DJ_DEVICE_CONTEXT {
     WDFWORKITEM StreamWorkItem;
     ACXCIRCUIT RenderCircuits[OPENA8DJ_STEREO_PAIRS];
     ACXCIRCUIT CaptureCircuits[OPENA8DJ_STEREO_PAIRS];
+    KSPIN_LOCK ActiveStreamLock;
     volatile PVOID ActiveRenderStreams[OPENA8DJ_STEREO_PAIRS];
     volatile PVOID ActiveCaptureStreams[OPENA8DJ_STEREO_PAIRS];
     volatile LONG StreamStopRequested;
