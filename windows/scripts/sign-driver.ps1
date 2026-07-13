@@ -116,3 +116,15 @@ $manifest = [ordered]@{
 $manifestPath = Join-Path $PackageDir "signing-manifest.json"
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path $manifestPath -Encoding ASCII
 Write-Host "Signing manifest written to $manifestPath"
+
+$packageManifestPath = Join-Path $PackageDir "package-manifest.json"
+if (-not (Test-Path -LiteralPath $packageManifestPath)) {
+    throw "Package manifest must exist before signing: $packageManifestPath"
+}
+$packageManifest = Get-Content -LiteralPath $packageManifestPath -Raw | ConvertFrom-Json
+$packageManifestPath = New-OpenA8DJPackageManifest `
+    -PackageDir $PackageDir `
+    -Configuration $Configuration `
+    -Platform $Platform `
+    -BuildFingerprint ([string]$packageManifest.build_fingerprint)
+Write-Host "Package manifest refreshed after signing: $packageManifestPath"

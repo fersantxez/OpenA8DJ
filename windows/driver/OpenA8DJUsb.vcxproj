@@ -91,6 +91,10 @@
       <PreprocessorDefinitions>ACX_VERSION_MAJOR=$(ACX_VERSION_MAJOR);ACX_VERSION_MINOR=$(ACX_VERSION_MINOR);ACX_MINIMUM_VERSION_REQUIRED=$(ACX_VERSION_MINOR);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ExceptionHandling>
       </ExceptionHandling>
+      <WppEnabled>true</WppEnabled>
+      <WppKernelMode>true</WppKernelMode>
+      <WppRecorderEnabled>true</WppRecorderEnabled>
+      <WppScanConfigurationData>Trace.h</WppScanConfigurationData>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies);$(DDK_LIB_PATH)\usbd.lib;$(DDK_LIB_PATH)\ks.lib;$(DDK_LIB_PATH)\acx\km\$(ACX_VERSION_MAJOR).$(ACX_VERSION_MINOR)\acxstub.lib</AdditionalDependencies>
@@ -104,6 +108,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenA8DJUsb.h" />
+    <ClInclude Include="OpenA8DJBuildIdentity.h" />
+    <ClInclude Include="Trace.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="OpenA8DJUsb.inf" />

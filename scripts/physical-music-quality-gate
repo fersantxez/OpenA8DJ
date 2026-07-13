@@ -40,9 +40,74 @@ def verify_irig_route(run_dir):
     errors = []
     if run_dir is None:
         return ["iRig route cannot be verified without --run-dir"]
-    record_log = resolve(run_dir) / "record.log"
+    run_path = resolve(run_dir)
+    route_proof = run_path / "route-proof.json"
+    if route_proof.exists():
+        try:
+            proof = load_json(route_proof)
+        except (OSError, ValueError) as error:
+            return [f"invalid route-proof.json: {error}"]
+        if proof.get("platform") != "windows":
+            return ["route-proof.json platform is not windows"]
+        if not proof.get("capture_is_irig_stream"):
+            return ["route-proof.json does not prove iRig Stream capture"]
+        if not proof.get("render_is_audio_8_dj"):
+            return ["route-proof.json does not prove Audio 8 DJ rendering"]
+        if not proof.get("capture_name_exact") or proof.get("capture_device") != "Line In (iRig Stream)":
+            return ["route-proof.json capture name is not the exact iRig Stream endpoint"]
+        if not proof.get("render_name_exact") or proof.get("render_device") != "Audio 8 DJ (8ch Out) (Audio 8 DJ)":
+            return ["route-proof.json render name is not the exact Audio 8 DJ aggregate endpoint"]
+        if proof.get("capture_hostapi") != "Windows DirectSound":
+            return ["route-proof.json capture host API is not Windows DirectSound"]
+        if proof.get("render_hostapi") != "Windows WASAPI":
+            return ["route-proof.json render host API is not Windows WASAPI"]
+        hardware_proof_path = run_path / "hardware-route-preflight.json"
+        if not hardware_proof_path.exists():
+            return ["missing Windows hardware-route-preflight.json"]
+        try:
+            hardware_proof = load_json(hardware_proof_path)
+        except (OSError, ValueError) as error:
+            return [f"invalid hardware-route-preflight.json: {error}"]
+        if hardware_proof.get("schema_version") != 2:
+            return ["hardware-route-preflight.json schema is not the container-bound version 2"]
+        for key in (
+            "audio8_usb_present_ok",
+            "irig_usb_present_ok",
+            "audio8_render_endpoint_present_ok",
+            "irig_capture_endpoint_present_ok",
+            "audio8_endpoint_matches_usb_container",
+            "irig_endpoint_matches_usb_container",
+        ):
+            if not hardware_proof.get(key):
+                return [f"hardware-route-preflight.json does not prove {key}"]
+        audio8_ids = hardware_proof.get("audio8_usb_instance_ids", [])
+        irig_ids = hardware_proof.get("irig_usb_instance_ids", [])
+        if isinstance(audio8_ids, str):
+            audio8_ids = [audio8_ids]
+        if isinstance(irig_ids, str):
+            irig_ids = [irig_ids]
+        if not any(str(value).upper().startswith("USB\\VID_17CC&PID_1978") for value in audio8_ids):
+            return ["hardware-route-preflight.json lacks the Audio 8 DJ USB instance"]
+        if not any(str(value).upper().startswith("USB\\VID_1963&PID_0059") for value in irig_ids):
+            return ["hardware-route-preflight.json lacks the iRig Stream USB instance"]
+        if len(audio8_ids) != 1 or len(irig_ids) != 1:
+            return ["hardware-route-preflight.json does not prove unique USB devices"]
+        for endpoint_key, usb_key, label in (
+            ("audio8_render_container_id", "audio8_usb_container_id", "Audio 8 DJ"),
+            ("irig_capture_container_id", "irig_usb_container_id", "iRig Stream"),
+        ):
+            endpoint_container = str(hardware_proof.get(endpoint_key, "")).upper()
+            usb_container = str(hardware_proof.get(usb_key, "")).upper()
+            if not endpoint_container or endpoint_container != usb_container:
+                return [f"hardware-route-preflight.json does not bind the {label} endpoint to its USB container"]
+        return []
+
+    record_log = run_path / "record.log"
     if not record_log.exists():
-        return [f"missing record.log for iRig route proof: {record_log}"]
+        return [
+            "missing physical route proof: expected Windows route-proof.json "
+            f"or macOS record.log under {run_path}"
+        ]
     text = record_log.read_text(encoding="utf-8", errors="replace")
     if 'device="iRig Stream"' not in text:
         errors.append("record.log does not prove capture device is iRig Stream")
@@ -126,6 +191,7 @@ def add_cpu_summary_metrics(metrics, cpu_rows):
         "coreaudiod",
         "total_audio_ui",
         "windowserver",
+        "system_cpu",
     )
     for column in columns:
         values = [row[column] for row in cpu_rows if column in row]
@@ -137,8 +203,106 @@ def add_cpu_summary_metrics(metrics, cpu_rows):
 
 
 def load_json(path):
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, "r", encoding="utf-8-sig") as handle:
         return json.load(handle)
+
+
+def windows_probe_value(probe, *names, default=0.0):
+    for name in names:
+        if name in probe:
+            return metric(probe, name, default)
+    return default
+
+
+def windows_two_clock_verdict(metrics, probe, baseline, args):
+    errors = []
+    warnings = [
+        "Windows two-clock mode: Mac time-warp/residual metrics are diagnostic because Audio 8 DJ render and iRig capture have independent USB clocks"
+    ]
+    alignment = windows_probe_value(
+        probe, "aligned_alignment_score_mono", "alignment_score_mono"
+    )
+    snr = windows_probe_value(probe, "aligned_min_snr_db", "min_snr_db", default=-240.0)
+    aligned_clicks = int(
+        windows_probe_value(
+            probe, "aligned_click_outliers_total", "click_outliers_total", default=999999
+        )
+    )
+    raw_clicks = int(windows_probe_value(probe, "raw_click_outliers", default=999999))
+    dropouts = int(
+        windows_probe_value(
+            probe, "aligned_dropout_windows_total", "dropout_windows_total", default=999999
+        )
+    )
+    peak = metric(metrics, "capture_peak", 0.0)
+    rms_dbfs = metric(metrics, "capture_rms_dbfs", -240.0)
+
+    metrics["mac_time_warp_quality_alignment_score"] = metric(
+        metrics, "quality_alignment_score", 0.0
+    )
+    metrics["quality_alignment_score"] = alignment
+    metrics["windows_two_clock_min_snr_db"] = snr
+    metrics["windows_two_clock_aligned_clicks"] = aligned_clicks
+    metrics["windows_two_clock_raw_clicks"] = raw_clicks
+    metrics["windows_two_clock_dropout_windows"] = dropouts
+    metrics["physical_route_integrity"] = "VALID_SIGNAL"
+    metrics["windows_two_clock_mode"] = True
+
+    fail_if(errors, alignment < args.min_alignment,
+            f"Windows alignment={alignment:.6f} < {args.min_alignment:.6f}")
+    fail_if(errors, snr < args.min_windows_snr_db,
+            f"Windows minimum SNR={snr:.3f} dB < {args.min_windows_snr_db:.3f} dB")
+    fail_if(errors, raw_clicks > args.max_windows_raw_clicks,
+            f"Windows raw click outliers={raw_clicks} > {args.max_windows_raw_clicks}")
+    if aligned_clicks > args.max_windows_aligned_clicks:
+        warnings.append(
+            f"Windows aligned click outliers={aligned_clicks} > "
+            f"{args.max_windows_aligned_clicks}; diagnostic only in two-clock mode "
+            f"because raw click outliers={raw_clicks}"
+        )
+    fail_if(errors, dropouts > args.max_windows_dropouts,
+            f"Windows dropout windows={dropouts} > {args.max_windows_dropouts}")
+    fail_if(errors, peak < args.min_capture_peak or peak > args.max_capture_peak,
+            f"Windows capture peak={peak:.6f} outside [{args.min_capture_peak:.6f}, {args.max_capture_peak:.6f}]")
+    fail_if(errors, rms_dbfs < args.min_windows_capture_rms_dbfs or rms_dbfs > args.max_capture_rms_dbfs,
+            f"Windows capture RMS={rms_dbfs:.2f} dBFS outside [{args.min_windows_capture_rms_dbfs:.2f}, {args.max_capture_rms_dbfs:.2f}]")
+    fail_if(errors, int(metric(metrics, "capture_clipped_frames_full", 0.0)) != 0,
+            "Windows capture contains clipped frames")
+    fail_if(errors, not bool(probe.get("playback_complete", False)),
+            "Windows playback did not complete")
+    fail_if(errors, not bool(probe.get("capture_complete", False)),
+            "Windows capture did not complete")
+    fail_if(errors, int(metric(probe, "status_event_count", 0.0)) != 0,
+            "Windows PortAudio status events were reported")
+    fail_if(errors, bool(probe.get("callback_watchdog_expired", False)),
+            "Windows callback watchdog expired")
+    fail_if(errors, metric(metrics, "cpu_system_cpu_avg", 1000.0) > 95.0,
+            "Windows average system CPU exceeded 95 percent")
+    fail_if(errors, metric(metrics, "cpu_system_cpu_p95", 1000.0) > 100.0,
+            "Windows p95 system CPU exceeded 100 percent")
+
+    if baseline:
+        baseline_alignment = windows_probe_value(
+            baseline, "aligned_alignment_score_mono", "alignment_score_mono"
+        )
+        baseline_snr = windows_probe_value(
+            baseline, "aligned_min_snr_db", "min_snr_db", default=-240.0
+        )
+        baseline_raw_clicks = int(
+            windows_probe_value(baseline, "raw_click_outliers", default=0)
+        )
+        fail_if(errors, alignment < baseline_alignment - args.windows_alignment_slack,
+                f"Windows alignment={alignment:.6f} is more than {args.windows_alignment_slack:.3f} below commercial baseline={baseline_alignment:.6f}")
+        fail_if(errors, snr < baseline_snr - args.windows_snr_slack_db,
+                f"Windows SNR={snr:.3f} dB is more than {args.windows_snr_slack_db:.3f} dB below commercial baseline={baseline_snr:.3f} dB")
+        fail_if(errors, raw_clicks > baseline_raw_clicks,
+                f"Windows raw clicks={raw_clicks} exceed commercial baseline={baseline_raw_clicks}")
+        metrics["windows_commercial_alignment"] = baseline_alignment
+        metrics["windows_commercial_min_snr_db"] = baseline_snr
+        metrics["windows_commercial_raw_clicks"] = baseline_raw_clicks
+    else:
+        warnings.append("no Windows commercial probe baseline supplied")
+    return not errors, errors, warnings
 
 
 def fail_if(errors, condition, message):
@@ -301,15 +465,26 @@ def verdict(metrics, baseline, args):
         fail_if(errors,
                 cpu_corr > args.max_mid_band_cpu_corr,
                 f"mid_band_cpu_corr_max={cpu_corr:.6f} > {args.max_mid_band_cpu_corr:.6f}")
-        fail_if(errors,
-                metric(metrics, "cpu_opena8dj_driver_avg", 0.0) > args.max_driver_cpu_avg,
-                f"cpu_opena8dj_driver_avg={metric(metrics, 'cpu_opena8dj_driver_avg', 0.0):.2f} > {args.max_driver_cpu_avg:.2f}")
-        fail_if(errors,
-                metric(metrics, "cpu_opena8dj_driver_p95", 0.0) > args.max_driver_cpu_p95,
-                f"cpu_opena8dj_driver_p95={metric(metrics, 'cpu_opena8dj_driver_p95', 0.0):.2f} > {args.max_driver_cpu_p95:.2f}")
-        fail_if(errors,
-                metric(metrics, "cpu_coreaudiod_p95", 0.0) > args.max_coreaudiod_cpu_p95,
-                f"cpu_coreaudiod_p95={metric(metrics, 'cpu_coreaudiod_p95', 0.0):.2f} > {args.max_coreaudiod_cpu_p95:.2f}")
+        if metrics.get("platform") == "windows":
+            fail_if(errors,
+                    "cpu_system_cpu_avg" not in metrics or "cpu_system_cpu_p95" not in metrics,
+                    "Windows CPU profile is missing required system_cpu summary metrics")
+            fail_if(errors,
+                    metric(metrics, "cpu_system_cpu_avg", 999.0) > args.max_system_cpu_avg,
+                    f"cpu_system_cpu_avg={metric(metrics, 'cpu_system_cpu_avg', 999.0):.2f} > {args.max_system_cpu_avg:.2f}")
+            fail_if(errors,
+                    metric(metrics, "cpu_system_cpu_p95", 999.0) > args.max_system_cpu_p95,
+                    f"cpu_system_cpu_p95={metric(metrics, 'cpu_system_cpu_p95', 999.0):.2f} > {args.max_system_cpu_p95:.2f}")
+        else:
+            fail_if(errors,
+                    metric(metrics, "cpu_opena8dj_driver_avg", 0.0) > args.max_driver_cpu_avg,
+                    f"cpu_opena8dj_driver_avg={metric(metrics, 'cpu_opena8dj_driver_avg', 0.0):.2f} > {args.max_driver_cpu_avg:.2f}")
+            fail_if(errors,
+                    metric(metrics, "cpu_opena8dj_driver_p95", 0.0) > args.max_driver_cpu_p95,
+                    f"cpu_opena8dj_driver_p95={metric(metrics, 'cpu_opena8dj_driver_p95', 0.0):.2f} > {args.max_driver_cpu_p95:.2f}")
+            fail_if(errors,
+                    metric(metrics, "cpu_coreaudiod_p95", 0.0) > args.max_coreaudiod_cpu_p95,
+                    f"cpu_coreaudiod_p95={metric(metrics, 'cpu_coreaudiod_p95', 0.0):.2f} > {args.max_coreaudiod_cpu_p95:.2f}")
     else:
         message = "no cpu profile supplied; CPU/residual coupling was not evaluated"
         if args.allow_missing_cpu_profile:
@@ -397,6 +572,9 @@ def print_summary(metrics, errors, warnings):
         "cpu_coreaudiod_avg",
         "cpu_coreaudiod_p95",
         "cpu_coreaudiod_max",
+        "cpu_system_cpu_avg",
+        "cpu_system_cpu_p95",
+        "cpu_system_cpu_max",
     ]
     for key in keys:
         if key in metrics:
@@ -457,6 +635,8 @@ def main():
     parser.add_argument("--max-driver-cpu-avg", type=float, default=8.0)
     parser.add_argument("--max-driver-cpu-p95", type=float, default=12.0)
     parser.add_argument("--max-coreaudiod-cpu-p95", type=float, default=8.0)
+    parser.add_argument("--max-system-cpu-avg", type=float, default=95.0)
+    parser.add_argument("--max-system-cpu-p95", type=float, default=100.0)
     parser.add_argument("--dirty-route-alignment-max", type=float, default=0.60)
     parser.add_argument("--dirty-route-time-warp-score-max", type=float, default=0.20)
     parser.add_argument("--dirty-route-mid-ratio-min", type=float, default=3.0)
@@ -471,6 +651,14 @@ def main():
     parser.add_argument("--relative-click-slack", type=float, default=1.00)
     parser.add_argument("--allow-missing-cpu-profile", action="store_true")
     parser.add_argument("--allow-non-irig", action="store_true")
+    parser.add_argument("--windows-two-clock", action="store_true")
+    parser.add_argument("--min-windows-snr-db", type=float, default=8.0)
+    parser.add_argument("--max-windows-raw-clicks", type=int, default=0)
+    parser.add_argument("--max-windows-aligned-clicks", type=int, default=8)
+    parser.add_argument("--max-windows-dropouts", type=int, default=8)
+    parser.add_argument("--min-windows-capture-rms-dbfs", type=float, default=-36.0)
+    parser.add_argument("--windows-alignment-slack", type=float, default=0.02)
+    parser.add_argument("--windows-snr-slack-db", type=float, default=1.0)
     args = parser.parse_args()
 
     if args.run_dir:
@@ -536,9 +724,26 @@ def main():
         "allow_missing_cpu_profile": bool(args.allow_missing_cpu_profile),
         "diagnostic_bypass_active": bool(args.allow_non_irig or args.allow_missing_cpu_profile),
     })
+    route_proof_path = run_dir / "route-proof.json" if run_dir is not None else None
+    if route_proof_path is not None and route_proof_path.exists():
+        try:
+            metrics["platform"] = str(load_json(route_proof_path).get("platform", ""))
+        except (OSError, ValueError):
+            metrics["platform"] = ""
 
     baseline = load_json(resolve(args.baseline_json)) if args.baseline_json else None
-    passed, errors, warnings = verdict(metrics, baseline, args)
+    if args.windows_two_clock:
+        if run_dir is None or metrics.get("platform") != "windows":
+            raise SystemExit("--windows-two-clock requires a Windows --run-dir")
+        probe_metrics_path = run_dir / "metrics.json"
+        if not probe_metrics_path.exists():
+            raise SystemExit("--windows-two-clock requires run-dir/metrics.json")
+        probe_metrics = load_json(probe_metrics_path)
+        passed, errors, warnings = windows_two_clock_verdict(
+            metrics, probe_metrics, baseline, args
+        )
+    else:
+        passed, errors, warnings = verdict(metrics, baseline, args)
     if not args.allow_non_irig:
         errors.extend(verify_irig_route(run_dir))
         passed = passed and not errors

@@ -58,6 +58,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "Windows surface contract test failed with exit code $LASTEXITCODE"
 }
 
+& (Join-Path $PSScriptRoot 'test-windows-hardware-lock.ps1')
+
 $compiler = Find-CCompiler
 if ($compiler.Kind -eq "clang") {
     & $compiler.Path `

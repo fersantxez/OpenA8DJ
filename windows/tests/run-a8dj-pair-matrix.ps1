@@ -9,7 +9,14 @@ param(
     [string]$InputHostApi = "MME",
     [string]$OutputHostApi = "MME",
     [string]$InputName = "Line In (iRig Stream)",
-    [string]$OutputName = "Speakers (Audio 8 DJ)",
+    [string]$OutputName = "Audio 8 DJ (8ch Out)",
+    [ValidateRange(0, 10)]
+    [int]$StatusRetries = 0,
+    [ValidateRange(1, 120)]
+    [int]$WatchdogGraceSeconds = 15,
+    [ValidateRange(0, 60)]
+    [int]$InterCaseCooldownSeconds = 2,
+    [switch]$AllowSoftFailures,
     [int]$PnpMonitorIntervalSeconds = 10,
     [switch]$WriteWavs,
     [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
@@ -80,7 +87,7 @@ function Test-RequiredHardware {
     $audio8Usb = $present | Where-Object { $_.InstanceId -match 'VID_17CC&PID_1978' }
     $audio8Out = $present | Where-Object {
         $_.FriendlyName -like "$OutputName*" -or
-        ($OutputName -match 'Audio 8 DJ' -and $_.FriendlyName -like 'Speakers (Audio 8 DJ)*')
+        ($OutputName -match 'Audio 8 DJ' -and $_.FriendlyName -like 'Audio 8 DJ (*Out)*')
     }
 
     $lines = @(
@@ -155,14 +162,16 @@ try {
         "does_not_attempt_irig_recovery=1"
         "blocks_if_irig_or_audio8_missing_before_start=1"
         "records_pnp_before_during_after=1"
-        "always_attempts_iso_silence_after=1"
+        "never_arms_or_attempts_iso_silence=1"
         "pnp_monitor_interval_seconds=$PnpMonitorIntervalSeconds"
+        "status_retries=$StatusRetries"
+        "watchdog_grace_seconds=$WatchdogGraceSeconds"
+        "inter_case_cooldown_seconds=$InterCaseCooldownSeconds"
+        "strict_failure_policy=$([int](-not $AllowSoftFailures))"
     ) | Set-Content -Path (Join-Path $OutDir "safety.txt") -Encoding UTF8
 
     Write-PnpSnapshot -Path (Join-Path $OutDir "pnp-before.txt") -Label "before"
     Test-RequiredHardware -RunDir $OutDir
-    & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "iso-silence-before.txt") -Encoding UTF8
-
     $monitorSeconds = [Math]::Max(($Seconds + 1) * ($(if ($Mode -eq "full") { 5 } else { 1 })) + 20, 30)
     $monitorJob = Start-PnpMonitor -Path (Join-Path $OutDir "pnp-monitor.tsv") -Seconds $monitorSeconds -IntervalSeconds $PnpMonitorIntervalSeconds
 
@@ -178,8 +187,14 @@ try {
         "--output-hostapi", $OutputHostApi,
         "--input-name", $InputName,
         "--output-name", $OutputName,
+        "--status-retries", $StatusRetries,
+        "--watchdog-grace-seconds", $WatchdogGraceSeconds,
+        "--inter-case-cooldown-seconds", $InterCaseCooldownSeconds,
         "--out-dir", $OutDir
     )
+    if (-not $AllowSoftFailures) {
+        $argsList += "--strict"
+    }
     if ($WriteWavs) {
         $argsList += "--write-wavs"
     }
@@ -190,8 +205,6 @@ try {
     }
 }
 finally {
-    & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "iso-silence-after.txt") -Encoding UTF8
-
     if ($monitorJob) {
         Wait-Job $monitorJob -Timeout 5 | Out-Null
         Stop-Job $monitorJob -ErrorAction SilentlyContinue

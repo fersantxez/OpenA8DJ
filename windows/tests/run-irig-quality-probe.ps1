@@ -8,7 +8,7 @@ param(
     [double]$Amplitude = 0.20,
     [string]$HostApi = "Windows DirectSound",
     [string]$InputName = "Line In (iRig Stream)",
-    [string]$OutputName = "Audio 8 DJ (Ch A, Out 1|2)",
+    [string]$OutputName = "Audio 8 DJ (8ch Out)",
     [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
     [string]$OutDir = ""
 )
@@ -67,7 +67,7 @@ function Test-RequiredHardware {
     $audio8Usb = $present | Where-Object { $_.InstanceId -match 'VID_17CC&PID_1978' }
     $audio8Out = $present | Where-Object {
         $_.FriendlyName -like "$OutputName*" -or
-        ($OutputName -match 'Audio 8 DJ' -and $_.FriendlyName -like 'Speakers (Audio 8 DJ)*')
+        ($OutputName -match 'Audio 8 DJ' -and $_.FriendlyName -like 'Audio 8 DJ (*Out)*')
     }
 
     $lines = @(

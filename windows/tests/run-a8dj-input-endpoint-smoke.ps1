@@ -6,6 +6,7 @@ param(
     [double]$SignalThreshold = 0.001,
     [string[]]$HostApi = @("MME", "Windows DirectSound", "Windows WASAPI"),
     [switch]$IncludeWdmKs,
+    [switch]$WriteWavs,
     [string]$InputName = "Audio 8 DJ",
     [string]$Python = "$env:LOCALAPPDATA\Programs\Python\Python313\python.exe",
     [string]$OutDir = ""
@@ -77,7 +78,10 @@ function Assert-RequiredHardware {
 
     $present = Get-PnpDevice -PresentOnly
     $audio8Usb = $present | Where-Object { $_.InstanceId -match 'VID_17CC&PID_1978' }
-    $audio8Inputs = $present | Where-Object { $_.FriendlyName -like 'Microphone (Audio 8 DJ)*' }
+    $audio8Inputs = $present | Where-Object {
+        $_.FriendlyName -like 'Audio 8 DJ (*In)*' -or
+        $_.FriendlyName -like 'Microphone (Audio 8 DJ)*'
+    }
     $irigUsb = $present | Where-Object { $_.InstanceId -match 'VID_1963&PID_0059' }
 
     $lines = @(
@@ -122,7 +126,7 @@ try {
         "does_not_change_default_audio_devices=1"
         "does_not_attempt_irig_recovery=1"
         "records_pnp_before_after=1"
-        "always_attempts_iso_silence_after=1"
+        "never_arms_or_attempts_iso_silence=1"
         "known_signal_required_for_quality_claim=1"
     ) | Set-Content -Path (Join-Path $OutDir "safety.txt") -Encoding UTF8
 
@@ -146,6 +150,9 @@ try {
     if ($IncludeWdmKs) {
         $args += "--include-wdm-ks"
     }
+    if ($WriteWavs) {
+        $args += "--write-wavs"
+    }
 
     & $Python @args
     $exitCode = $LASTEXITCODE
@@ -153,12 +160,8 @@ try {
         throw "Audio 8 DJ input endpoint probe failed with exit code $exitCode"
     }
 } finally {
-    try {
-        & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "iso-silence-after.txt") -Encoding UTF8
-    } catch {
-        "iso-silence-after failed: $($_.Exception.Message)" |
-            Set-Content -Path (Join-Path $OutDir "iso-silence-after-error.txt") -Encoding UTF8
-    }
+    "skipped: input endpoint probe never arms or attempts iso-silence" |
+        Set-Content -Path (Join-Path $OutDir "iso-silence-after.txt") -Encoding UTF8
     try {
         Write-PnpSnapshot -Path (Join-Path $OutDir "pnp-after.txt") -Label "after"
     } catch {

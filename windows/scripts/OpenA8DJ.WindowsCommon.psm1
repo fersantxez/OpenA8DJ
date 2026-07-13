@@ -47,6 +47,9 @@ function Read-OpenA8DJLockOwner {
             $owner[$matches[1]] = $matches[2]
         }
     }
+    if ($owner.Count -eq 0) {
+        return $null
+    }
     return [pscustomobject]$owner
 }
 
@@ -63,8 +66,12 @@ function Test-OpenA8DJHardwareLock {
 
     $owner = Read-OpenA8DJLockOwner -LockRoot $lockRoot
     if (-not $owner) {
+        # A crash can leave the directory and a zero-filled owner file behind.
+        # Do not reclaim a just-created directory because another process may be
+        # between mkdir and writing its owner record.
+        $lockAge = (Get-Date) - (Get-Item -LiteralPath $lockRoot -ErrorAction Stop).LastWriteTime
         [pscustomobject]@{
-            Status = "BUSY"
+            Status = if ($lockAge.TotalSeconds -ge 5) { "STALE" } else { "BUSY" }
             LockRoot = $lockRoot
             Owner = $null
         }
@@ -73,8 +80,9 @@ function Test-OpenA8DJHardwareLock {
 
     $pidValue = 0
     $pidAlive = $false
-    $canReclaim = $owner.PSObject.Properties.Name -contains "platform" -and $owner.platform -eq "windows-powershell"
-    if ($canReclaim -and $owner.PSObject.Properties.Name -contains "pid" -and [int]::TryParse([string]$owner.pid, [ref]$pidValue)) {
+    $ownerPropertyNames = @($owner.PSObject.Properties | ForEach-Object Name)
+    $canReclaim = $ownerPropertyNames -contains "platform" -and $owner.platform -eq "windows-powershell"
+    if ($canReclaim -and $ownerPropertyNames -contains "pid" -and [int]::TryParse([string]$owner.pid, [ref]$pidValue)) {
         $pidAlive = Test-OpenA8DJProcessAlive -ProcessId $pidValue
     }
 
@@ -208,4 +216,153 @@ function Find-OpenA8DJSignTool {
 function Get-OpenA8DJFileHashHex {
     param([Parameter(Mandatory = $true)][string]$Path)
     return (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
+}
+
+function Get-OpenA8DJDriverVersion {
+    param([Parameter(Mandatory = $true)][string]$InfPath)
+
+    foreach ($line in Get-Content -LiteralPath $InfPath) {
+        if ($line -match '^DriverVer\s*=\s*([^,]+),(.+)$') {
+            return $Matches[2].Trim()
+        }
+    }
+    throw "DriverVer not found in $InfPath"
+}
+
+function Get-OpenA8DJPeTimestampUtc {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $bytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $Path).Path)
+    if ($bytes.Length -lt 256 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) {
+        throw "Not a PE image: $Path"
+    }
+    $peOffset = [BitConverter]::ToInt32($bytes, 0x3c)
+    if ($peOffset -lt 0 -or $peOffset + 12 -gt $bytes.Length) {
+        throw "Invalid PE header offset: $Path"
+    }
+    $timestamp = [BitConverter]::ToUInt32($bytes, $peOffset + 8)
+    return [DateTimeOffset]::FromUnixTimeSeconds($timestamp).UtcDateTime.ToString('o')
+}
+
+function Get-OpenA8DJBuildFingerprint {
+    param([Parameter(Mandatory = $true)][string]$HeaderPath)
+
+    $text = Get-Content -LiteralPath $HeaderPath -Raw
+    if ($text -notmatch '#define\s+OPENA8DJ_BUILD_FINGERPRINT\s+"([0-9a-fA-F]+)"') {
+        throw "Build fingerprint not found in $HeaderPath"
+    }
+    return $Matches[1].ToLowerInvariant()
+}
+
+function New-OpenA8DJPackageManifest {
+    param(
+        [Parameter(Mandatory = $true)][string]$PackageDir,
+        [Parameter(Mandatory = $true)][string]$Configuration,
+        [Parameter(Mandatory = $true)][string]$Platform,
+        [Parameter(Mandatory = $true)][string]$BuildFingerprint
+    )
+
+    $PackageDir = (Resolve-Path -LiteralPath $PackageDir).Path
+    $infPath = Join-Path $PackageDir 'OpenA8DJUsb.inf'
+    $sysPath = Join-Path $PackageDir 'OpenA8DJUsb.sys'
+    foreach ($path in @($infPath, $sysPath)) {
+        if (-not (Test-Path -LiteralPath $path)) { throw "Package payload missing: $path" }
+    }
+
+    $names = @(
+        'OpenA8DJUsb.inf',
+        'OpenA8DJUsb.sys',
+        'OpenA8DJUsb.pdb',
+        'OpenA8DJUsb.cat',
+        'OpenA8DJUsb.cer',
+        'OpenA8DJUsb-TestCertificate.cer',
+        'opena8djctl.exe'
+    )
+    $files = @()
+    foreach ($name in $names) {
+        $path = Join-Path $PackageDir $name
+        if (Test-Path -LiteralPath $path) {
+            $item = Get-Item -LiteralPath $path
+            $files += [ordered]@{
+                name = $name
+                bytes = [long]$item.Length
+                sha256 = Get-OpenA8DJFileHashHex -Path $path
+            }
+        }
+    }
+    $manifest = [ordered]@{
+        schema = 'opena8dj-driver-package-v1'
+        generated_at_utc = (Get-Date).ToUniversalTime().ToString('o')
+        configuration = $Configuration
+        platform = $Platform
+        driver_version = Get-OpenA8DJDriverVersion -InfPath $infPath
+        build_fingerprint = $BuildFingerprint.ToLowerInvariant()
+        sys_pe_timestamp_utc = Get-OpenA8DJPeTimestampUtc -Path $sysPath
+        files = $files
+    }
+    $manifestPath = Join-Path $PackageDir 'package-manifest.json'
+    $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $manifestPath -Encoding ASCII
+    return $manifestPath
+}
+
+function Test-OpenA8DJPackageManifest {
+    param([Parameter(Mandatory = $true)][string]$PackageDir)
+
+    $PackageDir = (Resolve-Path -LiteralPath $PackageDir).Path
+    $manifestPath = Join-Path $PackageDir 'package-manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) {
+        throw "Mandatory package manifest missing: $manifestPath"
+    }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if ($manifest.schema -ne 'opena8dj-driver-package-v1') {
+        throw "Unsupported package manifest schema: $($manifest.schema)"
+    }
+    foreach ($file in @($manifest.files)) {
+        $path = Join-Path $PackageDir ([string]$file.name)
+        if (-not (Test-Path -LiteralPath $path)) {
+            throw "Manifest payload missing: $path"
+        }
+        $item = Get-Item -LiteralPath $path
+        $actualHash = Get-OpenA8DJFileHashHex -Path $path
+        if ($item.Length -ne [long]$file.bytes -or $actualHash -ne ([string]$file.sha256).ToLowerInvariant()) {
+            throw "Manifest mismatch for $($file.name): expected $($file.sha256)/$($file.bytes), actual $actualHash/$($item.Length)"
+        }
+    }
+    foreach ($required in @(
+        'OpenA8DJUsb.inf',
+        'OpenA8DJUsb.sys',
+        'OpenA8DJUsb.cat',
+        'OpenA8DJUsb-TestCertificate.cer'
+    )) {
+        if (-not (@($manifest.files.name) -contains $required)) {
+            throw "Manifest does not identify required payload: $required"
+        }
+    }
+    return $manifest
+}
+
+function Get-OpenA8DJDriverStoreMatches {
+    param([Parameter(Mandatory = $true)][string]$PackageDir)
+
+    $manifest = Test-OpenA8DJPackageManifest -PackageDir $PackageDir
+    $expectedSys = [string](@($manifest.files | Where-Object name -eq 'OpenA8DJUsb.sys')[0].sha256)
+    $expectedInf = [string](@($manifest.files | Where-Object name -eq 'OpenA8DJUsb.inf')[0].sha256)
+    $root = Join-Path $env:windir 'System32\DriverStore\FileRepository'
+    $matches = @()
+    foreach ($dir in @(Get-ChildItem -LiteralPath $root -Directory -Filter 'opena8djusb.inf_*' -ErrorAction SilentlyContinue)) {
+        $sys = Join-Path $dir.FullName 'OpenA8DJUsb.sys'
+        $inf = Join-Path $dir.FullName 'OpenA8DJUsb.inf'
+        if (-not (Test-Path -LiteralPath $sys) -or -not (Test-Path -LiteralPath $inf)) { continue }
+        $sysHash = Get-OpenA8DJFileHashHex -Path $sys
+        $infHash = Get-OpenA8DJFileHashHex -Path $inf
+        $matches += [pscustomobject]@{
+            Path = $dir.FullName
+            SysPath = $sys
+            InfPath = $inf
+            SysSha256 = $sysHash
+            InfSha256 = $infHash
+            Exact = ($sysHash -eq $expectedSys -and $infHash -eq $expectedInf)
+        }
+    }
+    return @($matches)
 }

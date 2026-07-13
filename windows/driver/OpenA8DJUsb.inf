@@ -3,7 +3,7 @@ Signature="$WINDOWS NT$"
 Class=USBDevice
 ClassGuid={88BAE032-5A81-49f0-BC3D-A4FF138216D6}
 Provider=%ProviderName%
-DriverVer=06/25/2026,0.0.134.0
+DriverVer=07/13/2026,0.0.183.0
 CatalogFile=OpenA8DJUsb.cat
 PnpLockdown=1
 
@@ -74,7 +74,7 @@ AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_OpenA8DJCaptureD%,OpenA8DJUsb.CaptureD
 [OpenA8DJUsb.Interface]
 
 [OpenA8DJUsb.RenderA.Interface]
-AddReg=OpenA8DJUsb.RenderA.Interface.AddReg
+AddReg=OpenA8DJUsb.RenderA.Interface.AddReg,OpenA8DJUsb.Format8ch48k.AddReg
 
 [OpenA8DJUsb.RenderA.Interface.AddReg]
 HKR,,FriendlyName,,%RenderAFriendlyName%
@@ -83,7 +83,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%RenderAFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%RenderAFriendlyName%
 
 [OpenA8DJUsb.RenderB.Interface]
-AddReg=OpenA8DJUsb.RenderB.Interface.AddReg
+AddReg=OpenA8DJUsb.RenderB.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.RenderB.Interface.AddReg]
 HKR,,FriendlyName,,%RenderBFriendlyName%
@@ -92,7 +92,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%RenderBFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%RenderBFriendlyName%
 
 [OpenA8DJUsb.RenderC.Interface]
-AddReg=OpenA8DJUsb.RenderC.Interface.AddReg
+AddReg=OpenA8DJUsb.RenderC.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.RenderC.Interface.AddReg]
 HKR,,FriendlyName,,%RenderCFriendlyName%
@@ -101,7 +101,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%RenderCFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%RenderCFriendlyName%
 
 [OpenA8DJUsb.RenderD.Interface]
-AddReg=OpenA8DJUsb.RenderD.Interface.AddReg
+AddReg=OpenA8DJUsb.RenderD.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.RenderD.Interface.AddReg]
 HKR,,FriendlyName,,%RenderDFriendlyName%
@@ -110,7 +110,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%RenderDFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%RenderDFriendlyName%
 
 [OpenA8DJUsb.CaptureA.Interface]
-AddReg=OpenA8DJUsb.CaptureA.Interface.AddReg
+AddReg=OpenA8DJUsb.CaptureA.Interface.AddReg,OpenA8DJUsb.Format8ch48k.AddReg
 
 [OpenA8DJUsb.CaptureA.Interface.AddReg]
 HKR,,FriendlyName,,%CaptureAFriendlyName%
@@ -119,7 +119,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%CaptureAFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%CaptureAFriendlyName%
 
 [OpenA8DJUsb.CaptureB.Interface]
-AddReg=OpenA8DJUsb.CaptureB.Interface.AddReg
+AddReg=OpenA8DJUsb.CaptureB.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.CaptureB.Interface.AddReg]
 HKR,,FriendlyName,,%CaptureBFriendlyName%
@@ -128,7 +128,7 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%CaptureBFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%CaptureBFriendlyName%
 
 [OpenA8DJUsb.CaptureC.Interface]
-AddReg=OpenA8DJUsb.CaptureC.Interface.AddReg
+AddReg=OpenA8DJUsb.CaptureC.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.CaptureC.Interface.AddReg]
 HKR,,FriendlyName,,%CaptureCFriendlyName%
@@ -137,13 +137,19 @@ HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%CaptureCFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%CaptureCFriendlyName%
 
 [OpenA8DJUsb.CaptureD.Interface]
-AddReg=OpenA8DJUsb.CaptureD.Interface.AddReg
+AddReg=OpenA8DJUsb.CaptureD.Interface.AddReg,OpenA8DJUsb.FormatStereo48k.AddReg
 
 [OpenA8DJUsb.CaptureD.Interface.AddReg]
 HKR,,FriendlyName,,%CaptureDFriendlyName%
 HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
 HKR,"EP\0",%DEVPKEY_Device_DeviceDesc%,,%CaptureDFriendlyName%
 HKR,"EP\0",%DEVPKEY_Device_FriendlyName%,,%CaptureDFriendlyName%
+
+[OpenA8DJUsb.Format8ch48k.AddReg]
+HKR,"EP\0",%PKEY_AudioEngine_OEMFormat%,%REG_BINARY%,41,00,00,00,28,00,00,00,FE,FF,08,00,80,BB,00,00,00,B8,0B,00,10,00,10,00,16,00,10,00,3F,06,00,00,01,00,00,00,00,00,10,00,80,00,00,AA,00,38,9B,71
+
+[OpenA8DJUsb.FormatStereo48k.AddReg]
+HKR,"EP\0",%PKEY_AudioEngine_OEMFormat%,%REG_BINARY%,41,00,00,00,28,00,00,00,FE,FF,02,00,80,BB,00,00,00,EE,02,00,04,00,10,00,16,00,10,00,03,00,00,00,01,00,00,00,00,00,10,00,80,00,00,AA,00,38,9B,71
 
 [Strings]
 ProviderName="OpenA8DJ"
@@ -156,14 +162,14 @@ KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
 KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
 KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
 KSCATEGORY_REALTIME="{EB115FFC-10C8-4964-831D-6DCB02E6F23F}"
-KSNAME_OpenA8DJRenderA="OpenA8DJ Render A"
-KSNAME_OpenA8DJRenderB="OpenA8DJ Render B"
-KSNAME_OpenA8DJRenderC="OpenA8DJ Render C"
-KSNAME_OpenA8DJRenderD="OpenA8DJ Render D"
-KSNAME_OpenA8DJCaptureA="OpenA8DJ Capture A"
-KSNAME_OpenA8DJCaptureB="OpenA8DJ Capture B"
-KSNAME_OpenA8DJCaptureC="OpenA8DJ Capture C"
-KSNAME_OpenA8DJCaptureD="OpenA8DJ Capture D"
+KSNAME_OpenA8DJRenderA="OpenA8DJ Render A v2"
+KSNAME_OpenA8DJRenderB="OpenA8DJ Render B v2"
+KSNAME_OpenA8DJRenderC="OpenA8DJ Render C v2"
+KSNAME_OpenA8DJRenderD="OpenA8DJ Render D v2"
+KSNAME_OpenA8DJCaptureA="OpenA8DJ Capture A v2"
+KSNAME_OpenA8DJCaptureB="OpenA8DJ Capture B v2"
+KSNAME_OpenA8DJCaptureC="OpenA8DJ Capture C v2"
+KSNAME_OpenA8DJCaptureD="OpenA8DJ Capture D v2"
 RenderAFriendlyName="Audio 8 DJ (8ch Out)"
 RenderBFriendlyName="Audio 8 DJ (Ch B, Out 3|4)"
 RenderCFriendlyName="Audio 8 DJ (Ch C, Out 5|6)"
@@ -173,6 +179,8 @@ CaptureBFriendlyName="Audio 8 DJ (Ch B, In 3|4)"
 CaptureCFriendlyName="Audio 8 DJ (Ch C, In 5|6)"
 CaptureDFriendlyName="Audio 8 DJ (Ch D, In 7|8)"
 PKEY_AudioEndpoint_Association="{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
+PKEY_AudioEngine_OEMFormat="{E4870E26-3CC5-4CD2-BA46-CA0A9A70ED04},3"
+REG_BINARY=0x00000001
 DEVPKEY_Device_DeviceDesc="{A45C254E-DF1C-4EFD-8020-67D146A850E0},2"
 DEVPKEY_Device_FriendlyName="{A45C254E-DF1C-4EFD-8020-67D146A850E0},14"
 KSNODETYPE_ANY="{00000000-0000-0000-0000-000000000000}"

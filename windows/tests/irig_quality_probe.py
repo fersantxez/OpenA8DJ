@@ -120,19 +120,25 @@ def play_and_record(
     blocksize: int,
     latency: str | float,
     progress_hooks: list[tuple[int, str, object]] | None = None,
+    cpu_sample_trace: list[tuple[float, float]] | None = None,
+    output_channels: int = 2,
+    output_pair: int = 1,
 ) -> tuple[np.ndarray, list[str], float, dict[str, float | int | str]]:
     capture = np.zeros_like(playback, dtype=np.float32)
     status_events: list[str] = []
     position = 0
     total = len(playback)
     start_perf = time.perf_counter()
+    last_callback_perf = start_perf
+    callback_watchdog_seconds = 5.0
+    global_deadline = start_perf + (total / float(rate)) + callback_watchdog_seconds + 10.0
     cpu_samples: list[float] = []
     if psutil is not None:
         psutil.cpu_percent(interval=None)
     pending_hooks = sorted(progress_hooks or [], key=lambda item: item[0])
 
     def callback(indata, outdata, frames, time_info, status):  # noqa: ARG001
-        nonlocal position
+        nonlocal position, last_callback_perf
         if status:
             status_events.append(str(status))
 
@@ -142,30 +148,41 @@ def play_and_record(
 
         outdata.fill(0)
         if n:
-            outdata[:n, :] = playback[start:end, :]
+            first_output_channel = (output_pair - 1) * 2
+            outdata[:n, first_output_channel : first_output_channel + 2] = playback[start:end, :]
             capture[start:end, :] = indata[:n, :]
 
         position += frames
+        last_callback_perf = time.perf_counter()
 
     with sd.Stream(
         samplerate=rate,
         blocksize=blocksize,
         latency=latency,
         dtype="float32",
-        channels=(2, 2),
+        channels=(2, output_channels),
         device=(input_device, output_device),
         callback=callback,
     ):
         while position < total:
+            now = time.perf_counter()
+            if now >= global_deadline or now - last_callback_perf > callback_watchdog_seconds:
+                raise RuntimeError("PortAudio callback watchdog expired")
             while pending_hooks and position >= pending_hooks[0][0]:
                 _, _, hook = pending_hooks.pop(0)
                 hook(position, total)
             if psutil is not None:
-                cpu_samples.append(float(psutil.cpu_percent(interval=None)))
+                cpu_percent = float(psutil.cpu_percent(interval=None))
+                cpu_samples.append(cpu_percent)
+                if cpu_sample_trace is not None:
+                    cpu_sample_trace.append(
+                        (time.perf_counter() - start_perf, cpu_percent)
+                    )
             time.sleep(0.050)
 
     elapsed = time.perf_counter() - start_perf
     cpu_metrics: dict[str, float | int | str] = {"cpu_monitor": "psutil" if psutil is not None else "unavailable"}
+    cpu_metrics["playback_complete"] = bool(position >= total)
     if cpu_samples:
         cpu_array = np.asarray(cpu_samples, dtype=np.float64)
         cpu_metrics.update(
@@ -389,6 +406,8 @@ def main() -> int:
     parser.add_argument("--signal", choices=("tone", "multitone"), default="multitone")
     parser.add_argument("--blocksize", type=int, default=512)
     parser.add_argument("--latency", default="high")
+    parser.add_argument("--output-channels", type=int, default=2)
+    parser.add_argument("--output-pair", type=int, default=1)
     parser.add_argument("--out-dir")
     parser.add_argument("--list-devices", action="store_true")
     args = parser.parse_args()
@@ -410,7 +429,16 @@ def main() -> int:
         output_device = find_device("output", args.output_name, args.hostapi)
 
     sd.check_input_settings(device=input_device, channels=2, samplerate=args.rate, dtype="float32")
-    sd.check_output_settings(device=output_device, channels=2, samplerate=args.rate, dtype="float32")
+    if args.output_channels <= 0 or args.output_channels % 2:
+        raise SystemExit("--output-channels must be a positive even number")
+    if args.output_pair < 1 or args.output_pair > args.output_channels // 2:
+        raise SystemExit("--output-pair is outside --output-channels")
+    sd.check_output_settings(
+        device=output_device,
+        channels=args.output_channels,
+        samplerate=args.rate,
+        dtype="float32",
+    )
 
     reference = make_reference(args.rate, args.seconds, args.amplitude, args.signal)
     pre = np.zeros((int(round(args.pre_roll * args.rate)), 2), dtype=np.float32)
@@ -435,6 +463,8 @@ def main() -> int:
         rate=args.rate,
         blocksize=args.blocksize,
         latency=args.latency,
+        output_channels=args.output_channels,
+        output_pair=args.output_pair,
     )
     sf.write(out_dir / "captured.wav", capture, args.rate, subtype="PCM_24")
 
@@ -453,12 +483,14 @@ def main() -> int:
     metrics["input_device_name"] = sd.query_devices(input_device)["name"]
     metrics["output_device"] = output_device
     metrics["output_device_name"] = sd.query_devices(output_device)["name"]
+    metrics["output_channels"] = args.output_channels
+    metrics["output_pair"] = args.output_pair
     metrics["out_dir"] = str(out_dir)
 
     (out_dir / "metrics.json").write_text(json.dumps(metrics, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_metrics(out_dir / "metrics.txt", metrics)
     print((out_dir / "metrics.txt").read_text(encoding="utf-8"))
-    return 0
+    return 2 if status_events or not bool(cpu_metrics["playback_complete"]) else 0
 
 
 if __name__ == "__main__":

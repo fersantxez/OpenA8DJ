@@ -12,8 +12,8 @@ static HANDLE OpenDevice(void)
 {
     HDEVINFO infoSet;
     SP_DEVICE_INTERFACE_DATA interfaceData;
-    PSP_DEVICE_INTERFACE_DETAIL_DATA_A detailData = NULL;
-    DWORD requiredSize = 0;
+    const char *requestedInstanceId = getenv("OPENA8DJ_INSTANCE_ID");
+    DWORD interfaceIndex = 0;
     HANDLE device = INVALID_HANDLE_VALUE;
 
     infoSet = SetupDiGetClassDevsA(
@@ -25,28 +25,67 @@ static HANDLE OpenDevice(void)
         return INVALID_HANDLE_VALUE;
     }
 
-    ZeroMemory(&interfaceData, sizeof(interfaceData));
-    interfaceData.cbSize = sizeof(interfaceData);
+    while (TRUE) {
+        PSP_DEVICE_INTERFACE_DETAIL_DATA_A detailData = NULL;
+        SP_DEVINFO_DATA deviceInfoData;
+        DWORD requiredSize = 0;
+        char instanceId[512];
 
-    if (!SetupDiEnumDeviceInterfaces(infoSet, NULL, &GUID_DEVINTERFACE_OPENA8DJ_USB, 0, &interfaceData)) {
-        SetupDiDestroyDeviceInfoList(infoSet);
-        return INVALID_HANDLE_VALUE;
-    }
+        ZeroMemory(&interfaceData, sizeof(interfaceData));
+        interfaceData.cbSize = sizeof(interfaceData);
+        if (!SetupDiEnumDeviceInterfaces(
+                infoSet,
+                NULL,
+                &GUID_DEVINTERFACE_OPENA8DJ_USB,
+                interfaceIndex++,
+                &interfaceData)) {
+            break;
+        }
 
-    (void)SetupDiGetDeviceInterfaceDetailA(infoSet, &interfaceData, NULL, 0, &requiredSize, NULL);
-    if (requiredSize == 0) {
-        SetupDiDestroyDeviceInfoList(infoSet);
-        return INVALID_HANDLE_VALUE;
-    }
+        ZeroMemory(&deviceInfoData, sizeof(deviceInfoData));
+        deviceInfoData.cbSize = sizeof(deviceInfoData);
+        (void)SetupDiGetDeviceInterfaceDetailA(
+            infoSet,
+            &interfaceData,
+            NULL,
+            0,
+            &requiredSize,
+            &deviceInfoData);
+        if (requiredSize == 0) {
+            continue;
+        }
 
-    detailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_A)calloc(1, requiredSize);
-    if (detailData == NULL) {
-        SetupDiDestroyDeviceInfoList(infoSet);
-        return INVALID_HANDLE_VALUE;
-    }
+        detailData = (PSP_DEVICE_INTERFACE_DETAIL_DATA_A)calloc(1, requiredSize);
+        if (detailData == NULL) {
+            break;
+        }
 
-    detailData->cbSize = sizeof(*detailData);
-    if (SetupDiGetDeviceInterfaceDetailA(infoSet, &interfaceData, detailData, requiredSize, NULL, NULL)) {
+        detailData->cbSize = sizeof(*detailData);
+        if (!SetupDiGetDeviceInterfaceDetailA(
+                infoSet,
+                &interfaceData,
+                detailData,
+                requiredSize,
+                NULL,
+                &deviceInfoData)) {
+            free(detailData);
+            continue;
+        }
+
+        if (requestedInstanceId != NULL && requestedInstanceId[0] != '\0') {
+            ZeroMemory(instanceId, sizeof(instanceId));
+            if (!SetupDiGetDeviceInstanceIdA(
+                    infoSet,
+                    &deviceInfoData,
+                    instanceId,
+                    (DWORD)sizeof(instanceId),
+                    NULL) ||
+                _stricmp(instanceId, requestedInstanceId) != 0) {
+                free(detailData);
+                continue;
+            }
+        }
+
         device = CreateFileA(
             detailData->DevicePath,
             GENERIC_READ | GENERIC_WRITE,
@@ -55,9 +94,12 @@ static HANDLE OpenDevice(void)
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL,
             NULL);
+        free(detailData);
+        if (device != INVALID_HANDLE_VALUE) {
+            break;
+        }
     }
 
-    free(detailData);
     SetupDiDestroyDeviceInfoList(infoSet);
     return device;
 }
@@ -470,6 +512,11 @@ static void PrintDiagnostics(const OPENA8DJ_DIAGNOSTICS *diagnostics)
            diagnostics->AcxLastSetRenderPacket,
            diagnostics->AcxLastSetRenderFlags,
            diagnostics->AcxLastSetRenderEosPacketLength);
+    printf("  acx-render-pkt-done:%llu\n", diagnostics->AcxRtRenderPacketCompletions);
+    printf("  acx-render-pkt-notify:%llu\n", diagnostics->AcxRtRenderPacketNotifications);
+    printf("  acx-render-pkt-notify-fail:%llu\n", diagnostics->AcxRtRenderPacketNotificationFailures);
+    printf("  acx-render-current:%lu\n", diagnostics->AcxRtRenderCurrentPacket);
+    printf("  acx-render-notify-status:0x%08lx\n", diagnostics->AcxRtRenderLastNotificationNtStatus);
     printf("  worker-iterations: %llu\n", diagnostics->StreamWorkerIterations);
     printf("  worker-cap-bytes:  %llu\n", diagnostics->StreamWorkerCaptureBytes);
     printf("  worker-play-bytes: %llu\n", diagnostics->StreamWorkerPlaybackBytes);
@@ -480,6 +527,65 @@ static void PrintDiagnostics(const OPENA8DJ_DIAGNOSTICS *diagnostics)
     printf("  worker-capt-mask:  0x%08lx\n", diagnostics->StreamWorkerLastCaptureMask);
     printf("  worker-max-cap:    %lu\n", diagnostics->StreamWorkerMaxCaptureBytes);
     printf("  worker-max-play:   %lu\n", diagnostics->StreamWorkerMaxPlaybackBytes);
+    printf("  iso-packets/slots: %lu/%lu\n",
+           diagnostics->PersistentIsoPacketCount,
+           diagnostics->PersistentIsoSlotCount);
+    printf("  iso-output-lead:   %lu frames\n", diagnostics->PersistentIsoOutputLeadFrames);
+    printf("  iso-qpc-frequency: %llu\n", diagnostics->IsoQpcFrequency);
+    printf("  iso-out-empty:     %llu\n", diagnostics->IsoOutputQueueEmptyTransitions);
+    printf("  iso-out-late:      %llu\n", diagnostics->IsoOutputLatePackets);
+    printf("  iso-out-bad-start: %llu\n", diagnostics->IsoOutputBadStartFrames);
+    printf("  iso-out-other-err: %llu\n", diagnostics->IsoOutputOtherPacketErrors);
+    printf("  iso-output-panic:  %llu\n", diagnostics->IsoOutputPanicFlags);
+    printf("  iso-cap-late:      %llu\n", diagnostics->IsoCaptureLatePackets);
+    printf("  iso-cap-bad-start: %llu\n", diagnostics->IsoCaptureBadStartFrames);
+    printf("  iso-cap-other-err: %llu\n", diagnostics->IsoCaptureOtherPacketErrors);
+    printf("  iso-cap-last:      urb=0x%08lx packet=0x%08lx errors=%lu\n",
+           diagnostics->IsoLastCaptureUrbStatus,
+           diagnostics->IsoLastCapturePacketStatus,
+           diagnostics->IsoLastCaptureErrorCount);
+    printf("  iso-cap-out-maxqpc:%llu\n", diagnostics->IsoCaptureToOutputSubmitMaxQpc);
+    printf("  iso-last-frames:   capture=%lu output=%lu\n",
+           diagnostics->IsoLastCaptureStartFrame,
+           diagnostics->IsoLastOutputStartFrame);
+    printf("  rate-settle-runs:  %llu\n", diagnostics->AudioRateSettleRuns);
+    printf("  rate-settle-snaps: %llu\n", diagnostics->AudioRateSettleSnapshots);
+    printf("  rate-settle-mismatch:%llu\n", diagnostics->AudioRateSettleMismatchedPackets);
+    printf("  rate-settle-fails: %llu\n", diagnostics->AudioRateSettleFailures);
+    printf("  rate-settle-last:  %lu bytes\n", diagnostics->AudioRateSettleLastObservedBytes);
+    printf("  iso-frame-query:   runs=%llu failures=%llu current=%lu seed=%lu next=%lu\n",
+           diagnostics->IsoCaptureFrameQueries,
+           diagnostics->IsoCaptureFrameQueryFailures,
+           diagnostics->IsoCaptureFrameQueryCurrent,
+           diagnostics->IsoCaptureSeedStartFrame,
+           diagnostics->IsoCaptureNextStartFrame);
+    printf("  iso-input-reset:   runs=%llu failures=%llu status=0x%08lx\n",
+           diagnostics->IsoInputPipeResetRuns,
+           diagnostics->IsoInputPipeResetFailures,
+           diagnostics->IsoInputPipeResetLastNtStatus);
+    printf("  iso-output-reset:  runs=%llu failures=%llu status=0x%08lx\n",
+           diagnostics->IsoOutputPipeResetRuns,
+           diagnostics->IsoOutputPipeResetFailures,
+           diagnostics->IsoOutputPipeResetLastNtStatus);
+    printf("  iso-transport:     healthy=%lu generation=%ld one-shot=%lu input-start=0x%08lx output-start=0x%08lx\n",
+           diagnostics->IsoTransportHealthy,
+           diagnostics->IsoTransportHealthyGeneration,
+           diagnostics->IsoOneShotActive,
+           diagnostics->IsoInputTargetStartLastNtStatus,
+           diagnostics->IsoOutputTargetStartLastNtStatus);
+    printf("  iso-cap-error-slot:%lu generation=%ld sequence=%llu frame=%lu snapshot=%lu\n",
+           diagnostics->IsoLastCaptureErrorSlot,
+           diagnostics->IsoLastCaptureErrorGeneration,
+           diagnostics->IsoLastCaptureErrorSubmitSequence,
+           diagnostics->IsoLastCaptureErrorScheduledStartFrame,
+           diagnostics->IsoCaptureErrorSnapshotSequence);
+    printf("  iso-cap-error-pkts:first=%lu last=%lu count=%lu\n",
+           diagnostics->IsoLastCaptureErrorFirstPacket,
+           diagnostics->IsoLastCaptureErrorLastPacket,
+           diagnostics->IsoLastCaptureErrorPacketCount);
+    printf("  iso-cap-error-qpc: submit=%llu complete=%llu\n",
+           diagnostics->IsoLastCaptureErrorSubmitQpc,
+           diagnostics->IsoLastCaptureErrorCompletionQpc);
 }
 
 static void PrintRenderTrace(const OPENA8DJ_RENDER_TRACE *trace)
@@ -599,6 +705,37 @@ static BOOL ParseProfile(const char *text, ULONG *profile)
     return FALSE;
 }
 
+static BOOL ParseCanaryPhase(const char *text, ULONG *phase)
+{
+    if (strcmp(text, "control-read") == 0) {
+        *phase = OPENA8DJ_CANARY_PHASE_CONTROL_READ;
+    } else if (strcmp(text, "iso-capture") == 0) {
+        *phase = OPENA8DJ_CANARY_PHASE_ISO_CAPTURE;
+    } else if (strcmp(text, "iso-output") == 0) {
+        *phase = OPENA8DJ_CANARY_PHASE_ISO_OUTPUT;
+    } else if (strcmp(text, "streaming") == 0) {
+        *phase = OPENA8DJ_CANARY_PHASE_STREAMING;
+    } else {
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static void PrintSafetyState(const OPENA8DJ_SAFETY_STATE *state)
+{
+    printf("OpenA8DJ physical safety state\n");
+    printf("  api-version:       %lu\n", state->ApiVersion);
+    printf("  build-fingerprint: %s\n", state->BuildFingerprint);
+    printf("  armed-phase:       %lu\n", state->ArmedPhase);
+    printf("  operations-left:   %lu\n", state->OperationsRemaining);
+    printf("  nonce:             %016llx%016llx\n", state->NonceHigh, state->NonceLow);
+    printf("  checkpoint:        %lu\n", state->LastCheckpoint);
+    printf("  checkpoint-seq:    %lu\n", state->LastCheckpointSequence);
+    printf("  checkpoint-status: 0x%08lx\n", state->LastNtStatus);
+    printf("  prepared/stopping/worker: %lu/%lu/%lu\n",
+        state->DevicePrepared, state->DeviceStopping, state->StreamWorkerActive);
+}
+
 static void Usage(const char *argv0)
 {
     fprintf(stderr, "Usage:\n");
@@ -614,6 +751,9 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s stream\n", argv0);
     fprintf(stderr, "  %s render-trace\n", argv0);
     fprintf(stderr, "  %s usb-playback-trace PATH\n", argv0);
+    fprintf(stderr, "  %s safety\n", argv0);
+    fprintf(stderr, "  %s arm control-read|iso-capture|iso-output|streaming NONCE_HIGH NONCE_LOW\n", argv0);
+    fprintf(stderr, "  %s disarm\n", argv0);
     fprintf(stderr, "  %s profile timecode-vinyl|timecode-cd-line|phono|unlock\n", argv0);
     fprintf(stderr, "  %s input-mode 0|1|2|timecode-vinyl|timecode-cd-line|phono\n", argv0);
     fprintf(stderr, "  %s gnd-vinyl on|off\n", argv0);
@@ -662,15 +802,59 @@ int main(int argc, char **argv)
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_CAPABILITIES, NULL, 0, &caps, sizeof(caps));
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_AUDIO_FORMAT, NULL, 0, &format, sizeof(format));
         (void)DeviceIo(device, IOCTL_OPENA8DJ_GET_STREAM_STATE, NULL, 0, &stream, sizeof(stream));
-        if (!DeviceIo(device, IOCTL_OPENA8DJ_GET_CONTROL_STATE, NULL, 0, &controls, sizeof(controls))) {
-            controls.Size = sizeof(controls);
-        }
+        controls.Size = sizeof(controls);
         PrintSurface(&surface);
         PrintUsbInfo(&usbInfo);
         PrintCapabilities(&caps);
         PrintFormat(&format);
         PrintControlState(&controls);
         PrintStreamState(&stream);
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "safety") == 0 && argc == 2) {
+        OPENA8DJ_SAFETY_STATE safety;
+        ZeroMemory(&safety, sizeof(safety));
+        if (!DeviceIo(device, IOCTL_OPENA8DJ_GET_SAFETY_STATE, NULL, 0, &safety, sizeof(safety))) {
+            fprintf(stderr, "Could not read safety state: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
+        PrintSafetyState(&safety);
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "arm") == 0 && argc == 5) {
+        OPENA8DJ_CANARY_ARM_REQUEST arm;
+        ZeroMemory(&arm, sizeof(arm));
+        arm.Size = sizeof(arm);
+        arm.ApiVersion = OPENA8DJ_DRIVER_API_VERSION;
+        arm.MaxOperations = 1;
+        if (!ParseCanaryPhase(argv[2], &arm.Phase)) {
+            Usage(argv[0]);
+            CloseHandle(device);
+            return 2;
+        }
+        arm.NonceHigh = _strtoui64(argv[3], NULL, 0);
+        arm.NonceLow = _strtoui64(argv[4], NULL, 0);
+        if ((arm.NonceHigh == 0 && arm.NonceLow == 0) ||
+            !DeviceIo(device, IOCTL_OPENA8DJ_ARM_PHYSICAL_CANARY, &arm, sizeof(arm), NULL, 0)) {
+            fprintf(stderr, "Could not arm one-shot canary: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
+        CloseHandle(device);
+        return 0;
+    }
+
+    if (strcmp(argv[1], "disarm") == 0 && argc == 2) {
+        if (!DeviceIo(device, IOCTL_OPENA8DJ_DISARM_PHYSICAL_CANARY, NULL, 0, NULL, 0)) {
+            fprintf(stderr, "Could not disarm physical canary: error=%lu\n", GetLastError());
+            CloseHandle(device);
+            return 1;
+        }
         CloseHandle(device);
         return 0;
     }
@@ -948,11 +1132,20 @@ int main(int argc, char **argv)
                 return 2;
             }
             if (strcmp(argv[1], "gnd-vinyl") == 0) {
-                controls.GndLiftTCVinyl = value;
+                fprintf(stderr, "Ground-lift controls are hardware readback-only on this Audio 8 DJ: error=%lu\n", (DWORD)ERROR_NOT_SUPPORTED);
+                PrintControlState(&controls);
+                CloseHandle(device);
+                return 1;
             } else if (strcmp(argv[1], "gnd-cd-line") == 0) {
-                controls.GndLiftTCCDLine = value;
+                fprintf(stderr, "Ground-lift controls are hardware readback-only on this Audio 8 DJ: error=%lu\n", (DWORD)ERROR_NOT_SUPPORTED);
+                PrintControlState(&controls);
+                CloseHandle(device);
+                return 1;
             } else if (strcmp(argv[1], "gnd-phono") == 0) {
-                controls.GndLiftPhono = value;
+                fprintf(stderr, "Ground-lift controls are hardware readback-only on this Audio 8 DJ: error=%lu\n", (DWORD)ERROR_NOT_SUPPORTED);
+                PrintControlState(&controls);
+                CloseHandle(device);
+                return 1;
             } else if (strcmp(argv[1], "software-lock") == 0) {
                 controls.SoftwareLock = value;
             } else {
@@ -963,7 +1156,12 @@ int main(int argc, char **argv)
         }
         controls.Size = sizeof(controls);
         if (!DeviceIo(device, IOCTL_OPENA8DJ_SET_CONTROL_STATE, &controls, sizeof(controls), &controls, sizeof(controls))) {
-            fprintf(stderr, "Could not write controls: error=%lu\n", GetLastError());
+            DWORD error = GetLastError();
+            if (error == ERROR_NOT_SUPPORTED && strncmp(argv[1], "gnd-", 4) == 0) {
+                fprintf(stderr, "Ground-lift controls are hardware readback-only on this Audio 8 DJ: error=%lu\n", error);
+            } else {
+                fprintf(stderr, "Could not write controls: error=%lu\n", error);
+            }
             CloseHandle(device);
             return 1;
         }

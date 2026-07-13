@@ -26,6 +26,22 @@ import soundfile as sf
 ROOT = Path(__file__).resolve().parents[2]
 CTL = ROOT / "windows" / "dist" / "Release" / "x64" / "opena8djctl.exe"
 
+STRICT_DRIVER_COUNTERS = (
+    "underruns",
+    "overruns",
+    "packet_errors",
+    "late_completions",
+    "iso_out_empty",
+    "iso_out_late",
+    "iso_out_bad_start",
+    "iso_out_other_err",
+    "iso_output_panic",
+    "iso_cap_late",
+    "iso_cap_bad_start",
+    "iso_cap_other_err",
+    "rate_settle_fails",
+)
+
 
 def hostapi_name(device: dict) -> str:
     return sd.query_hostapis(device["hostapi"])["name"]
@@ -92,10 +108,6 @@ def diagnostics() -> tuple[str, dict[str, int | str]]:
     return text, parse_diag(text)
 
 
-def silence() -> str:
-    return subprocess.check_output([str(CTL), "iso-silence"], text=True, errors="replace")
-
-
 def make_playback(rate: int, seconds: float, pair: int | None, amplitude: float) -> np.ndarray:
     frames = int(rate * seconds)
     t = np.arange(frames, dtype=np.float64) / float(rate)
@@ -133,7 +145,7 @@ def click_metrics(captured: np.ndarray, rate: int) -> dict[str, float | int]:
 
 def run_case(args: argparse.Namespace, name: str, pair: int | None, input_device: int, output_device: int) -> dict:
     playback = make_playback(args.rate, args.seconds, pair, args.amplitude)
-    captured = np.zeros((playback.shape[0], 2), dtype=np.float32)
+    captured = np.zeros((playback.shape[0], args.input_channels), dtype=np.float32)
     cursor = 0
     status_events: list[str] = []
     cpu_samples: list[dict[str, float]] = []
@@ -161,16 +173,36 @@ def run_case(args: argparse.Namespace, name: str, pair: int | None, input_device
             raise sd.CallbackStop
 
     start = time.perf_counter()
+    watchdog_expired = False
+    watchdog_deadline = (
+        start
+        + (playback.shape[0] / float(args.rate))
+        + args.watchdog_grace_seconds
+    )
+    extra_settings = None
+    if args.exclusive:
+        extra_settings = (
+            sd.WasapiSettings(exclusive=True),
+            sd.WasapiSettings(exclusive=True),
+        )
     with sd.Stream(
         samplerate=args.rate,
         blocksize=args.blocksize,
         dtype="float32",
         latency=args.latency,
-        channels=(2, 8),
+        channels=(args.input_channels, 8),
         device=(input_device, output_device),
+        extra_settings=extra_settings,
         callback=callback,
-    ):
+    ) as stream:
         while cursor < playback.shape[0]:
+            if time.perf_counter() >= watchdog_deadline:
+                watchdog_expired = True
+                status_events.append(
+                    f"watchdog timeout after {args.watchdog_grace_seconds:.1f}s grace"
+                )
+                stream.abort()
+                break
             cpu_samples.append(
                 {
                     "system": psutil.cpu_percent(interval=args.cpu_sample_interval),
@@ -181,13 +213,39 @@ def run_case(args: argparse.Namespace, name: str, pair: int | None, input_device
     time.sleep(0.25)
     after_text, after = diagnostics()
     (case_dir / "diagnostics-after.txt").write_text(after_text, encoding="utf-8")
-    (case_dir / "iso-silence-after.txt").write_text(silence(), encoding="utf-8")
+    silence_text = "skipped: pair matrix never arms or attempts iso-silence\n"
+    silence_exit = -1
+    (case_dir / "iso-silence-after.txt").write_text(silence_text, encoding="utf-8")
 
     deltas: dict[str, int] = {}
     for p in range(1, 5):
         key = f"render_pair_{p}_nonzero"
         deltas[f"render_pair_{p}_nonzero_delta"] = int(after.get(key, 0)) - int(before.get(key, 0))
         deltas[f"render_pair_{p}_peak_s24_after"] = int(after.get(f"render_pair_{p}_peak_s24", 0))
+
+    capture_clipped_frames = int(np.sum(np.max(np.abs(captured), axis=1) >= 0.999))
+    capture_click_metrics = click_metrics(captured, args.rate)
+    driver_counter_deltas = {
+        key: int(after.get(key, 0)) - int(before.get(key, 0))
+        for key in STRICT_DRIVER_COUNTERS
+    }
+    hard_failure_reasons: list[str] = []
+    if watchdog_expired:
+        hard_failure_reasons.append("stream_watchdog_expired")
+    if status_events:
+        hard_failure_reasons.append("portaudio_status_events")
+    if capture_clipped_frames != 0:
+        hard_failure_reasons.append(f"capture_clipped_frames_{capture_clipped_frames}")
+    if int(capture_click_metrics["raw_click_outliers"]) != 0:
+        hard_failure_reasons.append(
+            f"raw_click_outliers_{capture_click_metrics['raw_click_outliers']}"
+        )
+    # This read-mostly matrix intentionally never invokes the destructive
+    # iso-silence command. Stream, watchdog, click, and counter gates are the
+    # complete acceptance surface for this probe.
+    for key, delta in driver_counter_deltas.items():
+        if delta != 0:
+            hard_failure_reasons.append(f"driver_{key}_delta_{delta}")
 
     result = {
         "name": name,
@@ -197,18 +255,24 @@ def run_case(args: argparse.Namespace, name: str, pair: int | None, input_device
         "output_device": output_device,
         "input_device": input_device,
         "output_channels": 8,
-        "input_channels": 2,
+        "input_channels": args.input_channels,
+        "exclusive": args.exclusive,
         "elapsed_seconds": elapsed,
         "status_events": status_events,
+        "watchdog_expired": watchdog_expired,
+        "watchdog_grace_seconds": args.watchdog_grace_seconds,
+        "iso_silence_after_exit": silence_exit,
         "capture_peak": float(np.max(np.abs(captured))),
         "capture_rms": float(np.sqrt(np.mean(np.square(captured)))),
-        "capture_clipped_frames": int(np.sum(np.max(np.abs(captured), axis=1) >= 0.999)),
+        "capture_clipped_frames": capture_clipped_frames,
+        "driver_counter_deltas": driver_counter_deltas,
+        "hard_failure_reasons": hard_failure_reasons,
         "cpu_system_avg_percent": float(np.mean([x["system"] for x in cpu_samples])) if cpu_samples else 0.0,
         "cpu_system_max_percent": float(np.max([x["system"] for x in cpu_samples])) if cpu_samples else 0.0,
         "cpu_process_avg_percent": float(np.mean([x["process"] for x in cpu_samples])) if cpu_samples else 0.0,
         "cpu_process_max_percent": float(np.max([x["process"] for x in cpu_samples])) if cpu_samples else 0.0,
         "cpu_sample_interval_seconds": args.cpu_sample_interval,
-        **click_metrics(captured, args.rate),
+        **capture_click_metrics,
         **deltas,
     }
     if args.write_wavs:
@@ -237,14 +301,14 @@ def run_case_with_status_retries(
                 "status_event_count": len(result["status_events"]),
                 "capture_clipped_frames": result["capture_clipped_frames"],
                 "cpu_system_avg_percent": result["cpu_system_avg_percent"],
+                "hard_failure_reasons": result["hard_failure_reasons"],
             }
         )
         final_result = result
-        if not result["status_events"]:
+        if not result["hard_failure_reasons"]:
             break
         if attempt < args.status_retries:
             time.sleep(args.retry_cooldown_seconds)
-            silence()
 
     assert final_result is not None
     final_result["name"] = name
@@ -265,10 +329,15 @@ def main() -> int:
     parser.add_argument("--output-name", default="Speakers (Audio 8 DJ)")
     parser.add_argument("--input-hostapi", default="MME")
     parser.add_argument("--output-hostapi", default="MME")
+    parser.add_argument("--input-channels", type=int, default=2)
+    parser.add_argument("--exclusive", action="store_true")
     parser.add_argument("--mode", choices=["full", "all-pairs-only"], default="full")
     parser.add_argument("--status-retries", type=int, default=1)
     parser.add_argument("--retry-cooldown-seconds", type=float, default=3.0)
     parser.add_argument("--cpu-sample-interval", type=float, default=0.20)
+    parser.add_argument("--watchdog-grace-seconds", type=float, default=15.0)
+    parser.add_argument("--inter-case-cooldown-seconds", type=float, default=1.0)
+    parser.add_argument("--strict", action="store_true")
     parser.add_argument("--write-wavs", action="store_true")
     parser.add_argument("--out-dir", required=True)
     args = parser.parse_args()
@@ -276,14 +345,22 @@ def main() -> int:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     write_devices(out_dir / "devices.txt")
-    input_device = find_device("input", args.input_name, args.input_hostapi, 2)
+    input_device = find_device("input", args.input_name, args.input_hostapi, args.input_channels)
     output_device = find_device("output", args.output_name, args.output_hostapi, 8)
 
-    if args.mode == "all-pairs-only":
-        results = [run_case_with_status_retries(args, "all-pairs-long", None, input_device, output_device)]
-    else:
-        results = [run_case_with_status_retries(args, f"pair-{i + 1}", i, input_device, output_device) for i in range(4)]
-        results.append(run_case_with_status_retries(args, "all-pairs", None, input_device, output_device))
+    cases = (
+        [("all-pairs-long", None)]
+        if args.mode == "all-pairs-only"
+        else [(f"pair-{i + 1}", i) for i in range(4)] + [("all-pairs", None)]
+    )
+    results = []
+    for case_index, (name, pair) in enumerate(cases):
+        result = run_case_with_status_retries(args, name, pair, input_device, output_device)
+        results.append(result)
+        if args.strict and result["hard_failure_reasons"]:
+            break
+        if case_index + 1 < len(cases) and args.inter_case_cooldown_seconds > 0.0:
+            time.sleep(args.inter_case_cooldown_seconds)
 
     summary = {
         "input_device": input_device,
@@ -296,6 +373,8 @@ def main() -> int:
     }
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=2))
+    if args.strict and any(result["hard_failure_reasons"] for result in results):
+        return 1
     return 0
 
 

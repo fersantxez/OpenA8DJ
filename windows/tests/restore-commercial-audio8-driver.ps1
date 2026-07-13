@@ -51,8 +51,9 @@ if ($LASTEXITCODE -ne 0) {
 Start-Sleep -Seconds 5
 $pnp = pnputil /enum-devices /instanceid $instanceId
 $pnp
-if ($pnp -notmatch "Manufacturer Name:\s+Native Instruments" -or
-    $pnp -notmatch "Status:\s+Started") {
+$pnpText = $pnp -join "`n"
+if ($pnpText -notmatch "Manufacturer Name:\s+Native Instruments" -or
+    $pnpText -notmatch "Status:\s+Started") {
     throw "Commercial driver did not return to Native Instruments/Started."
 }
 

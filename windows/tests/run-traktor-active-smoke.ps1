@@ -756,7 +756,7 @@ try {
         "does_not_disable_or_enable_pnp_devices=1"
         "does_not_restart_windows_audio=1"
         "does_not_change_default_audio_devices=1"
-        "always_attempts_iso_silence_after=1"
+        "never_arms_or_attempts_iso_silence=1"
         "track_path=$TrackPath"
         "pnp_monitor_interval_seconds=$PnpMonitorIntervalSeconds"
         "traktor_trim_wheel_notches=$TraktorTrimWheelNotches"
@@ -764,7 +764,8 @@ try {
 
     Write-PnpSnapshot -Path (Join-Path $OutDir "pnp-before.txt") -Label "before"
     Test-RequiredHardware -RunDir $OutDir
-    & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "iso-silence-before.txt") -Encoding UTF8
+    "skipped: Traktor smoke never arms or attempts iso-silence" |
+        Set-Content -Path (Join-Path $OutDir "iso-silence-before.txt") -Encoding UTF8
     & $ctl diagnostics | Set-Content -Path (Join-Path $OutDir "diagnostics-before.txt") -Encoding UTF8
 
     $monitorJob = Start-PnpMonitor -Path (Join-Path $OutDir "pnp-monitor.tsv") -MonitorSeconds ($StartupSeconds + $Seconds + 40) -IntervalSeconds $PnpMonitorIntervalSeconds
@@ -946,7 +947,8 @@ finally {
 
     Start-Sleep -Seconds 2
     & $ctl diagnostics | Set-Content -Path (Join-Path $OutDir "diagnostics-after-close.txt") -Encoding UTF8
-    & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "iso-silence-after.txt") -Encoding UTF8
+    "skipped: Traktor smoke never arms or attempts iso-silence" |
+        Set-Content -Path (Join-Path $OutDir "iso-silence-after.txt") -Encoding UTF8
 
     if ($monitorJob) {
         Wait-Job $monitorJob -Timeout 5 | Out-Null

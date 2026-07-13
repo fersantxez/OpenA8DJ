@@ -152,7 +152,7 @@ try {
         "does_not_restart_windows_audio=1"
         "does_not_change_default_audio_devices=1"
         "always_restores_timecode_vinyl_48k_512=1"
-        "always_attempts_iso_silence_after=1"
+        "never_arms_or_attempts_iso_silence=1"
         "version_preflight_captures_source_package_loaded_api=1"
         "asio_endpoint_probe_is_registry_read_only=1"
         "midi_endpoint_probe_is_read_only=1"
@@ -168,7 +168,8 @@ try {
 
     & $ctl profile timecode-vinyl | Set-Content -Path (Join-Path $OutDir "00-restore-before.txt") -Encoding UTF8
     & $ctl set-format 48000 512 | Add-Content -Path (Join-Path $OutDir "00-restore-before.txt") -Encoding UTF8
-    & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "00-iso-silence-before.txt") -Encoding UTF8
+    "skipped: full validation never arms or attempts iso-silence" |
+        Set-Content -Path (Join-Path $OutDir "00-iso-silence-before.txt") -Encoding UTF8
 
     $steps += Invoke-InlineStep "local-hardware-smoke" {
         & (Join-Path $repoRoot "windows\tests\run-local-hardware-smoke.ps1")
@@ -239,7 +240,8 @@ try {
     try {
         & $ctl profile timecode-vinyl | Set-Content -Path (Join-Path $OutDir "98-restore-after.txt") -Encoding UTF8
         & $ctl set-format 48000 512 | Add-Content -Path (Join-Path $OutDir "98-restore-after.txt") -Encoding UTF8
-        & $ctl iso-silence | Set-Content -Path (Join-Path $OutDir "99-iso-silence-after.txt") -Encoding UTF8
+        "skipped: full validation never arms or attempts iso-silence" |
+            Set-Content -Path (Join-Path $OutDir "99-iso-silence-after.txt") -Encoding UTF8
         & $ctl diagnostics | Set-Content -Path (Join-Path $OutDir "99-diagnostics-after.txt") -Encoding UTF8
     } catch {
         "restore failed: $($_.Exception.Message)" | Set-Content -Path (Join-Path $OutDir "restore-error.txt") -Encoding UTF8

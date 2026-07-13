@@ -33,9 +33,13 @@ driver package.
 The repository now includes the first Windows WDK workstream in `windows/`:
 
 - `windows/OpenA8DJWindows.sln`
+- `windows/OpenA8DJVirtual.sln`
 - `windows/driver/OpenA8DJUsb.vcxproj`
 - `windows/driver/OpenA8DJUsb.inf`
+- `windows/driver/OpenA8DJVirtual.vcxproj`
+- `windows/driver/OpenA8DJVirtual.inf`
 - `windows/scripts/build-driver.ps1`
+- `windows/scripts/build-virtual-acx.ps1`
 
 `OpenA8DJUsb` is a KMDF USB transport/surface driver for
 `USB\VID_17CC&PID_1978`. It claims the Audio 8 DJ hardware, maps the known
@@ -52,14 +56,19 @@ CAIAQ USB pipes, and exposes the OpenA8DJ experimental Windows surface contract:
   streaming, MIDI, and ASIO
 - topology and diagnostics IOCTLs
 
-The package also builds `opena8djctl.exe` for testers. The current Windows
-workstream now includes an ACX endpoint layer and capture-paced isochronous
-render/capture engine for the physical Audio 8 DJ. It has local hardware
-evidence for 8-channel playback through the mixer/iRig route and Traktor active
-playback smoke tests, but it is still experimental rather than production-ready.
-MIDI publication, ASIO, real hardware control writes, hotplug/sleep validation,
-long-run DPC/CPU gates, timecode validation, and a clean Windows install matrix
-remain incomplete.
+The package also builds `opena8djctl.exe` for diagnostics. The source workstream
+includes ACX endpoint wiring and a capture-paced isochronous engine for the
+physical Audio 8 DJ, but the current artifact has not been installed or runtime
+validated in this pass. An isolated `OpenA8DJVirtual` ACX proof target can be
+built without USB hardware; it is not part of the USB package and has not been
+installed. MIDI publication, ASIO, real hardware control writes, hotplug/sleep
+validation, long-run DPC/CPU gates, timecode validation, and a clean Windows
+install matrix remain incomplete.
+
+Current candidate (2026-07-12): `OpenA8DJUsb` 0.0.135/API 27 and
+`OpenA8DJVirtual` 0.0.2 are build-verified but intentionally not installed.
+The virtual target is the next runtime proof gate and does not target the
+Audio 8 DJ USB VID/PID.
 
 ### Local API 24 evidence - 2026-06-25
 

@@ -72,14 +72,22 @@ The package also builds `opena8djctl.exe`, a Windows control tool that can query
 the surface, topology, diagnostics, capabilities, controls, profiles, and
 experimental format state.
 
-Important: the Windows audio endpoint layer and capture-paced isochronous
-engine are now present in this workstream, but this is still not a production
-driver. MIDI publication, ASIO, hotplug/sleep validation, long-run DPC/CPU
-gates, and full Traktor/timecode input validation remain incomplete.
+Important: source-level ACX endpoint wiring and the capture-paced isochronous
+engine are present in this workstream, but runtime endpoint enumeration and
+streaming are not yet proven on the current artifact. An isolated
+`OpenA8DJVirtual` ACX proof target is available for a no-USB proof run; it is
+not part of the USB package and has not been installed. MIDI publication, ASIO,
+hotplug/sleep validation, long-run DPC/CPU gates, and full Traktor/timecode
+input validation remain incomplete.
 Feedback and logs are welcome. Install and use experimental Windows builds at
 your own risk.
 
-Local 2026-06-25 API 24 note: the current test-signed package is
+Current candidate (2026-07-12): `OpenA8DJUsb` 0.0.135/API 27 and the isolated
+`OpenA8DJVirtual` proof package 0.0.2 are build-verified and test-signed, but
+neither package has been installed on this machine. Runtime endpoint
+enumeration remains an explicit pending gate.
+
+Historical local 2026-06-25 API 24 note: the test-signed package was
 `OpenA8DJUsb` 0.0.81/API 24. Hardware control profiles now verify readback for
 `input-mode` and `software-lock`; ground-lift flags are exposed as hardware
 readback and individual `gnd-*` writes must still be treated as
@@ -90,7 +98,7 @@ capture reported no clipping, no near-clipping, no raw click outliers, and no
 PortAudio status events. Audio 8 DJ input endpoints still need known-signal
 validation before this can be called DVS/timecode-ready.
 
-API 25 / 0.0.83 source note: the next package adds diagnostics-only stream
+Historical API 25 / 0.0.83 source note: that package added diagnostics-only stream
 worker counters for iteration rate, capture/playback byte totals, active
 render/capture masks, no-render iterations, and per-iteration byte maxima. It
 builds and verifies locally, but was not installed on the tablet because Secure

@@ -19,6 +19,12 @@ param(
 
     [switch]$DisableDeviceOnInstallProblem,
 
+    [switch]$AllowPhysicalBind,
+
+    [switch]$AcknowledgeCrashRisk,
+
+    [string]$ExpectedInstanceId = "USB\VID_17CC&PID_1978\SN-HKM6Q6EDKP___",
+
     [int]$WaitLockSeconds = 0
 )
 
@@ -76,6 +82,7 @@ try {
     }
 
     $PackageDir = (Resolve-Path $PackageDir).Path
+    $packageManifest = Test-OpenA8DJPackageManifest -PackageDir $PackageDir
     $infPath = Join-Path $PackageDir "OpenA8DJUsb.inf"
     $catPath = Join-Path $PackageDir "OpenA8DJUsb.cat"
     $certPath = Join-Path $PackageDir "OpenA8DJUsb-TestCertificate.cer"
@@ -133,12 +140,30 @@ try {
         }
     }
 
-    Write-Host "Installing driver package with pnputil"
-    & pnputil.exe /add-driver $infPath /install
+    if ($AllowPhysicalBind) {
+        if (-not $AcknowledgeCrashRisk) {
+            throw "Physical binding requires both -AllowPhysicalBind and -AcknowledgeCrashRisk."
+        }
+        $deviceBefore = Get-PnpDevice -InstanceId $ExpectedInstanceId -ErrorAction SilentlyContinue
+        if (-not $deviceBefore -or $deviceBefore.Problem -ne 'CM_PROB_DISABLED') {
+            throw "Physical binding is only permitted while the exact Audio 8 DJ device is disabled."
+        }
+    }
+
+    Write-Host $(if ($AllowPhysicalBind) { "Staging and binding driver package with pnputil" } else { "Staging driver package without binding or loading it" })
+    $pnputilArguments = @('/add-driver', $infPath)
+    if ($AllowPhysicalBind) { $pnputilArguments += '/install' }
+    & pnputil.exe @pnputilArguments
     $pnputilExit = $LASTEXITCODE
     $acceptedPnPUtilExits = @(0, 259, 3010)
     if ($acceptedPnPUtilExits -notcontains $pnputilExit) {
         throw "pnputil install failed with exit code $pnputilExit"
+    }
+
+    $storeMatches = @(Get-OpenA8DJDriverStoreMatches -PackageDir $PackageDir)
+    $exactStoreMatches = @($storeMatches | Where-Object Exact)
+    if ($exactStoreMatches.Count -ne 1 -or $storeMatches.Count -ne 1) {
+        throw "DriverStore identity gate failed: expected exactly one OpenA8DJ package and one exact hash match; found $($storeMatches.Count) total/$($exactStoreMatches.Count) exact."
     }
 
     $audio8Device = Get-OpenA8DJAudio8Device
@@ -155,6 +180,11 @@ try {
     $manifest = [ordered]@{
         installed_at = (Get-Date).ToUniversalTime().ToString("o")
         package_dir = $PackageDir
+        package_build_fingerprint = $packageManifest.build_fingerprint
+        package_sys_sha256 = (@($packageManifest.files | Where-Object name -eq 'OpenA8DJUsb.sys')[0].sha256)
+        driver_store_path = $exactStoreMatches[0].Path
+        driver_store_sys_sha256 = $exactStoreMatches[0].SysSha256
+        stage_only = -not [bool]$AllowPhysicalBind
         inf = $infPath
         catalog = $catPath
         inf_sha256 = Get-OpenA8DJFileHashHex -Path $infPath

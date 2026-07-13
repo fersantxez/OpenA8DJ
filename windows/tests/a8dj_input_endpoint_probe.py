@@ -20,6 +20,7 @@ from typing import Any
 
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
 
 
 def hostapi_name(device: dict[str, Any]) -> str:
@@ -89,7 +90,15 @@ def discover_targets(name_substring: str, hostapis: set[str], include_wdm_ks: bo
     return targets
 
 
-def probe_target(target: dict[str, Any], seconds: float, rate: int, blocksize: int, channels: int) -> dict[str, Any]:
+def probe_target(
+    target: dict[str, Any],
+    seconds: float,
+    rate: int,
+    blocksize: int,
+    channels: int,
+    out_dir: Path,
+    write_wavs: bool,
+) -> dict[str, Any]:
     device_index = int(target["device_index"])
     capture_channels = min(channels, int(target["max_input_channels"]))
     frame_count = int(round(seconds * rate))
@@ -147,6 +156,15 @@ def probe_target(target: dict[str, Any], seconds: float, rate: int, blocksize: i
         near_clip_frames = 0
         raw_click_outliers = 0
 
+    channel_peak = np.max(np.abs(usable), axis=0).astype(float).tolist() if usable.size else []
+    channel_rms = np.sqrt(np.mean(np.square(usable), axis=0)).astype(float).tolist() if usable.size else []
+    wav_path = ""
+    if write_wavs and usable.size:
+        safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", str(target["name"])).strip("-")
+        wav_name = f"device-{device_index:02d}-{safe_name}.wav"
+        sf.write(out_dir / wav_name, usable, rate, subtype="PCM_24")
+        wav_path = wav_name
+
     return {
         **target,
         "requested_rate": rate,
@@ -160,6 +178,9 @@ def probe_target(target: dict[str, Any], seconds: float, rate: int, blocksize: i
         "status_event_count": len(status_events),
         "capture_peak": peak,
         "capture_rms": rms,
+        "channel_peak": channel_peak,
+        "channel_rms": channel_rms,
+        "wav_path": wav_path,
         "capture_clipped_frames": clipped_frames,
         "capture_near_clip_frames": near_clip_frames,
         "raw_click_outliers": raw_click_outliers,
@@ -196,6 +217,7 @@ def main() -> int:
         help="Host API to include. Repeatable. Default: MME, Windows DirectSound, Windows WASAPI.",
     )
     parser.add_argument("--include-wdm-ks", action="store_true")
+    parser.add_argument("--write-wavs", action="store_true")
     args = parser.parse_args()
 
     hostapis = set(args.hostapi or ["MME", "Windows DirectSound", "Windows WASAPI"])
@@ -209,12 +231,20 @@ def main() -> int:
         target_rate = args.rate
         if target["hostapi"] in ("MME", "Windows DirectSound") and args.rate == 48000:
             target_rate = 44100
-        results.append(probe_target(target, args.seconds, target_rate, args.blocksize, args.channels))
+        results.append(
+            probe_target(
+                target,
+                args.seconds,
+                target_rate,
+                args.blocksize,
+                args.channels,
+                args.out_dir,
+                args.write_wavs,
+            )
+        )
 
     after_code, after_text = run_ctl(args.ctl, "diagnostics")
     after = parse_diagnostics(after_text)
-    run_ctl(args.ctl, "iso-silence")
-
     deltas = {
         key: metric_delta(before, after, key)
         for key in sorted(set(before.keys()) | set(after.keys()))

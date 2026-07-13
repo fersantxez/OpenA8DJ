@@ -13,6 +13,9 @@ on:
       - "docs/WINDOWS*.md"
       - ".github/workflows/windows-driver.yml"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build Windows driver (${{ matrix.platform }})
@@ -25,6 +28,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Add MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -40,7 +45,13 @@ jobs:
           if (-not $inf2cat) {
             throw "Inf2Cat.exe was not found. The WDK is required."
           }
+          $tools = "${env:ProgramFiles(x86)}\Windows Kits\10\Tools"
+          $infverif = Get-ChildItem -Path $tools -Recurse -Filter infverif.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $infverif) {
+            throw "infverif.exe was not found. The WDK is required."
+          }
           Write-Host "Found Inf2Cat at $($inf2cat.FullName)"
+          Write-Host "Found InfVerif at $($infverif.FullName)"
 
       - name: Build
         shell: pwsh
@@ -71,3 +82,20 @@ jobs:
           path: |
             windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation.cab
             windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation-manifest.json
+
+  virtual-acx-proof:
+    name: Build virtual ACX proof target
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build and validate virtual ACX target
+        shell: pwsh
+        run: .\windows\scripts\build-virtual-acx.ps1 -Configuration Release -Platform x64

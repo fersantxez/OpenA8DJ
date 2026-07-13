@@ -22,6 +22,7 @@ if (-not $OutputDir) {
 }
 
 $PackageDir = (Resolve-Path $PackageDir).Path
+Test-OpenA8DJPackageManifest -PackageDir $PackageDir | Out-Null
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $OutputDir = (Resolve-Path $OutputDir).Path
 
@@ -44,10 +45,12 @@ $driverFiles = @(
     "OpenA8DJUsb.inf",
     "OpenA8DJUsb.sys",
     "OpenA8DJUsb.cat",
+    "OpenA8DJUsb.pdb",
     "OpenA8DJUsb-TestCertificate.cer",
     "OpenA8DJUsb.cer",
     "opena8djctl.exe",
-    "signing-manifest.json"
+    "signing-manifest.json",
+    "package-manifest.json"
 )
 foreach ($name in $driverFiles) {
     $source = Join-Path $PackageDir $name
@@ -56,12 +59,13 @@ foreach ($name in $driverFiles) {
     }
 }
 
-$requiredDriverFiles = @("OpenA8DJUsb.inf", "OpenA8DJUsb.sys", "OpenA8DJUsb.cat", "OpenA8DJUsb-TestCertificate.cer")
+$requiredDriverFiles = @("OpenA8DJUsb.inf", "OpenA8DJUsb.sys", "OpenA8DJUsb.cat", "OpenA8DJUsb-TestCertificate.cer", "package-manifest.json")
 foreach ($name in $requiredDriverFiles) {
     if (-not (Test-Path (Join-Path $driverOut $name))) {
         throw "Installable package is missing required file: $name"
     }
 }
+Test-OpenA8DJPackageManifest -PackageDir $driverOut | Out-Null
 
 $scriptFiles = @(
     "OpenA8DJ.WindowsCommon.psm1",
