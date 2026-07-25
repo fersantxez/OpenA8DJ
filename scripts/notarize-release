@@ -8,6 +8,7 @@ tools_pkg="${TOOLS_PKG:-build/opena8dj-tools-${version}.pkg}"
 tools_dmg="${TOOLS_DMG:-build/opena8dj-tools-${version}.dmg}"
 checksums="${CHECKSUMS:-build/OpenA8DJ-${version}-checksums.txt}"
 profile="${NOTARY_PROFILE:-OpenA8DJNotary}"
+dmg_sign_identity="${DMG_SIGN_IDENTITY:-}"
 
 require_file() {
   local path="$1"
@@ -30,6 +31,13 @@ require_file "$tools_pkg"
 require_file "$tools_dmg"
 require_tool xcrun
 require_tool shasum
+require_tool hdiutil
+require_tool codesign
+
+if [[ -z "$dmg_sign_identity" ]]; then
+  printf 'DMG_SIGN_IDENTITY is required to rebuild DMGs with stapled packages\n' >&2
+  exit 2
+fi
 
 notarize_and_staple() {
   local artifact="$1"
@@ -39,9 +47,47 @@ notarize_and_staple() {
   xcrun stapler validate "$artifact"
 }
 
+rebuild_dmg_with_stapled_pkg() {
+  local image="$1"
+  local embedded_pkg="$2"
+  local embedded_name="$3"
+  local volume_name="$4"
+  local work_dir mount_dir root_dir
+
+  work_dir="$(mktemp -d "${TMPDIR:-/tmp}/opena8dj-notarize.XXXXXX")"
+  mount_dir="$work_dir/mount"
+  root_dir="$work_dir/root"
+  mkdir -p "$mount_dir" "$root_dir"
+
+  hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$image"
+  COPYFILE_DISABLE=1 cp -R "$mount_dir/." "$root_dir/"
+  hdiutil detach "$mount_dir"
+  install -m 644 "$embedded_pkg" "$root_dir/$embedded_name"
+
+  rm -f "$image"
+  COPYFILE_DISABLE=1 hdiutil create \
+    -volname "$volume_name" \
+    -srcfolder "$root_dir" \
+    -ov \
+    -format UDZO \
+    "$image"
+  codesign --force --sign "$dmg_sign_identity" --timestamp "$image"
+  rm -rf "$work_dir"
+}
+
 notarize_and_staple "$pkg"
+rebuild_dmg_with_stapled_pkg \
+  "$dmg" \
+  "$pkg" \
+  "OpenA8DJ-${version}.pkg" \
+  "OpenA8DJ ${version}"
 notarize_and_staple "$dmg"
 notarize_and_staple "$tools_pkg"
+rebuild_dmg_with_stapled_pkg \
+  "$tools_dmg" \
+  "$tools_pkg" \
+  "opena8dj-tools-${version}.pkg" \
+  "opena8dj-tools ${version}"
 notarize_and_staple "$tools_dmg"
 
 (

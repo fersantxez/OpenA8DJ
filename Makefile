@@ -1054,7 +1054,7 @@ release-signed:
 	$(MAKE) dist CODESIGN_TIMESTAMP=--timestamp CODESIGN_OPTIONS="--options runtime"
 
 notarize:
-	VERSION="$(VERSION)" PKG="$(PKG)" DMG="$(DMG)" CHECKSUMS="$(CHECKSUMS)" NOTARY_PROFILE="$(NOTARY_PROFILE)" ./scripts/notarize-release
+	VERSION="$(VERSION)" PKG="$(PKG)" DMG="$(DMG)" CHECKSUMS="$(CHECKSUMS)" NOTARY_PROFILE="$(NOTARY_PROFILE)" DMG_SIGN_IDENTITY="$(DMG_SIGN_IDENTITY)" ./scripts/notarize-release
 
 verify-signed-release:
 	VERSION="$(VERSION)" PKG="$(PKG)" DMG="$(DMG)" CHECKSUMS="$(CHECKSUMS)" HAL_BUNDLE="$(HAL_BUNDLE)" CONTROL_TOOL="$(CONTROL_TOOL)" MIDI_BRIDGE="$(MIDI_BRIDGE)" ./scripts/verify-signed-release
