@@ -1783,6 +1783,8 @@ summary = {
         "full_ab_command_shell_hint": physical_evidence_window_plan.get(
             "full_ab_command_shell_hint"
         ),
+        "reference_wav": physical_evidence_window_plan.get("reference_wav"),
+        "plan_status": physical_evidence_window_plan.get("status"),
         "blockers": physical_evidence_window_plan.get("blockers"),
         "next_action": physical_evidence_window_plan.get("next_action"),
         "lock_required_before_command": physical_evidence_window_plan.get(
