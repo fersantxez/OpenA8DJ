@@ -40,17 +40,29 @@ frozen executable hash above.
 - Elastic high water: 9216 frames
 - Offline modeled pipeline: 78.667 ms p95 for the baseline geometry
 - Offline C++/fixture gates: PASS
-- Exact-artifact HAL safety: PASS, one cycle, 20-second stabilization window
+- Exact-artifact HAL safety: PASS, three cycles, 20-second stabilization window
 - Required device: Open Audio 8 DJ present, 8 inputs / 8 outputs at 48 kHz
 - Final audio stack health: PASS
-- Final watched CPU sample: 0.2% maximum watched process, 0.0% driver/coreaudiod
+- Loaded-cycle watched CPU: 0.0%, 0.0%, and 0.1% total
+- Loaded-cycle driver/coreaudiod CPU: 0.0% in all three guard samples
+- Post-unload recovery: PASS after cycles 1 and 2
+- Final watched CPU sample after the soak: 0.0%
 - Hardware lock after validation: free
 
 Evidence directories:
 
 - `local-analysis/hal-candidate-safety/frozen-stable3072-final`
+- `local-analysis/hal-candidate-safety/frozen-stable3072-soak3`
 - `local-analysis/hal-candidate-safety/restore-stable-output3072-after-freeze-failure-wait20`
 - `local-analysis/timecode-latency/offline`
+
+The HAL safety evidence consumer was also corrected to discover the actual
+isolated worktree instead of falling back to a checkout with a hard-coded
+directory name. It now chooses the latest run from the explicit `finished=`
+timestamp and resolves the candidate path declared by that run's manifest.
+The resulting offline safety gate reports the frozen soak as latest,
+`diagnostic_install_active=true`, and identical candidate/current/installed
+hashes.
 
 ## Limits
 

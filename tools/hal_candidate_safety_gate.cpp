@@ -14,17 +14,22 @@ struct SafetyRun {
   std::filesystem::path dir;
   std::filesystem::file_time_type time{};
   bool has_time = false;
+  std::string finished;
 };
 
 std::filesystem::path repo_root(char** argv) {
   auto root = std::filesystem::absolute(argv[0]).parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
+  while (!root.empty()) {
+    if (std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
+      return root;
+    }
+    const auto parent = root.parent_path();
+    if (parent == root) {
+      break;
+    }
+    root = parent;
   }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    return "/Users/fer/dev/audio8djcpp";
-  }
-  return root;
+  return std::filesystem::current_path();
 }
 
 std::string read_file(const std::filesystem::path& path) {
@@ -158,7 +163,16 @@ void scan_runs_root(const std::filesystem::path& runs_root, std::optional<Safety
     run.dir = entry.path();
     run.time = time;
     run.has_time = true;
-    if (!latest || run.time > latest->time || run.dir.string() > latest->dir.string()) {
+    run.finished = key_value(summary_text, "finished")
+                       .value_or(key_value(manifest_text, "started").value_or(""));
+    const bool newer_explicit_time =
+        !run.finished.empty() &&
+        (!latest || latest->finished.empty() || run.finished > latest->finished);
+    const bool newer_file_time =
+        latest && run.finished.empty() && latest->finished.empty() &&
+        (run.time > latest->time ||
+         (run.time == latest->time && run.dir.string() > latest->dir.string()));
+    if (!latest || newer_explicit_time || newer_file_time) {
       latest = run;
     }
   }
@@ -271,10 +285,15 @@ int main(int argc, char** argv) {
                                       !recovery_summary.empty();
   const auto leave_loaded = manifest_value(manifest, "leave_loaded").value_or("missing");
   const auto candidate_hash = manifest_value(manifest, "candidate_hash").value_or("missing");
+  auto current_candidate_bundle =
+      std::filesystem::path(manifest_value(manifest, "candidate").value_or("build/OpenA8DJ.driver"));
+  if (current_candidate_bundle.is_relative()) {
+    current_candidate_bundle = root / current_candidate_bundle;
+  }
   const auto cycles = manifest_value(manifest, "cycles").value_or("missing");
   const auto installed_hal = std::filesystem::path("/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver");
   const auto current_candidate_executable =
-      root / "build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL";
+      current_candidate_bundle / "Contents/MacOS/OpenA8DJHAL";
   const auto active_installed_executable =
       installed_hal / "Contents/MacOS/OpenA8DJHAL";
   const bool active_hal_installed_now = std::filesystem::is_directory(installed_hal);
