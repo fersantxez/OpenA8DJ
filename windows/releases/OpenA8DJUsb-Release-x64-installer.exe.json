@@ -1,0 +1,12 @@
+{
+    "installer":  "OpenA8DJUsb-Release-x64-installer.exe",
+    "format":  ".NET Framework self-extracting EXE bootstrapper",
+    "configuration":  "Release",
+    "platform":  "x64",
+    "payload_zip":  "OpenA8DJUsb-Release-x64-installer.zip",
+    "sha256":  "ccdc2f2782f080067b7b5944abd977ffcc1727b171e3aeaedb49216fcc80b9cc",
+    "bytes":  340480,
+    "signed":  false,
+    "signing_note":  "Development package; not Microsoft-signed and not code-signed.",
+    "install_mode":  "stage-only by default; physical binding requires explicit installer script switches"
+}

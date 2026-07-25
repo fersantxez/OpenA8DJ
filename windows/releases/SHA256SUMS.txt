@@ -1,0 +1,2 @@
+ccdc2f2782f080067b7b5944abd977ffcc1727b171e3aeaedb49216fcc80b9cc  OpenA8DJUsb-Release-x64-installer.exe
+ea02c534b76ff3d669b52bc5af0c8356dcb42b3a6f22787d9f2f4bf3f2885a4c  OpenA8DJUsb-Release-x64-installer.zip

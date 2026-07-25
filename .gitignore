@@ -4,6 +4,8 @@
 # Build and release artifacts
 build/
 dist/
+__pycache__/
+*.pyc
 .venv/
 .venv-analysis/
 *.pkg

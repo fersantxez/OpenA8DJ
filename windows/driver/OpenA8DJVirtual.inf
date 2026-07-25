@@ -1,0 +1,168 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=MEDIA
+ClassGuid={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%ProviderName%
+DriverVer=07/12/2026,0.0.2.0
+CatalogFile=OpenA8DJVirtual.cat
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir=13
+OpenA8DJVirtual.CopyFiles=13
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[SourceDisksFiles]
+OpenA8DJVirtual.sys=1
+
+[Manufacturer]
+%ManufacturerName%=OpenA8DJVirtual,NTamd64.10.0...19041
+
+[OpenA8DJVirtual.NTamd64.10.0...19041]
+%DeviceName%=OpenA8DJVirtual.Install,ROOT\OpenA8DJVirtual
+
+[OpenA8DJVirtual.Install.NT]
+CopyFiles=OpenA8DJVirtual.CopyFiles
+
+[OpenA8DJVirtual.CopyFiles]
+OpenA8DJVirtual.sys
+
+[OpenA8DJVirtual.Install.NT.Services]
+AddService=OpenA8DJVirtual,%SPSVCINST_ASSOCSERVICE%,OpenA8DJVirtual.Service
+
+[OpenA8DJVirtual.Service]
+DisplayName=%ServiceName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenA8DJVirtual.sys
+
+[OpenA8DJVirtual.Install.NT.Wdf]
+KmdfService=OpenA8DJVirtual,OpenA8DJVirtual.Wdf
+
+[OpenA8DJVirtual.Wdf]
+KmdfLibraryVersion=1.31
+
+[OpenA8DJVirtual.Install.NT.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJRenderA%,OpenA8DJVirtual.RenderA.Interface
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_OpenA8DJRenderA%,OpenA8DJVirtual.RenderA.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJRenderA%,OpenA8DJVirtual.RenderA.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJRenderB%,OpenA8DJVirtual.RenderB.Interface
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_OpenA8DJRenderB%,OpenA8DJVirtual.RenderB.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJRenderB%,OpenA8DJVirtual.RenderB.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJRenderC%,OpenA8DJVirtual.RenderC.Interface
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_OpenA8DJRenderC%,OpenA8DJVirtual.RenderC.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJRenderC%,OpenA8DJVirtual.RenderC.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJRenderD%,OpenA8DJVirtual.RenderD.Interface
+AddInterface=%KSCATEGORY_RENDER%,%KSNAME_OpenA8DJRenderD%,OpenA8DJVirtual.RenderD.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJRenderD%,OpenA8DJVirtual.RenderD.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJCaptureA%,OpenA8DJVirtual.CaptureA.Interface
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_OpenA8DJCaptureA%,OpenA8DJVirtual.CaptureA.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJCaptureA%,OpenA8DJVirtual.CaptureA.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJCaptureB%,OpenA8DJVirtual.CaptureB.Interface
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_OpenA8DJCaptureB%,OpenA8DJVirtual.CaptureB.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJCaptureB%,OpenA8DJVirtual.CaptureB.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJCaptureC%,OpenA8DJVirtual.CaptureC.Interface
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_OpenA8DJCaptureC%,OpenA8DJVirtual.CaptureC.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJCaptureC%,OpenA8DJVirtual.CaptureC.Interface
+AddInterface=%KSCATEGORY_AUDIO%,%KSNAME_OpenA8DJCaptureD%,OpenA8DJVirtual.CaptureD.Interface
+AddInterface=%KSCATEGORY_CAPTURE%,%KSNAME_OpenA8DJCaptureD%,OpenA8DJVirtual.CaptureD.Interface
+AddInterface=%KSCATEGORY_REALTIME%,%KSNAME_OpenA8DJCaptureD%,OpenA8DJVirtual.CaptureD.Interface
+
+[OpenA8DJVirtual.RenderA.Interface]
+AddReg=OpenA8DJVirtual.RenderA.Interface.AddReg
+[OpenA8DJVirtual.RenderA.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%RenderAFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.RenderB.Interface]
+AddReg=OpenA8DJVirtual.RenderB.Interface.AddReg
+[OpenA8DJVirtual.RenderB.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%RenderBFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.RenderC.Interface]
+AddReg=OpenA8DJVirtual.RenderC.Interface.AddReg
+[OpenA8DJVirtual.RenderC.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%RenderCFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.RenderD.Interface]
+AddReg=OpenA8DJVirtual.RenderD.Interface.AddReg
+[OpenA8DJVirtual.RenderD.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%RenderDFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.CaptureA.Interface]
+AddReg=OpenA8DJVirtual.CaptureA.Interface.AddReg
+[OpenA8DJVirtual.CaptureA.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CaptureAFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.CaptureB.Interface]
+AddReg=OpenA8DJVirtual.CaptureB.Interface.AddReg
+[OpenA8DJVirtual.CaptureB.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CaptureBFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.CaptureC.Interface]
+AddReg=OpenA8DJVirtual.CaptureC.Interface.AddReg
+[OpenA8DJVirtual.CaptureC.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CaptureCFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[OpenA8DJVirtual.CaptureD.Interface]
+AddReg=OpenA8DJVirtual.CaptureD.Interface.AddReg
+[OpenA8DJVirtual.CaptureD.Interface.AddReg]
+HKR,,CLSID,,%Proxy.CLSID%
+HKR,,FriendlyName,,%CaptureDFriendlyName%
+HKR,"EP\0",%PKEY_AudioEndpoint_Association%,,%KSNODETYPE_ANY%
+HKR,"EP\0",%PKEY_AudioEndpoint_Supports_EventDriven_Mode%,0x00010001,0x1
+
+[Strings]
+ProviderName="OpenA8DJ"
+ManufacturerName="OpenA8DJ"
+DiskName="OpenA8DJ Virtual ACX Proof Package"
+DeviceName="OpenA8DJ Virtual ACX Proof Endpoint"
+ServiceName="OpenA8DJ Virtual ACX Proof Driver"
+SPSVCINST_ASSOCSERVICE=0x00000002
+Proxy.CLSID="{17CCA71B-ECD7-11D0-B908-00A0C9223196}"
+KSCATEGORY_AUDIO="{6994AD04-93EF-11D0-A3CC-00A0C9223196}"
+KSCATEGORY_RENDER="{65E8773E-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_CAPTURE="{65E8773D-8F56-11D0-A3B9-00A0C9223196}"
+KSCATEGORY_REALTIME="{EB115FFC-10C8-4964-831D-6DCB02E6F23F}"
+KSNAME_OpenA8DJRenderA="OpenA8DJ Virtual Render A"
+KSNAME_OpenA8DJRenderB="OpenA8DJ Virtual Render B"
+KSNAME_OpenA8DJRenderC="OpenA8DJ Virtual Render C"
+KSNAME_OpenA8DJRenderD="OpenA8DJ Virtual Render D"
+KSNAME_OpenA8DJCaptureA="OpenA8DJ Virtual Capture A"
+KSNAME_OpenA8DJCaptureB="OpenA8DJ Virtual Capture B"
+KSNAME_OpenA8DJCaptureC="OpenA8DJ Virtual Capture C"
+KSNAME_OpenA8DJCaptureD="OpenA8DJ Virtual Capture D"
+PKEY_AudioEndpoint_Association="{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},2"
+PKEY_AudioEndpoint_Supports_EventDriven_Mode="{1DA5D803-D492-4EDD-8C23-E0C0FFEE7F0E},7"
+KSNODETYPE_ANY="{00000000-0000-0000-0000-000000000000}"
+RenderAFriendlyName="OpenA8DJ Virtual (8ch Out)"
+RenderBFriendlyName="OpenA8DJ Virtual (Ch B, Out 3|4)"
+RenderCFriendlyName="OpenA8DJ Virtual (Ch C, Out 5|6)"
+RenderDFriendlyName="OpenA8DJ Virtual (Ch D, Out 7|8)"
+CaptureAFriendlyName="OpenA8DJ Virtual (8ch In)"
+CaptureBFriendlyName="OpenA8DJ Virtual (Ch B, In 3|4)"
+CaptureCFriendlyName="OpenA8DJ Virtual (Ch C, In 5|6)"
+CaptureDFriendlyName="OpenA8DJ Virtual (Ch D, In 7|8)"
