@@ -4,6 +4,7 @@ Date: 2026-07-25
 Worktree: `/Users/fer/dev/opena8dj-latency-lab`
 Branch: `codex/timecode-latency`
 Base revision: `27a8410`
+Current evidence revision: `324cddd`
 
 ## Scope
 
@@ -39,6 +40,11 @@ was touched during this run.
   modeled reductions.
 - `scripts/run-cpp-offline-gates` includes the latency gate and its test while
   preserving diagnostic failures for route contamination and iRig idle capture.
+- `tools/evidence_provenance_freshness_gate.cpp` now resolves the active
+  worktree instead of falling back to the legacy checkout, and treats the
+  optional candidate manifest as optional. The current offline evidence is
+  therefore attributable to `324cddd` with a clean worktree and the provenance
+  gate passes.
 - The CPU-pool candidate contract now correctly reports that a build-only helper
   cannot claim physical evidence or product readiness.
 
@@ -223,6 +229,14 @@ post-run health check still showed Open Audio 8 DJ as 8 inputs/8 outputs at
 48 kHz, iRig Stream at 44.1 kHz, `audio_stack_health=PASS`, and
 `hardware_lock=LOCK_FREE`. This check did not reset CoreAudio or change any
 device configuration.
+
+The broader offline runner still returns a diagnostic nonzero status because its
+readiness packet intentionally preserves three missing historical physical
+artifacts and the physical promotion gates remain closed. The final objective
+auditor now reports only the external blockers: full DriverKit/deXt runtime
+proof, a fresh same-session Audio8-to-iRig A/B comparison, runtime CPU/resource
+superiority, and the real Traktor/timecode-vinyl window. No stale-HEAD blocker
+remains.
 
 ## Evidence files
 
