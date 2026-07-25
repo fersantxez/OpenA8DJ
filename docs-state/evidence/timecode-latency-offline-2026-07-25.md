@@ -106,6 +106,7 @@ Candidate artifacts and safety results:
 | prefetch64 | `de9e1cfc67e6b7833e19e1cae6843fa972f2fe3430a89f9fc41cc1335d2ebeba` | FAIL on first cycle; CoreAudio 125.6% CPU and total watched 134.5% | not eligible; physical sound test intentionally skipped | reject |
 | restart1024 | `dce993ccf0763fc8915b84875f2e6618875340691cffa46b970e24eeb825d2b6` | PASS, two cycles, clean recovery | FAIL: alignment 0.958576, SNR 4.95 dB, lag jumps 22; CPU peaks 63.1% CoreAudio and 153.9% total watched | reject |
 | start2816 | `9acd9b948fe5b5df4865f6e2498a66f5a5f2d953a3093a34315dc0b63bf71086` | FAIL on post-unload guard; CoreAudio 105.3% CPU and total watched 114.5% | not eligible; physical sound test intentionally skipped | reject |
+| responsive512 | `d13747097e1bd3e7baf779eb43d7da6d526e1c9985b628b9c22fe9e77c5ac0ef` | PASS, two cycles, clean recovery | FAIL: alignment 0.959289, SNR 4.96 dB, lag jumps 23; no clipping | reject |
 
 The output2304 physical run also recorded zero capture status failures, zero
 capture transaction errors, zero playback transfer errors, zero output
@@ -157,6 +158,15 @@ The subsequent stable restore encountered a separate CoreAudio recovery spike
 (`108.9%`, total `128.0%`); the explicit `audio-stack-health --reset` recovery
 then passed, and the stable output3072 bundle was loaded and verified again.
 
+The responsive512 candidate retained the output target and prefetch settings
+and reduced only the input maximum-latency allowance to 512 frames. It passed
+two safety cycles and clean recovery. The isolated audio route still failed
+the strict quality gate with alignment `0.959289`, analog SNR `4.96` dB, and
+23 lag jumps, although no clipping was observed. This fixture does not carry
+Traktor timecode, so it cannot prove DVS input-latency improvement; the
+candidate is rejected pending a real timecode stimulus and a valid product
+comparison.
+
 ## Final post-test state
 
 After the candidate runs, the stable output3072 bundle was loaded again and
@@ -194,3 +204,6 @@ both safety and sound-quality gates.
 - `local-analysis/hal-candidate-safety/start2816-cycles2`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-start2816`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-start2816-reset`
+- `local-analysis/hal-candidate-safety/responsive512-cycles2`
+- `local-analysis/physical-superiority-window/20260725-responsive512-physical-pairB-48000`
+- `local-analysis/hal-candidate-safety/final-stable-output3072-after-responsive512`
