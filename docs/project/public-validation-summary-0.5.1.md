@@ -64,10 +64,28 @@ OpenA8DJ-0.5.1.dmg
 OpenA8DJ-0.5.1-checksums.txt
 ```
 
-The final GitHub-downloaded installation results are appended here after the
-signed assets replace the earlier prerelease files. Publication is not complete
-until the downloaded DMG passes its public checksum, Gatekeeper, stapled-ticket,
-normal Installer, installed-file, device-visibility, and CPU-health checks.
+The final GitHub assets were downloaded into
+`~/Downloads/OpenA8DJ-0.5.1-GitHub-Final` after a complete uninstall. The
+public checksum and DMG integrity checks passed. A quarantined Finder/open
+launch mounted the DMG without a Gatekeeper warning, and the normal Installer
+welcome screen opened successfully.
+
+The documented `sudo installer` fallback was then used with the same downloaded
+package to complete the unattended test. This fallback was not needed to bypass
+Gatekeeper or a package-signature failure. Installation completed with receipt
+`org.opena8dj.driver` version 0.5.1.
+
+The installed HAL, Control Center, command-line helper, and MIDI bridge matched
+the signed build hashes exactly and passed code-signature checks. Core Audio
+enumerated `Open Audio 8 DJ` with 8 inputs and 8 outputs at 48 kHz; the MIDI In
+and Out endpoints were present; Control Center, `opena8dj-control`, and
+`opena8dj-midid` were installed; and profile enumeration passed. Final idle
+samples were 0.0% for both the driver and CoreAudio.
+
+CoreAudio was restarted only by the installer postinstall. The validation did
+not handle USB hardware, change the sample rate or default device, automate
+Traktor, play audio, or record audio. The hardware lock was free afterward.
+Evidence is in `local-analysis/github-install-e2e-20260725T2208Z`.
 
 ## Distribution
 
@@ -84,8 +102,7 @@ asset.
 The final public DMG, its embedded installer, driver, MIDI bridge, and command
 line helper are Developer ID signed. Apple notarization accepted the final
 containers and their tickets are stapled. OpenA8DJ 0.5.1 supersedes 0.5.0 as
-the current signed and notarized responsive release once the GitHub-downloaded
-installation gate above passes.
+the current signed and notarized responsive release.
 
 ## Not Claimed
 

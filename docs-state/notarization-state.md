@@ -68,9 +68,16 @@ The GitHub release remains DMG-only for users: publish
 and tools containers are internal verification artifacts and must not be
 uploaded as separate release assets.
 
-The public GitHub-downloaded installation result is recorded in
-`docs/project/public-validation-summary-0.5.1.md` after the final release
-replacement and clean end-user installation.
+The final GitHub assets were downloaded after a complete uninstall and passed
+checksum, DMG integrity, quarantine/Finder open, Gatekeeper, stapled-ticket,
+normal Installer opening, installed-file, device-visibility, and CPU-health
+checks. The documented `sudo installer` fallback completed the unattended test
+with the same downloaded package; it was not used to bypass Gatekeeper or a
+signature failure. The installed driver remains available as 8 inputs and 8
+outputs at 48 kHz, with MIDI endpoints, Control Center, and command-line tools
+present. Evidence is recorded in
+`docs/project/public-validation-summary-0.5.1.md` and
+`local-analysis/github-install-e2e-20260725T2208Z`.
 
 ## Current 0.5.0 Publication Attempt
 

@@ -1,22 +1,25 @@
-# OpenA8DJ 0.5.0 Stable Reference
+# OpenA8DJ 0.5.1 Stable Reference
 
-Date: 2026-06-22
+Date: 2026-07-25
 
-This is the public GitHub release reference for OpenA8DJ 0.5.0, the current
-macOS C++ 0.5.x baseline.
+OpenA8DJ 0.5.1 is the current public macOS C++ release baseline. It freezes the
+responsive `output3072` profile accepted by the operator in Traktor.
 
 ## Public Reference
 
 ```text
-release=OpenA8DJ 0.5.0
+release=OpenA8DJ 0.5.1 Responsive Freeze
+release_url=https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1
 branch=main
 platform=macOS
+distribution=one self-contained driver DMG plus checksum file
+audio_source_commit=927d8af
+packaging_fix_commit=567c191
 driver=Core Audio HAL user-space driver
-runtime_state=DVS Vinyl input active, low-noise ground setting, CPU pool stable profile
-technical_evidence=docs-state/evidence/test-evidence.md
+runtime_state=DVS Vinyl input active by default
 ```
 
-## Build Profile
+## Frozen Profile
 
 ```text
 HAL_TIMECODE_INPUT_GAIN=1.0f
@@ -37,132 +40,83 @@ HAL_REUSE_ISOC_COMPLETIONS=0
 HAL_RAW_ISOC_COMPLETIONS=0
 ```
 
-## Runtime Profile
+## Public Artifacts
 
 ```text
-state=DVS Vinyl input active, low-noise ground setting
-input-mode=0 (timecode-vinyl)
-gnd-vinyl=off
-gnd-cd-line=off
-gnd-phono=off
-software-lock=on
-input-decode=on
-input-transform=A=normal B=normal C=normal D=normal
-input-source=A=A B=B C=C D=D
+OpenA8DJ-0.5.1.dmg
+  sha256=3ca1a7e0e4478c1583919a51490977a56b540e8cd1f10354686c45d8671fdbd0
+OpenA8DJ-0.5.1-checksums.txt
 ```
 
-## Validation
+The GitHub release has no standalone PKG or tools DMG. The public DMG contains
+the stapled PKG and installs:
 
 ```text
-human_validation=PASS
-operator_report=Sounds excellent. Freeze as stable.
-active_stream_target=3072 frames
-stable_profile=cpu-pool
-installed_hal_sha256=c6e4d491e35e73d90109cab33c71a616173d002fbc6fa2519c241512eb85c951
-unsigned_build_hal_sha256=79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098
-external_capture_validation_run=local-analysis/physical-cpu-candidate-ab/20260620T120432-cpu-pool-repeat-external-capture/soundcheck-candidate-repeat
-quality_alignment_score=0.948151
-analog_snr_db=8.72
-capture_clipped_frames=0
-targeted_offline_gates=PASS
-audio_stack_health_after_settle=PASS
-outputUnderruns=0
-outputActiveUnderruns=0
-outputLateWriteFrames=0
-playbackTransferErrors=0
-captureStatusFailures=0
-outputPanicFlags=0
-hardware_lock_after_install=absent
+OpenA8DJ.driver
+OpenA8DJ Control Center.app
+opena8dj-control
+opena8dj-midid
+opena8dj-uninstall
+Control Center and Traktor documentation
 ```
 
-## Latest Public GitHub Install Validation
+## Signing And Notarization
 
 ```text
-date=2026-06-22
-repo_commit=dde7afd
-artifact_source_commit=86bd027
-release=https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0
-evidence=local-analysis/github-install-e2e-20260622T063225Z
-download_location=~/Downloads
-install_source=GitHub release v0.5.0 public DMGs
-download_checksums=PASS
-stapled_tickets_public_dmgs=PASS
-gatekeeper_public_dmgs=PASS
-mounted_pkg_signatures=PASS
-mounted_pkg_gatekeeper=PASS
-normal_installer_opened_driver=yes
-normal_installer_opened_tools=yes
-sudo_fallback_used=yes
-driver_install=PASS
-tools_install=PASS
-installed_receipts=org.opena8dj.driver, org.opena8dj.tools
-installed_signatures=PASS
-core_audio_visibility=Open Audio 8 DJ, 8 input / 8 output channels at 48 kHz
-midi_visibility=Open Audio 8 DJ MIDI In/Out present
-control_center=PASS
-control_tool=PASS
-midid_launch_agent=PASS
-audio_stack_health=PASS
-coreaudio_restart=uninstall only, via project uninstaller
-hardware_usb_touched=no
-physical_playback_capture=not repeated for public download validation
-installed_hal_sha256=2fdbd49723b200c8c56577b88dba395f65ff5c86ebc1e81c23b0d138193aae10
-installed_control_cli_sha256=f2355b8f3d88d5a5ffdb1f876e41a9055ca38fa00c7a9f97591fd1b3afe18f09
-installed_midid_sha256=c5f856d68a13a42d257afe6e1069d3e7d78afb4106f67af1e58e629b9b108cb5
-installed_control_center_sha256=f0c3bf9982b13e63068371ee0d2365a21faf1b1e7ae68c1eddebe18ea9740fd2
+make verify-signed-release=PASS
+DMG Gatekeeper=Notarized Developer ID
+DMG stapled ticket=PASS
+embedded PKG Gatekeeper=Notarized Developer ID
+embedded PKG stapled ticket=PASS
+installed code signatures=PASS
+trusted timestamps=PASS
 ```
 
-The public download validation did not repeat the physical playback/capture
-soundcheck because the installed binary hashes matched the locally installed
-signed-DMG build that already passed physical route checks and isolated
-real-music external capture. No USB/hardware handling was needed for the public
-download install gate.
-
-## Latest Local Installer Validation
+Final Apple submission IDs:
 
 ```text
-date=2026-06-21
-repo_commit=2cb606a
-artifact_source_commit=86bd027
-evidence=local-analysis/local-install-e2e-20260621-112707
-install_source=local rebuilt signed DMGs
-install_mode=sudo installer from mounted DMGs
-driver_install=PASS
-tools_install=PASS
-installed_signatures=PASS
-core_audio_visibility=Open Audio 8 DJ, 8 input / 8 output channels at 48 kHz
-midi_visibility=Open Audio 8 DJ MIDI In/Out present
-control_tool=PASS
-audio_stack_health_final=PASS
-physical_route_A=PASS
-physical_route_B=PASS
-real_music_soundcheck=PASS
-quality_alignment_score=0.950734
-analog_snr_db=8.92
-capture_clipped_frames=0
-hardware_lock_after=absent
+763346e5-3bf5-47a5-9db0-1f775385a6a3  OpenA8DJ-0.5.1.pkg
+42274ddd-3e40-4404-8228-84298f72b42e  OpenA8DJ-0.5.1.dmg
+6b60378a-0667-442e-b268-7b206679ffcc  opena8dj-tools-0.5.1.pkg
+bbfca1d0-0dac-4f10-98c3-d1503771bf93  opena8dj-tools-0.5.1.dmg
 ```
 
-This was the same signed artifact family before GitHub upload. It is retained
-as the physical sound-quality evidence for the public build, and the public
-download validation above confirms the published files install to matching
-binary hashes.
-
-## Important Rejections
-
-- Do not use `HAL_INPUT_MAX_LATENCY_FRAMES=512` for DVS latency. It caused
-  Traktor to return to blank/low-signal-like `Calibrating`.
-- Do not enable digital timecode input gain or input gate in the stable DVS
-  build. Those were useful diagnostics, but they are not part of the stable
-  0.5.0 reference.
-- Do not jump to 2048 output frames without a separate same-session physical
-  validation window. The 3072-frame output target is the current stable balance.
-- Do not enable reusable/raw ISO completion-handler experiments in the stable
-  0.5.0 build without a separate same-artifact physical sound validation window.
-
-## Rollback References
+## GitHub-Downloaded Installation
 
 ```text
-previous_stable_output4096_sha256=5be65453c1e501f4c2a28bff67e37de71665662311d62a44c19087fe11a4caa7
-previous_frozen_good_sha256=bdd6f2f9ba2666f48dd27c639b279f13d89baa522f4bb7e60d42a0688777c5aa
+evidence=local-analysis/github-install-e2e-20260725T2208Z
+download_location=~/Downloads/OpenA8DJ-0.5.1-GitHub-Final
+download_checksum=PASS
+DMG integrity=PASS
+quarantined Finder open=PASS
+normal Installer welcome=PASS, no Gatekeeper warning
+sudo fallback used=yes, for unattended completion after GUI-path verification
+driver install=PASS
+installed receipt=org.opena8dj.driver 0.5.1
+Core Audio visibility=Open Audio 8 DJ, 8 input / 8 output at 48 kHz
+MIDI visibility=Open Audio 8 DJ MIDI In/Out present
+Control Center presence and signature=PASS
+control CLI and MIDI bridge presence and signatures=PASS
+audio stack health after install=PASS
+final idle driver CPU=0.0%
+final idle CoreAudio CPU=0.0%
+CoreAudio restart=installer postinstall only
+physical USB handling=none
+playback or recording=none
+hardware lock after validation=FREE
 ```
+
+Installed binary hashes matched the build exactly:
+
+```text
+4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66  OpenA8DJHAL
+55e7473ee8147179a195ca960041aea74ad3ac7b8f295cf7aca4c29dd6644de2  OpenA8DJControlCenter
+73be7d6a5c780cc21e3ca1baa77300ef83b3bd01374ae2fed2db80a34f7b42c2  opena8dj-control
+3d1e3697c7814580c31b47b88614e33b682d8129ec7407ea5f8ad30bc1e1ca75  opena8dj-midid
+```
+
+The final GitHub installation gate did not repeat physical playback or capture.
+The audio engine is the frozen 0.5.1 candidate previously accepted by the
+operator in Traktor and protected by the existing physical and offline quality
+evidence. Future latency candidates must pass
+`docs/project/timecode-latency-checkpoints.md` before replacing this baseline.

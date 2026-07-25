@@ -2363,3 +2363,66 @@ postinstall failed closed. That candidate was removed from GitHub, the partial
 install was fully cleaned, and commit `567c191` made the HAL and app components
 non-relocatable. The rebuilt signed package then passed a complete local
 install/uninstall before the final notarization submissions recorded above.
+
+## 2026-07-25 22:09 UTC - Final GitHub-downloaded 0.5.1 installation
+
+The machine was fully cleaned of the OpenA8DJ driver, Control Center, command
+line tools, MIDI bridge, launch agent, and package receipts. The two actual
+GitHub release assets were then downloaded as a normal user into
+`~/Downloads/OpenA8DJ-0.5.1-GitHub-Final`:
+
+```text
+OpenA8DJ-0.5.1.dmg
+OpenA8DJ-0.5.1-checksums.txt
+```
+
+The public checksum matched
+`3ca1a7e0e4478c1583919a51490977a56b540e8cd1f10354686c45d8671fdbd0`.
+`hdiutil verify`, DMG Gatekeeper assessment, and DMG stapled-ticket validation
+passed. After applying a realistic quarantine attribute, Finder/open mounted
+the DMG without a Gatekeeper warning. The embedded PKG independently passed
+stapled-ticket validation, Gatekeeper assessment, and Developer ID Installer
+signature verification with a trusted timestamp.
+
+The normal Installer welcome screen opened successfully. The documented
+`sudo installer` fallback then completed the unattended test using the same
+downloaded package. The fallback was not needed to bypass Gatekeeper or a
+signature failure. Installation passed with receipt `org.opena8dj.driver`
+version 0.5.1.
+
+Installed files and code signatures passed verification:
+
+```text
+/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/Applications/OpenA8DJ Control Center.app
+/usr/local/bin/opena8dj-control
+/usr/local/bin/opena8dj-midid
+/usr/local/bin/opena8dj-uninstall
+```
+
+The installed executable hashes matched the signed build exactly:
+
+```text
+4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66  OpenA8DJHAL
+55e7473ee8147179a195ca960041aea74ad3ac7b8f295cf7aca4c29dd6644de2  OpenA8DJControlCenter
+73be7d6a5c780cc21e3ca1baa77300ef83b3bd01374ae2fed2db80a34f7b42c2  opena8dj-control
+3d1e3697c7814580c31b47b88614e33b682d8129ec7407ea5f8ad30bc1e1ca75  opena8dj-midid
+```
+
+Core Audio enumerated `Open Audio 8 DJ` with 8 inputs and 8 outputs at 48 kHz.
+The Open Audio 8 DJ MIDI In and Out endpoints were present, Control Center and
+the command-line tools were present, profile enumeration passed, and final
+audio-stack health passed. Final idle samples were 0.0% for both the driver and
+CoreAudio.
+
+CoreAudio was restarted only by the installer postinstall. The test did not
+physically handle USB hardware, change the sample rate or default device,
+automate Traktor, play audio, or record audio. No physical sound-quality test
+was repeated because the installed executable matched the previously accepted
+frozen 0.5.1 build exactly. The hardware lock was free after validation.
+
+Evidence directory:
+
+```text
+local-analysis/github-install-e2e-20260725T2208Z
+```
