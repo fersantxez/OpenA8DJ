@@ -246,10 +246,24 @@ fi
 ./build/cpp-release/opena8djcpp_physical_capture_forensics | tee "$EVIDENCE_DIR/physical-capture-forensics.json"
 ./build/cpp-release/opena8djcpp_direct_usb_path_attribution | tee "$EVIDENCE_DIR/direct-usb-path-attribution.json"
 ./build/cpp-release/opena8djcpp_capture_route_health_gate | tee "$EVIDENCE_DIR/capture-route-health-gate.json"
+set +e
 ./build/cpp-release/opena8djcpp_irig_idle_capture_gate | tee "$EVIDENCE_DIR/irig-idle-capture-gate.json"
+IRIG_IDLE_CAPTURE_RC=${PIPESTATUS[0]}
+set -e
+if [[ "$IRIG_IDLE_CAPTURE_RC" -ne 0 && "$IRIG_IDLE_CAPTURE_RC" -ne 1 ]]; then
+  exit "$IRIG_IDLE_CAPTURE_RC"
+fi
+printf '%s\n' "$IRIG_IDLE_CAPTURE_RC" > "$EVIDENCE_DIR/irig-idle-capture-gate.rc"
+set +e
 python3 scripts/analyze-route-contamination.py \
   --json-out "$EVIDENCE_DIR/route-contamination-analysis.json" \
   >/dev/null
+ROUTE_CONTAMINATION_RC=$?
+set -e
+if [[ "$ROUTE_CONTAMINATION_RC" -ne 0 && "$ROUTE_CONTAMINATION_RC" -ne 1 ]]; then
+  exit "$ROUTE_CONTAMINATION_RC"
+fi
+printf '%s\n' "$ROUTE_CONTAMINATION_RC" > "$EVIDENCE_DIR/route-contamination-analysis.rc"
 ./build/cpp-release/opena8djcpp_historical_route_reference_gate | tee "$EVIDENCE_DIR/historical-route-reference-gate.json"
 make -C "$ROOT" dist >/dev/null
 python3 scripts/check-hal-bundle-complete \
@@ -310,7 +324,9 @@ python3 -m py_compile \
   scripts/human-test-rc-status \
   scripts/summarize-transport-cadence.py \
   scripts/summarize-physical-product-evidence.py \
-  scripts/analyze-audiophile-wav.py
+  scripts/analyze-audiophile-wav.py \
+  scripts/timecode-latency-offline-gate \
+  scripts/test-timecode-latency-offline-gate.py
 python3 scripts/test-promotion-window-contract.py | tee "$EVIDENCE_DIR/promotion-window-contract.txt"
 python3 scripts/test-known-good-route-selector.py | tee "$EVIDENCE_DIR/known-good-route-selector-test.txt"
 python3 scripts/test-watch-known-good-route.py | tee "$EVIDENCE_DIR/watch-known-good-route-test.txt"
@@ -320,6 +336,7 @@ python3 scripts/test-route-contamination-analysis.py | tee "$EVIDENCE_DIR/route-
 python3 scripts/test-final-objective-readiness.py | tee "$EVIDENCE_DIR/final-objective-readiness-test.txt"
 python3 scripts/test-build-human-test-rc-packet.py | tee "$EVIDENCE_DIR/human-test-rc-packet-test.txt"
 python3 scripts/test-audit-objective-external-readiness.py | tee "$EVIDENCE_DIR/objective-external-readiness-test.txt"
+python3 scripts/test-timecode-latency-offline-gate.py | tee "$EVIDENCE_DIR/timecode-latency-offline-gate-test.txt"
 set +e
 python3 scripts/evaluate-promotion-readiness.py \
   --json-out "$EVIDENCE_DIR/promotion-readiness-offline-check.json" \
@@ -346,6 +363,9 @@ python3 scripts/evaluate-final-objective-readiness.py \
 ./build/cpp-release/opena8djcpp_human_test_rc_gate | tee "$EVIDENCE_DIR/human-test-rc-gate.json"
 python3 scripts/human-test-rc-status > "$EVIDENCE_DIR/human-test-rc-status.json"
 ./build/cpp-release/opena8djcpp_offline_bench | tee "$EVIDENCE_DIR/offline-bench-release.json"
+python3 scripts/timecode-latency-offline-gate \
+  --skip-build \
+  > "$EVIDENCE_DIR/timecode-latency-offline-gate.stdout"
 python3 - <<'PY'
 import json
 import re
@@ -510,6 +530,7 @@ human_test_rc_gate = load_json("human-test-rc-gate.json")
 human_test_rc_status = load_json("human-test-rc-status.json")
 final_objective_readiness = load_json("final-objective-readiness.json")
 bench = load_json("offline-bench-release.json")
+timecode_latency = load_json("../timecode-latency/offline/latency-offline-gate.json")
 promotion_evaluator = load_json("promotion-readiness-offline-check.json")
 promotion_window_contract = (evidence / "promotion-window-contract.txt").read_text(encoding="utf-8")
 
@@ -3588,6 +3609,16 @@ summary = {
         "panic_flags": bench.get("panic_flags"),
         "decode_into_check_errors": bench.get("decode_into_check_errors"),
         "decode_into_panic_flags": bench.get("decode_into_panic_flags"),
+    },
+    "timecode_latency_offline_gate": {
+        "status": timecode_latency.get("result"),
+        "schema": timecode_latency.get("schema"),
+        "physical_evidence_present": timecode_latency.get("physical_evidence_present"),
+        "product_claim_allowed": timecode_latency.get("product_claim_allowed"),
+        "profiles": timecode_latency.get("profiles", []),
+        "comparison": timecode_latency.get("comparison", {}),
+        "hard_failures": timecode_latency.get("hard_failures", []),
+        "evidence": "local-analysis/timecode-latency/offline/latency-offline-gate.json",
     },
     "promotion_readiness_evaluator": {
         "status": "PASS" if promotion_evaluator.get("result") in ("PASS", "FAIL") else "FAIL",

@@ -1,0 +1,223 @@
+#!/usr/bin/env python3
+"""Run the non-interactive DVS latency frontier gate.
+
+This gate combines the existing offline DVS/transport contracts with a
+deterministic latency-budget model. The model is diagnostic evidence only: it
+does not claim physical or Traktor readiness without a lock-gated run.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import subprocess
+from pathlib import Path
+
+
+PROFILES = (
+    ("baseline", 64, 3072, 512, 128),
+    ("capture32", 32, 3072, 512, 128),
+    ("capture16", 16, 3072, 512, 128),
+    ("output2560", 64, 2560, 512, 128),
+    ("output2304", 64, 2304, 512, 128),
+    ("output2048", 64, 2048, 512, 128),
+    ("host256", 64, 2048, 256, 128),
+)
+
+OFFLINE_BINARIES = (
+    "opena8djcpp_timecode_matrix",
+    "opena8djcpp_dvs_timecode_stress_margin",
+    "opena8djcpp_jitter_model",
+    "opena8djcpp_simulated_output_matrix",
+    "opena8djcpp_runtime_discontinuity_analysis",
+    "opena8djcpp_offline_bench",
+)
+
+OFFLINE_ARGUMENTS = {
+    # The default mode reads historical saved evidence and is allowed to fail
+    # when that evidence is unavailable. The self-test keeps this gate fully
+    # deterministic and independent of the physical capture state.
+    "opena8djcpp_runtime_discontinuity_analysis": ["--self-test"],
+}
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def run(command: list[str], root: Path) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        command,
+        cwd=root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def run_json(binary: Path, root: Path, arguments: list[str] | None = None) -> dict[str, object]:
+    command = [str(binary), *(arguments or [])]
+    return_code, stdout, stderr = run(command, root)
+    payload: dict[str, object] = {
+        "binary": str(binary),
+        "arguments": arguments or [],
+        "return_code": return_code,
+        "result": "PASS" if return_code == 0 else "FAIL",
+    }
+    try:
+        parsed = json.loads(stdout)
+        if isinstance(parsed, dict):
+            payload["report"] = parsed
+    except json.JSONDecodeError:
+        payload["stdout_tail"] = stdout[-2000:]
+    if stderr:
+        payload["stderr_tail"] = stderr[-2000:]
+    return payload
+
+
+def model_profile(
+    name: str,
+    sample_rate: int,
+    capture_iso_frames: int,
+    output_target_frames: int,
+    host_buffer_frames: int,
+    output_prefetch_frames: int,
+) -> dict[str, object]:
+    rate = float(sample_rate)
+    capture_ms = capture_iso_frames / rate * 1000.0
+    host_ms = host_buffer_frames / rate * 1000.0
+    output_ms = output_target_frames / rate * 1000.0
+    prefetch_ms = output_prefetch_frames / rate * 1000.0
+    callback_rate = rate / host_buffer_frames
+    capture_completion_rate = rate / capture_iso_frames
+    work_proxy = callback_rate + capture_completion_rate
+    modeled_p95_ms = capture_ms + host_ms + output_ms + prefetch_ms
+    queue_cover_frames = capture_iso_frames * 8
+    safe_geometry = output_target_frames >= host_buffer_frames * 4
+    return {
+        "name": name,
+        "sample_rate": sample_rate,
+        "capture_iso_frames": capture_iso_frames,
+        "output_target_frames": output_target_frames,
+        "host_buffer_frames": host_buffer_frames,
+        "output_prefetch_frames": output_prefetch_frames,
+        "capture_batch_ms": capture_ms,
+        "host_callback_ms": host_ms,
+        "output_reserve_ms": output_ms,
+        "output_prefetch_ms": prefetch_ms,
+        "modeled_pipeline_p95_ms": modeled_p95_ms,
+        "capture_completions_per_second": capture_completion_rate,
+        "host_callbacks_per_second": callback_rate,
+        "realtime_work_proxy_per_second": work_proxy,
+        "capture_queue_cover_frames": queue_cover_frames,
+        "geometry_safe_for_frontier": safe_geometry,
+        "result": "PASS" if safe_geometry else "FAIL",
+    }
+
+
+def compare_profiles(profiles: list[dict[str, object]]) -> dict[str, object]:
+    baseline = next(item for item in profiles if item["name"] == "baseline")
+    baseline_latency = float(baseline["modeled_pipeline_p95_ms"])
+    baseline_work = float(baseline["realtime_work_proxy_per_second"])
+    comparisons = []
+    for profile in profiles:
+        latency = float(profile["modeled_pipeline_p95_ms"])
+        work = float(profile["realtime_work_proxy_per_second"])
+        comparisons.append({
+            "name": profile["name"],
+            "modeled_latency_reduction_ms": baseline_latency - latency,
+            "modeled_latency_reduction_percent": (baseline_latency - latency) / baseline_latency * 100.0,
+            "work_proxy_change_percent": (work - baseline_work) / baseline_work * 100.0,
+            "frontier_result": profile["result"],
+        })
+    return {
+        "baseline": baseline["name"],
+        "model_only": True,
+        "comparisons": comparisons,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-dir", type=Path, default=Path("local-analysis/timecode-latency/offline"))
+    parser.add_argument("--sample-rate", type=int, default=48000)
+    parser.add_argument("--skip-build", action="store_true")
+    args = parser.parse_args()
+
+    root = Path(__file__).resolve().parents[1]
+    run_dir = args.run_dir if args.run_dir.is_absolute() else root / args.run_dir
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    build_report: dict[str, object] = {"result": "PASS", "command": None}
+    if not args.skip_build:
+        configure = ["cmake", "-S", ".", "-B", "build/cpp-release", "-DCMAKE_BUILD_TYPE=Release"]
+        build = ["cmake", "--build", "build/cpp-release", "--target", *OFFLINE_BINARIES]
+        rc, _, stderr = run(configure, root)
+        build_report = {"configure_return_code": rc, "configure_stderr_tail": stderr[-2000:]}
+        if rc == 0:
+            rc, stdout, stderr = run(build, root)
+            build_report.update({
+                "build_return_code": rc,
+                "build_stdout_tail": stdout[-2000:],
+                "build_stderr_tail": stderr[-2000:],
+            })
+        build_report["result"] = "PASS" if rc == 0 else "FAIL"
+
+    binaries = []
+    for name in OFFLINE_BINARIES:
+        binary = root / "build/cpp-release" / name
+        if not binary.is_file():
+            binaries.append({"binary": str(binary), "result": "FAIL", "reason": "missing"})
+        else:
+            binaries.append(run_json(binary, root, OFFLINE_ARGUMENTS.get(name)))
+
+    profiles = [model_profile(name, args.sample_rate, capture, output, host, prefetch)
+                for name, capture, output, host, prefetch in PROFILES]
+    comparisons = compare_profiles(profiles)
+    hard_failures = []
+    if build_report["result"] != "PASS":
+        hard_failures.append("offline_benchmark_build_failed")
+    for item in binaries:
+        if item["result"] != "PASS":
+            hard_failures.append(f"offline_binary_failed:{Path(str(item['binary'])).name}")
+    for profile in profiles:
+        if profile["result"] != "PASS":
+            hard_failures.append(f"unsafe_geometry:{profile['name']}")
+
+    payload = {
+        "schema": "opena8djcpp.timecode-latency-offline-gate.v1",
+        "result": "PASS" if not hard_failures else "FAIL",
+        "safety": "offline_only_no_audio_coreaudio_usb_traktor_or_hardware_touch",
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "claim_blocker": "EXACT_ARTIFACT_LOCK_GATED_PHYSICAL_LATENCY_AND_SOUND_EVIDENCE_REQUIRED",
+        "run_dir": str(run_dir),
+        "sample_rate": args.sample_rate,
+        "source_revision": sha256_file(root / "scripts/timecode-latency-offline-gate"),
+        "build": build_report,
+        "offline_binaries": binaries,
+        "profiles": profiles,
+        "comparison": comparisons,
+        "hard_failures": hard_failures,
+    }
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    (run_dir / "latency-offline-gate.json").write_text(text, encoding="utf-8")
+    (run_dir / "result.txt").write_text(
+        f"timecode_latency_offline_gate={payload['result']}\n"
+        "product_claim_allowed=false\n"
+        f"hard_failures={len(hard_failures)}\n",
+        encoding="utf-8",
+    )
+    print(text, end="")
+    return 0 if not hard_failures else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

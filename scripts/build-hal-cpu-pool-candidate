@@ -224,8 +224,10 @@ def main() -> int:
         "reuse_isoc_completion_handlers_enabled": False,
         "raw_isoc_completion_handlers_enabled": False,
         "layout_signature_fast_path_required": True,
-        "physical_evidence_present": True,
-        "product_claim_allowed": True,
+        # This helper only builds and smoke-tests a bundle. Promotion claims
+        # require the separate exact-artifact, lock-gated quality window.
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
         "stable_freeze_reference": "OpenA8DJ 0.5.0 stable CPU pool profile",
         "candidate_metrics": candidate_metrics,
         "default_hal_after_restore": default_metrics,

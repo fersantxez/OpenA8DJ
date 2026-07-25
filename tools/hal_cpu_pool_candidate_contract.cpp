@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
   const auto hal_source = read_file(root / "src/hal/OpenA8DJUSB.m");
   const auto script = read_file(root / "scripts/build-hal-cpu-pool-candidate");
   const auto investigation =
-      read_file(root / "docs/memories/investigations/cpu-optimization-2026-06-19.md");
+      read_file(root / "docs-state/investigations/cpu-optimization-2026-06-19.md");
 
   const bool sources_present =
       !makefile.empty() && !hal_source.empty() && !script.empty() && !investigation.empty();
@@ -93,6 +93,8 @@ int main(int argc, char** argv) {
       contains(script, "physical_evidence_present") &&
       contains(script, "product_claim_allowed") &&
       contains(script, "CPU_POOL_FREEZE_REQUIRES_EXACT_ARTIFACT_SOUND_VALIDATION") &&
+      contains(script, "physical_evidence_present\": False") &&
+      contains(script, "product_claim_allowed\": False") &&
       contains(investigation, "CPU pool is now the frozen 0.5.0 stable build profile");
 
   std::vector<std::string> blockers;
