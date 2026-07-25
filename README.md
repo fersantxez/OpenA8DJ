@@ -28,7 +28,7 @@ Apple-notarized for normal installation on macOS.
 - 44.1 kHz and 48 kHz validated as the primary rates
 - CoreMIDI endpoints for Audio 8 DJ MIDI I/O
 - Traktor Timecode Vinyl input active by default
-- Optional Control Center for normal hardware profiles
+- Included Control Center for normal hardware profiles
 
 Windows, Linux, Rust, and DriverKit branches are experimental or research work,
 not the public macOS release line.

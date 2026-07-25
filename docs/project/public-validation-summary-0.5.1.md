@@ -23,13 +23,13 @@ the release claim.
 
 ```text
 Signed HAL executable SHA-256:
-561aadd32bc24f078ad8a94936a8faaec7f5e90ea19e96f8212a078711a9ed62
+c2d7bfef23c1127ce8cba98b84b64d06cd5e306faaeed4c3adf37ab87c431778
 
 OpenA8DJ-0.5.1.dmg SHA-256:
-92703ac81fd9c4e9ebffa123b42cc835906c2cec716b0eb916bd165b45de66ac
+663edff5d4f9fe1945f1838fc72cd1e1ffa0f2697297db926aac813e3f7f6998
 
 OpenA8DJ-0.5.1.pkg SHA-256:
-1d54486ba6d13e69752bf4994ca0c39bcd1a486da0ffff13bf20e51df194002e
+3cd3dbd2da3ddf5b255cd5f70768ca4024e3f2b277887ce572578c833723283c
 ```
 
 The clean 0.5.1 build passed `hdiutil verify`, checksum verification, HAL smoke
@@ -42,6 +42,11 @@ stapled and validated. `make verify-signed-release` passed on the exact final
 files, including code signatures, Developer ID authorities, package
 signatures, trusted timestamps, Gatekeeper assessment, stapled tickets, and
 checksums.
+
+The DMG was rebuilt after the PKG ticket was stapled, then re-signed and
+notarized. The embedded PKG therefore validates its own stapled ticket, passes
+Gatekeeper assessment, and contains OpenA8DJ Control Center. The public DMG is
+self-contained and does not depend on the 0.5.0 tools package.
 
 ## GitHub-Downloaded Installation
 
