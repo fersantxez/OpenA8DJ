@@ -3,14 +3,15 @@
 This document captures the current gap between the OpenA8DJ 0.5.x macOS driver
 baseline and a production-quality independent macOS driver.
 
-Current status: OpenA8DJ 0.5.0 is the canonical macOS C++ line. The previous
-C/Objective-C implementation is preserved on `legacy` for historical reference,
-comparison, and recovery.
+Current status: OpenA8DJ 0.5.1 is the frozen responsive macOS C++ preview;
+0.5.0 remains the last Developer ID signed and notarized baseline. The previous
+C/Objective-C implementation is preserved on `legacy` for historical
+reference, comparison, and recovery.
 
 ## Current evidence
 
 - macOS enumerates `Open Audio 8 DJ` as an 8-input / 8-output device in the
-  0.5.0 baseline.
+  0.5.1 responsive freeze.
 - The HAL exposes one 8-channel input stream with named Input A/B/C/D channel
   pairs and 4 stereo output streams with named Output A/B/C/D pairs.
 - Local listening confirmed substantially cleaner playback at 44.1 and 48 kHz

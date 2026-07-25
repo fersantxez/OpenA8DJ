@@ -18,8 +18,8 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PKG = ROOT / "build/OpenA8DJ-0.5.0.pkg"
-DMG = ROOT / "build/OpenA8DJ-0.5.0.dmg"
+PKG = ROOT / "build/OpenA8DJ-0.5.1.pkg"
+DMG = ROOT / "build/OpenA8DJ-0.5.1.dmg"
 CANDIDATE = ROOT / "build/OpenA8DJ.driver"
 CPP_OFFLINE = ROOT / "local-analysis/cpp-offline"
 WATCHER_JSON = CPP_OFFLINE / "watch-known-good-route.json"

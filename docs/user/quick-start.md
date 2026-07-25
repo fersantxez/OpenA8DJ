@@ -4,28 +4,25 @@ Use this when you only want to get the Audio 8 DJ working on macOS.
 
 ## 1. Download
 
-Open the latest GitHub release:
+Open the 0.5.1 responsive release:
 
 ```text
-https://github.com/fersantxez/OpenA8DJ/releases/latest
+https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1
 ```
 
 Download:
 
 ```text
-OpenA8DJ-0.5.0.dmg
+OpenA8DJ-0.5.1.dmg
 ```
 
-If you also want the optional Control Center app, download:
-
-```text
-opena8dj-tools-0.5.0.dmg
-```
+The optional 0.5.0 Control Center remains compatible and is available from the
+0.5.0 release.
 
 ## 2. Install The Driver
 
-1. Open `OpenA8DJ-0.5.0.dmg`.
-2. Double-click `OpenA8DJ-0.5.0.pkg`.
+1. Open `OpenA8DJ-0.5.1.dmg`.
+2. Double-click `OpenA8DJ-0.5.1.pkg`.
 3. Follow the macOS Installer prompts.
 4. Reconnect the Audio 8 DJ if it does not appear immediately.
 5. Reopen your DJ or audio app if it was already running.

@@ -2,7 +2,7 @@
 
 OpenA8DJ `main` builds the modern macOS driver line.
 
-The current stable 0.5.0 line uses:
+The current 0.5.1 responsive line uses:
 
 - a Core Audio HAL bundle for the installable macOS driver;
 - IOUSBHost for Audio 8 DJ USB transport;
@@ -29,35 +29,36 @@ build/audio-pair-tone
 build/midi-list
 ```
 
-The default HAL build is the frozen 0.5.0 CPU pool profile:
+The default HAL build is the frozen 0.5.1 `output3072` profile:
 
 ```text
 HAL_TRANSFER_POOL_CURSOR=1
 HAL_FAST_ISO_TRANSFER_CONFIG=1
 HAL_REUSE_ISOC_COMPLETIONS=0
 HAL_RAW_ISOC_COMPLETIONS=0
+HAL_OUTPUT_START_LATENCY_FRAMES=3072
+HAL_OUTPUT_RESTART_LATENCY_FRAMES=1536
+HAL_OUTPUT_TARGET_LATENCY_FRAMES=3072
+HAL_OUTPUT_ELASTIC_HIGH_WATER_FRAMES=9216
 ```
 
 ## Build The Installer
 
 ```sh
-make dist
+make driver-dist
 ```
 
-Generated release artifacts:
+Generated public driver artifacts:
 
 ```text
-build/OpenA8DJ-<version>.pkg
 build/OpenA8DJ-<version>.dmg
-build/opena8dj-tools-<version>.pkg
-build/opena8dj-tools-<version>.dmg
 build/OpenA8DJ-<version>-checksums.txt
 ```
 
-Artifacts produced by `make dist` without release signing identities are local
-build artifacts, not public release assets. Use `make release-signed`,
-`make notarize`, and `make verify-signed-release` for replacement GitHub
-release downloads.
+The PKG is built inside the DMG but is not uploaded as a separate GitHub asset.
+Artifacts produced without release signing identities must be labeled as
+previews. Use `make release-signed`, `make notarize`, and
+`make verify-signed-release` for a polished signed replacement.
 
 ## Build The Official Signed Release
 

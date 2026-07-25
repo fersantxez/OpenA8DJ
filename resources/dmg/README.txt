@@ -1,4 +1,4 @@
-OpenA8DJ 0.5.0
+OpenA8DJ 0.5.1
 ==============
 
 OpenA8DJ is an independent, open-source preservation driver for the Native
@@ -9,7 +9,7 @@ Instruments. Product names are used only to identify compatibility.
 
 Install:
 
-1. Double-click OpenA8DJ-0.5.0.pkg.
+1. Double-click OpenA8DJ-0.5.1.pkg.
 2. Follow the macOS Installer prompts.
 3. Reconnect the Audio 8 DJ if it does not appear immediately.
 
@@ -31,14 +31,16 @@ sudo /usr/local/bin/opena8dj-uninstall
 
 Current status:
 
-- Version: 0.5.0
+- Version: 0.5.1 responsive freeze
 - Architecture: modern macOS C++ user-space driver stack
 - Core Audio device: Open Audio 8 DJ
 - Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
 - Primary validated playback rates: 44.1 kHz and 48 kHz
 - Traktor Timecode Vinyl: vinyl input path active by default
-- Stable sound profile: CPU pool profile validated with real-time external
-  recording and human listening on 2026-06-20
+- Responsive profile: output3072, accepted in Traktor use on 2026-07-25 after
+  exact-artifact safety, offline latency, CPU, and stability checks
+- Signing: this 0.5.1 preview is locally signed, not Developer ID signed or
+  notarized; macOS may require Open Anyway or the documented sudo fallback
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
 - Windows/Linux: experimental platform areas, not included in this macOS driver
 

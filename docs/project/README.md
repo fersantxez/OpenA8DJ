@@ -34,7 +34,9 @@ and the tradeoffs behind the current 0.5.x line.
 OpenA8DJ treats sound quality as part of correctness. These pages explain how
 builds are checked before they are offered to users:
 
-- [Public validation summary](public-validation-summary.md)
+- [0.5.1 validation summary](public-validation-summary-0.5.1.md)
+- [0.5.0 public validation summary](public-validation-summary.md)
+- [Timecode latency checkpoints](timecode-latency-checkpoints.md)
 - [Testing and validation](validation/testing-and-validation.md)
 - [Measurement methodology](validation/measurement-methodology.md)
 - [Test plan](validation/test-plan.md)
@@ -45,6 +47,7 @@ builds are checked before they are offered to users:
 
 - [Release process](release.md)
 - [Legal and publication policy](../reference/legal.md)
+- [0.5.1 release notes](../reference/release-notes-0.5.1.md)
 - [0.5.0 release notes](../reference/release-notes-0.5.0.md)
 - [0.4.0 historical release notes](../reference/release-notes-0.4.0.md)
 

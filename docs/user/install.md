@@ -9,22 +9,22 @@ support, and the optional Control Center tools.
 
 ## Download
 
-Download the latest release from:
+Download the 0.5.1 responsive freeze from:
 
 ```text
-https://github.com/fersantxez/OpenA8DJ/releases/latest
+https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1
 ```
 
-For OpenA8DJ 0.5.0, the expected public assets are:
+For OpenA8DJ 0.5.1, the release assets are:
 
 ```text
-OpenA8DJ-0.5.0.dmg
-OpenA8DJ-0.5.0-checksums.txt
-opena8dj-tools-0.5.0.dmg
+OpenA8DJ-0.5.1.dmg
+OpenA8DJ-0.5.1-checksums.txt
 ```
 
-Use the `OpenA8DJ` DMG for the driver. Use the separate `opena8dj-tools` DMG
-when you also want the optional Control Center app.
+The optional 0.5.0 Control Center remains compatible and is available from the
+0.5.0 release. The 0.5.1 driver preview is locally signed, not Developer ID
+signed or Apple-notarized.
 
 ## Verify The Download
 
@@ -32,8 +32,8 @@ The public release includes a checksum file. Verification is optional for a
 normal install, but recommended if you want to confirm the download:
 
 ```sh
-shasum -a 256 OpenA8DJ-0.5.0.dmg
-grep OpenA8DJ-0.5.0.dmg OpenA8DJ-0.5.0-checksums.txt
+shasum -a 256 OpenA8DJ-0.5.1.dmg
+grep OpenA8DJ-0.5.1.dmg OpenA8DJ-0.5.1-checksums.txt
 ```
 
 The SHA-256 value printed by `shasum` must match the value in the checksum
@@ -43,8 +43,8 @@ file. Do not install if it differs.
 
 This is the normal non-technical install path for the public GitHub release:
 
-1. Open `OpenA8DJ-0.5.0.dmg`.
-2. Double-click `OpenA8DJ-0.5.0.pkg`.
+1. Open `OpenA8DJ-0.5.1.dmg`.
+2. Double-click `OpenA8DJ-0.5.1.pkg`.
 3. Follow the macOS Installer prompts.
 4. Restart the audio app if it was already open.
 5. Reconnect the Audio 8 DJ if it does not appear immediately.
@@ -58,8 +58,8 @@ release again from GitHub.
 Recent macOS versions may show a warning like:
 
 ```text
-"OpenA8DJ-0.5.0.pkg" Not Opened
-Apple could not verify "OpenA8DJ-0.5.0.pkg" is free of malware.
+"OpenA8DJ-0.5.1.pkg" Not Opened
+Apple could not verify "OpenA8DJ-0.5.1.pkg" is free of malware.
 ```
 
 If the dialog only offers `Move to Trash` and `Done`:
@@ -68,11 +68,11 @@ If the dialog only offers `Move to Trash` and `Done`:
 2. Do not click `Move to Trash`.
 3. Open System Settings.
 4. Go to Privacy & Security.
-5. In the Security section, find the blocked `OpenA8DJ-0.5.0.pkg` message.
+5. In the Security section, find the blocked `OpenA8DJ-0.5.1.pkg` message.
 6. Click `Open Anyway`.
 7. Confirm the second warning, then continue with the installer.
 
-Normal users should not need Terminal for the GitHub release installer.
+This preview is not notarized, so this approval can be required.
 
 ## If The Installer Fails
 
@@ -80,7 +80,7 @@ If the package opens but macOS Installer reports an install error, verify the
 checksum first, then install the package from the mounted DMG path:
 
 ```sh
-sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
+sudo installer -pkg "/Volumes/OpenA8DJ 0.5.1/OpenA8DJ-0.5.1.pkg" -target /
 ```
 
 For the optional Control Center tools:

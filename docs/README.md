@@ -52,6 +52,7 @@ validation documents for the kind of change you want to make:
 
 - [Public validation summary](project/public-validation-summary.md)
 - [Legal and publication policy](reference/legal.md)
+- [OpenA8DJ 0.5.1 release notes](reference/release-notes-0.5.1.md)
 - [OpenA8DJ 0.5.0 release notes](reference/release-notes-0.5.0.md)
 - [OpenA8DJ 0.4.0 historical release notes](reference/release-notes-0.4.0.md)
 

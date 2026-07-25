@@ -21,7 +21,7 @@ If macOS shows a warning for the GitHub release:
 1. Click `Done`.
 2. Open System Settings.
 3. Go to Privacy & Security.
-4. Find the blocked `OpenA8DJ-0.5.0.pkg` message.
+4. Find the blocked `OpenA8DJ-0.5.1.pkg` message.
 5. Click `Open Anyway`.
 6. Confirm and continue the installer.
 
@@ -32,7 +32,7 @@ download checksum and use the Terminal fallback for the package inside the
 mounted DMG:
 
 ```sh
-sudo installer -pkg "/Volumes/OpenA8DJ 0.5.0/OpenA8DJ-0.5.0.pkg" -target /
+sudo installer -pkg "/Volumes/OpenA8DJ 0.5.1/OpenA8DJ-0.5.1.pkg" -target /
 ```
 
 For the optional Control Center tools, use:

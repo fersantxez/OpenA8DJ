@@ -95,7 +95,8 @@ int main(int argc, char** argv) {
       contains(script, "CPU_POOL_FREEZE_REQUIRES_EXACT_ARTIFACT_SOUND_VALIDATION") &&
       contains(script, "physical_evidence_present\": False") &&
       contains(script, "product_claim_allowed\": False") &&
-      contains(investigation, "CPU pool is now the frozen 0.5.0 stable build profile");
+      contains(investigation, "CPU pool is now the frozen 0.5.0 stable build profile") ||
+      contains(investigation, "0.5.1 responsive output3072 profile");
 
   std::vector<std::string> blockers;
   if (!sources_present) {

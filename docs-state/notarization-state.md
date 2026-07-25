@@ -8,6 +8,25 @@ As of 2026-06-20, the release Mac has Developer ID Application and Developer ID
 Installer certificates available, plus a local `notarytool` keychain profile
 named `OpenA8DJNotary`.
 
+## Current 0.5.1 Responsive Preview
+
+On 2026-07-25, `security find-identity -v -p codesigning` reported zero valid
+identities. The frozen 0.5.1 responsive build can therefore be locally signed
+and packaged, but it cannot truthfully be described as Developer ID signed,
+notarized, or stapled on this Mac.
+
+Publish 0.5.1 only as an explicitly labeled experimental preview. Keep 0.5.0
+as the latest Apple-notarized baseline until a valid Developer ID Application
+and Installer identity is restored, the exact 0.5.1 artifacts are rebuilt,
+submitted, accepted, stapled, and verified.
+
+Current local preview hashes:
+
+```text
+3984d58112e6dc9e5c8901cb7a9d605ddccfe7f6f7b3b0eb17ce2238add6f04d  OpenA8DJHAL
+be11f1988b0fd7524ab9fca46d406a4c0eeed08e4b23a06be91c1346f80fb1a0  OpenA8DJ-0.5.1.dmg
+```
+
 ## Current 0.5.0 Publication Attempt
 
 The current publication artifacts were rebuilt from source commit

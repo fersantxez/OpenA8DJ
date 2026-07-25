@@ -228,7 +228,7 @@ def main() -> int:
         # require the separate exact-artifact, lock-gated quality window.
         "physical_evidence_present": False,
         "product_claim_allowed": False,
-        "stable_freeze_reference": "OpenA8DJ 0.5.0 stable CPU pool profile",
+        "stable_freeze_reference": "OpenA8DJ 0.5.1 responsive output3072 profile",
         "candidate_metrics": candidate_metrics,
         "default_hal_after_restore": default_metrics,
         "default_hal_restored": restore_rc == 0 and default_smoke_rc == 0,

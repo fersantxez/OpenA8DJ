@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(OpenA8DJ
-  VERSION 0.5.0
+  VERSION 0.5.1
   DESCRIPTION "Modern macOS C++ driver stack for Native Instruments Audio 8 DJ"
   LANGUAGES CXX)
 

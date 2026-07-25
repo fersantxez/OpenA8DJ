@@ -137,18 +137,16 @@ maintainer-facing signing state belongs in
 
 ## GitHub release
 
-Attach these files to each macOS release:
+Publish only the end-user DMG and its checksum file:
 
 ```text
 build/OpenA8DJ-<version>.dmg
-build/OpenA8DJ-<version>.pkg
-build/opena8dj-tools-<version>.dmg
-build/opena8dj-tools-<version>.pkg
 build/OpenA8DJ-<version>-checksums.txt
 ```
 
-The README links to the latest release page and the current versioned assets so
-testers can download the installer without building from source.
+The PKG remains inside the driver DMG because macOS Installer consumes it. Do
+not upload that PKG as a separate GitHub asset. Optional tools can have their
+own versioned release when they change.
 
 For 0.5.0 and later, the public release should make the easy path clear:
 download the DMG from GitHub Releases, open it, run the bundled PKG installer,

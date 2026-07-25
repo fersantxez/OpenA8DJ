@@ -1,5 +1,5 @@
 PROJECT := opena8dj
-VERSION := 0.5.0
+VERSION := 0.5.1
 TOOL := build/opena8dj-probe
 SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
@@ -239,7 +239,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-prepared-medium-candidate hal-cpu-pool-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-output3008-candidate hal-timecode-frozen-good-prefetch64-candidate hal-timecode-frozen-good-restart1024-candidate hal-timecode-frozen-good-start2816-candidate hal-timecode-frozen-good-output2560-candidate hal-timecode-frozen-good-output2816-candidate hal-timecode-frozen-good-output2304-candidate hal-timecode-frozen-good-output2048-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate freeze-timecode-responsive2816-candidate freeze-timecode-stable3072-candidate timecode-latency-e2e-fixture timecode-latency-offline-gate sign-hal sign-tools install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck soundcheck-irig-calibrated direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist release-signed notarize verify-signed-release FORCE
+.PHONY: all clean probe claim hal hal-usb-clock-candidate hal-human-test-lite-candidate hal-traktor-recovery-candidate hal-prepared-runtime hal-prepared-runtime-candidate hal-playback-scheduler-candidate hal-prepared-lite-candidate hal-prepared-medium-candidate hal-cpu-pool-candidate hal-cadence-diagnostic hal-hotpath-diagnostic hal-hotpath-diagnostic-candidate hal-capture-batch-diagnostic hal-capture-batch-v2-diagnostic hal-timecode-frozen-good-candidate hal-timecode-frozen-good-output4096-candidate hal-timecode-frozen-good-output3072-candidate hal-timecode-frozen-good-output3008-candidate hal-timecode-frozen-good-prefetch64-candidate hal-timecode-frozen-good-restart1024-candidate hal-timecode-frozen-good-start2816-candidate hal-timecode-frozen-good-output2560-candidate hal-timecode-frozen-good-output2816-candidate hal-timecode-frozen-good-output2304-candidate hal-timecode-frozen-good-output2048-candidate hal-timecode-frozen-good-responsive-candidate hal-timecode-responsive-candidate hal-timecode-low-noise-candidate freeze-timecode-responsive2816-candidate freeze-timecode-stable3072-candidate timecode-latency-e2e-fixture timecode-latency-offline-gate sign-hal sign-tools install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck soundcheck-irig-calibrated direct-usb-soundcheck simulated-output-soundcheck usb-play usb-play-plain usb-play-plain-gain05 usb-input-meter midi-list physical-run-compare package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg driver-checksums driver-dist checksums dist release-signed notarize verify-signed-release FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -1030,6 +1030,11 @@ control-surfaces-dmg: control-surfaces-package $(CONTROL_DMG_README)
 	if [ -n "$(DMG_SIGN_IDENTITY)" ]; then codesign --force --sign "$(DMG_SIGN_IDENTITY)" --timestamp "$(CONTROL_DMG)"; fi
 
 tools-dmg: control-surfaces-dmg
+
+driver-checksums: dmg
+	(cd build && shasum -a 256 "OpenA8DJ-$(VERSION).dmg" > "OpenA8DJ-$(VERSION)-checksums.txt")
+
+driver-dist: driver-checksums
 
 checksums: dmg control-surfaces-dmg
 	(cd build && shasum -a 256 "OpenA8DJ-$(VERSION).dmg" "OpenA8DJ-$(VERSION).pkg" "opena8dj-tools-$(VERSION).dmg" "opena8dj-tools-$(VERSION).pkg" > "OpenA8DJ-$(VERSION)-checksums.txt")

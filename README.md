@@ -18,7 +18,10 @@ use, you can support the maintainer here:
 
 ## Status
 
-OpenA8DJ 0.5.0 is the current macOS C++ baseline.
+OpenA8DJ 0.5.1 is the frozen responsive macOS C++ preview. It uses the
+accepted `output3072` DVS profile. OpenA8DJ 0.5.0 remains the latest
+Developer ID signed and Apple-notarized public baseline until 0.5.1 can be
+signed again.
 
 - Core Audio HAL device: `Open Audio 8 DJ`
 - 8 output channels as stereo deck pairs A/B/C/D
@@ -33,22 +36,22 @@ not the public release line.
 
 ## Download
 
-Use the [latest GitHub release](https://github.com/fersantxez/OpenA8DJ/releases/latest).
+Use the [OpenA8DJ 0.5.1 GitHub release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1)
+for the responsive freeze.
 
 Release assets:
 
-- `OpenA8DJ-0.5.0.dmg`: driver installer
-- `opena8dj-tools-0.5.0.dmg`: optional Control Center and support tools
-- `OpenA8DJ-0.5.0-checksums.txt`: SHA-256 checksums
+- `OpenA8DJ-0.5.1.dmg`: driver installer
+- `OpenA8DJ-0.5.1-checksums.txt`: SHA-256 checksum
 
 GitHub Actions artifacts are not release downloads.
 
 ## Install
 
-Download `OpenA8DJ-0.5.0.dmg`, open it, and run the included package installer.
+Download `OpenA8DJ-0.5.1.dmg`, open it, and run the included package installer.
 
-Install `opena8dj-tools-0.5.0.dmg` only if you also want
-`OpenA8DJ Control Center.app` and the support tools.
+The optional 0.5.0 Control Center remains compatible and is available from the
+[0.5.0 release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0).
 
 After installation, select `Open Audio 8 DJ` in Audio MIDI Setup, Traktor, or
 your audio application. If macOS blocks the package, or if you want checksum
@@ -79,17 +82,20 @@ line tool is included for diagnostics, automation, and maintainer workflows.
 
 ## Validation
 
-The 0.5.0 baseline was validated with:
+The 0.5.1 responsive freeze was validated with:
 
 - offline C++ and HAL safety tests;
-- macOS package and signature checks;
+- exact-artifact package, bundle, and checksum checks;
 - Audio MIDI Setup visibility as an 8-in/8-out device;
-- CoreMIDI endpoint checks;
-- real-music playback through Audio 8 DJ with real-time external capture;
-- human listening sign-off on the installed artifact.
+- three guarded load/recovery cycles;
+- an idle CPU observation of 0.0% for the driver and CoreAudio;
+- operator acceptance of the responsive Traktor behavior on the installed
+  artifact.
 
-See the [public validation summary](docs/project/public-validation-summary.md)
-and [release notes](docs/reference/release-notes-0.5.0.md).
+The preview is locally signed, not Developer ID signed or notarized. See the
+[0.5.1 validation summary](docs/project/public-validation-summary-0.5.1.md),
+[release notes](docs/reference/release-notes-0.5.1.md), and
+[future checkpoints](docs/project/timecode-latency-checkpoints.md).
 
 ## Documentation
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-version="${VERSION:-0.5.0}"
+version="${VERSION:-0.5.1}"
 pkg="${PKG:-build/OpenA8DJ-${version}.pkg}"
 dmg="${DMG:-build/OpenA8DJ-${version}.dmg}"
 tools_pkg="${TOOLS_PKG:-build/opena8dj-tools-${version}.pkg}"
