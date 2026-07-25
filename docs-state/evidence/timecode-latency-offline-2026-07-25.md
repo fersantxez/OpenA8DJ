@@ -43,6 +43,7 @@ failures. At 48 kHz, the modeled pipeline p95 values were:
 | Profile | Modeled p95 | Modeled reduction | Work proxy change |
 | --- | ---: | ---: | ---: |
 | baseline | 78.667 ms | 0.000% | 0.000% |
+| prefetch64 | 77.333 ms | 1.695% | 0.000% |
 | capture32 | 78.000 ms | 0.847% | +88.889% |
 | capture16 | 77.667 ms | 1.271% | +266.667% |
 | output2560 | 68.000 ms | 13.559% | 0.000% |
@@ -102,6 +103,7 @@ Candidate artifacts and safety results:
 | output2816 | `1ceae118c56cf31af1b34d12bf22e2fc8341e73c8180e94a82ad17871ee49052` | PASS, two cycles, clean recovery | FAIL: alignment 0.958982, SNR 4.94 dB, lag jumps 22 | reject |
 | output2048 | `402dafe1f24ccb4ecaa7cac09b91a810dc87b7d16aae3e566ed1aed7c4649617` | FAIL on two-cycle repeat; post-unload CoreAudio reached 170.0% CPU | not eligible | reject |
 | output2304 | `b9a5b9831d8c414a47c1d40f71ec8e2e813cc1ee85a4ce03099445a38b5d23fc` | PASS, two cycles, clean recovery | FAIL: first energy 0.70 s, correlation 0.284, aligned SNR -1.58 dB, lag jumps 22 | reject |
+| prefetch64 | `de9e1cfc67e6b7833e19e1cae6843fa972f2fe3430a89f9fc41cc1335d2ebeba` | FAIL on first cycle; CoreAudio 125.6% CPU and total watched 134.5% | not eligible; physical sound test intentionally skipped | reject |
 
 The output2304 physical run also recorded zero capture status failures, zero
 capture transaction errors, zero playback transfer errors, zero output
@@ -126,13 +128,25 @@ peaked at `25.5%`, total audio UI/services at `61.9%`, and the driver at `7.3%`.
 Those are useful performance observations, but the sound-quality gate still
 failed and the candidate therefore remains laboratory-only.
 
+The prefetch64 run kept the output target at 3072 frames and reduced only
+`HAL_OUTPUT_PREFETCH_FRAMES` from 128 to 64. Its offline model predicted a
+small 1.695% latency reduction with no modeled work increase, but the exact
+candidate failed the first live safety cycle: CoreAudio reached `125.6%` CPU
+and the total watched audio workload reached `134.5%`, above the configured
+120% safety ceiling. Core Audio enumeration still passed and the recovery
+window returned to `audio_stack_health=PASS`; because the safety gate failed,
+no physical sound or latency test was run for this candidate. It is rejected.
+
 ## Final post-test state
 
 After the candidate runs, the stable output3072 bundle was loaded again and
 passed one safety cycle. Core Audio enumerated Open Audio 8 DJ as 8 inputs and
 8 outputs at 48 kHz; iRig Stream was restored to 44.1 kHz; final audio-stack
-health was `PASS`; and the hardware lock was `LOCK_FREE`. No latency candidate
-was left installed or promoted.
+health was `PASS`; and the hardware lock was `LOCK_FREE`. A final repeat after
+the prefetch64 rejection used
+`local-analysis/hal-candidate-safety/final-stable-output3072-after-prefetch64`
+and reached the same healthy state. No latency candidate was left installed or
+promoted.
 
 The result is consistent with the offline frontier: lower output targets can
 reduce modeled delay without preserving the real capture quality and service
@@ -152,3 +166,5 @@ both safety and sound-quality gates.
 - `local-analysis/physical-superiority-window/20260725-output2304-vs-3072-same-session-pairB-48000`
 - `local-analysis/hal-candidate-safety/candidate2816-cycles2`
 - `local-analysis/physical-superiority-window/20260725-output2816-physical-pairB-48000`
+- `local-analysis/hal-candidate-safety/prefetch64-cycles2`
+- `local-analysis/hal-candidate-safety/final-stable-output3072-after-prefetch64`

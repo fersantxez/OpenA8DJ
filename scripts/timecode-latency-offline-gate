@@ -17,6 +17,7 @@ from pathlib import Path
 
 PROFILES = (
     ("baseline", 64, 3072, 512, 128),
+    ("prefetch64", 64, 3072, 512, 64),
     ("capture32", 32, 3072, 512, 128),
     ("capture16", 16, 3072, 512, 128),
     ("output2560", 64, 2560, 512, 128),
