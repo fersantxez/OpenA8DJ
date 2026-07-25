@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{FE1E84AE-A47B-4C3C-BD6C-FB7D94D65518}</ProjectGuid>
+    <RootNamespace>OpenA8DJMidi</RootNamespace>
+    <TargetName>OpenA8DJMidi</TargetName>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <SupportsPackaging>false</SupportsPackaging>
+    <RequiresPackageProject>false</RequiresPackageProject>
+    <EnableTestSign>false</EnableTestSign>
+    <SignMode>Off</SignMode>
+    <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
+    <Platform Condition="'$(Platform)'==''">x64</Platform>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <TargetVersion>Windows10</TargetVersion>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <DriverTargetPlatform>Windows Driver</DriverTargetPlatform>
+    <DriverType>WDM</DriverType>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <ConfigurationType>Driver</ConfigurationType>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup>
+    <OpenA8DJMidiOutRoot Condition="'$(OpenA8DJMidiOutRoot)'==''">$(ProjectDir)build\$(Configuration)\$(Platform)\</OpenA8DJMidiOutRoot>
+    <OpenA8DJMidiObjRoot Condition="'$(OpenA8DJMidiObjRoot)'==''">$(ProjectDir)obj\$(Configuration)\$(Platform)\</OpenA8DJMidiObjRoot>
+    <OutDir>$(OpenA8DJMidiOutRoot)</OutDir>
+    <IntDir>$(OpenA8DJMidiObjRoot)</IntDir>
+  </PropertyGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+  </ImportGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <ExceptionHandling>false</ExceptionHandling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <AdditionalOptions>/kernel %(AdditionalOptions)</AdditionalOptions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x0A00;NTDDI_VERSION=NTDDI_WIN10_VB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>portcls.lib;ks.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <DriverSign>
+      <FileDigestAlgorithm>sha256</FileDigestAlgorithm>
+    </DriverSign>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="OpenA8DJMidiAdapter.cpp" />
+    <ClCompile Include="OpenA8DJMidiBusContract.c" />
+    <ClCompile Include="OpenA8DJMidiDescriptors.cpp" />
+    <ClCompile Include="OpenA8DJMidiGuid.cpp" />
+    <ClCompile Include="OpenA8DJMidiMiniport.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OpenA8DJMidiBusContract.h" />
+    <ClInclude Include="OpenA8DJMidiBusInterface.h" />
+    <ClInclude Include="OpenA8DJMidiDescriptors.h" />
+    <ClInclude Include="OpenA8DJMidiMiniport.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="OpenA8DJMidi.inf" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

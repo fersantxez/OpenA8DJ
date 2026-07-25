@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{273231C0-AD4D-4A01-BA9C-B83B53D43483}</UniqueIdentifier>
+      <Extensions>c;cpp</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{11462C41-66BE-4448-AC03-77129DBED790}</UniqueIdentifier>
+      <Extensions>h</Extensions>
+    </Filter>
+    <Filter Include="Driver Package">
+      <UniqueIdentifier>{00EC859E-B5F4-40E3-AB6B-B22A920340DD}</UniqueIdentifier>
+      <Extensions>inf</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="OpenA8DJMidiAdapter.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="OpenA8DJMidiBusContract.c"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="OpenA8DJMidiDescriptors.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="OpenA8DJMidiGuid.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="OpenA8DJMidiMiniport.cpp"><Filter>Source Files</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OpenA8DJMidiBusContract.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="OpenA8DJMidiBusInterface.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="OpenA8DJMidiDescriptors.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="OpenA8DJMidiMiniport.h"><Filter>Header Files</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="OpenA8DJMidi.inf"><Filter>Driver Package</Filter></None>
+  </ItemGroup>
+</Project>

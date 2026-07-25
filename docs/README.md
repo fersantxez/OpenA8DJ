@@ -23,6 +23,12 @@ Use these pages in order:
 5. [Troubleshooting](user/troubleshooting.md)
 6. [Uninstall](user/uninstall.md)
 
+Windows is an experimental, separate workstream. Start with the [Windows
+status and installation guide](WINDOWS.md), then read the [simple unsigned
+driver guide](WINDOWS_TESTER_INSTALL_GUIDE_UNSIGNED_2026-06-19.md) and the
+[final Windows handoff](WINDOWS_HANDOFF_2026-07-25.md). The macOS line remains
+the primary supported product.
+
 ## If You Want To Understand The Project
 
 Read these pages when you want to know what OpenA8DJ is doing and why:

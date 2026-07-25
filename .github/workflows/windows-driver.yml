@@ -1,0 +1,117 @@
+name: Windows Driver
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "windows/**"
+      - "docs/WINDOWS*.md"
+      - ".github/workflows/windows-driver.yml"
+  pull_request:
+    paths:
+      - "windows/**"
+      - "docs/WINDOWS*.md"
+      - ".github/workflows/windows-driver.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Windows driver (${{ matrix.platform }})
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [x64]
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Check WDK
+        shell: pwsh
+        run: |
+          $kits = "${env:ProgramFiles(x86)}\Windows Kits\10\bin"
+          if (-not (Test-Path $kits)) {
+            throw "Windows SDK/WDK is not installed on this runner. Use a WDK-enabled runner or install the WDK before building."
+          }
+          $inf2cat = Get-ChildItem -Path $kits -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $inf2cat) {
+            throw "Inf2Cat.exe was not found. The WDK is required."
+          }
+          $tools = "${env:ProgramFiles(x86)}\Windows Kits\10\Tools"
+          $infverif = Get-ChildItem -Path $tools -Recurse -Filter infverif.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $infverif) {
+            throw "infverif.exe was not found. The WDK is required."
+          }
+          Write-Host "Found Inf2Cat at $($inf2cat.FullName)"
+          Write-Host "Found InfVerif at $($infverif.FullName)"
+
+      - name: Build
+        shell: pwsh
+        run: .\windows\scripts\build-driver.ps1 -Configuration Release -Platform ${{ matrix.platform }}
+
+      - name: Check Microsoft signing readiness
+        shell: pwsh
+        run: .\windows\scripts\test-signing-readiness.ps1 -Configuration Release -Platform ${{ matrix.platform }} -SkipBuild
+
+      - name: Build experimental installer ZIP
+        shell: pwsh
+        run: .\windows\scripts\build-installable-package.ps1 -Configuration Release -Platform ${{ matrix.platform }}
+
+      - name: Build experimental installer EXE
+        shell: pwsh
+        run: .\windows\scripts\build-exe-installer.ps1 -Configuration Release -Platform ${{ matrix.platform }}
+
+      - name: Upload signing readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}-signing-readiness
+          path: local-analysis/windows/signing-readiness-*/
+
+      - name: Upload unsigned driver package
+        if: ${{ github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}
+          path: windows/dist/Release/${{ matrix.platform }}/
+
+      - name: Upload experimental Windows installer ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}-experimental-installer
+          path: |
+            windows/dist/installer/OpenA8DJUsb-Release-${{ matrix.platform }}-installer.zip
+            windows/dist/installer/OpenA8DJUsb-Release-${{ matrix.platform }}-installer.exe
+
+      - name: Upload attestation submission payload
+        if: ${{ github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenA8DJUsb-Windows-${{ matrix.platform }}-attestation
+          path: |
+            windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation.cab
+            windows/dist/attestation/OpenA8DJUsb-Release-${{ matrix.platform }}-attestation-manifest.json
+
+  virtual-acx-proof:
+    name: Build virtual ACX proof target
+    runs-on: windows-2022
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build and validate virtual ACX target
+        shell: pwsh
+        run: .\windows\scripts\build-virtual-acx.ps1 -Configuration Release -Platform x64

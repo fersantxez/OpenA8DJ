@@ -1,0 +1,67 @@
+[Version]
+Signature="$WINDOWS NT$"
+Class=MEDIA
+ClassGuid={4d36e96c-e325-11ce-bfc1-08002be10318}
+Provider=%ProviderName%
+DriverVer=07/13/2026,0.0.1.0
+CatalogFile=OpenA8DJMidi.cat
+PnpLockDown=1
+
+[Manufacturer]
+%ManufacturerName%=OpenA8DJMidiModels,NTamd64.10.0...19041
+
+[OpenA8DJMidiModels.NTamd64.10.0...19041]
+%OpenA8DJMidi.DeviceDesc%=OpenA8DJMidi_Install,OPENA8DJ\MIDI
+
+[OpenA8DJMidi_Install]
+Include=ks.inf,wdmaudio.inf
+Needs=KS.Registration,WDMAUDIO.Registration
+CopyFiles=OpenA8DJMidi_CopyFiles
+
+[OpenA8DJMidi_Install.Services]
+AddService=OpenA8DJMidi,0x00000002,OpenA8DJMidi_Service
+
+[OpenA8DJMidi_Service]
+DisplayName=%OpenA8DJMidi.ServiceDesc%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%13%\OpenA8DJMidi.sys
+LoadOrderGroup=Base
+
+[OpenA8DJMidi_Install.Interfaces]
+AddInterface=%KSCATEGORY_AUDIO%,%MidiReference%,OpenA8DJMidi_Interface
+AddInterface=%KSCATEGORY_RENDER%,%MidiReference%,OpenA8DJMidi_Interface
+AddInterface=%KSCATEGORY_CAPTURE%,%MidiReference%,OpenA8DJMidi_Interface
+
+[OpenA8DJMidi_Interface]
+AddReg=OpenA8DJMidi_Interface_AddReg
+
+[OpenA8DJMidi_Interface_AddReg]
+HKR,,CLSID,,%KSProxy.CLSID%
+HKR,,FriendlyName,,%OpenA8DJMidi.FriendlyName%
+
+[DestinationDirs]
+OpenA8DJMidi_CopyFiles=13
+
+[OpenA8DJMidi_CopyFiles]
+OpenA8DJMidi.sys
+
+[SourceDisksNames]
+1=%DiskName%,,,
+
+[SourceDisksFiles]
+OpenA8DJMidi.sys=1
+
+[Strings]
+ProviderName="OpenA8DJ Project"
+ManufacturerName="OpenA8DJ Project"
+OpenA8DJMidi.DeviceDesc="OpenA8DJ MIDI"
+OpenA8DJMidi.ServiceDesc="OpenA8DJ PortCls MIDI Driver"
+OpenA8DJMidi.FriendlyName="OpenA8DJ MIDI"
+DiskName="OpenA8DJ MIDI Driver Installation Media"
+MidiReference="OpenA8DJMidi"
+KSCATEGORY_AUDIO="{6994ad04-93ef-11d0-a3cc-00a0c9223196}"
+KSCATEGORY_RENDER="{65e8773e-8f56-11d0-a3b9-00a0c9223196}"
+KSCATEGORY_CAPTURE="{65e8773d-8f56-11d0-a3b9-00a0c9223196}"
+KSProxy.CLSID="{17cca71b-ecd7-11d0-b908-00a0c9223196}"

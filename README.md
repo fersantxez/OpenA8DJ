@@ -32,7 +32,32 @@ signed again.
 - Optional Control Center for normal hardware profiles
 
 Windows, Linux, Rust, and DriverKit branches are experimental or research work,
-not the public release line.
+not the public macOS release line.
+
+## Experimental Windows Driver
+
+The repository now carries the experimental Windows driver workstream under
+`windows/`. It is separate from the macOS HAL driver, DMG, PKG, and Control
+Center packaging.
+
+Windows CI builds source code, the WDK driver package, `opena8djctl.exe`, and
+experimental installer ZIP/EXE artifacts named
+`OpenA8DJUsb-Release-x64-installer.zip` and
+`OpenA8DJUsb-Release-x64-installer.exe`. They are experimental Windows
+downloads, not part of the stable macOS release line and not Microsoft-certified.
+The source and current EXE/ZIP package are published under `windows/releases/`
+for controlled testing.
+
+The Windows driver package is not Microsoft-signed yet. Installing it requires
+an Administrator shell, Windows test-signing or disabled driver signature
+enforcement, and normally Secure Boot disabled. Windows may show an
+unsigned-driver prompt. Only accept that prompt on a test machine where a kernel
+driver crash or reboot is acceptable.
+
+Windows installer details live in [windows/installer/README.md](windows/installer/README.md)
+and the current Windows status lives in [docs/WINDOWS.md](docs/WINDOWS.md).
+The simple user installation steps are in
+[docs/WINDOWS_TESTER_INSTALL_GUIDE_UNSIGNED_2026-06-19.md](docs/WINDOWS_TESTER_INSTALL_GUIDE_UNSIGNED_2026-06-19.md).
 
 ## Download
 

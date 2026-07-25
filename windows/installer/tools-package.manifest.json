@@ -1,0 +1,44 @@
+{
+  "product": "OpenA8DJ Windows Tools",
+  "package_id": "org.opena8dj.windows.tools",
+  "owner": "windows",
+  "installs_driver_store": false,
+  "installs_user_tools": true,
+  "requires_admin": true,
+  "requires_hardware_lock_for_install": false,
+  "default_install_dir": "%ProgramFiles%\\OpenA8DJ\\Tools",
+  "payload": [
+    "opena8djctl.exe"
+  ],
+  "required_support_payload": [
+    "README-FIRST.txt or tools README",
+    "diagnostics/report command",
+    "profile/control command documentation",
+    "uninstall path",
+    "version and source metadata",
+    "SHA256 hashes",
+    "readiness label and limitations"
+  ],
+  "future_payload": [
+    "OpenA8DJ Control Center.exe",
+    "opena8dj-diagnostics.exe",
+    "Start Menu shortcuts",
+    "optional PATH integration"
+  ],
+  "install_method": {
+    "development": "included in windows/scripts/package-installer.ps1 ZIP",
+    "production": "WiX MSI"
+  },
+  "verification": [
+    "tool_files_present",
+    "tool_version_matches_bundle",
+    "surface_command_reports_driver_absent_or_present",
+    "uninstall_removes_user_mode_files"
+  ],
+  "public_release_gate": [
+    "signed_msi",
+    "clean_install_windows_10_22h2_x64",
+    "clean_install_windows_11_current_x64",
+    "repair_uninstall_upgrade_pass"
+  ]
+}
