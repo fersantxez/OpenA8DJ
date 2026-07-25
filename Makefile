@@ -60,6 +60,7 @@ PHYSICAL_RUN_COMPARE := build/physical-run-compare
 PHYSICAL_RUN_COMPARE_SRC := tools/physical_run_compare.cpp
 LAUNCH_AGENT_PLIST := resources/org.opena8dj.midid.plist
 PKG_ROOT := build/pkgroot
+PKG_COMPONENTS := build/components.plist
 PKG_SCRIPTS := resources/pkg/scripts
 PKG_SANITIZER := scripts/sanitize-macos-pkg.sh
 PKG := build/OpenA8DJ-$(VERSION).pkg
@@ -979,7 +980,10 @@ package: all sign-hal sign-tools $(CONTROL_CENTER_APP)
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
 	xattr -cr "$(PKG_ROOT)" 2>/dev/null || true
 	find "$(PKG_ROOT)" -name '._*' -delete
-	COPYFILE_DISABLE=1 pkgbuild --root "$(PKG_ROOT)" --scripts "$(PKG_SCRIPTS)" --identifier org.opena8dj.driver --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(PKG)"
+	COPYFILE_DISABLE=1 pkgbuild --analyze --root "$(PKG_ROOT)" "$(PKG_COMPONENTS)"
+	plutil -replace 0.BundleIsRelocatable -bool NO "$(PKG_COMPONENTS)"
+	plutil -replace 1.BundleIsRelocatable -bool NO "$(PKG_COMPONENTS)"
+	COPYFILE_DISABLE=1 pkgbuild --root "$(PKG_ROOT)" --component-plist "$(PKG_COMPONENTS)" --scripts "$(PKG_SCRIPTS)" --identifier org.opena8dj.driver --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(PKG)"
 	if [ -z "$(PKG_SIGN_IDENTITY)" ]; then "$(PKG_SANITIZER)" "$(PKG)" "$(PKG_ROOT)" "$(PKG_SCRIPTS)"; fi
 
 control-surfaces-package: $(CONTROL_CENTER_APP)
