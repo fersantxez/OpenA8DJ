@@ -41,7 +41,7 @@ Current status:
   exact-artifact safety, offline latency, CPU, and stability checks
 - Signing: Developer ID signed and Apple-notarized for normal macOS
   installation
-- Optional tools: opena8dj-control and OpenA8DJ Control Center
+- Included tools: opena8dj-control and OpenA8DJ Control Center
 - Windows/Linux: experimental platform areas, not included in this macOS driver
 
 After install, open Audio MIDI Setup and confirm Open Audio 8 DJ appears with 8

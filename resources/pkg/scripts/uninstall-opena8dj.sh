@@ -10,7 +10,9 @@ fi
 /usr/bin/find /usr/local/bin /Library/LaunchAgents /Library/Audio/Plug-Ins/HAL -name '._*' -delete 2>/dev/null || true
 /bin/rm -f /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid
 /bin/rm -rf /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/bin/rm -rf "/Applications/OpenA8DJ Control Center.app"
 /bin/rm -rf /Library/Documentation/OpenA8DJ
+/bin/rm -f /usr/local/bin/opena8dj-uninstall
 /usr/bin/killall coreaudiod 2>/dev/null || true
 
 exit 0

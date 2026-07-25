@@ -954,10 +954,12 @@ install-midid: $(MIDI_BRIDGE) $(LAUNCH_AGENT_PLIST)
 	launchctl bootstrap gui/$$(id -u) /Library/LaunchAgents/org.opena8dj.midid.plist
 	launchctl kickstart -k gui/$$(id -u)/org.opena8dj.midid
 
-package: all sign-hal sign-tools
+package: all sign-hal sign-tools $(CONTROL_CENTER_APP)
 	rm -rf $(PKG_ROOT)
 	install -d "$(PKG_ROOT)/Library/Audio/Plug-Ins/HAL"
 	COPYFILE_DISABLE=1 cp -R "$(HAL_BUNDLE)" "$(PKG_ROOT)/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+	install -d "$(PKG_ROOT)/Applications"
+	COPYFILE_DISABLE=1 cp -R "$(CONTROL_CENTER_APP)" "$(PKG_ROOT)/Applications/OpenA8DJ Control Center.app"
 	install -d "$(PKG_ROOT)/usr/local/bin"
 	install -m 755 "$(CONTROL_TOOL)" "$(PKG_ROOT)/usr/local/bin/opena8dj-control"
 	install -m 755 "$(MIDI_BRIDGE)" "$(PKG_ROOT)/usr/local/bin/opena8dj-midid"
@@ -970,6 +972,10 @@ package: all sign-hal sign-tools
 	install -m 644 docs/reference/legal.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
 	install -m 644 BRAND_POLICY.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/BRAND_POLICY.md"
 	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/RELEASE_NOTES.md"; fi
+	install -d "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces"
+	install -m 644 docs/user/control-center.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md"
+	install -m 644 docs/user/traktor-timecode.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/TRAKTOR_TIMECODE.md"
+	install -m 644 docs/project/cabling.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/CABLING.md"
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
 	xattr -cr "$(PKG_ROOT)" 2>/dev/null || true
 	find "$(PKG_ROOT)" -name '._*' -delete

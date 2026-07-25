@@ -7,6 +7,7 @@ if [ "$console_uid" != "0" ]; then
 fi
 
 /bin/rm -rf /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
+/bin/rm -rf "/Applications/OpenA8DJ Control Center.app"
 /bin/rm -f /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid
 /bin/rm -rf /Library/Documentation/OpenA8DJ
 

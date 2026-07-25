@@ -74,8 +74,8 @@ GitHub Actions artifacts are not release downloads.
 
 Download `OpenA8DJ-0.5.1.dmg`, open it, and run the included package installer.
 
-The optional 0.5.0 Control Center remains compatible and is available from the
-[0.5.0 release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0).
+The 0.5.1 DMG also installs OpenA8DJ Control Center and the command-line helper;
+no second tools download is required.
 
 After installation, select `Open Audio 8 DJ` in Audio MIDI Setup, Traktor, or
 your audio application. For checksum verification or troubleshooting, see the

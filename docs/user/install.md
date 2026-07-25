@@ -5,7 +5,7 @@ Instruments Audio 8 DJ. It is not affiliated with, endorsed by, sponsored by,
 or certified by Native Instruments.
 
 This guide installs the current macOS package: the OpenA8DJ audio driver, MIDI
-support, and the optional Control Center tools.
+support, Control Center, and command-line tools.
 
 ## Download
 
@@ -22,9 +22,9 @@ OpenA8DJ-0.5.1.dmg
 OpenA8DJ-0.5.1-checksums.txt
 ```
 
-The optional 0.5.0 Control Center remains compatible and is available from the
-0.5.0 release. The 0.5.1 driver DMG and its embedded installer are Developer ID
-signed and Apple-notarized.
+The 0.5.1 DMG is self-contained; no second tools download is required. The
+driver DMG and its embedded installer are Developer ID signed and
+Apple-notarized.
 
 ## Verify The Download
 
@@ -66,12 +66,6 @@ checksum first, then install the package from the mounted DMG path:
 sudo installer -pkg "/Volumes/OpenA8DJ 0.5.1/OpenA8DJ-0.5.1.pkg" -target /
 ```
 
-For the optional Control Center tools:
-
-```sh
-sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -target /
-```
-
 ## Installed Files
 
 ```text
@@ -81,13 +75,7 @@ sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -ta
 /usr/local/bin/opena8dj-midid
 /usr/local/bin/opena8dj-uninstall
 /Library/Documentation/OpenA8DJ
-```
-
-Optional tools package:
-
-```text
 /Applications/OpenA8DJ Control Center.app
-/usr/local/bin/opena8dj-control
 /Library/Documentation/OpenA8DJ/ControlSurfaces
 ```
 

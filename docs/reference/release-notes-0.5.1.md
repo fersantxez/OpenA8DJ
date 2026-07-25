@@ -38,6 +38,9 @@ or a full Timecode Vinyl certification matrix.
 The GitHub release contains one driver DMG and one checksum file. The PKG is
 inside the DMG and is not uploaded as a separate asset.
 
+The single DMG installs the driver, MIDI bridge, command-line helper, and
+OpenA8DJ Control Center. No separate tools DMG is required.
+
 The final DMG hash is published in `OpenA8DJ-0.5.1-checksums.txt`.
 
 The driver, command-line helpers, embedded PKG, and public DMG are Developer ID
