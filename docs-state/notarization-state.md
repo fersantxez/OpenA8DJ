@@ -23,19 +23,19 @@ Apple accepted all four release-verification containers on 2026-07-25:
 
 ```text
 OpenA8DJ-0.5.1.pkg
-  submission: 054caf6a-6eac-47e6-b493-49c6a9578a58
+  submission: 763346e5-3bf5-47a5-9db0-1f775385a6a3
   status: Accepted
 
 OpenA8DJ-0.5.1.dmg
-  submission: c934841f-ab88-4c79-9a36-29fc952a8189
+  submission: 42274ddd-3e40-4404-8228-84298f72b42e
   status: Accepted
 
 opena8dj-tools-0.5.1.pkg
-  submission: 1cc4fbb5-7830-4db6-b6fc-f040c3f3886e
+  submission: 6b60378a-0667-442e-b268-7b206679ffcc
   status: Accepted
 
 opena8dj-tools-0.5.1.dmg
-  submission: 60b58902-379e-4c41-99d8-0be9087c4ddb
+  submission: bbfca1d0-0dac-4f10-98c3-d1503771bf93
   status: Accepted
 ```
 
@@ -47,15 +47,21 @@ signatures, package signatures, and checksums.
 Final stapled SHA-256 hashes:
 
 ```text
-663edff5d4f9fe1945f1838fc72cd1e1ffa0f2697297db926aac813e3f7f6998  OpenA8DJ-0.5.1.dmg
-3cd3dbd2da3ddf5b255cd5f70768ca4024e3f2b277887ce572578c833723283c  OpenA8DJ-0.5.1.pkg
-9e4874cc4ba555b6be4e6a694f7d43ace4c795626e7ddaaf5c8925017d5b9f14  opena8dj-tools-0.5.1.dmg
-6e6135e41b072bd29878c35dc70aaf241255287ad0bcfd73c7a298dcfd7f8be7  opena8dj-tools-0.5.1.pkg
+3ca1a7e0e4478c1583919a51490977a56b540e8cd1f10354686c45d8671fdbd0  OpenA8DJ-0.5.1.dmg
+0df518ab16ad3361d944afdc789cbaaccb602fcf2ede936c7e2b57d4529040fd  OpenA8DJ-0.5.1.pkg
+24e0b62d031f48707c77891240bad00aa9f7f3f036fc2bbb82b80398c1bfdbed  opena8dj-tools-0.5.1.dmg
+cd1f603d53cb3d3be7c78a00ad126aaf624ea712972aa1d235ef131ba7b5a004  opena8dj-tools-0.5.1.pkg
 ```
 
 The final DMG is self-contained. Its embedded PKG contains OpenA8DJ Control
 Center and independently passes `xcrun stapler validate` and Gatekeeper
 assessment.
+
+The first self-contained packaging attempt was rejected during local
+installation because pkgbuild had marked the app component relocatable and
+macOS selected an old build directory instead of `/Applications`. Commit
+`567c191` marks both app and HAL components non-relocatable. A complete local
+install/uninstall passed before the final submissions above.
 
 The GitHub release remains DMG-only for users: publish
 `OpenA8DJ-0.5.1.dmg` and `OpenA8DJ-0.5.1-checksums.txt`. The standalone PKG

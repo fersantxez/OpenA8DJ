@@ -2311,12 +2311,13 @@ Conclusion:
   above confirms the uploaded assets install to the same binary hashes and pass
   the end-user install checks.
 
-## 2026-07-25 22:00 UTC - OpenA8DJ 0.5.1 final notarization gate
+## 2026-07-25 22:05 UTC - OpenA8DJ 0.5.1 final notarization gate
 
 - Worktree: `/Users/fer/dev/opena8dj-latency-lab`
 - Branch: `codex/timecode-latency`
 - Frozen audio source commit: `927d8af`
 - Self-contained packaging and notarization workflow commit: `39d0698`
+- Non-relocatable app/HAL component fix: `567c191`
 - Hardware touched: no
 - Driver installed or reloaded: no
 - CoreAudio restarted: no
@@ -2326,10 +2327,10 @@ documentation and valid Developer ID Application and Installer identities.
 Apple accepted all four verification containers:
 
 ```text
-054caf6a-6eac-47e6-b493-49c6a9578a58  OpenA8DJ-0.5.1.pkg
-c934841f-ab88-4c79-9a36-29fc952a8189  OpenA8DJ-0.5.1.dmg
-1cc4fbb5-7830-4db6-b6fc-f040c3f3886e  opena8dj-tools-0.5.1.pkg
-60b58902-379e-4c41-99d8-0be9087c4ddb  opena8dj-tools-0.5.1.dmg
+763346e5-3bf5-47a5-9db0-1f775385a6a3  OpenA8DJ-0.5.1.pkg
+42274ddd-3e40-4404-8228-84298f72b42e  OpenA8DJ-0.5.1.dmg
+6b60378a-0667-442e-b268-7b206679ffcc  opena8dj-tools-0.5.1.pkg
+bbfca1d0-0dac-4f10-98c3-d1503771bf93  opena8dj-tools-0.5.1.dmg
 ```
 
 All four containers were stapled and validated. `make
@@ -2341,11 +2342,11 @@ passed on the final public DMG.
 Final stapled SHA-256 hashes:
 
 ```text
-663edff5d4f9fe1945f1838fc72cd1e1ffa0f2697297db926aac813e3f7f6998  OpenA8DJ-0.5.1.dmg
-3cd3dbd2da3ddf5b255cd5f70768ca4024e3f2b277887ce572578c833723283c  OpenA8DJ-0.5.1.pkg
-9e4874cc4ba555b6be4e6a694f7d43ace4c795626e7ddaaf5c8925017d5b9f14  opena8dj-tools-0.5.1.dmg
-6e6135e41b072bd29878c35dc70aaf241255287ad0bcfd73c7a298dcfd7f8be7  opena8dj-tools-0.5.1.pkg
-c2d7bfef23c1127ce8cba98b84b64d06cd5e306faaeed4c3adf37ab87c431778  signed OpenA8DJHAL
+3ca1a7e0e4478c1583919a51490977a56b540e8cd1f10354686c45d8671fdbd0  OpenA8DJ-0.5.1.dmg
+0df518ab16ad3361d944afdc789cbaaccb602fcf2ede936c7e2b57d4529040fd  OpenA8DJ-0.5.1.pkg
+24e0b62d031f48707c77891240bad00aa9f7f3f036fc2bbb82b80398c1bfdbed  opena8dj-tools-0.5.1.dmg
+cd1f603d53cb3d3be7c78a00ad126aaf624ea712972aa1d235ef131ba7b5a004  opena8dj-tools-0.5.1.pkg
+4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66  signed OpenA8DJHAL
 ```
 
 The DMG mounted read-only. Its embedded package reported a Developer ID
@@ -2354,3 +2355,11 @@ Installer signature trusted by Apple notarization, independently passed
 Center, and carried the signed/notarized release notes. The standalone PKG and
 tools containers remain internal verification artifacts; only the
 self-contained driver DMG and its checksum file are public GitHub assets.
+
+The first GitHub-downloaded self-contained package reached the postinstall but
+failed because pkgbuild had marked Control Center relocatable. macOS selected
+an old build-tree copy of the app instead of `/Applications`, and the
+postinstall failed closed. That candidate was removed from GitHub, the partial
+install was fully cleaned, and commit `567c191` made the HAL and app components
+non-relocatable. The rebuilt signed package then passed a complete local
+install/uninstall before the final notarization submissions recorded above.

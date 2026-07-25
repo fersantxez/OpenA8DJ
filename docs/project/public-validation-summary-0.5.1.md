@@ -23,13 +23,13 @@ the release claim.
 
 ```text
 Signed HAL executable SHA-256:
-c2d7bfef23c1127ce8cba98b84b64d06cd5e306faaeed4c3adf37ab87c431778
+4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66
 
 OpenA8DJ-0.5.1.dmg SHA-256:
-663edff5d4f9fe1945f1838fc72cd1e1ffa0f2697297db926aac813e3f7f6998
+3ca1a7e0e4478c1583919a51490977a56b540e8cd1f10354686c45d8671fdbd0
 
 OpenA8DJ-0.5.1.pkg SHA-256:
-3cd3dbd2da3ddf5b255cd5f70768ca4024e3f2b277887ce572578c833723283c
+0df518ab16ad3361d944afdc789cbaaccb602fcf2ede936c7e2b57d4529040fd
 ```
 
 The clean 0.5.1 build passed `hdiutil verify`, checksum verification, HAL smoke
@@ -47,6 +47,11 @@ The DMG was rebuilt after the PKG ticket was stapled, then re-signed and
 notarized. The embedded PKG therefore validates its own stapled ticket, passes
 Gatekeeper assessment, and contains OpenA8DJ Control Center. The public DMG is
 self-contained and does not depend on the 0.5.0 tools package.
+
+The final component manifest marks both the HAL and Control Center as
+non-relocatable. A complete local install/uninstall passed before submission,
+with Control Center installed at `/Applications/OpenA8DJ Control Center.app`
+and the HAL installed under `/Library/Audio/Plug-Ins/HAL`.
 
 ## GitHub-Downloaded Installation
 
