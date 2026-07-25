@@ -104,6 +104,7 @@ Candidate artifacts and safety results:
 | output2048 | `402dafe1f24ccb4ecaa7cac09b91a810dc87b7d16aae3e566ed1aed7c4649617` | FAIL on two-cycle repeat; post-unload CoreAudio reached 170.0% CPU | not eligible | reject |
 | output2304 | `b9a5b9831d8c414a47c1d40f71ec8e2e813cc1ee85a4ce03099445a38b5d23fc` | PASS, two cycles, clean recovery | FAIL: first energy 0.70 s, correlation 0.284, aligned SNR -1.58 dB, lag jumps 22 | reject |
 | prefetch64 | `de9e1cfc67e6b7833e19e1cae6843fa972f2fe3430a89f9fc41cc1335d2ebeba` | FAIL on first cycle; CoreAudio 125.6% CPU and total watched 134.5% | not eligible; physical sound test intentionally skipped | reject |
+| restart1024 | `dce993ccf0763fc8915b84875f2e6618875340691cffa46b970e24eeb825d2b6` | PASS, two cycles, clean recovery | FAIL: alignment 0.958576, SNR 4.95 dB, lag jumps 22; CPU peaks 63.1% CoreAudio and 153.9% total watched | reject |
 
 The output2304 physical run also recorded zero capture status failures, zero
 capture transaction errors, zero playback transfer errors, zero output
@@ -137,6 +138,15 @@ and the total watched audio workload reached `134.5%`, above the configured
 window returned to `audio_stack_health=PASS`; because the safety gate failed,
 no physical sound or latency test was run for this candidate. It is rejected.
 
+The restart1024 candidate kept the 3072-frame start and steady-state target,
+and reduced only the discontinuity restart preroll from 1536 to 1024 frames.
+It passed two safety cycles and recovered cleanly, but the isolated physical
+soundcheck still failed with quality alignment `0.958576`, analog SNR `4.95`
+dB, and 22 lag jumps over two frames. The run had no clipping and no transfer
+errors, but the quality gate is decisive. CPU sampled during the soundcheck
+peaked at `63.1%` for CoreAudio and `153.9%` for the total watched audio/UI
+workload. No promotion is allowed.
+
 ## Final post-test state
 
 After the candidate runs, the stable output3072 bundle was loaded again and
@@ -168,3 +178,6 @@ both safety and sound-quality gates.
 - `local-analysis/physical-superiority-window/20260725-output2816-physical-pairB-48000`
 - `local-analysis/hal-candidate-safety/prefetch64-cycles2`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-prefetch64`
+- `local-analysis/hal-candidate-safety/restart1024-cycles2`
+- `local-analysis/physical-superiority-window/20260725-restart1024-physical-pairB-48000`
+- `local-analysis/hal-candidate-safety/final-stable-output3072-after-restart1024`
