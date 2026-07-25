@@ -1,0 +1,212 @@
+#!/usr/bin/env python3
+"""Freeze a named timecode HAL candidate while restoring the stable HAL.
+
+The build target temporarily writes build/OpenA8DJ.driver. This helper copies
+that exact bundle to a separate artifact, records its identity and selected
+latency geometry, then rebuilds the conservative output3072 profile. It does
+not install, load, unload, or change the default audio device.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HAL = ROOT / "build/OpenA8DJ.driver"
+DEFAULT_HAL_BIN = DEFAULT_HAL / "Contents/MacOS/OpenA8DJHAL"
+STABLE_TARGET = "hal-timecode-frozen-good-output3072-candidate"
+
+
+def resolve_path(value: str) -> Path:
+    path = Path(value)
+    return (ROOT / path if not path.is_absolute() else path).resolve()
+
+
+def require_inside_root(path: Path, label: str) -> None:
+    try:
+        path.relative_to(ROOT)
+    except ValueError as exc:
+        raise ValueError(f"{label} must stay inside {ROOT}: {path}") from exc
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def run_make(target: str) -> tuple[int, str, str]:
+    completed = subprocess.run(
+        ["make", "-B", target],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def normalize_local_signature(bundle: Path) -> tuple[int, str, str]:
+    """Make the copied experimental bundle internally self-consistent."""
+    subprocess.run(["xattr", "-cr", str(bundle)], cwd=ROOT, check=False)
+    signature = bundle / "Contents/_CodeSignature"
+    if signature.exists():
+        shutil.rmtree(signature)
+    completed = subprocess.run(
+        ["codesign", "--force", "--sign", "-", "--timestamp=none", str(bundle)],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stdout, completed.stderr
+
+
+def verify_local_signature(bundle: Path) -> tuple[int, str]:
+    completed = subprocess.run(
+        ["codesign", "--verify", "--deep", "--strict", str(bundle)],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    return completed.returncode, completed.stderr.strip()
+
+
+def bundle_metrics(path: Path) -> dict[str, object]:
+    executable = path / "Contents/MacOS/OpenA8DJHAL"
+    info = path / "Contents/Info.plist"
+    signature_rc, signature_error = verify_local_signature(path) if path.is_dir() else (1, "bundle missing")
+    return {
+        "path": str(path),
+        "bundle_exists": path.is_dir(),
+        "info_plist_exists": info.is_file(),
+        "executable_exists": executable.is_file(),
+        "executable_bytes": executable.stat().st_size if executable.is_file() else 0,
+        "executable_sha256": sha256(executable) if executable.is_file() else "",
+        "local_codesign_verify": "PASS" if signature_rc == 0 else "FAIL",
+        "local_codesign_error": signature_error,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--build-target", required=True)
+    parser.add_argument("--candidate", required=True)
+    parser.add_argument("--json-out", required=True)
+    parser.add_argument("--profile-name", default="output2816")
+    parser.add_argument("--output-target-frames", type=int, default=2816)
+    parser.add_argument("--output-start-latency-frames", type=int, default=2816)
+    parser.add_argument("--output-restart-latency-frames", type=int, default=1408)
+    parser.add_argument("--output-elastic-high-water-frames", type=int, default=8448)
+    parser.add_argument(
+        "--selection-reason",
+        default="Best recently safety-passing responsiveness compromise; accepts modest CPU headroom cost but preserves stable geometry.",
+    )
+    parser.add_argument("--physical-quality-status", default="FAIL_OR_UNCERTIFIED")
+    args = parser.parse_args()
+
+    candidate = resolve_path(args.candidate)
+    json_out = resolve_path(args.json_out)
+    require_inside_root(candidate, "--candidate")
+    require_inside_root(json_out, "--json-out")
+    if candidate in (ROOT, DEFAULT_HAL) or json_out == ROOT:
+        raise ValueError("candidate and report must be separate from the default HAL and root")
+    if json_out.is_relative_to(candidate):
+        raise ValueError("--json-out must not be inside the candidate bundle")
+
+    build_rc, build_stdout, build_stderr = run_make(args.build_target)
+    candidate_copied = False
+    normalize_rc, normalize_stdout, normalize_stderr = 1, "", "candidate was not built"
+    try:
+        if build_rc == 0 and DEFAULT_HAL.is_dir():
+            if candidate.exists():
+                shutil.rmtree(candidate)
+            shutil.copytree(DEFAULT_HAL, candidate, symlinks=True)
+            normalize_rc, normalize_stdout, normalize_stderr = normalize_local_signature(candidate)
+            candidate_copied = True
+        else:
+            normalize_rc, normalize_stdout, normalize_stderr = 1, "", "candidate not copied"
+    finally:
+        restore_rc, restore_stdout, restore_stderr = run_make(STABLE_TARGET)
+
+    candidate_metrics = bundle_metrics(candidate)
+    stable_metrics = bundle_metrics(DEFAULT_HAL)
+    candidate_hash = str(candidate_metrics["executable_sha256"])
+    stable_hash = str(stable_metrics["executable_sha256"])
+    complete = (
+        candidate_copied
+        and bool(candidate_metrics["bundle_exists"])
+        and bool(candidate_metrics["info_plist_exists"])
+        and bool(candidate_metrics["executable_exists"])
+        and int(candidate_metrics["executable_bytes"]) > 0
+    )
+    stable_restored = (
+        restore_rc == 0
+        and bool(stable_metrics["bundle_exists"])
+        and bool(stable_metrics["info_plist_exists"])
+        and bool(stable_metrics["executable_exists"])
+        and int(stable_metrics["executable_bytes"]) > 0
+    )
+    candidate_signed = candidate_metrics["local_codesign_verify"] == "PASS"
+    artifact_ready = complete and candidate_signed and stable_restored
+    report: dict[str, object] = {
+        "schema": "opena8djcpp.timecode-frozen-candidate.v1",
+        "result": "PASS" if artifact_ready else "FAIL",
+        "status": "FROZEN_EXPERIMENTAL" if artifact_ready else "NOT_FROZEN",
+        "build_target": args.build_target,
+        "candidate": candidate_metrics,
+        "stable_default_after_restore": stable_metrics,
+        "stable_default_restored": stable_restored,
+        "configuration": {
+            "sample_rate_reference_hz": 48000,
+            "output_start_latency_frames": args.output_start_latency_frames,
+            "output_restart_latency_frames": args.output_restart_latency_frames,
+            "output_target_latency_frames": args.output_target_frames,
+            "output_elastic_high_water_frames": args.output_elastic_high_water_frames,
+            "host_buffer_frames": 512,
+            "capture_iso_frames": 64,
+        },
+        "profile": args.profile_name,
+        "selection_reason": args.selection_reason,
+        "offline_claim": "MODEL_ONLY",
+        "physical_quality_status": args.physical_quality_status,
+        "product_claim_allowed": False,
+        "rollback": {
+            "profile": "output3072",
+            "make_target": STABLE_TARGET,
+            "default_bundle": str(DEFAULT_HAL),
+            "candidate_hash_differs_from_stable": bool(candidate_hash and stable_hash and candidate_hash != stable_hash),
+        },
+        "gates": [
+            {"name": "candidate_built_and_copied", "result": "PASS" if complete else "FAIL", "return_code": build_rc},
+            {"name": "candidate_local_signature", "result": "PASS" if candidate_metrics["local_codesign_verify"] == "PASS" else "FAIL", "return_code": normalize_rc},
+            {"name": "stable_default_restored", "result": "PASS" if stable_restored else "FAIL", "return_code": restore_rc},
+        ],
+    }
+    if build_rc != 0:
+        report["build_stdout_tail"] = build_stdout[-4000:]
+        report["build_stderr_tail"] = build_stderr[-4000:]
+    if restore_rc != 0:
+        report["restore_stdout_tail"] = restore_stdout[-4000:]
+        report["restore_stderr_tail"] = restore_stderr[-4000:]
+    json_out.parent.mkdir(parents=True, exist_ok=True)
+    json_out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if artifact_ready else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
