@@ -3,8 +3,8 @@
 Date: 2026-07-25
 Worktree: `/Users/fer/dev/opena8dj-latency-lab`
 Branch: `codex/timecode-latency`
-Base revision: `27a8410`
-Current evidence revision: `1532971`
+Base revision: `10a5478`
+Current evidence revision: `10a5478` (implementation revision; this document records later lock-gated evidence below)
 
 ## Scope
 
@@ -55,11 +55,17 @@ and final stable restore are recorded below.
   comparison reproducible without treating a plan as a completed measurement.
 - `scripts/run-cpp-offline-gates` includes the latency gate and its test while
   preserving diagnostic failures for route contamination and iRig idle capture.
+- Physical known-good route validation now rejects virtual outputs such as
+  BlackHole in the selector, preflight, request validator, and lock-gated shell
+  runner. A virtual output is not evidence of a wired route to the iRig.
+- Physical soundchecks can now use `--match-capture-rate` to match the external
+  capture device to the reference rate under the hardware lock and restore its
+  prior rate on every exit path.
 - `tools/evidence_provenance_freshness_gate.cpp` now resolves the active
   worktree instead of falling back to the legacy checkout, and treats the
   optional candidate manifest as optional. The current offline evidence is
-  therefore attributable to `324cddd` with a clean worktree and the provenance
-  gate passes.
+  therefore attributable to the current branch revision with a clean worktree
+  and the provenance gate passes.
 - The CPU-pool candidate contract now correctly reports that a build-only helper
   cannot claim physical evidence or product readiness.
 
@@ -325,6 +331,42 @@ stability required for DVS. No candidate is promoted. The installed/default
 profile remains output3072 until a future exact-artifact physical window passes
 both safety and sound-quality gates.
 
+### Known-good route revalidation
+
+The first route-only attempt used BlackHole 2ch as the selected output. It was
+invalidated by a real 48 kHz reference versus 44.1 kHz iRig mismatch. The
+corrected route runner temporarily changed the iRig to 48 kHz and restored it
+to 44.1 kHz, but the BlackHole path produced no correlated physical signal:
+
+- reference and capture were both recorded at 48 kHz;
+- `quality_alignment_score=0.014581`, `SNR=-47.16 dB`, and the native and
+  audiophile analyzers returned `FAIL`;
+- `capture_rate_configured=48000` and `capture_rate_restored=44100` are both
+  recorded in the run directory;
+- the output is now rejected before execution as virtual, and the selector
+  reports `PROVISION_WIRED_NON_AUDIO8_NON_BUILTIN_OUTPUT_FOR_IRIG_ROUTE_VALIDATION`.
+
+This is a route instrumentation correction and a failed diagnostic result, not
+product evidence. A real wired non-Audio8 output must be connected before a
+known-good route can pass.
+
+### Source-reference A/B repeat with rate matching
+
+The source-reference Audio 8 to iRig comparison was repeated after adding the
+capture-rate guard. Both mainline and candidate sessions matched the iRig to
+48 kHz and restored it to 44.1 kHz in their own evidence directories.
+
+| Session | Quality alignment | SNR floor | Mid residual | High residual | Quiet mid noise | Lag jumps | Driver CPU p95 | CoreAudio CPU p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mainline reference | 0.543327 | -5.78 dB | 3.057574 | 4.120340 | -48.63 dBFS | 39 | 5.1% | 4.8% |
+| stable output3072 candidate | 0.958375 | -6.95 dB | 2.557408 | 2.564459 | -47.12 dBFS | 37 | 5.3% | 6.7% |
+
+The candidate improved alignment and residual ratios relative to mainline, but
+it failed the absolute quality gates, relative SNR/noise gates, dual audiophile
+WAV gates, and CPU superiority gates. The same-session comparison therefore
+returned `FAIL`; this is diagnostic evidence only and does not authorize a
+latency or sound-quality claim.
+
 After the fixture and documentation changes, the final non-interactive rerun
 reported latency gate `PASS` with six e2e fixture profiles and zero hard
 failures; the C++ release suite remained `89/89` passed. A non-destructive
@@ -337,9 +379,9 @@ The broader offline runner still returns a diagnostic nonzero status because its
 readiness packet intentionally preserves three missing historical physical
 artifacts and the physical promotion gates remain closed. The final objective
 auditor now reports only the external blockers: full DriverKit/deXt runtime
-proof, a fresh same-session Audio8-to-iRig A/B comparison, runtime CPU/resource
-superiority, and the real Traktor/timecode-vinyl window. No stale-HEAD blocker
-remains.
+proof, a fresh same-session Audio8-to-iRig A/B comparison that passes, runtime
+CPU/resource superiority, a wired known-good route, and the real
+Traktor/timecode-vinyl window. No stale-HEAD blocker remains.
 
 ## Evidence files
 
@@ -358,6 +400,7 @@ remains.
 - `local-analysis/candidates/prepared-medium.driver`
 - `/tmp/opena8dj-persistent-medium.json`
 - `/tmp/opena8dj-cpp-offline-gates.log`
+- `/tmp/opena8dj-offline-after-route-fix.log`
 - `local-analysis/hal-candidate-safety/candidate2304-cycles2`
 - `local-analysis/physical-superiority-window/20260725-output2304-physical-pairB-48000`
 - `local-analysis/physical-superiority-window/20260725-output3072-control-physical-pairB-48000`
@@ -375,7 +418,10 @@ remains.
 - `local-analysis/hal-candidate-safety/output3008-cycles2`
 - `local-analysis/hal-candidate-safety/restore-stable-output3072-after-output3008`
 - `local-analysis/physical-evidence-window/20260725T193436Z/source-reference-ab`
+- `local-analysis/physical-evidence-window/20260725T2130Z/source-reference-ab`
+- `local-analysis/physical-evidence-window/route-only-20260725T2100Z`
 - `local-analysis/hal-candidate-safety/restore-stable-output3072-after-source-reference`
+- `local-analysis/hal-candidate-safety/restore-stable-output3072-after-source-reference-rate-match`
 - `local-analysis/hal-candidate-safety/responsive512-cycles2`
 - `local-analysis/physical-superiority-window/20260725-responsive512-physical-pairB-48000`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-responsive512`
