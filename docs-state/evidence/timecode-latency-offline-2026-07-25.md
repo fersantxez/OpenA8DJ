@@ -49,6 +49,10 @@ and final stable restore are recorded below.
   bundle with four slots per submit, eight logical ISO frames, and eight-entry
   capture/playback queues. It restores the stable default HAL after building
   the candidate and does not install or load it.
+- `scripts/run-cpp-offline-gates` accepts the optional
+  `OPENA8DJ_SOURCE_REFERENCE_WAV` environment variable and forwards it to the
+  physical-window planner. This makes a future lock-gated source-reference
+  comparison reproducible without treating a plan as a completed measurement.
 - `scripts/run-cpp-offline-gates` includes the latency gate and its test while
   preserving diagnostic failures for route contamination and iRig idle capture.
 - `tools/evidence_provenance_freshness_gate.cpp` now resolves the active

@@ -5,6 +5,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EVIDENCE_DIR="$ROOT/local-analysis/cpp-offline"
 mkdir -p "$EVIDENCE_DIR"
 
+SOURCE_REFERENCE_ARGS=()
+if [[ -n "${OPENA8DJ_SOURCE_REFERENCE_WAV:-}" ]]; then
+  SOURCE_REFERENCE_ARGS=(
+    --reference-wav
+    "$OPENA8DJ_SOURCE_REFERENCE_WAV"
+  )
+fi
+
 cd "$ROOT"
 
 cmake -S . -B build/cpp-offline
@@ -287,6 +295,7 @@ fi
 printf '%s\n' "$WATCH_KNOWN_GOOD_ROUTE_RC" > "$EVIDENCE_DIR/watch-known-good-route.rc"
 python3 scripts/plan-physical-evidence-window \
   --watcher-json "$EVIDENCE_DIR/watch-known-good-route.json" \
+  "${SOURCE_REFERENCE_ARGS[@]}" \
   --json-out "$EVIDENCE_DIR/physical-evidence-window-plan.json" \
   >/dev/null
 python3 scripts/plan-timecode-physical-window \
