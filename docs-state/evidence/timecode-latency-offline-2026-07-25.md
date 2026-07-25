@@ -134,8 +134,9 @@ candidates only, and the stable profile remains the only defensible default.
 The later lock-gated tests used the real Audio 8 DJ USB device, iRig Stream at
 48 kHz for the capture path, pair B, and then restored iRig Stream to its prior
 44.1 kHz setting. The hardware lock was free after every run. These tests did
-touch CoreAudio and the external capture path; they did not reset USB, restart
-CoreAudio, change default devices, or install a candidate permanently.
+touch CoreAudio and the external capture path. The safety and cleanup paths
+restarted or recovered CoreAudio where required; they did not reset USB, change
+default devices, or install a candidate permanently.
 
 Candidate artifacts and safety results:
 
@@ -219,6 +220,38 @@ failed after unload: CoreAudio reached `138.2%` CPU and the watched total reache
 recovery returned to `audio_stack_health=PASS`; no physical sound or latency
 test was run. The candidate is rejected despite the modeled improvement.
 
+### Source-reference Audio 8 to iRig A/B window
+
+The source-reference plan and preflight passed after the reference WAV was
+explicitly supplied. The executed same-session window then failed both absolute
+sound-quality gates, so it does not support promotion or a product latency
+claim. The candidate side used the current stable `output3072` bundle; it was
+not a new optimization candidate.
+
+| Run | Quality alignment | SNR floor | Mid residual | High residual | Quiet mid noise | Lag jumps >2 frames | Driver CPU p95 | CoreAudio CPU p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| mainline reference | 0.514801 | -5.51 dB | 2.985026 | 3.830859 | -48.66 dBFS | 38 | 5.2% | 9.3% |
+| stable output3072 candidate | 0.958731 | -11.59 dB | 3.974424 | 3.899467 | -45.47 dBFS | 24 | 6.3% | 5.1% |
+
+The candidate improved relative alignment and lag-jump count versus the
+mainline run, but failed its relative SNR, residual, quiet-noise, and driver-CPU
+gates. More importantly, neither run met the absolute product thresholds of
+`quality_alignment >= 0.98`, `SNR >= 35 dB`, zero lag jumps, and the configured
+residual/noise ceilings. The physical window therefore returned `FAIL`, with no
+promotion. The run also lacked the required audiophile WAV analyses, and no
+Traktor timecode stimulus was used.
+
+Evidence for this window is under
+`local-analysis/physical-evidence-window/20260725T193436Z/source-reference-ab`,
+including `physical-window-preflight.json`, both `metrics.json` files,
+`same-session-physical-compare.json`, `promotion-readiness.json`, and the two
+CPU profiles. The window acquired the shared hardware lock, loaded/unloaded the
+Audio 8 HAL, and performed CoreAudio recovery during cleanup. It did not reset
+USB, alter default devices, or use a physical turntable. The known-good
+`local-analysis/candidates/output3072/OpenA8DJ.driver` bundle was reloaded
+afterward and passed one safety cycle; Audio 8 DJ returned as 8x8 at 48 kHz,
+`audio_stack_health=PASS`, and the lock was `LOCK_FREE`.
+
 ## Final post-test state
 
 After the candidate runs, the stable output3072 bundle was loaded again and
@@ -239,6 +272,13 @@ passed the safety gate with `audio_stack_health=PASS`, CoreAudio at `0.0%`, and
 the required Audio 8 DJ device present. The post-restore check confirmed
 Open Audio 8 DJ at 8x8/48 kHz, iRig Stream at 44.1 kHz, and a free hardware
 lock.
+
+After the source-reference A/B window, the same known-good output3072 bundle
+was restored with
+`local-analysis/hal-candidate-safety/restore-stable-output3072-after-source-reference`.
+The restore passed one safety cycle. The final non-destructive checks showed
+Open Audio 8 DJ at 8x8/48 kHz, iRig Stream at 44.1 kHz,
+`audio_stack_health=PASS`, and `LOCK_FREE`.
 
 The result is consistent with the offline frontier: lower output targets can
 reduce modeled delay without preserving the real capture quality and service
@@ -291,6 +331,8 @@ remains.
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-start2816-reset`
 - `local-analysis/hal-candidate-safety/output3008-cycles2`
 - `local-analysis/hal-candidate-safety/restore-stable-output3072-after-output3008`
+- `local-analysis/physical-evidence-window/20260725T193436Z/source-reference-ab`
+- `local-analysis/hal-candidate-safety/restore-stable-output3072-after-source-reference`
 - `local-analysis/hal-candidate-safety/responsive512-cycles2`
 - `local-analysis/physical-superiority-window/20260725-responsive512-physical-pairB-48000`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-responsive512`
