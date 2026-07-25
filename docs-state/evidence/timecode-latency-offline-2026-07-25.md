@@ -84,10 +84,43 @@ candidate artifact, with the existing stable 3072 profile as control. Until that
 exists, `output2304`, `output2048`, and `host256` remain laboratory candidates
 only, and the stable profile remains the only defensible default.
 
+## Physical candidate validation
+
+The later lock-gated tests used the real Audio 8 DJ USB device, iRig Stream at
+48 kHz for the capture path, pair B, and then restored iRig Stream to its prior
+44.1 kHz setting. The hardware lock was free after every run. These tests did
+touch CoreAudio and the external capture path; they did not reset USB, restart
+CoreAudio, change default devices, or install a candidate permanently.
+
+Candidate artifacts and safety results:
+
+| Candidate | HAL executable SHA-256 | Safety result | Physical result | Decision |
+| --- | --- | --- | --- | --- |
+| output3072 control | `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098` | prior stable safety evidence | prior physical route/sound evidence | retain as stable |
+| output2560 | `e18647f3902b3c9a66977c59305251e8b95421650a5c3a66e7ff34c2bd41a353` | FAIL, CoreAudio health 108.1% CPU during load | not eligible | reject |
+| output2048 | `402dafe1f24ccb4ecaa7cac09b91a810dc87b7d16aae3e566ed1aed7c4649617` | FAIL on two-cycle repeat; post-unload CoreAudio reached 170.0% CPU | not eligible | reject |
+| output2304 | `b9a5b9831d8c414a47c1d40f71ec8e2e813cc1ee85a4ce03099445a38b5d23fc` | PASS, two cycles, clean recovery | FAIL: first energy 0.70 s, correlation 0.284, aligned SNR -1.58 dB, lag jumps 22 | reject |
+
+The output2304 physical run also recorded zero capture status failures, zero
+capture transaction errors, zero playback transfer errors, zero output
+underruns, zero active underruns, zero late-write frames, and zero panic flags.
+Those transport counters are useful diagnostics but do not override the failed
+quality gate. Its physical-latency analyzer reported a 0.70 s first-energy
+observation, best absolute correlation 0.284, aligned SNR -1.58 dB, linear-fit
+SNR -10.53 dB, and linear residual 0.958 of capture RMS. The result is
+diagnostic only and cannot support a product-quality or responsive-vinyl claim.
+
+The result is consistent with the offline frontier: lower output targets can
+reduce modeled delay without preserving the real capture quality and service
+stability required for DVS. No candidate is promoted. The installed/default
+profile remains output3072 until a future exact-artifact physical window passes
+both safety and sound-quality gates.
+
 ## Evidence files
 
 - `local-analysis/timecode-latency/offline/latency-offline-gate.json`
 - `local-analysis/timecode-latency/offline/result.txt`
 - `local-analysis/cpp-offline/current-offline-gates.json`
 - `/tmp/opena8dj-cpp-offline-gates.log`
-
+- `local-analysis/hal-candidate-safety/candidate2304-cycles2`
+- `local-analysis/physical-superiority-window/20260725-output2304-physical-pairB-48000`
