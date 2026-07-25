@@ -78,8 +78,8 @@ the surface, topology, diagnostics, capabilities, controls, profiles, and
 experimental format state.
 
 Important: source-level ACX endpoint wiring and the capture-paced isochronous
-engine are present in this workstream, but runtime endpoint enumeration and
-streaming are not yet proven on the current artifact. An isolated
+engine are present in this workstream, and runtime endpoint enumeration and
+streaming have been proven on the current local artifact. An isolated
 `OpenA8DJVirtual` ACX proof target is available for a no-USB proof run; it is
 not part of the USB package and has not been installed. MIDI publication, ASIO,
 hotplug/sleep validation, long-run DPC/CPU gates, and full Traktor/timecode
@@ -87,10 +87,12 @@ input validation remain incomplete.
 Feedback and logs are welcome. Install and use experimental Windows builds at
 your own risk.
 
-Current candidate (2026-07-12): `OpenA8DJUsb` 0.0.135/API 27 and the isolated
-`OpenA8DJVirtual` proof package 0.0.2 are build-verified and test-signed, but
-neither package has been installed on this machine. Runtime endpoint
-enumeration remains an explicit pending gate.
+Current candidate (2026-07-25): `OpenA8DJUsb` 0.0.183/API 44 is installed and
+test-signed on the Windows test machine. The Audio 8 DJ endpoint, 8-channel
+streaming, Traktor playback, and physical iRig loopback were exercised without
+BSOD, reboot, underrun, overrun, packet-error, or late-completion deltas. The
+isolated `OpenA8DJVirtual` proof package remains separate and is not installed
+by the USB installer.
 
 Historical local 2026-06-25 API 24 note: the test-signed package was
 `OpenA8DJUsb` 0.0.81/API 24. Hardware control profiles now verify readback for

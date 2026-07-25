@@ -112,8 +112,9 @@ driver\opena8djctl.exe diagnostics
 driver\opena8djctl.exe status
 ```
 
-Do not treat `start` failure as a bug at this stage. `start` is intentionally
-rejected until the real Windows audio/isochronous engine exists.
+If `start` is unavailable for a particular host API or format, do not repeatedly
+retry it. Save `surface`, `topology`, and `diagnostics`; the validated path uses
+the normal Windows audio endpoint and the conservative 512-frame test setup.
 
 ## Uninstall
 

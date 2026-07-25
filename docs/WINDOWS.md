@@ -109,17 +109,19 @@ CAIAQ USB pipes, and exposes the OpenA8DJ experimental Windows surface contract:
 
 The package also builds `opena8djctl.exe` for diagnostics. The source workstream
 includes ACX endpoint wiring and a capture-paced isochronous engine for the
-physical Audio 8 DJ, but the current artifact has not been installed or runtime
-validated in this pass. An isolated `OpenA8DJVirtual` ACX proof target can be
+physical Audio 8 DJ. The current local artifact has been installed and runtime
+validated on the Windows test machine. An isolated `OpenA8DJVirtual` ACX proof target can be
 built without USB hardware; it is not part of the USB package and has not been
 installed. MIDI publication, ASIO, real hardware control writes, hotplug/sleep
 validation, long-run DPC/CPU gates, timecode validation, and a clean Windows
 install matrix remain incomplete.
 
-Current candidate (2026-07-12): `OpenA8DJUsb` 0.0.135/API 27 and
-`OpenA8DJVirtual` 0.0.2 are build-verified but intentionally not installed.
-The virtual target is the next runtime proof gate and does not target the
-Audio 8 DJ USB VID/PID.
+Current candidate (2026-07-25): `OpenA8DJUsb` 0.0.183/API 44 is installed and
+active on the Windows test machine. The physical Audio 8 DJ and iRig Stream
+were present and healthy during validation; the driver completed Traktor and
+physical loopback tests without BSOD, reboot, underrun, overrun, packet-error,
+or late-completion deltas. `OpenA8DJVirtual` remains a separate proof target
+and does not target the Audio 8 DJ USB VID/PID.
 
 ### Local API 24 evidence - 2026-06-25
 
