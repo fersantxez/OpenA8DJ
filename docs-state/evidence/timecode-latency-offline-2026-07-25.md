@@ -65,6 +65,13 @@ The full C++ matrix passed:
   for packing, 563.718 to 578.056 MiB/s for decode-into, and 519.011 to
   831.103 million frames/s for forward routing.
 
+The final offline rerun after the candidate iterations also passed the latency
+gate and the C++ release suite: `89/89` tests passed. The five-run benchmark
+reported zero check errors, zero decode-output overflows, and zero panic flags;
+the observed ranges were 1,615.78-1,634.21 MiB/s for packing,
+561.095-578.756 MiB/s for decode-into, and 835.852-1,025.670 million frames/s
+for forward routing.
+
 ## Promotion status
 
 No candidate was promoted. The complete runner returned a nonzero status because
