@@ -23,6 +23,7 @@ def main() -> int:
     prefetch_64 = MODULE.model_profile("prefetch64", 48000, 64, 3072, 512, 64)
     output_2048 = MODULE.model_profile("output2048", 48000, 64, 2048, 512, 128)
     output_2816 = MODULE.model_profile("output2816", 48000, 64, 2816, 512, 128)
+    output_3008 = MODULE.model_profile("output3008", 48000, 64, 3008, 512, 128)
     host_256 = MODULE.model_profile("host256", 48000, 64, 2048, 256, 128)
     unsafe = MODULE.model_profile("unsafe", 48000, 64, 1024, 512, 128)
 
@@ -30,12 +31,15 @@ def main() -> int:
     assert prefetch_64["result"] == "PASS"
     assert output_2048["result"] == "PASS"
     assert output_2816["result"] == "PASS"
+    assert output_3008["result"] == "PASS"
     assert host_256["result"] == "PASS"
     assert unsafe["result"] == "FAIL"
     assert output_2048["modeled_pipeline_p95_ms"] < baseline["modeled_pipeline_p95_ms"]
     assert prefetch_64["modeled_pipeline_p95_ms"] < baseline["modeled_pipeline_p95_ms"]
     assert prefetch_64["realtime_work_proxy_per_second"] == baseline["realtime_work_proxy_per_second"]
     assert output_2816["modeled_pipeline_p95_ms"] < baseline["modeled_pipeline_p95_ms"]
+    assert output_3008["modeled_pipeline_p95_ms"] < baseline["modeled_pipeline_p95_ms"]
+    assert output_3008["modeled_pipeline_p95_ms"] > output_2816["modeled_pipeline_p95_ms"]
     assert output_2816["modeled_pipeline_p95_ms"] > output_2048["modeled_pipeline_p95_ms"]
     assert host_256["modeled_pipeline_p95_ms"] < output_2048["modeled_pipeline_p95_ms"]
     assert output_2048["geometry_safe_for_frontier"] is True
