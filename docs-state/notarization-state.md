@@ -20,6 +20,13 @@ as the latest Apple-notarized baseline until a valid Developer ID Application
 and Installer identity is restored, the exact 0.5.1 artifacts are rebuilt,
 submitted, accepted, stapled, and verified.
 
+The experimental preview was published on 2026-07-25 at
+https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1 with only the driver
+DMG and its checksum file. A fresh GitHub download passed checksum and DMG
+integrity checks and was installed through the documented `sudo installer`
+fallback. The installed receipt, HAL hash, 8-in/8-out device visibility, and
+audio-stack health all passed.
+
 Current local preview hashes:
 
 ```text
