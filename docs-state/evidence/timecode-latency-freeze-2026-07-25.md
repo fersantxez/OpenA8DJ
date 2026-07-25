@@ -64,6 +64,14 @@ The resulting offline safety gate reports the frozen soak as latest,
 `diagnostic_install_active=true`, and identical candidate/current/installed
 hashes.
 
+The final full offline run was repeated from clean commit `f019869` after that
+consumer fix. Both test suites passed (88/88 default and 89/89 release), the
+release benchmark reported zero errors, overflows, and panic flags, and the
+evidence-provenance freshness gate passed against the same commit. The overall
+runner returned nonzero only because the three required physical evidence
+artifacts remain unavailable; its authoritative `status` and
+`diagnostic_status` are both `PASS`.
+
 ## Limits
 
 This is a frozen experimental usability build, not a public-ready release.
