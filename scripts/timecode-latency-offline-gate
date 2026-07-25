@@ -20,6 +20,10 @@ PROFILES = (
     ("output3008", 64, 3008, 512, 128),
     ("prefetch64", 64, 3072, 512, 64),
     ("capture32", 32, 3072, 512, 128),
+    # The medium persistent-transport candidate submits four 8-frame slots
+    # per completion. Keep this named separately from the generic capture32
+    # frontier so its evidence cannot be mistaken for a HAL binding claim.
+    ("persistent-transport32", 32, 3072, 512, 128),
     ("capture16", 16, 3072, 512, 128),
     ("output2560", 64, 2560, 512, 128),
     ("output2816", 64, 2816, 512, 128),
@@ -36,6 +40,7 @@ E2E_PROFILES = (
     ("output3008", 64, 512, 3008, 128, 3008, 1504),
     ("output2560", 64, 512, 2560, 128, 2560, 1280),
     ("output2304", 64, 512, 2304, 128, 2304, 1152),
+    ("persistent-transport32", 32, 512, 3072, 128, 3072, 1536),
 )
 
 OFFLINE_BINARIES = (

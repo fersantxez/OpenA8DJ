@@ -4,7 +4,7 @@ Date: 2026-07-25
 Worktree: `/Users/fer/dev/opena8dj-latency-lab`
 Branch: `codex/timecode-latency`
 Base revision: `27a8410`
-Current evidence revision: `8aebeaf`
+Current evidence revision: `pending-profile-commit`
 
 ## Scope
 
@@ -39,8 +39,16 @@ and final stable restore are recorded below.
   `prefetch64`, `restart1024`, and `output3008` response changes while
   asserting that physical evidence and product claims remain false.
 - `scripts/test-timecode-latency-offline-gate.py` covers the baseline, the
-  `output2048`, `output3008`, and `host256` candidates, unsafe geometry
+  `output2048`, `output3008`, `host256`, and `persistent-transport32` candidates, unsafe geometry
   rejection, and monotonic modeled reductions.
+- The offline matrix and deterministic fixture include a separately named
+  `persistent-transport32` profile. It represents four 8-frame prepared slots
+  per submit, but remains model-only until the exact artifact is proven on the
+  real HAL path.
+- `make hal-prepared-medium-candidate` generates the medium prepared-runtime
+  bundle with four slots per submit, eight logical ISO frames, and eight-entry
+  capture/playback queues. It restores the stable default HAL after building
+  the candidate and does not install or load it.
 - `scripts/run-cpp-offline-gates` includes the latency gate and its test while
   preserving diagnostic failures for route contamination and iRig idle capture.
 - `tools/evidence_provenance_freshness_gate.cpp` now resolves the active
@@ -62,6 +70,7 @@ failures. At 48 kHz, the modeled pipeline p95 values were:
 | baseline | 78.667 ms | 0.000% | 0.000% |
 | prefetch64 | 77.333 ms | 1.695% | 0.000% |
 | capture32 | 78.000 ms | 0.847% | +88.889% |
+| persistent-transport32 | 78.000 ms | 0.847% | +88.889% |
 | capture16 | 77.667 ms | 1.271% | +266.667% |
 | output2560 | 68.000 ms | 13.559% | 0.000% |
 | output2816 | 73.333 ms | 6.780% | 0.000% |
@@ -99,6 +108,7 @@ candidate profiles in its offline matrix. The baseline result was:
 | prefetch64 | 70.427 ms | 75.472 ms | 75.765 ms | 5.068 ms | 41.792 ms |
 | restart1024 | 71.760 ms | 76.805 ms | 77.099 ms | 5.068 ms | 32.458 ms |
 | output3008 | 70.427 ms | 75.472 ms | 75.765 ms | 5.068 ms | 42.458 ms |
+| persistent-transport32 | 70.427 ms | 75.472 ms | 75.765 ms | 5.068 ms | 42.458 ms |
 
 The fixture gates passed marker propagation, monotonic output ordering, p95 <=
 100 ms, p99 <= 110 ms, and steady-state jitter p99-p50 <= 12 ms. The
@@ -107,6 +117,14 @@ the fixture baseline); `restart1024` reduces the first restart response while
 leaving steady-state p95 unchanged. These are timeline-fixture results only:
 they are not input-to-output measurements from a DVS signal, a turntable, or
 Traktor, and they do not authorize promotion.
+
+The `persistent-transport32` fixture also passed all of those gates. Its
+modeled steady-state p95 is `0.667 ms` lower than baseline, with the same
+restart response as baseline. The corresponding offline work proxy rises by
+`88.889%` because the model counts 32-frame capture completions rather than
+the current 64-frame baseline. That tradeoff must be measured on the exact
+candidate before promotion; it is not evidence that the real driver has
+achieved the modeled result.
 
 The next transport iteration was built and checked offline as
 `local-analysis/candidates/prepared-medium.driver`. It uses four prepared slots
