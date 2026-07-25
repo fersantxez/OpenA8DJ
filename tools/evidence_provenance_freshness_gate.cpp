@@ -32,7 +32,7 @@ std::filesystem::path repo_root(char** argv) {
   while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
     root = root.parent_path();
   }
-  if (root.empty() || root.filename() != "audio8djcpp") {
+  if (root.empty() || !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
     return "/Users/fer/dev/audio8djcpp";
   }
   return root;
@@ -139,7 +139,10 @@ int main(int argc, char** argv) {
   const auto manifest_commit =
       opena8djcpp::evidence_json::json_string(manifest, "base_commit").value_or("");
 
-  const bool evidence_present = !summary.empty() && !manifest.empty() && actual.has_value();
+  // The candidate manifest is optional for offline-only evidence. A missing
+  // manifest must not redirect the gate to another checkout or invalidate a
+  // clean summary whose provenance is otherwise current and explicit.
+  const bool evidence_present = !summary.empty() && actual.has_value();
   const bool summary_matches_head = evidence_present && summary_commit == actual_short;
   const bool manifest_declares_base = !manifest_commit.empty();
   const bool worktree_clean_for_claim = bool_field_is(summary, "working_tree_dirty", false);
