@@ -46,6 +46,7 @@ failures. At 48 kHz, the modeled pipeline p95 values were:
 | capture32 | 78.000 ms | 0.847% | +88.889% |
 | capture16 | 77.667 ms | 1.271% | +266.667% |
 | output2560 | 68.000 ms | 13.559% | 0.000% |
+| output2816 | 73.333 ms | 6.780% | 0.000% |
 | output2304 | 62.667 ms | 20.339% | 0.000% |
 | output2048 | 57.333 ms | 27.119% | 0.000% |
 | host256 | 52.000 ms | 33.898% | +11.111% |
@@ -98,6 +99,7 @@ Candidate artifacts and safety results:
 | --- | --- | --- | --- | --- |
 | output3072 control | `79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098` | prior stable safety evidence | prior physical route/sound evidence | retain as stable |
 | output2560 | `e18647f3902b3c9a66977c59305251e8b95421650a5c3a66e7ff34c2bd41a353` | FAIL, CoreAudio health 108.1% CPU during load | not eligible | reject |
+| output2816 | `1ceae118c56cf31af1b34d12bf22e2fc8341e73c8180e94a82ad17871ee49052` | PASS, two cycles, clean recovery | FAIL: alignment 0.958982, SNR 4.94 dB, lag jumps 22 | reject |
 | output2048 | `402dafe1f24ccb4ecaa7cac09b91a810dc87b7d16aae3e566ed1aed7c4649617` | FAIL on two-cycle repeat; post-unload CoreAudio reached 170.0% CPU | not eligible | reject |
 | output2304 | `b9a5b9831d8c414a47c1d40f71ec8e2e813cc1ee85a4ce03099445a38b5d23fc` | PASS, two cycles, clean recovery | FAIL: first energy 0.70 s, correlation 0.284, aligned SNR -1.58 dB, lag jumps 22 | reject |
 
@@ -119,6 +121,11 @@ control itself entered a `175.3%` CoreAudio runaway during the load window.
 That session is recorded as invalid comparison evidence, not as a promotion
 pass.
 
+The output2816 run was materially calmer than output2304: sampled CoreAudio
+peaked at `25.5%`, total audio UI/services at `61.9%`, and the driver at `7.3%`.
+Those are useful performance observations, but the sound-quality gate still
+failed and the candidate therefore remains laboratory-only.
+
 The result is consistent with the offline frontier: lower output targets can
 reduce modeled delay without preserving the real capture quality and service
 stability required for DVS. No candidate is promoted. The installed/default
@@ -135,3 +142,5 @@ both safety and sound-quality gates.
 - `local-analysis/physical-superiority-window/20260725-output2304-physical-pairB-48000`
 - `local-analysis/physical-superiority-window/20260725-output3072-control-physical-pairB-48000`
 - `local-analysis/physical-superiority-window/20260725-output2304-vs-3072-same-session-pairB-48000`
+- `local-analysis/hal-candidate-safety/candidate2816-cycles2`
+- `local-analysis/physical-superiority-window/20260725-output2816-physical-pairB-48000`
