@@ -451,6 +451,7 @@ run_audio8_soundcheck() {
     --stream-stats-snapshots
     --audio-stack-recover-on-fail
     --audio-stack-unload-on-recover
+    --match-capture-rate
     --skip-build
   )
   if [ -n "$music_file" ]; then

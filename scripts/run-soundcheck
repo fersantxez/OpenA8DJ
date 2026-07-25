@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+from contextlib import contextmanager
 import datetime as dt
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -507,6 +509,91 @@ def run_audio_stack_health(root, base_dir, args):
         raise SystemExit(f"audio stack health failed; see {health_log}")
 
 
+def resolve_capture_device(root, capture_name):
+    result = subprocess.run(
+        [str(root / "build" / "audio-list")],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        check=False,
+    )
+    pattern = re.compile(
+        r"^\s*\d+\s+id=(?P<id>\d+)\s+(?P<name>.*?)\s+uid=(?P<uid>.*?)\s+"
+        r"in=(?P<inputs>\d+)\s+out=(?P<outputs>\d+)\s+rate=(?P<rate>[0-9.]+)"
+    )
+    matches = []
+    for line in result.stdout.splitlines():
+        match = pattern.match(line)
+        if match and capture_name.lower() in match.group("name").lower():
+            matches.append(match.groupdict())
+    if result.returncode != 0 or len(matches) != 1:
+        raise SystemExit(
+            f"capture device must resolve exactly once for rate matching: {capture_name}"
+        )
+    device = matches[0]
+    if int(device["inputs"]) < 2:
+        raise SystemExit(f"capture device has fewer than two inputs: {capture_name}")
+    return device
+
+
+@contextmanager
+def temporary_capture_rate(root, base_dir, args):
+    if not args.match_capture_rate or args.prepare_only:
+        yield
+        return
+
+    device = resolve_capture_device(root, args.capture_device)
+    original_rate = int(float(device["rate"]))
+    requested_rate = int(args.rate)
+    plan = base_dir / "capture-rate-plan.txt"
+    plan.write_text(
+        "\n".join(
+            [
+                f"capture_rate_uid={device['uid']}",
+                f"capture_rate_original={original_rate}",
+                f"capture_rate_reference={requested_rate}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    changed = original_rate != requested_rate
+    if changed:
+        with open(base_dir / "capture-rate-config.log", "w", encoding="utf-8") as log:
+            run(
+                [str(root / "build" / "audio-config"), device["uid"], str(requested_rate)],
+                root,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+            )
+        with plan.open("a", encoding="utf-8") as handle:
+            handle.write(f"capture_rate_configured={requested_rate}\n")
+    else:
+        with plan.open("a", encoding="utf-8") as handle:
+            handle.write("capture_rate_configured=no_change\n")
+
+    try:
+        yield
+    finally:
+        if changed:
+            with open(base_dir / "capture-rate-restore.log", "w", encoding="utf-8") as log:
+                restore = subprocess.run(
+                    [str(root / "build" / "audio-config"), device["uid"], str(original_rate)],
+                    cwd=str(root),
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
+            restore_path = base_dir / "capture-rate-restore.txt"
+            if restore.returncode != 0:
+                restore_path.write_text("capture_rate_restore_failed=1\n", encoding="utf-8")
+                raise SystemExit("failed to restore capture device sample rate")
+            restore_path.write_text(
+                f"capture_rate_restored={original_rate}\n", encoding="utf-8"
+            )
+
+
 def classify_cpu_line(line):
     parts = line.strip().split(None, 3)
     if len(parts) < 4:
@@ -891,6 +978,11 @@ def main():
     parser.add_argument("--target-peak-db", type=float, default=-12.0)
     parser.add_argument("--capture-device")
     parser.add_argument("--capture-channels", default="1,2")
+    parser.add_argument(
+        "--match-capture-rate",
+        action="store_true",
+        help="temporarily match the physical capture device to --rate and restore it on exit",
+    )
     parser.add_argument("--allow-virtual-capture", action="store_true")
     parser.add_argument("--run-dir")
     parser.add_argument("--prepare-only", action="store_true")
@@ -985,7 +1077,8 @@ def main():
     def run_locked():
         make_tools(root, args.skip_build)
         run_audio_stack_health(root, base_dir, args)
-        return run_soundcheck_body(root, base_dir, fixture_dir, args)
+        with temporary_capture_rate(root, base_dir, args):
+            return run_soundcheck_body(root, base_dir, fixture_dir, args)
 
     if lock_context is None:
         make_tools(root, args.skip_build)
