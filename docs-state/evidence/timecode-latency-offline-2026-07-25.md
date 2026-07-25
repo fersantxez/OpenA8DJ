@@ -4,7 +4,7 @@ Date: 2026-07-25
 Worktree: `/Users/fer/dev/opena8dj-latency-lab`
 Branch: `codex/timecode-latency`
 Base revision: `27a8410`
-Current evidence revision: `ce82df0`
+Current evidence revision: `8aebeaf`
 
 ## Scope
 
