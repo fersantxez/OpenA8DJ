@@ -377,10 +377,12 @@ PY
     -v wanted_uid="$capture_device_uid" '
       {
         line_uid=""; line_rate=""
-        for (i = 1; i <= NF; i++) {
-          if ($i ~ /^uid=/) { line_uid=$i; sub(/^uid=/, "", line_uid) }
-          if ($i ~ /^rate=/) { line_rate=$i; sub(/^rate=/, "", line_rate) }
-        }
+        line_uid=$0
+        sub(/^.* uid=/, "", line_uid)
+        sub(/ in=.*/, "", line_uid)
+        line_rate=$0
+        sub(/^.* rate=/, "", line_rate)
+        sub(/[^0-9].*$/, "", line_rate)
         if ((wanted_uid != "" && line_uid == wanted_uid) ||
             (wanted_uid == "" && index($0, wanted) > 0)) {
           print line_uid "\t" line_rate
