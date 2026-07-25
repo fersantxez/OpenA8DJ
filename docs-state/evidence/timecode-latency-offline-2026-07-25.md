@@ -105,6 +105,7 @@ Candidate artifacts and safety results:
 | output2304 | `b9a5b9831d8c414a47c1d40f71ec8e2e813cc1ee85a4ce03099445a38b5d23fc` | PASS, two cycles, clean recovery | FAIL: first energy 0.70 s, correlation 0.284, aligned SNR -1.58 dB, lag jumps 22 | reject |
 | prefetch64 | `de9e1cfc67e6b7833e19e1cae6843fa972f2fe3430a89f9fc41cc1335d2ebeba` | FAIL on first cycle; CoreAudio 125.6% CPU and total watched 134.5% | not eligible; physical sound test intentionally skipped | reject |
 | restart1024 | `dce993ccf0763fc8915b84875f2e6618875340691cffa46b970e24eeb825d2b6` | PASS, two cycles, clean recovery | FAIL: alignment 0.958576, SNR 4.95 dB, lag jumps 22; CPU peaks 63.1% CoreAudio and 153.9% total watched | reject |
+| start2816 | `9acd9b948fe5b5df4865f6e2498a66f5a5f2d953a3093a34315dc0b63bf71086` | FAIL on post-unload guard; CoreAudio 105.3% CPU and total watched 114.5% | not eligible; physical sound test intentionally skipped | reject |
 
 The output2304 physical run also recorded zero capture status failures, zero
 capture transaction errors, zero playback transfer errors, zero output
@@ -147,6 +148,15 @@ errors, but the quality gate is decisive. CPU sampled during the soundcheck
 peaked at `63.1%` for CoreAudio and `153.9%` for the total watched audio/UI
 workload. No promotion is allowed.
 
+The start2816 candidate kept the 3072-frame steady-state target and restart
+preroll, changing only the first-start preroll from 3072 to 2816 frames. Its
+loaded-cycle health initially passed, but the post-unload safety guard failed:
+CoreAudio reached `105.3%` CPU and the watched total reached `114.5%`, with the
+candidate unloaded. Recovery passed, so no physical sound test was attempted.
+The subsequent stable restore encountered a separate CoreAudio recovery spike
+(`108.9%`, total `128.0%`); the explicit `audio-stack-health --reset` recovery
+then passed, and the stable output3072 bundle was loaded and verified again.
+
 ## Final post-test state
 
 After the candidate runs, the stable output3072 bundle was loaded again and
@@ -181,3 +191,6 @@ both safety and sound-quality gates.
 - `local-analysis/hal-candidate-safety/restart1024-cycles2`
 - `local-analysis/physical-superiority-window/20260725-restart1024-physical-pairB-48000`
 - `local-analysis/hal-candidate-safety/final-stable-output3072-after-restart1024`
+- `local-analysis/hal-candidate-safety/start2816-cycles2`
+- `local-analysis/hal-candidate-safety/final-stable-output3072-after-start2816`
+- `local-analysis/hal-candidate-safety/final-stable-output3072-after-start2816-reset`
