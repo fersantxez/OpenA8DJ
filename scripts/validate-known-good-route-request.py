@@ -62,6 +62,22 @@ def looks_virtual_capture(value: str) -> bool:
     )
 
 
+def looks_virtual_output(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "blackhole",
+            "soundflower",
+            "vb-cable",
+            "vbcable",
+            "background music",
+            "loopback audio",
+            "rogue amoeba loopback",
+        )
+    )
+
+
 def looks_irig_capture(value: str) -> bool:
     lowered = value.lower()
     return "irig" in lowered or "ik multimedia" in lowered
@@ -176,6 +192,7 @@ def main() -> int:
     )
     resolved_audio8 = audio8ish(output_identity)
     built_in_output = built_in_or_acoustic_output(output_identity)
+    virtual_output = looks_virtual_output(output_identity)
     virtual_capture = looks_virtual_capture(capture_identity)
     irig_capture = looks_irig_capture(capture_identity)
 
@@ -212,6 +229,9 @@ def main() -> int:
         pass_gate("output_not_builtin_acoustic", {"device": output or {}})
         if not built_in_output or args.allow_built_in_output_acoustic_diagnostic
         else fail_gate("output_not_builtin_acoustic", {"device": output or {}}, "built-in/acoustic output cannot validate wired iRig route"),
+        pass_gate("output_not_virtual", {"device": output or {}, "identity": output_identity})
+        if not virtual_output or args.allow_same_device_loopback_diagnostic
+        else fail_gate("output_not_virtual", {"device": output or {}, "identity": output_identity}, "virtual output cannot validate wired iRig route"),
         pass_gate("output_not_capture_device", {"output": output or {}, "capture": capture or {}})
         if not same_device or args.allow_same_device_loopback_diagnostic
         else fail_gate("output_not_capture_device", {"output": output or {}, "capture": capture or {}}, "output and capture devices are the same"),
@@ -238,6 +258,7 @@ def main() -> int:
         "output_match_count": len(output_matches),
         "capture_match_count": len(capture_matches),
         "output_builtin_or_acoustic": built_in_output,
+        "output_virtual": virtual_output,
         "output_same_as_capture": same_device,
         "capture_virtual": virtual_capture,
         "capture_is_irig": irig_capture,

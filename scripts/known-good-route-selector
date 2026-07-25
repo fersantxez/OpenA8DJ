@@ -98,6 +98,22 @@ def built_in_or_acoustic(value: str) -> bool:
     )
 
 
+def virtual_output(value: str) -> bool:
+    lowered = value.lower()
+    return any(
+        token in lowered
+        for token in (
+            "blackhole",
+            "soundflower",
+            "vb-cable",
+            "vbcable",
+            "background music",
+            "loopback audio",
+            "rogue amoeba loopback",
+        )
+    )
+
+
 def find_default_reference() -> str:
     candidates = [
         ROOT
@@ -150,6 +166,7 @@ def main() -> int:
         and not audio8ish(identity(device))
         and not irigish(identity(device))
         and not built_in_or_acoustic(identity(device))
+        and not virtual_output(identity(device))
     ]
     rejected_outputs = [
         {
@@ -161,6 +178,8 @@ def main() -> int:
                 if irigish(identity(device))
                 else "built_in_or_acoustic"
                 if built_in_or_acoustic(identity(device))
+                else "virtual_output"
+                if virtual_output(identity(device))
                 else "insufficient_outputs"
             ),
         }
