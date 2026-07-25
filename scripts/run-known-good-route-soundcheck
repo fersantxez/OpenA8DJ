@@ -10,6 +10,8 @@ explicit CoreAudio output device -> physical route -> iRig capture.
 
 This script rejects OpenA8DJ/Audio 8 as the output source. It does not install
 drivers, load HAL, change default devices, restart CoreAudio, or reset USB.
+With --match-reference-rate it temporarily matches the physical capture device
+to the reference WAV rate under the hardware lock, then restores its prior rate.
 
 Options:
   --run-dir PATH             Evidence directory
@@ -24,6 +26,8 @@ Options:
   --max-lag N                Analyzer max lag frames, default 360000
   --audiophile-max-lag-seconds N
                               Audiophile analyzer max lag seconds, default 6
+  --match-reference-rate      Temporarily match capture rate to the reference
+                              WAV under lock, restoring the prior rate on exit
   --allow-same-device-loopback-diagnostic
                               Allow output and capture device names to match;
                               diagnostic only, never promotion evidence
@@ -174,6 +178,7 @@ max_lag="360000"
 audiophile_max_lag_seconds="6"
 allow_same_device_loopback_diagnostic=0
 allow_built_in_output_acoustic_diagnostic=0
+match_reference_rate=0
 skip_build=0
 
 while [ "$#" -gt 0 ]; do
@@ -191,6 +196,7 @@ while [ "$#" -gt 0 ]; do
     --audiophile-max-lag-seconds) audiophile_max_lag_seconds="$2"; shift 2 ;;
     --allow-same-device-loopback-diagnostic) allow_same_device_loopback_diagnostic=1; shift ;;
     --allow-built-in-output-acoustic-diagnostic) allow_built_in_output_acoustic_diagnostic=1; shift ;;
+    --match-reference-rate) match_reference_rate=1; shift ;;
     --skip-build) skip_build=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -261,7 +267,7 @@ esac
 mkdir -p "$run_dir/fixture"
 
 if [ "$skip_build" -ne 1 ]; then
-  make -C "$root" build/audio-wav-play build/audio-record build/audio-list >/dev/null
+  make -C "$root" build/audio-wav-play build/audio-record build/audio-list build/audio-config >/dev/null
   cmake -S "$root" -B "$root/build/cpp-release" -DCMAKE_BUILD_TYPE=Release >/dev/null
   cmake --build "$root/build/cpp-release" \
     --target opena8djcpp_soundcheck_wav_quality opena8djcpp_audiophile_wav_analysis \
@@ -307,7 +313,23 @@ opena8dj_acquire_hardware_lock \
   "$run_dir" \
   "explicit non-Audio8 CoreAudio output playback, iRig Stream capture, no defaults change" \
   "driver-install,HAL-load,default-device-change,CoreAudio-restart,USB-reset"
-trap opena8dj_release_hardware_lock EXIT
+
+capture_rate_restore_needed=0
+capture_rate_uid=""
+capture_rate_original=""
+restore_capture_rate() {
+  if [ "$capture_rate_restore_needed" -ne 1 ]; then
+    return 0
+  fi
+  if "$root/build/audio-config" "$capture_rate_uid" "$capture_rate_original" \
+      > "$run_dir/capture-rate-restore.log" 2>&1; then
+    echo "capture_rate_restored=$capture_rate_original" > "$run_dir/capture-rate-restore.txt"
+  else
+    echo "capture_rate_restore_failed=1" > "$run_dir/capture-rate-restore.txt"
+  fi
+  capture_rate_restore_needed=0
+}
+trap 'restore_capture_rate; opena8dj_release_hardware_lock' EXIT
 cp "$(opena8dj_lock_root)/owner" "$run_dir/lock-owner.txt" 2>/dev/null || true
 
 validate_args=(
@@ -338,6 +360,58 @@ if ! /usr/bin/python3 "${validate_args[@]}" > "$run_dir/known-good-route-request
     echo "run_dir=$run_dir"
   } > "$run_dir/summary.txt"
   exit 2
+fi
+
+if [ "$match_reference_rate" -eq 1 ]; then
+  reference_rate="$(/usr/bin/python3 - "$reference_preflight" <<'PY'
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    value = json.load(handle).get("sample_rate")
+if not isinstance(value, int) or value <= 0:
+    raise SystemExit("reference WAV sample rate is unavailable")
+print(value)
+PY
+)"
+  capture_info="$("$root/build/audio-list" | /usr/bin/awk \
+    -v wanted="$capture_device" \
+    -v wanted_uid="$capture_device_uid" '
+      {
+        line_uid=""; line_rate=""
+        for (i = 1; i <= NF; i++) {
+          if ($i ~ /^uid=/) { line_uid=$i; sub(/^uid=/, "", line_uid) }
+          if ($i ~ /^rate=/) { line_rate=$i; sub(/^rate=/, "", line_rate) }
+        }
+        if ((wanted_uid != "" && line_uid == wanted_uid) ||
+            (wanted_uid == "" && index($0, wanted) > 0)) {
+          print line_uid "\t" line_rate
+          exit
+        }
+      }')"
+  if [ -z "$capture_info" ] || [ "$capture_info" = $'\t' ]; then
+    echo "capture device rate could not be resolved for --match-reference-rate" >&2
+    exit 2
+  fi
+  capture_rate_uid="${capture_info%%$'\t'*}"
+  capture_rate_original="${capture_info#*$'\t'}"
+  case "$capture_rate_uid:$capture_rate_original" in
+    *:|:*) echo "capture device rate metadata is incomplete: $capture_info" >&2; exit 2 ;;
+  esac
+  printf '%s\n' \
+    "capture_rate_reference=$reference_rate" \
+    "capture_rate_uid=$capture_rate_uid" \
+    "capture_rate_original=$capture_rate_original" \
+    > "$run_dir/capture-rate-plan.txt"
+  if [ "$capture_rate_original" != "$reference_rate" ]; then
+    capture_rate_restore_needed=1
+    if ! "$root/build/audio-config" "$capture_rate_uid" "$reference_rate" \
+        > "$run_dir/capture-rate-config.log" 2>&1; then
+      echo "failed to match capture rate to reference WAV" >&2
+      exit 2
+    fi
+    printf '%s\n' "capture_rate_configured=$reference_rate" >> "$run_dir/capture-rate-plan.txt"
+  else
+    printf '%s\n' "capture_rate_configured=no_change" >> "$run_dir/capture-rate-plan.txt"
+  fi
 fi
 
 "$root/build/audio-record" "$record_seconds" "$capture" "$capture_device" "$capture_channels" \
@@ -452,6 +526,9 @@ PY
   echo "output_device_uid=${output_device_uid:-}"
   echo "capture_device=$capture_device"
   echo "capture_device_uid=${capture_device_uid:-}"
+  echo "match_reference_rate=$match_reference_rate"
+  echo "capture_rate_plan=$run_dir/capture-rate-plan.txt"
+  echo "capture_rate_restore=$run_dir/capture-rate-restore.txt"
   echo "capture_channels=$capture_channels"
   echo "reference=$reference"
   echo "reference_preflight=$reference_preflight"

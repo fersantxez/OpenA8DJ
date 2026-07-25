@@ -353,6 +353,7 @@ if [ "$skip_known_good" -ne 1 ]; then
     --capture-channels "$capture_channels"
     --reference-wav "$reference_wav"
     --seconds "$seconds"
+    --match-reference-rate
     --skip-build
   )
   if [ -n "$known_good_output_device_uid" ]; then
