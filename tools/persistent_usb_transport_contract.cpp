@@ -53,6 +53,27 @@ int main() {
   const auto counters = transport.counters();
   const auto safety = transport.safety();
 
+  const PersistentUsbTransportConfig medium_config{
+      .request_pool = PreparedUsbRequestPoolConfig{.request_slots = 16},
+      .slots_per_submit = 4,
+      .frames_per_slot = 8,
+      .capture_bytes_per_slot = 512 * 8,
+      .playback_bytes_per_slot = kMode2DefaultTransferBytes,
+      .capture_queue_depth = 8,
+      .playback_queue_depth = 8,
+  };
+  PersistentUsbTransport medium_transport;
+  bool medium_ok = medium_transport.start(medium_config);
+  medium_ok = medium_transport.prime() && medium_ok;
+  for (std::uint32_t period = 0; period < kSteadyCompletionsPerDirection; ++period) {
+    medium_ok = medium_transport.complete_next(UsbSlotDirection::Capture) && medium_ok;
+    medium_ok = medium_transport.complete_next(UsbSlotDirection::Playback) && medium_ok;
+  }
+  const auto medium_steady_counters = medium_transport.counters();
+  const auto medium_cancelled = medium_transport.drain();
+  const auto medium_counters = medium_transport.counters();
+  const auto medium_safety = medium_transport.safety();
+
   PersistentUsbTransport bad_depth_transport;
   const bool bad_depth_rejected =
       !bad_depth_transport.start(PersistentUsbTransportConfig{
@@ -121,6 +142,31 @@ int main() {
     blockers.push_back("completed_frame_accounting_unexpected");
   }
   if (!safety.product_safe) blockers.push_back("persistent_transport_safety_failed");
+  const auto medium_expected_live = static_cast<std::uint64_t>(
+      medium_config.capture_queue_depth + medium_config.playback_queue_depth);
+  const auto medium_expected_steady_submits = expected_completion_calls;
+  const auto medium_expected_max_lead = static_cast<std::uint64_t>(
+      medium_config.capture_queue_depth * medium_config.slots_per_submit *
+      medium_config.frames_per_slot);
+  if (!medium_ok) blockers.push_back("medium_batch_runtime_operation_failed");
+  if (medium_steady_counters.live_requests != medium_expected_live) {
+    blockers.push_back("medium_batch_live_depth_not_preserved");
+  }
+  if (medium_cancelled != medium_expected_live || medium_counters.live_requests != 0) {
+    blockers.push_back("medium_batch_drain_did_not_cancel_live_window");
+  }
+  if (medium_counters.steady_submit_calls != medium_expected_steady_submits) {
+    blockers.push_back("medium_batch_steady_submit_count_unexpected");
+  }
+  if (medium_counters.max_capture_lead_frames != medium_expected_max_lead ||
+      medium_counters.max_playback_lead_frames != medium_expected_max_lead) {
+    blockers.push_back("medium_batch_submit_lead_window_unexpected");
+  }
+  if (medium_counters.slot_identity_mismatches != 0 ||
+      medium_counters.persistent_slot_reuses != medium_counters.steady_submit_calls ||
+      !medium_safety.product_safe) {
+    blockers.push_back("medium_batch_persistent_transport_safety_failed");
+  }
 
   const bool pass = blockers.empty();
   std::cout << "{\n"
@@ -161,6 +207,32 @@ int main() {
   print_number("completed_frames", counters.completed_frames);
   print_number("submitted_frames", counters.submitted_frames);
   print_number("cancelled_requests", counters.cancelled_requests);
+  print_number("medium_slots_per_submit", medium_config.slots_per_submit);
+  print_number("medium_frames_per_submit",
+               medium_config.slots_per_submit * medium_config.frames_per_slot);
+  print_number("medium_capture_queue_depth", medium_config.capture_queue_depth);
+  print_number("medium_playback_queue_depth", medium_config.playback_queue_depth);
+  print_number("medium_request_slots", medium_config.request_pool.request_slots);
+  print_number("medium_steady_submit_calls", medium_counters.steady_submit_calls);
+  print_number("medium_expected_steady_submit_calls", medium_expected_steady_submits);
+  print_number("medium_steady_live_requests_before_drain", medium_steady_counters.live_requests);
+  print_number("medium_max_live_requests", medium_counters.max_live_requests);
+  print_number("medium_max_capture_lead_frames", medium_counters.max_capture_lead_frames);
+  print_number("medium_max_playback_lead_frames", medium_counters.max_playback_lead_frames);
+  print_number("medium_slot_identity_mismatches", medium_counters.slot_identity_mismatches);
+  print_number("medium_persistent_slot_reuses", medium_counters.persistent_slot_reuses);
+  print_number("medium_fallback_allocations", medium_counters.fallback_allocations);
+  print_number("medium_cancelled_requests", medium_counters.cancelled_requests);
+  print_bool("medium_preallocated_only", medium_safety.preallocated_only);
+  print_bool("medium_bounded_live_requests", medium_safety.bounded_live_requests);
+  print_bool("medium_stable_queue_depth", medium_safety.stable_queue_depth);
+  print_bool("medium_continuous_sequences", medium_safety.continuous_sequences);
+  print_bool("medium_timestamp_continuity", medium_safety.timestamp_continuity);
+  print_bool("medium_persistent_slot_identity", medium_safety.persistent_slot_identity);
+  print_bool("medium_completion_owned_lifecycle", medium_safety.completion_owned_lifecycle);
+  print_bool("medium_drained", medium_safety.drained);
+  print_bool("medium_product_safe", medium_safety.product_safe);
+  print_number("medium_expected_submit_reduction_ratio", medium_config.slots_per_submit);
   print_bool("oversubscribed_depth_rejected", bad_depth_rejected);
   print_bool("unprimed_completion_rejected", unprimed_completion_rejected);
   print_bool("preallocated_only", safety.preallocated_only);

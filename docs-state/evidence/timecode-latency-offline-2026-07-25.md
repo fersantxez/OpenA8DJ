@@ -108,6 +108,23 @@ leaving steady-state p95 unchanged. These are timeline-fixture results only:
 they are not input-to-output measurements from a DVS signal, a turntable, or
 Traktor, and they do not authorize promotion.
 
+The next transport iteration was built and checked offline as
+`local-analysis/candidates/prepared-medium.driver`. It uses four prepared slots
+per USB submit (32 frames per request), eight capture and eight playback live
+requests, and a 16-slot preallocated request pool. Its HAL executable SHA-256
+was `5a78c1e94e34b7941ab22e0ef4b53361cfa72f0aca335c6e81d3cfc90f8c0996`; the
+restored default output3072 HAL remained
+`79390010acbd96b799d3f69d9f1ae92ccaec68e37439ae4a54a2ab91ea091098`.
+
+The persistent transport contract passed for the medium candidate over 128
+completion periods per direction: 256 steady submits, 16 maximum live
+requests, 256-frame maximum lead in each direction, zero slot mismatches,
+zero fallback allocations, continuous sequence/timestamp accounting, and
+complete drain. The expected offline submit reduction is 4x versus one-slot
+submits. This is a model and bundle contract only: it has no HAL binding,
+physical USB evidence, sound-quality evidence, CPU superiority evidence, or
+Traktor timecode evidence, so it remains default-off and is not promoted.
+
 ## Promotion status
 
 No candidate was promoted. The complete runner returned a nonzero status because
@@ -314,6 +331,10 @@ remains.
 - `local-analysis/timecode-latency/offline/e2e-output3008.json`
 - `local-analysis/timecode-latency/offline/result.txt`
 - `local-analysis/cpp-offline/current-offline-gates.json`
+- `local-analysis/candidates/prepared-medium.json`
+- `local-analysis/candidates/prepared-medium-bundle.json`
+- `local-analysis/candidates/prepared-medium.driver`
+- `/tmp/opena8dj-persistent-medium.json`
 - `/tmp/opena8dj-cpp-offline-gates.log`
 - `local-analysis/hal-candidate-safety/candidate2304-cycles2`
 - `local-analysis/physical-superiority-window/20260725-output2304-physical-pairB-48000`
