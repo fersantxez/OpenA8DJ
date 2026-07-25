@@ -110,6 +110,15 @@ observation, best absolute correlation 0.284, aligned SNR -1.58 dB, linear-fit
 SNR -10.53 dB, and linear residual 0.958 of capture RMS. The result is
 diagnostic only and cannot support a product-quality or responsive-vinyl claim.
 
+A same-procedure isolated control run makes the performance rejection stronger:
+the output2304 capture had native quality alignment `0.959203` versus `0.959141`
+for output3072, but its sampled CPU profile reached `83.6%` CoreAudio and
+`188.2%` total audio UI/services, versus `12.2%` and `44.8%` for the 3072
+control. The full same-session A/B attempt was also invalid because the 3072
+control itself entered a `175.3%` CoreAudio runaway during the load window.
+That session is recorded as invalid comparison evidence, not as a promotion
+pass.
+
 The result is consistent with the offline frontier: lower output targets can
 reduce modeled delay without preserving the real capture quality and service
 stability required for DVS. No candidate is promoted. The installed/default
@@ -124,3 +133,5 @@ both safety and sound-quality gates.
 - `/tmp/opena8dj-cpp-offline-gates.log`
 - `local-analysis/hal-candidate-safety/candidate2304-cycles2`
 - `local-analysis/physical-superiority-window/20260725-output2304-physical-pairB-48000`
+- `local-analysis/physical-superiority-window/20260725-output3072-control-physical-pairB-48000`
+- `local-analysis/physical-superiority-window/20260725-output2304-vs-3072-same-session-pairB-48000`
