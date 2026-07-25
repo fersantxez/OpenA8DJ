@@ -26,6 +26,14 @@ was touched during this run.
 - `scripts/timecode-latency-offline-gate` runs a deterministic profile matrix,
   validates output/host geometry, compares modeled latency against the stable
   baseline, and writes JSON evidence.
+- `scripts/timecode-latency-e2e-fixture` propagates deterministic input markers
+  through capture completion, host scheduling, output prefetch, and start/
+  restart/output queues. It reports input-to-output p50/p95/p99, steady-state
+  jitter, monotonic output ordering, and separate start/restart response
+  distributions. It is explicitly synthetic and never touches audio hardware.
+- `scripts/test-timecode-latency-e2e-fixture.py` covers the baseline,
+  `prefetch64`, and `restart1024` response changes while asserting that physical
+  evidence and product claims remain false.
 - `scripts/test-timecode-latency-offline-gate.py` covers the baseline, the
   `output2048` and `host256` candidates, unsafe geometry rejection, and monotonic
   modeled reductions.
@@ -71,6 +79,23 @@ reported zero check errors, zero decode-output overflows, and zero panic flags;
 the observed ranges were 1,615.78-1,634.21 MiB/s for packing,
 561.095-578.756 MiB/s for decode-into, and 835.852-1,025.670 million frames/s
 for forward routing.
+
+The deterministic input-to-output fixture also passed for the baseline and all
+candidate profiles in its offline matrix. The baseline result was:
+
+| Profile | p50 | p95 | p99 | steady jitter p99-p50 | restart p50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| baseline | 71.760 ms | 76.805 ms | 77.099 ms | 5.068 ms | 43.125 ms |
+| prefetch64 | 70.427 ms | 75.472 ms | 75.765 ms | 5.068 ms | 41.792 ms |
+| restart1024 | 71.760 ms | 76.805 ms | 77.099 ms | 5.068 ms | 32.458 ms |
+
+The fixture gates passed marker propagation, monotonic output ordering, p95 <=
+100 ms, p99 <= 110 ms, and steady-state jitter p99-p50 <= 12 ms. The
+`prefetch64` model reduces the synthetic p95 by 1.333 ms (1.736% relative to
+the fixture baseline); `restart1024` reduces the first restart response while
+leaving steady-state p95 unchanged. These are timeline-fixture results only:
+they are not input-to-output measurements from a DVS signal, a turntable, or
+Traktor, and they do not authorize promotion.
 
 ## Promotion status
 
@@ -191,9 +216,23 @@ stability required for DVS. No candidate is promoted. The installed/default
 profile remains output3072 until a future exact-artifact physical window passes
 both safety and sound-quality gates.
 
+After the fixture and documentation changes, the final non-interactive rerun
+reported latency gate `PASS` with six e2e fixture profiles and zero hard
+failures; the C++ release suite remained `89/89` passed. A non-destructive
+post-run health check still showed Open Audio 8 DJ as 8 inputs/8 outputs at
+48 kHz, iRig Stream at 44.1 kHz, `audio_stack_health=PASS`, and
+`hardware_lock=LOCK_FREE`. This check did not reset CoreAudio or change any
+device configuration.
+
 ## Evidence files
 
 - `local-analysis/timecode-latency/offline/latency-offline-gate.json`
+- `local-analysis/timecode-latency/offline/e2e-baseline.json`
+- `local-analysis/timecode-latency/offline/e2e-prefetch64.json`
+- `local-analysis/timecode-latency/offline/e2e-restart1024.json`
+- `local-analysis/timecode-latency/offline/e2e-output2816.json`
+- `local-analysis/timecode-latency/offline/e2e-output2560.json`
+- `local-analysis/timecode-latency/offline/e2e-output2304.json`
 - `local-analysis/timecode-latency/offline/result.txt`
 - `local-analysis/cpp-offline/current-offline-gates.json`
 - `/tmp/opena8dj-cpp-offline-gates.log`

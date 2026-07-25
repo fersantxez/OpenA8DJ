@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""Run a deterministic input-to-output timecode latency fixture.
+
+This is a timeline fixture, not a physical DVS or Traktor measurement. It
+propagates input markers through capture completion, host scheduling, output
+prefetch, and the configured output queue. It is useful for comparing safe
+parameter changes without touching CoreAudio, USB, or hardware.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+from pathlib import Path
+from statistics import fmean, pstdev
+
+
+def percentile(values: list[float], fraction: float) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        return 0.0
+    position = (len(ordered) - 1) * fraction
+    lower = math.floor(position)
+    upper = math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    weight = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * weight
+
+
+def ceil_to_period(frame: int, period: int) -> int:
+    return ((frame + period - 1) // period) * period
+
+
+def simulate(
+    *,
+    name: str,
+    sample_rate: int,
+    capture_iso_frames: int,
+    host_buffer_frames: int,
+    output_target_frames: int,
+    output_prefetch_frames: int,
+    start_latency_frames: int,
+    restart_latency_frames: int,
+    cycles: int = 4,
+    markers_per_cycle: int = 32,
+    marker_spacing_frames: int = 4800,
+) -> dict[str, object]:
+    if min(
+        sample_rate,
+        capture_iso_frames,
+        host_buffer_frames,
+        output_target_frames,
+        start_latency_frames,
+        restart_latency_frames,
+        cycles,
+        markers_per_cycle,
+        marker_spacing_frames,
+    ) <= 0:
+        raise ValueError("all fixture dimensions must be positive")
+    if output_prefetch_frames < 0:
+        raise ValueError("output prefetch cannot be negative")
+
+    records: list[dict[str, float | int | str]] = []
+    for cycle in range(cycles):
+        cycle_start = cycle * markers_per_cycle * marker_spacing_frames
+        for marker in range(markers_per_cycle):
+            # The deterministic phase walks through both scheduling quanta so
+            # p50/p95/p99 expose quantization instead of one lucky alignment.
+            input_frame = cycle_start + marker * marker_spacing_frames
+            input_frame += (marker * 37 + cycle * 53) % max(capture_iso_frames, host_buffer_frames)
+            capture_ready = ceil_to_period(input_frame, capture_iso_frames)
+            host_ready = ceil_to_period(capture_ready, host_buffer_frames)
+            if marker == 0:
+                phase = "start" if cycle == 0 else "restart"
+                output_delay = start_latency_frames if cycle == 0 else restart_latency_frames
+            else:
+                phase = "steady"
+                output_delay = output_target_frames
+            output_frame = host_ready + output_delay + output_prefetch_frames
+            latency_frames = output_frame - input_frame
+            records.append(
+                {
+                    "cycle": cycle,
+                    "marker": marker,
+                    "phase": phase,
+                    "input_frame": input_frame,
+                    "capture_ready_frame": capture_ready,
+                    "host_ready_frame": host_ready,
+                    "output_frame": output_frame,
+                    "latency_frames": latency_frames,
+                    "latency_ms": latency_frames / sample_rate * 1000.0,
+                }
+            )
+
+    all_latencies = [float(item["latency_ms"]) for item in records]
+    startup = [float(item["latency_ms"]) for item in records if item["phase"] == "start"]
+    restart = [float(item["latency_ms"]) for item in records if item["phase"] == "restart"]
+    steady = [
+        float(item["latency_ms"])
+        for item in records
+        if item["phase"] == "steady"
+    ]
+    output_frames = [int(item["output_frame"]) for item in records]
+    monotonic_output = all(left < right for left, right in zip(output_frames, output_frames[1:]))
+    p50 = percentile(all_latencies, 0.50)
+    p95 = percentile(all_latencies, 0.95)
+    p99 = percentile(all_latencies, 0.99)
+    jitter_p99_p50 = p99 - p50
+    steady_p50 = percentile(steady, 0.50)
+    steady_p99 = percentile(steady, 0.99)
+    steady_jitter_p99_p50 = steady_p99 - steady_p50
+    gates = [
+        {
+            "name": "marker_propagation_complete",
+            "result": "PASS" if len(records) == cycles * markers_per_cycle else "FAIL",
+            "value": len(records),
+            "threshold": cycles * markers_per_cycle,
+            "reason": "every input marker must reach the modeled output timeline",
+        },
+        {
+            "name": "output_timeline_monotonic",
+            "result": "PASS" if monotonic_output else "FAIL",
+            "value": monotonic_output,
+            "threshold": True,
+            "reason": "response improvements must not reorder audio events",
+        },
+        {
+            "name": "input_to_output_p95_ms",
+            "result": "PASS" if p95 <= 100.0 else "FAIL",
+            "value": p95,
+            "threshold": "<= 100.0",
+            "reason": "synthetic interactive-response budget only",
+        },
+        {
+            "name": "input_to_output_p99_ms",
+            "result": "PASS" if p99 <= 110.0 else "FAIL",
+            "value": p99,
+            "threshold": "<= 110.0",
+            "reason": "synthetic tail-latency budget only",
+        },
+        {
+            "name": "latency_jitter_p99_minus_p50_ms",
+            "result": "PASS" if steady_jitter_p99_p50 <= 12.0 else "FAIL",
+            "value": steady_jitter_p99_p50,
+            "threshold": "<= 12.0",
+            "reason": "steady-state quantization spread must remain bounded; start/restart are reported separately",
+        },
+    ]
+    return {
+        "schema": "opena8djcpp.timecode-latency-e2e-fixture.v1",
+        "result": "PASS" if all(item["result"] == "PASS" for item in gates) else "FAIL",
+        "safety": "offline_only_no_audio_coreaudio_usb_traktor_or_hardware_touch",
+        "physical_evidence_present": False,
+        "product_claim_allowed": False,
+        "profile": name,
+        "sample_rate": sample_rate,
+        "configuration_frames": {
+            "capture_iso": capture_iso_frames,
+            "host_buffer": host_buffer_frames,
+            "output_target": output_target_frames,
+            "output_prefetch": output_prefetch_frames,
+            "start_latency": start_latency_frames,
+            "restart_latency": restart_latency_frames,
+        },
+        "configuration_ms": {
+            "output_target": output_target_frames / sample_rate * 1000.0,
+            "output_prefetch": output_prefetch_frames / sample_rate * 1000.0,
+            "start_latency": start_latency_frames / sample_rate * 1000.0,
+            "restart_latency": restart_latency_frames / sample_rate * 1000.0,
+        },
+        "fixture_dimensions": {
+            "cycles": cycles,
+            "markers_per_cycle": markers_per_cycle,
+            "marker_spacing_frames": marker_spacing_frames,
+            "marker_count": len(records),
+        },
+        "latency_ms": {
+            "min": min(all_latencies),
+            "mean": fmean(all_latencies),
+            "p50": p50,
+            "p95": p95,
+            "p99": p99,
+            "max": max(all_latencies),
+            "jitter_stddev": pstdev(all_latencies),
+            "jitter_p99_minus_p50": jitter_p99_p50,
+            "steady_jitter_p99_minus_p50": steady_jitter_p99_p50,
+        },
+        "response_phases_ms": {
+            "start_p50": percentile(startup, 0.50),
+            "start_p95": percentile(startup, 0.95),
+            "restart_p50": percentile(restart, 0.50),
+            "restart_p95": percentile(restart, 0.95),
+            "steady_p50": steady_p50,
+            "steady_p95": percentile(steady, 0.95),
+            "steady_p99": steady_p99,
+        },
+        "gates": gates,
+        "records": records,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--name", default="fixture")
+    parser.add_argument("--sample-rate", type=int, default=48000)
+    parser.add_argument("--capture-iso-frames", type=int, default=64)
+    parser.add_argument("--host-buffer-frames", type=int, default=512)
+    parser.add_argument("--output-target-frames", type=int, default=3072)
+    parser.add_argument("--output-prefetch-frames", type=int, default=128)
+    parser.add_argument("--start-latency-frames", type=int, default=3072)
+    parser.add_argument("--restart-latency-frames", type=int, default=1536)
+    parser.add_argument("--cycles", type=int, default=4)
+    parser.add_argument("--markers-per-cycle", type=int, default=32)
+    parser.add_argument("--marker-spacing-frames", type=int, default=4800)
+    parser.add_argument("--summary-only", action="store_true")
+    parser.add_argument("--json-out", type=Path)
+    args = parser.parse_args()
+    payload = simulate(
+        name=args.name,
+        sample_rate=args.sample_rate,
+        capture_iso_frames=args.capture_iso_frames,
+        host_buffer_frames=args.host_buffer_frames,
+        output_target_frames=args.output_target_frames,
+        output_prefetch_frames=args.output_prefetch_frames,
+        start_latency_frames=args.start_latency_frames,
+        restart_latency_frames=args.restart_latency_frames,
+        cycles=args.cycles,
+        markers_per_cycle=args.markers_per_cycle,
+        marker_spacing_frames=args.marker_spacing_frames,
+    )
+    if args.summary_only:
+        payload["records"] = []
+        payload["records_omitted"] = True
+    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
+    if args.json_out:
+        args.json_out.parent.mkdir(parents=True, exist_ok=True)
+        args.json_out.write_text(text, encoding="utf-8")
+    print(text, end="")
+    return 0 if payload["result"] == "PASS" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

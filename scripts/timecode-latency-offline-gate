@@ -27,6 +27,15 @@ PROFILES = (
     ("host256", 64, 2048, 256, 128),
 )
 
+E2E_PROFILES = (
+    ("baseline", 64, 512, 3072, 128, 3072, 1536),
+    ("prefetch64", 64, 512, 3072, 64, 3072, 1536),
+    ("restart1024", 64, 512, 3072, 128, 3072, 1024),
+    ("output2816", 64, 512, 2816, 128, 2816, 1408),
+    ("output2560", 64, 512, 2560, 128, 2560, 1280),
+    ("output2304", 64, 512, 2304, 128, 2304, 1152),
+)
+
 OFFLINE_BINARIES = (
     "opena8djcpp_timecode_matrix",
     "opena8djcpp_dvs_timecode_stress_margin",
@@ -78,6 +87,50 @@ def run_json(binary: Path, root: Path, arguments: list[str] | None = None) -> di
         if isinstance(parsed, dict):
             payload["report"] = parsed
     except json.JSONDecodeError:
+        payload["stdout_tail"] = stdout[-2000:]
+    if stderr:
+        payload["stderr_tail"] = stderr[-2000:]
+    return payload
+
+
+def run_e2e_fixture(
+    root: Path,
+    run_dir: Path,
+    name: str,
+    capture_iso_frames: int,
+    host_buffer_frames: int,
+    output_target_frames: int,
+    output_prefetch_frames: int,
+    start_latency_frames: int,
+    restart_latency_frames: int,
+) -> dict[str, object]:
+    output_path = run_dir / f"e2e-{name}.json"
+    command = [
+        str(root / "scripts/timecode-latency-e2e-fixture"),
+        "--name", name,
+        "--sample-rate", "48000",
+        "--capture-iso-frames", str(capture_iso_frames),
+        "--host-buffer-frames", str(host_buffer_frames),
+        "--output-target-frames", str(output_target_frames),
+        "--output-prefetch-frames", str(output_prefetch_frames),
+        "--start-latency-frames", str(start_latency_frames),
+        "--restart-latency-frames", str(restart_latency_frames),
+        "--summary-only",
+        "--json-out", str(output_path),
+    ]
+    return_code, stdout, stderr = run(command, root)
+    payload: dict[str, object] = {
+        "profile": name,
+        "binary": str(root / "scripts/timecode-latency-e2e-fixture"),
+        "arguments": command[1:],
+        "return_code": return_code,
+        "result": "PASS" if return_code == 0 else "FAIL",
+    }
+    try:
+        parsed = json.loads(output_path.read_text(encoding="utf-8"))
+        if isinstance(parsed, dict):
+            payload["report"] = parsed
+    except (OSError, json.JSONDecodeError):
         payload["stdout_tail"] = stdout[-2000:]
     if stderr:
         payload["stderr_tail"] = stderr[-2000:]
@@ -183,6 +236,7 @@ def main() -> int:
     profiles = [model_profile(name, args.sample_rate, capture, output, host, prefetch)
                 for name, capture, output, host, prefetch in PROFILES]
     comparisons = compare_profiles(profiles)
+    e2e_fixture = [run_e2e_fixture(root, run_dir, *profile) for profile in E2E_PROFILES]
     hard_failures = []
     if build_report["result"] != "PASS":
         hard_failures.append("offline_benchmark_build_failed")
@@ -192,6 +246,9 @@ def main() -> int:
     for profile in profiles:
         if profile["result"] != "PASS":
             hard_failures.append(f"unsafe_geometry:{profile['name']}")
+    for item in e2e_fixture:
+        if item["result"] != "PASS":
+            hard_failures.append(f"e2e_fixture_failed:{item['profile']}")
 
     payload = {
         "schema": "opena8djcpp.timecode-latency-offline-gate.v1",
@@ -207,6 +264,7 @@ def main() -> int:
         "offline_binaries": binaries,
         "profiles": profiles,
         "comparison": comparisons,
+        "e2e_fixture": e2e_fixture,
         "hard_failures": hard_failures,
     }
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
