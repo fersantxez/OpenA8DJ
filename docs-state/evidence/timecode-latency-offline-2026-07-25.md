@@ -126,6 +126,14 @@ peaked at `25.5%`, total audio UI/services at `61.9%`, and the driver at `7.3%`.
 Those are useful performance observations, but the sound-quality gate still
 failed and the candidate therefore remains laboratory-only.
 
+## Final post-test state
+
+After the candidate runs, the stable output3072 bundle was loaded again and
+passed one safety cycle. Core Audio enumerated Open Audio 8 DJ as 8 inputs and
+8 outputs at 48 kHz; iRig Stream was restored to 44.1 kHz; final audio-stack
+health was `PASS`; and the hardware lock was `LOCK_FREE`. No latency candidate
+was left installed or promoted.
+
 The result is consistent with the offline frontier: lower output targets can
 reduce modeled delay without preserving the real capture quality and service
 stability required for DVS. No candidate is promoted. The installed/default
