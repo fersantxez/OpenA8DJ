@@ -380,6 +380,7 @@ PY
         line_uid=$0
         sub(/^.* uid=/, "", line_uid)
         sub(/ in=.*/, "", line_uid)
+        sub(/[[:space:]]+$/, "", line_uid)
         line_rate=$0
         sub(/^.* rate=/, "", line_rate)
         sub(/[^0-9].*$/, "", line_rate)
