@@ -1,6 +1,6 @@
 # Traktor Timecode Vinyl
 
-OpenA8DJ 0.5.1 is the frozen responsive macOS preview for Traktor and Timecode
+OpenA8DJ 0.5.1 is the frozen responsive macOS release for Traktor and Timecode
 Vinyl testing on the Audio 8 DJ. It uses the accepted `output3072` profile.
 
 The driver exposes the Core Audio surface Traktor expects:

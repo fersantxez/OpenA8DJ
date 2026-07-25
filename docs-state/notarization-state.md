@@ -4,35 +4,63 @@ This file records maintainer-facing signing and notarization state. Do not put
 Apple IDs, app-specific passwords, API keys, private keys, or keychain exports
 in this repository.
 
-As of 2026-06-20, the release Mac has Developer ID Application and Developer ID
-Installer certificates available, plus a local `notarytool` keychain profile
+As of 2026-07-25, the release Mac has valid Developer ID Application and
+Developer ID Installer identities, plus a local `notarytool` keychain profile
 named `OpenA8DJNotary`.
 
-## Current 0.5.1 Responsive Preview
+## Current 0.5.1 Responsive Release
 
-On 2026-07-25, `security find-identity -v -p codesigning` reported zero valid
-identities. The frozen 0.5.1 responsive build can therefore be locally signed
-and packaged, but it cannot truthfully be described as Developer ID signed,
-notarized, or stapled on this Mac.
-
-Publish 0.5.1 only as an explicitly labeled experimental preview. Keep 0.5.0
-as the latest Apple-notarized baseline until a valid Developer ID Application
-and Installer identity is restored, the exact 0.5.1 artifacts are rebuilt,
-submitted, accepted, stapled, and verified.
-
-The experimental preview was published on 2026-07-25 at
-https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1 with only the driver
-DMG and its checksum file. A fresh GitHub download passed checksum and DMG
-integrity checks and was installed through the documented `sudo installer`
-fallback. The installed receipt, HAL hash, 8-in/8-out device visibility, and
-audio-stack health all passed.
-
-Current local preview hashes:
+The responsive `output3072` freeze was rebuilt after valid Developer ID
+identities were restored. The final build includes the current packaged
+documentation and was signed with:
 
 ```text
-3984d58112e6dc9e5c8901cb7a9d605ddccfe7f6f7b3b0eb17ce2238add6f04d  OpenA8DJHAL
-be11f1988b0fd7524ab9fca46d406a4c0eeed08e4b23a06be91c1346f80fb1a0  OpenA8DJ-0.5.1.dmg
+Developer ID Application: Fernando Sanchez (D3KWK7MN3Y)
+Developer ID Installer: Fernando Sanchez (D3KWK7MN3Y)
 ```
+
+Apple accepted all four release-verification containers on 2026-07-25:
+
+```text
+OpenA8DJ-0.5.1.pkg
+  submission: 397294ed-1e26-481c-8583-23414dc37e11
+  status: Accepted
+
+OpenA8DJ-0.5.1.dmg
+  submission: b308d712-c17b-4358-a1ce-56f9458ce89b
+  status: Accepted
+
+opena8dj-tools-0.5.1.pkg
+  submission: fb9e300c-b1a1-4260-aae0-5b12c7dbb170
+  status: Accepted
+
+opena8dj-tools-0.5.1.dmg
+  submission: bf776b29-1a62-479c-b86d-78d56a858427
+  status: Accepted
+```
+
+The four containers were stapled and validated. `make verify-signed-release`
+then passed on the exact final stapled files, including Developer ID
+authorities, trusted timestamps, Gatekeeper assessment, stapled tickets, code
+signatures, package signatures, and checksums.
+
+Final stapled SHA-256 hashes:
+
+```text
+92703ac81fd9c4e9ebffa123b42cc835906c2cec716b0eb916bd165b45de66ac  OpenA8DJ-0.5.1.dmg
+1d54486ba6d13e69752bf4994ca0c39bcd1a486da0ffff13bf20e51df194002e  OpenA8DJ-0.5.1.pkg
+34c7a47ea454a7ca70af960cf80e40549e7b69101a9830f73a6dd9460db88d85  opena8dj-tools-0.5.1.dmg
+b0990d43c80587343bbdc09d66d344bd33ed656f66e95f16c9a7aff840489f9d  opena8dj-tools-0.5.1.pkg
+```
+
+The GitHub release remains DMG-only for users: publish
+`OpenA8DJ-0.5.1.dmg` and `OpenA8DJ-0.5.1-checksums.txt`. The standalone PKG
+and tools containers are internal verification artifacts and must not be
+uploaded as separate release assets.
+
+The public GitHub-downloaded installation result is recorded in
+`docs/project/public-validation-summary-0.5.1.md` after the final release
+replacement and clean end-user installation.
 
 ## Current 0.5.0 Publication Attempt
 

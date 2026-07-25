@@ -39,8 +39,8 @@ Current status:
 - Traktor Timecode Vinyl: vinyl input path active by default
 - Responsive profile: output3072, accepted in Traktor use on 2026-07-25 after
   exact-artifact safety, offline latency, CPU, and stability checks
-- Signing: this 0.5.1 preview is locally signed, not Developer ID signed or
-  notarized; macOS may require Open Anyway or the documented sudo fallback
+- Signing: Developer ID signed and Apple-notarized for normal macOS
+  installation
 - Optional tools: opena8dj-control and OpenA8DJ Control Center
 - Windows/Linux: experimental platform areas, not included in this macOS driver
 

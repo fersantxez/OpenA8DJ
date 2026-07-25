@@ -3,10 +3,10 @@
 This document captures the current gap between the OpenA8DJ 0.5.x macOS driver
 baseline and a production-quality independent macOS driver.
 
-Current status: OpenA8DJ 0.5.1 is the frozen responsive macOS C++ preview;
-0.5.0 remains the last Developer ID signed and notarized baseline. The previous
-C/Objective-C implementation is preserved on `legacy` for historical
-reference, comparison, and recovery.
+Current status: OpenA8DJ 0.5.1 is the frozen responsive macOS C++ release and
+the current Developer ID signed and Apple-notarized baseline. The previous
+C/Objective-C implementation is preserved on `legacy` for historical reference,
+comparison, and recovery.
 
 ## Current evidence
 

@@ -23,8 +23,8 @@ OpenA8DJ-0.5.1-checksums.txt
 ```
 
 The optional 0.5.0 Control Center remains compatible and is available from the
-0.5.0 release. The 0.5.1 driver preview is locally signed, not Developer ID
-signed or Apple-notarized.
+0.5.0 release. The 0.5.1 driver DMG and its embedded installer are Developer ID
+signed and Apple-notarized.
 
 ## Verify The Download
 
@@ -51,28 +51,11 @@ This is the normal non-technical install path for the public GitHub release:
 
 ## If macOS Shows A Security Warning
 
-Use only the GitHub Release download from this repository. If macOS shows a
-security warning for a file downloaded somewhere else, stop and download the
-release again from GitHub.
-
-Recent macOS versions may show a warning like:
-
-```text
-"OpenA8DJ-0.5.1.pkg" Not Opened
-Apple could not verify "OpenA8DJ-0.5.1.pkg" is free of malware.
-```
-
-If the dialog only offers `Move to Trash` and `Done`:
-
-1. Click `Done`.
-2. Do not click `Move to Trash`.
-3. Open System Settings.
-4. Go to Privacy & Security.
-5. In the Security section, find the blocked `OpenA8DJ-0.5.1.pkg` message.
-6. Click `Open Anyway`.
-7. Confirm the second warning, then continue with the installer.
-
-This preview is not notarized, so this approval can be required.
+The GitHub release is signed and notarized, so Gatekeeper should allow the
+normal installation. If macOS says it cannot verify the DMG or PKG, stop and
+download both release assets again from the official GitHub release. Verify the
+checksum before trying again. Do not use `Open Anyway` for a file whose checksum
+does not match.
 
 ## If The Installer Fails
 

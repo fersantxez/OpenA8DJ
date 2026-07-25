@@ -1,9 +1,8 @@
 # OpenA8DJ 0.5.1 Release Notes
 
 OpenA8DJ 0.5.1 freezes the responsive `output3072` profile selected during the
-July 2026 DVS latency work. It is published as an experimental preview so users
-can keep testing the version that was accepted in Traktor without waiting for
-the next optimization cycle.
+July 2026 DVS latency work. It is the signed and notarized public release of the
+version accepted in Traktor before the next optimization cycle.
 
 ## Responsive Freeze
 
@@ -39,18 +38,11 @@ or a full Timecode Vinyl certification matrix.
 The GitHub release contains one driver DMG and one checksum file. The PKG is
 inside the DMG and is not uploaded as a separate asset.
 
-Frozen HAL executable:
-
-```text
-3984d58112e6dc9e5c8901cb7a9d605ddccfe7f6f7b3b0eb17ce2238add6f04d  OpenA8DJHAL
-```
-
 The final DMG hash is published in `OpenA8DJ-0.5.1-checksums.txt`.
 
-This 0.5.1 preview is locally signed but is not Developer ID signed or
-Apple-notarized because no valid Developer ID identity is available on the
-release Mac. macOS may require `Open Anyway` or the documented `sudo installer`
-fallback. OpenA8DJ 0.5.0 remains the last signed and notarized public baseline.
+The driver, command-line helpers, embedded PKG, and public DMG are Developer ID
+signed. Apple notarization and stapled tickets allow Gatekeeper to validate the
+GitHub-downloaded release during normal installation.
 
 ## Continue From Here
 

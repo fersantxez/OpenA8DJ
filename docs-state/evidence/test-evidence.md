@@ -2310,3 +2310,45 @@ Conclusion:
   for the release build. The final GitHub-downloaded public-artifact validation
   above confirms the uploaded assets install to the same binary hashes and pass
   the end-user install checks.
+
+## 2026-07-25 21:52 UTC - OpenA8DJ 0.5.1 final notarization gate
+
+- Worktree: `/Users/fer/dev/opena8dj-latency-lab`
+- Branch: `codex/timecode-latency`
+- Frozen source commit before final evidence update: `927d8af`
+- Hardware touched: no
+- Driver installed or reloaded: no
+- CoreAudio restarted: no
+
+The responsive `output3072` freeze was rebuilt with the current packaged
+documentation and valid Developer ID Application and Installer identities.
+Apple accepted all four verification containers:
+
+```text
+397294ed-1e26-481c-8583-23414dc37e11  OpenA8DJ-0.5.1.pkg
+b308d712-c17b-4358-a1ce-56f9458ce89b  OpenA8DJ-0.5.1.dmg
+fb9e300c-b1a1-4260-aae0-5b12c7dbb170  opena8dj-tools-0.5.1.pkg
+bf776b29-1a62-479c-b86d-78d56a858427  opena8dj-tools-0.5.1.dmg
+```
+
+All four containers were stapled and validated. `make
+verify-signed-release` passed on the exact final files. It verified code
+signatures, Developer ID authorities, package signatures, trusted timestamps,
+Gatekeeper assessment, stapled tickets, and checksums. `hdiutil verify` also
+passed on the final public DMG.
+
+Final stapled SHA-256 hashes:
+
+```text
+92703ac81fd9c4e9ebffa123b42cc835906c2cec716b0eb916bd165b45de66ac  OpenA8DJ-0.5.1.dmg
+1d54486ba6d13e69752bf4994ca0c39bcd1a486da0ffff13bf20e51df194002e  OpenA8DJ-0.5.1.pkg
+34c7a47ea454a7ca70af960cf80e40549e7b69101a9830f73a6dd9460db88d85  opena8dj-tools-0.5.1.dmg
+b0990d43c80587343bbdc09d66d344bd33ed656f66e95f16c9a7aff840489f9d  opena8dj-tools-0.5.1.pkg
+561aadd32bc24f078ad8a94936a8faaec7f5e90ea19e96f8212a078711a9ed62  signed OpenA8DJHAL
+```
+
+The DMG mounted read-only, its embedded package reported a Developer ID
+Installer signature trusted by Apple notarization, and the packaged release
+notes and README described the signed/notarized release. The standalone PKG and
+tools containers remain internal verification artifacts; only the driver DMG
+and its checksum file are public GitHub assets.

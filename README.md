@@ -18,10 +18,9 @@ use, you can support the maintainer here:
 
 ## Status
 
-OpenA8DJ 0.5.1 is the frozen responsive macOS C++ preview. It uses the
-accepted `output3072` DVS profile. OpenA8DJ 0.5.0 remains the latest
-Developer ID signed and Apple-notarized public baseline until 0.5.1 can be
-signed again.
+OpenA8DJ 0.5.1 is the frozen responsive macOS C++ release. It uses the
+accepted `output3072` DVS profile and is Developer ID signed and
+Apple-notarized for normal installation on macOS.
 
 - Core Audio HAL device: `Open Audio 8 DJ`
 - 8 output channels as stereo deck pairs A/B/C/D
@@ -79,8 +78,8 @@ The optional 0.5.0 Control Center remains compatible and is available from the
 [0.5.0 release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.0).
 
 After installation, select `Open Audio 8 DJ` in Audio MIDI Setup, Traktor, or
-your audio application. If macOS blocks the package, or if you want checksum
-verification, see the [install guide](docs/user/install.md).
+your audio application. For checksum verification or troubleshooting, see the
+[install guide](docs/user/install.md).
 
 If the macOS Installer app fails after the package is opened, the install guide
 also includes a `sudo installer` fallback for the package inside the same
@@ -117,7 +116,8 @@ The 0.5.1 responsive freeze was validated with:
 - operator acceptance of the responsive Traktor behavior on the installed
   artifact.
 
-The preview is locally signed, not Developer ID signed or notarized. See the
+The public DMG and its embedded installer are Developer ID signed and
+Apple-notarized. See the
 [0.5.1 validation summary](docs/project/public-validation-summary-0.5.1.md),
 [release notes](docs/reference/release-notes-0.5.1.md), and
 [future checkpoints](docs/project/timecode-latency-checkpoints.md).

@@ -2,7 +2,7 @@
 
 OpenA8DJ 0.5.1 freezes the responsive `output3072` profile accepted for current
 Traktor use. This page separates what was observed from what remains outside
-the preview claim.
+the release claim.
 
 ## Verified
 
@@ -22,27 +22,31 @@ the preview claim.
 ## Exact Release Artifact
 
 ```text
-HAL executable SHA-256:
-3984d58112e6dc9e5c8901cb7a9d605ddccfe7f6f7b3b0eb17ce2238add6f04d
+Signed HAL executable SHA-256:
+561aadd32bc24f078ad8a94936a8faaec7f5e90ea19e96f8212a078711a9ed62
 
 OpenA8DJ-0.5.1.dmg SHA-256:
-be11f1988b0fd7524ab9fca46d406a4c0eeed08e4b23a06be91c1346f80fb1a0
+92703ac81fd9c4e9ebffa123b42cc835906c2cec716b0eb916bd165b45de66ac
+
+OpenA8DJ-0.5.1.pkg SHA-256:
+1d54486ba6d13e69752bf4994ca0c39bcd1a486da0ffff13bf20e51df194002e
 ```
 
 The clean 0.5.1 build passed `hdiutil verify`, checksum verification, HAL smoke
-and parity checks, 88/88 default tests, and 89/89 release tests. Expanding the
-PKG from the mounted DMG produced the same HAL executable hash as the named
-frozen candidate.
+and parity checks, 88/88 default tests, and 89/89 release tests. The final
+Developer ID signatures change the executable bytes relative to the unsigned
+frozen candidate, so the signed HAL hash above is the publication identity.
 
-The mounted-DMG PKG was installed locally. The receipt reported version 0.5.1,
-the installed HAL hash matched the packaged hash, the device enumerated as 8 in
-/ 8 out at 48 kHz, and the stabilized driver/CoreAudio CPU sample was 0.0% /
-0.0%. The hardware lock was released.
+Apple accepted the final PKG, DMG, tools PKG, and tools DMG. All four were
+stapled and validated. `make verify-signed-release` passed on the exact final
+files, including code signatures, Developer ID authorities, package
+signatures, trusted timestamps, Gatekeeper assessment, stapled tickets, and
+checksums.
 
 ## GitHub-Downloaded Installation
 
-The published prerelease is
-[OpenA8DJ 0.5.1 Responsive Freeze (Experimental)](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1).
+The public release is
+[OpenA8DJ 0.5.1 Responsive Freeze](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1).
 It contains exactly these two assets:
 
 ```text
@@ -50,28 +54,10 @@ OpenA8DJ-0.5.1.dmg
 OpenA8DJ-0.5.1-checksums.txt
 ```
 
-The assets were downloaded again from GitHub into `~/Downloads`. The downloaded
-DMG passed its published SHA-256 check and `hdiutil verify`. Its internal PKG
-reported version 0.5.1, and the embedded HAL executable matched the frozen
-SHA-256 above.
-
-The GitHub-downloaded DMG was then mounted and its internal PKG installed with
-the documented `sudo installer` path. This fallback was used because the
-preview is not Developer ID signed or notarized; normal Gatekeeper acceptance
-is not claimed. After 20 seconds:
-
-- the installed receipt reported version 0.5.1;
-- the installed HAL matched the frozen executable SHA-256;
-- `Open Audio 8 DJ` enumerated as 8 in / 8 out at 48 kHz;
-- audio-stack health passed;
-- the driver sampled at 0.9% CPU and CoreAudio at 0.2% CPU;
-- no USB reset, sample-rate change, default-device change, playback, recording,
-  or Traktor automation was performed;
-- the hardware lock was released.
-
-A subsequent stabilized health sample passed at 0.0% driver CPU and 0.0%
-CoreAudio CPU. The existing Control Center and `opena8dj-control` helper were
-also present after the driver upgrade.
+The final GitHub-downloaded installation results are appended here after the
+signed assets replace the earlier prerelease files. Publication is not complete
+until the downloaded DMG passes its public checksum, Gatekeeper, stapled-ticket,
+normal Installer, installed-file, device-visibility, and CPU-health checks.
 
 ## Distribution
 
@@ -85,9 +71,11 @@ OpenA8DJ-0.5.1-checksums.txt
 The DMG contains the macOS PKG installer. The PKG is not a separate GitHub
 asset.
 
-No valid Developer ID identity was available on the release Mac when 0.5.1 was
-built. The preview is locally signed, not Developer ID signed or notarized.
-OpenA8DJ 0.5.0 remains the last Apple-notarized baseline.
+The final public DMG, its embedded installer, driver, MIDI bridge, and command
+line helper are Developer ID signed. Apple notarization accepted the final
+containers and their tickets are stapled. OpenA8DJ 0.5.1 supersedes 0.5.0 as
+the current signed and notarized responsive release once the GitHub-downloaded
+installation gate above passes.
 
 ## Not Claimed
 
@@ -95,7 +83,6 @@ OpenA8DJ 0.5.0 remains the last Apple-notarized baseline.
 - Full Traktor Timecode Vinyl certification across both rates and decks
 - Audiophile superiority over 0.5.0
 - DriverKit/deXt production readiness
-- Developer ID or Apple notarization for the 0.5.1 preview
 
 Future candidates must follow the
 [timecode latency checkpoints](timecode-latency-checkpoints.md).
