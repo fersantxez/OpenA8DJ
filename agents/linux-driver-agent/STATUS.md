@@ -167,3 +167,34 @@ hardware validation has been run, and the label remains:
 ```text
 diagnostic only, sound quality not validated
 ```
+
+## 2026-07-26 macOS/Windows Hardware Lesson Integration
+
+The Linux track now imports the advanced macOS hardware handling and the Windows
+transition contract into Linux-specific tooling and documents.
+
+Added:
+
+- `linux/MACOS_WINDOWS_HARDWARE_LESSONS.md`
+- `opena8dj-linuxctl hardware-model`
+- `hardware-model.json` in `opena8dj-linuxctl verify` reports
+- profile schema v2 with USB endpoints, A/B/C/D topology, source oracles,
+  hot-path rules, and validation policy
+- package version `0.1.1~experimental20260726`
+
+Profile behavior is now aligned with macOS/Windows:
+
+- DVS vinyl sets vinyl mode, vinyl ground lift on, other ground lifts off, and
+  software lock on.
+- DVS CD/line sets CD/line mode, CD/line ground lift on, other ground lifts off,
+  and software lock on.
+- Phono/vinyl recording sets phono mode, phono ground lift on, other ground
+  lifts off, and software lock on.
+- Playback, C/D recording, effects-loop, microphone, DAW, and MIDI profiles do
+  not hide A/B mode changes.
+
+No hardware tests were run. No lock was acquired. The label remains:
+
+```text
+diagnostic only, sound quality not validated
+```

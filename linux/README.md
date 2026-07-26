@@ -61,6 +61,7 @@ If the lock is occupied, do not force it.
 The initial Linux track surface includes:
 
 - Linux architecture notes.
+- macOS/Windows hardware lesson integration for Linux.
 - Linux configuration and profile model.
 - Linux quality/performance gates.
 - A first `snd-usb-caiaq` audit.
@@ -108,6 +109,21 @@ Those packages install tools, docs, profile metadata, and a conservative udev
 tag. They rely on the distro's in-kernel `snd-usb-caiaq` driver and do not
 install a replacement kernel module. No packaging path is allowed to auto-load,
 bind, reset, or test live Audio 8 DJ hardware.
+
+The current experimental package set is generated under:
+
+```text
+dist/linux/experimental/opena8dj-linux-experimental-0.1.1~experimental20260726/
+```
+
+It keeps the same diagnostic-only scope and adds:
+
+- `opena8dj-linuxctl hardware-model`
+- `hardware-model.json` in verify reports
+- macOS/Windows-aligned profile aliases and control postures
+- packaged `linux/MACOS_WINDOWS_HARDWARE_LESSONS.md`
+- expanded profile schema with USB endpoints, A/B/C/D topology, hot-path rules,
+  and validation policy
 
 The next engineering step is to complete a source-level audit against the exact
 kernel baseline and decide whether the safest path is an upstream-style

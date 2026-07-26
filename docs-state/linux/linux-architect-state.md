@@ -12,6 +12,37 @@ Readiness label:
 diagnostic only, sound quality not validated
 ```
 
+## 2026-07-26 Update
+
+Linux now explicitly imports the macOS and Windows hardware lessons into the
+Linux implementation contract.
+
+New/updated artifacts:
+
+- `linux/MACOS_WINDOWS_HARDWARE_LESSONS.md`
+- `linux/tools/opena8dj-linuxctl` version `0.1.1`
+- `linux/packaging/common/profile-schema.json` schema v2
+- `dist/linux/experimental/opena8dj-linux-experimental-0.1.1~experimental20260726/`
+
+Functional changes:
+
+- `opena8dj-linuxctl hardware-model` exports USB endpoint facts, A/B/C/D
+  topology, macOS/Windows source oracles, hot-path rules, and validation
+  policy.
+- `opena8dj-linuxctl verify` writes `hardware-model.json` beside
+  `diagnostics.json`.
+- DVS, phono, and line profiles now include explicit ground-lift and
+  software-lock postures aligned with the macOS/Windows contract.
+- Profile aliases accept macOS-style names such as `timecode-vinyl`,
+  `timecode-cd-line`, `phono`, and `midi`.
+
+No hardware tests were run in this update. No hardware lock was acquired. The
+new package remains:
+
+```text
+diagnostic only, sound quality not validated
+```
+
 ## Executive State
 
 The Linux worktree is on the required branch and contains a coherent first

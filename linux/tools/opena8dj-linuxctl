@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-TOOL_VERSION = "0.1.0"
+TOOL_VERSION = "0.1.1"
 READINESS_LABEL = "diagnostic only, sound quality not validated"
 USB_VENDOR = "17cc"
 USB_PRODUCT = "1978"
@@ -57,20 +57,151 @@ PROFILES = {
     "playback-4out": {},
     "traktor-dvs-vinyl": {
         "input-mode": "timecode-vinyl",
+        "gnd-vinyl": "on",
+        "gnd-cd-line": "off",
+        "gnd-phono": "off",
         "software-lock": "on",
     },
     "traktor-dvs-cd-line": {
         "input-mode": "timecode-cd-line",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "on",
+        "gnd-phono": "off",
+        "software-lock": "on",
+    },
+    "vinyl-recording": {
+        "input-mode": "phono",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "off",
+        "gnd-phono": "on",
         "software-lock": "on",
     },
     "phono-recording": {
         "input-mode": "phono",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "off",
+        "gnd-phono": "on",
+        "software-lock": "on",
     },
     "line-recording": {
         "input-mode": "timecode-cd-line",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "on",
+        "gnd-phono": "off",
+        "software-lock": "on",
     },
+    "dj-set-recording": {},
+    "effects-loop": {},
+    "microphone": {},
     "daw-multichannel": {},
+    "midi-only": {},
     "midi-bridge": {},
+    "ground-diagnostics": {
+        "software-lock": "on",
+    },
+    "engineering-diagnostics": {
+        "software-lock": "on",
+    },
+    "unlock": {
+        "software-lock": "off",
+    },
+}
+PROFILE_ALIASES = {
+    "playback": "playback-4out",
+    "output-only": "playback-4out",
+    "spotify": "playback-4out",
+    "vlc": "playback-4out",
+    "dvs-vinyl": "traktor-dvs-vinyl",
+    "timecode-vinyl": "traktor-dvs-vinyl",
+    "tc-vinyl": "traktor-dvs-vinyl",
+    "dvs-cd-line": "traktor-dvs-cd-line",
+    "timecode-cd-line": "traktor-dvs-cd-line",
+    "timecode-cd": "traktor-dvs-cd-line",
+    "cd-line": "traktor-dvs-cd-line",
+    "line": "traktor-dvs-cd-line",
+    "phono": "vinyl-recording",
+    "midi": "midi-only",
+}
+PROFILE_DESCRIPTIONS = {
+    "playback-4out": "Outputs A/B/C/D active; no input-control change.",
+    "traktor-dvs-vinyl": "A/B timecode vinyl; vinyl ground lift on; software lock on.",
+    "traktor-dvs-cd-line": "A/B timecode CD-line; CD-line ground lift on; software lock on.",
+    "vinyl-recording": "A/B phono capture mode; phono ground lift on; software lock on.",
+    "phono-recording": "Alias-compatible phono recording profile.",
+    "line-recording": "A/B line capture mode; CD-line ground lift on; software lock on.",
+    "dj-set-recording": "C/D line capture workflow; physical MIC/LINE state still matters.",
+    "effects-loop": "C/D duplex workflow; no hidden routing change.",
+    "microphone": "Front XLR workflow; requires physical MIC/LINE switch selection.",
+    "daw-multichannel": "A/B/C/D multichannel use; no deck-specific hardware mode change.",
+    "midi-only": "MIDI bridge workflow; no audio-control change.",
+    "midi-bridge": "Alias-compatible MIDI bridge workflow.",
+    "ground-diagnostics": "Input/noise diagnostic posture; software lock on.",
+    "engineering-diagnostics": "Full diagnostic posture; software lock on.",
+    "unlock": "Software lock off.",
+}
+HARDWARE_MODEL = {
+    "schema": "org.opena8dj.linux.hardware-model.v1",
+    "readiness_label": READINESS_LABEL,
+    "source_oracles": {
+        "macos": [
+            "OpenA8DJUSB.m USB transport and stream counters",
+            "opena8dj-control profile/control surface",
+            "physical music quality gate and iRig capture discipline",
+        ],
+        "windows": [
+            "OpenA8DJShared.h API v2 surface",
+            "OpenA8DJAudioEngine offline contract",
+            "Windows ACX/KMDF design locks",
+        ],
+    },
+    "usb": {
+        "vendor_id": USB_VENDOR,
+        "product_id": USB_PRODUCT,
+        "endpoints": {
+            "control_midi_bulk_out": "0x01",
+            "control_midi_bulk_in": "0x81",
+            "isochronous_capture_in": "0x82",
+            "isochronous_playback_out": "0x06",
+        },
+    },
+    "audio": {
+        "physical_inputs": 8,
+        "physical_outputs": 8,
+        "stereo_pairs": ["A", "B", "C", "D"],
+        "first_class_sample_rates": [44100, 48000],
+        "planned_only_sample_rates": [88200, 96000],
+        "transport_format": "S24_3BE CAIAQ packet format",
+        "linux_pcm_policy": (
+            "Validate snd-usb-caiaq stereo-pair substreams first; add aggregate "
+            "8x8 presentation only as a user-space/client compatibility layer "
+            "until kernel evidence justifies a different shape."
+        ),
+    },
+    "controls": {
+        name: {"alsa_name": alsa_name}
+        for name, alsa_name in CONTROL_NAMES.items()
+    },
+    "profiles": {
+        name: {
+            "summary": PROFILE_DESCRIPTIONS[name],
+            "controls": changes,
+        }
+        for name, changes in PROFILES.items()
+    },
+    "profile_aliases": PROFILE_ALIASES,
+    "hot_path_rules": [
+        "no heap allocation in isochronous completion path",
+        "no steady-state logging or string formatting in the hot path",
+        "no broad locks shared by audio, MIDI, and controls",
+        "no control-plane work in packet completion callbacks",
+        "fixed URB/ring ownership and bounded packet parsing only",
+    ],
+    "validation_policy": [
+        "counters, install success, and enumeration are not sound-quality proof",
+        "normal listening candidate requires exact artifact physical capture",
+        "real music, external capture, reference comparison, CPU/xrun evidence",
+        "44.1 and 48 kHz pass before 88.2 or 96 kHz are claimed",
+    ],
 }
 
 
@@ -229,6 +360,16 @@ def resolve_card(card_arg: str | None, report: dict[str, Any] | None = None) -> 
     return "Audio8DJ"
 
 
+def resolve_profile(profile: str) -> str:
+    folded = profile.casefold()
+    if folded in PROFILES:
+        return folded
+    if folded in PROFILE_ALIASES:
+        return PROFILE_ALIASES[folded]
+    allowed = sorted([*PROFILES.keys(), *PROFILE_ALIASES.keys()])
+    raise SystemExit(f"unknown profile {profile!r}; allowed: {', '.join(allowed)}")
+
+
 def normalize_control_value(control: str, value: str) -> str:
     folded = value.casefold()
     if control == "input-mode":
@@ -310,6 +451,7 @@ def collect(include_command_output: bool, include_controls: bool) -> dict[str, A
             "found_by_proc_asound": bool(audio8_cards),
             "found_by_lsusb": bool(commands["lsusb_audio8"].get("stdout", "").strip()),
         },
+        "hardware_model": HARDWARE_MODEL,
         "commands": commands,
         "controls": control_outputs,
         "tests_not_run": [
@@ -401,7 +543,8 @@ def command_controls(args: argparse.Namespace) -> int:
 def command_list_profiles(args: argparse.Namespace) -> int:
     payload = {
         "readiness_label": READINESS_LABEL,
-        "profiles": PROFILES,
+        "profiles": HARDWARE_MODEL["profiles"],
+        "aliases": PROFILE_ALIASES,
         "note": "Profiles change ALSA controls only when apply-profile is run with --yes.",
     }
     if args.json:
@@ -414,20 +557,21 @@ def command_list_profiles(args: argparse.Namespace) -> int:
                 pairs = ", ".join(f"{key}={value}" for key, value in changes.items())
             else:
                 pairs = "no hardware-control changes"
-            print(f"  {name}: {pairs}")
+            print(f"  {name}: {PROFILE_DESCRIPTIONS[name]}")
+            print(f"    controls: {pairs}")
     return 0
 
 
 def command_apply_profile(args: argparse.Namespace) -> int:
-    if args.profile not in PROFILES:
-        raise SystemExit(f"unknown profile {args.profile!r}")
-
+    profile = resolve_profile(args.profile)
     report = collect(include_command_output=False, include_controls=False)
     card = resolve_card(args.card, report)
-    changes = PROFILES[args.profile]
+    changes = PROFILES[profile]
 
     if not args.yes:
-        print(f"Profile {args.profile} for ALSA card {card}")
+        print(f"Profile {profile} for ALSA card {card}")
+        if profile != args.profile:
+            print(f"  requested alias: {args.profile}")
         if changes:
             for control, value in changes.items():
                 print(f"  would set {control}={value}")
@@ -448,7 +592,8 @@ def command_apply_profile(args: argparse.Namespace) -> int:
         )
 
     payload = {
-        "profile": args.profile,
+        "profile": profile,
+        "requested_profile": args.profile,
         "card": card,
         "readiness_label": READINESS_LABEL,
         "applied": True,
@@ -459,7 +604,7 @@ def command_apply_profile(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        print(f"Applied profile {args.profile} to ALSA card {card}")
+        print(f"Applied profile {profile} to ALSA card {card}")
         print(READINESS_LABEL)
     return 0
 
@@ -495,9 +640,13 @@ def command_verify(args: argparse.Namespace) -> int:
 
     report = collect(include_command_output=True, include_controls=args.controls)
     diagnostics_path = report_dir / "diagnostics.json"
+    hardware_model_path = report_dir / "hardware-model.json"
     summary_path = report_dir / "summary.txt"
     diagnostics_path.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    hardware_model_path.write_text(
+        json.dumps(HARDWARE_MODEL, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     summary_path.write_text(
         "\n".join(
@@ -507,6 +656,7 @@ def command_verify(args: argparse.Namespace) -> int:
                 f"host: {report['platform']['system']} {report['platform']['release']}",
                 f"usb id: {report['usb_id']}",
                 f"audio8 card candidates: {len(report['audio8_matches']['cards'])}",
+                "hardware model: hardware-model.json",
                 "hardware-affecting tests run: none",
                 "physical sound validation: not run",
                 "",
@@ -521,6 +671,7 @@ def command_verify(args: argparse.Namespace) -> int:
                 {
                     "report_dir": str(report_dir),
                     "diagnostics": str(diagnostics_path),
+                    "hardware_model": str(hardware_model_path),
                     "summary": str(summary_path),
                     "readiness_label": READINESS_LABEL,
                 },
@@ -543,6 +694,7 @@ def command_version(args: argparse.Namespace) -> int:
                     "tool_version": TOOL_VERSION,
                     "readiness_label": READINESS_LABEL,
                     "driver_channel": "in-kernel snd-usb-caiaq",
+                    "hardware_model_schema": HARDWARE_MODEL["schema"],
                 },
                 indent=2,
                 sort_keys=True,
@@ -551,6 +703,27 @@ def command_version(args: argparse.Namespace) -> int:
     else:
         print(f"opena8dj-linuxctl {TOOL_VERSION}")
         print(READINESS_LABEL)
+    return 0
+
+
+def command_hardware_model(args: argparse.Namespace) -> int:
+    if args.json:
+        print(json.dumps(HARDWARE_MODEL, indent=2, sort_keys=True))
+    else:
+        print("OpenA8DJ Linux hardware model")
+        print(f"readiness: {READINESS_LABEL}")
+        print(f"usb: {USB_VENDOR}:{USB_PRODUCT}")
+        print("endpoints:")
+        for name, endpoint in HARDWARE_MODEL["usb"]["endpoints"].items():
+            print(f"  {name}: {endpoint}")
+        print("audio:")
+        print("  physical inputs: 8")
+        print("  physical outputs: 8")
+        print("  stereo pairs: A/B/C/D")
+        print("  first-class rates: 44100, 48000")
+        print("  planned-only rates: 88200, 96000")
+        print("policy:")
+        print(f"  {HARDWARE_MODEL['audio']['linux_pcm_policy']}")
     return 0
 
 
@@ -564,6 +737,13 @@ def command_self_test(args: argparse.Namespace) -> int:
             control in CONTROL_NAMES
             for changes in PROFILES.values()
             for control in changes
+        ),
+        "profile_aliases_resolve": all(
+            target in PROFILES for target in PROFILE_ALIASES.values()
+        ),
+        "hardware_model_has_macos_windows_oracles": bool(
+            HARDWARE_MODEL["source_oracles"]["macos"]
+            and HARDWARE_MODEL["source_oracles"]["windows"]
         ),
     }
     ok = all(checks.values())
@@ -622,7 +802,7 @@ def build_parser() -> argparse.ArgumentParser:
     apply_profile = subparsers.add_parser(
         "apply-profile", help="apply a profile with explicit confirmation"
     )
-    apply_profile.add_argument("profile", choices=sorted(PROFILES))
+    apply_profile.add_argument("profile")
     apply_profile.add_argument("--card", help="ALSA card index or id")
     apply_profile.add_argument("--yes", action="store_true", help="apply changes")
     apply_profile.add_argument("--json", action="store_true", help="emit JSON")
@@ -647,6 +827,12 @@ def build_parser() -> argparse.ArgumentParser:
     version = subparsers.add_parser("version", help="show tool version")
     version.add_argument("--json", action="store_true", help="emit JSON")
     version.set_defaults(func=command_version)
+
+    hardware_model = subparsers.add_parser(
+        "hardware-model", help="show macOS/Windows-derived hardware model"
+    )
+    hardware_model.add_argument("--json", action="store_true", help="emit JSON")
+    hardware_model.set_defaults(func=command_hardware_model)
 
     self_test = subparsers.add_parser("self-test", help="run offline self-test")
     self_test.add_argument("--json", action="store_true", help="emit JSON")

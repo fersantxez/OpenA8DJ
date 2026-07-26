@@ -27,14 +27,14 @@ from typing import Any, Iterable
 
 
 PACKAGE_NAME = "opena8dj-linux-experimental"
-TOOL_VERSION = "0.1.0"
-DEB_VERSION = "0.1.0~experimental20260622"
-RPM_VERSION = "0.1.0"
-RPM_RELEASE = "0.experimental20260622"
+TOOL_VERSION = "0.1.1"
+DEB_VERSION = "0.1.1~experimental20260726"
+RPM_VERSION = "0.1.1"
+RPM_RELEASE = "0.experimental20260726"
 DIST_ID = f"{PACKAGE_NAME}-{DEB_VERSION}"
 READINESS_LABEL = "diagnostic only, sound quality not validated"
 DRIVER_CHANNEL = "in-kernel snd-usb-caiaq"
-BUILD_MTIME = 1782086400  # 2026-06-22T00:00:00Z
+BUILD_MTIME = 1785024000  # 2026-07-26T00:00:00Z
 
 
 RPM_NULL = 0
@@ -141,6 +141,11 @@ def package_entries(root: Path, candidate_json: bytes) -> list[PayloadEntry]:
         InstallEntry(
             root / "linux/CANDIDATE_PAYLOAD.md",
             f"/usr/share/doc/{PACKAGE_NAME}/CANDIDATE_PAYLOAD.md",
+            0o644,
+        ),
+        InstallEntry(
+            root / "linux/MACOS_WINDOWS_HARDWARE_LESSONS.md",
+            f"/usr/share/doc/{PACKAGE_NAME}/MACOS_WINDOWS_HARDWARE_LESSONS.md",
             0o644,
         ),
         InstallEntry(
@@ -554,6 +559,19 @@ def base_candidate_metadata(root: Path) -> dict[str, Any]:
         "branch": branch,
         "driver_channel": DRIVER_CHANNEL,
         "module_name": "snd-usb-caiaq",
+        "hardware_model_schema": "org.opena8dj.linux.hardware-model.v1",
+        "cross_platform_lessons": {
+            "macos_reference": [
+                "OpenA8DJUSB.m USB transport and stream counters",
+                "opena8dj-control profile/control surface",
+                "physical music quality gate and external capture discipline",
+            ],
+            "windows_reference": [
+                "OpenA8DJShared.h API v2 surface",
+                "OpenA8DJAudioEngine offline contract",
+                "Windows ACX/KMDF design locks",
+            ],
+        },
         "kernel_targets": [
             "distribution kernel with CONFIG_SND_USB_CAIAQ enabled"
         ],

@@ -66,6 +66,7 @@ Profiles are convenience presets. They must not hide what controls changed.
 - Playback A/B/C/D enabled.
 - Capture A/B/C/D enabled.
 - Input mode: `timecode-vinyl`.
+- Ground lift: vinyl on; CD/line and phono off.
 - Software lock: `on`.
 - Ground-lift state explicit in the profile output.
 
@@ -74,13 +75,16 @@ Profiles are convenience presets. They must not hide what controls changed.
 - Playback A/B/C/D enabled.
 - Capture A/B/C/D enabled.
 - Input mode: `timecode-cd-line`.
+- Ground lift: CD/line on; vinyl and phono off.
 - Software lock: `on`.
 - Ground-lift CD/line state explicit in the profile output.
 
-### `phono-recording`
+### `vinyl-recording` / `phono-recording`
 
 - Capture A/B/C/D enabled.
 - Input mode: `phono`.
+- Ground lift: phono on; vinyl and CD/line off.
+- Software lock: `on`.
 - Playback available but not required.
 - Diagnostics should report input level and packet anomalies, not perform DSP.
 
@@ -88,7 +92,27 @@ Profiles are convenience presets. They must not hide what controls changed.
 
 - Capture A/B/C/D enabled.
 - Input mode: `timecode-cd-line`.
+- Ground lift: CD/line on; vinyl and phono off.
+- Software lock: `on`.
 - Intended for DJ set capture or line-level recording.
+
+### `dj-set-recording`
+
+- C/D line capture workflow.
+- No hidden A/B input-mode change.
+- Physical front-panel MIC/LINE state must be recorded during validation.
+
+### `effects-loop`
+
+- C/D duplex workflow.
+- No hidden routing or hardware-control change.
+- Pair isolation must prove send/return mapping.
+
+### `microphone`
+
+- Front XLR workflow.
+- No hidden control write.
+- Physical MIC/LINE switch and analog gain setting must be recorded.
 
 ### `daw-multichannel`
 
@@ -100,6 +124,16 @@ Profiles are convenience presets. They must not hide what controls changed.
 
 - rawmidi input/output active and visible to ALSA clients.
 - PCM configuration unchanged.
+
+### `ground-diagnostics` / `engineering-diagnostics`
+
+- Software lock: `on`.
+- Used for controlled measurement; does not imply sound-quality validation.
+
+### `unlock`
+
+- Software lock: `off`.
+- Must be an explicit user action.
 
 ## Persistence
 
@@ -115,17 +149,22 @@ profile restore until the restore behavior is designed and validated.
 
 ## CLI and User-Space Tooling
 
-A future Linux control tool may provide:
+The current diagnostic package provides `opena8dj-linuxctl` with:
 
 ```sh
 opena8dj-linuxctl status
-opena8dj-linuxctl profile traktor-dvs-vinyl
-opena8dj-linuxctl input-mode phono
-opena8dj-linuxctl gnd-vinyl on
-opena8dj-linuxctl diagnostics
+opena8dj-linuxctl diagnostics --json --controls
+opena8dj-linuxctl controls
+opena8dj-linuxctl list-profiles
+opena8dj-linuxctl apply-profile traktor-dvs-vinyl --yes
+opena8dj-linuxctl set-control input-mode phono --yes
+opena8dj-linuxctl hardware-model --json
+opena8dj-linuxctl verify --controls --report-dir ~/opena8dj-linux-report
 ```
 
-This first package does not create that tool.
+Hardware-control writes require `--yes`. Package install, status, diagnostics,
+hardware-model, list-profiles, and verify do not play audio, record audio, load
+modules, reset USB, or restart audio services.
 
 ## Compatibility Targets
 

@@ -21,6 +21,17 @@ it does not include a replacement kernel module and it has not passed physical
 sound-quality validation. This document remains the contract for future driver,
 DKMS, akmods, or source-channel candidates.
 
+The current diagnostic package payload is generated under:
+
+```text
+dist/linux/experimental/opena8dj-linux-experimental-0.1.1~experimental20260726/
+```
+
+It adds the macOS/Windows hardware lesson bridge, an exported
+`hardware-model`, expanded profile schema, and macOS/Windows-aligned profile
+control postures. It remains diagnostic-only and still does not include a
+replacement kernel module or physical sound-quality validation.
+
 ## Minimum Payload
 
 Each candidate must include:
@@ -31,6 +42,8 @@ Each candidate must include:
 - udev rules if needed.
 - ALSA UCM profiles if needed.
 - docs and `README-FIRST`.
+- cross-platform hardware lesson map when the candidate claims Audio 8 DJ
+  control/routing behavior.
 - uninstall and rollback path.
 - diagnostics and verify report tooling.
 - hashes and build metadata.
@@ -102,10 +115,18 @@ Required profiles:
 - `playback-4out`
 - `traktor-dvs-vinyl`
 - `traktor-dvs-cd-line`
+- `vinyl-recording`
 - `phono-recording`
 - `line-recording`
+- `dj-set-recording`
+- `effects-loop`
+- `microphone`
 - `daw-multichannel`
+- `midi-only`
 - `midi-bridge`
+- `ground-diagnostics`
+- `engineering-diagnostics`
+- `unlock`
 
 ## udev Rules
 

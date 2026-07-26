@@ -1,0 +1,53 @@
+{
+  "branch": "linux/full-driver-agent",
+  "built_at_unix": 1785087427,
+  "candidate_id": "opena8dj-linux-experimental-0.1.1~experimental20260726",
+  "cross_platform_lessons": {
+    "macos_reference": [
+      "OpenA8DJUSB.m USB transport and stream counters",
+      "opena8dj-control profile/control surface",
+      "physical music quality gate and external capture discipline"
+    ],
+    "windows_reference": [
+      "OpenA8DJShared.h API v2 surface",
+      "OpenA8DJAudioEngine offline contract",
+      "Windows ACX/KMDF design locks"
+    ]
+  },
+  "driver_channel": "in-kernel snd-usb-caiaq",
+  "git_commit": "f16975a01c33c3c2d4a593dce6b580f454bc5e4c",
+  "git_dirty": true,
+  "hardware_model_schema": "org.opena8dj.linux.hardware-model.v1",
+  "hardware_tests_run": false,
+  "hashes": {
+    "opena8dj-linux-experimental-0.1.1-0.experimental20260726.noarch.rpm": "710fc9bdd7acbb6b5f654a89084f525e8544e7d3477c20d38d24e9b28a34dd3c",
+    "opena8dj-linux-experimental-0.1.1~experimental20260726.tar.gz": "3f8c7554156963a3da773f9eb1b634b875cab55fd5435e1860284e9c8836471e",
+    "opena8dj-linux-experimental_0.1.1~experimental20260726_all.deb": "daadd50d3f48434409b40a1f2de6da276c3cf2843b67d39a9eca445944e9dfa5"
+  },
+  "kernel_targets": [
+    "distribution kernel with CONFIG_SND_USB_CAIAQ enabled"
+  ],
+  "module_name": "snd-usb-caiaq",
+  "name": "opena8dj-linux",
+  "native_instruments_payload_included": false,
+  "package_name": "opena8dj-linux-experimental",
+  "packages": [
+    {
+      "path": "opena8dj-linux-experimental_0.1.1~experimental20260726_all.deb",
+      "sha256": "daadd50d3f48434409b40a1f2de6da276c3cf2843b67d39a9eca445944e9dfa5"
+    },
+    {
+      "path": "opena8dj-linux-experimental-0.1.1-0.experimental20260726.noarch.rpm",
+      "sha256": "710fc9bdd7acbb6b5f654a89084f525e8544e7d3477c20d38d24e9b28a34dd3c"
+    },
+    {
+      "path": "opena8dj-linux-experimental-0.1.1~experimental20260726.tar.gz",
+      "sha256": "3f8c7554156963a3da773f9eb1b634b875cab55fd5435e1860284e9c8836471e"
+    }
+  ],
+  "physical_sound_quality_validated": false,
+  "playback_capture_tested": false,
+  "readme": "README-FIRST.md",
+  "secure_boot_tested": false,
+  "validation_label": "diagnostic only, sound quality not validated"
+}

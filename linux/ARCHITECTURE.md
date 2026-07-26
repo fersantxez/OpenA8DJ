@@ -46,6 +46,30 @@ The first implementation decision is deliberately still open:
 No decision is final until the `snd-usb-caiaq` audit is complete against the
 exact kernel baseline selected for development.
 
+## Cross-Platform Hardware Lessons
+
+Linux now carries a formal bridge document:
+
+```text
+linux/MACOS_WINDOWS_HARDWARE_LESSONS.md
+```
+
+That document converts the advanced macOS implementation and the Windows
+transition contract into Linux requirements. The important imported decisions
+are:
+
+- Treat Audio 8 DJ as vendor-specific CAIAQ hardware, not USB Audio Class.
+- Preserve endpoint facts: EP1 bulk/control/MIDI traffic, capture isochronous
+  endpoint `0x82`, and playback isochronous endpoint `0x06`.
+- Keep playback, capture, MIDI, and control paths separate.
+- Prefer the CAIAQ capture-paced cadence model first, because macOS and Windows
+  analysis both point to packet cadence as a real sound-quality surface.
+- Keep the ALSA/client-facing clock stable; USB timing may inform correction
+  but must not become a jittery public timeline.
+- Keep 44.1 kHz and 48 kHz as first-class validation rates. 88.2 and 96 kHz
+  remain planned/diagnostic until physical capture passes.
+- Do not claim readiness from install success, clean counters, or enumeration.
+
 ## PCM Surface
 
 The target ALSA surface is one 8-channel playback PCM and one 8-channel capture
@@ -126,6 +150,17 @@ The Audio 8 DJ Linux surface must include ALSA controls for:
 - Diagnostics counters and last-error state where appropriate.
 
 Control changes must be serialized away from the isochronous hot path.
+
+Profile semantics must match the macOS/Windows contract:
+
+- DVS vinyl sets timecode-vinyl mode, vinyl ground lift on, other ground lifts
+  off, and software lock on.
+- DVS CD/line sets timecode-CD-line mode, CD/line ground lift on, other ground
+  lifts off, and software lock on.
+- Phono/vinyl recording sets phono mode, phono ground lift on, other ground
+  lifts off, and software lock on.
+- Playback, DAW, MIDI, C/D recording, effects-loop, and microphone workflows do
+  not hide A/B control writes.
 
 ## MIDI
 

@@ -52,7 +52,8 @@ client compatibility proves it is needed.
 
 ## Milestone 0: Planning And Safe Scaffolding
 
-Status: in progress.
+Status: complete for the current diagnostic package; kernel baseline refresh
+remains open.
 
 Deliverables:
 
@@ -62,6 +63,7 @@ Deliverables:
 - `linux/LEGAL_AND_PROVENANCE.md`
 - `linux/ENUMERATION_PLAN.md`
 - `linux/SND_USB_CAIAQ_AUDIT.md` updated with source-level findings.
+- `linux/MACOS_WINDOWS_HARDWARE_LESSONS.md`
 - read-only `opena8dj-linuxctl` prototype.
 
 Acceptance:
@@ -70,6 +72,32 @@ Acceptance:
 - No hardware-affecting operation is added.
 - The read-only tool runs safely on non-Linux hosts and reports that hardware
   validation is not present.
+
+## Milestone 0.5: macOS/Windows Hardware Lesson Integration
+
+Status: implemented in the 2026-07-26 diagnostic package update.
+
+Deliverables:
+
+- Translate macOS `OpenA8DJUSB.m`, `opena8dj-control`, and physical QA lessons
+  into Linux hot-path, profile, diagnostic, and validation rules.
+- Translate Windows API v2, offline engine, and ACX/KMDF design locks into the
+  Linux ALSA/CAIAQ implementation contract.
+- Add an exported `hardware-model` surface to `opena8dj-linuxctl`.
+- Include `hardware-model.json` in exported Linux verify reports.
+- Align Linux profile control writes with macOS/Windows DVS, phono, line,
+  MIDI, and diagnostic workflow names.
+
+Acceptance:
+
+- `opena8dj-linuxctl hardware-model --json` is valid JSON and includes both
+  macOS and Windows source oracles.
+- `opena8dj-linuxctl list-profiles` exposes the cross-platform profile set and
+  aliases.
+- `opena8dj-linuxctl apply-profile <alias>` resolves macOS-compatible aliases
+  without writing hardware controls unless `--yes` is present.
+- The packaged profile schema contains USB endpoint facts, A/B/C/D topology,
+  source oracles, hot-path rules, and validation policy.
 
 ## Milestone 1: Kernel Baseline And CAIAQ Audit
 
@@ -165,9 +193,12 @@ Counters to design:
 - output URB starvation count.
 - input URB submit failure count.
 - output URB submit failure count.
+- capture/playback completion cadence outliers.
+- packet byte-count anomalies and layout signatures.
+- period elapsed count per direction.
+- MIDI bytes in/out and EP1 command errors.
 - stream start/stop/unpause counts.
 - rate/depth/bpp last configured.
-- period elapsed count per stream.
 - last EP1 control error.
 
 Acceptance:
@@ -253,6 +284,8 @@ Deliverables:
 - Timecode vinyl mode on A/B first, then A/B/C/D matrix.
 - Timecode CD/line mode.
 - Phono/line recording profiles.
+- Repeated start/unpause/client-restart checks to catch CAIAQ-style white-noise
+  regressions.
 - MIDI in/out loopback and burst tests.
 - Hot unplug idle and active.
 - Suspend/resume.
@@ -289,4 +322,4 @@ Acceptance:
 - Added a detailed implementation plan.
 - Added baseline, provenance, and enumeration documents.
 - Added a read-only Linux diagnostics tool prototype.
-
+- Added macOS/Windows hardware lesson integration and exported hardware model.

@@ -136,6 +136,34 @@ Prefer a new `snd-opena8dj` module if any are true:
 Current provisional position: CAIAQ is the first candidate to extend, but no
 driver choice is final.
 
+## macOS/Windows Lessons Applied To CAIAQ
+
+The current Linux path is not allowed to treat CAIAQ support as solved merely
+because Audio 8 DJ already probes. macOS and Windows work add these
+requirements to any CAIAQ extension:
+
+- Keep the capture-paced cadence model as the first hypothesis. CAIAQ already
+  mirrors playback packet layout from completed capture URBs, which matches the
+  strongest macOS timing clue.
+- Add diagnostics around that cadence before changing behavior: capture
+  completion deltas, playback completion deltas, capture-to-playback queue
+  deltas, short packets, failed transactions, zero-byte/other-size packet
+  anomalies, output starvation, and panic causes.
+- Preserve ALSA XRUN truth. Diagnostics must explain failures, not suppress
+  them.
+- Do not add logging, allocation, string formatting, profile handling, or
+  user-space policy to isochronous completion paths.
+- Keep MIDI/EP1 command traffic and ALSA control writes serialized away from
+  playback/capture completion timing.
+- Validate repeated start/unpause/client-restart behavior because CAIAQ has a
+  historical white-noise start/unpause bug class.
+- Validate A/B/C/D pair order before DVS claims because old Audio 8 DJ Linux
+  reports included channel-mapping problems that directly affect timecode.
+
+The profile/control layer is now documented in
+`linux/MACOS_WINDOWS_HARDWARE_LESSONS.md` and packaged in
+`linux/packaging/common/profile-schema.json`.
+
 ## Audit Checklist Still Open
 
 - Select exact kernel baseline.

@@ -1,6 +1,6 @@
 # Linux-only OpenA8DJ helper targets.
 
-.PHONY: help status diagnostics self-test packages driver-status driver-module
+.PHONY: help status diagnostics hardware-model self-test packages driver-status driver-module
 
 LINUXCTL := tools/opena8dj-linuxctl
 PACKAGE_BUILDER := packaging/build-experimental-packages.py
@@ -13,6 +13,7 @@ help:
 	@printf '%s\n' 'Targets:'
 	@printf '%s\n' '  status        - run read-only Linux status'
 	@printf '%s\n' '  diagnostics   - run read-only JSON diagnostics'
+	@printf '%s\n' '  hardware-model - show macOS/Windows-derived hardware model'
 	@printf '%s\n' '  self-test     - run offline tool self-test'
 	@printf '%s\n' '  packages      - build experimental .deb/.rpm artifacts'
 	@printf '%s\n' '  driver-status - show driver scaffold status'
@@ -23,6 +24,9 @@ status:
 
 diagnostics:
 	@$(LINUXCTL) diagnostics --json
+
+hardware-model:
+	@$(LINUXCTL) hardware-model --json
 
 self-test:
 	@$(LINUXCTL) self-test

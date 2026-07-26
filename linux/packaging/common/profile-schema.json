@@ -1,6 +1,34 @@
 {
+  "schema": "org.opena8dj.linux.profile-schema.v2",
   "readiness_label": "diagnostic only, sound quality not validated",
   "driver_channel": "in-kernel snd-usb-caiaq",
+  "source_oracles": {
+    "macos": [
+      "OpenA8DJUSB.m USB transport and stream counters",
+      "opena8dj-control profile/control surface",
+      "physical music quality gate and iRig capture discipline"
+    ],
+    "windows": [
+      "OpenA8DJShared.h API v2 surface",
+      "OpenA8DJAudioEngine offline contract",
+      "Windows ACX/KMDF design locks"
+    ]
+  },
+  "hardware": {
+    "usb_id": "17cc:1978",
+    "endpoints": {
+      "control_midi_bulk_out": "0x01",
+      "control_midi_bulk_in": "0x81",
+      "isochronous_capture_in": "0x82",
+      "isochronous_playback_out": "0x06"
+    },
+    "physical_inputs": 8,
+    "physical_outputs": 8,
+    "stereo_pairs": ["A", "B", "C", "D"],
+    "first_class_sample_rates": [44100, 48000],
+    "planned_only_sample_rates": [88200, 96000],
+    "transport_format": "S24_3BE CAIAQ packet format"
+  },
   "controls": {
     "input-mode": {
       "alsa_name": "Current input mode",
@@ -27,23 +55,134 @@
       "values": ["off", "on"]
     }
   },
+  "profile_aliases": {
+    "playback": "playback-4out",
+    "output-only": "playback-4out",
+    "spotify": "playback-4out",
+    "vlc": "playback-4out",
+    "dvs-vinyl": "traktor-dvs-vinyl",
+    "timecode-vinyl": "traktor-dvs-vinyl",
+    "tc-vinyl": "traktor-dvs-vinyl",
+    "dvs-cd-line": "traktor-dvs-cd-line",
+    "timecode-cd-line": "traktor-dvs-cd-line",
+    "timecode-cd": "traktor-dvs-cd-line",
+    "cd-line": "traktor-dvs-cd-line",
+    "line": "traktor-dvs-cd-line",
+    "phono": "vinyl-recording",
+    "midi": "midi-only"
+  },
   "profiles": {
-    "playback-4out": {},
+    "playback-4out": {
+      "summary": "Outputs A/B/C/D active; no input-control change.",
+      "controls": {}
+    },
     "traktor-dvs-vinyl": {
-      "input-mode": "timecode-vinyl",
-      "software-lock": "on"
+      "summary": "A/B timecode vinyl; vinyl ground lift on; software lock on.",
+      "controls": {
+        "input-mode": "timecode-vinyl",
+        "gnd-vinyl": "on",
+        "gnd-cd-line": "off",
+        "gnd-phono": "off",
+        "software-lock": "on"
+      }
     },
     "traktor-dvs-cd-line": {
-      "input-mode": "timecode-cd-line",
-      "software-lock": "on"
+      "summary": "A/B timecode CD-line; CD-line ground lift on; software lock on.",
+      "controls": {
+        "input-mode": "timecode-cd-line",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "on",
+        "gnd-phono": "off",
+        "software-lock": "on"
+      }
+    },
+    "vinyl-recording": {
+      "summary": "A/B phono capture mode; phono ground lift on; software lock on.",
+      "controls": {
+        "input-mode": "phono",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "off",
+        "gnd-phono": "on",
+        "software-lock": "on"
+      }
     },
     "phono-recording": {
-      "input-mode": "phono"
+      "summary": "Alias-compatible phono recording profile.",
+      "controls": {
+        "input-mode": "phono",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "off",
+        "gnd-phono": "on",
+        "software-lock": "on"
+      }
     },
     "line-recording": {
-      "input-mode": "timecode-cd-line"
+      "summary": "A/B line capture mode; CD-line ground lift on; software lock on.",
+      "controls": {
+        "input-mode": "timecode-cd-line",
+        "gnd-vinyl": "off",
+        "gnd-cd-line": "on",
+        "gnd-phono": "off",
+        "software-lock": "on"
+      }
     },
-    "daw-multichannel": {},
-    "midi-bridge": {}
+    "dj-set-recording": {
+      "summary": "C/D line capture workflow; physical MIC/LINE state still matters.",
+      "controls": {}
+    },
+    "effects-loop": {
+      "summary": "C/D duplex workflow; no hidden routing change.",
+      "controls": {}
+    },
+    "microphone": {
+      "summary": "Front XLR workflow; requires physical MIC/LINE switch selection.",
+      "controls": {}
+    },
+    "daw-multichannel": {
+      "summary": "A/B/C/D multichannel use; no deck-specific hardware mode change.",
+      "controls": {}
+    },
+    "midi-only": {
+      "summary": "MIDI bridge workflow; no audio-control change.",
+      "controls": {}
+    },
+    "midi-bridge": {
+      "summary": "Alias-compatible MIDI bridge workflow.",
+      "controls": {}
+    },
+    "ground-diagnostics": {
+      "summary": "Input/noise diagnostic posture; software lock on.",
+      "controls": {
+        "software-lock": "on"
+      }
+    },
+    "engineering-diagnostics": {
+      "summary": "Full diagnostic posture; software lock on.",
+      "controls": {
+        "software-lock": "on"
+      }
+    },
+    "unlock": {
+      "summary": "Software lock off.",
+      "controls": {
+        "software-lock": "off"
+      }
+    }
+  },
+  "linux_policy": {
+    "pcm_shape": "Validate snd-usb-caiaq stereo-pair substreams first; add aggregate 8x8 presentation only as user-space/client compatibility unless kernel evidence justifies a different shape.",
+    "hot_path": [
+      "no heap allocation in isochronous completion path",
+      "no steady-state logging or string formatting in the hot path",
+      "no broad locks shared by audio, MIDI, and controls",
+      "no control-plane work in packet completion callbacks",
+      "fixed URB/ring ownership and bounded packet parsing only"
+    ],
+    "validation": [
+      "counters, install success, and enumeration are not sound-quality proof",
+      "normal listening candidate requires exact artifact physical capture",
+      "real music, external capture, reference comparison, CPU/xrun evidence",
+      "44.1 and 48 kHz pass before 88.2 or 96 kHz are claimed"
+    ]
   }
 }

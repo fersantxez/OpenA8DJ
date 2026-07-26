@@ -13,6 +13,17 @@ Passing build checks, enumeration, and PCM smoke tests is not enough. A Linux
 candidate becomes a listening candidate only after the exact built and loaded
 artifact has passed physical audio validation.
 
+The macOS and Windows lessons are now part of this rule:
+
+- Clean counters do not prove clean audio.
+- Lower CPU is not an improvement if physical audio gets worse.
+- Start/unpause behavior must be tested because CAIAQ has historical
+  white-noise failure modes.
+- A/B/C/D routing must be tested because DVS fails on channel swap or phase
+  mistakes even when playback appears functional.
+- MIDI and control traffic must be tested during PCM use because EP1 activity
+  can become a timing interference source.
+
 ## Shared Hardware Lock
 
 Hardware-affecting gates require:
@@ -85,6 +96,8 @@ Evidence:
 - Full-duplex open/start/stop at both rates.
 - `pointer` monotonicity.
 - No hidden XRUNs.
+- Repeated start/unpause/client-restart cycles do not produce white noise,
+  metallic noise, speed errors, or stale output.
 
 This gate does not prove sound quality.
 
@@ -112,6 +125,8 @@ Evidence:
 - XRUN counts under realistic PipeWire/JACK settings.
 - Callback duration or trace evidence for bounded completion handlers.
 - No logging in the hot path during steady state.
+- No improvement is accepted from CPU reduction alone unless the physical audio
+  gate remains equal or better than the current baseline.
 
 Hardware lock required.
 
@@ -128,6 +143,10 @@ Evidence:
 - Residual/noise/clipping/click metrics.
 - Human listening only after measurements are clean.
 - Exact loaded module hash and kernel version.
+- CPU/UI stress profile so failures similar to the macOS window/cpu-coupled
+  crackle cases are visible.
+- Explicit check for white noise, metallic coloration, clicks, clipping,
+  channel swaps, phase inversion, speed drift, and intermittent residual bursts.
 
 This is the first gate that can support an audiophile-quality claim.
 
@@ -143,6 +162,30 @@ Evidence:
 - rawmidi in/out through `aconnect`.
 - PipeWire/JACK MIDI visibility.
 - No PCM timing degradation during MIDI traffic.
+- Traktor/Wine or substitute DVS scope evidence must record profile state:
+  input mode, ground-lift flags, software lock, ALSA card/substream names, and
+  sample rate.
+
+## Imported macOS Metric Targets
+
+The exact numeric thresholds may need Linux calibration, but the failure
+classes are fixed by the macOS physical gate:
+
+- reference/capture alignment;
+- capture peak and clipping;
+- 1-5 kHz residual and residual window spread;
+- 5-12 kHz residual;
+- low/mid/high spectral coloration;
+- metallic coloration score;
+- quiet-segment mid-band residual;
+- click outliers;
+- lag jumps;
+- CPU/residual correlation;
+- OpenA8DJ driver, ALSA server, PipeWire/JACK, and client CPU profiles.
+
+Linux may tune thresholds only after it has a known-good Linux baseline. It may
+not remove a failure class just because the first implementation lacks a direct
+counter.
 
 ### 8. Resilience
 

@@ -19,6 +19,13 @@ dist/linux/experimental/opena8dj-linux-experimental-0.1.0~experimental20260622/
 No package should load, bind, reload, or test live Audio 8 DJ hardware without
 explicit operator steps and the shared hardware lock during validation.
 
+The current package set produced after integrating macOS/Windows hardware
+lessons is stored in:
+
+```text
+dist/linux/experimental/opena8dj-linux-experimental-0.1.1~experimental20260726/
+```
+
 Every `.deb`, `.rpm`, DKMS, akmods, or built-module candidate must satisfy the
 candidate payload contract in `CANDIDATE_PAYLOAD.md`. The package artifact is
 not acceptable if it ships only a `.ko` or driver source without tools,
@@ -89,6 +96,30 @@ The `.deb` was generated as Debian binary package format 2.0 with
 binary package with gzip-compressed cpio payload. This host does not have
 `dpkg-deb`, `rpm`, or `rpmbuild`, so final install verification still must be
 run on the Linux test machine.
+
+## Experimental Package Set - 2026-07-26
+
+Built artifacts:
+
+- `opena8dj-linux-experimental_0.1.1~experimental20260726_all.deb`
+- `opena8dj-linux-experimental-0.1.1-0.experimental20260726.noarch.rpm`
+- `opena8dj-linux-experimental-0.1.1~experimental20260726.tar.gz`
+- `opena8dj-linux-candidate.json`
+- `README-FIRST.md`
+- `SHA256SUMS`
+
+Additions over the 2026-06-22 package:
+
+- `opena8dj-linuxctl hardware-model`
+- `hardware-model.json` in verify reports
+- macOS/Windows-derived source oracles in the diagnostic JSON
+- DVS/phono/line profile control postures aligned with macOS/Windows
+- profile aliases compatible with macOS-style operator names
+- packaged `MACOS_WINDOWS_HARDWARE_LESSONS.md`
+
+The package remains diagnostic-only. It still does not ship a kernel module,
+load `snd-usb-caiaq`, bind/unbind USB, restart audio services, play audio,
+record audio, or validate sound quality.
 
 ## Candidate Payload Contract
 

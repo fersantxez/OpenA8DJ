@@ -19,6 +19,7 @@ Examples:
 ```sh
 linux/tools/opena8dj-linuxctl status
 linux/tools/opena8dj-linuxctl diagnostics --json
+linux/tools/opena8dj-linuxctl hardware-model --json
 linux/tools/opena8dj-linuxctl self-test
 linux/tools/opena8dj-linuxctl list-profiles
 linux/tools/opena8dj-linuxctl verify --report-dir local-analysis/linux-verify/manual
@@ -31,7 +32,13 @@ Hardware-control writes are explicit:
 
 ```sh
 opena8dj-linuxctl apply-profile traktor-dvs-vinyl --yes
+opena8dj-linuxctl apply-profile timecode-vinyl --yes
 opena8dj-linuxctl set-control input-mode phono --yes
 ```
 
 Package installation never runs those commands.
+
+`hardware-model` is static reference data derived from the macOS and Windows
+workstreams. It records USB endpoints, A/B/C/D topology, profile semantics,
+hot-path rules, and validation policy so Linux diagnostics can be compared
+against the same hardware contract.
