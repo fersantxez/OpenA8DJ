@@ -1,7 +1,7 @@
 # OpenA8DJ
 
 OpenA8DJ is an independent, open-source preservation driver for the Native
-Instruments Audio 8 DJ on modern macOS.
+Instruments Audio 8 DJ.
 
 It keeps the classic Audio 8 DJ workflow usable: 8-in/8-out Core Audio,
 A/B/C/D deck routing, MIDI, and Traktor/timecode use. The project is not
