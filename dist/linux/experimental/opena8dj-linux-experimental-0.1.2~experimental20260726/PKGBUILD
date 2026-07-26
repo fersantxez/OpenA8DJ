@@ -1,0 +1,21 @@
+# Rebuild the exact diagnostic payload with makepkg.
+# Keep opena8dj-linux-experimental-0.1.2~experimental20260726.tar.gz beside this file before invoking makepkg.
+pkgname=opena8dj-linux-experimental
+pkgver=0.1.2
+pkgrel=1
+pkgdesc='Diagnostic-only OpenA8DJ Linux tooling for Native Instruments Audio 8 DJ'
+arch=('any')
+url='https://github.com/fersantxez/OpenA8DJ'
+license=('MIT')
+depends=('python' 'alsa-utils' 'usbutils')
+source=('opena8dj-linux-experimental-0.1.2~experimental20260726.tar.gz')
+sha256sums=('b49ea1ad72370f8f1691f65459431d7e3e09fe307f875afe71fce8c6ba8556b1')
+
+package() {
+  local payload="$srcdir/$pkgname"
+  install -Dm755 "$payload/usr/bin/opena8dj-linuxctl" \
+    "$pkgdir/usr/bin/opena8dj-linuxctl"
+  install -Dm644 "$payload/usr/lib/udev/rules.d/70-opena8dj-audio8dj.rules" \
+    "$pkgdir/usr/lib/udev/rules.d/70-opena8dj-audio8dj.rules"
+  cp -a "$payload/usr/share/." "$pkgdir/usr/share/"
+}

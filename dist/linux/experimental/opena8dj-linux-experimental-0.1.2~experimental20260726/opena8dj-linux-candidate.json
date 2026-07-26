@@ -1,0 +1,97 @@
+{
+  "arch_rebuild_recipe": "PKGBUILD",
+  "branch": "linux/full-driver-agent",
+  "built_at_unix": 1785088593,
+  "candidate_id": "opena8dj-linux-experimental-0.1.2~experimental20260726",
+  "cross_platform_lessons": {
+    "macos_reference": [
+      "OpenA8DJUSB.m USB transport and stream counters",
+      "opena8dj-control profile/control surface",
+      "physical music quality gate and external capture discipline"
+    ],
+    "windows_reference": [
+      "OpenA8DJShared.h API v2 surface",
+      "OpenA8DJAudioEngine offline contract",
+      "Windows ACX/KMDF design locks"
+    ]
+  },
+  "distribution_support": {
+    "arch": {
+      "artifact": "pkg.tar.zst",
+      "families": [
+        "Arch Linux",
+        "Manjaro",
+        "EndeavourOS"
+      ]
+    },
+    "debian_ubuntu": {
+      "artifact": "deb",
+      "families": [
+        "Debian",
+        "Ubuntu",
+        "Linux Mint",
+        "Pop!_OS"
+      ]
+    },
+    "portable": {
+      "artifact": "tar.gz",
+      "families": [
+        "Gentoo",
+        "NixOS",
+        "other distributions"
+      ],
+      "note": "manual inspection only; no package-manager integration"
+    },
+    "rpm": {
+      "artifact": "rpm",
+      "families": [
+        "Fedora",
+        "RHEL",
+        "Rocky Linux",
+        "AlmaLinux",
+        "openSUSE"
+      ]
+    }
+  },
+  "driver_channel": "in-kernel snd-usb-caiaq",
+  "git_commit": "ebeedf0457814b61635df0f95d07db4daec3bd9f",
+  "git_dirty": false,
+  "hardware_model_schema": "org.opena8dj.linux.hardware-model.v1",
+  "hardware_tests_run": false,
+  "hashes": {
+    "opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm": "c7b2fa2c62fbfd8ac3d2a546a0f3ec4abd953ada45e96063924dc01f5cdf14b5",
+    "opena8dj-linux-experimental-0.1.2-1-any.pkg.tar.zst": "77624c62a96aec65ee9d4bd7c6f225777f3329dbc520fbf60cd8741d1144754c",
+    "opena8dj-linux-experimental-0.1.2~experimental20260726.tar.gz": "b49ea1ad72370f8f1691f65459431d7e3e09fe307f875afe71fce8c6ba8556b1",
+    "opena8dj-linux-experimental_0.1.2~experimental20260726_all.deb": "788e4975716910a5c040185a2db252f4bdfb6cca8a02ada5d3f7fb0beacd463d"
+  },
+  "kernel_targets": [
+    "distribution kernel with CONFIG_SND_USB_CAIAQ enabled"
+  ],
+  "module_name": "snd-usb-caiaq",
+  "name": "opena8dj-linux",
+  "native_instruments_payload_included": false,
+  "package_name": "opena8dj-linux-experimental",
+  "packages": [
+    {
+      "path": "opena8dj-linux-experimental_0.1.2~experimental20260726_all.deb",
+      "sha256": "788e4975716910a5c040185a2db252f4bdfb6cca8a02ada5d3f7fb0beacd463d"
+    },
+    {
+      "path": "opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm",
+      "sha256": "c7b2fa2c62fbfd8ac3d2a546a0f3ec4abd953ada45e96063924dc01f5cdf14b5"
+    },
+    {
+      "path": "opena8dj-linux-experimental-0.1.2-1-any.pkg.tar.zst",
+      "sha256": "77624c62a96aec65ee9d4bd7c6f225777f3329dbc520fbf60cd8741d1144754c"
+    },
+    {
+      "path": "opena8dj-linux-experimental-0.1.2~experimental20260726.tar.gz",
+      "sha256": "b49ea1ad72370f8f1691f65459431d7e3e09fe307f875afe71fce8c6ba8556b1"
+    }
+  ],
+  "physical_sound_quality_validated": false,
+  "playback_capture_tested": false,
+  "readme": "README-FIRST.md",
+  "secure_boot_tested": false,
+  "validation_label": "diagnostic only, sound quality not validated"
+}
