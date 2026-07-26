@@ -2,9 +2,14 @@
 
 Use this when you only want to get the Audio 8 DJ working on macOS.
 
+## Before You Start
+
+OpenA8DJ 0.5.1 requires an Apple Silicon Mac running macOS 26 or later. It is
+for the Native Instruments Audio 8 DJ only.
+
 ## 1. Download
 
-Open the 0.5.1 responsive release:
+Open the current stable release:
 
 ```text
 https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1
@@ -16,16 +21,16 @@ Download:
 OpenA8DJ-0.5.1.dmg
 ```
 
-The optional 0.5.0 Control Center remains compatible and is available from the
-0.5.0 release.
-
-## 2. Install The Driver
+## 2. Install OpenA8DJ
 
 1. Open `OpenA8DJ-0.5.1.dmg`.
 2. Double-click `OpenA8DJ-0.5.1.pkg`.
 3. Follow the macOS Installer prompts.
 4. Reconnect the Audio 8 DJ if it does not appear immediately.
 5. Reopen your DJ or audio app if it was already running.
+
+This one installer includes the audio driver, MIDI support, Control Center, and
+command-line support tools.
 
 ## 3. Check macOS
 
@@ -47,7 +52,8 @@ The optional 0.5.0 Control Center remains compatible and is available from the
 ```
 
 For Traktor timecode vinyl, calibrate the vinyl inside Traktor. OpenA8DJ keeps
-the vinyl input path active by default.
+the vinyl input path active by default. If calibration fails, open OpenA8DJ
+Control Center, select `DVS Vinyl`, click `Apply`, and calibrate again.
 
 ## More Help
 

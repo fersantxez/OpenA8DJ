@@ -1,51 +1,59 @@
 OpenA8DJ 0.5.1
 ==============
 
-OpenA8DJ is an independent, open-source preservation driver for the Native
-Instruments Audio 8 DJ.
+OpenA8DJ lets a Native Instruments Audio 8 DJ work as an audio and MIDI
+interface on current macOS.
 
-It is not affiliated with, endorsed by, sponsored by, or certified by Native
-Instruments. Product names are used only to identify compatibility.
+Requirements
+------------
 
-Install:
+- Native Instruments Audio 8 DJ
+- Apple Silicon Mac
+- macOS 26 or later
+- Administrator password during installation
+
+Install
+-------
 
 1. Double-click OpenA8DJ-0.5.1.pkg.
 2. Follow the macOS Installer prompts.
-3. Reconnect the Audio 8 DJ if it does not appear immediately.
+3. Connect or reconnect the Audio 8 DJ.
+4. Reopen Traktor or any audio application that was already running.
 
-Use the OpenA8DJ files attached to the GitHub Release. Do not install copies
-from mirrors or unknown download sites.
+The installer adds the audio driver, MIDI support, OpenA8DJ Control Center, and
+the support tools. No second download is required.
 
-The installer adds:
+Check The Installation
+----------------------
 
-- /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-- /Library/LaunchAgents/org.opena8dj.midid.plist
-- /usr/local/bin/opena8dj-control
-- /usr/local/bin/opena8dj-midid
-- /usr/local/bin/opena8dj-uninstall
-- /Library/Documentation/OpenA8DJ
+1. Open Audio MIDI Setup.
+2. Select Open Audio 8 DJ.
+3. Confirm that it has 8 inputs and 8 outputs.
+4. Select Open Audio 8 DJ in Traktor or the audio application.
 
-Uninstall:
+Output pairs:
+
+1-2: A
+3-4: B
+5-6: C
+7-8: D
+
+For Traktor Timecode Vinyl, the DVS Vinyl profile is selected by default.
+Open OpenA8DJ Control Center from Applications if you need to reapply it or
+choose a different connection profile.
+
+Uninstall
+---------
+
+Open Terminal and run:
 
 sudo /usr/local/bin/opena8dj-uninstall
 
-Current status:
+Help
+----
 
-- Version: 0.5.1 responsive freeze
-- Architecture: modern macOS C++ user-space driver stack
-- Core Audio device: Open Audio 8 DJ
-- Audio channels: 8 inputs / 8 outputs, named as stereo pairs A/B/C/D
-- Primary validated playback rates: 44.1 kHz and 48 kHz
-- Traktor Timecode Vinyl: vinyl input path active by default
-- Responsive profile: output3072, accepted in Traktor use on 2026-07-25 after
-  exact-artifact safety, offline latency, CPU, and stability checks
-- Signing: Developer ID signed and Apple-notarized for normal macOS
-  installation
-- Included tools: opena8dj-control and OpenA8DJ Control Center
-- Windows/Linux: experimental platform areas, not included in this macOS driver
+https://github.com/fersantxez/OpenA8DJ
 
-After install, open Audio MIDI Setup and confirm Open Audio 8 DJ appears with 8
-inputs and 8 outputs. If it does not appear, reconnect the Audio 8 DJ once, then
-reopen the audio app.
-
-For more help, open the GitHub README or docs/user/install.md in the repository.
+Use only the installer attached to the official GitHub release. OpenA8DJ is an
+independent open-source project and is not affiliated with, endorsed by,
+sponsored by, or certified by Native Instruments.

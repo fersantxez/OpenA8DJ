@@ -7,9 +7,20 @@ or certified by Native Instruments.
 This guide installs the current macOS package: the OpenA8DJ audio driver, MIDI
 support, Control Center, and command-line tools.
 
+## Requirements
+
+```text
+Interface: Native Instruments Audio 8 DJ
+Mac: Apple Silicon
+Operating system: macOS 26 or later
+Access: administrator password during installation
+```
+
+The 0.5.1 public binary does not run on Intel Macs.
+
 ## Download
 
-Download the 0.5.1 responsive freeze from:
+Download the current stable release from:
 
 ```text
 https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1
@@ -41,7 +52,7 @@ file. Do not install if it differs.
 
 ## Normal Install
 
-This is the normal non-technical install path for the public GitHub release:
+This is the normal install path:
 
 1. Open `OpenA8DJ-0.5.1.dmg`.
 2. Double-click `OpenA8DJ-0.5.1.pkg`.
@@ -114,8 +125,8 @@ users do not need them for installation.
 ./build/midi-list
 ```
 
-Optional Control Center check: open `/Applications/OpenA8DJ Control
-Center.app`, choose `DVS Vinyl`, and confirm it shows the normal vinyl profile.
+Open `/Applications/OpenA8DJ Control Center.app` to confirm that the profile
+controls are available. `DVS Vinyl` is the default profile.
 
 ## Traktor / Timecode Vinyl
 
@@ -133,12 +144,6 @@ sudo /usr/local/bin/opena8dj-uninstall
 ```
 
 This unloads the MIDI bridge, removes installed files, and restarts Core Audio.
-
-Optional tools uninstall:
-
-```sh
-sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
-```
 
 ## More Help
 

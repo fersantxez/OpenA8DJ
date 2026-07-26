@@ -11,16 +11,7 @@ sudo /usr/local/bin/opena8dj-uninstall
 ```
 
 macOS may ask for your Mac password. The command removes the OpenA8DJ driver,
-MIDI bridge, command-line tools, and installed documentation.
-
-## Remove Control Center Only
-
-If you installed the optional tools package and only want to remove Control
-Center:
-
-```sh
-sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
-```
+MIDI bridge, Control Center, command-line tools, and installed documentation.
 
 ## After Uninstall
 

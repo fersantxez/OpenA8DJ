@@ -16,14 +16,15 @@ again.
 Use only the GitHub release download from this repository. If macOS blocks a
 file downloaded from somewhere else, stop and download it again from GitHub.
 
-If macOS shows a warning for the GitHub release:
+The public 0.5.1 DMG and its installer are signed and notarized. You should not
+need `Open Anyway` or disabled security settings. If macOS blocks the official
+download:
 
-1. Click `Done`.
-2. Open System Settings.
-3. Go to Privacy & Security.
-4. Find the blocked `OpenA8DJ-0.5.1.pkg` message.
-5. Click `Open Anyway`.
-6. Confirm and continue the installer.
+1. Delete the downloaded DMG.
+2. Download the DMG and checksum file again from the official 0.5.1 release.
+3. Verify the checksum using the installation guide.
+4. Stop and report the problem if the checksum matches but macOS still blocks
+   the installer.
 
 ## Installer Reports An Error
 
@@ -33,12 +34,6 @@ mounted DMG:
 
 ```sh
 sudo installer -pkg "/Volumes/OpenA8DJ 0.5.1/OpenA8DJ-0.5.1.pkg" -target /
-```
-
-For the optional Control Center tools, use:
-
-```sh
-sudo installer -pkg "/Volumes/opena8dj-tools 0.5.0/opena8dj-tools-0.5.0.pkg" -target /
 ```
 
 ## Traktor Does Not Calibrate Timecode Vinyl
@@ -70,8 +65,8 @@ or audio app.
 1. Stop playback.
 2. Reconnect the Audio 8 DJ.
 3. Reopen the audio app.
-4. In Control Center, choose `DVS Vinyl` for timecode vinyl or `Output Only`
-   for playback-only use.
+4. In Control Center, choose `DVS Vinyl` for timecode vinyl or
+   `Playback / 4 Stereo Outputs` for playback-only use.
 5. Try again.
 
 If the problem is reproducible, open a GitHub issue with:
@@ -82,4 +77,4 @@ If the problem is reproducible, open a GitHub issue with:
 - buffer size
 - exact cables and mixer routing
 - whether Control Center was set to `DVS Vinyl`, `DVS CD-Line`, or
-  `Output Only`
+  `Playback / 4 Stereo Outputs`

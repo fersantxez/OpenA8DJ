@@ -1,152 +1,184 @@
 # OpenA8DJ
 
-OpenA8DJ is an independent, open-source preservation driver for the Native
-Instruments Audio 8 DJ.
+OpenA8DJ lets a Native Instruments Audio 8 DJ work as an audio and MIDI
+interface on current macOS.
 
-It keeps the classic Audio 8 DJ workflow usable: 8-in/8-out Core Audio,
-A/B/C/D deck routing, MIDI, and Traktor/timecode use. The project is not
-affiliated with, endorsed by, sponsored by, or certified by Native Instruments,
-and it does not include Native Instruments binaries, firmware, installers,
-logos, or proprietary payloads.
+Install it when you want to keep using the Audio 8 DJ with Traktor, a DJ mixer,
+turntables, CDJs, or another Core Audio application. The installer adds the
+audio driver, MIDI support, and a Control Center app for choosing how the
+interface is connected.
 
-## Support The Project
+OpenA8DJ is an independent, open-source preservation project. It is not
+affiliated with, endorsed by, sponsored by, or certified by Native Instruments.
 
-OpenA8DJ is independent and non-profit. If this helps you keep an Audio 8 DJ in
-use, you can support the maintainer here:
+## Is This The Right Driver?
 
-[Buy me a coffee](https://ko-fi.com/fersantxez)
+OpenA8DJ 0.5.1 is for this setup:
 
-## Status
+| | Requirement |
+| --- | --- |
+| Audio interface | Native Instruments Audio 8 DJ |
+| Mac | Apple Silicon |
+| Operating system | macOS 26 or later |
+| Account | Administrator access during installation |
+| Audio rates | 44.1 kHz and 48 kHz |
 
-OpenA8DJ 0.5.1 is the frozen responsive macOS C++ release. It uses the
-accepted `output3072` DVS profile and is Developer ID signed and
-Apple-notarized for normal installation on macOS.
+This release does not run on Intel Macs and should not be installed for a
+different Native Instruments interface. Windows and Linux work is experimental
+and is not included in the macOS download.
 
-- Core Audio HAL device: `Open Audio 8 DJ`
-- 8 output channels as stereo deck pairs A/B/C/D
-- 8 input channels as stereo input pairs A/B/C/D
-- 44.1 kHz and 48 kHz validated as the primary rates
-- CoreMIDI endpoints for Audio 8 DJ MIDI I/O
-- Traktor Timecode Vinyl input active by default
-- Included Control Center for normal hardware profiles
+## What You Get
 
-Windows, Linux, Rust, and DriverKit branches are experimental or research work,
-not the public macOS release line.
+After installation, macOS and audio applications see:
 
-## Experimental Windows Driver
+- one device named `Open Audio 8 DJ`;
+- 8 inputs, arranged as stereo pairs A, B, C, and D;
+- 8 outputs, arranged as stereo pairs A, B, C, and D;
+- `Open Audio 8 DJ MIDI In` and `Open Audio 8 DJ MIDI Out`;
+- OpenA8DJ Control Center in the Applications folder.
 
-The repository now carries the experimental Windows driver workstream under
-`windows/`. It is separate from the macOS HAL driver, DMG, PKG, and Control
-Center packaging.
-
-Windows CI builds source code, the WDK driver package, `opena8djctl.exe`, and
-experimental installer ZIP/EXE artifacts named
-`OpenA8DJUsb-Release-x64-installer.zip` and
-`OpenA8DJUsb-Release-x64-installer.exe`. They are experimental Windows
-downloads, not part of the stable macOS release line and not Microsoft-certified.
-The source and current EXE/ZIP package are published under `windows/releases/`
-for controlled testing.
-
-The Windows driver package is not Microsoft-signed yet. Installing it requires
-an Administrator shell, Windows test-signing or disabled driver signature
-enforcement, and normally Secure Boot disabled. Windows may show an
-unsigned-driver prompt. Only accept that prompt on a test machine where a kernel
-driver crash or reboot is acceptable.
-
-Windows installer details live in [windows/installer/README.md](windows/installer/README.md)
-and the current Windows status lives in [docs/WINDOWS.md](docs/WINDOWS.md).
-The simple user installation steps are in
-[docs/WINDOWS_TESTER_INSTALL_GUIDE_UNSIGNED_2026-06-19.md](docs/WINDOWS_TESTER_INSTALL_GUIDE_UNSIGNED_2026-06-19.md).
+The default profile is ready for Traktor Timecode Vinyl. You can choose another
+profile in Control Center without using Terminal.
 
 ## Download
 
-Use the [OpenA8DJ 0.5.1 GitHub release](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1)
-for the responsive freeze.
+Download the current stable release from:
 
-Release assets:
+[OpenA8DJ 0.5.1 Responsive Freeze](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1)
 
-- `OpenA8DJ-0.5.1.dmg`: driver installer
-- `OpenA8DJ-0.5.1-checksums.txt`: SHA-256 checksum
+The release contains two files:
 
-GitHub Actions artifacts are not release downloads.
+| File | Purpose |
+| --- | --- |
+| `OpenA8DJ-0.5.1.dmg` | The installer |
+| `OpenA8DJ-0.5.1-checksums.txt` | An optional download-integrity check |
+
+You only need the DMG to install OpenA8DJ. Do not use packages copied from
+mirrors, forums, or GitHub Actions.
 
 ## Install
 
-Download `OpenA8DJ-0.5.1.dmg`, open it, and run the included package installer.
+1. Download `OpenA8DJ-0.5.1.dmg`.
+2. Double-click the DMG to open it.
+3. Double-click `OpenA8DJ-0.5.1.pkg` inside the window.
+4. Follow the macOS Installer steps and enter your Mac password when asked.
+5. Connect or reconnect the Audio 8 DJ.
+6. Close and reopen Traktor or any audio application that was already running.
 
-The 0.5.1 DMG also installs OpenA8DJ Control Center and the command-line helper;
-no second tools download is required.
+The public installer is Developer ID signed and Apple-notarized. A normal
+download should open without using **Open Anyway** or disabling macOS security.
 
-After installation, select `Open Audio 8 DJ` in Audio MIDI Setup, Traktor, or
-your audio application. For checksum verification or troubleshooting, see the
-[install guide](docs/user/install.md).
+For checksum verification and the documented installer fallback, see the
+[full installation guide](docs/user/install.md).
 
-If the macOS Installer app fails after the package is opened, the install guide
-also includes a `sudo installer` fallback for the package inside the same
-mounted DMG.
+## Confirm That It Is Working
 
-## Use
+1. Open **Audio MIDI Setup** on the Mac.
+2. Select **Open Audio 8 DJ**.
+3. Confirm that it shows 8 inputs and 8 outputs.
+4. Open your DJ or audio application.
+5. Select **Open Audio 8 DJ** as its audio device.
 
-Typical output routing:
+The four output pairs correspond to the labels printed on the interface:
 
-```text
-1-2: deck/output A
-3-4: deck/output B
-5-6: deck/output C
-7-8: deck/output D
+| Application channels | Audio 8 DJ output |
+| --- | --- |
+| 1-2 | A |
+| 3-4 | B |
+| 5-6 | C |
+| 7-8 | D |
+
+If the device is not listed, reconnect it once and reopen the application.
+Follow [Troubleshooting](docs/user/troubleshooting.md) if it still does not
+appear.
+
+## Traktor And Timecode Vinyl
+
+For a typical two-turntable DVS setup:
+
+1. Connect the left turntable to Audio 8 DJ input A.
+2. Connect the right turntable to Audio 8 DJ input B.
+3. Connect outputs A and B to the corresponding mixer channels.
+4. Select **Open Audio 8 DJ** as Traktor's audio device.
+5. Assign Traktor's input and output pairs.
+6. Calibrate each control vinyl inside Traktor.
+
+The installer selects the **DVS Vinyl** profile by default. If Traktor does not
+receive a usable timecode signal, open **OpenA8DJ Control Center**, select
+**DVS Vinyl**, click **Apply**, and calibrate again.
+
+See [Traktor and Timecode Vinyl](docs/user/traktor-timecode.md) for the complete
+setup and calibration guide.
+
+## Control Center
+
+Open **OpenA8DJ Control Center** from the Applications folder when you change
+how the interface is being used.
+
+Common profiles include:
+
+- **DVS Vinyl** for control vinyl connected to phono inputs;
+- **DVS CD-Line** for CDJs or line-level timecode;
+- **Playback / 4 Stereo Outputs** when using the interface only for playback;
+- **Vinyl Recording** for recording records through the phono inputs;
+- **DJ Set Recording** for recording a mixer output through line inputs.
+
+Choose a profile and click **Apply**. The setting belongs to the interface
+workflow, not to a particular Traktor deck.
+
+See the [Control Center guide](docs/user/control-center.md) for every profile.
+
+## Remove OpenA8DJ
+
+Open Terminal and run:
+
+```sh
+sudo /usr/local/bin/opena8dj-uninstall
 ```
 
-For Traktor Timecode Vinyl, connect the turntables to the Audio 8 DJ inputs
-you use for DVS and calibrate inside Traktor. OpenA8DJ keeps the vinyl input
-path active by default.
+Enter your Mac password when asked. The uninstaller removes the driver, MIDI
+support, Control Center, command-line tools, and installed documentation. See
+the [uninstall guide](docs/user/uninstall.md) for the final check.
 
-Use `OpenA8DJ Control Center.app` for normal profile changes such as DVS Vinyl,
-DVS CD/Line, Output Only, ground-lift flags, and support exports. The command
-line tool is included for diagnostics, automation, and maintainer workflows.
+## Known Limits
 
-## Validation
+- The stable public installer is currently Apple Silicon only.
+- 44.1 kHz and 48 kHz are the primary supported rates.
+- The release has been used successfully with Traktor Timecode Vinyl, but it is
+  not an official Native Instruments-certified driver.
+- Windows, Linux, Rust, and DriverKit development live in separate experimental
+  branches and are not user-ready alternatives to this macOS release.
 
-The 0.5.1 responsive freeze was validated with:
+## Help And Documentation
 
-- offline C++ and HAL safety tests;
-- exact-artifact package, bundle, and checksum checks;
-- Audio MIDI Setup visibility as an 8-in/8-out device;
-- three guarded load/recovery cycles;
-- an idle CPU observation of 0.0% for the driver and CoreAudio;
-- operator acceptance of the responsive Traktor behavior on the installed
-  artifact.
-
-The public DMG and its embedded installer are Developer ID signed and
-Apple-notarized. See the
-[0.5.1 validation summary](docs/project/public-validation-summary-0.5.1.md),
-[release notes](docs/reference/release-notes-0.5.1.md), and
-[future checkpoints](docs/project/timecode-latency-checkpoints.md).
-
-## Documentation
-
-- [Documentation index](docs/README.md)
 - [Quick start](docs/user/quick-start.md)
-- [Install guide](docs/user/install.md)
+- [Installation](docs/user/install.md)
 - [Traktor and Timecode Vinyl](docs/user/traktor-timecode.md)
 - [Control Center](docs/user/control-center.md)
-- [Architecture](docs/project/architecture.md)
-- [Contributing](docs/project/contributing.md)
-- [Release process](docs/project/release.md)
-- [Development state and maintainer notes](docs-state/README.md)
+- [Troubleshooting](docs/user/troubleshooting.md)
+- [Uninstall](docs/user/uninstall.md)
+- [Documentation index](docs/README.md)
 
-## Contributing
-
-Useful contributions include sound-quality reports, Traktor/timecode validation,
-routing and MIDI validation, documentation fixes, and reproducible bug reports.
+For a reproducible problem, include the macOS version, application and version,
+sample rate, buffer size, physical routing, and selected Control Center profile.
 
 - [Report a bug](https://github.com/fersantxez/OpenA8DJ/issues/new?template=bug_report.yml)
 - [Request a feature](https://github.com/fersantxez/OpenA8DJ/issues/new?template=feature_request.yml)
 - [View open issues](https://github.com/fersantxez/OpenA8DJ/issues)
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[legal and publication policy](docs/reference/legal.md) before contributing
-code or release material.
+## Project
 
-## License
+Developers and contributors can start with:
 
-OpenA8DJ is released under the MIT License. See [LICENSE](LICENSE).
+- [Architecture](docs/project/architecture.md)
+- [Contributing](CONTRIBUTING.md)
+- [Release process](docs/project/release.md)
+- [Legal and publication policy](docs/reference/legal.md)
+
+OpenA8DJ is released under the [MIT License](LICENSE). Product names are used
+only to identify compatibility. The repository and release packages do not
+contain Native Instruments driver binaries, firmware, installers, logos, or
+other proprietary vendor payloads.
+
+If OpenA8DJ helps keep your Audio 8 DJ in use, you can
+[support the maintainer](https://ko-fi.com/fersantxez).

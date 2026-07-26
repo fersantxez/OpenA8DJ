@@ -1,59 +1,73 @@
 # Control Center
 
-OpenA8DJ Control Center is the optional macOS app for changing normal Audio 8 DJ
-profiles without using Terminal.
+OpenA8DJ Control Center changes how the Audio 8 DJ inputs and outputs are used.
+It is installed automatically by the OpenA8DJ 0.5.1 DMG; there is no separate
+tools download.
 
-The Control Center tools are separate from the driver installer. They add:
+Open it from the Applications folder:
 
 ```text
 /Applications/OpenA8DJ Control Center.app
-/usr/local/bin/opena8dj-control
-/Library/Documentation/OpenA8DJ/ControlSurfaces
 ```
 
-The tools package does not replace the driver. Install the main OpenA8DJ driver
-package first.
+## Choose A Profile
 
-## Install
+1. Connect the Audio 8 DJ.
+2. Close any audio application that is actively using the device.
+3. Open OpenA8DJ Control Center.
+4. Select the profile that matches the connected equipment.
+5. Click `Apply`.
+6. Reopen the audio application if necessary.
 
-1. Download `opena8dj-tools-0.5.0.dmg` from the GitHub release.
-2. Open the DMG.
-3. Double-click `opena8dj-tools-0.5.0.pkg`.
-4. Follow the macOS Installer prompts.
-5. Open `OpenA8DJ Control Center.app` from Applications.
-
-## Normal Profiles
+## Common Profiles
 
 ### DVS Vinyl
 
-Use this for Traktor Scratch or DVS with timecode vinyl. This is the normal
-default profile for OpenA8DJ 0.5.0.
-
-```text
-Turntable A -> Audio 8 DJ input A
-Turntable B -> Audio 8 DJ input B
-Audio 8 DJ output A -> mixer channel A
-Audio 8 DJ output B -> mixer channel B
-```
-
-Click `DVS Vinyl`, then `Apply`.
+Use this for Traktor Scratch or another DVS application with control vinyl.
+Turntables normally connect to inputs A and B. This is the default profile in
+OpenA8DJ 0.5.1.
 
 ### DVS CD-Line
 
-Use this for CDJs, media players, or line-level timecode sources.
+Use this for CDJs, media players, or another line-level timecode source. Do not
+use the vinyl profile for a line-level signal.
 
-Click `DVS CD-Line`, then `Apply`.
+### Playback / 4 Stereo Outputs
 
-### Output Only
+Use this when the Audio 8 DJ is providing four stereo outputs and its inputs
+are not needed.
 
-Use this when the Audio 8 DJ is only being used as an output interface.
+### Vinyl Recording
 
-Click `Output Only`, then `Apply`.
+Use this to record records through the phono inputs without a DVS timecode
+workflow.
+
+### DJ Set Recording
+
+Use this to record a mixer or other line-level source through the Audio 8 DJ
+inputs.
+
+### Effects Loop
+
+Use this when routing audio out to external effects and back into the
+interface.
+
+### Microphone
+
+Use this with the front microphone input. The physical MIC/LINE switch on the
+Audio 8 DJ must also be in the correct position.
+
+## After Applying A Profile
+
+Open Audio MIDI Setup or the audio application and confirm that `Open Audio 8
+DJ` is still selected. Profile changes do not assign Traktor decks; input and
+output deck assignments remain inside Traktor.
 
 ## Export Support Information
 
-If someone asks for your OpenA8DJ settings, use Control Center to export the
-current configuration and attach that file to the GitHub issue.
+When reporting a problem, use Control Center to export the current
+configuration. Attach that file to the GitHub issue together with the macOS
+version, application version, sample rate, buffer size, and physical routing.
 
-Normal users should not need the command-line tool. It is installed for
-maintainers, diagnostics, and scripted support.
+Normal users do not need the included command-line tool. It is available for
+diagnostics and scripted support.
