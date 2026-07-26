@@ -44,7 +44,7 @@ profile in Control Center without using Terminal.
 
 Download the current stable release from:
 
-[OpenA8DJ 0.5.1 Responsive Freeze](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1)
+[OpenA8DJ 0.5.1 for macOS](https://github.com/fersantxez/OpenA8DJ/releases/tag/v0.5.1)
 
 The release contains two files:
 
