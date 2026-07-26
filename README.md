@@ -11,6 +11,8 @@ interface is connected.
 OpenA8DJ is an independent, open-source preservation project. It is not
 affiliated with, endorsed by, sponsored by, or certified by Native Instruments.
 
+**Support the project:** [Buy me a coffee](https://ko-fi.com/fersantxez)
+
 ## Is This The Right Driver?
 
 OpenA8DJ 0.5.1 is for this setup:
@@ -179,6 +181,3 @@ OpenA8DJ is released under the [MIT License](LICENSE). Product names are used
 only to identify compatibility. The repository and release packages do not
 contain Native Instruments driver binaries, firmware, installers, logos, or
 other proprietary vendor payloads.
-
-If OpenA8DJ helps keep your Audio 8 DJ in use, you can
-[support the maintainer](https://ko-fi.com/fersantxez).
