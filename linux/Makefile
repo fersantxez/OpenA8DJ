@@ -15,7 +15,7 @@ help:
 	@printf '%s\n' '  diagnostics   - run read-only JSON diagnostics'
 	@printf '%s\n' '  hardware-model - show macOS/Windows-derived hardware model'
 	@printf '%s\n' '  self-test     - run offline tool self-test'
-	@printf '%s\n' '  packages      - build experimental .deb/.rpm artifacts'
+	@printf '%s\n' '  packages      - build experimental .deb/.rpm/.pkg.tar.zst artifacts'
 	@printf '%s\n' '  driver-status - show driver scaffold status'
 	@printf '%s\n' '  driver-module - intentionally refuses module build'
 

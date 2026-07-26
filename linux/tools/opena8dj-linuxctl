@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 
-TOOL_VERSION = "0.1.1"
+TOOL_VERSION = "0.1.2"
 READINESS_LABEL = "diagnostic only, sound quality not validated"
 USB_VENDOR = "17cc"
 USB_PRODUCT = "1978"

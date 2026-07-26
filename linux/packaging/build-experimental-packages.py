@@ -27,10 +27,12 @@ from typing import Any, Iterable
 
 
 PACKAGE_NAME = "opena8dj-linux-experimental"
-TOOL_VERSION = "0.1.1"
-DEB_VERSION = "0.1.1~experimental20260726"
-RPM_VERSION = "0.1.1"
+TOOL_VERSION = "0.1.2"
+DEB_VERSION = "0.1.2~experimental20260726"
+RPM_VERSION = "0.1.2"
 RPM_RELEASE = "0.experimental20260726"
+ARCH_VERSION = "0.1.2"
+ARCH_RELEASE = "1"
 DIST_ID = f"{PACKAGE_NAME}-{DEB_VERSION}"
 READINESS_LABEL = "diagnostic only, sound quality not validated"
 DRIVER_CHANNEL = "in-kernel snd-usb-caiaq"
@@ -546,6 +548,55 @@ def make_rpm(entries: list[PayloadEntry], output: Path, candidate_id: str) -> No
     output.write_bytes(lead + sig_header + main_header + payload)
 
 
+def make_arch_pkg(entries: list[PayloadEntry], output: Path) -> None:
+    """Create a pacman-installable noarch package without invoking makepkg."""
+    install_size = sum(len(entry.data) for entry in entries if not entry.is_dir)
+    pkginfo = f"""pkgname = {PACKAGE_NAME}
+pkgbase = {PACKAGE_NAME}
+pkgver = {ARCH_VERSION}-{ARCH_RELEASE}
+pkgdesc = Experimental OpenA8DJ Linux diagnostics for Native Instruments Audio 8 DJ
+url = https://github.com/fersantxez/OpenA8DJ
+builddate = {BUILD_MTIME}
+packager = OpenA8DJ Experimental <noreply@opena8dj.local>
+size = {install_size}
+arch = any
+license = MIT
+depend = python
+depend = alsa-utils
+depend = usbutils
+""".encode("utf-8")
+
+    with tempfile.TemporaryDirectory() as tmp_name:
+        tmp = Path(tmp_name)
+        archive = tmp / f"{PACKAGE_NAME}.pkg.tar"
+        with tarfile.open(archive, mode="w", format=tarfile.GNU_FORMAT) as tar:
+            info = tarfile.TarInfo(".PKGINFO")
+            info.mtime = BUILD_MTIME
+            info.uid = 0
+            info.gid = 0
+            info.uname = "root"
+            info.gname = "root"
+            info.mode = 0o644
+            info.size = len(pkginfo)
+            tar.addfile(info, io.BytesIO(pkginfo))
+            for entry in entries:
+                info = tarfile.TarInfo(entry.path.lstrip("/"))
+                info.mtime = BUILD_MTIME
+                info.uid = 0
+                info.gid = 0
+                info.uname = "root"
+                info.gname = "root"
+                info.mode = entry.mode & 0o7777
+                if entry.is_dir:
+                    info.type = tarfile.DIRTYPE
+                    info.size = 0
+                    tar.addfile(info)
+                else:
+                    info.size = len(entry.data)
+                    tar.addfile(info, io.BytesIO(entry.data))
+        run(["zstd", "--quiet", "--no-progress", "-19", "--force", "-o", str(output), str(archive)])
+
+
 def base_candidate_metadata(root: Path) -> dict[str, Any]:
     branch = git_value(["branch", "--show-current"], root, "unknown")
     commit = git_value(["rev-parse", "HEAD"], root, "unknown")
@@ -575,6 +626,25 @@ def base_candidate_metadata(root: Path) -> dict[str, Any]:
         "kernel_targets": [
             "distribution kernel with CONFIG_SND_USB_CAIAQ enabled"
         ],
+        "distribution_support": {
+            "debian_ubuntu": {
+                "artifact": "deb",
+                "families": ["Debian", "Ubuntu", "Linux Mint", "Pop!_OS"],
+            },
+            "rpm": {
+                "artifact": "rpm",
+                "families": ["Fedora", "RHEL", "Rocky Linux", "AlmaLinux", "openSUSE"],
+            },
+            "arch": {
+                "artifact": "pkg.tar.zst",
+                "families": ["Arch Linux", "Manjaro", "EndeavourOS"],
+            },
+            "portable": {
+                "artifact": "tar.gz",
+                "families": ["Gentoo", "NixOS", "other distributions"],
+                "note": "manual inspection only; no package-manager integration",
+            },
+        },
         "packages": [],
         "hashes": {},
         "validation_label": READINESS_LABEL,
@@ -592,6 +662,38 @@ def write_json(path: Path, data: dict[str, Any]) -> None:
 
 def copy_readme(root: Path, output_dir: Path) -> None:
     shutil.copy2(root / "linux/packaging/common/README-FIRST.md", output_dir / "README-FIRST.md")
+
+
+def write_arch_pkgbuild(output_dir: Path, tarball: Path) -> Path:
+    """Write a reproducible makepkg recipe for the exact release tarball."""
+    recipe = output_dir / "PKGBUILD"
+    digest = sha256_file(tarball)
+    recipe.write_text(
+        f"""# Rebuild the exact diagnostic payload with makepkg.
+# Keep {tarball.name} beside this file before invoking makepkg.
+pkgname={PACKAGE_NAME}
+pkgver={ARCH_VERSION}
+pkgrel={ARCH_RELEASE}
+pkgdesc='Diagnostic-only OpenA8DJ Linux tooling for Native Instruments Audio 8 DJ'
+arch=('any')
+url='https://github.com/fersantxez/OpenA8DJ'
+license=('MIT')
+depends=('python' 'alsa-utils' 'usbutils')
+source=('{tarball.name}')
+sha256sums=('{digest}')
+
+package() {{
+  local payload="$srcdir/$pkgname"
+  install -Dm755 "$payload/usr/bin/opena8dj-linuxctl" \\
+    "$pkgdir/usr/bin/opena8dj-linuxctl"
+  install -Dm644 "$payload/usr/lib/udev/rules.d/70-opena8dj-audio8dj.rules" \\
+    "$pkgdir/usr/lib/udev/rules.d/70-opena8dj-audio8dj.rules"
+  cp -a "$payload/usr/share/." "$pkgdir/usr/share/"
+}}
+""",
+        encoding="utf-8",
+    )
+    return recipe
 
 
 def write_checksums(output_dir: Path, artifacts: Iterable[Path]) -> None:
@@ -614,13 +716,15 @@ def build(output_base: Path) -> dict[str, Any]:
 
     deb = output_dir / f"{PACKAGE_NAME}_{DEB_VERSION}_all.deb"
     rpm = output_dir / f"{PACKAGE_NAME}-{RPM_VERSION}-{RPM_RELEASE}.noarch.rpm"
+    arch = output_dir / f"{PACKAGE_NAME}-{ARCH_VERSION}-{ARCH_RELEASE}-any.pkg.tar.zst"
     tarball = output_dir / f"{PACKAGE_NAME}-{DEB_VERSION}.tar.gz"
 
     make_deb(entries, deb)
     make_rpm(entries, rpm, DIST_ID)
+    make_arch_pkg(entries, arch)
     make_tar_gz(entries, tarball)
 
-    artifacts = [deb, rpm, tarball]
+    artifacts = [deb, rpm, arch, tarball]
     candidate["packages"] = [
         {"path": artifact.name, "sha256": sha256_file(artifact)}
         for artifact in artifacts
@@ -628,12 +732,14 @@ def build(output_base: Path) -> dict[str, Any]:
     candidate["hashes"] = {artifact.name: sha256_file(artifact) for artifact in artifacts}
     candidate["built_at_unix"] = int(time.time())
     candidate["readme"] = "README-FIRST.md"
+    candidate["arch_rebuild_recipe"] = "PKGBUILD"
 
     candidate_path = output_dir / "opena8dj-linux-candidate.json"
     write_json(candidate_path, candidate)
     copy_readme(root, output_dir)
+    arch_pkgbuild = write_arch_pkgbuild(output_dir, tarball)
 
-    all_artifacts = [*artifacts, candidate_path, output_dir / "README-FIRST.md"]
+    all_artifacts = [*artifacts, candidate_path, output_dir / "README-FIRST.md", arch_pkgbuild]
     write_checksums(output_dir, all_artifacts)
     return {"output_dir": str(output_dir), "artifacts": [str(path) for path in all_artifacts]}
 

@@ -1,7 +1,8 @@
 # Linux Packaging Strategy
 
-This document defines the packaging track for Debian, Ubuntu, and derivatives
-first, with an RPM lane for Fedora, Red Hat, and compatible derivatives.
+This document defines installable experimental packages for the major Linux
+families while the driver remains diagnostic-only: Debian/Ubuntu (`.deb`),
+Fedora/RHEL/openSUSE (`.rpm`), and Arch (`.pkg.tar.zst`).
 
 Current state:
 
@@ -34,18 +35,21 @@ readiness labels.
 
 ## Priorities
 
-Primary lane:
+Native installer coverage:
 
 - Debian.
 - Ubuntu.
-- Debian/Ubuntu derivatives that preserve DKMS, udev, ALSA, and PipeWire
-  packaging conventions.
-
-Secondary lane:
-
 - Fedora.
-- Red Hat Enterprise Linux derivatives.
-- RPM-based systems using `akmods`, DKMS, or kernel module packaging.
+- Red Hat Enterprise Linux, Rocky Linux, and AlmaLinux.
+- openSUSE.
+- Arch Linux, Manjaro, and EndeavourOS.
+
+The `.deb` package is intended for Debian/Ubuntu derivatives such as Linux
+Mint and Pop!_OS. The `.rpm` package is a common package format but each RPM
+family still needs install validation on its own distribution before support is
+claimed. Gentoo and NixOS are significant distributions with distinct package
+models; the portable tarball is supplied for inspection only, not as an
+installer that bypasses their native packaging.
 
 ## Package Split
 
@@ -121,6 +125,22 @@ The package remains diagnostic-only. It still does not ship a kernel module,
 load `snd-usb-caiaq`, bind/unbind USB, restart audio services, play audio,
 record audio, or validate sound quality.
 
+## Experimental Package Set - 2026-07-26 (Multi-Distro)
+
+Built artifacts:
+
+- `opena8dj-linux-experimental_0.1.2~experimental20260726_all.deb`
+- `opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm`
+- `opena8dj-linux-experimental-0.1.2-1-any.pkg.tar.zst`
+- `opena8dj-linux-experimental-0.1.2~experimental20260726.tar.gz`
+- `opena8dj-linux-candidate.json`
+- `README-FIRST.md`
+- `SHA256SUMS`
+
+The new Arch package contains a standard `.PKGINFO` and the same files as the
+other native installers. It has no post-install script, so `pacman -U` cannot
+load a module, reset USB, or run an audio test as a side effect.
+
 ## Candidate Payload Contract
 
 Packaging deliverables must implement `CANDIDATE_PAYLOAD.md`.
@@ -140,7 +160,7 @@ Minimum candidate payload:
 - license/provenance and Native Instruments no-payload policy.
 - validation labels and limitations.
 
-This applies equally to Debian/Ubuntu `.deb` candidates and RPM/akmods/DKMS
+This applies equally to Debian/Ubuntu `.deb`, RPM, Arch, akmods, and DKMS
 candidates. A package that only installs a kernel object is incomplete.
 
 ## DKMS vs In-Tree Module
@@ -410,12 +430,21 @@ RPM candidates must also satisfy `CANDIDATE_PAYLOAD.md`; an RPM that ships only
 `opena8dj.ko`, `snd-opena8dj.ko`, or a patched `snd-usb-caiaq.ko` is not a
 complete candidate.
 
+## Arch Lane
+
+The generated `.pkg.tar.zst` is the diagnostic installer for Arch-family
+systems. Every release directory includes a `PKGBUILD` whose source tarball and
+checksum match that exact release. Future driver-bearing Arch packages must
+preserve the same separation between tools, UCM/udev data, and any out-of-tree
+module source. They must not use package hooks to auto-load, bind, reset, or
+test an attached device.
+
 ## Current Next Step
 
 Run the generated package set on the Linux test machine:
 
 ```sh
-sudo apt install ./opena8dj-linux-experimental_0.1.0~experimental20260622_all.deb
+sudo apt install ./opena8dj-linux-experimental_0.1.2~experimental20260726_all.deb
 opena8dj-linuxctl status
 opena8dj-linuxctl diagnostics --json --controls
 opena8dj-linuxctl verify --controls --report-dir ~/opena8dj-linux-report
@@ -424,7 +453,7 @@ opena8dj-linuxctl verify --controls --report-dir ~/opena8dj-linux-report
 or:
 
 ```sh
-sudo dnf install ./opena8dj-linux-experimental-0.1.0-0.experimental20260622.noarch.rpm
+sudo dnf install ./opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm
 opena8dj-linuxctl status
 opena8dj-linuxctl diagnostics --json --controls
 opena8dj-linuxctl verify --controls --report-dir ~/opena8dj-linux-report

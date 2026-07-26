@@ -79,11 +79,13 @@ not complete if it only ships a driver binary or `.ko`; it needs the surrounding
 tools, configuration/profile schema, rollback path, diagnostics, metadata,
 provenance, and validation labels.
 
-Packaging priorities:
+Packaging coverage:
 
-- Debian/Ubuntu and derivatives first.
-- RPM-based distributions second, with `akmods`, DKMS, or kmod strategy chosen
-  after the driver path is settled.
+- Debian, Ubuntu, Linux Mint, and Pop!_OS: `.deb`.
+- Fedora, RHEL, Rocky, AlmaLinux, and openSUSE: `.rpm`.
+- Arch Linux, Manjaro, and EndeavourOS: `.pkg.tar.zst`.
+- Gentoo, NixOS, and other packaging models: portable `.tar.gz` for manual
+  inspection only, until native integration is implemented.
 
 The packaging scaffold lives under:
 
@@ -113,12 +115,13 @@ bind, reset, or test live Audio 8 DJ hardware.
 The current experimental package set is generated under:
 
 ```text
-dist/linux/experimental/opena8dj-linux-experimental-0.1.1~experimental20260726/
+dist/linux/experimental/opena8dj-linux-experimental-0.1.2~experimental20260726/
 ```
 
 It keeps the same diagnostic-only scope and adds:
 
 - `opena8dj-linuxctl hardware-model`
+- an installable Arch `.pkg.tar.zst` package
 - `hardware-model.json` in verify reports
 - macOS/Windows-aligned profile aliases and control postures
 - packaged `linux/MACOS_WINDOWS_HARDWARE_LESSONS.md`

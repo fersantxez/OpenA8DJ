@@ -43,6 +43,18 @@ new package remains:
 diagnostic only, sound quality not validated
 ```
 
+## 2026-07-26 Multi-Distro Packaging Update
+
+The diagnostic package set now has native installers for the major Linux
+families: `.deb` for Debian/Ubuntu derivatives, `.rpm` for Fedora, RHEL,
+Rocky, AlmaLinux, and openSUSE, plus `.pkg.tar.zst` for Arch, Manjaro, and
+EndeavourOS. A portable `.tar.gz` remains for inspection on other packaging
+models such as Gentoo and NixOS; it is deliberately not an installer.
+
+This increases installation coverage only. No package contains an OpenA8DJ
+kernel driver, uses a package hook to touch hardware, or changes the readiness
+label.
+
 ## Executive State
 
 The Linux worktree is on the required branch and contains a coherent first

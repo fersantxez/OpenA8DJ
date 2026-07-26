@@ -198,3 +198,16 @@ No hardware tests were run. No lock was acquired. The label remains:
 ```text
 diagnostic only, sound quality not validated
 ```
+
+## 2026-07-26 Multi-Distro Experimental Packaging
+
+The experimental package builder now produces:
+
+- `.deb` for Debian, Ubuntu, Linux Mint, and Pop!_OS.
+- `.rpm` for Fedora, RHEL, Rocky, AlmaLinux, and openSUSE.
+- `.pkg.tar.zst` for Arch, Manjaro, and EndeavourOS.
+- `.tar.gz` for manual inspection on other Linux packaging models.
+
+The package version is `0.1.2~experimental20260726`. Native installer coverage
+does not constitute distribution support or an audio-quality pass: all package
+forms remain diagnostic only, sound quality not validated.

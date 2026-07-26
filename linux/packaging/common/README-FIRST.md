@@ -40,14 +40,33 @@ in-kernel snd-usb-caiaq
 ## Debian/Ubuntu Install
 
 ```sh
-sudo apt install ./opena8dj-linux-experimental_0.1.1~experimental20260726_all.deb
+sudo apt install ./opena8dj-linux-experimental_0.1.2~experimental20260726_all.deb
 ```
 
-## RPM Install
+## Fedora, RHEL, Rocky, AlmaLinux, And openSUSE Install
 
 ```sh
-sudo dnf install ./opena8dj-linux-experimental-0.1.1-0.experimental20260726.noarch.rpm
+sudo dnf install ./opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm
 ```
+
+On openSUSE, use:
+
+```sh
+sudo zypper install ./opena8dj-linux-experimental-0.1.2-0.experimental20260726.noarch.rpm
+```
+
+## Arch, Manjaro, And EndeavourOS Install
+
+```sh
+sudo pacman -U ./opena8dj-linux-experimental-0.1.2-1-any.pkg.tar.zst
+```
+
+## Other Distributions
+
+The `.tar.gz` archive is intentionally not a system installer. It is a
+portable, inspectable payload for systems such as Gentoo or NixOS, where the
+maintainer should provide native integration rather than bypass the package
+manager.
 
 ## First Commands On Linux
 
