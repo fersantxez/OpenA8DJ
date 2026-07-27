@@ -139,6 +139,10 @@ static void CheckArmValidation(void)
     assert(!waiting.profileVerified);
     assert(!waiting.qualified && !waiting.optimizedActive);
     assert(waiting.armState == kOpenA8DJTimecodeWaitingProfile);
+    OpenA8DJTimecodeDisarm(
+        &waiting, kOpenA8DJTimecodeFailExplicitDisarm);
+    assert(!waiting.armed);
+    assert(waiting.armState == kOpenA8DJTimecodeDisarmed);
 }
 
 static void CheckQualification(void)

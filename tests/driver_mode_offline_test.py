@@ -676,6 +676,21 @@ def run_tests(repo, shipping_binary):
         hal.rindex("- (void)addTimecodePhysicalFrame:"):
         hal.rindex("- (void)addInputStatsBatch:")
     ]
+    arm_timecode_handler = hal[
+        hal.index("- (void)armTimecodeOnWriterQueueWithProfile:"):
+        hal.index("- (void)publishTimecodeWindow:")
+    ]
+    fail_open_handler = hal[
+        hal.index("static void TimecodeFailOpenLocked"):
+        hal.index("static void TimecodeMarkActivatedLocked")
+    ]
+    set_mode_handler = hal[
+        hal.index(
+            "static OpenA8DJDriverModeStatePayload "
+            "DriverModeSetRequested"
+        ):
+        hal.index("static dispatch_queue_attr_t OpenA8DJUSBQueueAttributes")
+    ]
     check(first_timecode_feed < first_input_write and
           "RingTrimToLatest(&_inputRing" not in hal and
           "TimecodeFailOpenLocked" in read_input_handler and
@@ -697,6 +712,38 @@ def run_tests(repo, shipping_binary):
     check("publishTimecodeWindow" in add_timecode_handler and
           "if (complete)" in add_timecode_handler,
           "classifier does not publish only at complete windows")
+    classification_gate = "atomic_load(&gTimecodeClassificationArmed)"
+    check("ATOMIC_VAR_INIT(false)" in hal[
+              hal.index("gTimecodeClassificationArmed") - 80:
+              hal.index("gTimecodeClassificationArmed") + 100
+          ] and
+          classification_gate in add_timecode_handler and
+          add_timecode_handler.index(classification_gate) <
+              add_timecode_handler.index(
+                  "OpenA8DJTimecodeClassifierFeedFrame") and
+          "return;" in add_timecode_handler[
+              add_timecode_handler.index(classification_gate):
+              add_timecode_handler.index(
+                  "OpenA8DJTimecodeClassifierFeedFrame")
+          ],
+          "disarmed timecode classification does not exit before feeding")
+    check("bool accepted = OpenA8DJTimecodeArm(" in
+              arm_timecode_handler and
+          "accepted && gTimecodeState.armed" in
+              arm_timecode_handler and
+          "atomic_store(&gTimecodeClassificationArmed, true)" in
+              arm_timecode_handler,
+          "accepted arm does not enable timecode classification")
+    check("atomic_store(&gTimecodeClassificationArmed, false)" in
+              fail_open_handler and
+          "atomic_store(&gTimecodeClassificationArmed, false)" in
+              set_mode_handler and
+          hal.count(
+              "atomic_store(&gTimecodeClassificationArmed, false)") == 3,
+          "a timecode disarm route leaves classification enabled")
+    check("atomic_load(&gTimecodeClassificationArmed) ?" in hal and
+          "mach_absolute_time() : 0" in hal,
+          "engine reopen loses armed classifier timeout state")
     check("dispatch_queue_set_specific" in hal and
           "dispatch_get_specific" in hal and
           "dispatch_sync(_queue, armBlock)" in hal,

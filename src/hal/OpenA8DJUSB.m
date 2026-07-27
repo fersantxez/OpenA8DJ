@@ -286,6 +286,7 @@ enum {
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 static atomic_uint gCoreAudioBufferFrames = ATOMIC_VAR_INIT(512);
+static atomic_bool gTimecodeClassificationArmed = ATOMIC_VAR_INIT(false);
 static char gTimecodeWriterQueueSpecificKey;
 static pthread_mutex_t gDriverModeMutex = PTHREAD_MUTEX_INITIALIZER;
 static OpenA8DJDriverModeState gDriverModeState = {
@@ -305,6 +306,9 @@ static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy
 static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
 {
     if (!gTimecodeState.armed && !gTimecodeState.optimizedActive) {
+        if (disarm) {
+            atomic_store(&gTimecodeClassificationArmed, false);
+        }
         return;
     }
     uint32_t fallback = gTimecodeState.fallbackMode;
@@ -348,6 +352,7 @@ static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
             break;
     }
     if (disarm) {
+        atomic_store(&gTimecodeClassificationArmed, false);
         OpenA8DJTimecodeDisarm(&gTimecodeState, reason);
     } else {
         gTimecodeState.armState = kOpenA8DJTimecodeDeoptPendingBoundary;
@@ -469,6 +474,7 @@ static OpenA8DJDriverModeStatePayload DriverModeSetRequested(uint32_t modeID)
     pthread_mutex_lock(&gDriverModeMutex);
     if (modeID == kOpenA8DJDriverModeBalanced ||
         modeID == kOpenA8DJDriverModePerformance) {
+        atomic_store(&gTimecodeClassificationArmed, false);
         OpenA8DJTimecodeDisarm(&gTimecodeState,
                                kOpenA8DJTimecodeFailExplicitDisarm);
     }
@@ -2141,7 +2147,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         pthread_mutex_init(&_inputStatsMutex, NULL);
         pthread_mutex_init(&_timecodePublishedWindowMutex, NULL);
         OpenA8DJTimecodeClassifierInit(&_timecodeClassifier, sampleRate);
-        atomic_init(&_timecodeLastCompleteHostTime, 0);
+        atomic_init(
+            &_timecodeLastCompleteHostTime,
+            atomic_load(&gTimecodeClassificationArmed) ?
+                mach_absolute_time() : 0);
         pthread_mutex_init(&_streamStatsMutex, NULL);
         pthread_mutex_init(&_clockAnchorMutex, NULL);
         pthread_mutex_init(&_transferPoolMutex, NULL);
@@ -3625,10 +3634,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                 &self->_timecodeLastCompleteHostTime,
                 mach_absolute_time());
         }
-        (void)OpenA8DJTimecodeArm(
+        bool accepted = OpenA8DJTimecodeArm(
             &gTimecodeState, fallback, profile,
             self->_sampleRate,
             atomic_load(&gCoreAudioBufferFrames));
+        if (accepted && gTimecodeState.armed) {
+            atomic_store(&gTimecodeClassificationArmed, true);
+        }
         pthread_mutex_unlock(&gDriverModeMutex);
     };
     if (dispatch_get_specific(
@@ -3731,6 +3743,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (void)addTimecodePhysicalFrame:(const float *)samples
 {
+    if (!atomic_load(&gTimecodeClassificationArmed)) {
+        return;
+    }
     OpenA8DJTimecodeWindow window;
     bool complete = OpenA8DJTimecodeClassifierFeedFrame(
         &_timecodeClassifier, samples, &window);
