@@ -1,5 +1,6 @@
 #import "OpenA8DJUSB.h"
 #import "OpenA8DJDriverMode.h"
+#import "OpenA8DJTimecodeOptimized.h"
 #import "OpenA8DJIPCAuth.h"
 
 #import <Foundation/Foundation.h>
@@ -276,10 +277,15 @@ enum {
     kIPCTypeStreamStats = 11,
     kIPCTypeDriverModeGet = 12,
     kIPCTypeDriverModeSet = 13,
-    kIPCTypeDriverModeState = 14
+    kIPCTypeDriverModeState = 14,
+    kIPCTypeTimecodeOptimizedGet = 15,
+    kIPCTypeTimecodeOptimizedArm = 16,
+    kIPCTypeTimecodeOptimizedDisarm = 17,
+    kIPCTypeTimecodeOptimizedState = 18
 };
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
+static atomic_uint gCoreAudioBufferFrames = ATOMIC_VAR_INIT(512);
 static pthread_mutex_t gDriverModeMutex = PTHREAD_MUTEX_INITIALIZER;
 static OpenA8DJDriverModeState gDriverModeState = {
     .requestedMode = kOpenA8DJDriverModeBalanced,
@@ -287,12 +293,88 @@ static OpenA8DJDriverModeState gDriverModeState = {
     .lastResult = kOpenA8DJDriverModeResultUnchanged
 };
 static bool gDriverModeStreaming = false;
+static OpenA8DJTimecodeState gTimecodeState = {
+    .armState = kOpenA8DJTimecodeDisarmed,
+    .fallbackMode = kOpenA8DJDriverModeBalanced
+};
+
+static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
+                                          void *context);
+
+static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
+{
+    if (!gTimecodeState.armed && !gTimecodeState.optimizedActive) {
+        return;
+    }
+    uint32_t fallback = gTimecodeState.fallbackMode;
+    bool wasOptimized = gTimecodeState.optimizedActive ||
+                        gDriverModeState.effectiveMode ==
+                            kOpenA8DJDriverModeTimecodeOptimized;
+    gTimecodeState.qualified = 0;
+    gTimecodeState.optimizedActive = 0;
+    gTimecodeState.eligibleWindows = 0;
+    gTimecodeState.dropoutWindows = 0;
+    gTimecodeState.lastFailOpenReason = reason;
+    if (wasOptimized) {
+        gTimecodeState.counters.deoptimizations++;
+    }
+    switch (reason) {
+        case kOpenA8DJTimecodeFailOutsideAllowlist:
+            gTimecodeState.counters.outsideAllowlistTrips++;
+            break;
+        case kOpenA8DJTimecodeFailStatsMissing:
+        case kOpenA8DJTimecodeFailStatsInvalid:
+            gTimecodeState.counters.missingEvidenceTrips++;
+            break;
+        case kOpenA8DJTimecodeFailWrongProfile:
+            gTimecodeState.counters.profileTrips++;
+            break;
+        case kOpenA8DJTimecodeFailConfigurationChanged:
+        case kOpenA8DJTimecodeFailInputLeadViolation:
+            gTimecodeState.counters.configurationTrips++;
+            break;
+        case kOpenA8DJTimecodeFailXRunOrTransportError:
+            gTimecodeState.counters.xrunErrorTrips++;
+            break;
+        default:
+            break;
+    }
+    if (disarm) {
+        OpenA8DJTimecodeDisarm(&gTimecodeState, reason);
+    } else {
+        gTimecodeState.armState = kOpenA8DJTimecodeDeoptPendingBoundary;
+    }
+    (void)OpenA8DJDriverModeSet(&gDriverModeState,
+                                fallback,
+                                gDriverModeStreaming,
+                                DriverModeProductionPreflight,
+                                NULL);
+    if (!gDriverModeState.pending &&
+        gDriverModeState.effectiveMode == fallback &&
+        !disarm) {
+        gTimecodeState.armState = kOpenA8DJTimecodeQualifying;
+    }
+}
 
 static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
                                           void *context)
 {
     (void)context;
-    return OpenA8DJDriverModePolicyIsSafe(policy, kRingFrames);
+    if (!OpenA8DJDriverModePolicyIsSafe(policy, kRingFrames)) {
+        return false;
+    }
+    if (policy->timecodeEvidenceRequired) {
+        uint32_t bufferFrames = atomic_load(&gCoreAudioBufferFrames);
+        return gTimecodeState.armed && gTimecodeState.qualified &&
+               gTimecodeState.profileVerified &&
+               gTimecodeState.allowedInputPairMask ==
+                   kOpenA8DJTimecodeAllowedPairMask &&
+               gTimecodeState.sampleRateSnapshot > 0.0 &&
+               gTimecodeState.bufferFramesSnapshot == bufferFrames &&
+               policy->inputLeadCeilingFrames >= bufferFrames * 4 &&
+               policy->inputLeadCeilingFrames < kRingFrames;
+    }
+    return true;
 }
 
 static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
@@ -303,6 +385,19 @@ static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
                                            DriverModeProductionPreflight,
                                            NULL);
     (void)OpenA8DJDriverModeLookup(gDriverModeState.effectiveMode, &policy);
+    if (gDriverModeState.effectiveMode ==
+        kOpenA8DJDriverModeTimecodeOptimized) {
+        gTimecodeState.optimizedActive = 1;
+        gTimecodeState.armState = kOpenA8DJTimecodeActive;
+        gTimecodeState.counters.activations++;
+    } else if (gTimecodeState.armed &&
+               gTimecodeState.armState ==
+                   kOpenA8DJTimecodeDeoptPendingBoundary) {
+        gTimecodeState.armState =
+            gTimecodeState.profileVerified ?
+                kOpenA8DJTimecodeQualifying :
+                kOpenA8DJTimecodeWaitingProfile;
+    }
     gDriverModeStreaming = true;
     pthread_mutex_unlock(&gDriverModeMutex);
     return policy;
@@ -315,6 +410,18 @@ static void DriverModeEndStream(void)
     (void)OpenA8DJDriverModePromotePending(&gDriverModeState,
                                            DriverModeProductionPreflight,
                                            NULL);
+    if (gDriverModeState.effectiveMode ==
+        kOpenA8DJDriverModeTimecodeOptimized) {
+        gTimecodeState.optimizedActive = 1;
+        gTimecodeState.armState = kOpenA8DJTimecodeActive;
+        gTimecodeState.counters.activations++;
+    } else if (gTimecodeState.armed) {
+        gTimecodeState.optimizedActive = 0;
+        gTimecodeState.armState =
+            gTimecodeState.profileVerified ?
+                kOpenA8DJTimecodeQualifying :
+                kOpenA8DJTimecodeWaitingProfile;
+    }
     pthread_mutex_unlock(&gDriverModeMutex);
 }
 
@@ -345,6 +452,11 @@ static OpenA8DJDriverModeStatePayload DriverModeSetRequested(uint32_t modeID)
 {
     OpenA8DJDriverModeStatePayload payload;
     pthread_mutex_lock(&gDriverModeMutex);
+    if (modeID == kOpenA8DJDriverModeBalanced ||
+        modeID == kOpenA8DJDriverModePerformance) {
+        OpenA8DJTimecodeDisarm(&gTimecodeState,
+                               kOpenA8DJTimecodeFailExplicitDisarm);
+    }
     (void)OpenA8DJDriverModeSet(&gDriverModeState,
                                 modeID,
                                 gDriverModeStreaming,
@@ -391,6 +503,25 @@ typedef struct OpenA8DJControlPayload {
     uint8_t inputSource[kStreams];
     uint8_t inputDecodeEnabled;
 } __attribute__((packed)) OpenA8DJControlPayload;
+
+static uint8_t TimecodeProfileForControl(
+    const OpenA8DJControlPayload *control)
+{
+    if (control == NULL) {
+        return kOpenA8DJTimecodeProfileUnavailable;
+    }
+    return OpenA8DJTimecodeProfileForElectricalState(
+        control->inputMode,
+        control->gndLiftTCVinyl,
+        control->gndLiftTCCDLine,
+        control->gndLiftPhono,
+        control->softwareLock,
+        control->inputDecodeEnabled,
+        control->inputSwapMask,
+        control->inputInvertLeftMask,
+        control->inputInvertRightMask,
+        control->inputSource);
+}
 
 typedef struct OpenA8DJInputStatsPayload {
     uint64_t frames[kStreams];
@@ -628,7 +759,10 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t driverModeOutputRestartLatencyFrames;
     uint64_t driverModeOutputTargetLatencyFrames;
     uint64_t driverModeWorkerQoS;
+    OpenA8DJTimecodeStatePayload timecodeOptimized;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
+_Static_assert(sizeof(OpenA8DJStreamStatsPayload) <= 4096,
+               "stream stats must fit the bounded IPC payload");
 
 typedef struct OpenA8DJOutputFillStats {
     uint64_t framesRead;
@@ -1124,11 +1258,6 @@ static uint32_t RingWriteWithDropped(FloatRing *ring,
     return written;
 }
 
-static uint32_t RingWrite(FloatRing *ring, const float *frames, uint32_t frameCount)
-{
-    return RingWriteWithDropped(ring, frames, frameCount, NULL);
-}
-
 static uint32_t RingRead(FloatRing *ring, float *frames, uint32_t frameCount, bool zeroFill)
 {
     if (frames == NULL || frameCount == 0) {
@@ -1150,6 +1279,14 @@ static uint32_t RingRead(FloatRing *ring, float *frames, uint32_t frameCount, bo
                (size_t)(frameCount - read) * ring->channels * sizeof(float));
     }
     return read;
+}
+
+static uint32_t RingAvailable(FloatRing *ring)
+{
+    pthread_mutex_lock(&ring->mutex);
+    uint32_t available = ring->availableFrames;
+    pthread_mutex_unlock(&ring->mutex);
+    return available;
 }
 
 static uint32_t TimelineIndexForFrame(int64_t frameNumber, uint32_t capacityFrames)
@@ -1832,9 +1969,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint8_t _inputBytes[kStreams][kChannelsPerStream * kBytesPerSample];
     uint8_t _inputByteCount[kStreams];
     float _pendingInput[kChannels];
+    float _pendingPhysicalInput[kChannels];
     uint8_t _pendingInputMask;
     OpenA8DJInputStatsPayload _inputStats;
     pthread_mutex_t _inputStatsMutex;
+    OpenA8DJTimecodeClassifier _timecodeClassifier;
+    pthread_mutex_t _timecodeClassifierMutex;
+    atomic_ullong _timecodeLastCompleteHostTime;
     atomic_uint _inputSwapMask;
     atomic_uint _inputInvertLeftMask;
     atomic_uint _inputInvertRightMask;
@@ -1977,6 +2118,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         pthread_mutex_init(&_ep1Mutex, NULL);
         pthread_cond_init(&_ep1Cond, NULL);
         pthread_mutex_init(&_inputStatsMutex, NULL);
+        pthread_mutex_init(&_timecodeClassifierMutex, NULL);
+        OpenA8DJTimecodeClassifierInit(&_timecodeClassifier, sampleRate);
+        atomic_init(&_timecodeLastCompleteHostTime, 0);
         pthread_mutex_init(&_streamStatsMutex, NULL);
         pthread_mutex_init(&_clockAnchorMutex, NULL);
         pthread_mutex_init(&_transferPoolMutex, NULL);
@@ -2059,6 +2203,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_destroy(&_clockAnchorMutex);
     pthread_mutex_destroy(&_streamStatsMutex);
     pthread_mutex_destroy(&_inputStatsMutex);
+    pthread_mutex_destroy(&_timecodeClassifierMutex);
     pthread_mutex_destroy(&_transferPoolMutex);
     pthread_cond_destroy(&_ep1Cond);
     pthread_mutex_destroy(&_ep1Mutex);
@@ -2803,6 +2948,24 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t *counter = (uint64_t *)((uint8_t *)&_streamStats + offset);
     *counter += value;
     pthread_mutex_unlock(&_streamStatsMutex);
+    if (value != 0 &&
+        (offset == offsetof(OpenA8DJStreamStatsPayload, captureTransactionFailures) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, playbackTransactionFailures) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, captureShortTransfers) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, playbackShortTransfers) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, playbackQueueFailures) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, outputActiveUnderruns) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, outputRingOverruns) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, outputTimelineResets) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, inputCheckErrors) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, outputPanicFlags) ||
+         offset == offsetof(OpenA8DJStreamStatsPayload, outputLateWriteFrames))) {
+        pthread_mutex_lock(&gDriverModeMutex);
+        TimecodeFailOpenLocked(
+            kOpenA8DJTimecodeFailXRunOrTransportError, true);
+        pthread_mutex_unlock(&gDriverModeMutex);
+    }
 }
 
 - (void)addTimingMinOffset:(size_t)minOffset
@@ -3079,6 +3242,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats.driverModeOutputRestartLatencyFrames = driverMode.outputRestartLatencyFrames;
     stats.driverModeOutputTargetLatencyFrames = driverMode.outputTargetLatencyFrames;
     stats.driverModeWorkerQoS = driverMode.workerQoS;
+    OpenA8DJTimecodeStatePayload timecode =
+        [self timecodeStateSnapshot];
+    memcpy(&stats.timecodeOptimized, &timecode, sizeof(timecode));
 
     pthread_mutex_lock(&_clockAnchorMutex);
     stats.clockAnchorValid = _clockAnchor.valid ? 1 : 0;
@@ -3416,6 +3582,82 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     [self addInputStatsBatch:&stats];
 }
 
+- (void)evaluateTimecodeWindow:(const OpenA8DJTimecodeWindow *)window
+{
+    OpenA8DJControlPayload control;
+    [self loadControlPayload:&control];
+    uint8_t profile = TimecodeProfileForControl(&control);
+
+    pthread_mutex_lock(&gDriverModeMutex);
+    if (!gTimecodeState.armed) {
+        pthread_mutex_unlock(&gDriverModeMutex);
+        return;
+    }
+    if (profile == kOpenA8DJTimecodeProfileUnavailable ||
+        profile != gTimecodeState.electricalProfile) {
+        bool alreadyWaiting =
+            gTimecodeState.armState ==
+                kOpenA8DJTimecodeWaitingProfile &&
+            !gTimecodeState.profileVerified;
+        gTimecodeState.profileVerified = 0;
+        gTimecodeState.electricalProfile =
+            kOpenA8DJTimecodeProfileUnavailable;
+        gTimecodeState.qualified = 0;
+        gTimecodeState.eligibleWindows = 0;
+        if (gTimecodeState.optimizedActive ||
+            gDriverModeState.effectiveMode ==
+                kOpenA8DJDriverModeTimecodeOptimized) {
+            TimecodeFailOpenLocked(
+                kOpenA8DJTimecodeFailWrongProfile, false);
+        } else {
+            gTimecodeState.armState =
+                kOpenA8DJTimecodeWaitingProfile;
+            gTimecodeState.lastFailOpenReason =
+                kOpenA8DJTimecodeFailWrongProfile;
+            if (!alreadyWaiting) {
+                gTimecodeState.counters.profileTrips++;
+            }
+        }
+        pthread_mutex_unlock(&gDriverModeMutex);
+        return;
+    }
+    uint8_t decision = OpenA8DJTimecodeObserveWindow(
+        &gTimecodeState, window, gDriverModeStreaming);
+    if (decision == UINT8_MAX) {
+        if (!OpenA8DJDriverModeSet(
+                &gDriverModeState,
+                kOpenA8DJDriverModeTimecodeOptimized,
+                gDriverModeStreaming,
+                DriverModeProductionPreflight,
+                NULL)) {
+            TimecodeFailOpenLocked(kOpenA8DJTimecodeFailApplyFailed, true);
+        } else if (!gDriverModeState.pending) {
+            gTimecodeState.optimizedActive = 1;
+            gTimecodeState.armState = kOpenA8DJTimecodeActive;
+            gTimecodeState.counters.activations++;
+        }
+    } else if (decision != kOpenA8DJTimecodeFailNone) {
+        bool disarm = decision != kOpenA8DJTimecodeFailAllowedPairDropout;
+        TimecodeFailOpenLocked(decision, disarm);
+    }
+    pthread_mutex_unlock(&gDriverModeMutex);
+}
+
+- (void)addTimecodePhysicalFrame:(const float *)samples
+{
+    OpenA8DJTimecodeWindow window;
+    bool complete;
+    pthread_mutex_lock(&_timecodeClassifierMutex);
+    complete = OpenA8DJTimecodeClassifierFeedFrame(
+        &_timecodeClassifier, samples, &window);
+    pthread_mutex_unlock(&_timecodeClassifierMutex);
+    if (complete) {
+        atomic_store(&_timecodeLastCompleteHostTime,
+                     mach_absolute_time());
+        [self evaluateTimecodeWindow:&window];
+    }
+}
+
 - (void)addInputStatsBatch:(const OpenA8DJInputStatsPayload *)stats
 {
     if (!InputStatsHasFrames(stats)) {
@@ -3449,8 +3691,89 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (void)sendDriverModeStateToClient:(int)fd
 {
-    OpenA8DJDriverModeStatePayload state = DriverModeStateSnapshot();
-    (void)IPCSend(fd, kIPCTypeDriverModeState, &state, sizeof(state));
+    struct {
+        OpenA8DJDriverModeStatePayload state;
+        OpenA8DJTimecodeStatePayload timecode;
+    } __attribute__((packed)) reply;
+    OpenA8DJTimecodeStatePayload timecode =
+        [self timecodeStateSnapshot];
+    reply.state = timecode.driverMode;
+    reply.timecode = timecode;
+    (void)IPCSend(fd, kIPCTypeDriverModeState, &reply, sizeof(reply));
+}
+
+- (OpenA8DJTimecodeStatePayload)timecodeStateSnapshot
+{
+    OpenA8DJTimecodeStatePayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload.schemaVersion = kOpenA8DJTimecodeSchemaVersion;
+    payload.evidenceKind = 1; /* observed_activity */
+    payload.intentObserved = 0;
+    pthread_mutex_lock(&gDriverModeMutex);
+    OpenA8DJDriverModeMakeStatePayload(
+        &gDriverModeState, gDriverModeStreaming, &payload.driverMode);
+    payload.timecode = gTimecodeState;
+    pthread_mutex_unlock(&gDriverModeMutex);
+    pthread_mutex_lock(&_timecodeClassifierMutex);
+    payload.latestWindow = _timecodeClassifier.latest;
+    pthread_mutex_unlock(&_timecodeClassifierMutex);
+    uint64_t lastComplete =
+        atomic_load(&_timecodeLastCompleteHostTime);
+    uint64_t freshness =
+        MachTicksForNanoseconds(500000000ull);
+    uint64_t now = mach_absolute_time();
+    if (lastComplete == 0 || freshness == 0 ||
+        now < lastComplete || now - lastComplete > freshness) {
+        memset(&payload.latestWindow, 0,
+               sizeof(payload.latestWindow));
+    }
+    return payload;
+}
+
+- (void)sendTimecodeStateToClient:(int)fd
+{
+    OpenA8DJTimecodeStatePayload payload = [self timecodeStateSnapshot];
+    (void)IPCSend(fd, kIPCTypeTimecodeOptimizedState,
+                  &payload, sizeof(payload));
+}
+
+- (void)armTimecodeForClient:(int)fd
+                     payload:(const uint8_t *)bytes
+                      length:(NSUInteger)length
+{
+    OpenA8DJTimecodeArmPayload request;
+    if (!OpenA8DJTimecodeValidateArmPayload(
+            bytes, length, &request)) {
+        [self sendTimecodeStateToClient:fd];
+        return;
+    }
+    OpenA8DJControlPayload control;
+    [self loadControlPayload:&control];
+    uint8_t profile = TimecodeProfileForControl(&control);
+    pthread_mutex_lock(&gDriverModeMutex);
+    uint32_t fallback = gDriverModeState.effectiveMode;
+    if (fallback == kOpenA8DJDriverModeTimecodeOptimized) {
+        fallback = gTimecodeState.fallbackMode;
+    }
+    (void)OpenA8DJTimecodeArm(
+        &gTimecodeState, fallback, profile, _sampleRate,
+        atomic_load(&gCoreAudioBufferFrames));
+    pthread_mutex_unlock(&gDriverModeMutex);
+    pthread_mutex_lock(&_timecodeClassifierMutex);
+    OpenA8DJTimecodeClassifierInit(&_timecodeClassifier, _sampleRate);
+    pthread_mutex_unlock(&_timecodeClassifierMutex);
+    atomic_store(&_timecodeLastCompleteHostTime,
+                 mach_absolute_time());
+    [self sendTimecodeStateToClient:fd];
+}
+
+- (void)disarmTimecodeForClient:(int)fd
+{
+    pthread_mutex_lock(&gDriverModeMutex);
+    TimecodeFailOpenLocked(
+        kOpenA8DJTimecodeFailExplicitDisarm, true);
+    pthread_mutex_unlock(&gDriverModeMutex);
+    [self sendTimecodeStateToClient:fd];
 }
 
 - (void)rejectDriverModeRequestForClient:(int)fd reason:(uint8_t)reason
@@ -3476,12 +3799,35 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             break;
         case kIPCTypeControlSet:
             if (length >= offsetof(OpenA8DJControlPayload, inputDecodeEnabled)) {
+                pthread_mutex_lock(&gDriverModeMutex);
+                TimecodeFailOpenLocked(
+                    kOpenA8DJTimecodeFailWrongProfile, false);
+                pthread_mutex_unlock(&gDriverModeMutex);
                 OpenA8DJControlPayload state;
                 [self loadControlPayload:&state];
                 NSUInteger copyLength = length < sizeof(state) ? length : sizeof(state);
                 memcpy(&state, payload, copyLength);
                 [self storeControlPayload:&state];
                 (void)[self writeControls];
+                [self loadControlPayload:&state];
+                uint8_t profile = TimecodeProfileForControl(&state);
+                pthread_mutex_lock(&gDriverModeMutex);
+                if (gTimecodeState.armed) {
+                    gTimecodeState.electricalProfile = profile;
+                    gTimecodeState.profileVerified =
+                        profile != kOpenA8DJTimecodeProfileUnavailable;
+                    gTimecodeState.qualified = 0;
+                    gTimecodeState.eligibleWindows = 0;
+                    if (gDriverModeState.effectiveMode !=
+                            kOpenA8DJDriverModeTimecodeOptimized &&
+                        !gDriverModeState.pending) {
+                        gTimecodeState.armState =
+                            gTimecodeState.profileVerified ?
+                                kOpenA8DJTimecodeQualifying :
+                                kOpenA8DJTimecodeWaitingProfile;
+                    }
+                }
+                pthread_mutex_unlock(&gDriverModeMutex);
                 [self sendControlStateToClient:fd];
             }
             break;
@@ -3514,6 +3860,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             (void)IPCSend(fd, kIPCTypeDriverModeState, &state, sizeof(state));
             break;
         }
+        case kIPCTypeTimecodeOptimizedGet:
+            if (length == 0) [self sendTimecodeStateToClient:fd];
+            break;
+        case kIPCTypeTimecodeOptimizedArm:
+            [self armTimecodeForClient:fd payload:payload length:length];
+            break;
+        case kIPCTypeTimecodeOptimizedDisarm:
+            if (length == 0) [self disarmTimecodeForClient:fd];
+            break;
         default:
             break;
     }
@@ -3666,6 +4021,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         }
     }
     memset(_pendingInput, 0, sizeof(_pendingInput));
+    memset(_pendingPhysicalInput, 0, sizeof(_pendingPhysicalInput));
     _pendingInputMask = 0;
     _inputMode2Index = 0;
     memset(_outputFrameBytes, 0, sizeof(_outputFrameBytes));
@@ -3956,6 +4312,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     const uint8_t *right = &_inputBytes[stream][3];
     float leftSample = (float)S24BEToS32(left) / 8388608.0f;
     float rightSample = (float)S24BEToS32(right) / 8388608.0f;
+    _pendingPhysicalInput[stream * 2] = leftSample;
+    _pendingPhysicalInput[stream * 2 + 1] = rightSample;
     uint32_t pairBit = 1u << stream;
     if ((atomic_load(&_inputSwapMask) & pairBit) != 0) {
         float tmp = leftSample;
@@ -3974,6 +4332,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     _inputByteCount[stream] = 0;
     _pendingInputMask |= (uint8_t)(1u << stream);
     if (_pendingInputMask == 0x0f) {
+        [self addTimecodePhysicalFrame:_pendingPhysicalInput];
         float routedInput[kChannels];
         uint32_t sourceMap = atomic_load(&_inputSourceMap);
         for (uint32_t destination = 0; destination < kStreams; destination++) {
@@ -3984,7 +4343,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             routedInput[destination * 2] = _pendingInput[source * 2];
             routedInput[destination * 2 + 1] = _pendingInput[source * 2 + 1];
         }
-        RingWrite(&_inputRing, routedInput, 1);
+        uint32_t droppedInputFrames = 0;
+        RingWriteWithDropped(&_inputRing, routedInput, 1,
+                             &droppedInputFrames);
+        if (droppedInputFrames != 0) {
+            pthread_mutex_lock(&gDriverModeMutex);
+            TimecodeFailOpenLocked(
+                kOpenA8DJTimecodeFailXRunOrTransportError, true);
+            pthread_mutex_unlock(&gDriverModeMutex);
+        }
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
         [self appendDiagnosticFrames:&_diagnosticInputBuffer counter:&_diagnosticInputFrames frames:routedInput count:1];
 #endif
@@ -4070,6 +4437,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         const uint8_t *right = &_inputBytes[stream][3];
         float leftSample = (float)S24BEToS32(left) / 8388608.0f;
         float rightSample = (float)S24BEToS32(right) / 8388608.0f;
+        _pendingPhysicalInput[stream * 2] = leftSample;
+        _pendingPhysicalInput[stream * 2 + 1] = rightSample;
         uint32_t pairBit = 1u << stream;
         if ((atomic_load(&_inputSwapMask) & pairBit) != 0) {
             float tmp = leftSample;
@@ -4088,6 +4457,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         _inputByteCount[stream] = 0;
         _pendingInputMask |= (uint8_t)(1u << stream);
         if (_pendingInputMask == 0x0f) {
+            [self addTimecodePhysicalFrame:_pendingPhysicalInput];
             float routedInput[kChannels];
             uint32_t sourceMap = atomic_load(&_inputSourceMap);
             for (uint32_t destination = 0; destination < kStreams; destination++) {
@@ -4098,7 +4468,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                 routedInput[destination * 2] = _pendingInput[source * 2];
                 routedInput[destination * 2 + 1] = _pendingInput[source * 2 + 1];
             }
-            RingWrite(&_inputRing, routedInput, 1);
+            uint32_t droppedInputFrames = 0;
+            RingWriteWithDropped(&_inputRing, routedInput, 1,
+                                 &droppedInputFrames);
+            if (droppedInputFrames != 0) {
+                pthread_mutex_lock(&gDriverModeMutex);
+                TimecodeFailOpenLocked(
+                    kOpenA8DJTimecodeFailXRunOrTransportError, true);
+                pthread_mutex_unlock(&gDriverModeMutex);
+            }
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
             [self appendDiagnosticFrames:&_diagnosticInputBuffer counter:&_diagnosticInputFrames frames:routedInput count:1];
 #endif
@@ -5168,7 +5546,37 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         memset(outInterleaved, 0, (size_t)frames * channels * sizeof(float));
         return 0;
     }
-    return RingRead(&_inputRing, outInterleaved, frames, true);
+    if (_streamDriverModePolicy.inputLeadGuardEnabled) {
+        uint32_t available = RingAvailable(&_inputRing);
+        if (available > _streamDriverModePolicy.inputLeadCeilingFrames) {
+            pthread_mutex_lock(&gDriverModeMutex);
+            gTimecodeState.inputLeadFrames = available;
+            TimecodeFailOpenLocked(
+                kOpenA8DJTimecodeFailInputLeadViolation, true);
+            pthread_mutex_unlock(&gDriverModeMutex);
+        }
+    }
+    uint64_t lastComplete =
+        atomic_load(&_timecodeLastCompleteHostTime);
+    uint64_t missingThreshold =
+        MachTicksForNanoseconds(500000000ull);
+    if (lastComplete != 0 && missingThreshold != 0 &&
+        mach_absolute_time() - lastComplete > missingThreshold) {
+        pthread_mutex_lock(&gDriverModeMutex);
+        TimecodeFailOpenLocked(
+            kOpenA8DJTimecodeFailStatsMissing, true);
+        pthread_mutex_unlock(&gDriverModeMutex);
+        atomic_store(&_timecodeLastCompleteHostTime, 0);
+    }
+    uint32_t read = RingRead(
+        &_inputRing, outInterleaved, frames, true);
+    if (read < frames) {
+        pthread_mutex_lock(&gDriverModeMutex);
+        TimecodeFailOpenLocked(
+            kOpenA8DJTimecodeFailXRunOrTransportError, true);
+        pthread_mutex_unlock(&gDriverModeMutex);
+    }
+    return read;
 }
 
 - (void)setInputDecodeEnabled:(BOOL)enabled
@@ -5325,6 +5733,10 @@ bool OpenA8DJUSBStart(double sampleRate)
 
 bool OpenA8DJUSBSetSampleRate(double sampleRate)
 {
+    pthread_mutex_lock(&gDriverModeMutex);
+    TimecodeFailOpenLocked(
+        kOpenA8DJTimecodeFailConfigurationChanged, true);
+    pthread_mutex_unlock(&gDriverModeMutex);
     pthread_mutex_lock(&gEngineMutex);
     if (gEngine == nil) {
         gEngine = [[OpenA8DJUSBEngine alloc] initWithSampleRate:sampleRate];
@@ -5343,6 +5755,18 @@ bool OpenA8DJUSBSetSampleRate(double sampleRate)
     BOOL ok = !wasStreaming || [gEngine start];
     pthread_mutex_unlock(&gEngineMutex);
     return ok;
+}
+
+void OpenA8DJUSBSetCoreAudioBufferFrames(uint32_t bufferFrames)
+{
+    uint32_t previous = atomic_exchange(
+        &gCoreAudioBufferFrames, bufferFrames);
+    if (previous != bufferFrames) {
+        pthread_mutex_lock(&gDriverModeMutex);
+        TimecodeFailOpenLocked(
+            kOpenA8DJTimecodeFailConfigurationChanged, true);
+        pthread_mutex_unlock(&gDriverModeMutex);
+    }
 }
 
 bool OpenA8DJUSBEnsureOpen(double sampleRate)

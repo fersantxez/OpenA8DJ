@@ -13,7 +13,8 @@ enum {
 typedef enum OpenA8DJDriverModeID {
     kOpenA8DJDriverModeInvalid = 0,
     kOpenA8DJDriverModeBalanced = 1,
-    kOpenA8DJDriverModePerformance = 2
+    kOpenA8DJDriverModePerformance = 2,
+    kOpenA8DJDriverModeTimecodeOptimized = 3
 } OpenA8DJDriverModeID;
 
 typedef enum OpenA8DJDriverModeWorkerQoS {
@@ -35,7 +36,8 @@ typedef enum OpenA8DJDriverModeRejection {
     kOpenA8DJDriverModeRejectionBadLength = 1,
     kOpenA8DJDriverModeRejectionUnsupportedSchema = 2,
     kOpenA8DJDriverModeRejectionReservedNonzero = 3,
-    kOpenA8DJDriverModeRejectionUnknownMode = 4
+    kOpenA8DJDriverModeRejectionUnknownMode = 4,
+    kOpenA8DJDriverModeRejectionArmRequired = 5
 } OpenA8DJDriverModeRejection;
 
 typedef struct OpenA8DJDriverModePolicy {
@@ -43,6 +45,10 @@ typedef struct OpenA8DJDriverModePolicy {
     uint32_t outputRestartLatencyFrames;
     uint32_t outputTargetLatencyFrames;
     uint32_t workerQoS;
+    uint32_t inputLeadCeilingFrames;
+    uint8_t inputLeadGuardEnabled;
+    uint8_t timecodeEvidenceRequired;
+    uint8_t reserved[2];
 } OpenA8DJDriverModePolicy;
 
 typedef struct OpenA8DJDriverModeSetPayload {
@@ -101,7 +107,8 @@ static inline bool OpenA8DJDriverModeLookup(uint32_t modeID,
                 .outputStartLatencyFrames = 8192,
                 .outputRestartLatencyFrames = 4096,
                 .outputTargetLatencyFrames = 8192,
-                .workerQoS = kOpenA8DJDriverModeWorkerQoSDefault
+                .workerQoS = kOpenA8DJDriverModeWorkerQoSDefault,
+                .inputLeadCeilingFrames = 32768
             };
             break;
         case kOpenA8DJDriverModePerformance:
@@ -109,7 +116,19 @@ static inline bool OpenA8DJDriverModeLookup(uint32_t modeID,
                 .outputStartLatencyFrames = 4096,
                 .outputRestartLatencyFrames = 4096,
                 .outputTargetLatencyFrames = 4096,
-                .workerQoS = kOpenA8DJDriverModeWorkerQoSUserInteractive
+                .workerQoS = kOpenA8DJDriverModeWorkerQoSUserInteractive,
+                .inputLeadCeilingFrames = 32768
+            };
+            break;
+        case kOpenA8DJDriverModeTimecodeOptimized:
+            policy = (OpenA8DJDriverModePolicy){
+                .outputStartLatencyFrames = 4096,
+                .outputRestartLatencyFrames = 4096,
+                .outputTargetLatencyFrames = 4096,
+                .workerQoS = kOpenA8DJDriverModeWorkerQoSUserInteractive,
+                .inputLeadCeilingFrames = 2048,
+                .inputLeadGuardEnabled = 1,
+                .timecodeEvidenceRequired = 1
             };
             break;
         default:
@@ -139,6 +158,20 @@ static inline bool OpenA8DJDriverModePolicyIsSafe(
     if (policy->outputRestartLatencyFrames > policy->outputStartLatencyFrames ||
         policy->outputTargetLatencyFrames < policy->outputRestartLatencyFrames ||
         policy->outputTargetLatencyFrames > policy->outputStartLatencyFrames) {
+        return false;
+    }
+    if (policy->inputLeadCeilingFrames == 0 ||
+        policy->inputLeadCeilingFrames > outputRingCapacityFrames ||
+        policy->inputLeadGuardEnabled > 1 ||
+        policy->timecodeEvidenceRequired > 1) {
+        return false;
+    }
+    if (policy->timecodeEvidenceRequired &&
+        (!policy->inputLeadGuardEnabled ||
+         policy->inputLeadCeilingFrames != 2048 ||
+         policy->outputStartLatencyFrames < 4096 ||
+         policy->outputRestartLatencyFrames < 4096 ||
+         policy->outputTargetLatencyFrames < 4096)) {
         return false;
     }
     return policy->workerQoS == kOpenA8DJDriverModeWorkerQoSDefault ||
@@ -271,9 +304,12 @@ static inline bool OpenA8DJDriverModeValidateSetPayload(
                     break;
                 }
             }
-            if (rejection == kOpenA8DJDriverModeRejectionNone &&
-                !OpenA8DJDriverModeLookup(payload.modeID, NULL)) {
-                rejection = kOpenA8DJDriverModeRejectionUnknownMode;
+            if (rejection == kOpenA8DJDriverModeRejectionNone) {
+                if (!OpenA8DJDriverModeLookup(payload.modeID, NULL)) {
+                    rejection = kOpenA8DJDriverModeRejectionUnknownMode;
+                } else if (payload.modeID == kOpenA8DJDriverModeTimecodeOptimized) {
+                    rejection = kOpenA8DJDriverModeRejectionArmRequired;
+                }
             }
         }
     }

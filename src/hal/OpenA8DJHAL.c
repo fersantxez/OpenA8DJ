@@ -1351,6 +1351,7 @@ static void ApplySampleRate(Float64 newRate)
     }
     pthread_mutex_unlock(&gClockMutex);
     if (changed) {
+        OpenA8DJUSBSetCoreAudioBufferFrames(gBufferFrames);
         NotifySampleRateChanged();
     }
 }
@@ -1379,6 +1380,7 @@ static void ApplyBufferFrameSize(UInt32 newSize)
     }
     pthread_mutex_unlock(&gClockMutex);
     if (changed) {
+        OpenA8DJUSBSetCoreAudioBufferFrames(newSize);
         NotifyBufferFrameSizeChanged();
     }
 }
@@ -2006,6 +2008,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
     atomic_fetch_add(&gStopGeneration, 1);
     if (gRunningClients == 0) {
         StartClock();
+        OpenA8DJUSBSetCoreAudioBufferFrames(gBufferFrames);
         if (!OpenA8DJUSBStart(gSampleRate)) {
             Trace("StartIO USB start failed");
             atomic_store(&gDevicePresent, false);

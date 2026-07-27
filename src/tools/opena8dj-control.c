@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #include "../hal/OpenA8DJDriverMode.h"
+#include "../hal/OpenA8DJTimecodeOptimized.h"
 
 #ifndef OPENA8DJ_PUBLIC_API_SOCKET_PATH
 #define OPENA8DJ_PUBLIC_API_SOCKET_PATH "/tmp/opena8dj-control.sock"
@@ -39,6 +40,7 @@ static const char *kPublicAPIVersion = "1.0";
 #define OPENA8DJ_ERROR_DRIVER_MODE_NOT_ALLOWED "driver_mode_not_allowed"
 #define OPENA8DJ_ERROR_DRIVER_MODE_BUSY "driver_mode_busy"
 #define OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED "driver_mode_apply_failed"
+#define OPENA8DJ_ERROR_DRIVER_MODE_ARM_REQUIRED "driver_mode_arm_required"
 
 enum {
     kIPCVersion = 1,
@@ -56,7 +58,11 @@ enum {
     kIPCTypeStreamStats = 11,
     kIPCTypeDriverModeGet = 12,
     kIPCTypeDriverModeSet = 13,
-    kIPCTypeDriverModeState = 14
+    kIPCTypeDriverModeState = 14,
+    kIPCTypeTimecodeOptimizedGet = 15,
+    kIPCTypeTimecodeOptimizedArm = 16,
+    kIPCTypeTimecodeOptimizedDisarm = 17,
+    kIPCTypeTimecodeOptimizedState = 18
 };
 
 enum {
@@ -286,7 +292,10 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t driverModeOutputRestartLatencyFrames;
     uint64_t driverModeOutputTargetLatencyFrames;
     uint64_t driverModeWorkerQoS;
+    OpenA8DJTimecodeStatePayload timecodeOptimized;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
+_Static_assert(sizeof(OpenA8DJStreamStatsPayload) <= 4096,
+               "stream stats must fit the bounded IPC payload");
 
 typedef struct OpenA8DJWakeState {
     AudioDeviceID device;
@@ -646,6 +655,8 @@ static const char *DriverModeName(uint32_t modeID)
             return "balanced";
         case kOpenA8DJDriverModePerformance:
             return "performance";
+        case kOpenA8DJDriverModeTimecodeOptimized:
+            return "timecode-optimized";
         default:
             return NULL;
     }
@@ -659,6 +670,10 @@ static bool ParseDriverMode(const char *text, uint32_t *outModeID)
     }
     if (strcmp(text, "performance") == 0) {
         *outModeID = kOpenA8DJDriverModePerformance;
+        return true;
+    }
+    if (strcmp(text, "timecode-optimized") == 0) {
+        *outModeID = kOpenA8DJDriverModeTimecodeOptimized;
         return true;
     }
     return false;
@@ -697,6 +712,8 @@ static const char *DriverModeRejectionName(uint8_t rejection)
             return "reserved_nonzero";
         case kOpenA8DJDriverModeRejectionUnknownMode:
             return "unknown_mode";
+        case kOpenA8DJDriverModeRejectionArmRequired:
+            return "arm_required";
         default:
             return NULL;
     }
@@ -1410,6 +1427,148 @@ static OpenA8DJDriverModeTransactionResult SetDriverModeAndReadBack(
     return kDriverModeTransactionOK;
 }
 
+static bool ValidateTimecodeState(
+    const OpenA8DJTimecodeStatePayload *state)
+{
+    if (state == NULL ||
+        state->schemaVersion != kOpenA8DJTimecodeSchemaVersion ||
+        state->reserved0 != 0 ||
+        state->evidenceKind != 1 ||
+        state->intentObserved != 0 ||
+        !ValidateDriverModeState(&state->driverMode) ||
+        state->timecode.armed > 1 ||
+        state->timecode.profileVerified > 1 ||
+        state->timecode.qualified > 1 ||
+        state->timecode.optimizedActive > 1 ||
+        state->timecode.armState > kOpenA8DJTimecodeFaulted ||
+        state->timecode.lastFailOpenReason >
+            kOpenA8DJTimecodeFailExplicitDisarm ||
+        state->timecode.allowedInputPairMask !=
+            (state->timecode.armed ?
+                kOpenA8DJTimecodeAllowedPairMask : 0) ||
+        state->timecode.fallbackMode <
+            kOpenA8DJDriverModeBalanced ||
+        state->timecode.fallbackMode >
+            kOpenA8DJDriverModePerformance) {
+        return false;
+    }
+    for (size_t index = 0; index < sizeof(state->reserved); index++) {
+        if (state->reserved[index] != 0) return false;
+    }
+    return true;
+}
+
+static bool ReadDriverModeAndTimecode(
+    int fd,
+    OpenA8DJDriverModeStatePayload *driverMode,
+    OpenA8DJTimecodeStatePayload *timecode,
+    bool *hasTimecode)
+{
+    *hasTimecode = false;
+    if (!SendIPC(fd, kIPCTypeDriverModeGet, NULL, 0)) return false;
+    for (int message = 0; message < 64; message++) {
+        OpenA8DJIPCHeader header;
+        if (!ReadFull(fd, &header, sizeof(header)) ||
+            header.magic != kIPCMagic ||
+            header.version != kIPCVersion ||
+            header.length > 4096) {
+            return false;
+        }
+        uint8_t payload[4096];
+        if (header.length > 0 &&
+            !ReadFull(fd, payload, header.length)) {
+            return false;
+        }
+        if (header.type != kIPCTypeDriverModeState) continue;
+        if (header.length != sizeof(*driverMode) &&
+            header.length != sizeof(*driverMode) + sizeof(*timecode)) {
+            return false;
+        }
+        memcpy(driverMode, payload, sizeof(*driverMode));
+        if (!ValidateDriverModeState(driverMode)) return false;
+        if (header.length > sizeof(*driverMode)) {
+            memcpy(timecode, payload + sizeof(*driverMode),
+                   sizeof(*timecode));
+            if (!ValidateTimecodeState(timecode) ||
+                !DriverModeStatesEqual(
+                    driverMode, &timecode->driverMode)) {
+                return false;
+            }
+            *hasTimecode = true;
+        }
+        return true;
+    }
+    return false;
+}
+
+static bool ReadOneTimecodeState(
+    int fd,
+    OpenA8DJTimecodeStatePayload *state)
+{
+    for (int message = 0; message < 64; message++) {
+        OpenA8DJIPCHeader header;
+        if (!ReadFull(fd, &header, sizeof(header)) ||
+            header.magic != kIPCMagic ||
+            header.version != kIPCVersion ||
+            header.length > 4096) {
+            return false;
+        }
+        uint8_t payload[4096];
+        if (header.length > 0 &&
+            !ReadFull(fd, payload, header.length)) {
+            return false;
+        }
+        if (header.type == kIPCTypeTimecodeOptimizedState) {
+            if (header.length != sizeof(*state)) return false;
+            memcpy(state, payload, sizeof(*state));
+            return ValidateTimecodeState(state);
+        }
+    }
+    return false;
+}
+
+static bool ReadTimecodeState(
+    int fd,
+    OpenA8DJTimecodeStatePayload *state)
+{
+    return SendIPC(fd, kIPCTypeTimecodeOptimizedGet, NULL, 0) &&
+           ReadOneTimecodeState(fd, state);
+}
+
+static bool TimecodeStatesEqual(
+    const OpenA8DJTimecodeStatePayload *left,
+    const OpenA8DJTimecodeStatePayload *right)
+{
+    return memcmp(left, right, sizeof(*left)) == 0;
+}
+
+static bool MutateTimecodeAndReadBack(
+    int fd,
+    bool arm,
+    OpenA8DJTimecodeStatePayload *outState)
+{
+    OpenA8DJTimecodeArmPayload request;
+    memset(&request, 0, sizeof(request));
+    request.schemaVersion = kOpenA8DJTimecodeSchemaVersion;
+    request.modeID = kOpenA8DJDriverModeTimecodeOptimized;
+    request.allowedInputPairMask =
+        kOpenA8DJTimecodeAllowedPairMask;
+    OpenA8DJTimecodeStatePayload mutation;
+    OpenA8DJTimecodeStatePayload readBack;
+    if (!SendIPC(fd,
+                 arm ? kIPCTypeTimecodeOptimizedArm :
+                       kIPCTypeTimecodeOptimizedDisarm,
+                 arm ? (const void *)&request : NULL,
+                 arm ? sizeof(request) : 0) ||
+        !ReadOneTimecodeState(fd, &mutation) ||
+        !ReadTimecodeState(fd, &readBack) ||
+        !TimecodeStatesEqual(&mutation, &readBack)) {
+        return false;
+    }
+    *outState = readBack;
+    return true;
+}
+
 static void PrintState(const OpenA8DJControlPayload *state)
 {
     printf("Audio 8 DJ controls\n");
@@ -1828,7 +1987,8 @@ static void PrintPublicVersion(void)
     PrintJSONString(stdout, kPublicAPISchema);
     fputs(",\"transport\":\"process-json\",\"privateIPCVersion\":1,"
           "\"capabilities\":[\"stats.read\",\"usb-quality.read\",\"hardware.read\",\"profiles.list\","
-          "\"profile.read\",\"profile.write\",\"driver-mode.read\",\"driver-mode.write\"]}}\n",
+          "\"profile.read\",\"profile.write\",\"driver-mode.read\",\"driver-mode.write\","
+          "\"timecode-optimized.read\",\"timecode-optimized.arm\"]}}\n",
           stdout);
 }
 
@@ -1920,8 +2080,146 @@ static void PrintPublicDriverModes(void)
           "{\"id\":\"balanced\",\"name\":\"Balanced\",\"default\":true,"
           "\"requiresIdleBoundary\":true},"
           "{\"id\":\"performance\",\"name\":\"Performance\",\"default\":false,"
+          "\"requiresIdleBoundary\":true},"
+          "{\"id\":\"timecode-optimized\",\"name\":\"Timecode Optimized\","
+          "\"default\":false,\"requiresArm\":true,"
           "\"requiresIdleBoundary\":true}]}}\n",
           stdout);
+}
+
+static const char *TimecodeArmStateName(uint8_t state)
+{
+    static const char *names[] = {
+        "disarmed", "waiting_profile", "qualifying",
+        "qualified_pending_boundary", "active",
+        "deopt_pending_boundary", "faulted"
+    };
+    return state < sizeof(names) / sizeof(names[0]) ?
+        names[state] : "unknown";
+}
+
+static const char *TimecodeFailReasonName(uint8_t reason)
+{
+    static const char *names[] = {
+        "none", "outside_allowlist", "allowed_pair_dropout",
+        "stats_missing", "stats_invalid", "wrong_profile",
+        "configuration_changed", "xrun_or_transport_error",
+        "input_lead_violation", "apply_failed", "explicit_disarm"
+    };
+    return reason < sizeof(names) / sizeof(names[0]) ?
+        names[reason] : "unknown";
+}
+
+static const char *TimecodeProfileName(uint8_t profile)
+{
+    switch (profile) {
+        case kOpenA8DJTimecodeProfileVinyl:
+            return "traktor-dvs-vinyl";
+        case kOpenA8DJTimecodeProfileCDLine:
+            return "traktor-dvs-cd-line";
+        case kOpenA8DJTimecodeProfilePhono:
+            return "vinyl-recording";
+        default:
+            return "unavailable";
+    }
+}
+
+static void PrintPublicTimecodeMembers(
+    const OpenA8DJTimecodeStatePayload *payload)
+{
+    OpenA8DJTimecodeState stateStorage;
+    memcpy(&stateStorage, &payload->timecode, sizeof(stateStorage));
+    const OpenA8DJTimecodeState *state = &stateStorage;
+    fprintf(stdout,
+            "\"armed\":%s,\"armState\":",
+            state->armed ? "true" : "false");
+    PrintJSONString(stdout, TimecodeArmStateName(state->armState));
+    fputs(",\"allowedInputPairs\":", stdout);
+    fputs(state->armed ? "[\"A\",\"B\"]" : "[]", stdout);
+    fputs(",\"evidenceKind\":\"observed_activity\","
+          "\"intentObserved\":false,\"electricalProfile\":", stdout);
+    PrintJSONString(stdout, TimecodeProfileName(state->electricalProfile));
+    fprintf(stdout,
+            ",\"profileVerified\":%s,\"qualified\":%s,"
+            "\"optimizedActive\":%s,\"fallbackMode\":",
+            state->profileVerified ? "true" : "false",
+            state->qualified ? "true" : "false",
+            state->optimizedActive ? "true" : "false");
+    PrintJSONString(stdout, DriverModeName(state->fallbackMode));
+    fprintf(stdout,
+            ",\"eligibleWindows\":%u,\"requiredEligibleWindows\":%u,"
+            "\"dropoutWindows\":%u,\"windowFrames\":%u,"
+            "\"lastFailOpenReason\":",
+            state->eligibleWindows,
+            kOpenA8DJTimecodeRequiredEligibleWindows,
+            state->dropoutWindows,
+            state->windowFrames);
+    PrintJSONString(stdout,
+                    TimecodeFailReasonName(state->lastFailOpenReason));
+    fprintf(stdout,
+            ",\"inputLeadCeilingFrames\":%u,"
+            "\"inputLeadFrames\":%u,\"counters\":{\"arms\":%llu,"
+            "\"disarms\":%llu,\"qualifications\":%llu,"
+            "\"activations\":%llu,\"deoptimizations\":%llu,"
+            "\"outsideAllowlistTrips\":%llu,"
+            "\"missingEvidenceTrips\":%llu,\"profileTrips\":%llu,"
+            "\"configurationTrips\":%llu,\"xrunErrorTrips\":%llu}",
+            kOpenA8DJTimecodeInputLeadCeilingFrames,
+            state->inputLeadFrames,
+            (unsigned long long)state->counters.arms,
+            (unsigned long long)state->counters.disarms,
+            (unsigned long long)state->counters.qualifications,
+            (unsigned long long)state->counters.activations,
+            (unsigned long long)state->counters.deoptimizations,
+            (unsigned long long)state->counters.outsideAllowlistTrips,
+            (unsigned long long)state->counters.missingEvidenceTrips,
+            (unsigned long long)state->counters.profileTrips,
+            (unsigned long long)state->counters.configurationTrips,
+            (unsigned long long)state->counters.xrunErrorTrips);
+    OpenA8DJTimecodeWindow window;
+    memcpy(&window, &payload->latestWindow, sizeof(window));
+    bool fresh = OpenA8DJTimecodeWindowValid(
+        &window, state->windowFrames);
+    fprintf(stdout,
+            ",\"thresholds\":{\"allowedEntryACRMS\":%.6g,"
+            "\"allowedEntryPeak\":%.6g,\"allowedHoldACRMS\":%.6g,"
+            "\"allowedHoldPeak\":%.6g,\"forbiddenTripACRMS\":%.6g,"
+            "\"forbiddenTripPeak\":%.6g},\"windowFresh\":%s,"
+            "\"pairWindows\":{",
+            OPENA8DJ_TIMECODE_ENTRY_RMS,
+            OPENA8DJ_TIMECODE_ENTRY_PEAK,
+            OPENA8DJ_TIMECODE_HOLD_RMS,
+            OPENA8DJ_TIMECODE_HOLD_PEAK,
+            OPENA8DJ_TIMECODE_FORBIDDEN_RMS,
+            OPENA8DJ_TIMECODE_FORBIDDEN_PEAK,
+            fresh ? "true" : "false");
+    for (uint32_t pair = 0; pair < 4; pair++) {
+        if (pair != 0) fputc(',', stdout);
+        fprintf(stdout, "\"%c\":", (int)('A' + pair));
+        if (!fresh) {
+            fputs("null", stdout);
+            continue;
+        }
+        bool active = pair < 2 ?
+            OpenA8DJTimecodePairEntry(&window, pair) :
+            (OpenA8DJTimecodeWindowRMS(&window, pair, 0) >=
+                 OPENA8DJ_TIMECODE_FORBIDDEN_RMS ||
+             OpenA8DJTimecodeWindowRMS(&window, pair, 1) >=
+                 OPENA8DJ_TIMECODE_FORBIDDEN_RMS ||
+             window.peak[pair][0] >=
+                 OPENA8DJ_TIMECODE_FORBIDDEN_PEAK ||
+             window.peak[pair][1] >=
+                 OPENA8DJ_TIMECODE_FORBIDDEN_PEAK);
+        fprintf(stdout,
+                "{\"active\":%s,\"leftACRMS\":%.9g,"
+                "\"rightACRMS\":%.9g,\"leftPeak\":%.9g,"
+                "\"rightPeak\":%.9g}",
+                active ? "true" : "false",
+                OpenA8DJTimecodeWindowRMS(&window, pair, 0),
+                OpenA8DJTimecodeWindowRMS(&window, pair, 1),
+                window.peak[pair][0], window.peak[pair][1]);
+    }
+    fputc('}', stdout);
 }
 
 static void PrintPublicDriverModeMembers(const OpenA8DJDriverModeStatePayload *state)
@@ -1955,6 +2253,15 @@ static void PrintPublicDriverModeMembers(const OpenA8DJDriverModeStatePayload *s
             state->outputRestartLatencyFrames,
             state->outputTargetLatencyFrames);
     PrintJSONString(stdout, DriverModeQoSName(state->workerQoS));
+    OpenA8DJDriverModePolicy policy;
+    (void)OpenA8DJDriverModeLookup(state->effectiveMode, &policy);
+    fprintf(stdout,
+            ",\"inputLeadGuardEnabled\":%s,"
+            "\"inputLeadCeilingFrames\":%u,"
+            "\"timecodeEvidenceRequired\":%s",
+            policy.inputLeadGuardEnabled ? "true" : "false",
+            policy.inputLeadCeilingFrames,
+            policy.timecodeEvidenceRequired ? "true" : "false");
     fputs("}", stdout);
 }
 
@@ -1964,7 +2271,19 @@ static void PrintPublicDriverMode(const char *operation,
     PrintPublicEnvelopePrefix(operation, true);
     fputs(",\"data\":{", stdout);
     PrintPublicDriverModeMembers(state);
-    fputs("}}\n", stdout);
+    fputs(",\"timecodeOptimized\":null}}\n", stdout);
+}
+
+static void PrintPublicTimecodeDriverMode(
+    const char *operation,
+    const OpenA8DJTimecodeStatePayload *state)
+{
+    PrintPublicEnvelopePrefix(operation, true);
+    fputs(",\"data\":{", stdout);
+    PrintPublicDriverModeMembers(&state->driverMode);
+    fputs(",\"timecodeOptimized\":{", stdout);
+    PrintPublicTimecodeMembers(state);
+    fputs("}}}\n", stdout);
 }
 
 typedef enum OpenA8DJStatsDriverModeResult {
@@ -2018,6 +2337,22 @@ static OpenA8DJStatsDriverModeResult DriverModeFromStreamStats(
         (uint32_t)stats->driverModeOutputTargetLatencyFrames;
     outState->workerQoS = (uint32_t)stats->driverModeWorkerQoS;
     return ValidateDriverModeState(outState) ?
+        kStatsDriverModeValid : kStatsDriverModeInvalid;
+}
+
+static OpenA8DJStatsDriverModeResult TimecodeFromStreamStats(
+    const OpenA8DJStreamStatsPayload *stats,
+    size_t payloadLength,
+    OpenA8DJTimecodeStatePayload *outState)
+{
+    if (!StreamStatsHasField(
+            payloadLength,
+            offsetof(OpenA8DJStreamStatsPayload, timecodeOptimized),
+            sizeof(stats->timecodeOptimized))) {
+        return kStatsDriverModeUnavailable;
+    }
+    memcpy(outState, &stats->timecodeOptimized, sizeof(*outState));
+    return ValidateTimecodeState(outState) ?
         kStatsDriverModeValid : kStatsDriverModeInvalid;
 }
 
@@ -2139,7 +2474,8 @@ static void PrintCumulativeQualityJSON(const OpenA8DJStreamStatsPayload *stats,
 
 static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats,
                              size_t payloadLength,
-                             const OpenA8DJDriverModeStatePayload *driverMode)
+                             const OpenA8DJDriverModeStatePayload *driverMode,
+                             const OpenA8DJTimecodeStatePayload *timecode)
 {
     bool hasStreaming = StreamStatsHasField(payloadLength,
                                              offsetof(OpenA8DJStreamStatsPayload, streaming),
@@ -2202,6 +2538,14 @@ static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats,
     } else {
         fputc('{', stdout);
         PrintPublicDriverModeMembers(driverMode);
+        fputc('}', stdout);
+    }
+    fputs(",\"timecodeOptimized\":", stdout);
+    if (timecode == NULL) {
+        fputs("null", stdout);
+    } else {
+        fputc('{', stdout);
+        PrintPublicTimecodeMembers(timecode);
         fputc('}', stdout);
     }
     fputs("}}\n", stdout);
@@ -3086,8 +3430,14 @@ static int RunPublicAPI(int argc, char **argv)
     if (argc >= 3 && strcmp(argv[2], "profiles") == 0) operation = "profiles.list";
     if (argc >= 3 && strcmp(argv[2], "driver-modes") == 0) operation = "driver_modes.list";
     if (argc >= 3 && strcmp(argv[2], "driver-mode") == 0) {
-        operation = argc >= 4 && strcmp(argv[3], "set") == 0 ?
-            "driver_mode.set" : "driver_mode.get";
+        if (argc >= 4 && strcmp(argv[3], "set") == 0)
+            operation = "driver_mode.set";
+        else if (argc >= 4 && strcmp(argv[3], "arm") == 0)
+            operation = "driver_mode.arm";
+        else if (argc >= 4 && strcmp(argv[3], "disarm") == 0)
+            operation = "driver_mode.disarm";
+        else
+            operation = "driver_mode.get";
     }
     if (argc >= 3 && strcmp(argv[2], "profile") == 0) {
         operation = argc >= 4 && strcmp(argv[3], "set") == 0 ? "profile.set" : "profile.get";
@@ -3116,8 +3466,27 @@ static int RunPublicAPI(int argc, char **argv)
     bool driverModeWrite = argc == 5 &&
                            strcmp(argv[2], "driver-mode") == 0 &&
                            strcmp(argv[3], "set") == 0;
+    bool timecodeArmSyntax = argc >= 4 &&
+                             strcmp(argv[2], "driver-mode") == 0 &&
+                             strcmp(argv[3], "arm") == 0;
+    bool timecodeArm = argc == 7 &&
+                       timecodeArmSyntax &&
+                       strcmp(argv[4], "timecode-optimized") == 0 &&
+                       strcmp(argv[5], "--input-pairs") == 0 &&
+                       strcmp(argv[6], "A,B") == 0;
+    bool timecodeDisarm = argc == 5 &&
+                          strcmp(argv[2], "driver-mode") == 0 &&
+                          strcmp(argv[3], "disarm") == 0 &&
+                          strcmp(argv[4], "timecode-optimized") == 0;
+    if (timecodeArmSyntax && !timecodeArm) {
+        return PrintPublicError(
+            "driver_mode.arm", "timecode_pair_allowlist_invalid",
+            "The MVP allowlist must be exactly --input-pairs A,B.",
+            false, 2);
+    }
     if (!profileRead && !driverModeRead && !statsRead && !hardwareRead &&
-        !profileWrite && !driverModeWrite) {
+        !profileWrite && !driverModeWrite &&
+        !timecodeArm && !timecodeDisarm) {
         return PrintPublicError(operation,
                                 "invalid_request",
                                 "The public API request has an unknown operation or wrong arity.",
@@ -3143,16 +3512,28 @@ static int RunPublicAPI(int argc, char **argv)
                                 false,
                                 2);
     }
+    if (driverModeWrite &&
+        requestedDriverMode ==
+            kOpenA8DJDriverModeTimecodeOptimized) {
+        return PrintPublicError("driver_mode.set",
+                                OPENA8DJ_ERROR_DRIVER_MODE_ARM_REQUIRED,
+                                "Timecode Optimized requires an explicit A,B arm request.",
+                                false,
+                                2);
+    }
 
     int lockFD = -1;
-    if (profileWrite || driverModeWrite) {
+    if (profileWrite || driverModeWrite ||
+        timecodeArm || timecodeDisarm) {
         lockFD = AcquirePublicMutationLock();
         if (lockFD < 0) {
             return PrintPublicError(operation,
-                                    driverModeWrite ?
+                                    (driverModeWrite || timecodeArm ||
+                                     timecodeDisarm) ?
                                         OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED :
                                         "profile_apply_failed",
-                                    driverModeWrite ?
+                                    (driverModeWrite || timecodeArm ||
+                                     timecodeDisarm) ?
                                         "The driver-mode mutation lock could not be acquired safely." :
                                         "The profile mutation lock could not be acquired safely.",
                                     true,
@@ -3182,13 +3563,20 @@ static int RunPublicAPI(int argc, char **argv)
                                     4);
         }
         OpenA8DJDriverModeStatePayload statsDriverMode;
+        OpenA8DJTimecodeStatePayload statsTimecode;
         OpenA8DJStatsDriverModeResult modeResult = kStatsDriverModeUnavailable;
+        OpenA8DJStatsDriverModeResult timecodeResult =
+            kStatsDriverModeUnavailable;
         if (statsRead) {
             modeResult = DriverModeFromStreamStats(&stats,
                                                    payloadLength,
                                                    &statsDriverMode);
+            timecodeResult = TimecodeFromStreamStats(
+                &stats, payloadLength, &statsTimecode);
         }
-        if (statsRead && modeResult == kStatsDriverModeInvalid) {
+        if (statsRead &&
+            (modeResult == kStatsDriverModeInvalid ||
+             timecodeResult == kStatsDriverModeInvalid)) {
             close(fd);
             return PrintPublicError(operation,
                                     "backend_protocol_error",
@@ -3203,7 +3591,9 @@ static int RunPublicAPI(int argc, char **argv)
             PrintPublicStats(&stats,
                              payloadLength,
                              modeResult == kStatsDriverModeValid ?
-                                 &statsDriverMode : NULL);
+                                 &statsDriverMode : NULL,
+                             timecodeResult == kStatsDriverModeValid ?
+                                 &statsTimecode : NULL);
         }
         return 0;
     }
@@ -3211,7 +3601,11 @@ static int RunPublicAPI(int argc, char **argv)
     if (driverModeRead || driverModeWrite) {
         OpenA8DJDriverModeStatePayload driverModeState;
         if (driverModeRead) {
-            if (!ReadDriverModeState(fd, &driverModeState)) {
+            OpenA8DJTimecodeStatePayload timecodeState;
+            bool hasTimecode = false;
+            if (!ReadDriverModeAndTimecode(
+                    fd, &driverModeState,
+                    &timecodeState, &hasTimecode)) {
                 close(fd);
                 return PrintPublicError(operation,
                                         "backend_protocol_error",
@@ -3220,7 +3614,13 @@ static int RunPublicAPI(int argc, char **argv)
                                         4);
             }
             close(fd);
-            PrintPublicDriverMode("driver_mode.get", &driverModeState);
+            if (hasTimecode) {
+                PrintPublicTimecodeDriverMode(
+                    "driver_mode.get", &timecodeState);
+            } else {
+                PrintPublicDriverMode(
+                    "driver_mode.get", &driverModeState);
+            }
             return 0;
         }
         OpenA8DJDriverModeTransactionResult transaction =
@@ -3242,6 +3642,25 @@ static int RunPublicAPI(int argc, char **argv)
                                     4);
         }
         PrintPublicDriverMode("driver_mode.set", &driverModeState);
+        return 0;
+    }
+
+    if (timecodeArm || timecodeDisarm) {
+        OpenA8DJTimecodeStatePayload timecodeState;
+        bool ok = MutateTimecodeAndReadBack(
+            fd, timecodeArm, &timecodeState);
+        close(fd);
+        close(lockFD);
+        if (!ok) {
+            return PrintPublicError(
+                operation, "backend_protocol_error",
+                "The HAL timecode arm/disarm read-back transaction disagreed.",
+                true, 4);
+        }
+        PrintPublicTimecodeDriverMode(
+            timecodeArm ? "driver_mode.arm" :
+                          "driver_mode.disarm",
+            &timecodeState);
         return 0;
     }
 

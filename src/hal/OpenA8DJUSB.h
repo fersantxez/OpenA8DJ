@@ -28,6 +28,7 @@ bool OpenA8DJUSBStart(double sampleRate);
 bool OpenA8DJUSBEnsureOpen(double sampleRate);
 bool OpenA8DJUSBDevicePresent(void);
 bool OpenA8DJUSBSetSampleRate(double sampleRate);
+void OpenA8DJUSBSetCoreAudioBufferFrames(uint32_t bufferFrames);
 void OpenA8DJUSBSetInputDecodeActive(bool active);
 void OpenA8DJUSBStop(void);
 void OpenA8DJUSBClose(void);
