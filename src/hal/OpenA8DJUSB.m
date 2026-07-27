@@ -1,6 +1,7 @@
 #import "OpenA8DJUSB.h"
 #import "OpenA8DJDriverMode.h"
 #import "OpenA8DJTimecodeOptimized.h"
+#import "OpenA8DJVirtualLoopback.h"
 #import "OpenA8DJVintageCompatible.h"
 #import "OpenA8DJIPCAuth.h"
 
@@ -284,7 +285,10 @@ enum {
     kIPCTypeTimecodeOptimizedDisarm = 17,
     kIPCTypeTimecodeOptimizedState = 18,
     kIPCTypeVintageCompatibleGet = 19,
-    kIPCTypeVintageCompatibleState = 20
+    kIPCTypeVintageCompatibleState = 20,
+    kIPCTypeLoopbackGet = 21,
+    kIPCTypeLoopbackSet = 22,
+    kIPCTypeLoopbackState = 23
 };
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
@@ -962,6 +966,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t driverModeWorkerQoS;
     OpenA8DJTimecodeStatePayload timecodeOptimized;
     OpenA8DJVintageStatePayload vintageCompatible;
+    OpenA8DJLoopbackStatePayload loopback;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 _Static_assert(sizeof(OpenA8DJStreamStatsPayload) <= 4096,
                "stream stats must fit the bounded IPC payload");
@@ -3553,6 +3558,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats.playbackZeroCompleteTransactions = atomic_load(&_cadenceDiagnostics.playbackZeroCompleteTransactions);
     stats.playbackLayoutSignatureSum = atomic_load(&_cadenceDiagnostics.playbackLayoutSignatureSum);
 #endif
+    OpenA8DJHALVirtualLoopbackSnapshot(&stats.loopback);
 
     return stats;
 }
@@ -3602,6 +3608,13 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 {
     OpenA8DJStreamStatsPayload stats = [self streamStatsSnapshot];
     (void)IPCSend(fd, kIPCTypeStreamStats, &stats, sizeof(stats));
+}
+
+- (void)sendLoopbackStateToClient:(int)fd
+{
+    OpenA8DJLoopbackStatePayload state;
+    OpenA8DJHALVirtualLoopbackSnapshot(&state);
+    (void)IPCSend(fd, kIPCTypeLoopbackState, &state, sizeof(state));
 }
 
 - (void)resetClockAnchorWithSeedBump:(BOOL)bumpSeed
@@ -4203,6 +4216,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                               sizeof(vintage));
             }
             break;
+        case kIPCTypeLoopbackGet:
+            [self sendLoopbackStateToClient:fd];
+            break;
+        case kIPCTypeLoopbackSet: {
+            OpenA8DJLoopbackStatePayload state;
+            if (!OpenA8DJHALVirtualLoopbackApply(
+                    (const OpenA8DJLoopbackSetRequest *)payload,
+                    length, &state)) {
+                OpenA8DJHALVirtualLoopbackSnapshot(&state);
+            }
+            (void)IPCSend(fd, kIPCTypeLoopbackState,
+                          &state, sizeof(state));
+            break;
+        }
         default:
             break;
     }
