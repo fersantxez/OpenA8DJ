@@ -286,6 +286,7 @@ enum {
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
 static atomic_uint gCoreAudioBufferFrames = ATOMIC_VAR_INIT(512);
+static char gTimecodeWriterQueueSpecificKey;
 static pthread_mutex_t gDriverModeMutex = PTHREAD_MUTEX_INITIALIZER;
 static OpenA8DJDriverModeState gDriverModeState = {
     .requestedMode = kOpenA8DJDriverModeBalanced,
@@ -1988,7 +1989,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJInputStatsPayload _inputStats;
     pthread_mutex_t _inputStatsMutex;
     OpenA8DJTimecodeClassifier _timecodeClassifier;
-    pthread_mutex_t _timecodeClassifierMutex;
+    OpenA8DJTimecodeWindow _timecodePublishedWindow;
+    pthread_mutex_t _timecodePublishedWindowMutex;
     atomic_ullong _timecodeLastCompleteHostTime;
     atomic_uint _inputSwapMask;
     atomic_uint _inputInvertLeftMask;
@@ -2126,13 +2128,18 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_diagnosticEventCount, 0);
 #endif
         _queue = dispatch_queue_create("org.opena8dj.driver.usb", OpenA8DJUSBQueueAttributes());
+        dispatch_queue_set_specific(
+            _queue,
+            &gTimecodeWriterQueueSpecificKey,
+            &gTimecodeWriterQueueSpecificKey,
+            NULL);
         _ep1Queue = dispatch_queue_create("org.opena8dj.driver.ep1", DISPATCH_QUEUE_SERIAL);
         _ipcQueue = dispatch_queue_create("org.opena8dj.driver.ipc", DISPATCH_QUEUE_SERIAL);
         pthread_mutex_init(&_bulkOutMutex, NULL);
         pthread_mutex_init(&_ep1Mutex, NULL);
         pthread_cond_init(&_ep1Cond, NULL);
         pthread_mutex_init(&_inputStatsMutex, NULL);
-        pthread_mutex_init(&_timecodeClassifierMutex, NULL);
+        pthread_mutex_init(&_timecodePublishedWindowMutex, NULL);
         OpenA8DJTimecodeClassifierInit(&_timecodeClassifier, sampleRate);
         atomic_init(&_timecodeLastCompleteHostTime, 0);
         pthread_mutex_init(&_streamStatsMutex, NULL);
@@ -2217,7 +2224,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     pthread_mutex_destroy(&_clockAnchorMutex);
     pthread_mutex_destroy(&_streamStatsMutex);
     pthread_mutex_destroy(&_inputStatsMutex);
-    pthread_mutex_destroy(&_timecodeClassifierMutex);
+    pthread_mutex_destroy(&_timecodePublishedWindowMutex);
     pthread_mutex_destroy(&_transferPoolMutex);
     pthread_cond_destroy(&_ep1Cond);
     pthread_mutex_destroy(&_ep1Mutex);
@@ -3596,6 +3603,51 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     [self addInputStatsBatch:&stats];
 }
 
+- (void)armTimecodeOnWriterQueueWithProfile:(uint8_t)profile
+{
+    void (^armBlock)(void) = ^{
+        pthread_mutex_lock(&gDriverModeMutex);
+        uint32_t fallback = gDriverModeState.effectiveMode;
+        if (fallback ==
+            kOpenA8DJDriverModeTimecodeOptimized) {
+            fallback = gTimecodeState.fallbackMode;
+        }
+        if (!gTimecodeState.armed) {
+            OpenA8DJTimecodeClassifierInit(
+                &self->_timecodeClassifier, self->_sampleRate);
+            pthread_mutex_lock(
+                &self->_timecodePublishedWindowMutex);
+            memset(&self->_timecodePublishedWindow, 0,
+                   sizeof(self->_timecodePublishedWindow));
+            pthread_mutex_unlock(
+                &self->_timecodePublishedWindowMutex);
+            atomic_store(
+                &self->_timecodeLastCompleteHostTime,
+                mach_absolute_time());
+        }
+        (void)OpenA8DJTimecodeArm(
+            &gTimecodeState, fallback, profile,
+            self->_sampleRate,
+            atomic_load(&gCoreAudioBufferFrames));
+        pthread_mutex_unlock(&gDriverModeMutex);
+    };
+    if (dispatch_get_specific(
+            &gTimecodeWriterQueueSpecificKey) ==
+        &gTimecodeWriterQueueSpecificKey) {
+        armBlock();
+    } else {
+        dispatch_sync(_queue, armBlock);
+    }
+}
+
+- (void)publishTimecodeWindow:
+    (const OpenA8DJTimecodeWindow *)window
+{
+    pthread_mutex_lock(&_timecodePublishedWindowMutex);
+    _timecodePublishedWindow = *window;
+    pthread_mutex_unlock(&_timecodePublishedWindowMutex);
+}
+
 - (void)evaluateTimecodeWindow:(const OpenA8DJTimecodeWindow *)window
 {
     OpenA8DJControlPayload control;
@@ -3680,12 +3732,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 - (void)addTimecodePhysicalFrame:(const float *)samples
 {
     OpenA8DJTimecodeWindow window;
-    bool complete;
-    pthread_mutex_lock(&_timecodeClassifierMutex);
-    complete = OpenA8DJTimecodeClassifierFeedFrame(
+    bool complete = OpenA8DJTimecodeClassifierFeedFrame(
         &_timecodeClassifier, samples, &window);
-    pthread_mutex_unlock(&_timecodeClassifierMutex);
     if (complete) {
+        [self publishTimecodeWindow:&window];
         atomic_store(&_timecodeLastCompleteHostTime,
                      mach_absolute_time());
         [self evaluateTimecodeWindow:&window];
@@ -3748,9 +3798,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         &gDriverModeState, gDriverModeStreaming, &payload.driverMode);
     payload.timecode = gTimecodeState;
     pthread_mutex_unlock(&gDriverModeMutex);
-    pthread_mutex_lock(&_timecodeClassifierMutex);
-    payload.latestWindow = _timecodeClassifier.latest;
-    pthread_mutex_unlock(&_timecodeClassifierMutex);
+    pthread_mutex_lock(&_timecodePublishedWindowMutex);
+    payload.latestWindow = _timecodePublishedWindow;
+    pthread_mutex_unlock(&_timecodePublishedWindowMutex);
     uint64_t lastComplete =
         atomic_load(&_timecodeLastCompleteHostTime);
     uint64_t freshness =
@@ -3803,20 +3853,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint8_t profile = freshControl ?
         TimecodeProfileForControl(&control) :
         kOpenA8DJTimecodeProfileUnavailable;
-    pthread_mutex_lock(&gDriverModeMutex);
-    uint32_t fallback = gDriverModeState.effectiveMode;
-    if (fallback == kOpenA8DJDriverModeTimecodeOptimized) {
-        fallback = gTimecodeState.fallbackMode;
-    }
-    (void)OpenA8DJTimecodeArm(
-        &gTimecodeState, fallback, profile, _sampleRate,
-        atomic_load(&gCoreAudioBufferFrames));
-    pthread_mutex_unlock(&gDriverModeMutex);
-    pthread_mutex_lock(&_timecodeClassifierMutex);
-    OpenA8DJTimecodeClassifierInit(&_timecodeClassifier, _sampleRate);
-    pthread_mutex_unlock(&_timecodeClassifierMutex);
-    atomic_store(&_timecodeLastCompleteHostTime,
-                 mach_absolute_time());
+    [self armTimecodeOnWriterQueueWithProfile:profile];
     [self sendTimecodeStateToClient:fd];
 }
 

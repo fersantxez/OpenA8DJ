@@ -672,6 +672,10 @@ def run_tests(repo, shipping_binary):
         hal.index("- (void)evaluateTimecodeWindow:"):
         hal.index("- (void)addTimecodePhysicalFrame:")
     ]
+    add_timecode_handler = hal[
+        hal.rindex("- (void)addTimecodePhysicalFrame:"):
+        hal.rindex("- (void)addInputStatsBatch:")
+    ]
     check(first_timecode_feed < first_input_write and
           "RingTrimToLatest(&_inputRing" not in hal and
           "TimecodeFailOpenLocked" in read_input_handler and
@@ -680,8 +684,23 @@ def run_tests(repo, shipping_binary):
           "C/D/lead decisions can trim or drop optimized input samples")
     check("readControls" not in evaluate_handler and
           "sendCommand" not in evaluate_handler and
-          "loadControlPayload" in evaluate_handler,
+          "loadControlPayload" in evaluate_handler and
+          evaluate_handler.count(
+              "pthread_mutex_lock(&gDriverModeMutex)") == 1,
           "timecode classifier hot path performs blocking control I/O")
+    for forbidden in (
+        "pthread_mutex", "calloc", "malloc", "USBTrace",
+        "Trace(", "readControls", "sendCommand"
+    ):
+        check(forbidden not in add_timecode_handler,
+              f"per-frame timecode classifier contains {forbidden}")
+    check("publishTimecodeWindow" in add_timecode_handler and
+          "if (complete)" in add_timecode_handler,
+          "classifier does not publish only at complete windows")
+    check("dispatch_queue_set_specific" in hal and
+          "dispatch_get_specific" in hal and
+          "dispatch_sync(_queue, armBlock)" in hal,
+          "arm/reset is not serialized with the classifier writer")
     mode_header = (repo / "src/hal/OpenA8DJDriverMode.h").read_text()
     check("malloc(" not in mode_header and "calloc(" not in mode_header and
           "realloc(" not in mode_header,

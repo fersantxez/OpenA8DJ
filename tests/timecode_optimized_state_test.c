@@ -251,6 +251,11 @@ static void CheckNonDestructiveAccumulator(void)
     OpenA8DJTimecodeWindow saved = classifier.latest;
     /* An operator-facing input-stats read has no reference to this state. */
     assert(memcmp(&saved, &classifier.latest, sizeof(saved)) == 0);
+    OpenA8DJTimecodeClassifierInit(&classifier, 8.0);
+    assert(classifier.accumulatedFrames == 0);
+    assert(classifier.completedWindows == 0);
+    assert(!classifier.latest.complete);
+    assert(classifier.windowFrames == 2);
 }
 
 static void CheckDCAndNoise(void)
