@@ -1,6 +1,6 @@
 # USB quality meter design
 
-Status: implementation-ready MVP design  
+Status: implementation-ready MVP design
 Scope: macOS HAL stream statistics, public API v1, and
 `opena8dj-control usb-quality`
 
