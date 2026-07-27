@@ -17,6 +17,7 @@ MAGIC = 0x4A443841
 HEADER = struct.Struct("=IBBH")
 CONTROL_STATE = 6
 TC_GET, TC_ARM, TC_DISARM, TC_STATE = 15, 16, 17, 18
+VINTAGE_GET = 19
 STREAM_GET, STREAM_STATE = 10, 11
 DRIVER_GET, DRIVER_STATE = 12, 14
 DRIVER_STATE_SIZE = 88
@@ -164,7 +165,9 @@ def run(repo):
         check(tc["allowedInputPairs"] == ["A", "B"], "allowlist output")
         check(tc["evidenceKind"] == "observed_activity" and
               tc["intentObserved"] is False, "truthful evidence")
-        check([item[2] for item in server.requests] == [TC_ARM, TC_GET],
+        check([item[2] for item in server.requests] == [
+            TC_ARM, TC_GET, VINTAGE_GET
+        ],
               "arm did not use one set/read-back connection")
         arm_payload = server.requests[0][3]
         check(len(arm_payload) == 16 and
@@ -205,7 +208,8 @@ def run(repo):
               doc["data"]["timecodeOptimized"]["armState"] == "disarmed",
               "disarm state")
         check([item[2] for item in server.requests] ==
-              [TC_DISARM, TC_GET], "disarm read-back transaction")
+              [TC_DISARM, TC_GET, VINTAGE_GET],
+              "disarm read-back transaction")
         sock.unlink(missing_ok=True)
 
         server = Server(sock, states, arm_kind="waiting")

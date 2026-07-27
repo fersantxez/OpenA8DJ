@@ -24,6 +24,7 @@ STREAM_STATS = 11
 DRIVER_MODE_GET = 12
 DRIVER_MODE_SET = 13
 DRIVER_MODE_STATE = 14
+VINTAGE_COMPATIBLE_GET = 19
 HEADER = struct.Struct("=IBBH")
 SET_PAYLOAD = struct.Struct("=HHI8s")
 STATE_PAYLOAD = struct.Struct("=HHIIBBBBQQQQQQIIII8s")
@@ -372,7 +373,8 @@ def run_tests(repo, shipping_binary):
     check(result.returncode == 0, "offline mode list failed")
     validate_envelope(document, "driver_modes.list")
     check([entry["id"] for entry in document["data"]["driverModes"]] == [
-        "balanced", "performance", "timecode-optimized"
+        "balanced", "performance", "timecode-optimized",
+        "vintage-compatible"
     ], "mode allowlist/order changed")
     check(document["data"]["driverModes"][2]["requiresArm"] is True,
           "timecode mode is not explicitly armed")
@@ -418,7 +420,9 @@ def run_tests(repo, shipping_binary):
                 "inputLeadCeilingFrames": 32768,
                 "timecodeEvidenceRequired": False,
             }, "balanced policy differs from shipping defaults")
-            check([request[3] for request in server.requests] == [DRIVER_MODE_GET],
+            check([request[3] for request in server.requests] == [
+                DRIVER_MODE_GET, VINTAGE_COMPATIBLE_GET
+            ],
                   "mode get performed extra IPC")
         socket_path.unlink(missing_ok=True)
 
@@ -440,7 +444,8 @@ def run_tests(repo, shipping_binary):
             check(document["data"]["effectivePolicy"]["workerQoS"] == "user-interactive",
                   "performance worker QoS missing")
             check([request[3] for request in server.requests] == [
-                DRIVER_MODE_SET, DRIVER_MODE_GET
+                DRIVER_MODE_SET, DRIVER_MODE_GET,
+                VINTAGE_COMPATIBLE_GET
             ], "set did not do same-connection read-back")
         socket_path.unlink(missing_ok=True)
 
@@ -600,7 +605,10 @@ def run_tests(repo, shipping_binary):
             by_connection = {}
             for connection, _magic, _version, message_type, _payload in server.requests:
                 by_connection.setdefault(connection, []).append(message_type)
-            check(all(messages == [DRIVER_MODE_SET, DRIVER_MODE_GET]
+            check(all(messages == [
+                DRIVER_MODE_SET, DRIVER_MODE_GET,
+                VINTAGE_COMPATIBLE_GET
+            ]
                       for messages in by_connection.values()),
                   f"mutation transactions interleaved or tore: {by_connection}")
             check(server.state["requested"] == server.state["effective"] and
