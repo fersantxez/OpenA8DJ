@@ -29,6 +29,17 @@ bool OpenA8DJUSBEnsureOpen(double sampleRate);
 bool OpenA8DJUSBDevicePresent(void);
 bool OpenA8DJUSBSetSampleRate(double sampleRate);
 void OpenA8DJUSBSetCoreAudioBufferFrames(uint32_t bufferFrames);
+void OpenA8DJUSBSetHALRuntimeDescriptor(bool usbHALTimestampEnabled,
+                                        uint32_t timestampPeriodFrames,
+                                        uint8_t inputChannels,
+                                        uint8_t outputChannels,
+                                        uint8_t inputStreams,
+                                        uint8_t outputStreams,
+                                        uint8_t clientSampleFormat,
+                                        uint32_t supportedRateMask,
+                                        double sampleRate);
+bool OpenA8DJUSBDriverModeAllowsConfigurationChange(void);
+uint32_t OpenA8DJUSBNormalizeCoreAudioBufferFrames(uint32_t requestedFrames);
 void OpenA8DJUSBSetInputDecodeActive(bool active);
 void OpenA8DJUSBStop(void);
 void OpenA8DJUSBClose(void);

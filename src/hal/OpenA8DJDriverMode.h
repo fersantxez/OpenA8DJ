@@ -14,7 +14,8 @@ typedef enum OpenA8DJDriverModeID {
     kOpenA8DJDriverModeInvalid = 0,
     kOpenA8DJDriverModeBalanced = 1,
     kOpenA8DJDriverModePerformance = 2,
-    kOpenA8DJDriverModeTimecodeOptimized = 3
+    kOpenA8DJDriverModeTimecodeOptimized = 3,
+    kOpenA8DJDriverModeVintageCompatible = 4
 } OpenA8DJDriverModeID;
 
 typedef enum OpenA8DJDriverModeWorkerQoS {
@@ -37,7 +38,8 @@ typedef enum OpenA8DJDriverModeRejection {
     kOpenA8DJDriverModeRejectionUnsupportedSchema = 2,
     kOpenA8DJDriverModeRejectionReservedNonzero = 3,
     kOpenA8DJDriverModeRejectionUnknownMode = 4,
-    kOpenA8DJDriverModeRejectionArmRequired = 5
+    kOpenA8DJDriverModeRejectionArmRequired = 5,
+    kOpenA8DJDriverModeRejectionConflict = 6
 } OpenA8DJDriverModeRejection;
 
 typedef struct OpenA8DJDriverModePolicy {
@@ -48,7 +50,9 @@ typedef struct OpenA8DJDriverModePolicy {
     uint32_t inputLeadCeilingFrames;
     uint8_t inputLeadGuardEnabled;
     uint8_t timecodeEvidenceRequired;
-    uint8_t reserved[2];
+    uint8_t vintagePreflightRequired;
+    uint8_t bufferNormalization;
+    uint32_t fixedBufferFrames;
 } OpenA8DJDriverModePolicy;
 
 typedef struct OpenA8DJDriverModeSetPayload {
@@ -131,6 +135,18 @@ static inline bool OpenA8DJDriverModeLookup(uint32_t modeID,
                 .timecodeEvidenceRequired = 1
             };
             break;
+        case kOpenA8DJDriverModeVintageCompatible:
+            policy = (OpenA8DJDriverModePolicy){
+                .outputStartLatencyFrames = 8192,
+                .outputRestartLatencyFrames = 4096,
+                .outputTargetLatencyFrames = 8192,
+                .workerQoS = kOpenA8DJDriverModeWorkerQoSDefault,
+                .inputLeadCeilingFrames = 32768,
+                .vintagePreflightRequired = 1,
+                .bufferNormalization = 1,
+                .fixedBufferFrames = 512
+            };
+            break;
         default:
             return false;
     }
@@ -163,7 +179,9 @@ static inline bool OpenA8DJDriverModePolicyIsSafe(
     if (policy->inputLeadCeilingFrames == 0 ||
         policy->inputLeadCeilingFrames > outputRingCapacityFrames ||
         policy->inputLeadGuardEnabled > 1 ||
-        policy->timecodeEvidenceRequired > 1) {
+        policy->timecodeEvidenceRequired > 1 ||
+        policy->vintagePreflightRequired > 1 ||
+        policy->bufferNormalization > 1) {
         return false;
     }
     if (policy->timecodeEvidenceRequired &&
@@ -172,6 +190,19 @@ static inline bool OpenA8DJDriverModePolicyIsSafe(
          policy->outputStartLatencyFrames < 4096 ||
          policy->outputRestartLatencyFrames < 4096 ||
          policy->outputTargetLatencyFrames < 4096)) {
+        return false;
+    }
+    if (policy->vintagePreflightRequired &&
+        (policy->timecodeEvidenceRequired ||
+         policy->inputLeadGuardEnabled ||
+         policy->bufferNormalization != 1 ||
+         policy->fixedBufferFrames != 512 ||
+         policy->workerQoS != kOpenA8DJDriverModeWorkerQoSDefault)) {
+        return false;
+    }
+    if (!policy->vintagePreflightRequired &&
+        (policy->bufferNormalization != 0 ||
+         policy->fixedBufferFrames != 0)) {
         return false;
     }
     return policy->workerQoS == kOpenA8DJDriverModeWorkerQoSDefault ||

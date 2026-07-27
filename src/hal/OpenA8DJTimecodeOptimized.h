@@ -62,7 +62,8 @@ typedef enum OpenA8DJTimecodeRejection {
     kOpenA8DJTimecodeRejectionUnsupportedSchema = 2,
     kOpenA8DJTimecodeRejectionReservedNonzero = 3,
     kOpenA8DJTimecodeRejectionUnknownMode = 4,
-    kOpenA8DJTimecodeRejectionInvalidPairMask = 5
+    kOpenA8DJTimecodeRejectionInvalidPairMask = 5,
+    kOpenA8DJTimecodeRejectionModeConflict = 6
 } OpenA8DJTimecodeRejection;
 
 typedef struct OpenA8DJTimecodeArmPayload {

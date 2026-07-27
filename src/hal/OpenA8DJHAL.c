@@ -15,6 +15,7 @@
 #include <mach/mach_time.h>
 
 #include "OpenA8DJUSB.h"
+#include "OpenA8DJVintageCompatible.h"
 
 #ifndef OPENA8DJ_ENABLE_TRACE
 #define OPENA8DJ_ENABLE_TRACE 0
@@ -1011,10 +1012,7 @@ static UInt32 BufferFramesForBytes(UInt32 bytes)
 
 static UInt32 NormalizeBufferFrames(UInt32 frames)
 {
-    if (frames <= 512) return 512;
-    if (frames <= 1024) return 1024;
-    if (frames <= 2048) return 2048;
-    return 4096;
+    return OpenA8DJUSBNormalizeCoreAudioBufferFrames(frames);
 }
 
 static bool IsSupportedRate(Float64 rate)
@@ -1351,6 +1349,16 @@ static void ApplySampleRate(Float64 newRate)
     }
     pthread_mutex_unlock(&gClockMutex);
     if (changed) {
+        OpenA8DJUSBSetHALRuntimeDescriptor(
+            OPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP != 0,
+            kOpenA8DJZeroTimeStampPeriodFrames,
+            kOpenA8DJChannels,
+            kOpenA8DJChannels,
+            kOpenA8DJInputStreamCount,
+            kOpenA8DJOutputStreamCount,
+            kOpenA8DJVintageClientSampleFormatFloat32,
+            kOpenA8DJVintageRequiredRateMask,
+            newRate);
         OpenA8DJUSBSetCoreAudioBufferFrames(gBufferFrames);
         NotifySampleRateChanged();
     }
@@ -1428,6 +1436,17 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_Initialize(AudioServerPlugInDriverRef
     gHostTime = mach_absolute_time();
     gBufferFrames = RecommendedBufferFramesForRate(gSampleRate);
     pthread_mutex_unlock(&gClockMutex);
+    OpenA8DJUSBSetHALRuntimeDescriptor(
+        OPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP != 0,
+        kOpenA8DJZeroTimeStampPeriodFrames,
+        kOpenA8DJChannels,
+        kOpenA8DJChannels,
+        kOpenA8DJInputStreamCount,
+        kOpenA8DJOutputStreamCount,
+        kOpenA8DJVintageClientSampleFormatFloat32,
+        kOpenA8DJVintageRequiredRateMask,
+        gSampleRate);
+    OpenA8DJUSBSetCoreAudioBufferFrames(gBufferFrames);
     atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
 #if OPENA8DJ_BACKGROUND_PREOPEN_ON_INIT
     ScheduleBackgroundPreopen();
@@ -1484,6 +1503,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(Audi
         gPendingSampleRate = 0.0;
         pthread_mutex_unlock(&gClockMutex);
         if (newRate > 0.0) {
+            if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+                return kAudioHardwareIllegalOperationError;
+            }
             ApplySampleRate(newRate);
             if (gRunningClients > 0) {
                 (void)OpenA8DJUSBSetSampleRate(newRate);
@@ -1498,6 +1520,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(Audi
         gPendingBufferFrames = 0;
         pthread_mutex_unlock(&gClockMutex);
         if (newSize > 0) {
+            if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+                return kAudioHardwareIllegalOperationError;
+            }
             ApplyBufferFrameSize(newSize);
         }
         return kAudioHardwareNoError;
@@ -1928,6 +1953,12 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         if (sameRate) {
             return kAudioHardwareNoError;
         }
+        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+            pthread_mutex_lock(&gClockMutex);
+            gPendingSampleRate = 0.0;
+            pthread_mutex_unlock(&gClockMutex);
+            return kAudioHardwareIllegalOperationError;
+        }
         if (gHost != NULL) {
             return gHost->RequestDeviceConfigurationChange(gHost,
                                                            kOpenA8DJDeviceObjectID,
@@ -1960,6 +1991,12 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         pthread_mutex_unlock(&gClockMutex);
         if (sameSize) {
             return kAudioHardwareNoError;
+        }
+        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+            pthread_mutex_lock(&gClockMutex);
+            gPendingBufferFrames = 0;
+            pthread_mutex_unlock(&gClockMutex);
+            return kAudioHardwareIllegalOperationError;
         }
         if (gHost != NULL) {
             return gHost->RequestDeviceConfigurationChange(gHost,

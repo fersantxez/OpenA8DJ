@@ -1,6 +1,7 @@
 #import "OpenA8DJUSB.h"
 #import "OpenA8DJDriverMode.h"
 #import "OpenA8DJTimecodeOptimized.h"
+#import "OpenA8DJVintageCompatible.h"
 #import "OpenA8DJIPCAuth.h"
 
 #import <Foundation/Foundation.h>
@@ -281,7 +282,9 @@ enum {
     kIPCTypeTimecodeOptimizedGet = 15,
     kIPCTypeTimecodeOptimizedArm = 16,
     kIPCTypeTimecodeOptimizedDisarm = 17,
-    kIPCTypeTimecodeOptimizedState = 18
+    kIPCTypeTimecodeOptimizedState = 18,
+    kIPCTypeVintageCompatibleGet = 19,
+    kIPCTypeVintageCompatibleState = 20
 };
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
@@ -299,9 +302,63 @@ static OpenA8DJTimecodeState gTimecodeState = {
     .armState = kOpenA8DJTimecodeDisarmed,
     .fallbackMode = kOpenA8DJDriverModeBalanced
 };
+static OpenA8DJVintageBuildDescriptor gVintageDescriptor;
+static OpenA8DJVintagePreflightResult gVintagePreflight;
+static uint64_t gVintagePreflightGeneration = 0;
+static uint64_t gVintageFailureCounter = 0;
+static uint64_t gVintageTransientReasons = 0;
 
 static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
                                           void *context);
+
+static void VintageRefreshDescriptorLocked(void)
+{
+    gVintageDescriptor.resetAudioParamsBeforeStream =
+        OPENA8DJ_RESET_AUDIO_PARAMS_BEFORE_STREAM ? 1 : 0;
+    gVintageDescriptor.capturePacedOutput =
+        OPENA8DJ_PLAYBACK_CAPTURE_PACED ? 1 : 0;
+    gVintageDescriptor.outputStartByte = OPENA8DJ_OUTPUT_START_BYTE;
+    gVintageDescriptor.explicitUSBScheduling =
+        OPENA8DJ_ENABLE_EXPLICIT_ISOC_SCHEDULING ? 1 : 0;
+    gVintageDescriptor.captureQueueDepth = kCaptureQueueDepth;
+    gVintageDescriptor.playbackQueueDepth = kPlaybackQueueTarget;
+    gVintageDescriptor.captureTransactions = kIsoFramesPerTransfer;
+    gVintageDescriptor.playbackTransactions =
+        kPlaybackIsoFramesPerTransfer;
+    gVintageDescriptor.currentBufferFrames =
+        atomic_load(&gCoreAudioBufferFrames);
+}
+
+static OpenA8DJVintagePreflightResult VintageRunPreflightLocked(void)
+{
+    VintageRefreshDescriptorLocked();
+    gVintagePreflight =
+        OpenA8DJVintageEvaluatePreflight(&gVintageDescriptor);
+    gVintagePreflightGeneration++;
+    if (!gVintagePreflight.mandatoryPassed) {
+        gVintageFailureCounter++;
+    }
+    return gVintagePreflight;
+}
+
+static bool VintageModePresentLocked(void)
+{
+    return gDriverModeState.requestedMode ==
+               kOpenA8DJDriverModeVintageCompatible ||
+           gDriverModeState.effectiveMode ==
+               kOpenA8DJDriverModeVintageCompatible;
+}
+
+static bool TimecodeFamilyPresentLocked(void)
+{
+    return gTimecodeState.armed ||
+           gTimecodeState.qualified ||
+           gTimecodeState.optimizedActive ||
+           gDriverModeState.requestedMode ==
+               kOpenA8DJDriverModeTimecodeOptimized ||
+           gDriverModeState.effectiveMode ==
+               kOpenA8DJDriverModeTimecodeOptimized;
+}
 
 static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
 {
@@ -387,6 +444,11 @@ static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy
     if (!OpenA8DJDriverModePolicyIsSafe(policy, kRingFrames)) {
         return false;
     }
+    if (policy->vintagePreflightRequired) {
+        OpenA8DJVintagePreflightResult result =
+            VintageRunPreflightLocked();
+        return result.mandatoryPassed != 0;
+    }
     if (policy->timecodeEvidenceRequired) {
         uint32_t bufferFrames = atomic_load(&gCoreAudioBufferFrames);
         return gTimecodeState.armed && gTimecodeState.qualified &&
@@ -408,6 +470,25 @@ static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
     (void)OpenA8DJDriverModePromotePending(&gDriverModeState,
                                            DriverModeProductionPreflight,
                                            NULL);
+    if (gDriverModeState.effectiveMode ==
+        kOpenA8DJDriverModeVintageCompatible) {
+        OpenA8DJVintagePreflightResult result =
+            VintageRunPreflightLocked();
+        if (!result.mandatoryPassed) {
+            gVintagePreflight.reasons |=
+                kOpenA8DJVintageReasonApplyFailed;
+            gDriverModeState.requestedMode =
+                kOpenA8DJDriverModeBalanced;
+            gDriverModeState.effectiveMode =
+                kOpenA8DJDriverModeBalanced;
+            gDriverModeState.pending = false;
+            gDriverModeState.lastResult =
+                kOpenA8DJDriverModeResultApplyFailed;
+            gDriverModeState.applyFailures++;
+            gDriverModeState.appliedTransitions++;
+            gDriverModeState.generation++;
+        }
+    }
     (void)OpenA8DJDriverModeLookup(gDriverModeState.effectiveMode, &policy);
     if (gDriverModeState.effectiveMode ==
         kOpenA8DJDriverModeTimecodeOptimized) {
@@ -456,6 +537,51 @@ static OpenA8DJDriverModeStatePayload DriverModeStateSnapshot(void)
     return payload;
 }
 
+static OpenA8DJVintageStatePayload VintageStateSnapshot(void)
+{
+    OpenA8DJVintageStatePayload payload;
+    memset(&payload, 0, sizeof(payload));
+    payload.schemaVersion = kOpenA8DJVintageSchemaVersion;
+    payload.experimental = 1;
+    pthread_mutex_lock(&gDriverModeMutex);
+    VintageRefreshDescriptorLocked();
+    OpenA8DJDriverModeMakeStatePayload(
+        &gDriverModeState, gDriverModeStreaming, &payload.driverMode);
+    bool present = VintageModePresentLocked();
+    OpenA8DJVintagePreflightResult result = present ?
+        gVintagePreflight :
+        OpenA8DJVintageEvaluatePreflight(&gVintageDescriptor);
+    payload.reasons = result.reasons | gVintageTransientReasons;
+    payload.capabilities = result.capabilities;
+    payload.knownCapabilities = result.knownCapabilities;
+    payload.preflightGeneration = gVintagePreflightGeneration;
+    payload.failureCounter = gVintageFailureCounter;
+    payload.descriptor = gVintageDescriptor;
+    if (!present) {
+        payload.reasons |= kOpenA8DJVintageReasonNotRequested;
+        if (gVintagePreflightGeneration == 0) {
+            payload.reasons |= kOpenA8DJVintageReasonPreflightNotRun;
+        }
+    }
+    payload.status = OpenA8DJVintageEvaluateConformance(
+        present,
+        gVintagePreflightGeneration != 0,
+        payload.reasons,
+        false);
+    if (gDriverModeState.effectiveMode ==
+        kOpenA8DJDriverModeVintageCompatible) {
+        payload.bufferNormalization =
+            kOpenA8DJVintageBufferNormalizationFixed;
+        payload.normalizedBufferFrames =
+            kOpenA8DJVintageRequiredBufferFrames;
+    } else {
+        payload.bufferNormalization =
+            kOpenA8DJVintageBufferNormalizationShippingTable;
+    }
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return payload;
+}
+
 static OpenA8DJDriverModeStatePayload DriverModeRejectRequest(uint8_t rejection)
 {
     OpenA8DJDriverModeStatePayload payload;
@@ -472,11 +598,29 @@ static OpenA8DJDriverModeStatePayload DriverModeSetRequested(uint32_t modeID)
 {
     OpenA8DJDriverModeStatePayload payload;
     pthread_mutex_lock(&gDriverModeMutex);
+    if (modeID == kOpenA8DJDriverModeVintageCompatible &&
+        TimecodeFamilyPresentLocked()) {
+        gVintageTransientReasons =
+            kOpenA8DJVintageReasonTimecodeModeConflict;
+        OpenA8DJDriverModeReject(
+            &gDriverModeState,
+            kOpenA8DJDriverModeRejectionConflict);
+        OpenA8DJDriverModeMakeStatePayload(&gDriverModeState,
+                                           gDriverModeStreaming,
+                                           &payload);
+        pthread_mutex_unlock(&gDriverModeMutex);
+        return payload;
+    }
     if (modeID == kOpenA8DJDriverModeBalanced ||
         modeID == kOpenA8DJDriverModePerformance) {
         atomic_store(&gTimecodeClassificationArmed, false);
         OpenA8DJTimecodeDisarm(&gTimecodeState,
                                kOpenA8DJTimecodeFailExplicitDisarm);
+    }
+    gVintageTransientReasons = 0;
+    if (modeID == kOpenA8DJDriverModeVintageCompatible &&
+        gDriverModeStreaming) {
+        (void)VintageRunPreflightLocked();
     }
     (void)OpenA8DJDriverModeSet(&gDriverModeState,
                                 modeID,
@@ -781,6 +925,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t driverModeOutputTargetLatencyFrames;
     uint64_t driverModeWorkerQoS;
     OpenA8DJTimecodeStatePayload timecodeOptimized;
+    OpenA8DJVintageStatePayload vintageCompatible;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 _Static_assert(sizeof(OpenA8DJStreamStatsPayload) <= 4096,
                "stream stats must fit the bounded IPC payload");
@@ -3275,6 +3420,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     OpenA8DJTimecodeStatePayload timecode =
         [self timecodeStateSnapshot];
     memcpy(&stats.timecodeOptimized, &timecode, sizeof(timecode));
+    OpenA8DJVintageStatePayload vintage = VintageStateSnapshot();
+    memcpy(&stats.vintageCompatible, &vintage, sizeof(vintage));
 
     pthread_mutex_lock(&_clockAnchorMutex);
     stats.clockAnchorValid = _clockAnchor.valid ? 1 : 0;
@@ -3613,9 +3760,16 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 }
 
 - (void)armTimecodeOnWriterQueueWithProfile:(uint8_t)profile
+                              rejectionOut:(uint8_t *)rejectionOut
 {
+    __block uint8_t rejection = kOpenA8DJTimecodeRejectionNone;
     void (^armBlock)(void) = ^{
         pthread_mutex_lock(&gDriverModeMutex);
+        if (VintageModePresentLocked()) {
+            rejection = kOpenA8DJTimecodeRejectionModeConflict;
+            pthread_mutex_unlock(&gDriverModeMutex);
+            return;
+        }
         uint32_t fallback = gDriverModeState.effectiveMode;
         if (fallback ==
             kOpenA8DJDriverModeTimecodeOptimized) {
@@ -3649,6 +3803,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         armBlock();
     } else {
         dispatch_sync(_queue, armBlock);
+    }
+    if (rejectionOut != NULL) {
+        *rejectionOut = rejection;
     }
 }
 
@@ -3868,8 +4025,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint8_t profile = freshControl ?
         TimecodeProfileForControl(&control) :
         kOpenA8DJTimecodeProfileUnavailable;
-    [self armTimecodeOnWriterQueueWithProfile:profile];
+    [self armTimecodeOnWriterQueueWithProfile:profile
+                                 rejectionOut:&rejection];
+    if (rejection != kOpenA8DJTimecodeRejectionNone) {
+        [self sendTimecodeRejectionToClient:fd reason:rejection];
+        return;
+    }
     [self sendTimecodeStateToClient:fd];
+}
+
+- (void)sendVintageStateToClient:(int)fd
+{
+    OpenA8DJVintageStatePayload payload = VintageStateSnapshot();
+    (void)IPCSend(fd, kIPCTypeVintageCompatibleState,
+                  &payload, sizeof(payload));
 }
 
 - (void)disarmTimecodeForClient:(int)fd
@@ -3982,6 +4151,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             } else {
                 [self sendTimecodeRejectionToClient:fd
                                              reason:kOpenA8DJTimecodeRejectionBadLength];
+            }
+            break;
+        case kIPCTypeVintageCompatibleGet:
+            if (length == 0) {
+                [self sendVintageStateToClient:fd];
+            } else {
+                OpenA8DJVintageStatePayload vintage =
+                    VintageStateSnapshot();
+                vintage.reasons |=
+                    kOpenA8DJVintageReasonApplyFailed;
+                (void)IPCSend(fd,
+                              kIPCTypeVintageCompatibleState,
+                              &vintage,
+                              sizeof(vintage));
             }
             break;
         default:
@@ -5870,6 +6053,55 @@ bool OpenA8DJUSBSetSampleRate(double sampleRate)
     BOOL ok = !wasStreaming || [gEngine start];
     pthread_mutex_unlock(&gEngineMutex);
     return ok;
+}
+
+void OpenA8DJUSBSetHALRuntimeDescriptor(bool usbHALTimestampEnabled,
+                                        uint32_t timestampPeriodFrames,
+                                        uint8_t inputChannels,
+                                        uint8_t outputChannels,
+                                        uint8_t inputStreams,
+                                        uint8_t outputStreams,
+                                        uint8_t clientSampleFormat,
+                                        uint32_t supportedRateMask,
+                                        double sampleRate)
+{
+    pthread_mutex_lock(&gDriverModeMutex);
+    gVintageDescriptor.usbHALTimestampEnabled =
+        usbHALTimestampEnabled ? 1 : 0;
+    gVintageDescriptor.timestampPeriodFrames =
+        timestampPeriodFrames;
+    gVintageDescriptor.inputChannels = inputChannels;
+    gVintageDescriptor.outputChannels = outputChannels;
+    gVintageDescriptor.inputStreams = inputStreams;
+    gVintageDescriptor.outputStreams = outputStreams;
+    gVintageDescriptor.clientSampleFormat = clientSampleFormat;
+    gVintageDescriptor.supportedRateMask = supportedRateMask;
+    gVintageDescriptor.effectiveRateMask =
+        OpenA8DJVintageRateMaskForRate(sampleRate);
+    gVintageDescriptor.effectiveSampleRate = sampleRate;
+    gVintageDescriptor.timestampSampleRate = sampleRate;
+    pthread_mutex_unlock(&gDriverModeMutex);
+}
+
+bool OpenA8DJUSBDriverModeAllowsConfigurationChange(void)
+{
+    pthread_mutex_lock(&gDriverModeMutex);
+    bool allowed =
+        !gDriverModeStreaming || !VintageModePresentLocked();
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return allowed;
+}
+
+uint32_t OpenA8DJUSBNormalizeCoreAudioBufferFrames(
+    uint32_t requestedFrames)
+{
+    pthread_mutex_lock(&gDriverModeMutex);
+    bool effective =
+        gDriverModeState.effectiveMode ==
+            kOpenA8DJDriverModeVintageCompatible;
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return OpenA8DJVintageNormalizeBufferFrames(
+        requestedFrames, effective);
 }
 
 void OpenA8DJUSBSetCoreAudioBufferFrames(uint32_t bufferFrames)
