@@ -1523,7 +1523,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(Audi
             if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
                 return kAudioHardwareIllegalOperationError;
             }
-            ApplyBufferFrameSize(newSize);
+            UInt32 normalizedSize = NormalizeBufferFrames(newSize);
+            if (normalizedSize == 0) {
+                return kAudioHardwareUnsupportedOperationError;
+            }
+            ApplyBufferFrameSize(normalizedSize);
         }
         return kAudioHardwareNoError;
     }

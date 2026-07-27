@@ -549,8 +549,7 @@ static OpenA8DJVintageStatePayload VintageStateSnapshot(void)
     OpenA8DJDriverModeMakeStatePayload(
         &gDriverModeState, gDriverModeStreaming, &payload.driverMode);
     bool present = VintageModePresentLocked();
-    OpenA8DJVintagePreflightResult result = present ?
-        gVintagePreflight :
+    OpenA8DJVintagePreflightResult result =
         OpenA8DJVintageEvaluatePreflight(&gVintageDescriptor);
     payload.reasons = result.reasons | gVintageTransientReasons;
     payload.capabilities = result.capabilities;
