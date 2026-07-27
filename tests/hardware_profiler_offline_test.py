@@ -48,6 +48,11 @@ def base_fixture():
         "schema": "org.opena8dj.public-api.response.v1", "apiVersion": "1.0",
         "ok": True,
     }
+    iso = {
+        "queueFailures": 0, "completionStatusFailures": 0,
+        "transactionStatusFailures": 0, "zeroLengthTransactions": 0,
+        "shortTransactions": 0,
+    }
     return {
         "generatedAt": "2026-07-26T12:00:00Z",
         "osVersion": "15.5.0",
@@ -57,6 +62,8 @@ def base_fixture():
             "descriptorReadable": True, "currentConfiguration": 1, "usable": True,
             "bcdDevice": 257, "linkSpeedBitsPerSecond": 480_000_000,
             "requiredPowerMilliAmps": 500, "availablePowerMilliAmps": 500,
+            "powerEvidenceScope": "device-current-pair",
+            "powerEvidenceUnit": "mA",
             "failedRequestedPower": False,
         }],
         "coreAudioAvailable": True,
@@ -94,8 +101,8 @@ def base_fixture():
                                 "completionJitter": {"capture": direction,
                                                      "playback": direction},
                                 "isoErrors": {
-                                    "capture": {"queueFailures": 0},
-                                    "playback": {"queueFailures": 0},
+                                    "capture": iso,
+                                    "playback": iso,
                                 }},
                 },
             }},
@@ -135,6 +142,10 @@ def run(repo):
         assert_case(test_binary, directory, catalog, "absent",
                     lambda f: f["usbCandidates"].clear(),
                     {"usb.identity": ("FAIL", "USB_DEVICE_NOT_FOUND")})
+        assert_case(test_binary, directory, catalog, "usb-query-unavailable",
+                    lambda f: f.update(usbEnumerationAvailable=False),
+                    {"usb.identity": ("UNKNOWN", "USB_IDENTITY_UNKNOWN"),
+                     "usb.enumeration": ("UNKNOWN", "USB_ENUMERATION_UNKNOWN")})
         assert_case(test_binary, directory, catalog, "mismatch",
                     lambda f: f.update(usbCandidates=[{"vendorId": 1, "productId": 2}]),
                     {"usb.identity": ("FAIL", "USB_IDENTITY_MISMATCH")})
@@ -152,6 +163,9 @@ def run(repo):
                     lambda f: f["usbCandidates"][0].update(
                         requiredPowerMilliAmps=500, availablePowerMilliAmps=100),
                     {"usb.power": ("FAIL", "USB_POWER_INSUFFICIENT")})
+        assert_case(test_binary, directory, catalog, "power-scope-unknown",
+                    lambda f: f["usbCandidates"][0].pop("powerEvidenceScope"),
+                    {"usb.power": ("UNKNOWN", "USB_POWER_UNKNOWN")})
         assert_case(test_binary, directory, catalog, "power-flag",
                     lambda f: f["usbCandidates"][0].update(failedRequestedPower=True),
                     {"usb.power": ("FAIL", "USB_POWER_INSUFFICIENT")})
@@ -159,6 +173,13 @@ def run(repo):
                     lambda f: f["api"].update(hardware={"state": "unavailable"}),
                     {"driver.api-pairing": ("FAIL", "DRIVER_API_MISMATCH"),
                      "device.firmware": ("UNKNOWN", "DEVICE_INFO_UNAVAILABLE")})
+        def incomplete_hardware(fixture):
+            fixture["api"]["hardware"]["document"]["data"]["capabilities"].pop(
+                "dataAlignment")
+        assert_case(test_binary, directory, catalog, "device-info-incomplete",
+                    incomplete_hardware,
+                    {"device.firmware": ("FAIL", "DEVICE_INFO_INVALID"),
+                     "driver.api-pairing": ("FAIL", "DRIVER_API_MISMATCH")})
         assert_case(test_binary, directory, catalog, "api-schema-wrong",
                     lambda f: f["api"]["stats"]["document"].update(schema="wrong"),
                     {"driver.api-pairing": ("FAIL", "DRIVER_API_MISMATCH"),
@@ -171,6 +192,59 @@ def run(repo):
                     lambda f: f["api"]["stats"]["document"]["data"]["quality"][
                         "completionJitter"]["capture"]["bins"].update(le50=19),
                     {"usb.stream-quality": ("FAIL", "USB_QUALITY_INVALID")})
+        assert_case(test_binary, directory, catalog, "quality-missing-iso",
+                    lambda f: f["api"]["stats"]["document"]["data"]["quality"].pop(
+                        "isoErrors"),
+                    {"usb.stream-quality": ("FAIL", "USB_QUALITY_INVALID"),
+                     "driver.api-pairing": ("FAIL", "DRIVER_API_MISMATCH")})
+        assert_case(test_binary, directory, catalog, "quality-missing-output",
+                    lambda f: f["api"]["stats"]["document"]["data"].pop("output"),
+                    {"usb.stream-quality": ("FAIL", "USB_QUALITY_INVALID"),
+                     "driver.api-pairing": ("FAIL", "DRIVER_API_MISMATCH")})
+        assert_case(test_binary, directory, catalog, "quality-startup-underruns",
+                    lambda f: f["api"]["stats"]["document"]["data"]["output"].update(
+                        underruns=9),
+                    {"usb.stream-quality": ("PASS", "USB_QUALITY_HEALTHY")})
+        assert_case(test_binary, directory, catalog, "quality-active-underrun",
+                    lambda f: f["api"]["stats"]["document"]["data"]["output"].update(
+                        activeUnderruns=1),
+                    {"usb.stream-quality": ("WARN", "USB_QUALITY_DEGRADED")})
+
+        raw = base_fixture()
+        raw["rawUSBRegistryProperties"] = [{
+            "idVendor": 0x17CC, "idProduct": 0x1978, "bcdDevice": 257,
+            "kUSBCurrentConfiguration": 1, "USBSpeed": 3,
+            "USB Current Available": 500, "USB Current Required": 500,
+            "kUSBFailedRequestedPower": False,
+        }]
+        raw_path = directory / "raw-usb.json"
+        write(raw_path, raw)
+        _, raw_document = invoke(test_binary, raw_path, catalog)
+        check(codes(raw_document)["usb.enumeration"] ==
+              ("PASS", "USB_ENUMERATION_OK") and
+              codes(raw_document)["usb.link-speed"] ==
+              ("PASS", "USB_LINK_HIGH_SPEED") and
+              codes(raw_document)["usb.power"] ==
+              ("PASS", "USB_POWER_SUFFICIENT"),
+              "documented raw USB properties did not normalize correctly")
+
+        ambiguous = base_fixture()
+        ambiguous["rawUSBRegistryProperties"] = [{
+            "idVendor": 0x17CC, "idProduct": 0x1978, "bcdDevice": 257,
+            "bConfigurationValue": 1, "Device Speed": 480_000_000,
+            "USBSpeed": 7, "UsbPowerSinkAllocation": 500,
+            "Bus Power Available": 500, "USB Current Required": 500,
+        }]
+        ambiguous_path = directory / "ambiguous-usb.json"
+        write(ambiguous_path, ambiguous)
+        _, ambiguous_document = invoke(test_binary, ambiguous_path, catalog)
+        check(codes(ambiguous_document)["usb.enumeration"] ==
+              ("WARN", "USB_DESCRIPTOR_INCOMPLETE") and
+              codes(ambiguous_document)["usb.link-speed"] ==
+              ("UNKNOWN", "USB_LINK_UNKNOWN") and
+              codes(ambiguous_document)["usb.power"] ==
+              ("UNKNOWN", "USB_POWER_UNKNOWN"),
+              "ambiguous USB enum/power/configuration keys were trusted")
 
         privacy_fixture = base_fixture()
         secrets = ["/Users/alice/private.sock", "SERIAL-SECRET", "0x1234abcd",
@@ -217,6 +291,28 @@ def run(repo):
         check(codes(document)["known-issues.catalog"] ==
               ("UNKNOWN", "KNOWN_ISSUES_CATALOG_INVALID"), "duplicate rules accepted")
 
+        invalid_group_catalog = directory / "invalid-group.json"
+        invalid_group = json.loads(bundled.read_text())
+        invalid_group["issues"] = [{**rule, "id": "bad-group", "exclusiveGroup": 7}]
+        write(invalid_group_catalog, invalid_group)
+        _, document = invoke(test_binary, fixture_path, invalid_group_catalog)
+        check(codes(document)["known-issues.catalog"] ==
+              ("UNKNOWN", "KNOWN_ISSUES_CATALOG_INVALID"),
+              "non-string exclusiveGroup was accepted")
+        invalid_group["issues"][0]["exclusiveGroup"] = ""
+        write(invalid_group_catalog, invalid_group)
+        _, document = invoke(test_binary, fixture_path, invalid_group_catalog)
+        check(codes(document)["known-issues.catalog"] ==
+              ("UNKNOWN", "KNOWN_ISSUES_CATALOG_INVALID"),
+              "empty exclusiveGroup was accepted")
+        invalid_group["issues"][0]["exclusiveGroup"] = None
+        invalid_group["issues"][0]["summary"] = "x" * 1025
+        write(invalid_group_catalog, invalid_group)
+        _, document = invoke(test_binary, fixture_path, invalid_group_catalog)
+        check(codes(document)["known-issues.catalog"] ==
+              ("UNKNOWN", "KNOWN_ISSUES_CATALOG_INVALID"),
+              "oversized catalog field was accepted")
+
         conflict_catalog = directory / "conflict.json"
         fail_rule = dict(rule)
         fail_rule.update(id="conflict-fail", status="FAIL",
@@ -246,6 +342,7 @@ def run(repo):
 
         unresolved_catalog = directory / "unresolved.json"
         unresolved = json.loads(bundled.read_text())
+        unresolved["recognizedFirmwareVersions"] = [31]
         unresolved["issues"] = [{
             **rule, "id": "missing-firmware",
             "all": [{"fact": "usb.vendorId", "op": "eq", "value": 6092},
@@ -253,12 +350,21 @@ def run(repo):
         }]
         write(unresolved_catalog, unresolved)
         missing = base_fixture()
-        missing["api"]["hardware"]["document"]["data"]["deviceInfoAvailable"] = False
+        missing_data = missing["api"]["hardware"]["document"]["data"]
+        missing_data["deviceInfoAvailable"] = False
+        missing_data["firmwareVersion"] = None
+        missing_data["hardwareSubtype"] = None
+        missing_data["capabilities"] = {
+            key: None for key in missing_data["capabilities"]
+        }
         missing_path = directory / "missing.json"
         write(missing_path, missing)
         _, document = invoke(test_binary, missing_path, unresolved_catalog)
         check(codes(document)["known-issues.catalog"] ==
               ("UNKNOWN", "KNOWN_ISSUES_EVIDENCE_MISSING"), "missing evidence unmatched")
+        check(codes(document)["device.firmware"] ==
+              ("UNKNOWN", "DEVICE_INFO_UNAVAILABLE"),
+              "recognized catalog fabricated absent firmware evidence")
 
         rejected = subprocess.run(
             [str(shipping), "--fixture", str(fixture_path)],
@@ -281,6 +387,19 @@ def run(repo):
     check("expectedVID = 0x17cc" in source and "expectedPID = 0x1978" in source,
           "exact identity constants changed")
     check("productName" not in source, "name-based USB fallback exists")
+    check('"kUSBCurrentConfiguration"' in source and
+          '"bConfigurationValue"' not in source,
+          "current configuration does not use the IOUSBHost current key")
+    for forbidden in ['"Device Speed"', '"USB Link Speed"',
+                      '"UsbPowerSinkAllocation"', '"kUSBBusCurrentAllocation"',
+                      '"Bus Power Available"', '"Current Available"']:
+        check(forbidden not in source, f"ambiguous live USB property remains: {forbidden}")
+    check('"UsbLinkSpeed"' in source and '"USBSpeed"' in source and
+          "connectionSpeedBitsPerSecond" in source,
+          "USB bitrate/enum normalization is missing")
+    check("SIGTERM" in source and "SIGKILL" in source and
+          "waitUntilExit()" in source and "DispatchGroup" in source,
+          "child timeout does not terminate, kill, reap, and join readers")
 
     makefile = (repo / "Makefile").read_text()
     catalog_bytes = bundled.read_bytes()

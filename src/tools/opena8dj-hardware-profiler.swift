@@ -185,6 +185,68 @@ private func numberProperty(_ properties: [String: Any], _ names: [String]) -> I
     return nil
 }
 
+private func booleanProperty(_ properties: [String: Any], _ name: String) -> Bool? {
+    guard let number = properties[name] as? NSNumber,
+          CFGetTypeID(number) == CFBooleanGetTypeID() else { return nil }
+    return number.boolValue
+}
+
+private func connectionSpeedBitsPerSecond(_ value: Int64) -> Int64? {
+    switch value {
+    case 1: return 12_000_000
+    case 2: return 1_500_000
+    case 3: return 480_000_000
+    case 4: return 5_000_000_000
+    case 5: return 10_000_000_000
+    case 6: return 20_000_000_000
+    default: return nil
+    }
+}
+
+private func normalizedUSBDevice(_ properties: [String: Any]) -> [String: Any]? {
+    guard let vendor = numberProperty(properties, ["idVendor"]),
+          let product = numberProperty(properties, ["idProduct"]),
+          vendor == Int64(expectedVID), product == Int64(expectedPID) else { return nil }
+    let deviceRelease = numberProperty(properties, ["bcdDevice"])
+    let currentConfiguration = numberProperty(properties, ["kUSBCurrentConfiguration"])
+    var device: [String: Any] = [
+        "vendorId": vendor, "productId": product,
+        "descriptorReadable": deviceRelease != nil,
+        "currentConfiguration": currentConfiguration ?? unavailable,
+        "usable": currentConfiguration.map { $0 > 0 } ?? unavailable,
+        "bcdDevice": deviceRelease ?? unavailable
+    ]
+    if let bitrate = numberProperty(properties, ["UsbLinkSpeed"]), bitrate > 0 {
+        device["linkSpeedBitsPerSecond"] = bitrate
+        device["linkSpeedSource"] = "UsbLinkSpeed"
+    } else if let speed = numberProperty(properties, ["USBSpeed"]),
+              let bitrate = connectionSpeedBitsPerSecond(speed) {
+        device["linkSpeedBitsPerSecond"] = bitrate
+        device["linkSpeedSource"] = "USBSpeed-enum"
+    } else {
+        device["linkSpeedBitsPerSecond"] = unavailable
+        device["linkSpeedSource"] = unavailable
+    }
+
+    // Only this explicit device-scoped mA pair is treated as comparable.
+    if let available = numberProperty(properties, ["USB Current Available"]),
+       let required = numberProperty(properties, ["USB Current Required"]),
+       available >= 0, required >= 0 {
+        device["availablePowerMilliAmps"] = available
+        device["requiredPowerMilliAmps"] = required
+        device["powerEvidenceScope"] = "device-current-pair"
+        device["powerEvidenceUnit"] = "mA"
+    } else {
+        device["availablePowerMilliAmps"] = unavailable
+        device["requiredPowerMilliAmps"] = unavailable
+        device["powerEvidenceScope"] = unavailable
+        device["powerEvidenceUnit"] = unavailable
+    }
+    device["failedRequestedPower"] =
+        booleanProperty(properties, "kUSBFailedRequestedPower") ?? unavailable
+    return device
+}
+
 private func liveUSB() -> (Bool, [[String: Any]], [[String: Any]]) {
     guard let matching = IOServiceMatching("IOUSBHostDevice") else {
         return (false, [], [["source": "ioregistry.usb", "reasonCode": "matching_unavailable",
@@ -207,25 +269,7 @@ private func liveUSB() -> (Bool, [[String: Any]], [[String: Any]]) {
               let properties = unmanaged?.takeRetainedValue() as? [String: Any] else {
             continue
         }
-        guard numberProperty(properties, ["idVendor"]) == Int64(expectedVID),
-              numberProperty(properties, ["idProduct"]) == Int64(expectedPID) else { continue }
-        var device: [String: Any] = [
-            "vendorId": expectedVID, "productId": expectedPID,
-            "descriptorReadable": true,
-            "currentConfiguration": numberProperty(properties, ["bConfigurationValue"]) ?? unavailable,
-            "usable": true
-        ]
-        device["bcdDevice"] = numberProperty(properties, ["bcdDevice"]) ?? unavailable
-        device["linkSpeedBitsPerSecond"] =
-            numberProperty(properties, ["UsbLinkSpeed", "USB Link Speed", "Device Speed"]) ?? unavailable
-        device["requiredPowerMilliAmps"] =
-            numberProperty(properties, ["USB Current Required", "Current Required"]) ?? unavailable
-        device["availablePowerMilliAmps"] =
-            numberProperty(properties, ["UsbPowerSinkAllocation", "kUSBBusCurrentAllocation",
-                                        "Bus Power Available", "Current Available"]) ?? unavailable
-        device["failedRequestedPower"] =
-            (properties["kUSBFailedRequestedPower"] as? NSNumber)?.boolValue ?? unavailable
-        devices.append(device)
+        if let device = normalizedUSBDevice(properties) { devices.append(device) }
     }
     return (true, devices, [])
 }
@@ -301,6 +345,7 @@ private func runControl(_ executable: URL, _ arguments: [String]) -> [String: An
     process.standardOutput = output
     process.standardError = errors
     let semaphore = DispatchSemaphore(value: 0)
+    let readers = DispatchGroup()
     let lock = NSLock()
     var stdout = Data(), stderrBytes = 0, overflow = false
     func consume(_ data: Data, keep: Bool) {
@@ -322,32 +367,45 @@ private func runControl(_ executable: URL, _ arguments: [String]) -> [String: An
             }
         }
         lock.unlock()
-        if exceeded && process.isRunning { process.terminate() }
+        if exceeded && process.processIdentifier > 0 {
+            _ = kill(process.processIdentifier, SIGTERM)
+        }
     }
-    output.fileHandleForReading.readabilityHandler = { consume($0.availableData, keep: true) }
-    errors.fileHandleForReading.readabilityHandler = { consume($0.availableData, keep: false) }
+    func drain(_ handle: FileHandle, keep: Bool) {
+        readers.enter()
+        DispatchQueue.global(qos: .utility).async {
+            while let data = try? handle.read(upToCount: 64 * 1024), !data.isEmpty {
+                consume(data, keep: keep)
+            }
+            readers.leave()
+        }
+    }
     process.terminationHandler = { _ in semaphore.signal() }
     do { try process.run() } catch {
-        output.fileHandleForReading.readabilityHandler = nil
-        errors.fileHandleForReading.readabilityHandler = nil
         return ["state": "unavailable", "reasonCode": "launch_failed"]
     }
+    drain(output.fileHandleForReading, keep: true)
+    drain(errors.fileHandleForReading, keep: false)
+    var timedOut = false
     if semaphore.wait(timeout: .now() + .seconds(3)) == .timedOut {
-        process.terminate()
-        _ = semaphore.wait(timeout: .now() + .seconds(1))
-        output.fileHandleForReading.readabilityHandler = nil
-        errors.fileHandleForReading.readabilityHandler = nil
-        return ["state": "unavailable", "reasonCode": "timeout"]
+        timedOut = true
+        _ = kill(process.processIdentifier, SIGTERM)
+        if semaphore.wait(timeout: .now() + .milliseconds(250)) == .timedOut {
+            _ = kill(process.processIdentifier, SIGKILL)
+            process.waitUntilExit()
+        }
     }
-    output.fileHandleForReading.readabilityHandler = nil
-    errors.fileHandleForReading.readabilityHandler = nil
-    consume(output.fileHandleForReading.readDataToEndOfFile(), keep: true)
-    _ = errors.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    readers.wait()
     lock.lock()
     let didOverflow = overflow
+    let capturedStdout = stdout
     lock.unlock()
+    if timedOut {
+        return ["state": "unavailable", "reasonCode": "timeout"]
+    }
     guard !didOverflow,
-          let object = try? JSONSerialization.jsonObject(with: stdout),
+          let object = try? JSONSerialization.jsonObject(with: capturedStdout),
           let document = object as? [String: Any] else {
         return ["state": "malformed",
                 "reasonCode": didOverflow ? "output_limit_exceeded" : "invalid_json"]
@@ -381,6 +439,19 @@ private func liveObservation() -> [String: Any] {
     ]
 }
 
+#if OPENA8DJ_HARDWARE_PROFILER_TESTING
+private func fixtureObservation(_ decoded: [String: Any]) -> [String: Any] {
+    guard let raw = decoded["rawUSBRegistryProperties"] as? [[String: Any]] else {
+        return decoded
+    }
+    var observation = decoded
+    observation["usbEnumerationAvailable"] = true
+    observation["usbCandidates"] = raw.compactMap(normalizedUSBDevice)
+    observation.removeValue(forKey: "rawUSBRegistryProperties")
+    return observation
+}
+#endif
+
 private func apiDocument(_ api: [String: Any], _ name: String) -> [String: Any]? {
     guard let result = dictionary(api[name]), string(result, "state") == "ok" else { return nil }
     return dictionary(result["document"])
@@ -401,6 +472,11 @@ private func isJSONNumber(_ value: Any?) -> Bool {
     return CFGetTypeID(number) != CFBooleanGetTypeID()
 }
 
+private func nonnegativeInteger(_ object: [String: Any], _ key: String) -> Int64? {
+    guard let value = integer(object, key), value >= 0 else { return nil }
+    return value
+}
+
 private func validVersionDocument(_ document: [String: Any]?) -> Bool {
     guard validEnvelope(document, operation: "version.get"),
           let data = dictionary(document?["data"]),
@@ -419,14 +495,19 @@ private func validHardwareDocument(_ document: [String: Any]?) -> Bool {
     let capabilityKeys = ["analogAudioOutputs","analogAudioInputs","digitalAudioOutputs",
                           "digitalAudioInputs","midiOutputs","midiInputs","dataAlignment"]
     if marker {
-        return scalarKeys.allSatisfy { integer(data, $0) != nil } &&
-               capabilityKeys.allSatisfy { integer(capabilities, $0) != nil }
+        return scalarKeys.allSatisfy { nonnegativeInteger(data, $0) != nil } &&
+               capabilityKeys.allSatisfy { nonnegativeInteger(capabilities, $0) != nil }
     }
     return scalarKeys.allSatisfy { data[$0] is NSNull } &&
            capabilityKeys.allSatisfy { capabilities[$0] is NSNull }
 }
 
-private func validStatsDocument(_ document: [String: Any]?) -> Bool {
+private let jitterBinKeys = ["le50","le100","le250","le500","le1000","gt1000"]
+private let isoErrorKeys = ["queueFailures","completionStatusFailures",
+                            "transactionStatusFailures","zeroLengthTransactions",
+                            "shortTransactions"]
+
+private func basicStatsData(_ document: [String: Any]?) -> [String: Any]? {
     guard validEnvelope(document, operation: "stats.get"),
           let data = dictionary(document?["data"]),
           let stream = dictionary(data["stream"]),
@@ -437,8 +518,40 @@ private func validStatsDocument(_ document: [String: Any]?) -> Bool {
           integer(capture, "transfers") != nil,
           integer(playback, "transfers") != nil,
           let quality = dictionary(data["quality"]),
-          bool(quality, "instrumentationAvailable") != nil else { return false }
+          bool(quality, "instrumentationAvailable") != nil else { return nil }
+    return data
+}
+
+private func qualityStructureValid(_ data: [String: Any]) -> Bool {
+    guard let quality = dictionary(data["quality"]),
+          let jitter = dictionary(quality["completionJitter"]),
+          let iso = dictionary(quality["isoErrors"]),
+          let output = dictionary(data["output"]),
+          let activeUnderruns = integer(output, "activeUnderruns"),
+          let ringOverruns = integer(output, "ringOverruns"),
+          activeUnderruns >= 0, ringOverruns >= 0 else { return false }
+    for directionName in ["capture", "playback"] {
+        guard let direction = dictionary(jitter[directionName]),
+              let samples = integer(direction, "samples"),
+              let invalid = integer(direction, "invalidIntervals"),
+              let bins = dictionary(direction["bins"]),
+              samples >= 0, invalid >= 0 else { return false }
+        let values = jitterBinKeys.compactMap { integer(bins, $0) }
+        guard values.count == jitterBinKeys.count,
+              values.allSatisfy({ $0 >= 0 }),
+              values.reduce(Int64(0), +) == samples,
+              let errors = dictionary(iso[directionName]),
+              isoErrorKeys.allSatisfy({
+                  guard let value = integer(errors, $0) else { return false }
+                  return value >= 0
+              }) else { return false }
+    }
     return true
+}
+
+private func validStatsDocument(_ document: [String: Any]?) -> Bool {
+    guard let data = basicStatsData(document) else { return false }
+    return qualityStructureValid(data)
 }
 
 private func percentileBin(_ direction: [String: Any], _ numerator: Int64) -> Int {
@@ -454,19 +567,28 @@ private func percentileBin(_ direction: [String: Any], _ numerator: Int64) -> In
 }
 
 private func evaluateQuality(_ statsDocument: [String: Any]?) -> [String: Any] {
-    guard validStatsDocument(statsDocument),
-          let data = dictionary(statsDocument?["data"]),
+    guard let data = basicStatsData(statsDocument),
           let stream = dictionary(data["stream"]),
-          bool(stream, "streaming") == true,
           let quality = dictionary(data["quality"]),
-          bool(quality, "instrumentationAvailable") == true,
-          let jitter = dictionary(quality["completionJitter"]),
-          let capture = dictionary(jitter["capture"]),
-          let playback = dictionary(jitter["playback"]) else {
+          let streaming = bool(stream, "streaming"),
+          let instrumentation = bool(quality, "instrumentationAvailable") else {
         return check("usb.stream-quality", .unknown, "USB_QUALITY_UNAVAILABLE",
                      "Stream quality evidence is unavailable.",
                      [evidence("opena8dj.api.stats", "quality.instrumentationAvailable", nil,
                                reason: "not_streaming_or_unavailable")])
+    }
+    guard streaming, instrumentation else {
+        return check("usb.stream-quality", .unknown, "USB_QUALITY_UNAVAILABLE",
+                     "Stream quality instrumentation is inactive or unavailable.")
+    }
+    guard qualityStructureValid(data),
+          let jitter = dictionary(quality["completionJitter"]),
+          let capture = dictionary(jitter["capture"]),
+          let playback = dictionary(jitter["playback"]),
+          let iso = dictionary(quality["isoErrors"]),
+          let output = dictionary(data["output"]) else {
+        return check("usb.stream-quality", .fail, "USB_QUALITY_INVALID",
+                     "Claimed quality instrumentation is structurally inconsistent.")
     }
     let transferObjects = [dictionary(data["capture"]), dictionary(data["playback"])]
     let directions = [capture, playback]
@@ -475,19 +597,7 @@ private func evaluateQuality(_ statsDocument: [String: Any]?) -> [String: Any] {
         let transfers = transferObjects[index].flatMap { integer($0, "transfers") } ?? 0
         if transfers == 0 { continue }
         active += 1
-        guard let samples = integer(directions[index], "samples"),
-              let bins = dictionary(directions[index]["bins"]) else {
-            return check("usb.stream-quality", .unknown, "USB_QUALITY_UNAVAILABLE",
-                         "Quality samples are unavailable.")
-        }
-        let binKeys = ["le50","le100","le250","le500","le1000","gt1000"]
-        let binValues = binKeys.compactMap { integer(bins, $0) }
-        let sum = binValues.reduce(Int64(0), +)
-        if samples < 0 || binValues.count != binKeys.count ||
-           binValues.contains(where: { $0 < 0 }) || sum != samples {
-            return check("usb.stream-quality", .fail, "USB_QUALITY_INVALID",
-                         "Quality counters are structurally inconsistent.")
-        }
+        let samples = integer(directions[index], "samples")!
         if samples < 20 {
             return check("usb.stream-quality", .unknown, "USB_QUALITY_UNAVAILABLE",
                          "There are not enough quality samples.")
@@ -506,16 +616,13 @@ private func evaluateQuality(_ statsDocument: [String: Any]?) -> [String: Any] {
             degraded = true
         }
     }
-    if let iso = dictionary(quality["isoErrors"]) {
-        for directionName in ["capture", "playback"] {
-            if let values = dictionary(iso[directionName]),
-               values.values.contains(where: { ($0 as? NSNumber)?.int64Value ?? 0 > 0 }) {
-                degraded = true
-            }
+    for directionName in ["capture", "playback"] {
+        if let values = dictionary(iso[directionName]),
+           isoErrorKeys.contains(where: { (integer(values, $0) ?? 0) > 0 }) {
+            degraded = true
         }
     }
-    if let output = dictionary(data["output"]),
-       ["underruns","activeUnderruns","ringOverruns"].contains(where: {
+    if ["activeUnderruns","ringOverruns"].contains(where: {
            (integer(output, $0) ?? 0) > 0
        }) { degraded = true }
     return degraded ?
@@ -531,6 +638,18 @@ private let allowedFacts: Set<String> = [
     "device.firmwareVersion","device.hardwareSubtype","driver.version","api.version","os.version"
 ]
 private let allowedOps: Set<String> = ["eq","ne","lt","lte","gt","gte","version-in-range"]
+private let integerFacts: Set<String> = [
+    "usb.vendorId","usb.productId","usb.bcdDevice","usb.linkSpeedBitsPerSecond",
+    "usb.requiredPowerMilliAmps","usb.availablePowerMilliAmps",
+    "device.firmwareVersion","device.hardwareSubtype"
+]
+
+private func isNonnegativeIntegerNumber(_ number: NSNumber) -> Bool {
+    guard CFGetTypeID(number) != CFBooleanGetTypeID() else { return false }
+    let value = number.doubleValue
+    return value.isFinite && value >= 0 && value.rounded(.towardZero) == value &&
+           value <= Double(Int64.max)
+}
 
 private func strictVersion(_ value: String) -> [Int]? {
     let parts = value.split(separator: ".", omittingEmptySubsequences: false)
@@ -561,24 +680,35 @@ private func catalogValidation(_ catalog: [String: Any]) -> String? {
           catalog["issues"] is [[String: Any]] else { return "schema_or_version" }
     if let recognized = catalog["recognizedFirmwareVersions"] {
         guard let values = recognized as? [NSNumber],
-              values.allSatisfy({
-                  CFGetTypeID($0) != CFBooleanGetTypeID() && $0.int64Value >= 0
-              }),
+              values.allSatisfy(isNonnegativeIntegerNumber),
               Set(values.map(\.int64Value)).count == values.count else {
             return "invalid_recognized_firmware"
         }
     }
     var ids = Set<String>()
     for issue in array(catalog["issues"]) {
-        guard let id = string(issue, "id"), !id.isEmpty, ids.insert(id).inserted,
+        guard let id = string(issue, "id"), !id.isEmpty, id.count <= 128,
+              ids.insert(id).inserted,
               let status = string(issue, "status"), status == "WARN" || status == "FAIL",
               let summary = string(issue, "summary"), !summary.isEmpty,
+              summary.count <= 1024,
               let source = dictionary(issue["source"]),
-              !(string(source, "title") ?? "").isEmpty,
-              !(string(source, "version") ?? "").isEmpty,
+              let sourceTitle = string(source, "title"), !sourceTitle.isEmpty,
+              sourceTitle.count <= 256,
+              let sourceVersion = string(source, "version"), !sourceVersion.isEmpty,
+              sourceVersion.count <= 128,
+              (source["url"] == nil || (source["url"] as? String).map {
+                  !$0.isEmpty && $0.count <= 2048
+              } == true),
               let remediation = issue["remediation"] as? [String], !remediation.isEmpty,
+              remediation.allSatisfy({ !$0.isEmpty && $0.count <= 2048 }),
               let predicates = issue["all"] as? [[String: Any]], !predicates.isEmpty else {
             return "invalid_rule"
+        }
+        if let group = issue["exclusiveGroup"], !(group is NSNull) {
+            guard let text = group as? String, !text.isEmpty, text.count <= 128 else {
+                return "invalid_exclusive_group"
+            }
         }
         for predicate in predicates {
             guard let fact = string(predicate, "fact"), allowedFacts.contains(fact),
@@ -588,11 +718,24 @@ private func catalogValidation(_ catalog: [String: Any]) -> String? {
             if op == "version-in-range" {
                 guard let minimum = string(predicate, "minimum"),
                       let maximum = string(predicate, "maximum"),
-                      strictVersion(minimum) != nil, strictVersion(maximum) != nil else {
+                      let parsedMinimum = strictVersion(minimum),
+                      let parsedMaximum = strictVersion(maximum),
+                      compareVersion(parsedMinimum, parsedMaximum) <= 0 else {
                     return "invalid_version_range"
                 }
-            } else if predicate["value"] == nil || predicate["value"] is NSNull {
-                return "missing_value"
+            } else {
+                guard let value = predicate["value"], !(value is NSNull) else {
+                    return "missing_value"
+                }
+                if integerFacts.contains(fact) {
+                    guard let number = value as? NSNumber,
+                          isNonnegativeIntegerNumber(number) else {
+                        return "invalid_value_type"
+                    }
+                } else {
+                    guard let text = value as? String, !text.isEmpty,
+                          text.count <= 128 else { return "invalid_value_type" }
+                }
             }
         }
     }
@@ -704,7 +847,7 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
     }
     var checks: [[String: Any]] = []
     if !usbAvailable {
-        checks.append(check("usb.identity", .unknown, "USB_DEVICE_NOT_FOUND",
+        checks.append(check("usb.identity", .unknown, "USB_IDENTITY_UNKNOWN",
                             "USB enumeration is unavailable.",
                             [evidence("ioregistry.usb", "enumeration", nil,
                                       reason: "query_unavailable")]))
@@ -724,8 +867,11 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
                             "No exact Audio 8 DJ USB device is present."))
     }
 
-    let device = exact.first
-    if let device {
+    let device = usbAvailable ? exact.first : nil
+    if !usbAvailable {
+        checks.append(check("usb.enumeration", .unknown, "USB_ENUMERATION_UNKNOWN",
+                            "USB enumeration evidence is unavailable."))
+    } else if let device {
         let descriptor = bool(device, "descriptorReadable")
         let configuration = integer(device, "currentConfiguration")
         let usable = bool(device, "usable")
@@ -740,7 +886,7 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
                                 "The exact USB identity is present but descriptors are incomplete."))
         }
     } else {
-        checks.append(check("usb.enumeration", .unknown, "USB_ENUMERATION_FAILED",
+        checks.append(check("usb.enumeration", .unknown, "USB_ENUMERATION_UNKNOWN",
                             "USB enumeration cannot be evaluated without the exact device."))
     }
 
@@ -769,6 +915,8 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
                             "The USB stack asserted failed requested power.",
                             [evidence("ioregistry.usb", "failedRequestedPower", true)]))
     } else if let device,
+              string(device, "powerEvidenceScope") == "device-current-pair",
+              string(device, "powerEvidenceUnit") == "mA",
               let available = integer(device, "availablePowerMilliAmps"),
               let required = integer(device, "requiredPowerMilliAmps") {
         let enough = available >= required
@@ -790,16 +938,22 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
     let hardwareDoc = apiDocument(api, "hardware")
     let statsDoc = apiDocument(api, "stats")
     let hardwareValid = validHardwareDocument(hardwareDoc)
-    let hardwareData = hardwareValid ? dictionary(hardwareDoc?["data"]) : nil
+    let hardwareEnvelopeValid = validEnvelope(hardwareDoc, operation: "hardware.get")
+    let hardwareData = hardwareEnvelopeValid ? dictionary(hardwareDoc?["data"]) : nil
     let infoAvailable = hardwareData.flatMap { bool($0, "deviceInfoAvailable") } == true
-    let firmware = infoAvailable ? hardwareData.flatMap { integer($0, "firmwareVersion") } : nil
-    let subtype = infoAvailable ? hardwareData.flatMap { integer($0, "hardwareSubtype") } : nil
+    let observedFirmware = infoAvailable ?
+        hardwareData.flatMap { nonnegativeInteger($0, "firmwareVersion") } : nil
+    let observedSubtype = infoAvailable ?
+        hardwareData.flatMap { nonnegativeInteger($0, "hardwareSubtype") } : nil
     let capabilities = hardwareData.flatMap { dictionary($0["capabilities"]) }
-    let completeDeviceInfo = firmware != nil && subtype != nil && capabilities != nil &&
+    let completeDeviceInfo = observedFirmware != nil && observedSubtype != nil &&
+        capabilities != nil &&
         ["analogAudioOutputs","analogAudioInputs","digitalAudioOutputs","digitalAudioInputs",
          "midiOutputs","midiInputs","dataAlignment"].allSatisfy { field in
-            capabilities.flatMap { integer($0, field) } != nil
+            capabilities.flatMap { nonnegativeInteger($0, field) } != nil
         }
+    let firmware = infoAvailable && completeDeviceInfo ? observedFirmware : nil
+    let subtype = infoAvailable && completeDeviceInfo ? observedSubtype : nil
     let firmwareCheckIndex = checks.count
     if infoAvailable && !completeDeviceInfo {
         checks.append(check("device.firmware", .fail, "DEVICE_INFO_INVALID",
@@ -845,9 +999,9 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
                             "Core Audio pairing is unknown while USB is absent."))
     }
 
-    let hardwareStructuresConsistent = !infoAvailable || completeDeviceInfo
+    let hardwareStructuresConsistent = hardwareValid && (!infoAvailable || completeDeviceInfo)
     let allAPIsValid = validVersionDocument(versionDoc) &&
-                       hardwareValid && hardwareStructuresConsistent &&
+                       hardwareStructuresConsistent &&
                        validStatsDocument(statsDoc)
     if uidDevices.count == 1 && allAPIsValid {
         let apiVersion = string(versionDoc.flatMap { dictionary($0["data"]) } ?? [:], "apiVersion")
@@ -874,10 +1028,15 @@ private func evaluate(_ observation: [String: Any], catalog: [String: Any],
     if let device {
         for (fact, key) in [
             ("usb.vendorId","vendorId"),("usb.productId","productId"),("usb.bcdDevice","bcdDevice"),
-            ("usb.linkSpeedBitsPerSecond","linkSpeedBitsPerSecond"),
-            ("usb.requiredPowerMilliAmps","requiredPowerMilliAmps"),
-            ("usb.availablePowerMilliAmps","availablePowerMilliAmps")
+            ("usb.linkSpeedBitsPerSecond","linkSpeedBitsPerSecond")
         ] { facts[fact] = device[key] ?? unavailable }
+        if string(device, "powerEvidenceScope") == "device-current-pair",
+           string(device, "powerEvidenceUnit") == "mA" {
+            facts["usb.requiredPowerMilliAmps"] =
+                device["requiredPowerMilliAmps"] ?? unavailable
+            facts["usb.availablePowerMilliAmps"] =
+                device["availablePowerMilliAmps"] ?? unavailable
+        }
     }
     facts["device.firmwareVersion"] = firmware ?? unavailable
     facts["device.hardwareSubtype"] = subtype ?? unavailable
@@ -999,7 +1158,7 @@ do {
             throw NSError(domain: "fixture", code: 70,
                           userInfo: [NSLocalizedDescriptionKey: "fixture is not an object"])
         }
-        observation = decoded
+        observation = fixtureObservation(decoded)
     } else {
         observation = liveObservation()
     }

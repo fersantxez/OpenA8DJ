@@ -9,6 +9,7 @@ Give local third-party applications a stable, machine-readable way to:
 
 - discover the API version;
 - read a bounded, documented snapshot of driver statistics;
+- read marker-qualified device information already cached by the HAL;
 - enumerate the built-in profiles;
 - query the active profile and control state; and
 - apply one built-in profile dynamically.
@@ -57,6 +58,7 @@ The public entry point is:
 ```text
 opena8dj-control api version
 opena8dj-control api stats
+opena8dj-control api hardware
 opena8dj-control api profiles
 opena8dj-control api profile
 opena8dj-control api profile set <canonical-profile-id>
@@ -90,8 +92,8 @@ Required top-level members and their types are stable for API major version 1:
 - `schema`: the exact string above;
 - `apiVersion`: semantic API version string, initially `1.0`;
 - `ok`: boolean;
-- `operation`: one of `version.get`, `stats.get`, `profiles.list`,
-  `profile.get`, or `profile.set`; and
+- `operation`: one of `version.get`, `stats.get`, `hardware.get`,
+  `profiles.list`, `profile.get`, or `profile.set`; and
 - `data`: an object on success.
 
 Minor releases may add object members and new operations. They must not remove
@@ -142,7 +144,29 @@ Unknown operations use the literal operation value `unknown`.
 - `privateIPCVersion`: `1` (diagnostic only; not a promise that clients may use
   the private IPC); and
 - `capabilities`: an array containing `stats.read`, `usb-quality.read`,
-  `profiles.list`, `profile.read`, and `profile.write`.
+  `hardware.read`, `profiles.list`, `profile.read`, and `profile.write`.
+
+### `hardware.get`
+
+This operation takes no arguments and reads only the already cached
+device-information tail in the non-resetting HAL statistics snapshot. It does
+not open or wake a USB device, issue `GET_DEVICE_INFO`, start Core Audio, change
+a profile or hardware control, or perform firmware management.
+
+`data.deviceInfoAvailable` is `true` only when the HAL received and completely
+decoded the command-matched device-information response during its existing
+open path. When true, `firmwareVersion` and `hardwareSubtype` are integers and
+`capabilities` contains integer `analogAudioOutputs`, `analogAudioInputs`,
+`digitalAudioOutputs`, `digitalAudioInputs`, `midiOutputs`, `midiInputs`, and
+`dataAlignment`.
+
+For an older append-compatible HAL, an absent tail, or any marker other than
+exactly `1`, the operation still succeeds with `deviceInfoAvailable: false`.
+`firmwareVersion`, `hardwareSubtype`, and every member of
+`data.capabilities` are then JSON `null`; these placeholders are unavailable
+evidence and must not be interpreted as firmware zero or zero capabilities. A
+private reply shorter than the existing base through `sampleRate` remains a
+`backend_protocol_error`.
 
 ### `profiles.list`
 
@@ -288,7 +312,8 @@ factored functions linked into a harness), not just grep source:
    `backend_permission_denied`, `backend_protocol_error`, and
    `profile_apply_failed`, including stable exit statuses.
 6. Use a private temporary-directory mock of private IPC v1 to test profile
-   query, stats conversion, successful set/read-back, and mismatched read-back.
+   query, stats conversion, cached hardware conversion including legacy-null
+   semantics, successful set/read-back, and mismatched read-back.
    The test binary may receive a compile-time socket path and an explicit
    test-only allowance for a mock owned by the current UID; the shipping binary
    may not have a runtime redirect or current-UID owner bypass.
@@ -314,7 +339,7 @@ performance measurement must instead run through:
 
 ## Acceptance criteria
 
-- All five public operations return the documented v1 JSON envelopes.
+- All six public operations return the documented v1 JSON envelopes.
 - Existing non-API commands remain behaviorally compatible.
 - A caller cannot use the public API to apply anything except a canonical
   built-in preset.

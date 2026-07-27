@@ -13,6 +13,11 @@ Exit status is `0` for PASS, `1` for WARN, `2` for FAIL, `3` when evidence is
 incomplete/UNKNOWN, `64` for invalid arguments, and `70` for an internal
 construction error. UNKNOWN is not a health claim.
 
+Unavailable USB enumeration uses the additive result codes
+`USB_IDENTITY_UNKNOWN` and `USB_ENUMERATION_UNKNOWN`; these are distinct from
+the failure codes for an observed missing/mismatched identity or unusable
+device.
+
 The profiler enumerates public IORegistry and Core Audio properties and calls
 the authenticated, non-waking `opena8dj-control api` process interface. It
 does not open or reset USB devices, start audio, query firmware directly,
