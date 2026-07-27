@@ -94,8 +94,11 @@ any transform is `wrong_profile`.
 
 The mode does not infer or select one of these profiles. `api profile set` and
 `api driver-mode arm` remain separate authenticated, serialized transactions.
-A profile change while armed resets qualification. A profile change while
-optimized triggers fail-open deoptimization and disarms the mode.
+A profile change while armed resets qualification and leaves the explicit arm
+visible as `waiting_profile`. A profile change while optimized triggers
+fail-open deoptimization to the fallback and leaves the arm inelegible. It must
+reverify, requalify, and cross a new safe boundary before becoming effective
+again.
 
 ## Explicit arm and session lifecycle
 
@@ -144,6 +147,7 @@ The classifier uses fixed 250 ms windows derived from the active sample rate.
 It records per channel:
 
 - decoded frame count;
+- sum, so mean/DC can be removed;
 - sum of squares;
 - absolute peak; and
 - finite-value/decoder validity.
@@ -151,17 +155,20 @@ It records per channel:
 The initial internal thresholds are conservative candidates, immutable through
 the public API:
 
-- allowed-channel entry: RMS at least `0.002` (about -54 dBFS) and peak at
-  least `0.007943` (about -42 dBFS);
-- allowed-channel hold: RMS at least `0.001` (about -60 dBFS) or peak at least
-  `0.003981` (about -48 dBFS);
-- forbidden-channel trip: RMS at least `0.001` or peak at least `0.003981`.
+- allowed-channel entry: AC RMS after mean removal at least `0.01` (about
+  -40 dBFS) and peak at least `0.031623` (about -30 dBFS);
+- allowed-channel hold: AC RMS after mean removal at least `0.005` (about
+  -46 dBFS) or peak at least `0.015849` (about -36 dBFS);
+- forbidden-channel trip: AC RMS after mean removal at least `0.001` or peak
+  at least `0.003981`.
 
 A pair is entry-active only when both of its channels meet both entry
 conditions in the same complete window. A and B must both be entry-active.
 Any channel of C or D meeting the forbidden trip is outside-allowlist activity.
-NaN, infinity, an incomplete window, no fresh frame, or a frame-count mismatch
-is missing/invalid evidence, never silence.
+Constant DC cannot qualify because entry and hold use variance-derived AC RMS;
+peak alone is insufficient for entry. NaN, infinity, an incomplete window, no
+fresh frame, or a frame-count mismatch is missing/invalid evidence, never
+silence.
 
 These thresholds are engineering starting points, not a claim that every
 timecode medium has this level. They may be revised only with recorded physical
@@ -234,7 +241,7 @@ require a new explicit arm before any future optimization:
 | Three or four active pairs | one window | deopt, disarm |
 | A or B absent below hold | four windows | deopt, remain armed and requalify only after fallback boundary |
 | classifier stats missing/invalid | immediate at 500 ms | deopt, disarm |
-| electrical profile/control change or mismatch | immediate | deopt, disarm |
+| electrical profile/control change or mismatch | immediate | deopt, remain armed in `waiting_profile` |
 | sample-rate request/change | before configuration commit | deopt, disarm |
 | Core Audio buffer request/change | before configuration commit | deopt, disarm |
 | input decode disabled or routing/transform changed | immediate | deopt, disarm |
@@ -420,9 +427,10 @@ Stable new errors:
 | `timecode_profile_not_eligible` | no fresh exact electrical profile | true | 5 |
 | `timecode_arm_apply_failed` | transactional arm/preflight failed | true | 5 |
 
-Wrong profile may be represented truthfully as an armed waiting state only if
-the caller explicitly allows waiting; the canonical CLI arm defaults to
-rejecting before mutation when the current profile is already known wrong.
+Wrong, stale, or unavailable profile is represented truthfully as an armed
+`waiting_profile` state. The arm succeeds because it records explicit A+B
+intent, but cannot qualify or become effective until a fresh exact electrical
+profile is verified.
 
 ## Observability requirements
 
@@ -460,8 +468,9 @@ Required cases:
 6. Exactly A+B active for seven windows does not qualify; the eighth qualifies.
 7. Only A, only B, or one channel of a stereo pair never qualifies.
 8. A+B active qualifies; A+B+C or all four trips immediately.
-9. Values immediately below/at/above RMS and peak thresholds exercise both
-   conditions and hysteresis deterministically.
+9. Values immediately below/at/above AC RMS and peak thresholds exercise both
+   conditions and hysteresis deterministically; constant DC and low noise do
+   not qualify.
 10. A brief allowed-pair dropout does not deopt; four windows do.
 11. One forbidden-pair window, missing/invalid stats, wrong profile, profile
     change, rate change, buffer change, input routing/transform/decode change,
