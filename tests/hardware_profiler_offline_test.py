@@ -435,7 +435,9 @@ def run(repo):
         "deviceNumDigitalAudioOut", "deviceNumDigitalAudioIn",
         "deviceNumMidiOut", "deviceNumMidiIn", "deviceDataAlignment",
     ]
-    check(hal_fields == cli_fields and hal_fields[-10:] == expected_tail,
+    device_start = hal_fields.index("deviceInfoAvailable")
+    check(hal_fields == cli_fields and
+          hal_fields[device_start:device_start + len(expected_tail)] == expected_tail,
           "append-only payload parity/tail failed")
     check("_deviceInfoAvailable = true" in hal and
           "bytes[0] != kCommandGetDeviceInfo" in hal,

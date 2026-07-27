@@ -161,6 +161,22 @@ def stream_payload(source_path):
         "deviceNumMidiOut": 1,
         "deviceNumMidiIn": 1,
         "deviceDataAlignment": 2,
+        "driverModeSchemaVersion": 1,
+        "driverModeRequested": 2,
+        "driverModeEffective": 1,
+        "driverModePending": 1,
+        "driverModeLastResult": 2,
+        "driverModeRejectionReason": 0,
+        "driverModeGeneration": 4,
+        "driverModeAcceptedRequests": 5,
+        "driverModeRejectedRequests": 2,
+        "driverModeAppliedTransitions": 1,
+        "driverModeApplyFailures": 1,
+        "driverModePendingTransitions": 3,
+        "driverModeOutputStartLatencyFrames": 8192,
+        "driverModeOutputRestartLatencyFrames": 4096,
+        "driverModeOutputTargetLatencyFrames": 8192,
+        "driverModeWorkerQoS": 0,
     }
     for name, value in values.items():
         field_offset, fmt = offsets[name]
@@ -169,7 +185,7 @@ def stream_payload(source_path):
     base_length = sample_rate_offset + struct.calcsize("=" + sample_rate_format)
     old_tail_offset, old_tail_format = offsets["outputLateWriteBatches"]
     old_tail_length = old_tail_offset + struct.calcsize("=" + old_tail_format)
-    return bytes(payload), values, base_length, old_tail_length
+    return bytes(payload), values, base_length, old_tail_length, offsets
 
 
 class MockIPC:
@@ -334,7 +350,8 @@ def run_tests(repo, shipping_binary):
     validate_envelope(document, "version.get", True)
     check(document["data"]["capabilities"] == [
         "stats.read", "usb-quality.read", "hardware.read",
-        "profiles.list", "profile.read", "profile.write"
+        "profiles.list", "profile.read", "profile.write",
+        "driver-mode.read", "driver-mode.write"
     ], "wrong capabilities")
 
     result, document = invoke(shipping_binary, "api", "profiles")
@@ -431,14 +448,16 @@ def run_tests(repo, shipping_binary):
                   "public profile read used destructive input statistics")
         socket_path.unlink(missing_ok=True)
 
-        stats_payload, expected_stats, stats_base_length, stats_old_tail_length = stream_payload(source)
+        (stats_payload, expected_stats, stats_base_length,
+         stats_old_tail_length, stats_offsets) = stream_payload(source)
         with MockIPC(socket_path, initial_state, stats=stats_payload) as server:
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "stats query failed")
             validate_envelope(document, "stats.get", True)
             data = document["data"]
             check(set(data) == {
-                "stream", "clock", "capture", "playback", "output", "health", "quality"
+                "stream", "clock", "capture", "playback", "output", "health",
+                "quality", "driverMode"
             },
                   "wrong stats group set")
             check(set(data["stream"]) == {
@@ -526,6 +545,13 @@ def run_tests(repo, shipping_binary):
             check(iso["playback"]["shortTransactions"] ==
                   expected_stats["playbackISOShortTransactions"],
                   "playback shorts lost")
+            check(data["driverMode"]["requestedMode"] == "performance" and
+                  data["driverMode"]["effectiveMode"] == "balanced" and
+                  data["driverMode"]["pending"] is True,
+                  "driver mode stats state missing")
+            check(data["driverMode"]["counters"]["rejectedRequests"] == 2 and
+                  data["driverMode"]["effectivePolicy"]["workerQoS"] == "default",
+                  "driver mode counters or policy missing")
             check([request[2] for request in server.requests] == [STREAM_STATS_GET],
                   "stats request was not a single non-destructive stream snapshot")
         socket_path.unlink(missing_ok=True)
@@ -548,7 +574,8 @@ def run_tests(repo, shipping_binary):
                   "hardware API did not use one cached stream snapshot")
         socket_path.unlink(missing_ok=True)
 
-        with MockIPC(socket_path, initial_state, stats=stats_payload[:-80]):
+        device_info_offset = stats_offsets["deviceInfoAvailable"][0]
+        with MockIPC(socket_path, initial_state, stats=stats_payload[:device_info_offset]):
             result, document = invoke(harness, "api", "hardware")
             check(result.returncode == 0, "legacy hardware tail failed")
             validate_envelope(document, "hardware.get", True)
@@ -583,6 +610,8 @@ def run_tests(repo, shipping_binary):
                   "missing trailing counter was not zero")
             check(document["data"]["quality"]["instrumentationAvailable"] is False,
                   "base legacy payload claimed instrumentation")
+            check(document["data"]["driverMode"] is None,
+                  "base legacy payload fabricated driver mode")
         socket_path.unlink(missing_ok=True)
 
         with MockIPC(socket_path, initial_state, stats=stats_payload[:stats_old_tail_length]):
@@ -592,11 +621,15 @@ def run_tests(repo, shipping_binary):
                   "legacy former-tail payload claimed instrumentation")
             check(document["data"]["quality"]["completionJitter"]["capture"]["samples"] == 0,
                   "legacy payload fabricated jitter")
+            check(document["data"]["driverMode"] is None,
+                  "former-tail payload fabricated driver mode")
         socket_path.unlink(missing_ok=True)
 
-        marker_disabled_payload = (
-            stats_payload[:-88] + struct.pack("=Q", 0) + stats_payload[-80:]
-        )
+        marker_disabled_payload = bytearray(stats_payload)
+        struct.pack_into("=Q",
+                         marker_disabled_payload,
+                         stats_offsets["qualityInstrumentationEnabled"][0],
+                         0)
         with MockIPC(socket_path, initial_state, stats=marker_disabled_payload):
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "disabled instrumentation stats failed")
@@ -665,15 +698,29 @@ def run_tests(repo, shipping_binary):
     check(field_names[field_names.index("outputLateWriteBatches") + 1] ==
           "captureCompletionJitterSamples",
           "quality fields were not appended after the former tail")
-    check(field_names[-12:-10] == [
+    quality_marker = field_names.index("qualityInstrumentationEnabled")
+    check(field_names[quality_marker - 1:quality_marker + 1] == [
         "playbackISOShortTransactions", "qualityInstrumentationEnabled"
     ], "instrumentation availability moved within the existing quality group")
-    check(field_names[-10:] == [
+    device_fields = [
         "deviceInfoAvailable", "deviceFirmwareVersion", "deviceHardwareSubtype",
         "deviceNumAnalogAudioOut", "deviceNumAnalogAudioIn",
         "deviceNumDigitalAudioOut", "deviceNumDigitalAudioIn",
         "deviceNumMidiOut", "deviceNumMidiIn", "deviceDataAlignment",
-    ], "device-information fields are not the exact append-only tail")
+    ]
+    device_start = field_names.index("deviceInfoAvailable")
+    check(field_names[device_start:device_start + len(device_fields)] == device_fields,
+          "device-information append-only group changed")
+    check(field_names[device_start + len(device_fields):] == [
+        "driverModeSchemaVersion", "driverModeRequested", "driverModeEffective",
+        "driverModePending", "driverModeLastResult", "driverModeRejectionReason",
+        "driverModeGeneration", "driverModeAcceptedRequests",
+        "driverModeRejectedRequests", "driverModeAppliedTransitions",
+        "driverModeApplyFailures", "driverModePendingTransitions",
+        "driverModeOutputStartLatencyFrames",
+        "driverModeOutputRestartLatencyFrames",
+        "driverModeOutputTargetLatencyFrames", "driverModeWorkerQoS",
+    ], "driver-mode fields are not the exact append-only tail")
     payload_size = sum(
         struct.calcsize("=" + {
             "uint8_t": "B", "uint32_t": "I", "uint64_t": "Q", "double": "d"

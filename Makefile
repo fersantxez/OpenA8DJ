@@ -7,6 +7,7 @@ HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
 HAL_CONFIG := build/hal-build-config.txt
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_IPC_AUTH := src/hal/OpenA8DJIPCAuth.h
+DRIVER_MODE_HEADER := src/hal/OpenA8DJDriverMode.h
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
@@ -48,6 +49,8 @@ CONTROL_TOOL := build/opena8dj-control
 CONTROL_TOOL_SRC := src/tools/opena8dj-control.c
 PUBLIC_API_TEST := tests/public_api_contract_test.py
 PUBLIC_API_PEER_POLICY_TEST := tests/public_api_peer_policy_test.c
+DRIVER_MODE_TEST := tests/driver_mode_offline_test.py
+DRIVER_MODE_STATE_TEST := tests/driver_mode_state_test.c
 USB_QUALITY_CLI_TEST := tests/usb_quality_cli_test.py
 HARDWARE_PROFILER := build/opena8dj-hardware-profiler
 HARDWARE_PROFILER_TEST := build/opena8dj-hardware-profiler-test
@@ -217,7 +220,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center driver-mode-offline-test public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(MIDI_LIST)
 
@@ -240,7 +243,7 @@ $(HAL_CONFIG): FORCE
 		rm -f "$$tmp"; \
 	fi
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(HAL_PLIST) $(HAL_CONFIG)
+$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(DRIVER_MODE_HEADER) $(HAL_PLIST) $(HAL_CONFIG)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
@@ -569,12 +572,15 @@ $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build
 	xcrun clang $(CFLAGS) $(MIDI_FRAMEWORKS) -o $@ $<
 
-$(CONTROL_TOOL): $(CONTROL_TOOL_SRC)
+$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 
 public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST) $(PUBLIC_API_PEER_POLICY_TEST) $(HAL_IPC_AUTH)
 	python3 $(PUBLIC_API_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
+
+driver-mode-offline-test: $(CONTROL_TOOL) $(DRIVER_MODE_TEST) $(DRIVER_MODE_STATE_TEST) $(DRIVER_MODE_HEADER)
+	python3 $(DRIVER_MODE_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
 
 usb-quality-offline-test: $(CONTROL_TOOL) $(USB_QUALITY_CLI_TEST)
 	python3 $(USB_QUALITY_CLI_TEST) --repo .
