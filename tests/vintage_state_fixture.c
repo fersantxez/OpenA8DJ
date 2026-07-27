@@ -24,6 +24,8 @@ static OpenA8DJVintageBuildDescriptor GoodDescriptor(void)
     descriptor.timestampPeriodFrames = 16384;
     descriptor.supportedRateMask =
         kOpenA8DJVintageRequiredRateMask;
+    descriptor.transportRateMask =
+        kOpenA8DJVintageRequiredRateMask;
     descriptor.effectiveRateMask =
         kOpenA8DJVintageRate48000;
     descriptor.currentBufferFrames = 512;

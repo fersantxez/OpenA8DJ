@@ -310,6 +310,7 @@ static uint64_t gVintageTransientReasons = 0;
 
 static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
                                           void *context);
+static int SampleRateCode(double sampleRate);
 
 static void VintageRefreshDescriptorLocked(void)
 {
@@ -325,6 +326,27 @@ static void VintageRefreshDescriptorLocked(void)
     gVintageDescriptor.captureTransactions = kIsoFramesPerTransfer;
     gVintageDescriptor.playbackTransactions =
         kPlaybackIsoFramesPerTransfer;
+    gVintageDescriptor.transportRateMask = 0;
+    if (SampleRateCode(44100.0) >= 0) {
+        gVintageDescriptor.transportRateMask |=
+            kOpenA8DJVintageRate44100;
+    }
+    if (SampleRateCode(48000.0) >= 0) {
+        gVintageDescriptor.transportRateMask |=
+            kOpenA8DJVintageRate48000;
+    }
+    if (SampleRateCode(88200.0) >= 0) {
+        gVintageDescriptor.transportRateMask |=
+            kOpenA8DJVintageRate88200;
+    }
+    if (SampleRateCode(96000.0) >= 0) {
+        gVintageDescriptor.transportRateMask |=
+            kOpenA8DJVintageRate96000;
+    }
+    if (SampleRateCode(192000.0) >= 0) {
+        gVintageDescriptor.transportRateMask |=
+            kOpenA8DJVintageRate192000;
+    }
     gVintageDescriptor.currentBufferFrames =
         atomic_load(&gCoreAudioBufferFrames);
 }

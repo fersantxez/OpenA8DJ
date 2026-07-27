@@ -73,6 +73,8 @@ static OpenA8DJVintageBuildDescriptor GoodDescriptor(void)
         kOpenA8DJVintageRequiredTimestampPeriodFrames;
     descriptor.supportedRateMask =
         kOpenA8DJVintageRequiredRateMask;
+    descriptor.transportRateMask =
+        kOpenA8DJVintageRequiredRateMask;
     descriptor.effectiveRateMask =
         kOpenA8DJVintageRate48000;
     descriptor.currentBufferFrames =
@@ -180,6 +182,10 @@ static void CheckPreflightFailures(void)
     CHECK_FAILURE(currentBufferFrames, 1024,
                   kOpenA8DJVintageReasonBufferNot512);
     CHECK_FAILURE(supportedRateMask,
+                  kOpenA8DJVintageRequiredRateMask &
+                      ~kOpenA8DJVintageRate88200,
+                  kOpenA8DJVintageReasonRateSurfaceMismatch);
+    CHECK_FAILURE(transportRateMask,
                   kOpenA8DJVintageRequiredRateMask &
                       ~kOpenA8DJVintageRate88200,
                   kOpenA8DJVintageReasonRateSurfaceMismatch);

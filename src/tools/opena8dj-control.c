@@ -2490,7 +2490,8 @@ static void PrintPublicVintageMembers(
             "\"rate96000\":%s,\"rate192000\":%s},"
             "\"preflight\":{\"generation\":%llu,"
             "\"failureCounter\":%llu,\"currentBufferFrames\":%u,"
-            "\"supportedRateMask\":%u,\"effectiveRateMask\":%u,"
+            "\"supportedRateMask\":%u,\"transportRateMask\":%u,"
+            "\"effectiveRateMask\":%u,"
             "\"timestampPeriodFrames\":%u,"
             "\"bufferNormalization\":",
             (state->capabilities &
@@ -2527,6 +2528,7 @@ static void PrintPublicVintageMembers(
             (unsigned long long)state->failureCounter,
             state->descriptor.currentBufferFrames,
             state->descriptor.supportedRateMask,
+            state->descriptor.transportRateMask,
             state->descriptor.effectiveRateMask,
             state->descriptor.timestampPeriodFrames);
     PrintJSONString(

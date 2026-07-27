@@ -116,6 +116,7 @@ typedef struct OpenA8DJVintageBuildDescriptor {
     uint16_t playbackTransactions;
     uint32_t timestampPeriodFrames;
     uint32_t supportedRateMask;
+    uint32_t transportRateMask;
     uint32_t effectiveRateMask;
     uint32_t currentBufferFrames;
     double effectiveSampleRate;
@@ -230,6 +231,10 @@ static inline OpenA8DJVintagePreflightResult OpenA8DJVintageEvaluatePreflight(
     }
     if (descriptor->supportedRateMask !=
             kOpenA8DJVintageRequiredRateMask ||
+        descriptor->transportRateMask !=
+            kOpenA8DJVintageRequiredRateMask ||
+        descriptor->supportedRateMask !=
+            descriptor->transportRateMask ||
         descriptor->effectiveRateMask == 0 ||
         (descriptor->effectiveRateMask &
              ~kOpenA8DJVintageRequiredRateMask) != 0 ||
