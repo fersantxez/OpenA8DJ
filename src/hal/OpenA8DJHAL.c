@@ -1471,6 +1471,7 @@ static void ScheduleBackgroundPreopen(void)
 
 static void NotifySampleRateChanged(void)
 {
+    return;
     if (gHost == NULL) {
         return;
     }
@@ -1483,10 +1484,6 @@ static void NotifySampleRateChanged(void)
         {kAudioStreamPropertyPhysicalFormat, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain}
     };
     gHost->PropertiesChanged(gHost, kOpenA8DJDeviceObjectID, 2, deviceChanged);
-    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackDeviceObjectID, 2,
-                             deviceChanged);
-    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackStreamObjectID, 2,
-                             streamChanged);
     for (UInt32 i = 0; i < kOpenA8DJOutputStreamCount; i++) {
         gHost->PropertiesChanged(gHost, kOutputStreamIDs[i], 2, streamChanged);
     }
@@ -1495,6 +1492,33 @@ static void NotifySampleRateChanged(void)
         gHost->PropertiesChanged(gHost, kInputStreamIDs[i], 2, streamChanged);
     }
 #endif
+}
+
+static void NotifyLoopbackSampleRateChanged(void)
+{
+    if (gHost == NULL) {
+        return;
+    }
+    AudioObjectPropertyAddress deviceChanged[] = {
+        {kAudioDevicePropertyNominalSampleRate,
+         kAudioObjectPropertyScopeGlobal,
+         kAudioObjectPropertyElementMain},
+        {kAudioDevicePropertyActualSampleRate,
+         kAudioObjectPropertyScopeGlobal,
+         kAudioObjectPropertyElementMain}
+    };
+    AudioObjectPropertyAddress streamChanged[] = {
+        {kAudioStreamPropertyVirtualFormat,
+         kAudioObjectPropertyScopeGlobal,
+         kAudioObjectPropertyElementMain},
+        {kAudioStreamPropertyPhysicalFormat,
+         kAudioObjectPropertyScopeGlobal,
+         kAudioObjectPropertyElementMain}
+    };
+    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackDeviceObjectID, 2,
+                             deviceChanged);
+    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackStreamObjectID, 2,
+                             streamChanged);
 }
 
 static void ApplySampleRate(Float64 newRate)
@@ -1525,11 +1549,13 @@ static void ApplySampleRate(Float64 newRate)
             newRate);
         OpenA8DJUSBSetCoreAudioBufferFrames(gBufferFrames);
         NotifySampleRateChanged();
+        NotifyLoopbackSampleRateChanged();
     }
 }
 
 static void NotifyBufferFrameSizeChanged(void)
 {
+    return;
     if (gHost == NULL) {
         return;
     }

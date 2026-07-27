@@ -440,4 +440,3 @@ contract, privacy reset, and noninterference by fixtures. It does not prove
 recording application, streaming application, aggregate-device, long-duration
 drift, or OBS behavior. Those require a separately authorized live matrix under
 the shared hardware lock and must not be claimed until executed.
-
