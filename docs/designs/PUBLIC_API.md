@@ -217,7 +217,6 @@ compares the read-back payload with the expected payload. It returns
 
 On success, `data` contains:
 
-- `requestedProfile`: the canonical requested ID;
 - `activeProfile`: the truthfully inferred ID or `"custom"`;
 - `applied`: `true`; and
 - the same control state fields as `profile.get`.
@@ -433,6 +432,11 @@ performance measurement must instead run through:
   --run-dir <unique-run-directory> \
   -- <command>
 ```
+
+The `public-api` gate is only for general live API work. Any live driver-mode
+or performance-mode command, Core Audio or USB exercise, or benchmark must use
+`--gate performance-mode` as required by
+[PERFORMANCE_MODE.md](PERFORMANCE_MODE.md).
 
 ## Acceptance criteria
 
