@@ -1,0 +1,1 @@
+{"schema":"org.opena8dj.public-api.response.v1","apiVersion":"1.1","ok":true,"operation":"profiles.list","data":{"profiles":[{"id":"playback-4out","title":"Playback","surface":"4 stereo outputs","summary":"A/B/C/D output pairs."},{"id":"traktor-dvs-vinyl","title":"DVS Vinyl","surface":"Traktor A/B","summary":"A/B timecode vinyl."}]}}

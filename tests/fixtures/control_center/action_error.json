@@ -1,0 +1,1 @@
+{"schema":"org.opena8dj.public-api.response.v1","apiVersion":"1.1","ok":false,"operation":"profile.set","error":{"code":"profile_apply_failed","message":"The requested profile could not be applied and verified.","retryable":true}}

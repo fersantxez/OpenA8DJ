@@ -69,8 +69,26 @@ HARDWARE_PROFILER_GENERATED_SRC := build/opena8dj-hardware-profiler-main.swift
 HARDWARE_PROFILER_CATALOG := resources/hardware-profiler-known-issues-v1.json
 HARDWARE_PROFILER_TEST_SRC := tests/hardware_profiler_offline_test.py
 CONTROL_CENTER_APP := build/OpenA8DJControlCenter.app
-CONTROL_CENTER_SRC := macos/OpenA8DJControlCenter/OpenA8DJControlCenter.swift
+CONTROL_CENTER_SRC := \
+	macos/OpenA8DJControlCenter/Models.swift \
+	macos/OpenA8DJControlCenter/Decoders.swift \
+	macos/OpenA8DJControlCenter/ProcessRunner.swift \
+	macos/OpenA8DJControlCenter/DashboardReducer.swift \
+	macos/OpenA8DJControlCenter/ControlCenterStore.swift \
+	macos/OpenA8DJControlCenter/Views.swift \
+	macos/OpenA8DJControlCenter/App.swift
+CONTROL_CENTER_CORE_SRC := \
+	macos/OpenA8DJControlCenter/Models.swift \
+	macos/OpenA8DJControlCenter/Decoders.swift \
+	macos/OpenA8DJControlCenter/ProcessRunner.swift \
+	macos/OpenA8DJControlCenter/DashboardReducer.swift
 CONTROL_CENTER_PLIST := macos/OpenA8DJControlCenter/Info.plist
+CONTROL_CENTER_FIXTURES := $(sort $(wildcard tests/fixtures/control_center/*))
+CONTROL_CENTER_OFFLINE_TEST_SRC := tests/control_center_offline_tests.swift
+CONTROL_CENTER_OFFLINE_TEST := build/control-center-offline-tests
+CONTROL_CENTER_UI_TEST_SRC := tests/control_center_ui_construction.swift
+CONTROL_CENTER_UI_TEST := build/control-center-ui-construction
+CONTROL_CENTER_POLICY_TEST := tests/control_center_source_policy_test.py
 MIDI_LIST := build/midi-list
 MIDI_LIST_SRC := src/tools/midi-list.c
 LAUNCH_AGENT_PLIST := resources/org.opena8dj.midid.plist
@@ -230,7 +248,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center driver-mode-offline-test vintage-compatible-offline-test virtual-loopback-offline-test virtual-loopback-tsan-test virtual-loopback-smoke-locked public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center control-center-offline-test control-center-smoke-test driver-mode-offline-test vintage-compatible-offline-test virtual-loopback-offline-test virtual-loopback-tsan-test virtual-loopback-smoke-locked public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(MIDI_LIST)
 
@@ -636,15 +654,52 @@ $(HARDWARE_PROFILER_TEST): $(HARDWARE_PROFILER_GENERATED_SRC)
 hardware-profiler-offline-test: $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_TEST) $(HARDWARE_PROFILER_TEST_SRC)
 	python3 "$(HARDWARE_PROFILER_TEST_SRC)" --repo .
 
-$(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL)
+$(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_CATALOG)
 	rm -rf "$(CONTROL_CENTER_APP)"
 	mkdir -p "$(CONTROL_CENTER_APP)/Contents/MacOS" "$(CONTROL_CENTER_APP)/Contents/Resources"
 	cp "$(CONTROL_CENTER_PLIST)" "$(CONTROL_CENTER_APP)/Contents/Info.plist"
 	cp "$(CONTROL_TOOL)" "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
-	xcrun swiftc -parse-as-library -O -framework SwiftUI -framework AppKit -o "$(CONTROL_CENTER_APP)/Contents/MacOS/OpenA8DJControlCenter" "$(CONTROL_CENTER_SRC)"
+	cp "$(HARDWARE_PROFILER)" "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler"
+	cp "$(HARDWARE_PROFILER_CATALOG)" "$(CONTROL_CENTER_APP)/Contents/Resources/hardware-profiler-known-issues-v1.json"
+	chmod 755 "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control" "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler"
+	xcrun swiftc -parse-as-library -O -target "$$(uname -m)-apple-macosx13.0" \
+		-framework SwiftUI -framework AppKit \
+		-o "$(CONTROL_CENTER_APP)/Contents/MacOS/OpenA8DJControlCenter" $(CONTROL_CENTER_SRC)
 	codesign --force --deep --sign - "$(CONTROL_CENTER_APP)"
 
 control-center: $(CONTROL_CENTER_APP)
+
+$(CONTROL_CENTER_OFFLINE_TEST): $(CONTROL_CENTER_CORE_SRC) $(CONTROL_CENTER_OFFLINE_TEST_SRC)
+	@mkdir -p build
+	xcrun swiftc -O -o "$@" $(CONTROL_CENTER_CORE_SRC) "$(CONTROL_CENTER_OFFLINE_TEST_SRC)"
+
+control-center-offline-test: $(CONTROL_CENTER_OFFLINE_TEST) $(CONTROL_CENTER_FIXTURES) $(CONTROL_CENTER_POLICY_TEST)
+	"$(CONTROL_CENTER_OFFLINE_TEST)" tests/fixtures/control_center
+	python3 "$(CONTROL_CENTER_POLICY_TEST)" --repo .
+
+$(CONTROL_CENTER_UI_TEST): $(filter-out macos/OpenA8DJControlCenter/App.swift,$(CONTROL_CENTER_SRC)) $(CONTROL_CENTER_UI_TEST_SRC)
+	@mkdir -p build
+	xcrun swiftc -parse-as-library -O -D OPENA8DJ_CONTROL_CENTER_TESTING \
+		-target "$$(uname -m)-apple-macosx13.0" \
+		-framework SwiftUI -framework AppKit -o "$@" \
+		$(filter-out macos/OpenA8DJControlCenter/App.swift,$(CONTROL_CENTER_SRC)) \
+		"$(CONTROL_CENTER_UI_TEST_SRC)"
+
+control-center-smoke-test: control-center-offline-test $(CONTROL_CENTER_APP) $(CONTROL_CENTER_UI_TEST)
+	"$(CONTROL_CENTER_UI_TEST)" tests/fixtures/control_center
+	plutil -lint "$(CONTROL_CENTER_APP)/Contents/Info.plist"
+	codesign --verify --deep --strict "$(CONTROL_CENTER_APP)"
+	test -f "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
+	test ! -L "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
+	test -x "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control"
+	test -f "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler"
+	test ! -L "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler"
+	test -x "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler"
+	test -f "$(CONTROL_CENTER_APP)/Contents/Resources/hardware-profiler-known-issues-v1.json"
+	test "$$(shasum -a 256 "$(CONTROL_TOOL)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-control" | awk '{print $$1}')"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_CENTER_APP)/Contents/Resources/opena8dj-hardware-profiler" | awk '{print $$1}')"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER_CATALOG)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_CENTER_APP)/Contents/Resources/hardware-profiler-known-issues-v1.json" | awk '{print $$1}')"
+	! find "$(CONTROL_CENTER_APP)" -type f \( -iname '*native*instruments*' -o -iname '*traktor*.png' -o -iname '*traktor*.icns' \) | grep .
 
 $(MIDI_LIST): $(MIDI_LIST_SRC)
 	@mkdir -p build
@@ -740,7 +795,14 @@ control-surfaces-package: $(CONTROL_CENTER_APP) $(HARDWARE_PROFILER) $(HARDWARE_
 	install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh"
 	test -x "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-hardware-profiler"
 	test -f "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+	test -x "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/opena8dj-control"
+	test -x "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/opena8dj-hardware-profiler"
+	test -f "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/hardware-profiler-known-issues-v1.json"
+	test "$$(shasum -a 256 "$(CONTROL_TOOL)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/opena8dj-control" | awk '{print $$1}')"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/opena8dj-hardware-profiler" | awk '{print $$1}')"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER_CATALOG)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app/Contents/Resources/hardware-profiler-known-issues-v1.json" | awk '{print $$1}')"
 	test "$$(shasum -a 256 "$(HARDWARE_PROFILER_CATALOG)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json" | awk '{print $$1}')"
+	! find "$(CONTROL_PKG_ROOT)" -type f \( -iname '*native*instruments*' -o -iname '*traktor*.png' -o -iname '*traktor*.icns' \) | grep .
 	chmod +x "$(CONTROL_PKG_SCRIPTS)/preinstall" "$(CONTROL_PKG_SCRIPTS)/postinstall" "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh"
 	xattr -cr "$(CONTROL_PKG_ROOT)" 2>/dev/null || true
 	find "$(CONTROL_PKG_ROOT)" -name '._*' -delete

@@ -3,9 +3,14 @@ set -eu
 
 /usr/sbin/chown -R root:wheel /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 /bin/chmod -R go-w /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
-/usr/sbin/chown root:wheel /Library/LaunchAgents/org.opena8dj.midid.plist /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid /usr/local/bin/opena8dj-uninstall
+/usr/sbin/chown root:wheel /Library/LaunchAgents/org.opena8dj.midid.plist \
+  /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-hardware-profiler \
+  /usr/local/bin/opena8dj-midid /usr/local/bin/opena8dj-uninstall \
+  "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
 /bin/chmod 644 /Library/LaunchAgents/org.opena8dj.midid.plist
-/bin/chmod 755 /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid /usr/local/bin/opena8dj-uninstall
+/bin/chmod 755 /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-hardware-profiler /usr/local/bin/opena8dj-midid /usr/local/bin/opena8dj-uninstall
+/bin/chmod 644 "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+/bin/chmod go-w "/Library/Application Support/OpenA8DJ"
 /usr/bin/xattr -cr /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver 2>/dev/null || true
 /usr/bin/find /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver /usr/local/bin /Library/LaunchAgents -name '._*' -delete 2>/dev/null || true
 

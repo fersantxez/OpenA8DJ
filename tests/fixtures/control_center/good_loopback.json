@@ -1,0 +1,1 @@
+{"schema":"org.opena8dj.public-api.response.v1","apiVersion":"1.1","ok":true,"operation":"loopback.get","data":{"enabled":false,"sourcePair":"A","sessionOnly":true,"physicalPlaybackPublishing":false,"ringCapacity":32768,"generation":4,"registeredReaderCount":0,"sourceFramesPublished":0,"framesDelivered":0,"silenceFrames":0,"gapFrames":0,"overrunEvents":0,"overrunFrames":0}}
