@@ -64,8 +64,9 @@ To inspect the device from Terminal:
 OpenA8DJ has two control surfaces:
 
 - `/usr/local/bin/opena8dj-control`: scriptable engineering and recovery CLI.
-- `OpenA8DJ Control Center`: native macOS app for presets, status, import/export,
-  and safe profile switching.
+- `OpenA8DJ Control Center`: native macOS foreground dashboard for validated
+  device, USB-quality, profile, driver-mode, Timecode, Vintage, loopback, and
+  profiler evidence, with confirmed and separately read-back mutations.
 
 These tools have their own installer, separate from the full driver package.
 Use it when the HAL driver is already installed and you only need to update the
@@ -88,6 +89,8 @@ The opena8dj-tools installer adds:
 ```text
 /Applications/OpenA8DJ Control Center.app
 /usr/local/bin/opena8dj-control
+/usr/local/bin/opena8dj-hardware-profiler
+/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json
 /Library/Documentation/OpenA8DJ/ControlSurfaces
 ```
 
@@ -103,7 +106,23 @@ Build and open the local app without packaging:
 
 ```sh
 make control-center
-open build/OpenA8DJControlCenter.app
+make control-center-offline-test
+make control-center-smoke-test
+```
+
+The offline targets compile the production decoder/reducer/process policy,
+exercise checked-in API 1.1/quality/profiler fixtures, construct every dashboard
+section offscreen, and verify the signed bundle and hashes. They do not contact
+Core Audio, the driver, a private socket, hardware, or the network.
+
+Any live launch, profiler run, installation test, or screenshot must use the
+shared hardware gate:
+
+```sh
+./scripts/shared-hardware-lock-run \
+  --gate modern-control-panel \
+  --run-dir local-analysis/modern-control-panel/<unique-run> \
+  -- open build/OpenA8DJControlCenter.app
 ```
 
 Manual local install without creating a package:
@@ -118,10 +137,11 @@ Uninstall only the control surfaces:
 sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh
 ```
 
-The local app bundle embeds the matching `opena8dj-control` binary in
-`Contents/Resources`, so the UI and CLI use the same backend. Local builds are
-ad-hoc signed for development; public distribution still requires Developer ID
-signing and Apple notarization.
+The app embeds the matching `opena8dj-control`,
+`opena8dj-hardware-profiler`, and immutable known-issues catalog in
+`Contents/Resources`. It resolves only those regular executable bundle
+siblings. Local builds are ad-hoc signed for development; public distribution
+still requires Developer ID signing and Apple notarization.
 
 Detailed usage, presets, cabling workflows, and diagrams are in
 [Control surfaces user guide](AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md).

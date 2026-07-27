@@ -1,5 +1,51 @@
 # Audio 8 DJ Control Surface Verification - 2026-06-19
 
+## Modern Control Center offline verification — 2026-07-27
+
+The current panel supersedes the preset/import/export UI described later in
+this historical record. Its supported trust boundary is the bundled public API
+1.1 process interface plus the bundled read-only hardware profiler. The panel
+does not directly use private IPC, Core Audio, USB, a shell, `PATH`, or a
+network.
+
+Offline acceptance commands:
+
+```sh
+make control-center-offline-test
+make control-center-smoke-test
+```
+
+The fixture suite covers compatible 1.1, older compatible partial tails,
+profiler `UNKNOWN`, schema/API/operation/type/enum/cross-field mismatches,
+invalid UTF-8, missing newline, duplicate/trailing objects, stdout/stderr caps,
+timeout/cancellation, non-overlap, refresh coalescing, visibility cancellation,
+2/4/8/15-second backoff, baseline/delta/counter reset/reconnect/generation
+rollback, stale last-good retention, action errors, requested/effective pending,
+Timecode armed/waiting, Vintage partial/unverified, loopback privacy/default
+disabled, and package/source policy.
+
+The smoke target performs a release build at deployment target macOS 13.0,
+constructs the root and every top-level SwiftUI section offscreen from checked-in
+fixtures, lints the plist, verifies the ad-hoc signature, rejects symlinked or
+missing bundled tools, verifies the control/profiler/catalog hashes, and checks
+for prohibited vendor assets and APIs.
+
+No app launch, Core Audio/API live read, live profiler invocation, install, or
+screenshot is part of those commands. Consequently this implementation is
+offline-verified only. Live metrics and final visual QA remain unverified until
+normal, dark, increased-contrast, large-text, and Reduce Motion screenshots are
+captured under:
+
+```sh
+./scripts/shared-hardware-lock-run \
+  --gate modern-control-panel \
+  --run-dir local-analysis/modern-control-panel/<unique-run> \
+  -- open build/OpenA8DJControlCenter.app
+```
+
+The older locked results below remain historical evidence for the old control
+surface; they are not evidence for the modern dashboard.
+
 ## Scope
 
 This verifies the two current OpenA8DJ control surfaces:

@@ -7,6 +7,8 @@ installer. It installs:
 
 - `/Applications/OpenA8DJ Control Center.app`
 - `/usr/local/bin/opena8dj-control`
+- `/usr/local/bin/opena8dj-hardware-profiler`
+- `/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json`
 - `/Library/Documentation/OpenA8DJ/ControlSurfaces`
 
 It does not install, replace, unload, or restart the HAL driver. It does not
@@ -19,7 +21,8 @@ Local development build:
 
 ```sh
 make control-center
-open build/OpenA8DJControlCenter.app
+make control-center-offline-test
+make control-center-smoke-test
 ```
 
 Local installer package:
@@ -50,27 +53,25 @@ sudo /Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-
 
 ## Control Surface Model
 
-The macOS panel and the CLI share the same backend. The app bundle embeds the
-matching CLI binary and calls it for every read/write.
+The panel is a client of versioned, public process JSON. Its bundle contains
+the matching control tool, profiler, and known-issues catalog; it never searches
+`PATH`, runs a shell, opens the private socket itself, or contacts a network.
 
 ```text
 User
   |
   +-- OpenA8DJ Control Center.app
   |      |
-  |      +-- Contents/Resources/opena8dj-control
+  |      +-- Contents/Resources/opena8dj-control (public API 1.1)
+  |      +-- Contents/Resources/opena8dj-hardware-profiler
+  |      +-- Contents/Resources/hardware-profiler-known-issues-v1.json
   |
   +-- Terminal: /usr/local/bin/opena8dj-control
-         |
-         v
-  /tmp/opena8dj-control.sock
-         |
-         v
-  OpenA8DJ HAL bridge
-         |
-         v
-  Native Instruments Audio 8 DJ
 ```
+
+Only the public CLI owns its authenticated driver transport. The dashboard does
+not expose private IPC details, raw JSON, paths, environment values, or
+arbitrary stderr.
 
 ## Safety Rule For Shared Hardware
 
@@ -83,7 +84,10 @@ The panel is an end-user UI and does not acquire the development lock itself.
 For locked engineering work, prefer the CLI through:
 
 ```sh
-scripts/shared-hardware-lock-run --gate control-surface-work --run-dir local-analysis/... -- ./build/opena8dj-control ...
+./scripts/shared-hardware-lock-run \
+  --gate modern-control-panel \
+  --run-dir local-analysis/modern-control-panel/<unique-run> \
+  -- open build/OpenA8DJControlCenter.app
 ```
 
 ## Open The Panel
@@ -100,16 +104,59 @@ Development app:
 open build/OpenA8DJControlCenter.app
 ```
 
-The panel supports:
+The panel has five keyboard-accessible sections:
 
-- Preset selection.
-- Apply selected preset.
-- Refresh current hardware state.
-- Export current config as JSON.
-- Import a saved JSON config.
+- Overview: profiler device/firmware/power/Core Audio checks, exact electrical
+  profile and stream state.
+- USB Quality: backend classification and reasons, bounded p95/p99 jitter,
+  isochronous errors, hard xruns, late writes, sampling context, and age.
+- Driver Modes: separate requested/effective/pending state, effective policy,
+  Timecode arm/qualification/fail-open evidence, and the literal
+  `Experimental — Unverified` Vintage status.
+- Loopback: exact output source pair, session-only publishing/readers/counters,
+  and gap/overrun evidence. Loopback starts disabled.
+- Diagnostics: backend/schema disagreements and redacted source errors.
 
-It intentionally does not yet expose every low-level field as manual controls.
-Use the CLI for individual toggles and routing transforms.
+The dashboard polls only while its window is foreground-visible. Closing,
+miniaturizing, resigning active, or leaving the dashboard cancels the current
+bounded process and cadence. A backend absence backs off to 2, 4, 8, then 15
+seconds. Permission/protocol failures do not spin. At three seconds evidence is
+shown as aging; at ten seconds it is stale. A failed refresh keeps the last
+validated values visible only with a stale phase, age, and source error.
+
+`UNKNOWN`, partial, insufficient-data, not-streaming, warming-up, pending,
+experimental, unverified, stale, and mismatch are distinct textual states.
+Power is never inferred from device presence, and USB `bcdDevice` is never
+presented as firmware.
+
+Profile, Balanced/Performance/Vintage, Timecode arm/disarm, and loopback
+operations are compile-time allowlisted. The panel permits one busy action,
+shows the requested effect before executing it, validates the mutation
+response, performs a separate public get, and compares fields/generation.
+Pending is a successful truthful result. A disagreement causes at most one
+compensating public mutation and one final read-back; the UI reports rolled
+back, rollback failed, rollback unavailable, or indeterminate without erasing
+the original error.
+
+Enabling loopback, including changing its source while enabled, requires an
+explicit privacy confirmation: the selected output pair becomes an
+application-readable virtual input for the current session. No pair is called
+a “master.” Disable remains immediate when no other action is busy.
+
+The profiler is support-redacted and read-only. `UNKNOWN` means evidence was
+not available; it is not success or failure. The app sends no profiler data
+off-machine.
+
+Offline verification:
+
+```sh
+make control-center-offline-test
+make control-center-smoke-test
+```
+
+Those commands do not prove live metrics or final visual quality. Live launch
+and screenshots at normal, dark, increased-contrast, large-text, and Reduce
+Motion settings require the `modern-control-panel` shared lock shown above.
 
 ## CLI Quick Reference
 
