@@ -22,7 +22,12 @@ CONTROL_STATE = 6
 INPUT_STATS_GET = 8
 STREAM_STATS_GET = 10
 STREAM_STATS = 11
+LOOPBACK_GET = 21
+LOOPBACK_SET = 22
+LOOPBACK_STATE = 23
 HEADER = struct.Struct("=IBBH")
+LOOPBACK_SET_PAYLOAD = struct.Struct("=IBBBB")
+LOOPBACK_STATE_PAYLOAD = struct.Struct("=IBBBBIIQQQQQQQ")
 SCHEMA = "org.opena8dj.public-api.response.v1"
 CANONICAL_PROFILES = [
     "playback-4out",
@@ -65,7 +70,7 @@ def invoke(binary, *args):
 
 def validate_envelope(document, operation, ok):
     check(document["schema"] == SCHEMA, "wrong schema")
-    check(document["apiVersion"] == "1.0", "wrong API version")
+    check(document["apiVersion"] == "1.1", "wrong API version")
     check(document["ok"] is ok, "wrong ok value")
     check(document["operation"] == operation, "wrong operation")
     check(isinstance(document["data" if ok else "error"], dict), "wrong envelope payload type")
@@ -198,6 +203,7 @@ class MockIPC:
         malformed=False,
         mode=0o666,
         replace_path_on_accept=False,
+        loopback_state=None,
     ):
         self.path = str(path)
         self.state = bytearray(state)
@@ -206,6 +212,9 @@ class MockIPC:
         self.malformed = malformed
         self.mode = mode
         self.replace_path_on_accept = replace_path_on_accept
+        self.loopback_state = list(loopback_state or (
+            1, 0, 0, 1, 0, 32768, 0, 1, 0, 0, 0, 0, 0, 0
+        ))
         self.requests = []
         self.error = None
         self.replacement = None
@@ -272,6 +281,27 @@ class MockIPC:
                         self.state[:] = payload
                     elif message_type == STREAM_STATS_GET:
                         self._send(connection, STREAM_STATS, self.stats)
+                    elif message_type == LOOPBACK_GET:
+                        self._send(
+                            connection, LOOPBACK_STATE,
+                            LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
+                        )
+                    elif message_type == LOOPBACK_SET:
+                        if len(payload) == LOOPBACK_SET_PAYLOAD.size:
+                            schema, enabled, source, r0, r1 = (
+                                LOOPBACK_SET_PAYLOAD.unpack(payload)
+                            )
+                            if (schema == 1 and enabled in (0, 1) and
+                                    source in range(4) and r0 == 0 and r1 == 0):
+                                if (self.loopback_state[1] != enabled or
+                                        self.loopback_state[2] != source):
+                                    self.loopback_state[7] += 1
+                                self.loopback_state[1] = enabled
+                                self.loopback_state[2] = source
+                        self._send(
+                            connection, LOOPBACK_STATE,
+                            LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
+                        )
         except (BrokenPipeError, ConnectionResetError, OSError) as error:
             if self.listener.fileno() != -1:
                 self.error = error
@@ -354,7 +384,8 @@ def run_tests(repo, shipping_binary):
         "driver-mode.read", "driver-mode.write",
         "timecode-optimized.read", "timecode-optimized.arm",
         "driver-mode.vintage-compatible.read",
-        "driver-mode.vintage-compatible.write"
+        "driver-mode.vintage-compatible.write",
+        "loopback.read", "loopback.write"
     ], "wrong capabilities")
 
     result, document = invoke(shipping_binary, "api", "profiles")
@@ -389,8 +420,62 @@ def run_tests(repo, shipping_binary):
                 "api", "profile", "set", rejected
             )
         assert_error(harness, 3, "profile.get", "backend_unavailable", "api", "profile")
-
         initial_state = bytes([0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 2, 3, 1])
+        for rejected in ["a", "0", "AA", "../A", "A" * 65]:
+            assert_error(
+                harness, 2, "loopback.enable",
+                "loopback_source_not_allowed",
+                "api", "loopback", "enable", rejected
+            )
+
+        with MockIPC(socket_path, initial_state) as server:
+            result, document = invoke(
+                harness, "api", "loopback", "get"
+            )
+            check(result.returncode == 0, "loopback get failed")
+            validate_envelope(document, "loopback.get", True)
+            check(document["data"]["enabled"] is False, "loopback default not disabled")
+            check(document["data"]["sourcePair"] == "A", "loopback default source wrong")
+            check([request[2] for request in server.requests] == [LOOPBACK_GET],
+                  "loopback get used unexpected IPC")
+        socket_path.unlink(missing_ok=True)
+
+        for pair in ["A", "B", "C", "D"]:
+            with MockIPC(socket_path, initial_state) as server:
+                result, document = invoke(
+                    harness, "api", "loopback", "enable", pair
+                )
+                check(result.returncode == 0, f"loopback enable {pair} failed")
+                validate_envelope(document, "loopback.enable", True)
+                check(document["data"]["enabled"] is True,
+                      "loopback enable not reflected")
+                check(document["data"]["sourcePair"] == pair,
+                      "loopback source read-back mismatch")
+                check([request[2] for request in server.requests] ==
+                      [LOOPBACK_SET, LOOPBACK_GET],
+                      "loopback set/get was not same-connection transaction")
+            socket_path.unlink(missing_ok=True)
+
+        enabled_b = (
+            1, 1, 1, 1, 0, 32768, 0, 9, 4, 3, 2, 1, 0, 0
+        )
+        with MockIPC(
+            socket_path, initial_state, loopback_state=enabled_b
+        ) as server:
+            result, document = invoke(
+                harness, "api", "loopback", "disable"
+            )
+            check(result.returncode == 0, "loopback disable failed")
+            validate_envelope(document, "loopback.disable", True)
+            check(document["data"]["enabled"] is False,
+                  "loopback disable not reflected")
+            check(document["data"]["sourcePair"] == "B",
+                  "disable did not retain source pair")
+            check([request[2] for request in server.requests] ==
+                  [LOOPBACK_GET, LOOPBACK_SET, LOOPBACK_GET],
+                  "disable transaction sequence wrong")
+        socket_path.unlink(missing_ok=True)
+
         with MockIPC(socket_path, initial_state, mode=0o777):
             assert_error(
                 harness, 4, "profile.get", "backend_permission_denied", "api", "profile"
@@ -461,7 +546,7 @@ def run_tests(repo, shipping_binary):
             check(set(data) == {
                 "stream", "clock", "capture", "playback", "output", "health",
                 "quality", "driverMode", "timecodeOptimized",
-                "vintageCompatible"
+                "vintageCompatible", "loopback"
             },
                   "wrong stats group set")
             check(set(data["stream"]) == {
@@ -560,6 +645,8 @@ def run_tests(repo, shipping_binary):
                   "legacy stats fabricated timecode state")
             check(data["vintageCompatible"] is None,
                   "legacy stats fabricated Vintage state")
+            check(data["loopback"] is None,
+                  "legacy stats fabricated loopback state")
             check([request[2] for request in server.requests] == [STREAM_STATS_GET],
                   "stats request was not a single non-destructive stream snapshot")
         socket_path.unlink(missing_ok=True)

@@ -23,6 +23,7 @@
 
 #include "../hal/OpenA8DJDriverMode.h"
 #include "../hal/OpenA8DJTimecodeOptimized.h"
+#include "../hal/OpenA8DJVirtualLoopback.h"
 #include "../hal/OpenA8DJVintageCompatible.h"
 
 #ifndef OPENA8DJ_PUBLIC_API_SOCKET_PATH
@@ -36,13 +37,15 @@ static const char *kPublicAPILockPath = OPENA8DJ_PUBLIC_API_LOCK_PATH;
 #endif
 
 static const char *kPublicAPISchema = "org.opena8dj.public-api.response.v1";
-static const char *kPublicAPIVersion = "1.0";
+static const char *kPublicAPIVersion = "1.1";
 
 #define OPENA8DJ_ERROR_DRIVER_MODE_NOT_ALLOWED "driver_mode_not_allowed"
 #define OPENA8DJ_ERROR_DRIVER_MODE_BUSY "driver_mode_busy"
 #define OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED "driver_mode_apply_failed"
 #define OPENA8DJ_ERROR_DRIVER_MODE_ARM_REQUIRED "driver_mode_arm_required"
 #define OPENA8DJ_ERROR_DRIVER_MODE_CONFLICT "driver_mode_conflict"
+#define OPENA8DJ_ERROR_LOOPBACK_SOURCE_NOT_ALLOWED "loopback_source_not_allowed"
+#define OPENA8DJ_ERROR_LOOPBACK_APPLY_FAILED "loopback_apply_failed"
 
 enum {
     kIPCVersion = 1,
@@ -66,7 +69,10 @@ enum {
     kIPCTypeTimecodeOptimizedDisarm = 17,
     kIPCTypeTimecodeOptimizedState = 18,
     kIPCTypeVintageCompatibleGet = 19,
-    kIPCTypeVintageCompatibleState = 20
+    kIPCTypeVintageCompatibleState = 20,
+    kIPCTypeLoopbackGet = 21,
+    kIPCTypeLoopbackSet = 22,
+    kIPCTypeLoopbackState = 23
 };
 
 enum {
@@ -298,6 +304,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t driverModeWorkerQoS;
     OpenA8DJTimecodeStatePayload timecodeOptimized;
     OpenA8DJVintageStatePayload vintageCompatible;
+    OpenA8DJLoopbackStatePayload loopback;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 _Static_assert(sizeof(OpenA8DJStreamStatsPayload) <= 4096,
                "stream stats must fit the bounded IPC payload");
@@ -1625,6 +1632,93 @@ static OpenA8DJVintageReadResult ReadVintageState(
     return ReadOneVintageState(fd, state);
 }
 
+static bool ValidateLoopbackState(
+    const OpenA8DJLoopbackStatePayload *state)
+{
+    return state->schemaVersion == kOpenA8DJLoopbackSchemaVersion &&
+           state->enabled <= 1 &&
+           state->sourcePair <= kOpenA8DJLoopbackSourcePairD &&
+           state->sessionOnly == 1 &&
+           state->physicalPlaybackPublishing <= 1 &&
+           state->ringCapacity == kOpenA8DJLoopbackRingCapacity &&
+           state->registeredReaderCount <= kOpenA8DJLoopbackMaxClients &&
+           state->generation != 0;
+}
+
+static bool ReadOneLoopbackState(
+    int fd,
+    OpenA8DJLoopbackStatePayload *state)
+{
+    for (int message = 0; message < 64; ++message) {
+        OpenA8DJIPCHeader header;
+        if (!ReadFull(fd, &header, sizeof(header)) ||
+            header.magic != kIPCMagic ||
+            header.version != kIPCVersion ||
+            header.length > 4096) {
+            return false;
+        }
+        uint8_t payload[4096];
+        if (header.length > 0 &&
+            !ReadFull(fd, payload, header.length)) {
+            return false;
+        }
+        if (header.type == kIPCTypeLoopbackState) {
+            if (header.length != sizeof(*state)) {
+                return false;
+            }
+            memcpy(state, payload, sizeof(*state));
+            return ValidateLoopbackState(state);
+        }
+    }
+    return false;
+}
+
+static bool ReadLoopbackState(
+    int fd,
+    OpenA8DJLoopbackStatePayload *state)
+{
+    return SendIPC(fd, kIPCTypeLoopbackGet, NULL, 0) &&
+           ReadOneLoopbackState(fd, state);
+}
+
+static bool LoopbackConfigurationEqual(
+    const OpenA8DJLoopbackStatePayload *left,
+    const OpenA8DJLoopbackStatePayload *right)
+{
+    return left->schemaVersion == right->schemaVersion &&
+           left->enabled == right->enabled &&
+           left->sourcePair == right->sourcePair &&
+           left->sessionOnly == right->sessionOnly &&
+           left->ringCapacity == right->ringCapacity &&
+           right->generation >= left->generation;
+}
+
+static bool MutateLoopbackAndReadBack(
+    int fd,
+    bool enabled,
+    OpenA8DJLoopbackSourcePair sourcePair,
+    OpenA8DJLoopbackStatePayload *outState)
+{
+    OpenA8DJLoopbackSetRequest request = {
+        .schemaVersion = kOpenA8DJLoopbackSchemaVersion,
+        .enabled = enabled ? 1 : 0,
+        .sourcePair = (uint8_t)sourcePair,
+        .reserved = {0, 0}
+    };
+    OpenA8DJLoopbackStatePayload setState;
+    OpenA8DJLoopbackStatePayload readBack;
+    if (!SendIPC(fd, kIPCTypeLoopbackSet, &request, sizeof(request)) ||
+        !ReadOneLoopbackState(fd, &setState) ||
+        !ReadLoopbackState(fd, &readBack) ||
+        !LoopbackConfigurationEqual(&setState, &readBack) ||
+        readBack.enabled != request.enabled ||
+        readBack.sourcePair != request.sourcePair) {
+        return false;
+    }
+    *outState = readBack;
+    return true;
+}
+
 static bool TimecodeStatesEqual(
     const OpenA8DJTimecodeStatePayload *left,
     const OpenA8DJTimecodeStatePayload *right)
@@ -2110,6 +2204,51 @@ static void PrintPublicStateMembers(const OpenA8DJControlPayload *state)
     fputc('}', stdout);
 }
 
+static const char *LoopbackSourcePairName(uint8_t sourcePair)
+{
+    static const char *names[] = {"A", "B", "C", "D"};
+    return sourcePair <= kOpenA8DJLoopbackSourcePairD ?
+        names[sourcePair] : NULL;
+}
+
+static void PrintPublicLoopbackMembers(
+    const OpenA8DJLoopbackStatePayload *state)
+{
+    fprintf(stdout,
+            "\"enabled\":%s,\"sourcePair\":",
+            state->enabled ? "true" : "false");
+    PrintJSONString(stdout, LoopbackSourcePairName(state->sourcePair));
+    fprintf(stdout,
+            ",\"sessionOnly\":true,"
+            "\"physicalPlaybackPublishing\":%s,"
+            "\"ringCapacity\":%u,\"generation\":%llu,"
+            "\"registeredReaderCount\":%u,"
+            "\"sourceFramesPublished\":%llu,"
+            "\"framesDelivered\":%llu,\"silenceFrames\":%llu,"
+            "\"gapFrames\":%llu,\"overrunEvents\":%llu,"
+            "\"overrunFrames\":%llu",
+            state->physicalPlaybackPublishing ? "true" : "false",
+            state->ringCapacity,
+            (unsigned long long)state->generation,
+            state->registeredReaderCount,
+            (unsigned long long)state->sourceFramesPublished,
+            (unsigned long long)state->framesDelivered,
+            (unsigned long long)state->silenceFrames,
+            (unsigned long long)state->gapFrames,
+            (unsigned long long)state->overrunEvents,
+            (unsigned long long)state->overrunFrames);
+}
+
+static void PrintPublicLoopback(
+    const char *operation,
+    const OpenA8DJLoopbackStatePayload *state)
+{
+    PrintPublicEnvelopePrefix(operation, true);
+    fputs(",\"data\":{", stdout);
+    PrintPublicLoopbackMembers(state);
+    fputs("}}\n", stdout);
+}
+
 static void PrintPublicVersion(void)
 {
     PrintPublicEnvelopePrefix("version.get", true);
@@ -2122,7 +2261,8 @@ static void PrintPublicVersion(void)
           "\"profile.read\",\"profile.write\",\"driver-mode.read\",\"driver-mode.write\","
           "\"timecode-optimized.read\",\"timecode-optimized.arm\","
           "\"driver-mode.vintage-compatible.read\","
-          "\"driver-mode.vintage-compatible.write\"]}}\n",
+          "\"driver-mode.vintage-compatible.write\","
+          "\"loopback.read\",\"loopback.write\"]}}\n",
           stdout);
 }
 
@@ -2853,6 +2993,18 @@ static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats,
     } else {
         fputc('{', stdout);
         PrintPublicVintageMembers(vintage);
+        fputc('}', stdout);
+    }
+    fputs(",\"loopback\":", stdout);
+    if (!StreamStatsHasField(
+            payloadLength,
+            offsetof(OpenA8DJStreamStatsPayload, loopback),
+            sizeof(stats->loopback)) ||
+        !ValidateLoopbackState(&stats->loopback)) {
+        fputs("null", stdout);
+    } else {
+        fputc('{', stdout);
+        PrintPublicLoopbackMembers(&stats->loopback);
         fputc('}', stdout);
     }
     fputs("}}\n", stdout);
@@ -3749,6 +3901,14 @@ static int RunPublicAPI(int argc, char **argv)
     if (argc >= 3 && strcmp(argv[2], "profile") == 0) {
         operation = argc >= 4 && strcmp(argv[3], "set") == 0 ? "profile.set" : "profile.get";
     }
+    if (argc >= 3 && strcmp(argv[2], "loopback") == 0) {
+        if (argc >= 4 && strcmp(argv[3], "enable") == 0)
+            operation = "loopback.enable";
+        else if (argc >= 4 && strcmp(argv[3], "disable") == 0)
+            operation = "loopback.disable";
+        else
+            operation = "loopback.get";
+    }
 
     if (argc == 3 && strcmp(argv[2], "version") == 0) {
         PrintPublicVersion();
@@ -3767,6 +3927,15 @@ static int RunPublicAPI(int argc, char **argv)
     bool driverModeRead = argc == 3 && strcmp(argv[2], "driver-mode") == 0;
     bool statsRead = argc == 3 && strcmp(argv[2], "stats") == 0;
     bool hardwareRead = argc == 3 && strcmp(argv[2], "hardware") == 0;
+    bool loopbackRead = argc == 4 &&
+                        strcmp(argv[2], "loopback") == 0 &&
+                        strcmp(argv[3], "get") == 0;
+    bool loopbackEnable = argc == 5 &&
+                          strcmp(argv[2], "loopback") == 0 &&
+                          strcmp(argv[3], "enable") == 0;
+    bool loopbackDisable = argc == 4 &&
+                           strcmp(argv[2], "loopback") == 0 &&
+                           strcmp(argv[3], "disable") == 0;
     bool profileWrite = argc == 5 &&
                         strcmp(argv[2], "profile") == 0 &&
                         strcmp(argv[3], "set") == 0;
@@ -3793,7 +3962,8 @@ static int RunPublicAPI(int argc, char **argv)
     }
     if (!profileRead && !driverModeRead && !statsRead && !hardwareRead &&
         !profileWrite && !driverModeWrite &&
-        !timecodeArm && !timecodeDisarm) {
+        !timecodeArm && !timecodeDisarm &&
+        !loopbackRead && !loopbackEnable && !loopbackDisable) {
         return PrintPublicError(operation,
                                 "invalid_request",
                                 "The public API request has an unknown operation or wrong arity.",
@@ -3803,6 +3973,20 @@ static int RunPublicAPI(int argc, char **argv)
 
     const char *requestedProfile = profileWrite ? argv[4] : NULL;
     uint32_t requestedDriverMode = kOpenA8DJDriverModeInvalid;
+    OpenA8DJLoopbackSourcePair requestedLoopbackPair =
+        kOpenA8DJLoopbackSourcePairA;
+    if (loopbackEnable) {
+        if (strlen(argv[4]) != 1 ||
+            argv[4][0] < 'A' || argv[4][0] > 'D') {
+            return PrintPublicError(
+                "loopback.enable",
+                OPENA8DJ_ERROR_LOOPBACK_SOURCE_NOT_ALLOWED,
+                "The source pair must be exactly A, B, C, or D.",
+                false, 2);
+        }
+        requestedLoopbackPair =
+            (OpenA8DJLoopbackSourcePair)(argv[4][0] - 'A');
+    }
     if (profileWrite &&
         (strlen(requestedProfile) > 64 || FindCanonicalPreset(requestedProfile) == NULL)) {
         return PrintPublicError("profile.set",
@@ -3831,14 +4015,19 @@ static int RunPublicAPI(int argc, char **argv)
 
     int lockFD = -1;
     if (profileWrite || driverModeWrite ||
-        timecodeArm || timecodeDisarm) {
+        timecodeArm || timecodeDisarm ||
+        loopbackEnable || loopbackDisable) {
         lockFD = AcquirePublicMutationLock();
         if (lockFD < 0) {
             return PrintPublicError(operation,
+                                    (loopbackEnable || loopbackDisable) ?
+                                        OPENA8DJ_ERROR_LOOPBACK_APPLY_FAILED :
                                     (driverModeWrite || timecodeArm ||
                                      timecodeDisarm) ?
                                         OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED :
                                         "profile_apply_failed",
+                                    (loopbackEnable || loopbackDisable) ?
+                                        "The loopback mutation lock could not be acquired safely." :
                                     (driverModeWrite || timecodeArm ||
                                      timecodeDisarm) ?
                                         "The driver-mode mutation lock could not be acquired safely." :
@@ -3915,6 +4104,38 @@ static int RunPublicAPI(int argc, char **argv)
                              vintageResult == kStatsDriverModeValid ?
                                  &statsVintage : NULL);
         }
+        return 0;
+    }
+
+    if (loopbackRead || loopbackEnable || loopbackDisable) {
+        OpenA8DJLoopbackStatePayload state;
+        bool ok;
+        if (loopbackRead) {
+            ok = ReadLoopbackState(fd, &state);
+        } else if (loopbackEnable) {
+            ok = MutateLoopbackAndReadBack(
+                fd, true, requestedLoopbackPair, &state);
+        } else {
+            OpenA8DJLoopbackStatePayload current;
+            ok = ReadLoopbackState(fd, &current) &&
+                 MutateLoopbackAndReadBack(
+                     fd, false,
+                     (OpenA8DJLoopbackSourcePair)current.sourcePair,
+                     &state);
+        }
+        close(fd);
+        if (lockFD >= 0) close(lockFD);
+        if (!ok) {
+            return PrintPublicError(
+                operation,
+                loopbackRead ? "backend_protocol_error" :
+                               OPENA8DJ_ERROR_LOOPBACK_APPLY_FAILED,
+                loopbackRead ?
+                    "The HAL bridge returned an invalid loopback reply." :
+                    "The loopback mutation could not be applied and verified.",
+                true, loopbackRead ? 4 : 5);
+        }
+        PrintPublicLoopback(operation, &state);
         return 0;
     }
 
@@ -4108,6 +4329,8 @@ static void Usage(const char *argv0)
             argv0);
     fprintf(stderr, "  %s api profile set canonical-profile-id\n", argv0);
     fprintf(stderr, "  %s api driver-mode set balanced|performance\n", argv0);
+    fprintf(stderr, "  %s api loopback get|disable\n", argv0);
+    fprintf(stderr, "  %s api loopback enable A|B|C|D\n", argv0);
     fprintf(stderr, "    Driver modes are session-only; performance is experimental.\n");
     fprintf(stderr, "    A change while streaming may be accepted as pending until a safe boundary.\n");
     fprintf(stderr, "  %s usb-quality [--json] [--interval-ms 100..60000] [--count 1..86400]\n",
