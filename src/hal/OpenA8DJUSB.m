@@ -4217,7 +4217,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             }
             break;
         case kIPCTypeLoopbackGet:
-            [self sendLoopbackStateToClient:fd];
+            if (length == 0) {
+                [self sendLoopbackStateToClient:fd];
+            }
             break;
         case kIPCTypeLoopbackSet: {
             OpenA8DJLoopbackStatePayload state;
