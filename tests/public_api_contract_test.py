@@ -126,13 +126,39 @@ def stream_payload(source_path):
         "outputLateWriteBatches": 38,
         "inputCheckErrors": 41,
         "outputPanicFlags": 42,
+        "captureCompletionJitterSamples": 63,
+        "captureCompletionJitterInvalidIntervals": 64,
+        "captureCompletionJitterLe50": 1,
+        "captureCompletionJitterLe100": 2,
+        "captureCompletionJitterLe250": 3,
+        "captureCompletionJitterLe500": 4,
+        "captureCompletionJitterLe1000": 5,
+        "captureCompletionJitterGt1000": 48,
+        "playbackCompletionJitterSamples": 75,
+        "playbackCompletionJitterInvalidIntervals": 76,
+        "playbackCompletionJitterLe50": 10,
+        "playbackCompletionJitterLe100": 11,
+        "playbackCompletionJitterLe250": 12,
+        "playbackCompletionJitterLe500": 13,
+        "playbackCompletionJitterLe1000": 14,
+        "playbackCompletionJitterGt1000": 15,
+        "captureISOCompletionStatusFailures": 81,
+        "captureISOTransactionStatusFailures": 82,
+        "captureISOZeroLengthTransactions": 83,
+        "captureISOShortTransactions": 84,
+        "playbackISOCompletionStatusFailures": 91,
+        "playbackISOTransactionStatusFailures": 92,
+        "playbackISOZeroLengthTransactions": 93,
+        "playbackISOShortTransactions": 94,
     }
     for name, value in values.items():
         field_offset, fmt = offsets[name]
         struct.pack_into("=" + fmt, payload, field_offset, value)
     sample_rate_offset, sample_rate_format = offsets["sampleRate"]
     base_length = sample_rate_offset + struct.calcsize("=" + sample_rate_format)
-    return bytes(payload), values, base_length
+    old_tail_offset, old_tail_format = offsets["outputLateWriteBatches"]
+    old_tail_length = old_tail_offset + struct.calcsize("=" + old_tail_format)
+    return bytes(payload), values, base_length, old_tail_length
 
 
 class MockIPC:
@@ -296,7 +322,7 @@ def run_tests(repo, shipping_binary):
     check(result.returncode == 0, "shipping version failed")
     validate_envelope(document, "version.get", True)
     check(document["data"]["capabilities"] == [
-        "stats.read", "profiles.list", "profile.read", "profile.write"
+        "stats.read", "usb-quality.read", "profiles.list", "profile.read", "profile.write"
     ], "wrong capabilities")
 
     result, document = invoke(shipping_binary, "api", "profiles")
@@ -393,13 +419,15 @@ def run_tests(repo, shipping_binary):
                   "public profile read used destructive input statistics")
         socket_path.unlink(missing_ok=True)
 
-        stats_payload, expected_stats, stats_base_length = stream_payload(source)
+        stats_payload, expected_stats, stats_base_length, stats_old_tail_length = stream_payload(source)
         with MockIPC(socket_path, initial_state, stats=stats_payload) as server:
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "stats query failed")
             validate_envelope(document, "stats.get", True)
             data = document["data"]
-            check(set(data) == {"stream", "clock", "capture", "playback", "output", "health"},
+            check(set(data) == {
+                "stream", "clock", "capture", "playback", "output", "health", "quality"
+            },
                   "wrong stats group set")
             check(set(data["stream"]) == {
                 "streaming", "sampleRate", "outputRingFrames", "outputTargetLatencyFrames"
@@ -422,7 +450,8 @@ def run_tests(repo, shipping_binary):
             check(isinstance(data["stream"]["streaming"], bool), "streaming is not boolean")
             check(isinstance(data["stream"]["sampleRate"], (int, float)), "rate is not number")
             check(isinstance(data["clock"]["anchorValid"], bool), "anchorValid is not boolean")
-            for group_name, group in data.items():
+            for group_name in ["stream", "clock", "capture", "playback", "output", "health"]:
+                group = data[group_name]
                 for field_name, value in group.items():
                     if field_name not in {"streaming", "sampleRate", "anchorValid"}:
                         check(isinstance(value, int) and not isinstance(value, bool),
@@ -443,6 +472,48 @@ def run_tests(repo, shipping_binary):
                   "wrong output stats")
             check(data["health"]["outputPanicFlags"] == expected_stats["outputPanicFlags"],
                   "wrong health stats")
+            quality = data["quality"]
+            check(set(quality) == {
+                "instrumentationAvailable", "completionJitter", "isoErrors"
+            }, "wrong quality group set")
+            check(quality["instrumentationAvailable"] is True,
+                  "new instrumentation was not detected")
+            jitter = quality["completionJitter"]
+            check(jitter["unit"] == "microseconds", "wrong jitter unit")
+            check(jitter["binUpperBoundsUs"] == [50, 100, 250, 500, 1000, None],
+                  "wrong jitter bounds")
+            for direction in ["capture", "playback"]:
+                direction_jitter = jitter[direction]
+                check(set(direction_jitter) == {"samples", "invalidIntervals", "bins"},
+                      f"wrong {direction} jitter shape")
+                check(set(direction_jitter["bins"]) == {
+                    "le50", "le100", "le250", "le500", "le1000", "gt1000"
+                }, f"wrong {direction} bins")
+                check(all(isinstance(value, int) and not isinstance(value, bool)
+                          for value in direction_jitter["bins"].values()),
+                      f"{direction} bins are not integers")
+                check(sum(direction_jitter["bins"].values()) ==
+                      direction_jitter["samples"],
+                      f"{direction} bins do not sum to samples")
+            check(jitter["capture"]["invalidIntervals"] ==
+                  expected_stats["captureCompletionJitterInvalidIntervals"],
+                  "capture invalid intervals lost")
+            iso = quality["isoErrors"]
+            for direction in ["capture", "playback"]:
+                check(set(iso[direction]) == {
+                    "queueFailures", "completionStatusFailures",
+                    "transactionStatusFailures", "zeroLengthTransactions",
+                    "shortTransactions"
+                }, f"wrong {direction} ISO error shape")
+                check(all(isinstance(value, int) and not isinstance(value, bool)
+                          for value in iso[direction].values()),
+                      f"{direction} ISO counters are not integers")
+            check(iso["capture"]["completionStatusFailures"] ==
+                  expected_stats["captureISOCompletionStatusFailures"],
+                  "capture completion failures lost")
+            check(iso["playback"]["shortTransactions"] ==
+                  expected_stats["playbackISOShortTransactions"],
+                  "playback shorts lost")
             check([request[2] for request in server.requests] == [STREAM_STATS_GET],
                   "stats request was not a single non-destructive stream snapshot")
         socket_path.unlink(missing_ok=True)
@@ -468,6 +539,27 @@ def run_tests(repo, shipping_binary):
                   "base sample rate was not preserved")
             check(document["data"]["capture"]["bytes"] == 0,
                   "missing trailing counter was not zero")
+            check(document["data"]["quality"]["instrumentationAvailable"] is False,
+                  "base legacy payload claimed instrumentation")
+        socket_path.unlink(missing_ok=True)
+
+        with MockIPC(socket_path, initial_state, stats=stats_payload[:stats_old_tail_length]):
+            result, document = invoke(harness, "api", "stats")
+            check(result.returncode == 0, "legacy former-tail stats failed")
+            check(document["data"]["quality"]["instrumentationAvailable"] is False,
+                  "legacy former-tail payload claimed instrumentation")
+            check(document["data"]["quality"]["completionJitter"]["capture"]["samples"] == 0,
+                  "legacy payload fabricated jitter")
+        socket_path.unlink(missing_ok=True)
+
+        with MockIPC(socket_path, initial_state, stats=stats_payload + b"future-tail"):
+            result, document = invoke(harness, "api", "stats")
+            check(result.returncode == 0, "future append-compatible stats failed")
+            check(document["data"]["quality"]["instrumentationAvailable"] is True,
+                  "known quality tail missing with future bytes")
+            check(document["data"]["quality"]["isoErrors"]["playback"]["shortTransactions"] ==
+                  expected_stats["playbackISOShortTransactions"],
+                  "future tail corrupted known fields")
         socket_path.unlink(missing_ok=True)
 
         for profile in CANONICAL_PROFILES:
@@ -499,6 +591,46 @@ def run_tests(repo, shipping_binary):
             )
 
     hal_text = hal_source.read_text()
+    def payload_fields(text):
+        match = re.search(
+            r"typedef struct OpenA8DJStreamStatsPayload \{(.*?)\}"
+            r" __attribute__\(\(packed\)\) OpenA8DJStreamStatsPayload;",
+            text,
+            re.S,
+        )
+        check(match is not None, "private stream payload definition missing")
+        return re.findall(
+            r"^\s*(uint8_t|uint32_t|uint64_t|double)\s+([A-Za-z0-9_]+);",
+            match.group(1),
+            re.M,
+        )
+
+    hal_payload_fields = payload_fields(hal_text)
+    cli_payload_fields = payload_fields(source.read_text())
+    check(hal_payload_fields == cli_payload_fields,
+          "HAL and CLI stream payload field order differs")
+    field_names = [name for _, name in cli_payload_fields]
+    check(field_names[field_names.index("outputLateWriteBatches") + 1] ==
+          "captureCompletionJitterSamples",
+          "quality fields were not appended after the former tail")
+    check(field_names[-1] == "playbackISOShortTransactions",
+          "instrumentation availability does not require the complete quality tail")
+    check("_lastCaptureCompletionHostTime = 0;" in hal_text and
+          "_lastPlaybackCompletionHostTime = 0;" in hal_text,
+          "stream restart does not clear completion baselines")
+    check("if (captureHadPreviousCompletion) {" in hal_text and
+          "if (playbackHadPreviousCompletion) {" in hal_text,
+          "first completion can enter the jitter histogram")
+    check("StreamStatsFlushCompletionQualityLocked(" in hal_text and
+          "_pendingCaptureCompletionQuality" in hal_text and
+          "_pendingPlaybackCompletionQuality" in hal_text,
+          "quality events are not preserved across batched stream-stat updates")
+    check("size_t copyLength = header.length < sizeof(*stats) ? header.length : sizeof(*stats);" in
+          source.read_text(),
+          "stream payload reader lost append-compatible length negotiation")
+    check("uint8_t payload[4096];" in source.read_text() and
+          "ReadFull(fd, payload, header.length)" in source.read_text(),
+          "reader does not consume a complete future payload before truncating known fields")
     check(re.search(r"chmod\(kIPCSocketPath,\s*0666\)", hal_text) is not None,
           "HAL socket policy is not cross-UID connectable")
     check("getpeereid(fd, &peerUID, &peerGID)" in hal_text,

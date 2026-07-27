@@ -162,6 +162,23 @@ opena8dj-control api stats
 opena8dj-control api profile set traktor-dvs-vinyl
 ```
 
+### USB link quality meter
+
+The read-only meter polls the same non-destructive stream snapshot used by
+`api stats`; it does not start Core Audio or wake the interface:
+
+```bash
+opena8dj-control usb-quality
+opena8dj-control usb-quality --interval-ms 1000 --count 30
+opena8dj-control usb-quality --json --interval-ms 1000 --count 30
+```
+
+JSON mode is newline-delimited JSON, one complete observation per line.
+Percentiles are fixed histogram bounds (`upperBoundUs`) rather than invented
+exact values; a result above the last bin is explicitly reported as
+`overflow: true`. An older HAL reports `instrumentationAvailable: false`
+instead of a false healthy zero-error result.
+
 Every `api` invocation writes exactly one newline-terminated JSON object to
 standard output. Check both the process exit status and the `ok` member. For
 example, this Python snippet reads a non-destructive statistics snapshot:
@@ -207,6 +224,7 @@ Build the CLI and run the complete mock-backed contract suite without hardware:
 
 ```sh
 make public-api-offline-test
+make usb-quality-offline-test
 ```
 
 ## Case 1: Playback / Four Stereo Outputs

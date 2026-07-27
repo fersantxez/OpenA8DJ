@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef OPENA8DJ_PUBLIC_API_SOCKET_PATH
@@ -225,6 +226,30 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackLayoutSignatureSum;
     uint64_t outputLateWriteFrames;
     uint64_t outputLateWriteBatches;
+    uint64_t captureCompletionJitterSamples;
+    uint64_t captureCompletionJitterInvalidIntervals;
+    uint64_t captureCompletionJitterLe50;
+    uint64_t captureCompletionJitterLe100;
+    uint64_t captureCompletionJitterLe250;
+    uint64_t captureCompletionJitterLe500;
+    uint64_t captureCompletionJitterLe1000;
+    uint64_t captureCompletionJitterGt1000;
+    uint64_t playbackCompletionJitterSamples;
+    uint64_t playbackCompletionJitterInvalidIntervals;
+    uint64_t playbackCompletionJitterLe50;
+    uint64_t playbackCompletionJitterLe100;
+    uint64_t playbackCompletionJitterLe250;
+    uint64_t playbackCompletionJitterLe500;
+    uint64_t playbackCompletionJitterLe1000;
+    uint64_t playbackCompletionJitterGt1000;
+    uint64_t captureISOCompletionStatusFailures;
+    uint64_t captureISOTransactionStatusFailures;
+    uint64_t captureISOZeroLengthTransactions;
+    uint64_t captureISOShortTransactions;
+    uint64_t playbackISOCompletionStatusFailures;
+    uint64_t playbackISOTransactionStatusFailures;
+    uint64_t playbackISOZeroLengthTransactions;
+    uint64_t playbackISOShortTransactions;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -1576,7 +1601,8 @@ static void PrintPublicVersion(void)
     fputs(",\"schema\":", stdout);
     PrintJSONString(stdout, kPublicAPISchema);
     fputs(",\"transport\":\"process-json\",\"privateIPCVersion\":1,"
-          "\"capabilities\":[\"stats.read\",\"profiles.list\",\"profile.read\",\"profile.write\"]}}\n",
+          "\"capabilities\":[\"stats.read\",\"usb-quality.read\",\"profiles.list\","
+          "\"profile.read\",\"profile.write\"]}}\n",
           stdout);
 }
 
@@ -1614,6 +1640,106 @@ static uint64_t PublicStreamField(const OpenA8DJStreamStatsPayload *stats,
     PublicStreamField((stats), (length), offsetof(OpenA8DJStreamStatsPayload, field), \
                       sizeof((stats)->field), (uint64_t)((stats)->field))
 
+static bool QualityInstrumentationAvailable(size_t payloadLength)
+{
+    return StreamStatsHasField(
+        payloadLength,
+        offsetof(OpenA8DJStreamStatsPayload, playbackISOShortTransactions),
+        sizeof(((OpenA8DJStreamStatsPayload *)0)->playbackISOShortTransactions));
+}
+
+static void PrintCumulativeJitterDirectionJSON(
+    const OpenA8DJStreamStatsPayload *stats,
+    size_t payloadLength,
+    bool capture)
+{
+    uint64_t samples = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterSamples) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterSamples);
+    uint64_t invalid = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterInvalidIntervals) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterInvalidIntervals);
+    uint64_t le50 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterLe50) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterLe50);
+    uint64_t le100 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterLe100) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterLe100);
+    uint64_t le250 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterLe250) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterLe250);
+    uint64_t le500 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterLe500) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterLe500);
+    uint64_t le1000 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterLe1000) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterLe1000);
+    uint64_t gt1000 = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureCompletionJitterGt1000) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackCompletionJitterGt1000);
+    fprintf(stdout,
+            "{\"samples\":%llu,\"invalidIntervals\":%llu,"
+            "\"bins\":{\"le50\":%llu,\"le100\":%llu,\"le250\":%llu,"
+            "\"le500\":%llu,\"le1000\":%llu,\"gt1000\":%llu}}",
+            (unsigned long long)samples,
+            (unsigned long long)invalid,
+            (unsigned long long)le50,
+            (unsigned long long)le100,
+            (unsigned long long)le250,
+            (unsigned long long)le500,
+            (unsigned long long)le1000,
+            (unsigned long long)gt1000);
+}
+
+static void PrintCumulativeISOErrorsDirectionJSON(
+    const OpenA8DJStreamStatsPayload *stats,
+    size_t payloadLength,
+    bool capture)
+{
+    uint64_t queueFailures = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureQueueFailures) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackQueueFailures);
+    uint64_t completionFailures = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureISOCompletionStatusFailures) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackISOCompletionStatusFailures);
+    uint64_t transactionFailures = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureISOTransactionStatusFailures) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackISOTransactionStatusFailures);
+    uint64_t zeroLength = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureISOZeroLengthTransactions) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackISOZeroLengthTransactions);
+    uint64_t shortTransactions = capture ?
+        PUBLIC_STREAM_FIELD(stats, payloadLength, captureISOShortTransactions) :
+        PUBLIC_STREAM_FIELD(stats, payloadLength, playbackISOShortTransactions);
+    fprintf(stdout,
+            "{\"queueFailures\":%llu,\"completionStatusFailures\":%llu,"
+            "\"transactionStatusFailures\":%llu,\"zeroLengthTransactions\":%llu,"
+            "\"shortTransactions\":%llu}",
+            (unsigned long long)queueFailures,
+            (unsigned long long)completionFailures,
+            (unsigned long long)transactionFailures,
+            (unsigned long long)zeroLength,
+            (unsigned long long)shortTransactions);
+}
+
+static void PrintCumulativeQualityJSON(const OpenA8DJStreamStatsPayload *stats,
+                                       size_t payloadLength)
+{
+    fputs("{\"instrumentationAvailable\":", stdout);
+    fputs(QualityInstrumentationAvailable(payloadLength) ? "true" : "false", stdout);
+    fputs(",\"completionJitter\":{\"unit\":\"microseconds\","
+          "\"binUpperBoundsUs\":[50,100,250,500,1000,null],\"capture\":",
+          stdout);
+    PrintCumulativeJitterDirectionJSON(stats, payloadLength, true);
+    fputs(",\"playback\":", stdout);
+    PrintCumulativeJitterDirectionJSON(stats, payloadLength, false);
+    fputs("},\"isoErrors\":{\"capture\":", stdout);
+    PrintCumulativeISOErrorsDirectionJSON(stats, payloadLength, true);
+    fputs(",\"playback\":", stdout);
+    PrintCumulativeISOErrorsDirectionJSON(stats, payloadLength, false);
+    fputs("}}", stdout);
+}
+
 static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t payloadLength)
 {
     bool hasStreaming = StreamStatsHasField(payloadLength,
@@ -1635,7 +1761,7 @@ static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
             "\"output\":{\"framesWritten\":%llu,\"framesRead\":%llu,\"underruns\":%llu,"
             "\"activeUnderruns\":%llu,\"ringOverruns\":%llu,\"timelineResets\":%llu,"
             "\"lateWriteFrames\":%llu,\"lateWriteBatches\":%llu},"
-            "\"health\":{\"inputCheckErrors\":%llu,\"outputPanicFlags\":%llu}}}\n",
+            "\"health\":{\"inputCheckErrors\":%llu,\"outputPanicFlags\":%llu}",
             hasStreaming && stats->streaming ? "true" : "false",
             hasSampleRate && isfinite(stats->sampleRate) ? stats->sampleRate : 0.0,
             (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputRingFrames),
@@ -1669,9 +1795,543 @@ static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
             (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputLateWriteBatches),
             (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, inputCheckErrors),
             (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputPanicFlags));
+    fputs(",\"quality\":", stdout);
+    PrintCumulativeQualityJSON(stats, payloadLength);
+    fputs("}}\n", stdout);
 }
 
 #undef PUBLIC_STREAM_FIELD
+
+enum {
+    kQualityBinCount = 6,
+    kQualityMinimumSamples = 20
+};
+
+typedef struct OpenA8DJQualityJitterWindow {
+    uint64_t samples;
+    uint64_t invalidIntervals;
+    uint64_t bins[kQualityBinCount];
+    int percentile50Bin;
+    int percentile95Bin;
+    int percentile99Bin;
+    bool active;
+} OpenA8DJQualityJitterWindow;
+
+typedef struct OpenA8DJQualityISOErrorWindow {
+    uint64_t queueFailures;
+    uint64_t completionStatusFailures;
+    uint64_t transactionStatusFailures;
+    uint64_t zeroLengthTransactions;
+    uint64_t shortTransactions;
+    uint64_t totalEvents;
+} OpenA8DJQualityISOErrorWindow;
+
+typedef struct OpenA8DJQualityXrunWindow {
+    uint64_t outputUnderruns;
+    uint64_t activeOutputUnderruns;
+    uint64_t outputRingOverruns;
+    uint64_t outputLateWriteBatches;
+    uint64_t outputLateWriteFrames;
+    uint64_t totalHardXruns;
+} OpenA8DJQualityXrunWindow;
+
+typedef struct OpenA8DJQualityWindow {
+    const char *classification;
+    const char *reasons[16];
+    size_t reasonCount;
+    bool streaming;
+    bool instrumentationAvailable;
+    bool captureActive;
+    bool playbackActive;
+    double sampleRate;
+    uint64_t windowMilliseconds;
+    OpenA8DJQualityJitterWindow captureJitter;
+    OpenA8DJQualityJitterWindow playbackJitter;
+    OpenA8DJQualityISOErrorWindow captureISOErrors;
+    OpenA8DJQualityISOErrorWindow playbackISOErrors;
+    OpenA8DJQualityXrunWindow xruns;
+} OpenA8DJQualityWindow;
+
+static bool QualityCounterDecreased(const OpenA8DJStreamStatsPayload *previous,
+                                    const OpenA8DJStreamStatsPayload *current)
+{
+#define QUALITY_COUNTER_DECREASED(field) (current->field < previous->field)
+    return
+        QUALITY_COUNTER_DECREASED(captureTransfers) ||
+        QUALITY_COUNTER_DECREASED(playbackTransfers) ||
+        QUALITY_COUNTER_DECREASED(captureQueueFailures) ||
+        QUALITY_COUNTER_DECREASED(playbackQueueFailures) ||
+        QUALITY_COUNTER_DECREASED(outputUnderruns) ||
+        QUALITY_COUNTER_DECREASED(outputActiveUnderruns) ||
+        QUALITY_COUNTER_DECREASED(outputRingOverruns) ||
+        QUALITY_COUNTER_DECREASED(outputLateWriteFrames) ||
+        QUALITY_COUNTER_DECREASED(outputLateWriteBatches) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterSamples) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterInvalidIntervals) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterLe50) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterLe100) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterLe250) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterLe500) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterLe1000) ||
+        QUALITY_COUNTER_DECREASED(captureCompletionJitterGt1000) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterSamples) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterInvalidIntervals) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterLe50) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterLe100) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterLe250) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterLe500) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterLe1000) ||
+        QUALITY_COUNTER_DECREASED(playbackCompletionJitterGt1000) ||
+        QUALITY_COUNTER_DECREASED(captureISOCompletionStatusFailures) ||
+        QUALITY_COUNTER_DECREASED(captureISOTransactionStatusFailures) ||
+        QUALITY_COUNTER_DECREASED(captureISOZeroLengthTransactions) ||
+        QUALITY_COUNTER_DECREASED(captureISOShortTransactions) ||
+        QUALITY_COUNTER_DECREASED(playbackISOCompletionStatusFailures) ||
+        QUALITY_COUNTER_DECREASED(playbackISOTransactionStatusFailures) ||
+        QUALITY_COUNTER_DECREASED(playbackISOZeroLengthTransactions) ||
+        QUALITY_COUNTER_DECREASED(playbackISOShortTransactions);
+#undef QUALITY_COUNTER_DECREASED
+}
+
+static int QualityPercentileBin(const uint64_t bins[kQualityBinCount],
+                                uint64_t samples,
+                                uint64_t percentile)
+{
+    if (samples == 0) {
+        return -1;
+    }
+    uint64_t rank = samples / 100 * percentile;
+    uint64_t remainder = samples % 100;
+    rank += (remainder * percentile + 99) / 100;
+    uint64_t cumulative = 0;
+    for (int bin = 0; bin < kQualityBinCount; bin++) {
+        cumulative += bins[bin];
+        if (cumulative >= rank) {
+            return bin;
+        }
+    }
+    return -1;
+}
+
+static bool QualityPermilleAtMost(uint64_t numerator,
+                                  uint64_t denominator,
+                                  uint64_t maximumPermille)
+{
+    if (denominator == 0) {
+        return true;
+    }
+    uint64_t maximumNumerator =
+        (denominator / 1000) * maximumPermille +
+        ((denominator % 1000) * maximumPermille) / 1000;
+    return numerator <= maximumNumerator;
+}
+
+static void QualityAddReason(OpenA8DJQualityWindow *window, const char *reason)
+{
+    if (window->reasonCount <
+        sizeof(window->reasons) / sizeof(window->reasons[0])) {
+        window->reasons[window->reasonCount++] = reason;
+    }
+}
+
+static void QualityFinalizeJitter(OpenA8DJQualityJitterWindow *jitter)
+{
+    jitter->percentile50Bin = QualityPercentileBin(jitter->bins, jitter->samples, 50);
+    jitter->percentile95Bin = QualityPercentileBin(jitter->bins, jitter->samples, 95);
+    jitter->percentile99Bin = QualityPercentileBin(jitter->bins, jitter->samples, 99);
+}
+
+static bool QualityJitterCountsAreConsistent(
+    const OpenA8DJQualityJitterWindow *jitter)
+{
+    uint64_t sum = 0;
+    for (int bin = 0; bin < kQualityBinCount; bin++) {
+        if (UINT64_MAX - sum < jitter->bins[bin]) {
+            return false;
+        }
+        sum += jitter->bins[bin];
+    }
+    return sum == jitter->samples;
+}
+
+static OpenA8DJQualityWindow CalculateQualityWindow(
+    const OpenA8DJStreamStatsPayload *previous,
+    size_t previousLength,
+    bool hasPrevious,
+    const OpenA8DJStreamStatsPayload *current,
+    size_t currentLength,
+    uint64_t windowMilliseconds)
+{
+    OpenA8DJQualityWindow window;
+    memset(&window, 0, sizeof(window));
+    window.classification = "warming-up";
+    window.streaming = current->streaming != 0;
+    window.instrumentationAvailable = QualityInstrumentationAvailable(currentLength);
+    window.sampleRate = isfinite(current->sampleRate) ? current->sampleRate : 0.0;
+    window.windowMilliseconds = windowMilliseconds;
+
+    if (!window.streaming) {
+        window.classification = "not-streaming";
+        return window;
+    }
+    if (!window.instrumentationAvailable) {
+        window.classification = "insufficient-data";
+        QualityAddReason(&window, "instrumentation_unavailable");
+        return window;
+    }
+    if (!hasPrevious ||
+        !QualityInstrumentationAvailable(previousLength) ||
+        (!previous->streaming && current->streaming)) {
+        return window;
+    }
+    if (QualityCounterDecreased(previous, current)) {
+        QualityAddReason(&window, "counter_reset");
+        return window;
+    }
+
+#define QUALITY_DELTA(field) (current->field - previous->field)
+    window.captureActive = QUALITY_DELTA(captureTransfers) > 0;
+    window.playbackActive = QUALITY_DELTA(playbackTransfers) > 0;
+    window.captureJitter.active = window.captureActive;
+    window.playbackJitter.active = window.playbackActive;
+
+    window.captureJitter.samples = QUALITY_DELTA(captureCompletionJitterSamples);
+    window.captureJitter.invalidIntervals =
+        QUALITY_DELTA(captureCompletionJitterInvalidIntervals);
+    window.captureJitter.bins[0] = QUALITY_DELTA(captureCompletionJitterLe50);
+    window.captureJitter.bins[1] = QUALITY_DELTA(captureCompletionJitterLe100);
+    window.captureJitter.bins[2] = QUALITY_DELTA(captureCompletionJitterLe250);
+    window.captureJitter.bins[3] = QUALITY_DELTA(captureCompletionJitterLe500);
+    window.captureJitter.bins[4] = QUALITY_DELTA(captureCompletionJitterLe1000);
+    window.captureJitter.bins[5] = QUALITY_DELTA(captureCompletionJitterGt1000);
+    window.playbackJitter.samples = QUALITY_DELTA(playbackCompletionJitterSamples);
+    window.playbackJitter.invalidIntervals =
+        QUALITY_DELTA(playbackCompletionJitterInvalidIntervals);
+    window.playbackJitter.bins[0] = QUALITY_DELTA(playbackCompletionJitterLe50);
+    window.playbackJitter.bins[1] = QUALITY_DELTA(playbackCompletionJitterLe100);
+    window.playbackJitter.bins[2] = QUALITY_DELTA(playbackCompletionJitterLe250);
+    window.playbackJitter.bins[3] = QUALITY_DELTA(playbackCompletionJitterLe500);
+    window.playbackJitter.bins[4] = QUALITY_DELTA(playbackCompletionJitterLe1000);
+    window.playbackJitter.bins[5] = QUALITY_DELTA(playbackCompletionJitterGt1000);
+
+    window.captureISOErrors.queueFailures = QUALITY_DELTA(captureQueueFailures);
+    window.captureISOErrors.completionStatusFailures =
+        QUALITY_DELTA(captureISOCompletionStatusFailures);
+    window.captureISOErrors.transactionStatusFailures =
+        QUALITY_DELTA(captureISOTransactionStatusFailures);
+    window.captureISOErrors.zeroLengthTransactions =
+        QUALITY_DELTA(captureISOZeroLengthTransactions);
+    window.captureISOErrors.shortTransactions =
+        QUALITY_DELTA(captureISOShortTransactions);
+    window.playbackISOErrors.queueFailures = QUALITY_DELTA(playbackQueueFailures);
+    window.playbackISOErrors.completionStatusFailures =
+        QUALITY_DELTA(playbackISOCompletionStatusFailures);
+    window.playbackISOErrors.transactionStatusFailures =
+        QUALITY_DELTA(playbackISOTransactionStatusFailures);
+    window.playbackISOErrors.zeroLengthTransactions =
+        QUALITY_DELTA(playbackISOZeroLengthTransactions);
+    window.playbackISOErrors.shortTransactions =
+        QUALITY_DELTA(playbackISOShortTransactions);
+    window.captureISOErrors.totalEvents =
+        window.captureISOErrors.queueFailures +
+        window.captureISOErrors.completionStatusFailures +
+        window.captureISOErrors.transactionStatusFailures +
+        window.captureISOErrors.zeroLengthTransactions +
+        window.captureISOErrors.shortTransactions;
+    window.playbackISOErrors.totalEvents =
+        window.playbackISOErrors.queueFailures +
+        window.playbackISOErrors.completionStatusFailures +
+        window.playbackISOErrors.transactionStatusFailures +
+        window.playbackISOErrors.zeroLengthTransactions +
+        window.playbackISOErrors.shortTransactions;
+
+    window.xruns.outputUnderruns = QUALITY_DELTA(outputUnderruns);
+    window.xruns.activeOutputUnderruns = QUALITY_DELTA(outputActiveUnderruns);
+    window.xruns.outputRingOverruns = QUALITY_DELTA(outputRingOverruns);
+    window.xruns.outputLateWriteBatches = QUALITY_DELTA(outputLateWriteBatches);
+    window.xruns.outputLateWriteFrames = QUALITY_DELTA(outputLateWriteFrames);
+    window.xruns.totalHardXruns =
+        window.xruns.activeOutputUnderruns + window.xruns.outputRingOverruns;
+#undef QUALITY_DELTA
+
+    QualityFinalizeJitter(&window.captureJitter);
+    QualityFinalizeJitter(&window.playbackJitter);
+    if (!QualityJitterCountsAreConsistent(&window.captureJitter) ||
+        !QualityJitterCountsAreConsistent(&window.playbackJitter)) {
+        window.classification = "insufficient-data";
+        QualityAddReason(&window, "instrumentation_inconsistent");
+        return window;
+    }
+
+    bool unstable = false;
+    if (window.captureISOErrors.totalEvents > 0) {
+        QualityAddReason(&window, "capture.iso_errors");
+        unstable = true;
+    }
+    if (window.playbackISOErrors.totalEvents > 0) {
+        QualityAddReason(&window, "playback.iso_errors");
+        unstable = true;
+    }
+    if (window.xruns.totalHardXruns > 0) {
+        QualityAddReason(&window, "output.hard_xrun");
+        unstable = true;
+    }
+    if (window.captureActive && window.captureJitter.percentile99Bin == 5) {
+        QualityAddReason(&window, "capture.p99_gt_1000us");
+        unstable = true;
+    }
+    if (window.playbackActive && window.playbackJitter.percentile99Bin == 5) {
+        QualityAddReason(&window, "playback.p99_gt_1000us");
+        unstable = true;
+    }
+    if (window.captureActive &&
+        !QualityPermilleAtMost(window.captureJitter.bins[5],
+                               window.captureJitter.samples,
+                               10)) {
+        QualityAddReason(&window, "capture.overflow_gt_10_permille");
+        unstable = true;
+    }
+    if (window.playbackActive &&
+        !QualityPermilleAtMost(window.playbackJitter.bins[5],
+                               window.playbackJitter.samples,
+                               10)) {
+        QualityAddReason(&window, "playback.overflow_gt_10_permille");
+        unstable = true;
+    }
+    if (unstable) {
+        window.classification = "unstable";
+        return window;
+    }
+
+    bool insufficient = false;
+    if (window.captureActive && window.captureJitter.samples < kQualityMinimumSamples) {
+        QualityAddReason(&window, "capture.insufficient_samples");
+        insufficient = true;
+    }
+    if (window.playbackActive && window.playbackJitter.samples < kQualityMinimumSamples) {
+        QualityAddReason(&window, "playback.insufficient_samples");
+        insufficient = true;
+    }
+    if (insufficient) {
+        window.classification = "insufficient-data";
+        return window;
+    }
+
+    bool stable = true;
+    if (window.captureActive && window.captureJitter.percentile95Bin > 2) {
+        QualityAddReason(&window, "capture.p95_gt_250us");
+        stable = false;
+    }
+    if (window.captureActive && window.captureJitter.percentile99Bin > 3) {
+        QualityAddReason(&window, "capture.p99_gt_500us");
+        stable = false;
+    }
+    if (window.captureActive &&
+        !QualityPermilleAtMost(window.captureJitter.bins[5],
+                               window.captureJitter.samples,
+                               1)) {
+        QualityAddReason(&window, "capture.overflow_gt_1_permille");
+        stable = false;
+    }
+    if (window.playbackActive && window.playbackJitter.percentile95Bin > 2) {
+        QualityAddReason(&window, "playback.p95_gt_250us");
+        stable = false;
+    }
+    if (window.playbackActive && window.playbackJitter.percentile99Bin > 3) {
+        QualityAddReason(&window, "playback.p99_gt_500us");
+        stable = false;
+    }
+    if (window.playbackActive &&
+        !QualityPermilleAtMost(window.playbackJitter.bins[5],
+                               window.playbackJitter.samples,
+                               1)) {
+        QualityAddReason(&window, "playback.overflow_gt_1_permille");
+        stable = false;
+    }
+    window.classification = stable ? "stable" : "degraded";
+    return window;
+}
+
+static void PrintQualityPercentileJSON(int bin)
+{
+    static const unsigned upperBounds[5] = {50, 100, 250, 500, 1000};
+    if (bin < 0) {
+        fputs("null", stdout);
+    } else if (bin < 5) {
+        fprintf(stdout,
+                "{\"upperBoundUs\":%u,\"overflow\":false}",
+                upperBounds[bin]);
+    } else {
+        fputs("{\"upperBoundUs\":null,\"lowerBoundExclusiveUs\":1000,"
+              "\"overflow\":true}",
+              stdout);
+    }
+}
+
+static void PrintQualityJitterWindowJSON(
+    const OpenA8DJQualityJitterWindow *jitter)
+{
+    fprintf(stdout,
+            "{\"active\":%s,\"samples\":%llu,\"invalidIntervals\":%llu,"
+            "\"bins\":{\"le50\":%llu,\"le100\":%llu,\"le250\":%llu,"
+            "\"le500\":%llu,\"le1000\":%llu,\"gt1000\":%llu},\"p50\":",
+            jitter->active ? "true" : "false",
+            (unsigned long long)jitter->samples,
+            (unsigned long long)jitter->invalidIntervals,
+            (unsigned long long)jitter->bins[0],
+            (unsigned long long)jitter->bins[1],
+            (unsigned long long)jitter->bins[2],
+            (unsigned long long)jitter->bins[3],
+            (unsigned long long)jitter->bins[4],
+            (unsigned long long)jitter->bins[5]);
+    PrintQualityPercentileJSON(jitter->percentile50Bin);
+    fputs(",\"p95\":", stdout);
+    PrintQualityPercentileJSON(jitter->percentile95Bin);
+    fputs(",\"p99\":", stdout);
+    PrintQualityPercentileJSON(jitter->percentile99Bin);
+    fputc('}', stdout);
+}
+
+static void PrintQualityISOErrorWindowJSON(
+    const OpenA8DJQualityISOErrorWindow *errors)
+{
+    fprintf(stdout,
+            "{\"queueFailures\":%llu,\"completionStatusFailures\":%llu,"
+            "\"transactionStatusFailures\":%llu,\"zeroLengthTransactions\":%llu,"
+            "\"shortTransactions\":%llu,\"totalEvents\":%llu}",
+            (unsigned long long)errors->queueFailures,
+            (unsigned long long)errors->completionStatusFailures,
+            (unsigned long long)errors->transactionStatusFailures,
+            (unsigned long long)errors->zeroLengthTransactions,
+            (unsigned long long)errors->shortTransactions,
+            (unsigned long long)errors->totalEvents);
+}
+
+static void PrintQualityThresholdsJSON(void)
+{
+    fputs("{\"minimumSamplesPerActiveDirection\":20,"
+          "\"stableP95UpperBoundUs\":250,\"stableP99UpperBoundUs\":500,"
+          "\"degradedP99UpperBoundUs\":1000,"
+          "\"stableOverflowPermilleMax\":1,"
+          "\"degradedOverflowPermilleMax\":10}",
+          stdout);
+}
+
+static void PrintQualitySampleJSON(const OpenA8DJQualityWindow *window,
+                                   uint64_t sequence)
+{
+    fprintf(stdout,
+            "{\"schema\":\"org.opena8dj.usb-quality.sample.v1\","
+            "\"sequence\":%llu,\"windowMilliseconds\":%llu,"
+            "\"streaming\":%s,\"sampleRateHz\":%.17g,"
+            "\"instrumentationAvailable\":%s,"
+            "\"jitter\":{\"unit\":\"microseconds\","
+            "\"binUpperBoundsUs\":[50,100,250,500,1000,null],\"capture\":",
+            (unsigned long long)sequence,
+            (unsigned long long)window->windowMilliseconds,
+            window->streaming ? "true" : "false",
+            window->sampleRate,
+            window->instrumentationAvailable ? "true" : "false");
+    PrintQualityJitterWindowJSON(&window->captureJitter);
+    fputs(",\"playback\":", stdout);
+    PrintQualityJitterWindowJSON(&window->playbackJitter);
+    fputs("},\"isoErrors\":{\"capture\":", stdout);
+    PrintQualityISOErrorWindowJSON(&window->captureISOErrors);
+    fputs(",\"playback\":", stdout);
+    PrintQualityISOErrorWindowJSON(&window->playbackISOErrors);
+    fprintf(stdout,
+            "},\"xruns\":{\"outputUnderruns\":%llu,"
+            "\"activeOutputUnderruns\":%llu,\"outputRingOverruns\":%llu,"
+            "\"outputLateWriteBatches\":%llu,\"outputLateWriteFrames\":%llu,"
+            "\"totalHardXruns\":%llu},\"stability\":{\"classification\":",
+            (unsigned long long)window->xruns.outputUnderruns,
+            (unsigned long long)window->xruns.activeOutputUnderruns,
+            (unsigned long long)window->xruns.outputRingOverruns,
+            (unsigned long long)window->xruns.outputLateWriteBatches,
+            (unsigned long long)window->xruns.outputLateWriteFrames,
+            (unsigned long long)window->xruns.totalHardXruns);
+    PrintJSONString(stdout, window->classification);
+    fputs(",\"reasons\":[", stdout);
+    for (size_t reason = 0; reason < window->reasonCount; reason++) {
+        if (reason != 0) {
+            fputc(',', stdout);
+        }
+        PrintJSONString(stdout, window->reasons[reason]);
+    }
+    fputs("],\"thresholds\":", stdout);
+    PrintQualityThresholdsJSON();
+    fprintf(stdout,
+            ",\"inputs\":{\"captureActive\":%s,\"playbackActive\":%s,"
+            "\"captureSamples\":%llu,\"playbackSamples\":%llu,"
+            "\"captureISOErrorEvents\":%llu,\"playbackISOErrorEvents\":%llu,"
+            "\"totalHardXruns\":%llu}}}\n",
+            window->captureActive ? "true" : "false",
+            window->playbackActive ? "true" : "false",
+            (unsigned long long)window->captureJitter.samples,
+            (unsigned long long)window->playbackJitter.samples,
+            (unsigned long long)window->captureISOErrors.totalEvents,
+            (unsigned long long)window->playbackISOErrors.totalEvents,
+            (unsigned long long)window->xruns.totalHardXruns);
+}
+
+static void FormatQualityPercentile(char *buffer, size_t size, int bin)
+{
+    static const unsigned upperBounds[5] = {50, 100, 250, 500, 1000};
+    if (bin < 0) {
+        (void)snprintf(buffer, size, "-");
+    } else if (bin < 5) {
+        (void)snprintf(buffer, size, "<=%uus", upperBounds[bin]);
+    } else {
+        (void)snprintf(buffer, size, ">1000us");
+    }
+}
+
+static void PrintQualitySampleHuman(const OpenA8DJQualityWindow *window,
+                                    bool printHeader)
+{
+    if (printHeader) {
+        puts("classification       cap-p95  cap-p99  play-p95 play-p99 "
+             "iso-cap iso-play hard-xruns window-ms");
+    }
+    char captureP95[16];
+    char captureP99[16];
+    char playbackP95[16];
+    char playbackP99[16];
+    FormatQualityPercentile(captureP95, sizeof(captureP95),
+                            window->captureJitter.percentile95Bin);
+    FormatQualityPercentile(captureP99, sizeof(captureP99),
+                            window->captureJitter.percentile99Bin);
+    FormatQualityPercentile(playbackP95, sizeof(playbackP95),
+                            window->playbackJitter.percentile95Bin);
+    FormatQualityPercentile(playbackP99, sizeof(playbackP99),
+                            window->playbackJitter.percentile99Bin);
+    printf("%-20s %-8s %-8s %-8s %-8s %7llu %8llu %10llu %9llu\n",
+           window->classification,
+           captureP95,
+           captureP99,
+           playbackP95,
+           playbackP99,
+           (unsigned long long)window->captureISOErrors.totalEvents,
+           (unsigned long long)window->playbackISOErrors.totalEvents,
+           (unsigned long long)window->xruns.totalHardXruns,
+           (unsigned long long)window->windowMilliseconds);
+    if (strcmp(window->classification, "stable") != 0) {
+        fputs("  reasons: ", stdout);
+        if (window->reasonCount == 0) {
+            fputc('-', stdout);
+        }
+        for (size_t reason = 0; reason < window->reasonCount; reason++) {
+            if (reason != 0) {
+                fputc(',', stdout);
+            }
+            fputs(window->reasons[reason], stdout);
+        }
+        fputs("\n  thresholds: min-samples=20 stable-p95<=250us "
+              "stable-p99<=500us degraded-p99<=1000us "
+              "overflow<=1/10 permille\n",
+              stdout);
+    }
+}
 
 static OpenA8DJPublicBackendResult ConnectPublicSocket(int *outFD)
 {
@@ -1816,6 +2476,183 @@ static int PublicBackendError(const char *operation, OpenA8DJPublicBackendResult
                             "The HAL control bridge is not running.",
                             true,
                             3);
+}
+
+static volatile sig_atomic_t gUSBQualityInterrupted = 0;
+
+static void HandleUSBQualityInterrupt(int signalNumber)
+{
+    (void)signalNumber;
+    gUSBQualityInterrupted = 1;
+}
+
+static bool ParseBoundedUnsigned(const char *text,
+                                 uint64_t minimum,
+                                 uint64_t maximum,
+                                 uint64_t *outValue)
+{
+    if (text == NULL || *text == '\0' || *text == '-' || *text == '+') {
+        return false;
+    }
+    errno = 0;
+    char *end = NULL;
+    unsigned long long parsed = strtoull(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0' ||
+        parsed < minimum || parsed > maximum) {
+        return false;
+    }
+    *outValue = (uint64_t)parsed;
+    return true;
+}
+
+static uint64_t MonotonicMilliseconds(void)
+{
+    struct timespec now = {0};
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return 0;
+    }
+    return (uint64_t)now.tv_sec * 1000 +
+           (uint64_t)now.tv_nsec / 1000000;
+}
+
+static void SleepUSBQualityInterval(uint64_t intervalMilliseconds)
+{
+    struct timespec remaining = {
+        .tv_sec = (time_t)(intervalMilliseconds / 1000),
+        .tv_nsec = (long)((intervalMilliseconds % 1000) * 1000000)
+    };
+    while (!gUSBQualityInterrupted &&
+           nanosleep(&remaining, &remaining) != 0 &&
+           errno == EINTR) {
+    }
+}
+
+static int PrintUSBQualityBackendError(bool json,
+                                       uint64_t sequence,
+                                       const char *code,
+                                       const char *message,
+                                       bool retryable,
+                                       int exitCode)
+{
+    if (!json) {
+        fprintf(stderr, "usb-quality: %s: %s\n", code, message);
+        return exitCode;
+    }
+    fprintf(stdout,
+            "{\"schema\":\"org.opena8dj.usb-quality.sample.v1\","
+            "\"sequence\":%llu,\"error\":{\"code\":",
+            (unsigned long long)sequence);
+    PrintJSONString(stdout, code);
+    fputs(",\"message\":", stdout);
+    PrintJSONString(stdout, message);
+    fprintf(stdout, ",\"retryable\":%s}}\n", retryable ? "true" : "false");
+    return exitCode;
+}
+
+static int RunUSBQuality(int argc, char **argv)
+{
+    uint64_t intervalMilliseconds = 1000;
+    uint64_t count = UINT64_MAX;
+    bool json = false;
+    bool sawInterval = false;
+    bool sawCount = false;
+    for (int argument = 2; argument < argc; argument++) {
+        if (strcmp(argv[argument], "--json") == 0 && !json) {
+            json = true;
+        } else if (strcmp(argv[argument], "--interval-ms") == 0 &&
+                   !sawInterval && argument + 1 < argc) {
+            sawInterval = true;
+            if (!ParseBoundedUnsigned(argv[++argument], 100, 60000,
+                                      &intervalMilliseconds)) {
+                fprintf(stderr, "usb-quality: --interval-ms must be 100..60000\n");
+                return 2;
+            }
+        } else if (strcmp(argv[argument], "--count") == 0 &&
+                   !sawCount && argument + 1 < argc) {
+            sawCount = true;
+            if (!ParseBoundedUnsigned(argv[++argument], 1, 86400, &count)) {
+                fprintf(stderr, "usb-quality: --count must be 1..86400\n");
+                return 2;
+            }
+        } else {
+            fprintf(stderr, "usb-quality: invalid argument\n");
+            return 2;
+        }
+    }
+
+    (void)signal(SIGPIPE, SIG_IGN);
+    (void)signal(SIGINT, HandleUSBQualityInterrupt);
+    gUSBQualityInterrupted = 0;
+    OpenA8DJStreamStatsPayload previous;
+    memset(&previous, 0, sizeof(previous));
+    size_t previousLength = 0;
+    bool hasPrevious = false;
+    uint64_t previousTime = 0;
+
+    for (uint64_t sequence = 1;
+         sequence <= count && !gUSBQualityInterrupted;
+         sequence++) {
+        if (sequence > 1) {
+            SleepUSBQualityInterval(intervalMilliseconds);
+            if (gUSBQualityInterrupted) {
+                break;
+            }
+        }
+
+        int fd = -1;
+        OpenA8DJPublicBackendResult backend = ConnectPublicSocket(&fd);
+        if (backend != kPublicBackendOK) {
+            return PrintUSBQualityBackendError(
+                json,
+                sequence,
+                backend == kPublicBackendPermissionDenied ?
+                    "backend_permission_denied" : "backend_unavailable",
+                backend == kPublicBackendPermissionDenied ?
+                    "The HAL bridge socket or peer credentials failed local authentication." :
+                    "The HAL control bridge is not running.",
+                backend != kPublicBackendPermissionDenied,
+                backend == kPublicBackendPermissionDenied ? 4 : 3);
+        }
+
+        OpenA8DJStreamStatsPayload current;
+        size_t currentLength = 0;
+        size_t minimumPayloadLength =
+            offsetof(OpenA8DJStreamStatsPayload, sampleRate) +
+            sizeof(current.sampleRate);
+        bool readOK = ReadStreamStats(fd, &current, &currentLength);
+        close(fd);
+        if (!readOK || currentLength < minimumPayloadLength) {
+            return PrintUSBQualityBackendError(
+                json,
+                sequence,
+                "backend_protocol_error",
+                "The HAL bridge returned an invalid statistics reply.",
+                true,
+                4);
+        }
+
+        uint64_t currentTime = MonotonicMilliseconds();
+        uint64_t elapsed = hasPrevious && currentTime >= previousTime ?
+            currentTime - previousTime : 0;
+        OpenA8DJQualityWindow window =
+            CalculateQualityWindow(&previous,
+                                   previousLength,
+                                   hasPrevious,
+                                   &current,
+                                   currentLength,
+                                   elapsed);
+        if (json) {
+            PrintQualitySampleJSON(&window, sequence);
+        } else {
+            PrintQualitySampleHuman(&window, sequence == 1);
+        }
+        fflush(stdout);
+        previous = current;
+        previousLength = currentLength;
+        previousTime = currentTime;
+        hasPrevious = true;
+    }
+    return 0;
 }
 
 static bool PublicSendStateAndReadBack(int fd,
@@ -1971,6 +2808,8 @@ static void Usage(const char *argv0)
     fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
     fprintf(stderr, "  %s api version|stats|profiles|profile\n", argv0);
     fprintf(stderr, "  %s api profile set canonical-profile-id\n", argv0);
+    fprintf(stderr, "  %s usb-quality [--json] [--interval-ms 100..60000] [--count 1..86400]\n",
+            argv0);
     fprintf(stderr, "  %s list-profiles\n", argv0);
     fprintf(stderr, "  %s export-config [path]\n", argv0);
     fprintf(stderr, "  %s import-config path\n", argv0);
@@ -1998,6 +2837,9 @@ int main(int argc, char **argv)
     if (argc >= 2 && strcmp(argv[1], "api") == 0) {
         (void)signal(SIGPIPE, SIG_IGN);
         return RunPublicAPI(argc, argv);
+    }
+    if (argc >= 2 && strcmp(argv[1], "usb-quality") == 0) {
+        return RunUSBQuality(argc, argv);
     }
 
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {

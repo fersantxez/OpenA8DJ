@@ -42,6 +42,14 @@ must occur in the existing stream-statistics update batch while
 accumulators that are copied by the snapshot. Output xrun counters continue to
 use the existing batched output-fill path.
 
+Implementation note: builds with `OPENA8DJ_HOT_STREAM_STATS_INTERVAL` greater
+than one retain completion-quality observations in fixed per-direction batch
+storage, following the existing output-fill batching pattern, and flush them
+while the existing stream-statistics lock is held. A live snapshot can lag by
+one partial batch; stopping flushes the remainder. The first completion after a
+restart stays excluded, and every flushed histogram preserves
+`sum(bins) == samples`.
+
 ## Metric contract
 
 All driver fields are unsigned cumulative counters scoped to the current

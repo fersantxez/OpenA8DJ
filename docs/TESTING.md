@@ -31,6 +31,16 @@ make package
 sudo installer -pkg build/OpenA8DJ-<version>.pkg -target /
 ```
 
+The USB quality meter has a deterministic mock-socket suite and requires no
+HAL load, USB device, or Core Audio initialization:
+
+```bash
+make usb-quality-offline-test
+```
+
+Any HAL build or live meter verification must still run through the shared
+hardware lock described below.
+
 The package installs the HAL bundle, the control/MIDI tools, a user LaunchAgent
 in `/Library/LaunchAgents`, and an uninstall helper at:
 

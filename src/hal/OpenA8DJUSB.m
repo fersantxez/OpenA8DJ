@@ -500,6 +500,30 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackLayoutSignatureSum;
     uint64_t outputLateWriteFrames;
     uint64_t outputLateWriteBatches;
+    uint64_t captureCompletionJitterSamples;
+    uint64_t captureCompletionJitterInvalidIntervals;
+    uint64_t captureCompletionJitterLe50;
+    uint64_t captureCompletionJitterLe100;
+    uint64_t captureCompletionJitterLe250;
+    uint64_t captureCompletionJitterLe500;
+    uint64_t captureCompletionJitterLe1000;
+    uint64_t captureCompletionJitterGt1000;
+    uint64_t playbackCompletionJitterSamples;
+    uint64_t playbackCompletionJitterInvalidIntervals;
+    uint64_t playbackCompletionJitterLe50;
+    uint64_t playbackCompletionJitterLe100;
+    uint64_t playbackCompletionJitterLe250;
+    uint64_t playbackCompletionJitterLe500;
+    uint64_t playbackCompletionJitterLe1000;
+    uint64_t playbackCompletionJitterGt1000;
+    uint64_t captureISOCompletionStatusFailures;
+    uint64_t captureISOTransactionStatusFailures;
+    uint64_t captureISOZeroLengthTransactions;
+    uint64_t captureISOShortTransactions;
+    uint64_t playbackISOCompletionStatusFailures;
+    uint64_t playbackISOTransactionStatusFailures;
+    uint64_t playbackISOZeroLengthTransactions;
+    uint64_t playbackISOShortTransactions;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -653,6 +677,102 @@ static uint64_t ExpectedIsoTransferTicks(void)
     double ticksPerSecond = MachTicksPerSecond();
     double ticks = (ticksPerSecond * (double)kIsoFramesPerTransfer) / 8000.0;
     return ticks > 0.0 ? (uint64_t)llround(ticks) : 0;
+}
+
+static uint64_t MachTicksForNanoseconds(uint64_t nanoseconds)
+{
+    mach_timebase_info_data_t timebase = {0};
+    if (mach_timebase_info(&timebase) != KERN_SUCCESS ||
+        timebase.numer == 0 ||
+        timebase.denom == 0 ||
+        nanoseconds > (UINT64_MAX - (uint64_t)timebase.numer + 1) /
+                      (uint64_t)timebase.denom) {
+        return 0;
+    }
+    uint64_t scaled = nanoseconds * (uint64_t)timebase.denom;
+    return (scaled + (uint64_t)timebase.numer - 1) / (uint64_t)timebase.numer;
+}
+
+typedef struct OpenA8DJCompletionQualityBatch {
+    uint64_t jitterSamples;
+    uint64_t jitterInvalidIntervals;
+    uint64_t jitterBins[6];
+    uint64_t completionStatusFailures;
+    uint64_t transactionStatusFailures;
+    uint64_t zeroLengthTransactions;
+    uint64_t shortTransactions;
+} OpenA8DJCompletionQualityBatch;
+
+static void CompletionQualityRecordJitter(
+    OpenA8DJCompletionQualityBatch *batch,
+    bool invalidInterval,
+    uint64_t completionDelta,
+    uint64_t transactionCount,
+    uint64_t ticksPerUSBMicroframe,
+    const uint64_t binThresholdTicks[5])
+{
+    if (invalidInterval || ticksPerUSBMicroframe == 0) {
+        batch->jitterInvalidIntervals++;
+        return;
+    }
+
+    uint64_t nominalTicks =
+        transactionCount <= UINT64_MAX / ticksPerUSBMicroframe ?
+            transactionCount * ticksPerUSBMicroframe :
+            UINT64_MAX;
+    uint64_t jitterTicks = completionDelta >= nominalTicks ?
+        completionDelta - nominalTicks :
+        nominalTicks - completionDelta;
+
+    batch->jitterSamples++;
+    if (jitterTicks <= binThresholdTicks[0]) {
+        batch->jitterBins[0]++;
+    } else if (jitterTicks <= binThresholdTicks[1]) {
+        batch->jitterBins[1]++;
+    } else if (jitterTicks <= binThresholdTicks[2]) {
+        batch->jitterBins[2]++;
+    } else if (jitterTicks <= binThresholdTicks[3]) {
+        batch->jitterBins[3]++;
+    } else if (jitterTicks <= binThresholdTicks[4]) {
+        batch->jitterBins[4]++;
+    } else {
+        batch->jitterBins[5]++;
+    }
+}
+
+static void StreamStatsFlushCompletionQualityLocked(
+    OpenA8DJStreamStatsPayload *stats,
+    OpenA8DJCompletionQualityBatch *batch,
+    bool capture)
+{
+    if (capture) {
+        stats->captureCompletionJitterSamples += batch->jitterSamples;
+        stats->captureCompletionJitterInvalidIntervals += batch->jitterInvalidIntervals;
+        stats->captureCompletionJitterLe50 += batch->jitterBins[0];
+        stats->captureCompletionJitterLe100 += batch->jitterBins[1];
+        stats->captureCompletionJitterLe250 += batch->jitterBins[2];
+        stats->captureCompletionJitterLe500 += batch->jitterBins[3];
+        stats->captureCompletionJitterLe1000 += batch->jitterBins[4];
+        stats->captureCompletionJitterGt1000 += batch->jitterBins[5];
+        stats->captureISOCompletionStatusFailures += batch->completionStatusFailures;
+        stats->captureISOTransactionStatusFailures += batch->transactionStatusFailures;
+        stats->captureISOZeroLengthTransactions += batch->zeroLengthTransactions;
+        stats->captureISOShortTransactions += batch->shortTransactions;
+    } else {
+        stats->playbackCompletionJitterSamples += batch->jitterSamples;
+        stats->playbackCompletionJitterInvalidIntervals += batch->jitterInvalidIntervals;
+        stats->playbackCompletionJitterLe50 += batch->jitterBins[0];
+        stats->playbackCompletionJitterLe100 += batch->jitterBins[1];
+        stats->playbackCompletionJitterLe250 += batch->jitterBins[2];
+        stats->playbackCompletionJitterLe500 += batch->jitterBins[3];
+        stats->playbackCompletionJitterLe1000 += batch->jitterBins[4];
+        stats->playbackCompletionJitterGt1000 += batch->jitterBins[5];
+        stats->playbackISOCompletionStatusFailures += batch->completionStatusFailures;
+        stats->playbackISOTransactionStatusFailures += batch->transactionStatusFailures;
+        stats->playbackISOZeroLengthTransactions += batch->zeroLengthTransactions;
+        stats->playbackISOShortTransactions += batch->shortTransactions;
+    }
+    memset(batch, 0, sizeof(*batch));
 }
 
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
@@ -1640,6 +1760,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t _lastCaptureCompletionHostTime;
     uint64_t _lastPlaybackCompletionHostTime;
     uint64_t _lastCaptureTransactionUSBTime;
+    uint64_t _ticksPerUSBMicroframe;
+    uint64_t _completionJitterBinThresholdTicks[5];
+    OpenA8DJCompletionQualityBatch _pendingCaptureCompletionQuality;
+    OpenA8DJCompletionQualityBatch _pendingPlaybackCompletionQuality;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     OpenA8DJCadenceDiagnostics _cadenceDiagnostics;
 #endif
@@ -1720,6 +1844,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_outputFramesWrittenAtomic, 0);
         atomic_init(&_captureHotStreamStatsCounter, 0);
         atomic_init(&_playbackHotStreamStatsCounter, 0);
+        _ticksPerUSBMicroframe = MachTicksForNanoseconds(125000);
+        _completionJitterBinThresholdTicks[0] = MachTicksForNanoseconds(50000);
+        _completionJitterBinThresholdTicks[1] = MachTicksForNanoseconds(100000);
+        _completionJitterBinThresholdTicks[2] = MachTicksForNanoseconds(250000);
+        _completionJitterBinThresholdTicks[3] = MachTicksForNanoseconds(500000);
+        _completionJitterBinThresholdTicks[4] = MachTicksForNanoseconds(1000000);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceReset(&_cadenceDiagnostics);
 #endif
@@ -2760,11 +2890,23 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 {
     pthread_mutex_lock(&_streamStatsMutex);
     memset(&_streamStats, 0, sizeof(_streamStats));
+    memset(&_pendingCaptureCompletionQuality, 0, sizeof(_pendingCaptureCompletionQuality));
+    memset(&_pendingPlaybackCompletionQuality, 0, sizeof(_pendingPlaybackCompletionQuality));
     pthread_mutex_unlock(&_streamStatsMutex);
     atomic_store(&_outputFramesWrittenAtomic, 0);
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     CadenceReset(&_cadenceDiagnostics);
 #endif
+}
+
+- (void)flushPendingCompletionQuality
+{
+    pthread_mutex_lock(&_streamStatsMutex);
+    StreamStatsFlushCompletionQualityLocked(
+        &_streamStats, &_pendingCaptureCompletionQuality, true);
+    StreamStatsFlushCompletionQualityLocked(
+        &_streamStats, &_pendingPlaybackCompletionQuality, false);
+    pthread_mutex_unlock(&_streamStatsMutex);
 }
 
 - (OpenA8DJStreamStatsPayload)streamStatsSnapshot
@@ -3428,6 +3570,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     dispatch_sync(_queue, ^{
     });
     [self waitForPlaybackTransfersToDrain];
+    [self flushPendingCompletionQuality];
     [self accumulateOutputFillStats:NULL force:YES];
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self closeDiagnosticCapture];
@@ -4060,7 +4203,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 {
     uint64_t captureCompletionTime = mach_absolute_time();
     uint64_t captureCompletionDelta = 0;
-    if (_lastCaptureCompletionHostTime != 0 && captureCompletionTime > _lastCaptureCompletionHostTime) {
+    bool captureHadPreviousCompletion = _lastCaptureCompletionHostTime != 0;
+    bool captureInvalidCompletionInterval =
+        captureHadPreviousCompletion && captureCompletionTime <= _lastCaptureCompletionHostTime;
+    if (captureHadPreviousCompletion && !captureInvalidCompletionInterval) {
         captureCompletionDelta = captureCompletionTime - _lastCaptureCompletionHostTime;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceRecordOutlier(&_cadenceDiagnostics.captureCompletionDeltaOutliers,
@@ -4081,6 +4227,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t otherByteCountTransactions = 0;
     uint64_t filteredTransactions = 0;
     uint64_t shortTransfers = 0;
+    uint64_t completionStatusFailures =
+        status != kIOReturnSuccess &&
+        !(status == kIOReturnAborted && !atomic_load(&_streaming)) ? 1 : 0;
+    uint64_t transactionStatusFailures = 0;
+    uint64_t zeroLengthTransactions = 0;
+    uint64_t shortTransactions = 0;
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED
     uint32_t playbackRequests[kIsoFramesPerTransfer];
     NSUInteger playbackRequestCount = 0;
@@ -4127,10 +4279,18 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             if (transaction->status != kIOReturnSuccess) {
                 statusFailures++;
                 failedTransactions++;
+                transactionStatusFailures++;
 #if OPENA8DJ_ENABLE_TRACE
                 traceFailedTransactions++;
 #endif
                 continue;
+            }
+            if (transaction->requestCount > 0 &&
+                transaction->completeCount < transaction->requestCount) {
+                shortTransactions++;
+                if (transaction->completeCount == 0) {
+                    zeroLengthTransactions++;
+                }
             }
             if (transaction->completeCount == 0) {
                 zeroCompleteTransactions++;
@@ -4241,6 +4401,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
 #endif
 
+    if (captureHadPreviousCompletion) {
+        CompletionQualityRecordJitter(
+            &_pendingCaptureCompletionQuality,
+            captureInvalidCompletionInterval,
+            captureCompletionDelta,
+            transfer.transactionCount,
+            _ticksPerUSBMicroframe,
+            _completionJitterBinThresholdTicks);
+    }
+    _pendingCaptureCompletionQuality.completionStatusFailures += completionStatusFailures;
+    _pendingCaptureCompletionQuality.transactionStatusFailures += transactionStatusFailures;
+    _pendingCaptureCompletionQuality.zeroLengthTransactions += zeroLengthTransactions;
+    _pendingCaptureCompletionQuality.shortTransactions += shortTransactions;
+
 #if OPENA8DJ_ENABLE_HOT_STREAM_STATS
     uint64_t captureStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
     uint64_t captureStatsCounter = atomic_fetch_add(&_captureHotStreamStatsCounter, 1) + 1;
@@ -4258,6 +4432,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                    offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSum),
                                    offsetof(OpenA8DJStreamStatsPayload, captureToPlaybackQueueDeltaSamples),
                                    captureToPlaybackQueueDelta);
+        StreamStatsFlushCompletionQualityLocked(
+            &_streamStats, &_pendingCaptureCompletionQuality, true);
         _streamStats.captureTransfers += 1;
         _streamStats.captureTransactions += captureTransactions;
         _streamStats.captureBytes += captureByteCount;
@@ -4282,6 +4458,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     (void)otherByteCountTransactions;
     (void)filteredTransactions;
     (void)shortTransfers;
+    (void)completionStatusFailures;
+    (void)transactionStatusFailures;
+    (void)zeroLengthTransactions;
+    (void)shortTransactions;
 #endif
 
 #if OPENA8DJ_PLAYBACK_CAPTURE_PACED
@@ -4539,6 +4719,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                                              count:count
                                                          nextIndex:&_playbackTransferPoolCursor];
     if (transfer == nil) {
+        [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, playbackQueueFailures)
+                               value:1];
         return NO;
     }
     uint64_t firstFrameNumber = [self nextPlaybackFirstFrameNumberForCount:count];
@@ -4625,7 +4807,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 {
     uint64_t playbackCompletionTime = mach_absolute_time();
     uint64_t playbackCompletionDelta = 0;
-    if (_lastPlaybackCompletionHostTime != 0 && playbackCompletionTime > _lastPlaybackCompletionHostTime) {
+    bool playbackHadPreviousCompletion = _lastPlaybackCompletionHostTime != 0;
+    bool playbackInvalidCompletionInterval =
+        playbackHadPreviousCompletion && playbackCompletionTime <= _lastPlaybackCompletionHostTime;
+    if (playbackHadPreviousCompletion && !playbackInvalidCompletionInterval) {
         playbackCompletionDelta = playbackCompletionTime - _lastPlaybackCompletionHostTime;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
         CadenceRecordOutlier(&_cadenceDiagnostics.playbackCompletionDeltaOutliers,
@@ -4647,6 +4832,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     uint64_t playbackBytes = 0;
     uint64_t failedTransactions = 0;
     uint64_t shortTransfers = 0;
+    uint64_t completionStatusFailures =
+        status != kIOReturnSuccess &&
+        !(status == kIOReturnAborted && !atomic_load(&_streaming)) ? 1 : 0;
+    uint64_t transactionStatusFailures = 0;
+    uint64_t zeroLengthTransactions = 0;
+    uint64_t shortTransactions = 0;
 #if OPENA8DJ_ENABLE_CADENCE_DIAGNOSTIC
     uint64_t playbackLayoutSignature = 0;
 #endif
@@ -4668,7 +4859,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             [self recordPlaybackScheduleStatus:transaction->status];
             if (transaction->status != kIOReturnSuccess) {
                 failedTransactions++;
+                transactionStatusFailures++;
                 continue;
+            }
+            if (transaction->requestCount > 0 &&
+                transaction->completeCount < transaction->requestCount) {
+                shortTransactions++;
+                if (transaction->completeCount == 0) {
+                    zeroLengthTransactions++;
+                }
             }
             playbackTransactions++;
             playbackBytes += transaction->completeCount;
@@ -4708,6 +4907,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (status != kIOReturnSuccess && status != kIOReturnAborted && atomic_load(&_streaming)) {
         USBTrace("isoc OUT complete status=0x%08x", status);
     }
+    if (playbackHadPreviousCompletion) {
+        CompletionQualityRecordJitter(
+            &_pendingPlaybackCompletionQuality,
+            playbackInvalidCompletionInterval,
+            playbackCompletionDelta,
+            transfer.transactionCount,
+            _ticksPerUSBMicroframe,
+            _completionJitterBinThresholdTicks);
+    }
+    _pendingPlaybackCompletionQuality.completionStatusFailures += completionStatusFailures;
+    _pendingPlaybackCompletionQuality.transactionStatusFailures += transactionStatusFailures;
+    _pendingPlaybackCompletionQuality.zeroLengthTransactions += zeroLengthTransactions;
+    _pendingPlaybackCompletionQuality.shortTransactions += shortTransactions;
+
 #if OPENA8DJ_ENABLE_HOT_STREAM_STATS
     uint64_t playbackStatsInterval = OPENA8DJ_HOT_STREAM_STATS_INTERVAL < 1 ? 1 : OPENA8DJ_HOT_STREAM_STATS_INTERVAL;
     uint64_t playbackStatsCounter = atomic_fetch_add(&_playbackHotStreamStatsCounter, 1) + 1;
@@ -4719,6 +4932,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                    offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSum),
                                    offsetof(OpenA8DJStreamStatsPayload, playbackCompletionDeltaSamples),
                                    playbackCompletionDelta);
+        StreamStatsFlushCompletionQualityLocked(
+            &_streamStats, &_pendingPlaybackCompletionQuality, false);
         _streamStats.playbackTransfers += 1;
         _streamStats.playbackTransactions += playbackTransactions;
         _streamStats.playbackBytes += playbackBytes;
@@ -4732,6 +4947,10 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     (void)playbackBytes;
     (void)failedTransactions;
     (void)shortTransfers;
+    (void)completionStatusFailures;
+    (void)transactionStatusFailures;
+    (void)zeroLengthTransactions;
+    (void)shortTransactions;
 #endif
     [self releasePooledTransfer:transfer];
 #if !OPENA8DJ_PLAYBACK_CAPTURE_PACED
