@@ -8,7 +8,10 @@ fi
 
 /bin/rm -f /Library/LaunchAgents/org.opena8dj.midid.plist
 /usr/bin/find /usr/local/bin /Library/LaunchAgents /Library/Audio/Plug-Ins/HAL -name '._*' -delete 2>/dev/null || true
-/bin/rm -f /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid
+/bin/rm -f /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-midid \
+  /usr/local/bin/opena8dj-hardware-profiler
+/bin/rm -f "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+/bin/rmdir "/Library/Application Support/OpenA8DJ" 2>/dev/null || true
 /bin/rm -rf /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 /bin/rm -rf /Library/Documentation/OpenA8DJ
 /usr/bin/killall coreaudiod 2>/dev/null || true

@@ -2,7 +2,9 @@
 set -eu
 
 /bin/rm -rf "/Applications/OpenA8DJ Control Center.app"
-/bin/rm -f /usr/local/bin/opena8dj-control
+/bin/rm -f /usr/local/bin/opena8dj-control /usr/local/bin/opena8dj-hardware-profiler
+/bin/rm -f "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+/bin/rmdir "/Library/Application Support/OpenA8DJ" 2>/dev/null || true
 /bin/rm -rf /Library/Documentation/OpenA8DJ/ControlSurfaces
 /bin/rmdir /Library/Documentation/OpenA8DJ 2>/dev/null || true
 

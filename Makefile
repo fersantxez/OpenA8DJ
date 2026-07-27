@@ -49,6 +49,12 @@ CONTROL_TOOL_SRC := src/tools/opena8dj-control.c
 PUBLIC_API_TEST := tests/public_api_contract_test.py
 PUBLIC_API_PEER_POLICY_TEST := tests/public_api_peer_policy_test.c
 USB_QUALITY_CLI_TEST := tests/usb_quality_cli_test.py
+HARDWARE_PROFILER := build/opena8dj-hardware-profiler
+HARDWARE_PROFILER_TEST := build/opena8dj-hardware-profiler-test
+HARDWARE_PROFILER_SRC := src/tools/opena8dj-hardware-profiler.swift
+HARDWARE_PROFILER_GENERATED_SRC := build/opena8dj-hardware-profiler-main.swift
+HARDWARE_PROFILER_CATALOG := resources/hardware-profiler-known-issues-v1.json
+HARDWARE_PROFILER_TEST_SRC := tests/hardware_profiler_offline_test.py
 CONTROL_CENTER_APP := build/OpenA8DJControlCenter.app
 CONTROL_CENTER_SRC := macos/OpenA8DJControlCenter/OpenA8DJControlCenter.swift
 CONTROL_CENTER_PLIST := macos/OpenA8DJControlCenter/Info.plist
@@ -211,9 +217,9 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center public-api-offline-test usb-quality-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
 
-all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
+all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(MIDI_LIST)
 
 $(TOOL): $(SRC)
 	@mkdir -p build
@@ -573,6 +579,25 @@ public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST) $(PUBLIC_API_PEER_PO
 usb-quality-offline-test: $(CONTROL_TOOL) $(USB_QUALITY_CLI_TEST)
 	python3 $(USB_QUALITY_CLI_TEST) --repo .
 
+$(HARDWARE_PROFILER_GENERATED_SRC): Makefile $(HARDWARE_PROFILER_SRC)
+	@mkdir -p build
+	@printf 'let openA8DJHardwareProfilerVersion = "%s"\n' "$(VERSION)" > "$@"
+	@sed -n '1,$$p' "$(HARDWARE_PROFILER_SRC)" >> "$@"
+
+$(HARDWARE_PROFILER): $(HARDWARE_PROFILER_GENERATED_SRC) $(HARDWARE_PROFILER_CATALOG)
+	@mkdir -p build
+	xcrun swiftc -O -framework CoreAudio -framework IOKit \
+		-o "$@" "$(HARDWARE_PROFILER_GENERATED_SRC)"
+	cp "$(HARDWARE_PROFILER_CATALOG)" build/hardware-profiler-known-issues-v1.json
+
+$(HARDWARE_PROFILER_TEST): $(HARDWARE_PROFILER_GENERATED_SRC)
+	@mkdir -p build
+	xcrun swiftc -O -D OPENA8DJ_HARDWARE_PROFILER_TESTING \
+		-framework CoreAudio -framework IOKit -o "$@" "$(HARDWARE_PROFILER_GENERATED_SRC)"
+
+hardware-profiler-offline-test: $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_TEST) $(HARDWARE_PROFILER_TEST_SRC)
+	python3 "$(HARDWARE_PROFILER_TEST_SRC)" --repo .
+
 $(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL)
 	rm -rf "$(CONTROL_CENTER_APP)"
 	mkdir -p "$(CONTROL_CENTER_APP)/Contents/MacOS" "$(CONTROL_CENTER_APP)/Contents/Resources"
@@ -597,13 +622,17 @@ install-hal: sign-hal
 		--leave-loaded \
 		--run-dir local-analysis/hal-candidate-safety/make-install-hal-$$(date +%Y%m%d-%H%M%S)
 
-install-tools: $(CONTROL_TOOL)
-	sudo install -d /usr/local/bin
+install-tools: $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_CATALOG)
+	sudo install -d /usr/local/bin "/Library/Application Support/OpenA8DJ"
 	sudo install -m 755 $(CONTROL_TOOL) /usr/local/bin/opena8dj-control
+	sudo install -m 755 $(HARDWARE_PROFILER) /usr/local/bin/opena8dj-hardware-profiler
+	sudo install -m 644 $(HARDWARE_PROFILER_CATALOG) "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
 
-install-control-surfaces: $(CONTROL_CENTER_APP)
-	sudo install -d /usr/local/bin /Applications /Library/Documentation/OpenA8DJ/ControlSurfaces
+install-control-surfaces: $(CONTROL_CENTER_APP) $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_CATALOG)
+	sudo install -d /usr/local/bin /Applications /Library/Documentation/OpenA8DJ/ControlSurfaces "/Library/Application Support/OpenA8DJ"
 	sudo install -m 755 $(CONTROL_TOOL) /usr/local/bin/opena8dj-control
+	sudo install -m 755 $(HARDWARE_PROFILER) /usr/local/bin/opena8dj-hardware-profiler
+	sudo install -m 644 $(HARDWARE_PROFILER_CATALOG) "/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
 	sudo rm -rf "/Applications/OpenA8DJ Control Center.app"
 	COPYFILE_DISABLE=1 sudo cp -R "$(CONTROL_CENTER_APP)" "/Applications/OpenA8DJ Control Center.app"
 	sudo install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md /Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md
@@ -629,7 +658,10 @@ package: all sign-hal
 	COPYFILE_DISABLE=1 cp -R "$(HAL_BUNDLE)" "$(PKG_ROOT)/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
 	install -d "$(PKG_ROOT)/usr/local/bin"
 	install -m 755 "$(CONTROL_TOOL)" "$(PKG_ROOT)/usr/local/bin/opena8dj-control"
+	install -m 755 "$(HARDWARE_PROFILER)" "$(PKG_ROOT)/usr/local/bin/opena8dj-hardware-profiler"
 	install -m 755 "$(MIDI_BRIDGE)" "$(PKG_ROOT)/usr/local/bin/opena8dj-midid"
+	install -d "$(PKG_ROOT)/Library/Application Support/OpenA8DJ"
+	install -m 644 "$(HARDWARE_PROFILER_CATALOG)" "$(PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
 	install -m 755 "$(PKG_SCRIPTS)/uninstall-opena8dj.sh" "$(PKG_ROOT)/usr/local/bin/opena8dj-uninstall"
 	install -d "$(PKG_ROOT)/Library/LaunchAgents"
 	install -m 644 "$(LAUNCH_AGENT_PLIST)" "$(PKG_ROOT)/Library/LaunchAgents/org.opena8dj.midid.plist"
@@ -637,20 +669,27 @@ package: all sign-hal
 	install -m 644 LICENSE "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LICENSE"
 	install -m 644 NOTICE.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/LEGAL.md"
+	install -m 644 docs/HARDWARE_PROFILER.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/HARDWARE_PROFILER.md"
 	install -m 644 BRAND_POLICY.md "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/BRAND_POLICY.md"
 	if [ -f "$(RELEASE_NOTES)" ]; then install -m 644 "$(RELEASE_NOTES)" "$(PKG_ROOT)/Library/Documentation/OpenA8DJ/RELEASE_NOTES.md"; fi
+	test -x "$(PKG_ROOT)/usr/local/bin/opena8dj-hardware-profiler"
+	test -f "$(PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER_CATALOG)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json" | awk '{print $$1}')"
 	chmod +x "$(PKG_SCRIPTS)/preinstall" "$(PKG_SCRIPTS)/postinstall" "$(PKG_SCRIPTS)/uninstall-opena8dj.sh"
 	xattr -cr "$(PKG_ROOT)" 2>/dev/null || true
 	find "$(PKG_ROOT)" -name '._*' -delete
 	COPYFILE_DISABLE=1 pkgbuild --root "$(PKG_ROOT)" --scripts "$(PKG_SCRIPTS)" --identifier org.opena8dj.driver --version "$(VERSION)" --install-location / --filter '(^|/)\._.*' --filter '(^|/)\.DS_Store$$' $(if $(PKG_SIGN_IDENTITY),--sign "$(PKG_SIGN_IDENTITY)") "$(PKG)"
 	if [ -z "$(PKG_SIGN_IDENTITY)" ]; then "$(PKG_SANITIZER)" "$(PKG)" "$(PKG_ROOT)" "$(PKG_SCRIPTS)"; fi
 
-control-surfaces-package: $(CONTROL_CENTER_APP)
+control-surfaces-package: $(CONTROL_CENTER_APP) $(HARDWARE_PROFILER) $(HARDWARE_PROFILER_CATALOG)
 	rm -rf "$(CONTROL_PKG_ROOT)"
 	install -d "$(CONTROL_PKG_ROOT)/Applications"
 	COPYFILE_DISABLE=1 cp -R "$(CONTROL_CENTER_APP)" "$(CONTROL_PKG_ROOT)/Applications/OpenA8DJ Control Center.app"
 	install -d "$(CONTROL_PKG_ROOT)/usr/local/bin"
 	install -m 755 "$(CONTROL_TOOL)" "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-control"
+	install -m 755 "$(HARDWARE_PROFILER)" "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-hardware-profiler"
+	install -d "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ"
+	install -m 644 "$(HARDWARE_PROFILER_CATALOG)" "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
 	install -d "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces"
 	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_USER_GUIDE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/USER_GUIDE.md"
 	install -m 644 docs/AUDIO8DJ_CONTROL_SURFACES_DEMO_RUNBOOK_2026-06-19.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/DEMO_RUNBOOK_2026-06-19.md"
@@ -658,8 +697,12 @@ control-surfaces-package: $(CONTROL_CENTER_APP)
 	install -m 644 LICENSE "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LICENSE"
 	install -m 644 NOTICE.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/NOTICE.md"
 	install -m 644 docs/LEGAL.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/LEGAL.md"
+	install -m 644 docs/HARDWARE_PROFILER.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/HARDWARE_PROFILER.md"
 	install -m 644 BRAND_POLICY.md "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/BRAND_POLICY.md"
 	install -m 755 "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh" "$(CONTROL_PKG_ROOT)/Library/Documentation/OpenA8DJ/ControlSurfaces/uninstall-opena8dj-control-surfaces.sh"
+	test -x "$(CONTROL_PKG_ROOT)/usr/local/bin/opena8dj-hardware-profiler"
+	test -f "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json"
+	test "$$(shasum -a 256 "$(HARDWARE_PROFILER_CATALOG)" | awk '{print $$1}')" = "$$(shasum -a 256 "$(CONTROL_PKG_ROOT)/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json" | awk '{print $$1}')"
 	chmod +x "$(CONTROL_PKG_SCRIPTS)/preinstall" "$(CONTROL_PKG_SCRIPTS)/postinstall" "$(CONTROL_PKG_SCRIPTS)/uninstall-opena8dj-control-surfaces.sh"
 	xattr -cr "$(CONTROL_PKG_ROOT)" 2>/dev/null || true
 	find "$(CONTROL_PKG_ROOT)" -name '._*' -delete

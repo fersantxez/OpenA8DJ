@@ -1,7 +1,7 @@
 # Installing OpenA8DJ
 
-OpenA8DJ installs a Core Audio HAL driver, a MIDI/control LaunchAgent, and two
-command-line tools.
+OpenA8DJ installs a Core Audio HAL driver, a MIDI/control LaunchAgent, and
+command-line control and diagnostic tools.
 
 ## Two-click install
 
@@ -19,10 +19,17 @@ Installed files:
 /Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver
 /Library/LaunchAgents/org.opena8dj.midid.plist
 /usr/local/bin/opena8dj-control
+/usr/local/bin/opena8dj-hardware-profiler
 /usr/local/bin/opena8dj-midid
 /usr/local/bin/opena8dj-uninstall
+/Library/Application Support/OpenA8DJ/hardware-profiler-known-issues-v1.json
 /Library/Documentation/OpenA8DJ
 ```
+
+The hardware profiler is read-only. Run `opena8dj-hardware-profiler` for a
+concise report or `opena8dj-hardware-profiler --json` for one support-redacted
+JSON document. Its installed `HARDWARE_PROFILER.md` guide documents privacy,
+status/exit semantics, evidence limitations, and offline catalog overrides.
 
 ## Verify
 
