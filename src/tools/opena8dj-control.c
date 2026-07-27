@@ -1435,6 +1435,8 @@ static bool ValidateTimecodeState(
         state->reserved0 != 0 ||
         state->evidenceKind != 1 ||
         state->intentObserved != 0 ||
+        state->rejectionReason >
+            kOpenA8DJTimecodeRejectionInvalidPairMask ||
         !ValidateDriverModeState(&state->driverMode) ||
         state->timecode.armed > 1 ||
         state->timecode.profileVerified > 1 ||
@@ -1539,7 +1541,36 @@ static bool TimecodeStatesEqual(
     const OpenA8DJTimecodeStatePayload *left,
     const OpenA8DJTimecodeStatePayload *right)
 {
-    return memcmp(left, right, sizeof(*left)) == 0;
+    OpenA8DJTimecodeState leftState;
+    OpenA8DJTimecodeState rightState;
+    memcpy(&leftState, &left->timecode, sizeof(leftState));
+    memcpy(&rightState, &right->timecode, sizeof(rightState));
+    return left->schemaVersion == right->schemaVersion &&
+           left->evidenceKind == right->evidenceKind &&
+           left->intentObserved == right->intentObserved &&
+           left->rejectionReason == kOpenA8DJTimecodeRejectionNone &&
+           right->rejectionReason == kOpenA8DJTimecodeRejectionNone &&
+           leftState.armed == rightState.armed &&
+           leftState.allowedInputPairMask ==
+               rightState.allowedInputPairMask &&
+           leftState.fallbackMode == rightState.fallbackMode &&
+           leftState.electricalProfile ==
+               rightState.electricalProfile &&
+           leftState.profileVerified ==
+               rightState.profileVerified &&
+           leftState.sampleRateSnapshot ==
+               rightState.sampleRateSnapshot &&
+           leftState.bufferFramesSnapshot ==
+               rightState.bufferFramesSnapshot &&
+           rightState.generation >= leftState.generation &&
+           rightState.counters.arms >= leftState.counters.arms &&
+           rightState.counters.disarms >= leftState.counters.disarms &&
+           rightState.counters.qualifications >=
+               leftState.counters.qualifications &&
+           rightState.counters.activations >=
+               leftState.counters.activations &&
+           rightState.counters.deoptimizations >=
+               leftState.counters.deoptimizations;
 }
 
 static bool MutateTimecodeAndReadBack(
@@ -2182,8 +2213,8 @@ static void PrintPublicTimecodeMembers(
         &window, state->windowFrames);
     fprintf(stdout,
             ",\"thresholds\":{\"allowedEntryACRMS\":%.6g,"
-            "\"allowedEntryPeak\":%.6g,\"allowedHoldACRMS\":%.6g,"
-            "\"allowedHoldPeak\":%.6g,\"forbiddenTripACRMS\":%.6g,"
+            "\"allowedEntryACPeak\":%.6g,\"allowedHoldACRMS\":%.6g,"
+            "\"allowedHoldACPeak\":%.6g,\"forbiddenTripACRMS\":%.6g,"
             "\"forbiddenTripPeak\":%.6g},\"windowFresh\":%s,"
             "\"pairWindows\":{",
             OPENA8DJ_TIMECODE_ENTRY_RMS,
@@ -2212,11 +2243,14 @@ static void PrintPublicTimecodeMembers(
                  OPENA8DJ_TIMECODE_FORBIDDEN_PEAK);
         fprintf(stdout,
                 "{\"active\":%s,\"leftACRMS\":%.9g,"
-                "\"rightACRMS\":%.9g,\"leftPeak\":%.9g,"
-                "\"rightPeak\":%.9g}",
+                "\"rightACRMS\":%.9g,\"leftACPeak\":%.9g,"
+                "\"rightACPeak\":%.9g,\"leftRawPeak\":%.9g,"
+                "\"rightRawPeak\":%.9g}",
                 active ? "true" : "false",
                 OpenA8DJTimecodeWindowRMS(&window, pair, 0),
                 OpenA8DJTimecodeWindowRMS(&window, pair, 1),
+                OpenA8DJTimecodeWindowACPeak(&window, pair, 0),
+                OpenA8DJTimecodeWindowACPeak(&window, pair, 1),
                 window.peak[pair][0], window.peak[pair][1]);
     }
     fputc('}', stdout);

@@ -56,6 +56,15 @@ typedef enum OpenA8DJTimecodeProfile {
     kOpenA8DJTimecodeProfilePhono = 3
 } OpenA8DJTimecodeProfile;
 
+typedef enum OpenA8DJTimecodeRejection {
+    kOpenA8DJTimecodeRejectionNone = 0,
+    kOpenA8DJTimecodeRejectionBadLength = 1,
+    kOpenA8DJTimecodeRejectionUnsupportedSchema = 2,
+    kOpenA8DJTimecodeRejectionReservedNonzero = 3,
+    kOpenA8DJTimecodeRejectionUnknownMode = 4,
+    kOpenA8DJTimecodeRejectionInvalidPairMask = 5
+} OpenA8DJTimecodeRejection;
+
 typedef struct OpenA8DJTimecodeArmPayload {
     uint16_t schemaVersion;
     uint16_t reserved0;
@@ -69,6 +78,8 @@ typedef struct OpenA8DJTimecodeWindow {
     double sum[4][2];
     double square[4][2];
     double peak[4][2];
+    double minimum[4][2];
+    double maximum[4][2];
     uint8_t finite;
     uint8_t complete;
     uint8_t reserved[6];
@@ -124,7 +135,8 @@ typedef struct OpenA8DJTimecodeStatePayload {
     OpenA8DJTimecodeWindow latestWindow;
     uint8_t evidenceKind;
     uint8_t intentObserved;
-    uint8_t reserved[6];
+    uint8_t rejectionReason;
+    uint8_t reserved[5];
 } __attribute__((packed)) OpenA8DJTimecodeStatePayload;
 
 static inline uint8_t OpenA8DJTimecodeProfileForElectricalState(
@@ -180,6 +192,12 @@ static inline void OpenA8DJTimecodeClassifierInit(
     memset(classifier, 0, sizeof(*classifier));
     classifier->windowFrames = OpenA8DJTimecodeFramesPerWindow(sampleRate);
     classifier->accumulating.finite = 1;
+    for (uint32_t pair = 0; pair < 4; pair++) {
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            classifier->accumulating.minimum[pair][channel] = INFINITY;
+            classifier->accumulating.maximum[pair][channel] = -INFINITY;
+        }
+    }
 }
 
 static inline bool OpenA8DJTimecodeClassifierFeedFrame(
@@ -204,6 +222,12 @@ static inline bool OpenA8DJTimecodeClassifierFeedFrame(
             if (magnitude > classifier->accumulating.peak[pair][channel]) {
                 classifier->accumulating.peak[pair][channel] = magnitude;
             }
+            if (value < classifier->accumulating.minimum[pair][channel]) {
+                classifier->accumulating.minimum[pair][channel] = value;
+            }
+            if (value > classifier->accumulating.maximum[pair][channel]) {
+                classifier->accumulating.maximum[pair][channel] = value;
+            }
         }
     }
     classifier->accumulatedFrames++;
@@ -223,6 +247,12 @@ static inline bool OpenA8DJTimecodeClassifierFeedFrame(
     }
     memset(&classifier->accumulating, 0, sizeof(classifier->accumulating));
     classifier->accumulating.finite = 1;
+    for (uint32_t pair = 0; pair < 4; pair++) {
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            classifier->accumulating.minimum[pair][channel] = INFINITY;
+            classifier->accumulating.maximum[pair][channel] = -INFINITY;
+        }
+    }
     classifier->accumulatedFrames = 0;
     return true;
 }
@@ -238,6 +268,14 @@ static inline bool OpenA8DJTimecodeWindowValid(
     for (uint32_t pair = 0; pair < 4; pair++) {
         if (window->frames[pair] != expectedFrames) {
             return false;
+        }
+        for (uint32_t channel = 0; channel < 2; channel++) {
+            if (!isfinite(window->minimum[pair][channel]) ||
+                !isfinite(window->maximum[pair][channel]) ||
+                window->minimum[pair][channel] >
+                    window->maximum[pair][channel]) {
+                return false;
+            }
         }
     }
     return true;
@@ -260,6 +298,24 @@ static inline double OpenA8DJTimecodeWindowRMS(
     return variance >= 0.0 ? sqrt(variance) : NAN;
 }
 
+static inline double OpenA8DJTimecodeWindowACPeak(
+    const OpenA8DJTimecodeWindow *window,
+    uint32_t pair,
+    uint32_t channel)
+{
+    if (window == NULL || pair >= 4 || channel >= 2 ||
+        window->frames[pair] == 0 ||
+        !isfinite(window->minimum[pair][channel]) ||
+        !isfinite(window->maximum[pair][channel])) {
+        return NAN;
+    }
+    double mean = window->sum[pair][channel] /
+                  window->frames[pair];
+    double below = fabs(window->minimum[pair][channel] - mean);
+    double above = fabs(window->maximum[pair][channel] - mean);
+    return below > above ? below : above;
+}
+
 static inline bool OpenA8DJTimecodeChannelEntry(
     const OpenA8DJTimecodeWindow *window,
     uint32_t pair,
@@ -267,7 +323,8 @@ static inline bool OpenA8DJTimecodeChannelEntry(
 {
     return OpenA8DJTimecodeWindowRMS(window, pair, channel) >=
                OPENA8DJ_TIMECODE_ENTRY_RMS &&
-           window->peak[pair][channel] >= OPENA8DJ_TIMECODE_ENTRY_PEAK;
+           OpenA8DJTimecodeWindowACPeak(window, pair, channel) >=
+               OPENA8DJ_TIMECODE_ENTRY_PEAK;
 }
 
 static inline bool OpenA8DJTimecodeChannelHold(
@@ -277,7 +334,8 @@ static inline bool OpenA8DJTimecodeChannelHold(
 {
     return OpenA8DJTimecodeWindowRMS(window, pair, channel) >=
                OPENA8DJ_TIMECODE_HOLD_RMS ||
-           window->peak[pair][channel] >= OPENA8DJ_TIMECODE_HOLD_PEAK;
+           OpenA8DJTimecodeWindowACPeak(window, pair, channel) >=
+               OPENA8DJ_TIMECODE_HOLD_PEAK;
 }
 
 static inline bool OpenA8DJTimecodePairEntry(
@@ -319,31 +377,59 @@ static inline void OpenA8DJTimecodeStateInit(OpenA8DJTimecodeState *state)
     state->fallbackMode = kOpenA8DJDriverModeBalanced;
 }
 
+static inline bool OpenA8DJTimecodeValidateArmPayloadDetailed(
+    const void *bytes,
+    size_t length,
+    OpenA8DJTimecodeArmPayload *outPayload,
+    uint8_t *outRejection)
+{
+    OpenA8DJTimecodeArmPayload payload;
+    uint8_t rejection = kOpenA8DJTimecodeRejectionNone;
+    memset(&payload, 0, sizeof(payload));
+    if (bytes == NULL || length != sizeof(payload)) {
+        rejection = kOpenA8DJTimecodeRejectionBadLength;
+    } else {
+        memcpy(&payload, bytes, sizeof(payload));
+        if (payload.schemaVersion != kOpenA8DJTimecodeSchemaVersion) {
+            rejection =
+                kOpenA8DJTimecodeRejectionUnsupportedSchema;
+        } else if (payload.reserved0 != 0) {
+            rejection =
+                kOpenA8DJTimecodeRejectionReservedNonzero;
+        } else if (payload.modeID !=
+                   kOpenA8DJDriverModeTimecodeOptimized) {
+            rejection = kOpenA8DJTimecodeRejectionUnknownMode;
+        } else if (payload.allowedInputPairMask !=
+                   kOpenA8DJTimecodeAllowedPairMask) {
+            rejection =
+                kOpenA8DJTimecodeRejectionInvalidPairMask;
+        } else {
+            for (size_t index = 0;
+                 index < sizeof(payload.reserved);
+                 index++) {
+                if (payload.reserved[index] != 0) {
+                    rejection =
+                        kOpenA8DJTimecodeRejectionReservedNonzero;
+                    break;
+                }
+            }
+        }
+    }
+    if (outRejection != NULL) *outRejection = rejection;
+    if (rejection != kOpenA8DJTimecodeRejectionNone) return false;
+    if (outPayload != NULL) {
+        *outPayload = payload;
+    }
+    return true;
+}
+
 static inline bool OpenA8DJTimecodeValidateArmPayload(
     const void *bytes,
     size_t length,
     OpenA8DJTimecodeArmPayload *outPayload)
 {
-    OpenA8DJTimecodeArmPayload payload;
-    if (bytes == NULL || length != sizeof(payload)) {
-        return false;
-    }
-    memcpy(&payload, bytes, sizeof(payload));
-    if (payload.schemaVersion != kOpenA8DJTimecodeSchemaVersion ||
-        payload.reserved0 != 0 ||
-        payload.modeID != kOpenA8DJDriverModeTimecodeOptimized ||
-        payload.allowedInputPairMask != kOpenA8DJTimecodeAllowedPairMask) {
-        return false;
-    }
-    for (size_t index = 0; index < sizeof(payload.reserved); index++) {
-        if (payload.reserved[index] != 0) {
-            return false;
-        }
-    }
-    if (outPayload != NULL) {
-        *outPayload = payload;
-    }
-    return true;
+    return OpenA8DJTimecodeValidateArmPayloadDetailed(
+        bytes, length, outPayload, NULL);
 }
 
 static inline bool OpenA8DJTimecodeArm(
@@ -429,6 +515,7 @@ static inline uint8_t OpenA8DJTimecodeObserveWindow(
                 kOpenA8DJTimecodeQualifiedPendingBoundary :
                 kOpenA8DJTimecodeActive;
             state->counters.qualifications++;
+            state->generation++;
             return UINT8_MAX; /* qualification decision */
         }
         state->armState = kOpenA8DJTimecodeQualifying;

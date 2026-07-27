@@ -31,6 +31,8 @@ static OpenA8DJTimecodeWindow Window(double allowedRMS,
             window.square[pair][channel] =
                 rms * rms * window.frames[pair];
             window.peak[pair][channel] = peak;
+            window.minimum[pair][channel] = -peak;
+            window.maximum[pair][channel] = peak;
         }
     }
     return window;
@@ -96,22 +98,37 @@ static void CheckArmValidation(void)
     payload.schemaVersion = 1;
     payload.modeID = kOpenA8DJDriverModeTimecodeOptimized;
     payload.allowedInputPairMask = 0x3;
+    uint8_t rejection = 0xff;
     assert(OpenA8DJTimecodeValidateArmPayload(
         &payload, sizeof(payload), NULL));
+    assert(!OpenA8DJTimecodeValidateArmPayloadDetailed(
+        &payload, sizeof(payload) - 1, NULL, &rejection));
+    assert(rejection == kOpenA8DJTimecodeRejectionBadLength);
     const uint8_t badMasks[] = {0, 1, 2, 4, 8, 7, 15, 0x83};
     for (size_t index = 0; index < sizeof(badMasks); index++) {
         payload.allowedInputPairMask = badMasks[index];
-        assert(!OpenA8DJTimecodeValidateArmPayload(
-            &payload, sizeof(payload), NULL));
+        assert(!OpenA8DJTimecodeValidateArmPayloadDetailed(
+            &payload, sizeof(payload), NULL, &rejection));
+        assert(rejection ==
+               kOpenA8DJTimecodeRejectionInvalidPairMask);
     }
     payload.allowedInputPairMask = 3;
     payload.reserved[3] = 1;
-    assert(!OpenA8DJTimecodeValidateArmPayload(
-        &payload, sizeof(payload), NULL));
+    assert(!OpenA8DJTimecodeValidateArmPayloadDetailed(
+        &payload, sizeof(payload), NULL, &rejection));
+    assert(rejection ==
+           kOpenA8DJTimecodeRejectionReservedNonzero);
     payload.reserved[3] = 0;
     payload.schemaVersion = 2;
-    assert(!OpenA8DJTimecodeValidateArmPayload(
-        &payload, sizeof(payload), NULL));
+    assert(!OpenA8DJTimecodeValidateArmPayloadDetailed(
+        &payload, sizeof(payload), NULL, &rejection));
+    assert(rejection ==
+           kOpenA8DJTimecodeRejectionUnsupportedSchema);
+    payload.schemaVersion = 1;
+    payload.modeID = kOpenA8DJDriverModePerformance;
+    assert(!OpenA8DJTimecodeValidateArmPayloadDetailed(
+        &payload, sizeof(payload), NULL, &rejection));
+    assert(rejection == kOpenA8DJTimecodeRejectionUnknownMode);
 
     OpenA8DJTimecodeState waiting;
     OpenA8DJTimecodeStateInit(&waiting);
@@ -137,23 +154,27 @@ static void CheckQualification(void)
     OpenA8DJTimecodeWindow both = Window(
         OPENA8DJ_TIMECODE_ENTRY_RMS,
         OPENA8DJ_TIMECODE_ENTRY_PEAK, 0x0f, 0, 0, 0);
+    uint64_t generationBeforeQualification = state.generation;
     for (int i = 0; i < 7; i++) {
         assert(OpenA8DJTimecodeObserveWindow(
             &state, &both, true) == kOpenA8DJTimecodeFailNone);
+        assert(state.generation == generationBeforeQualification);
     }
     assert(!state.qualified && state.eligibleWindows == 7);
     assert(OpenA8DJTimecodeObserveWindow(&state, &both, true) == UINT8_MAX);
     assert(state.qualified);
+    assert(state.generation ==
+           generationBeforeQualification + 1);
     assert(state.armState ==
            kOpenA8DJTimecodeQualifiedPendingBoundary);
 
     state = Armed();
     OpenA8DJTimecodeWindow onlyA = Window(
-        0.01, 0.02, 0x03, 0, 0, 0);
+        0.02, 0.04, 0x03, 0, 0, 0);
     OpenA8DJTimecodeWindow onlyB = Window(
-        0.01, 0.02, 0x0c, 0, 0, 0);
+        0.02, 0.04, 0x0c, 0, 0, 0);
     OpenA8DJTimecodeWindow mono = Window(
-        0.01, 0.02, 0x05, 0, 0, 0);
+        0.02, 0.04, 0x05, 0, 0, 0);
     for (int i = 0; i < 12; i++) {
         assert(OpenA8DJTimecodeObserveWindow(
             &state, &onlyA, false) == kOpenA8DJTimecodeFailNone);
@@ -245,6 +266,22 @@ static void CheckDCAndNoise(void)
     }
     assert(!OpenA8DJTimecodePairEntry(&completed, 0));
     assert(!OpenA8DJTimecodePairEntry(&completed, 1));
+    OpenA8DJTimecodeState active;
+    OpenA8DJTimecodeStateInit(&active);
+    assert(OpenA8DJTimecodeArm(
+        &active, kOpenA8DJDriverModeBalanced,
+        kOpenA8DJTimecodeProfileVinyl, 16.0, 1));
+    active.qualified = 1;
+    active.optimizedActive = 1;
+    active.armState = kOpenA8DJTimecodeActive;
+    for (int index = 0; index < 3; index++) {
+        assert(OpenA8DJTimecodeObserveWindow(
+            &active, &completed, true) ==
+            kOpenA8DJTimecodeFailNone);
+    }
+    assert(OpenA8DJTimecodeObserveWindow(
+        &active, &completed, true) ==
+        kOpenA8DJTimecodeFailAllowedPairDropout);
 
     OpenA8DJTimecodeClassifierInit(&classifier, 16.0);
     for (int frame = 0; frame < 4; frame++) {

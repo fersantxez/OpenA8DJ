@@ -307,6 +307,13 @@ static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
         return;
     }
     uint32_t fallback = gTimecodeState.fallbackMode;
+    if (!disarm &&
+        gTimecodeState.armState ==
+            kOpenA8DJTimecodeDeoptPendingBoundary &&
+        gTimecodeState.lastFailOpenReason == reason &&
+        gDriverModeState.requestedMode == fallback) {
+        return;
+    }
     bool wasOptimized = gTimecodeState.optimizedActive ||
                         gDriverModeState.effectiveMode ==
                             kOpenA8DJDriverModeTimecodeOptimized;
@@ -343,6 +350,7 @@ static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
         OpenA8DJTimecodeDisarm(&gTimecodeState, reason);
     } else {
         gTimecodeState.armState = kOpenA8DJTimecodeDeoptPendingBoundary;
+        gTimecodeState.generation++;
     }
     (void)OpenA8DJDriverModeSet(&gDriverModeState,
                                 fallback,
@@ -354,6 +362,16 @@ static void TimecodeFailOpenLocked(uint8_t reason, bool disarm)
         !disarm) {
         gTimecodeState.armState = kOpenA8DJTimecodeQualifying;
     }
+}
+
+static void TimecodeMarkActivatedLocked(void)
+{
+    if (!gTimecodeState.optimizedActive) {
+        gTimecodeState.optimizedActive = 1;
+        gTimecodeState.counters.activations++;
+        gTimecodeState.generation++;
+    }
+    gTimecodeState.armState = kOpenA8DJTimecodeActive;
 }
 
 static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
@@ -387,9 +405,7 @@ static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
     (void)OpenA8DJDriverModeLookup(gDriverModeState.effectiveMode, &policy);
     if (gDriverModeState.effectiveMode ==
         kOpenA8DJDriverModeTimecodeOptimized) {
-        gTimecodeState.optimizedActive = 1;
-        gTimecodeState.armState = kOpenA8DJTimecodeActive;
-        gTimecodeState.counters.activations++;
+        TimecodeMarkActivatedLocked();
     } else if (gTimecodeState.armed &&
                gTimecodeState.armState ==
                    kOpenA8DJTimecodeDeoptPendingBoundary) {
@@ -412,9 +428,7 @@ static void DriverModeEndStream(void)
                                            NULL);
     if (gDriverModeState.effectiveMode ==
         kOpenA8DJDriverModeTimecodeOptimized) {
-        gTimecodeState.optimizedActive = 1;
-        gTimecodeState.armState = kOpenA8DJTimecodeActive;
-        gTimecodeState.counters.activations++;
+        TimecodeMarkActivatedLocked();
     } else if (gTimecodeState.armed) {
         gTimecodeState.optimizedActive = 0;
         gTimecodeState.armState =
@@ -3585,15 +3599,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 - (void)evaluateTimecodeWindow:(const OpenA8DJTimecodeWindow *)window
 {
     OpenA8DJControlPayload control;
-    bool freshControl = [self readControls];
-    if (freshControl) {
-        [self loadControlPayload:&control];
-    } else {
-        memset(&control, 0, sizeof(control));
-    }
-    uint8_t profile = freshControl ?
-        TimecodeProfileForControl(&control) :
-        kOpenA8DJTimecodeProfileUnavailable;
+    [self loadControlPayload:&control];
+    uint8_t profile = TimecodeProfileForControl(&control);
 
     pthread_mutex_lock(&gDriverModeMutex);
     if (!gTimecodeState.armed) {
@@ -3622,6 +3629,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                 kOpenA8DJTimecodeFailWrongProfile;
             if (!alreadyWaiting) {
                 gTimecodeState.counters.profileTrips++;
+                gTimecodeState.generation++;
             }
         }
         pthread_mutex_unlock(&gDriverModeMutex);
@@ -3644,6 +3652,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         } else {
             gTimecodeState.armState =
                 kOpenA8DJTimecodeQualifying;
+            gTimecodeState.generation++;
         }
         pthread_mutex_unlock(&gDriverModeMutex);
         return;
@@ -3659,9 +3668,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                 NULL)) {
             TimecodeFailOpenLocked(kOpenA8DJTimecodeFailApplyFailed, true);
         } else if (!gDriverModeState.pending) {
-            gTimecodeState.optimizedActive = 1;
-            gTimecodeState.armState = kOpenA8DJTimecodeActive;
-            gTimecodeState.counters.activations++;
+            TimecodeMarkActivatedLocked();
         }
     } else if (decision != kOpenA8DJTimecodeFailNone) {
         bool disarm = decision != kOpenA8DJTimecodeFailAllowedPairDropout;
@@ -3764,14 +3771,26 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                   &payload, sizeof(payload));
 }
 
+- (void)sendTimecodeRejectionToClient:(int)fd
+                               reason:(uint8_t)reason
+{
+    OpenA8DJTimecodeStatePayload payload =
+        [self timecodeStateSnapshot];
+    payload.rejectionReason = reason;
+    (void)IPCSend(fd, kIPCTypeTimecodeOptimizedState,
+                  &payload, sizeof(payload));
+}
+
 - (void)armTimecodeForClient:(int)fd
                      payload:(const uint8_t *)bytes
                       length:(NSUInteger)length
 {
     OpenA8DJTimecodeArmPayload request;
-    if (!OpenA8DJTimecodeValidateArmPayload(
-            bytes, length, &request)) {
-        [self sendTimecodeStateToClient:fd];
+    uint8_t rejection = kOpenA8DJTimecodeRejectionNone;
+    if (!OpenA8DJTimecodeValidateArmPayloadDetailed(
+            bytes, length, &request, &rejection)) {
+        [self sendTimecodeRejectionToClient:fd
+                                     reason:rejection];
         return;
     }
     OpenA8DJControlPayload control;
@@ -3895,13 +3914,23 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             break;
         }
         case kIPCTypeTimecodeOptimizedGet:
-            if (length == 0) [self sendTimecodeStateToClient:fd];
+            if (length == 0) {
+                [self sendTimecodeStateToClient:fd];
+            } else {
+                [self sendTimecodeRejectionToClient:fd
+                                             reason:kOpenA8DJTimecodeRejectionBadLength];
+            }
             break;
         case kIPCTypeTimecodeOptimizedArm:
             [self armTimecodeForClient:fd payload:payload length:length];
             break;
         case kIPCTypeTimecodeOptimizedDisarm:
-            if (length == 0) [self disarmTimecodeForClient:fd];
+            if (length == 0) {
+                [self disarmTimecodeForClient:fd];
+            } else {
+                [self sendTimecodeRejectionToClient:fd
+                                             reason:kOpenA8DJTimecodeRejectionBadLength];
+            }
             break;
         default:
             break;

@@ -48,12 +48,13 @@ def compile_control(repo, output, sock, lock):
 
 class Server:
     def __init__(self, path, states, arm_kind="qualifying", mismatch=False,
-                 stats=None):
+                 observation_advance=False, stats=None):
         self.path = path
         self.states = states
         self.kind = "disarmed"
         self.arm_kind = arm_kind
         self.mismatch = mismatch
+        self.observation_advance = observation_advance
         self.stats = stats
         self.requests = []
         self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -100,7 +101,11 @@ class Server:
                     reply = self.states[self.kind]
                     if self.mismatch:
                         altered = bytearray(reply)
-                        altered[-1] ^= 1
+                        altered[98] = 2
+                        reply = bytes(altered)
+                    elif self.observation_advance:
+                        altered = bytearray(reply)
+                        altered[-16] ^= 1
                         reply = bytes(altered)
                     self.send(conn, TC_STATE, reply)
                 elif kind == STREAM_GET and self.stats is not None:
@@ -226,6 +231,17 @@ def run(repo):
         check(result.returncode == 4 and
               doc["error"]["code"] == "backend_protocol_error",
               "arm/read-back mismatch accepted")
+        sock.unlink(missing_ok=True)
+
+        server = Server(sock, states, observation_advance=True)
+        result, doc = invoke(
+            control, "api", "driver-mode", "arm",
+            "timecode-optimized", "--input-pairs", "A,B",
+        )
+        server.close()
+        check(result.returncode == 0 and
+              doc["data"]["timecodeOptimized"]["armed"],
+              "observational window advance broke semantic read-back")
         sock.unlink(missing_ok=True)
 
         server = Server(sock, states, arm_kind="invalid-enum")

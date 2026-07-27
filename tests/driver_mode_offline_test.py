@@ -614,6 +614,9 @@ def run_tests(repo, shipping_binary):
     check("dispatch_block_create_with_qos_class" in hal and
           "QOS_CLASS_USER_INTERACTIVE" in hal,
           "performance QoS is not on the dispatched worker block")
+    check(hal.count("gTimecodeState.counters.activations++") == 1 and
+          hal.count("TimecodeMarkActivatedLocked();") == 3,
+          "timecode activation can be counted more than once per transition")
     check("_streamDriverModePolicy.outputStartLatencyFrames" in hal and
           "_streamDriverModePolicy.outputRestartLatencyFrames" in hal and
           "_streamDriverModePolicy.outputTargetLatencyFrames" in hal,
@@ -622,6 +625,32 @@ def run_tests(repo, shipping_binary):
           "kIPCTypeDriverModeSet = 13" in hal and
           "kIPCTypeDriverModeState = 14" in hal,
           "private IPC IDs were not appended")
+    timecode_get_handler = hal[
+        hal.index("case kIPCTypeTimecodeOptimizedGet:"):
+        hal.index("case kIPCTypeTimecodeOptimizedArm:")
+    ]
+    timecode_arm_method = hal[
+        hal.index("- (void)armTimecodeForClient:"):
+        hal.index("- (void)disarmTimecodeForClient:")
+    ]
+    timecode_disarm_handler = hal[
+        hal.index("case kIPCTypeTimecodeOptimizedDisarm:"):
+        hal.index("default:", hal.index(
+            "case kIPCTypeTimecodeOptimizedDisarm:"
+        ))
+    ]
+    check("sendTimecodeRejectionToClient" in timecode_get_handler and
+          "kOpenA8DJTimecodeRejectionBadLength" in
+          timecode_get_handler and
+          "sendTimecodeRejectionToClient" in
+          timecode_disarm_handler and
+          "kOpenA8DJTimecodeRejectionBadLength" in
+          timecode_disarm_handler,
+          "malformed timecode get/disarm can hang without a reply")
+    check("OpenA8DJTimecodeValidateArmPayloadDetailed" in
+          timecode_arm_method and
+          "sendTimecodeRejectionToClient" in timecode_arm_method,
+          "malformed private arm is not rejected observably")
     check("OpenA8DJDriverModeValidateSetPayload" in hal,
           "HAL does not validate driver-mode set payloads")
     check("realloc(" not in hal and
@@ -639,12 +668,20 @@ def run_tests(repo, shipping_binary):
         hal.rindex("- (uint32_t)readInput:"):
         hal.rindex("- (void)setInputDecodeEnabled:")
     ]
+    evaluate_handler = hal[
+        hal.index("- (void)evaluateTimecodeWindow:"):
+        hal.index("- (void)addTimecodePhysicalFrame:")
+    ]
     check(first_timecode_feed < first_input_write and
           "RingTrimToLatest(&_inputRing" not in hal and
           "TimecodeFailOpenLocked" in read_input_handler and
           "RingRead(" in read_input_handler and
           "_inputRing, outInterleaved" in read_input_handler,
           "C/D/lead decisions can trim or drop optimized input samples")
+    check("readControls" not in evaluate_handler and
+          "sendCommand" not in evaluate_handler and
+          "loadControlPayload" in evaluate_handler,
+          "timecode classifier hot path performs blocking control I/O")
     mode_header = (repo / "src/hal/OpenA8DJDriverMode.h").read_text()
     check("malloc(" not in mode_header and "calloc(" not in mode_header and
           "realloc(" not in mode_header,
