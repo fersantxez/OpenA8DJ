@@ -45,9 +45,10 @@ can infer four states (`playback-4out`, `traktor-dvs-vinyl`,
 the same hardware state, so a later query cannot always recover the name that
 was requested. In that case the truthful active profile is `custom`.
 
-The current HAL changes the socket mode to `0666`. That is not acceptable for a
-public mutation surface on a multi-user Mac and must be tightened as part of
-this MVP.
+The HAL is hosted by the `_coreaudiod` account while the bundled clients run as
+the console user. The socket therefore has to remain connectable across those
+UIDs. Public mutation safety must come from authenticating Unix peer
+credentials, not from making the socket owner-only.
 
 ## Invocation contract
 
@@ -122,7 +123,7 @@ The stable v1 error codes are:
 | `invalid_request` | Wrong arity or unknown API operation | false | 2 |
 | `profile_not_allowed` | Profile is not a canonical built-in ID | false | 2 |
 | `backend_unavailable` | HAL control bridge is not running | true | 3 |
-| `backend_permission_denied` | Socket is not a safe local owner-only socket | false | 4 |
+| `backend_permission_denied` | Socket path, owner, or peer credentials failed local authentication | false | 4 |
 | `backend_protocol_error` | Private IPC reply is invalid, truncated, or incompatible | true | 4 |
 | `profile_apply_failed` | Set or read-back verification failed | true | 5 |
 
@@ -203,20 +204,28 @@ subset is grouped as follows:
   `lateWriteFrames`, and `lateWriteBatches`; and
 - `health`: `inputCheckErrors` and `outputPanicFlags`.
 
-All counters and frame values are JSON integers. If a value does not exist in
-an older append-compatible private payload, it is reported as `0`; it is not
-omitted or fabricated from a different metric.
+All counters and frame values are JSON integers. The private payload must
+contain its base through `sampleRate`; an empty or shorter payload is a
+`backend_protocol_error`. If a later value does not exist in an older
+append-compatible payload, it is reported as `0`; it is not omitted or
+fabricated from a different metric.
 
 The destructive input meter statistics are intentionally excluded from v1.
 Reading public statistics must never change later observations.
 
 ## Security and concurrency
 
-1. The HAL socket mode changes from `0666` to `0600` before `listen`. Existing
-   bundled clients run in the same user session and remain compatible.
-2. Before any public API operation connects, it uses `lstat` and rejects a path
-   that is not a Unix socket, is not owned by the effective user, or has any
-   group/other permission bits. It does not follow a symlink.
+1. The HAL socket remains `0666` so the console-user clients can connect to the
+   `_coreaudiod` host. Immediately after `accept`, the HAL obtains the Unix peer
+   credentials with `getpeereid` and accepts only UID 0, its own effective UID,
+   or the current `/dev/console` owner. It closes every other peer before adding
+   it to the client set, sending state, or dispatching a request.
+2. Before any public API operation connects, it uses `lstat` without following
+   symlinks and rejects a path that is not a Unix socket, has any executable
+   permission bit, or is not owned by UID 0 or the `_coreaudiod` account. After
+   connecting it obtains the server credentials with `getpeereid`, repeats
+   `lstat`, verifies that device/inode and owner did not change, and requires
+   the peer UID to equal the observed socket owner.
 3. Production uses the fixed existing socket path. A test-only socket override
    may be compiled into a dedicated test harness, but the shipping binary must
    not accept an environment variable, config file, or request field that
@@ -244,8 +253,8 @@ Reading public statistics must never change later observations.
 - Keep existing human CLI output and command behavior backward compatible.
 - Factor JSON envelope/state/stats emitters enough to test them without
   hardware. Do not make the packed private structs a public installed header.
-- The HAL change is limited to socket permissions unless a narrowly necessary
-  fix is found while implementing the safety checks.
+- The HAL change is limited to authenticating accepted local peers and
+  preserving the cross-UID socket mode required by the Core Audio host.
 - Add the public API usage to the control-surfaces user guide and CLI help.
 - Add an offline contract test target to `Makefile`; it must not connect to
   Core Audio, USB, `/tmp/opena8dj-control.sock`, or installed components.
@@ -267,10 +276,12 @@ factored functions linked into a harness), not just grep source:
    `profile_apply_failed`, including stable exit statuses.
 6. Use a private temporary-directory mock of private IPC v1 to test profile
    query, stats conversion, successful set/read-back, and mismatched read-back.
-   The test binary may receive a compile-time socket path; the shipping binary
-   may not have a runtime redirect.
+   The test binary may receive a compile-time socket path and an explicit
+   test-only allowance for a mock owned by the current UID; the shipping binary
+   may not have a runtime redirect or current-UID owner bypass.
 7. Verify JSON escaping with quotes, backslashes, and control characters.
-8. Verify the HAL source/build artifact creates the IPC socket as `0600`.
+8. Verify the HAL source/build artifact keeps the IPC socket at `0666` and
+   authenticates every accepted peer before registering or dispatching it.
 9. Run the existing control tool build with warnings enabled and the new
    contract test through a single documented offline command.
 
@@ -293,8 +304,8 @@ performance measurement must instead run through:
   built-in preset.
 - A successful mutation is backed by exact state read-back.
 - The public path does not wake audio or perform destructive stats reads.
-- Unsafe socket ownership/type/mode is rejected, and the HAL socket is owner
-  read/write only.
+- Unsafe socket ownership/type/mode or mismatched peer credentials are
+  rejected, and the HAL authenticates every accepted client.
 - Contract tests cover success, all stable errors, hostile inputs, mock private
   IPC, schema/types, and socket-mode policy without hardware.
 - The user guide contains a copy/paste integration example and compatibility

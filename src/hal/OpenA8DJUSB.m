@@ -233,6 +233,23 @@ static const uint32_t kInputSourceIdentityMap = 0x3210;
 static const uint8_t kInputMode2LeftFirstStreamMask = (1u << 1) | (1u << 3);
 
 static const char *kIPCSocketPath = "/tmp/opena8dj-control.sock";
+
+static bool IPCPeerIsAuthorized(int fd)
+{
+    uid_t peerUID = (uid_t)-1;
+    gid_t peerGID = (gid_t)-1;
+    if (getpeereid(fd, &peerUID, &peerGID) != 0) {
+        return false;
+    }
+    (void)peerGID;
+    if (peerUID == 0 || peerUID == geteuid()) {
+        return true;
+    }
+
+    struct stat consoleState;
+    return stat("/dev/console", &consoleState) == 0 &&
+           peerUID == consoleState.st_uid;
+}
 #if OPENA8DJ_ENABLE_STREAM_KEEPALIVE
 static const uint64_t kStreamKeepaliveIntervalNsec = 250000000ull;
 static const uint64_t kStreamKeepaliveLeewayNsec = 50000000ull;
@@ -3216,7 +3233,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         close(fd);
         return;
     }
-    if (chmod(kIPCSocketPath, 0600) != 0) {
+    if (chmod(kIPCSocketPath, 0666) != 0) {
         USBTrace("IPC chmod failed errno=%d %s", errno, strerror(errno));
         close(fd);
         unlink(kIPCSocketPath);
@@ -3244,6 +3261,11 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                     USBTrace("IPC accept failed");
                 }
                 break;
+            }
+            if (!IPCPeerIsAuthorized(client)) {
+                USBTrace("IPC peer rejected");
+                close(client);
+                continue;
             }
             [strongSelf addIPCClient:client];
             [strongSelf sendControlStateToClient:client];

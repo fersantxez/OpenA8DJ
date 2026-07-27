@@ -130,11 +130,13 @@ def stream_payload(source_path):
     for name, value in values.items():
         field_offset, fmt = offsets[name]
         struct.pack_into("=" + fmt, payload, field_offset, value)
-    return bytes(payload), values
+    sample_rate_offset, sample_rate_format = offsets["sampleRate"]
+    base_length = sample_rate_offset + struct.calcsize("=" + sample_rate_format)
+    return bytes(payload), values, base_length
 
 
 class MockIPC:
-    def __init__(self, path, state, stats=b"", mismatch=False, malformed=False, mode=0o600):
+    def __init__(self, path, state, stats=b"", mismatch=False, malformed=False, mode=0o666):
         self.path = str(path)
         self.state = bytearray(state)
         self.stats = stats
@@ -210,6 +212,7 @@ def compile_harness(source, output, socket_path, lock_path):
         "-O2",
         f'-DOPENA8DJ_PUBLIC_API_SOCKET_PATH="{socket_path}"',
         f'-DOPENA8DJ_PUBLIC_API_LOCK_PATH="{lock_path}"',
+        "-DOPENA8DJ_PUBLIC_API_TEST_TRUST_CURRENT_UID=1",
         "-DOPENA8DJ_PUBLIC_API_TEST_ESCAPE=1",
         "-framework",
         "CoreAudio",
@@ -274,7 +277,7 @@ def run_tests(repo, shipping_binary):
         assert_error(harness, 3, "profile.get", "backend_unavailable", "api", "profile")
 
         initial_state = bytes([0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 2, 3, 1])
-        with MockIPC(socket_path, initial_state, mode=0o666):
+        with MockIPC(socket_path, initial_state, mode=0o777):
             assert_error(
                 harness, 4, "profile.get", "backend_permission_denied", "api", "profile"
             )
@@ -324,7 +327,7 @@ def run_tests(repo, shipping_binary):
                   "public profile read used destructive input statistics")
         socket_path.unlink(missing_ok=True)
 
-        stats_payload, expected_stats = stream_payload(source)
+        stats_payload, expected_stats, stats_base_length = stream_payload(source)
         with MockIPC(socket_path, initial_state, stats=stats_payload) as server:
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "stats query failed")
@@ -379,10 +382,26 @@ def run_tests(repo, shipping_binary):
         socket_path.unlink(missing_ok=True)
 
         with MockIPC(socket_path, initial_state, stats=b""):
+            assert_error(
+                harness, 4, "stats.get", "backend_protocol_error", "api", "stats"
+            )
+        socket_path.unlink(missing_ok=True)
+
+        with MockIPC(
+            socket_path, initial_state, stats=stats_payload[:stats_base_length - 1]
+        ):
+            assert_error(
+                harness, 4, "stats.get", "backend_protocol_error", "api", "stats"
+            )
+        socket_path.unlink(missing_ok=True)
+
+        with MockIPC(socket_path, initial_state, stats=stats_payload[:stats_base_length]):
             result, document = invoke(harness, "api", "stats")
-            check(result.returncode == 0, "append-compatible empty stats failed")
-            check(document["data"]["capture"]["bytes"] == 0, "missing counter was not zero")
-            check(document["data"]["stream"]["sampleRate"] == 0, "missing rate was not zero")
+            check(result.returncode == 0, "append-compatible base stats failed")
+            check(document["data"]["stream"]["sampleRate"] == 48000,
+                  "base sample rate was not preserved")
+            check(document["data"]["capture"]["bytes"] == 0,
+                  "missing trailing counter was not zero")
         socket_path.unlink(missing_ok=True)
 
         for profile in CANONICAL_PROFILES:
@@ -414,8 +433,26 @@ def run_tests(repo, shipping_binary):
             )
 
     hal_text = hal_source.read_text()
-    check(re.search(r"chmod\(kIPCSocketPath,\s*0600\)", hal_text) is not None,
-          "HAL socket policy is not 0600")
+    check(re.search(r"chmod\(kIPCSocketPath,\s*0666\)", hal_text) is not None,
+          "HAL socket policy is not cross-UID connectable")
+    check("getpeereid(fd, &peerUID, &peerGID)" in hal_text,
+          "HAL does not obtain accepted peer credentials")
+    check("peerUID == 0 || peerUID == geteuid()" in hal_text,
+          "HAL peer policy is missing root or host UID")
+    check('stat("/dev/console", &consoleState)' in hal_text and
+          "peerUID == consoleState.st_uid" in hal_text,
+          "HAL peer policy is missing current console UID")
+    accept_policy = hal_text[hal_text.index("int client = accept"):]
+    authorize_index = accept_policy.index("IPCPeerIsAuthorized(client)")
+    add_index = accept_policy.index("[strongSelf addIPCClient:client]")
+    send_index = accept_policy.index("[strongSelf sendControlStateToClient:client]")
+    dispatch_index = accept_policy.index("dispatch_async", send_index)
+    check(authorize_index < add_index < send_index < dispatch_index,
+          "HAL peer authorization does not precede registration and dispatch")
+    check("getpeereid(fd, &peerUID, &peerGID)" in source.read_text(),
+          "public client does not authenticate server credentials")
+    check('getpwnam("_coreaudiod")' in source.read_text(),
+          "public client does not resolve the Core Audio host account")
 
 
 def main():

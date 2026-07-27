@@ -184,9 +184,12 @@ print(response["data"]["output"]["underruns"])
 
 `api version` and `api profiles` work without a running driver. API reads and
 writes never start Core Audio; they return `backend_unavailable` when the
-owner-only local HAL bridge is not already running. Profile writes accept only
-an exact ID returned by `api profiles` and verify the complete state by reading
-it back.
+authenticated local HAL bridge is not already running. The bridge is hosted by
+the `_coreaudiod` system account, authenticates every connecting process using
+Unix peer credentials, and permits only root, its own host UID, or the current
+console user. The client independently verifies the server peer and socket
+identity. Profile writes accept only an exact ID returned by `api profiles` and
+verify the complete state by reading it back.
 
 The schema identifier is `org.opena8dj.public-api.response.v1` and the initial
 API version is `1.0`. Applications may ignore unknown object members added by a

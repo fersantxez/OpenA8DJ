@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pwd.h>
 #include <signal.h>
 #include <sys/file.h>
 #include <sys/select.h>
@@ -1679,9 +1680,15 @@ static OpenA8DJPublicBackendResult ConnectPublicSocket(int *outFD)
     if (lstat(kSocketPath, &pathState) != 0) {
         return errno == EACCES ? kPublicBackendPermissionDenied : kPublicBackendUnavailable;
     }
+    struct passwd *coreAudioAccount = getpwnam("_coreaudiod");
+    bool expectedOwner = pathState.st_uid == 0 ||
+                         (coreAudioAccount != NULL && pathState.st_uid == coreAudioAccount->pw_uid);
+#ifdef OPENA8DJ_PUBLIC_API_TEST_TRUST_CURRENT_UID
+    expectedOwner = expectedOwner || pathState.st_uid == geteuid();
+#endif
     if (!S_ISSOCK(pathState.st_mode) ||
-        pathState.st_uid != geteuid() ||
-        (pathState.st_mode & 0077) != 0) {
+        !expectedOwner ||
+        (pathState.st_mode & 0111) != 0) {
         return kPublicBackendPermissionDenied;
     }
 
@@ -1724,6 +1731,21 @@ static OpenA8DJPublicBackendResult ConnectPublicSocket(int *outFD)
     if (!connected) {
         close(fd);
         return kPublicBackendUnavailable;
+    }
+
+    uid_t peerUID = (uid_t)-1;
+    gid_t peerGID = (gid_t)-1;
+    struct stat verifiedPathState;
+    if (getpeereid(fd, &peerUID, &peerGID) != 0 ||
+        lstat(kSocketPath, &verifiedPathState) != 0 ||
+        !S_ISSOCK(verifiedPathState.st_mode) ||
+        (verifiedPathState.st_mode & 0111) != 0 ||
+        verifiedPathState.st_dev != pathState.st_dev ||
+        verifiedPathState.st_ino != pathState.st_ino ||
+        verifiedPathState.st_uid != pathState.st_uid ||
+        peerUID != verifiedPathState.st_uid) {
+        close(fd);
+        return kPublicBackendPermissionDenied;
     }
     if (fcntl(fd, F_SETFL, flags) != 0) {
         close(fd);
@@ -1782,7 +1804,7 @@ static int PublicBackendError(const char *operation, OpenA8DJPublicBackendResult
     if (result == kPublicBackendPermissionDenied) {
         return PrintPublicError(operation,
                                 "backend_permission_denied",
-                                "The HAL bridge socket is not a safe local owner-only socket.",
+                                "The HAL bridge socket or peer credentials failed local authentication.",
                                 false,
                                 4);
     }
@@ -1865,7 +1887,10 @@ static int RunPublicAPI(int argc, char **argv)
     if (statsRead) {
         OpenA8DJStreamStatsPayload stats;
         size_t payloadLength = 0;
-        if (!ReadStreamStats(fd, &stats, &payloadLength)) {
+        size_t minimumPayloadLength =
+            offsetof(OpenA8DJStreamStatsPayload, sampleRate) + sizeof(stats.sampleRate);
+        if (!ReadStreamStats(fd, &stats, &payloadLength) ||
+            payloadLength < minimumPayloadLength) {
             close(fd);
             return PrintPublicError("stats.get",
                                     "backend_protocol_error",
