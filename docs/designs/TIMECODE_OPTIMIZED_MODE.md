@@ -149,26 +149,36 @@ It records per channel:
 - decoded frame count;
 - sum, so mean/DC can be removed;
 - sum of squares;
-- absolute peak; and
+- raw absolute peak plus minimum/maximum, so AC peak can be measured relative
+  to the window mean; and
 - finite-value/decoder validity.
 
 The initial internal thresholds are conservative candidates, immutable through
 the public API:
 
 - allowed-channel entry: AC RMS after mean removal at least `0.01` (about
-  -40 dBFS) and peak at least `0.031623` (about -30 dBFS);
+  -40 dBFS) and AC peak at least `0.031623` (about -30 dBFS);
 - allowed-channel hold: AC RMS after mean removal at least `0.005` (about
-  -46 dBFS) or peak at least `0.015849` (about -36 dBFS);
-- forbidden-channel trip: AC RMS after mean removal at least `0.001` or peak
-  at least `0.003981`.
+  -46 dBFS) or AC peak at least `0.015849` (about -36 dBFS);
+- forbidden-channel trip: AC RMS after mean removal at least `0.001` or raw
+  peak at least `0.003981`, deliberately conservative for fail-open.
 
 A pair is entry-active only when both of its channels meet both entry
 conditions in the same complete window. A and B must both be entry-active.
 Any channel of C or D meeting the forbidden trip is outside-allowlist activity.
-Constant DC cannot qualify because entry and hold use variance-derived AC RMS;
-peak alone is insufficient for entry. NaN, infinity, an incomplete window, no
-fresh frame, or a frame-count mismatch is missing/invalid evidence, never
-silence.
+Constant DC cannot qualify or hold the mode because A/B entry and hold use
+mean-relative AC RMS and AC peak. NaN, infinity, an incomplete window, no fresh
+frame, or a frame-count mismatch is missing/invalid evidence, never silence.
+
+The decoder-side classifier is single-writer on the serial USB queue. Its
+per-frame feed performs no mutex operation, allocation, logging, IPC, or USB
+control request. Only a completed 250 ms window is copied to a published
+snapshot under a mutex and evaluated as one batch. Arm/reset is serialized
+with that writer queue. The fresh electrical control read occurs on explicit
+arm through the IPC path; window evaluation consumes the cached, locked
+profile state and must never issue a synchronous `READ_IO`. Required profiles
+have software lock enabled, and any control mutation through the bridge
+invalidates qualification synchronously.
 
 These thresholds are engineering starting points, not a claim that every
 timecode medium has this level. They may be revised only with recorded physical
@@ -413,8 +423,9 @@ Profile members and commands remain unchanged.
 }
 ```
 
-Expose per-pair window state (`active`, RMS and peak per channel) in stats, not
-as proof of intent. Values are null when no fresh complete window exists.
+Expose per-pair window state (`active`, AC RMS, AC peak, and raw peak per
+channel) in stats, not as proof of intent. Values are null when no fresh
+complete window exists.
 Every arm response performs set/read-back verification on one authenticated
 connection. A mismatch is `backend_protocol_error`.
 
@@ -468,9 +479,10 @@ Required cases:
 6. Exactly A+B active for seven windows does not qualify; the eighth qualifies.
 7. Only A, only B, or one channel of a stereo pair never qualifies.
 8. A+B active qualifies; A+B+C or all four trips immediately.
-9. Values immediately below/at/above AC RMS and peak thresholds exercise both
-   conditions and hysteresis deterministically; constant DC and low noise do
-   not qualify.
+9. Values immediately below/at/above AC RMS and AC-peak thresholds exercise
+   both conditions and hysteresis deterministically; constant DC and low noise
+   do not qualify, and constant DC after activation expires through dropout
+   hysteresis.
 10. A brief allowed-pair dropout does not deopt; four windows do.
 11. One forbidden-pair window, missing/invalid stats, wrong profile, profile
     change, rate change, buffer change, input routing/transform/decode change,
