@@ -3585,16 +3585,22 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 - (void)evaluateTimecodeWindow:(const OpenA8DJTimecodeWindow *)window
 {
     OpenA8DJControlPayload control;
-    [self loadControlPayload:&control];
-    uint8_t profile = TimecodeProfileForControl(&control);
+    bool freshControl = [self readControls];
+    if (freshControl) {
+        [self loadControlPayload:&control];
+    } else {
+        memset(&control, 0, sizeof(control));
+    }
+    uint8_t profile = freshControl ?
+        TimecodeProfileForControl(&control) :
+        kOpenA8DJTimecodeProfileUnavailable;
 
     pthread_mutex_lock(&gDriverModeMutex);
     if (!gTimecodeState.armed) {
         pthread_mutex_unlock(&gDriverModeMutex);
         return;
     }
-    if (profile == kOpenA8DJTimecodeProfileUnavailable ||
-        profile != gTimecodeState.electricalProfile) {
+    if (profile == kOpenA8DJTimecodeProfileUnavailable) {
         bool alreadyWaiting =
             gTimecodeState.armState ==
                 kOpenA8DJTimecodeWaitingProfile &&
@@ -3617,6 +3623,27 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             if (!alreadyWaiting) {
                 gTimecodeState.counters.profileTrips++;
             }
+        }
+        pthread_mutex_unlock(&gDriverModeMutex);
+        return;
+    }
+    if (!gTimecodeState.profileVerified ||
+        profile != gTimecodeState.electricalProfile) {
+        bool wasOptimized =
+            gTimecodeState.optimizedActive ||
+            gDriverModeState.effectiveMode ==
+                kOpenA8DJDriverModeTimecodeOptimized;
+        gTimecodeState.electricalProfile = profile;
+        gTimecodeState.profileVerified = 1;
+        gTimecodeState.qualified = 0;
+        gTimecodeState.eligibleWindows = 0;
+        gTimecodeState.dropoutWindows = 0;
+        if (wasOptimized) {
+            TimecodeFailOpenLocked(
+                kOpenA8DJTimecodeFailWrongProfile, false);
+        } else {
+            gTimecodeState.armState =
+                kOpenA8DJTimecodeQualifying;
         }
         pthread_mutex_unlock(&gDriverModeMutex);
         return;
@@ -3748,8 +3775,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         return;
     }
     OpenA8DJControlPayload control;
-    [self loadControlPayload:&control];
-    uint8_t profile = TimecodeProfileForControl(&control);
+    bool freshControl = [self readControls];
+    if (freshControl) {
+        [self loadControlPayload:&control];
+    } else {
+        memset(&control, 0, sizeof(control));
+    }
+    uint8_t profile = freshControl ?
+        TimecodeProfileForControl(&control) :
+        kOpenA8DJTimecodeProfileUnavailable;
     pthread_mutex_lock(&gDriverModeMutex);
     uint32_t fallback = gDriverModeState.effectiveMode;
     if (fallback == kOpenA8DJDriverModeTimecodeOptimized) {
