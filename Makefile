@@ -45,6 +45,7 @@ MIDI_BRIDGE := build/opena8dj-midid
 MIDI_BRIDGE_SRC := src/tools/opena8dj-midid.m
 CONTROL_TOOL := build/opena8dj-control
 CONTROL_TOOL_SRC := src/tools/opena8dj-control.c
+PUBLIC_API_TEST := tests/public_api_contract_test.py
 CONTROL_CENTER_APP := build/OpenA8DJControlCenter.app
 CONTROL_CENTER_SRC := macos/OpenA8DJControlCenter/OpenA8DJControlCenter.swift
 CONTROL_CENTER_PLIST := macos/OpenA8DJControlCenter/Info.plist
@@ -207,7 +208,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center public-api-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(MIDI_LIST)
 
@@ -562,6 +563,9 @@ $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 $(CONTROL_TOOL): $(CONTROL_TOOL_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
+
+public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST)
+	python3 $(PUBLIC_API_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
 
 $(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL)
 	rm -rf "$(CONTROL_CENTER_APP)"

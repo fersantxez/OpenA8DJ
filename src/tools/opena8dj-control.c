@@ -9,12 +9,28 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/file.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-static const char *kSocketPath = "/tmp/opena8dj-control.sock";
+#ifndef OPENA8DJ_PUBLIC_API_SOCKET_PATH
+#define OPENA8DJ_PUBLIC_API_SOCKET_PATH "/tmp/opena8dj-control.sock"
+#endif
+
+static const char *kSocketPath = OPENA8DJ_PUBLIC_API_SOCKET_PATH;
+
+#ifdef OPENA8DJ_PUBLIC_API_LOCK_PATH
+static const char *kPublicAPILockPath = OPENA8DJ_PUBLIC_API_LOCK_PATH;
+#endif
+
+static const char *kPublicAPISchema = "org.opena8dj.public-api.response.v1";
+static const char *kPublicAPIVersion = "1.0";
 
 enum {
     kIPCVersion = 1,
@@ -994,7 +1010,7 @@ static int ConnectSocketWithWake(bool allowWake)
 
 static bool ReadOneState(int fd, OpenA8DJControlPayload *state)
 {
-    while (true) {
+    for (int message = 0; message < 64; message++) {
         OpenA8DJIPCHeader header;
         if (!ReadFull(fd, &header, sizeof(header))) {
             return false;
@@ -1017,6 +1033,7 @@ static bool ReadOneState(int fd, OpenA8DJControlPayload *state)
             return true;
         }
     }
+    return false;
 }
 
 static bool ReadState(int fd, OpenA8DJControlPayload *state)
@@ -1028,7 +1045,7 @@ static bool ReadState(int fd, OpenA8DJControlPayload *state)
         return false;
     }
 
-    while (true) {
+    for (int message = 0; message < 64; message++) {
         fd_set readSet;
         FD_ZERO(&readSet);
         FD_SET(fd, &readSet);
@@ -1091,7 +1108,7 @@ static bool ReadStats(int fd, OpenA8DJInputStatsPayload *stats)
     if (!SendIPC(fd, kIPCTypeInputStatsGet, NULL, 0)) {
         return false;
     }
-    while (true) {
+    for (int message = 0; message < 64; message++) {
         OpenA8DJIPCHeader header;
         if (!ReadFull(fd, &header, sizeof(header))) {
             return false;
@@ -1108,6 +1125,7 @@ static bool ReadStats(int fd, OpenA8DJInputStatsPayload *stats)
             return true;
         }
     }
+    return false;
 }
 
 static bool ReadStreamStats(int fd, OpenA8DJStreamStatsPayload *stats, size_t *payloadLength)
@@ -1115,7 +1133,7 @@ static bool ReadStreamStats(int fd, OpenA8DJStreamStatsPayload *stats, size_t *p
     if (!SendIPC(fd, kIPCTypeStreamStatsGet, NULL, 0)) {
         return false;
     }
-    while (true) {
+    for (int message = 0; message < 64; message++) {
         OpenA8DJIPCHeader header;
         if (!ReadFull(fd, &header, sizeof(header))) {
             return false;
@@ -1137,6 +1155,7 @@ static bool ReadStreamStats(int fd, OpenA8DJStreamStatsPayload *stats, size_t *p
             return true;
         }
     }
+    return false;
 }
 
 static void PrintState(const OpenA8DJControlPayload *state)
@@ -1426,6 +1445,482 @@ static void PrintStreamStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
 
 #undef STREAM_STATS_HAS_FIELD
 
+typedef enum OpenA8DJPublicBackendResult {
+    kPublicBackendOK = 0,
+    kPublicBackendUnavailable,
+    kPublicBackendPermissionDenied
+} OpenA8DJPublicBackendResult;
+
+static void PrintJSONString(FILE *out, const char *value)
+{
+    static const char hex[] = "0123456789abcdef";
+    const unsigned char *cursor = (const unsigned char *)value;
+    fputc('"', out);
+    while (*cursor != '\0') {
+        unsigned char byte = *cursor++;
+        switch (byte) {
+            case '"':
+                fputs("\\\"", out);
+                break;
+            case '\\':
+                fputs("\\\\", out);
+                break;
+            case '\b':
+                fputs("\\b", out);
+                break;
+            case '\f':
+                fputs("\\f", out);
+                break;
+            case '\n':
+                fputs("\\n", out);
+                break;
+            case '\r':
+                fputs("\\r", out);
+                break;
+            case '\t':
+                fputs("\\t", out);
+                break;
+            default:
+                if (byte < 0x20) {
+                    fputs("\\u00", out);
+                    fputc(hex[byte >> 4], out);
+                    fputc(hex[byte & 0x0f], out);
+                } else {
+                    fputc(byte, out);
+                }
+                break;
+        }
+    }
+    fputc('"', out);
+}
+
+static void PrintPublicEnvelopePrefix(const char *operation, bool ok)
+{
+    fputs("{\"schema\":", stdout);
+    PrintJSONString(stdout, kPublicAPISchema);
+    fputs(",\"apiVersion\":", stdout);
+    PrintJSONString(stdout, kPublicAPIVersion);
+    fprintf(stdout, ",\"ok\":%s,\"operation\":", ok ? "true" : "false");
+    PrintJSONString(stdout, operation);
+}
+
+static int PrintPublicError(const char *operation,
+                            const char *code,
+                            const char *message,
+                            bool retryable,
+                            int exitStatus)
+{
+    PrintPublicEnvelopePrefix(operation, false);
+    fputs(",\"error\":{\"code\":", stdout);
+    PrintJSONString(stdout, code);
+    fputs(",\"message\":", stdout);
+    PrintJSONString(stdout, message);
+    fprintf(stdout, ",\"retryable\":%s}}\n", retryable ? "true" : "false");
+    return exitStatus;
+}
+
+static const OpenA8DJPreset *FindCanonicalPreset(const char *name)
+{
+    for (size_t i = 0; i < kBuiltInPresetCount; i++) {
+        if (strcmp(name, kBuiltInPresets[i].name) == 0) {
+            return &kBuiltInPresets[i];
+        }
+    }
+    return NULL;
+}
+
+static bool ApplyCanonicalPreset(const char *name, OpenA8DJControlPayload *state)
+{
+    return FindCanonicalPreset(name) != NULL && ApplyPreset(name, state);
+}
+
+static void PrintPublicStateMembers(const OpenA8DJControlPayload *state)
+{
+    fputs("\"activeProfile\":", stdout);
+    PrintJSONString(stdout, InferredPresetName(state));
+    fputs(",\"inputMode\":", stdout);
+    PrintJSONString(stdout, InputModeName(state->inputMode));
+    fprintf(stdout,
+            ",\"inputModeValue\":%u"
+            ",\"inputDecode\":%s"
+            ",\"softwareLock\":%s"
+            ",\"groundLiftVinyl\":%s"
+            ",\"groundLiftCDLine\":%s"
+            ",\"groundLiftPhono\":%s",
+            state->inputMode,
+            BoolJSON(state->inputDecodeEnabled),
+            BoolJSON(state->softwareLock),
+            BoolJSON(state->gndLiftTCVinyl),
+            BoolJSON(state->gndLiftTCCDLine),
+            BoolJSON(state->gndLiftPhono));
+    fputs(",\"inputSources\":{", stdout);
+    for (int pair = 0; pair < kInputPairs; pair++) {
+        if (pair != 0) fputc(',', stdout);
+        fprintf(stdout, "\"%c\":\"%c\"", 'A' + pair, PairLetter(state->inputSource[pair], pair));
+    }
+    fputs("},\"inputTransforms\":{", stdout);
+    for (int pair = 0; pair < kInputPairs; pair++) {
+        if (pair != 0) fputc(',', stdout);
+        fprintf(stdout, "\"%c\":", 'A' + pair);
+        PrintJSONString(stdout, InputTransformName(InputTransformForPair(state, pair)));
+    }
+    fputc('}', stdout);
+}
+
+static void PrintPublicVersion(void)
+{
+    PrintPublicEnvelopePrefix("version.get", true);
+    fputs(",\"data\":{\"apiVersion\":", stdout);
+    PrintJSONString(stdout, kPublicAPIVersion);
+    fputs(",\"schema\":", stdout);
+    PrintJSONString(stdout, kPublicAPISchema);
+    fputs(",\"transport\":\"process-json\",\"privateIPCVersion\":1,"
+          "\"capabilities\":[\"stats.read\",\"profiles.list\",\"profile.read\",\"profile.write\"]}}\n",
+          stdout);
+}
+
+static void PrintPublicProfiles(void)
+{
+    PrintPublicEnvelopePrefix("profiles.list", true);
+    fputs(",\"data\":{\"profiles\":[", stdout);
+    for (size_t i = 0; i < kBuiltInPresetCount; i++) {
+        const OpenA8DJPreset *preset = &kBuiltInPresets[i];
+        if (i != 0) fputc(',', stdout);
+        fputs("{\"id\":", stdout);
+        PrintJSONString(stdout, preset->name);
+        fputs(",\"title\":", stdout);
+        PrintJSONString(stdout, preset->title);
+        fputs(",\"surface\":", stdout);
+        PrintJSONString(stdout, preset->surface);
+        fputs(",\"summary\":", stdout);
+        PrintJSONString(stdout, preset->summary);
+        fputc('}', stdout);
+    }
+    fputs("]}}\n", stdout);
+}
+
+static uint64_t PublicStreamField(const OpenA8DJStreamStatsPayload *stats,
+                                  size_t payloadLength,
+                                  size_t offset,
+                                  size_t size,
+                                  uint64_t value)
+{
+    (void)stats;
+    return StreamStatsHasField(payloadLength, offset, size) ? value : 0;
+}
+
+#define PUBLIC_STREAM_FIELD(stats, length, field) \
+    PublicStreamField((stats), (length), offsetof(OpenA8DJStreamStatsPayload, field), \
+                      sizeof((stats)->field), (uint64_t)((stats)->field))
+
+static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t payloadLength)
+{
+    bool hasStreaming = StreamStatsHasField(payloadLength,
+                                             offsetof(OpenA8DJStreamStatsPayload, streaming),
+                                             sizeof(stats->streaming));
+    bool hasSampleRate = StreamStatsHasField(payloadLength,
+                                              offsetof(OpenA8DJStreamStatsPayload, sampleRate),
+                                              sizeof(stats->sampleRate));
+    PrintPublicEnvelopePrefix("stats.get", true);
+    fprintf(stdout,
+            ",\"data\":{\"stream\":{\"streaming\":%s,\"sampleRate\":%.17g,"
+            "\"outputRingFrames\":%llu,\"outputTargetLatencyFrames\":%llu},"
+            "\"clock\":{\"anchorValid\":%s,\"acceptedAnchors\":%llu,"
+            "\"rejectedAnchors\":%llu,\"anchorResets\":%llu,\"usbFrameResyncs\":%llu},"
+            "\"capture\":{\"transfers\":%llu,\"transactions\":%llu,\"bytes\":%llu,"
+            "\"transactionFailures\":%llu,\"shortTransfers\":%llu,\"queueFailures\":%llu},"
+            "\"playback\":{\"transfers\":%llu,\"transactions\":%llu,\"bytes\":%llu,"
+            "\"transactionFailures\":%llu,\"shortTransfers\":%llu,\"queueFailures\":%llu},"
+            "\"output\":{\"framesWritten\":%llu,\"framesRead\":%llu,\"underruns\":%llu,"
+            "\"activeUnderruns\":%llu,\"ringOverruns\":%llu,\"timelineResets\":%llu,"
+            "\"lateWriteFrames\":%llu,\"lateWriteBatches\":%llu},"
+            "\"health\":{\"inputCheckErrors\":%llu,\"outputPanicFlags\":%llu}}}\n",
+            hasStreaming && stats->streaming ? "true" : "false",
+            hasSampleRate && isfinite(stats->sampleRate) ? stats->sampleRate : 0.0,
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputRingFrames),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputTargetLatencyFrames),
+            StreamStatsHasField(payloadLength,
+                                offsetof(OpenA8DJStreamStatsPayload, clockAnchorValid),
+                                sizeof(stats->clockAnchorValid)) && stats->clockAnchorValid ? "true" : "false",
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, clockAcceptedAnchors),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, clockRejectedAnchors),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, clockAnchorResets),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, clockUSBFrameResyncs),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureTransfers),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureTransactions),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureBytes),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureTransactionFailures),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureShortTransfers),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, captureQueueFailures),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackTransfers),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackTransactions),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackBytes),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackTransactionFailures),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackShortTransfers),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, playbackQueueFailures),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputFramesWritten),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputFramesRead),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputUnderruns),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputActiveUnderruns),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputRingOverruns),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputTimelineResets),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputLateWriteFrames),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputLateWriteBatches),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, inputCheckErrors),
+            (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputPanicFlags));
+}
+
+#undef PUBLIC_STREAM_FIELD
+
+static OpenA8DJPublicBackendResult ConnectPublicSocket(int *outFD)
+{
+    struct stat pathState;
+    *outFD = -1;
+    if (lstat(kSocketPath, &pathState) != 0) {
+        return errno == EACCES ? kPublicBackendPermissionDenied : kPublicBackendUnavailable;
+    }
+    if (!S_ISSOCK(pathState.st_mode) ||
+        pathState.st_uid != geteuid() ||
+        (pathState.st_mode & 0077) != 0) {
+        return kPublicBackendPermissionDenied;
+    }
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) {
+        return kPublicBackendUnavailable;
+    }
+#ifdef SO_NOSIGPIPE
+    int noSignal = 1;
+    (void)setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, sizeof(noSignal));
+#endif
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0 || fcntl(fd, F_SETFL, flags | O_NONBLOCK) != 0) {
+        close(fd);
+        return kPublicBackendUnavailable;
+    }
+
+    struct sockaddr_un address;
+    memset(&address, 0, sizeof(address));
+    address.sun_family = AF_UNIX;
+    if (strlcpy(address.sun_path, kSocketPath, sizeof(address.sun_path)) >= sizeof(address.sun_path)) {
+        close(fd);
+        return kPublicBackendUnavailable;
+    }
+    int result = connect(fd, (struct sockaddr *)&address, sizeof(address));
+    bool connected = result == 0;
+    if (!connected && errno == EINPROGRESS) {
+        fd_set writeSet;
+        FD_ZERO(&writeSet);
+        FD_SET(fd, &writeSet);
+        struct timeval connectTimeout = {.tv_sec = 0, .tv_usec = 500000};
+        result = select(fd + 1, NULL, &writeSet, NULL, &connectTimeout);
+        if (result > 0) {
+            int socketError = 0;
+            socklen_t errorSize = sizeof(socketError);
+            connected = getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &errorSize) == 0 &&
+                        socketError == 0;
+        }
+    }
+    if (!connected) {
+        close(fd);
+        return kPublicBackendUnavailable;
+    }
+    if (fcntl(fd, F_SETFL, flags) != 0) {
+        close(fd);
+        return kPublicBackendUnavailable;
+    }
+    struct timeval ioTimeout = {.tv_sec = 1, .tv_usec = 0};
+    (void)setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &ioTimeout, sizeof(ioTimeout));
+    (void)setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &ioTimeout, sizeof(ioTimeout));
+    *outFD = fd;
+    return kPublicBackendOK;
+}
+
+static const char *PublicMutationLockPath(char *buffer, size_t bufferSize)
+{
+#ifdef OPENA8DJ_PUBLIC_API_LOCK_PATH
+    (void)buffer;
+    (void)bufferSize;
+    return kPublicAPILockPath;
+#else
+    snprintf(buffer, bufferSize, "/tmp/opena8dj-public-api-%u.lock", (unsigned)geteuid());
+    return buffer;
+#endif
+}
+
+static int AcquirePublicMutationLock(void)
+{
+    char generatedPath[128];
+    const char *path = PublicMutationLockPath(generatedPath, sizeof(generatedPath));
+    int fd = open(path, O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
+    if (fd < 0) {
+        return -1;
+    }
+    struct stat lockState;
+    if (fstat(fd, &lockState) != 0 ||
+        !S_ISREG(lockState.st_mode) ||
+        lockState.st_uid != geteuid() ||
+        (lockState.st_mode & 0777) != 0600) {
+        close(fd);
+        return -1;
+    }
+    for (int attempt = 0; attempt < 100; attempt++) {
+        if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+            return fd;
+        }
+        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+            break;
+        }
+        usleep(10000);
+    }
+    close(fd);
+    return -1;
+}
+
+static int PublicBackendError(const char *operation, OpenA8DJPublicBackendResult result)
+{
+    if (result == kPublicBackendPermissionDenied) {
+        return PrintPublicError(operation,
+                                "backend_permission_denied",
+                                "The HAL bridge socket is not a safe local owner-only socket.",
+                                false,
+                                4);
+    }
+    return PrintPublicError(operation,
+                            "backend_unavailable",
+                            "The HAL control bridge is not running.",
+                            true,
+                            3);
+}
+
+static bool PublicSendStateAndReadBack(int fd,
+                                       const OpenA8DJControlPayload *expected,
+                                       OpenA8DJControlPayload *actual)
+{
+    return SendIPC(fd, kIPCTypeControlSet, expected, sizeof(*expected)) &&
+           ReadState(fd, actual);
+}
+
+static int RunPublicAPI(int argc, char **argv)
+{
+    const char *operation = "unknown";
+    if (argc >= 3 && strcmp(argv[2], "version") == 0) operation = "version.get";
+    if (argc >= 3 && strcmp(argv[2], "stats") == 0) operation = "stats.get";
+    if (argc >= 3 && strcmp(argv[2], "profiles") == 0) operation = "profiles.list";
+    if (argc >= 3 && strcmp(argv[2], "profile") == 0) {
+        operation = argc >= 4 && strcmp(argv[3], "set") == 0 ? "profile.set" : "profile.get";
+    }
+
+    if (argc == 3 && strcmp(argv[2], "version") == 0) {
+        PrintPublicVersion();
+        return 0;
+    }
+    if (argc == 3 && strcmp(argv[2], "profiles") == 0) {
+        PrintPublicProfiles();
+        return 0;
+    }
+
+    bool profileRead = argc == 3 && strcmp(argv[2], "profile") == 0;
+    bool statsRead = argc == 3 && strcmp(argv[2], "stats") == 0;
+    bool profileWrite = argc == 5 &&
+                        strcmp(argv[2], "profile") == 0 &&
+                        strcmp(argv[3], "set") == 0;
+    if (!profileRead && !statsRead && !profileWrite) {
+        return PrintPublicError(operation,
+                                "invalid_request",
+                                "The public API request has an unknown operation or wrong arity.",
+                                false,
+                                2);
+    }
+
+    const char *requestedProfile = profileWrite ? argv[4] : NULL;
+    if (profileWrite &&
+        (strlen(requestedProfile) > 64 || FindCanonicalPreset(requestedProfile) == NULL)) {
+        return PrintPublicError("profile.set",
+                                "profile_not_allowed",
+                                "The requested profile is not in the built-in allowlist.",
+                                false,
+                                2);
+    }
+
+    int lockFD = -1;
+    if (profileWrite) {
+        lockFD = AcquirePublicMutationLock();
+        if (lockFD < 0) {
+            return PrintPublicError("profile.set",
+                                    "profile_apply_failed",
+                                    "The profile mutation lock could not be acquired safely.",
+                                    true,
+                                    5);
+        }
+    }
+
+    int fd = -1;
+    OpenA8DJPublicBackendResult backend = ConnectPublicSocket(&fd);
+    if (backend != kPublicBackendOK) {
+        if (lockFD >= 0) close(lockFD);
+        return PublicBackendError(operation, backend);
+    }
+
+    if (statsRead) {
+        OpenA8DJStreamStatsPayload stats;
+        size_t payloadLength = 0;
+        if (!ReadStreamStats(fd, &stats, &payloadLength)) {
+            close(fd);
+            return PrintPublicError("stats.get",
+                                    "backend_protocol_error",
+                                    "The HAL bridge returned an invalid statistics reply.",
+                                    true,
+                                    4);
+        }
+        close(fd);
+        PrintPublicStats(&stats, payloadLength);
+        return 0;
+    }
+
+    OpenA8DJControlPayload state;
+    if (!ReadState(fd, &state)) {
+        close(fd);
+        if (lockFD >= 0) close(lockFD);
+        return PrintPublicError(operation,
+                                "backend_protocol_error",
+                                "The HAL bridge returned an invalid control reply.",
+                                true,
+                                4);
+    }
+    if (profileRead) {
+        close(fd);
+        PrintPublicEnvelopePrefix("profile.get", true);
+        fputs(",\"data\":{", stdout);
+        PrintPublicStateMembers(&state);
+        fputs("}}\n", stdout);
+        return 0;
+    }
+
+    OpenA8DJControlPayload expected = state;
+    OpenA8DJControlPayload actual = expected;
+    if (!ApplyCanonicalPreset(requestedProfile, &expected) ||
+        !PublicSendStateAndReadBack(fd, &expected, &actual) ||
+        memcmp(&actual, &expected, sizeof(expected)) != 0) {
+        if (fd >= 0) close(fd);
+        close(lockFD);
+        return PrintPublicError("profile.set",
+                                "profile_apply_failed",
+                                "The requested profile could not be applied and verified.",
+                                true,
+                                5);
+    }
+    close(fd);
+    close(lockFD);
+    PrintPublicEnvelopePrefix("profile.set", true);
+    fputs(",\"data\":{\"requestedProfile\":", stdout);
+    PrintJSONString(stdout, requestedProfile);
+    fputs(",\"applied\":true,", stdout);
+    PrintPublicStateMembers(&actual);
+    fputs("}}\n", stdout);
+    return 0;
+}
+
 static bool ParseBool(const char *text, uint8_t *outValue)
 {
     if (strcmp(text, "on") == 0 || strcmp(text, "1") == 0 || strcmp(text, "true") == 0) {
@@ -1446,6 +1941,8 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
+    fprintf(stderr, "  %s api version|stats|profiles|profile\n", argv0);
+    fprintf(stderr, "  %s api profile set canonical-profile-id\n", argv0);
     fprintf(stderr, "  %s list-profiles\n", argv0);
     fprintf(stderr, "  %s export-config [path]\n", argv0);
     fprintf(stderr, "  %s import-config path\n", argv0);
@@ -1463,6 +1960,18 @@ static void Usage(const char *argv0)
 
 int main(int argc, char **argv)
 {
+#ifdef OPENA8DJ_PUBLIC_API_TEST_ESCAPE
+    if (argc == 3 && strcmp(argv[1], "--public-api-test-escape") == 0) {
+        PrintJSONString(stdout, argv[2]);
+        fputc('\n', stdout);
+        return 0;
+    }
+#endif
+    if (argc >= 2 && strcmp(argv[1], "api") == 0) {
+        (void)signal(SIGPIPE, SIG_IGN);
+        return RunPublicAPI(argc, argv);
+    }
+
     if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
         Usage(argv[0]);
         return 0;

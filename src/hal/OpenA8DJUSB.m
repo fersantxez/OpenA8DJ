@@ -3216,7 +3216,12 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         close(fd);
         return;
     }
-    chmod(kIPCSocketPath, 0666);
+    if (chmod(kIPCSocketPath, 0600) != 0) {
+        USBTrace("IPC chmod failed errno=%d %s", errno, strerror(errno));
+        close(fd);
+        unlink(kIPCSocketPath);
+        return;
+    }
     if (listen(fd, 8) != 0) {
         USBTrace("IPC listen failed errno=%d %s", errno, strerror(errno));
         close(fd);

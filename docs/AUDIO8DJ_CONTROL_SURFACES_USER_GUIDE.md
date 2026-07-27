@@ -149,6 +149,58 @@ Read without waking the HAL bridge:
 OPENA8DJ_CONTROL_NO_WAKE=1 opena8dj-control export-config -
 ```
 
+## Public JSON API v1
+
+Local applications can use the versioned process API without linking against a
+driver SDK or depending on the private socket protocol:
+
+```sh
+opena8dj-control api version
+opena8dj-control api profiles
+opena8dj-control api profile
+opena8dj-control api stats
+opena8dj-control api profile set traktor-dvs-vinyl
+```
+
+Every `api` invocation writes exactly one newline-terminated JSON object to
+standard output. Check both the process exit status and the `ok` member. For
+example, this Python snippet reads a non-destructive statistics snapshot:
+
+```python
+import json
+import subprocess
+
+result = subprocess.run(
+    ["opena8dj-control", "api", "stats"],
+    check=False,
+    capture_output=True,
+    text=True,
+)
+response = json.loads(result.stdout)
+if result.returncode != 0 or not response["ok"]:
+    raise RuntimeError(response["error"]["code"])
+print(response["data"]["output"]["underruns"])
+```
+
+`api version` and `api profiles` work without a running driver. API reads and
+writes never start Core Audio; they return `backend_unavailable` when the
+owner-only local HAL bridge is not already running. Profile writes accept only
+an exact ID returned by `api profiles` and verify the complete state by reading
+it back.
+
+The schema identifier is `org.opena8dj.public-api.response.v1` and the initial
+API version is `1.0`. Applications may ignore unknown object members added by a
+future compatible minor release. They should branch on documented error codes,
+not human-readable messages or JSON member ordering. The packed binary protocol
+at `/tmp/opena8dj-control.sock` remains private and is not a supported client
+interface.
+
+Build the CLI and run the complete mock-backed contract suite without hardware:
+
+```sh
+make public-api-offline-test
+```
+
 ## Case 1: Playback / Four Stereo Outputs
 
 Preset:
