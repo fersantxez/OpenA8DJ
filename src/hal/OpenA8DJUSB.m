@@ -552,6 +552,11 @@ static OpenA8DJVintageStatePayload VintageStateSnapshot(void)
     OpenA8DJVintagePreflightResult result =
         OpenA8DJVintageEvaluatePreflight(&gVintageDescriptor);
     payload.reasons = result.reasons | gVintageTransientReasons;
+    if (present &&
+        gDriverModeState.lastResult ==
+            kOpenA8DJDriverModeResultApplyFailed) {
+        payload.reasons |= kOpenA8DJVintageReasonApplyFailed;
+    }
     payload.capabilities = result.capabilities;
     payload.knownCapabilities = result.knownCapabilities;
     payload.preflightGeneration = gVintagePreflightGeneration;
@@ -622,11 +627,20 @@ static OpenA8DJDriverModeStatePayload DriverModeSetRequested(uint32_t modeID)
         gDriverModeStreaming) {
         (void)VintageRunPreflightLocked();
     }
-    (void)OpenA8DJDriverModeSet(&gDriverModeState,
-                                modeID,
-                                gDriverModeStreaming,
-                                DriverModeProductionPreflight,
-                                NULL);
+    bool applied = OpenA8DJDriverModeSet(
+        &gDriverModeState,
+        modeID,
+        gDriverModeStreaming,
+        DriverModeProductionPreflight,
+        NULL);
+    if (!applied &&
+        modeID == kOpenA8DJDriverModeVintageCompatible &&
+        gDriverModeState.lastResult ==
+            kOpenA8DJDriverModeResultApplyFailed) {
+        gVintageTransientReasons =
+            gVintagePreflight.reasons |
+            kOpenA8DJVintageReasonApplyFailed;
+    }
     OpenA8DJDriverModeMakeStatePayload(&gDriverModeState,
                                        gDriverModeStreaming,
                                        &payload);

@@ -97,6 +97,7 @@ typedef enum OpenA8DJVintageCapability {
 } OpenA8DJVintageCapability;
 
 #define OPENA8DJ_VINTAGE_KNOWN_CAPABILITY_MASK ((uint64_t)((1ull << 14) - 1ull))
+#define OPENA8DJ_VINTAGE_RUNTIME_CAPABILITY_MASK ((uint64_t)((1ull << 10) - 1ull))
 
 typedef struct OpenA8DJVintageBuildDescriptor {
     uint8_t resetAudioParamsBeforeStream;
@@ -317,7 +318,15 @@ static inline bool OpenA8DJVintageValidateStatePayload(
         (payload->capabilities & ~payload->knownCapabilities) != 0 ||
         (payload->reasons & ~OPENA8DJ_VINTAGE_KNOWN_REASON_MASK) != 0 ||
         payload->bufferNormalization >
-            kOpenA8DJVintageBufferNormalizationFixed) {
+            kOpenA8DJVintageBufferNormalizationFixed ||
+        payload->descriptor.resetAudioParamsBeforeStream > 1 ||
+        payload->descriptor.capturePacedOutput > 1 ||
+        payload->descriptor.explicitUSBScheduling > 1 ||
+        payload->descriptor.usbHALTimestampEnabled > 1 ||
+        payload->descriptor.clientSampleFormat >
+            kOpenA8DJVintageClientSampleFormatInt24 ||
+        !isfinite(payload->descriptor.effectiveSampleRate) ||
+        !isfinite(payload->descriptor.timestampSampleRate)) {
         return false;
     }
     for (size_t index = 0; index < sizeof(payload->reserved0); index++) {
@@ -326,21 +335,64 @@ static inline bool OpenA8DJVintageValidateStatePayload(
     for (size_t index = 0; index < sizeof(payload->reserved); index++) {
         if (payload->reserved[index] != 0) return false;
     }
-    bool modePresent = OpenA8DJVintageModePresent(&payload->driverMode);
+    OpenA8DJVintageBuildDescriptor descriptor;
+    memcpy(&descriptor, &payload->descriptor, sizeof(descriptor));
+    OpenA8DJVintagePreflightResult evaluated =
+        OpenA8DJVintageEvaluatePreflight(&descriptor);
+    if ((payload->capabilities &
+             OPENA8DJ_VINTAGE_RUNTIME_CAPABILITY_MASK) !=
+            (evaluated.capabilities &
+             OPENA8DJ_VINTAGE_RUNTIME_CAPABILITY_MASK) ||
+        (payload->reasons & OPENA8DJ_VINTAGE_MANDATORY_REASON_MASK) !=
+            (evaluated.reasons &
+             OPENA8DJ_VINTAGE_MANDATORY_REASON_MASK) ||
+        (((payload->capabilities &
+               kOpenA8DJVintageCapabilityRate192000) == 0) !=
+         ((payload->reasons &
+               kOpenA8DJVintageReasonRate192000NotImplemented) != 0)) ||
+        (((payload->capabilities &
+               kOpenA8DJVintageCapabilityLegacyStereoStreamPartition) == 0) !=
+         ((payload->reasons &
+               kOpenA8DJVintageReasonLegacyStreamPartitionMismatch) != 0)) ||
+        (((payload->capabilities &
+               kOpenA8DJVintageCapabilityLegacyClientInt24) == 0) !=
+         ((payload->reasons &
+               kOpenA8DJVintageReasonLegacyClientFormatMismatch) != 0))) {
+        return false;
+    }
+    bool legacyGeometry =
+        (payload->capabilities &
+             kOpenA8DJVintageCapabilityLegacyCaptureDepth64) != 0 &&
+        (payload->capabilities &
+             kOpenA8DJVintageCapabilityLegacyOutputSlots128) != 0;
+    if (legacyGeometry ==
+        ((payload->reasons &
+              kOpenA8DJVintageReasonLegacyQueueGeometryMismatch) != 0)) {
+        return false;
+    }
+    OpenA8DJDriverModeStatePayload driverMode;
+    memcpy(&driverMode, &payload->driverMode, sizeof(driverMode));
+    bool modePresent = OpenA8DJVintageModePresent(&driverMode);
     if (!modePresent) {
-        return payload->status == kOpenA8DJVintageConformanceUnverified &&
+        return payload->status ==
+                   kOpenA8DJVintageConformanceUnverified &&
                (payload->reasons &
-                    kOpenA8DJVintageReasonNotRequested) != 0;
+                    kOpenA8DJVintageReasonNotRequested) != 0 &&
+               payload->bufferNormalization ==
+                   kOpenA8DJVintageBufferNormalizationShippingTable &&
+               payload->normalizedBufferFrames == 0;
     }
     if ((payload->reasons & kOpenA8DJVintageReasonNotRequested) != 0 ||
+        (payload->reasons &
+             kOpenA8DJVintageReasonPreflightNotRun) != 0 ||
         payload->preflightGeneration == 0 ||
         payload->bufferNormalization !=
-            (payload->driverMode.effectiveMode ==
+            (driverMode.effectiveMode ==
                      kOpenA8DJDriverModeVintageCompatible ?
                  kOpenA8DJVintageBufferNormalizationFixed :
                  kOpenA8DJVintageBufferNormalizationShippingTable) ||
         payload->normalizedBufferFrames !=
-            (payload->driverMode.effectiveMode ==
+            (driverMode.effectiveMode ==
                      kOpenA8DJDriverModeVintageCompatible ?
                  kOpenA8DJVintageRequiredBufferFrames : 0)) {
         return false;
