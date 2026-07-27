@@ -6,6 +6,7 @@ HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
 HAL_CONFIG := build/hal-build-config.txt
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
+HAL_IPC_AUTH := src/hal/OpenA8DJIPCAuth.h
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
@@ -46,6 +47,7 @@ MIDI_BRIDGE_SRC := src/tools/opena8dj-midid.m
 CONTROL_TOOL := build/opena8dj-control
 CONTROL_TOOL_SRC := src/tools/opena8dj-control.c
 PUBLIC_API_TEST := tests/public_api_contract_test.py
+PUBLIC_API_PEER_POLICY_TEST := tests/public_api_peer_policy_test.c
 CONTROL_CENTER_APP := build/OpenA8DJControlCenter.app
 CONTROL_CENTER_SRC := macos/OpenA8DJControlCenter/OpenA8DJControlCenter.swift
 CONTROL_CENTER_PLIST := macos/OpenA8DJControlCenter/Info.plist
@@ -231,7 +233,7 @@ $(HAL_CONFIG): FORCE
 		rm -f "$$tmp"; \
 	fi
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_PLIST) $(HAL_CONFIG)
+$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(HAL_PLIST) $(HAL_CONFIG)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
@@ -564,7 +566,7 @@ $(CONTROL_TOOL): $(CONTROL_TOOL_SRC)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 
-public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST)
+public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST) $(PUBLIC_API_PEER_POLICY_TEST) $(HAL_IPC_AUTH)
 	python3 $(PUBLIC_API_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
 
 $(CONTROL_CENTER_APP): $(CONTROL_CENTER_SRC) $(CONTROL_CENTER_PLIST) $(CONTROL_TOOL)

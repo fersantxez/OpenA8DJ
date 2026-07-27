@@ -1,4 +1,5 @@
 #import "OpenA8DJUSB.h"
+#import "OpenA8DJIPCAuth.h"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
@@ -242,13 +243,12 @@ static bool IPCPeerIsAuthorized(int fd)
         return false;
     }
     (void)peerGID;
-    if (peerUID == 0 || peerUID == geteuid()) {
-        return true;
-    }
-
     struct stat consoleState;
-    return stat("/dev/console", &consoleState) == 0 &&
-           peerUID == consoleState.st_uid;
+    uid_t consoleUID = (uid_t)-1;
+    if (stat("/dev/console", &consoleState) == 0) {
+        consoleUID = consoleState.st_uid;
+    }
+    return OpenA8DJIPCPeerUIDIsAuthorized(peerUID, geteuid(), consoleUID);
 }
 #if OPENA8DJ_ENABLE_STREAM_KEEPALIVE
 static const uint64_t kStreamKeepaliveIntervalNsec = 250000000ull;

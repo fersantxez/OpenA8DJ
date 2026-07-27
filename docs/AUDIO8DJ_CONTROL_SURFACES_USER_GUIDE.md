@@ -191,6 +191,11 @@ console user. The client independently verifies the server peer and socket
 identity. Profile writes accept only an exact ID returned by `api profiles` and
 verify the complete state by reading it back.
 
+Peer enforcement on the server requires the matching updated OpenA8DJ HAL
+driver. Installing only a newer control tool cannot add server-side
+authentication to an older HAL, although the new client still authenticates
+the server before using the public API.
+
 The schema identifier is `org.opena8dj.public-api.response.v1` and the initial
 API version is `1.0`. Applications may ignore unknown object members added by a
 future compatible minor release. They should branch on documented error codes,

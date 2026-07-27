@@ -219,7 +219,10 @@ Reading public statistics must never change later observations.
    `_coreaudiod` host. Immediately after `accept`, the HAL obtains the Unix peer
    credentials with `getpeereid` and accepts only UID 0, its own effective UID,
    or the current `/dev/console` owner. It closes every other peer before adding
-   it to the client set, sending state, or dispatching a request.
+   it to the client set, sending state, or dispatching a request. Mode `0666`
+   is only cross-UID DAC permission to attempt a connection; it grants no
+   authorization to read or mutate controls. Other local accounts are closed
+   based on their authenticated peer UID.
 2. Before any public API operation connects, it uses `lstat` without following
    symlinks and rejects a path that is not a Unix socket, has any executable
    permission bit, or is not owned by UID 0 or the `_coreaudiod` account. After
@@ -245,6 +248,9 @@ Reading public statistics must never change later observations.
    firmware, USB, MIDI, installation, reload, or privilege-elevation operation.
 9. Statistics can reveal device activity to the logged-in user but are not
    exposed cross-user or over a network.
+10. Server-side peer enforcement requires the matching updated HAL. Updating
+    only `opena8dj-control` can authenticate a server from the client side, but
+    cannot add peer authorization to an already-installed legacy HAL.
 
 ## Implementation boundaries
 
@@ -282,7 +288,10 @@ factored functions linked into a harness), not just grep source:
 7. Verify JSON escaping with quotes, backslashes, and control characters.
 8. Verify the HAL source/build artifact keeps the IPC socket at `0666` and
    authenticates every accepted peer before registering or dispatching it.
-9. Run the existing control tool build with warnings enabled and the new
+9. Compile and execute the factored HAL UID policy with both allowed UIDs and
+   a denied unrelated local UID, and exercise pathname inode replacement
+   between connect and the client's second `lstat`.
+10. Run the existing control tool build with warnings enabled and the new
    contract test through a single documented offline command.
 
 No hardware lock is required for compilation or the mock contract suite. Any

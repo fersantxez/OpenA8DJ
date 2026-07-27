@@ -136,17 +136,31 @@ def stream_payload(source_path):
 
 
 class MockIPC:
-    def __init__(self, path, state, stats=b"", mismatch=False, malformed=False, mode=0o666):
+    def __init__(
+        self,
+        path,
+        state,
+        stats=b"",
+        mismatch=False,
+        malformed=False,
+        mode=0o666,
+        replace_path_on_accept=False,
+    ):
         self.path = str(path)
         self.state = bytearray(state)
         self.stats = stats
         self.mismatch = mismatch
         self.malformed = malformed
+        self.mode = mode
+        self.replace_path_on_accept = replace_path_on_accept
         self.requests = []
         self.error = None
+        self.replacement = None
         self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.listener.bind(self.path)
         os.chmod(self.path, mode)
+        self.original_inode = os.lstat(self.path).st_ino
+        self.replacement_inode = None
         self.listener.listen(1)
         self.thread = threading.Thread(target=self._serve, daemon=True)
 
@@ -156,6 +170,8 @@ class MockIPC:
 
     def __exit__(self, exc_type, exc, traceback):
         self.listener.close()
+        if self.replacement is not None:
+            self.replacement.close()
         self.thread.join(timeout=1)
         if self.error is not None and exc_type is None:
             raise self.error
@@ -178,6 +194,13 @@ class MockIPC:
         try:
             connection, _ = self.listener.accept()
             with connection:
+                if self.replace_path_on_accept:
+                    os.unlink(self.path)
+                    self.replacement = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    self.replacement.bind(self.path)
+                    os.chmod(self.path, self.mode)
+                    self.replacement_inode = os.lstat(self.path).st_ino
+                    self.replacement.listen(1)
                 while True:
                     raw_header = self._read_full(connection, HEADER.size)
                     if raw_header is None:
@@ -213,6 +236,7 @@ def compile_harness(source, output, socket_path, lock_path):
         f'-DOPENA8DJ_PUBLIC_API_SOCKET_PATH="{socket_path}"',
         f'-DOPENA8DJ_PUBLIC_API_LOCK_PATH="{lock_path}"',
         "-DOPENA8DJ_PUBLIC_API_TEST_TRUST_CURRENT_UID=1",
+        "-DOPENA8DJ_PUBLIC_API_TEST_POST_CONNECT_DELAY_USEC=150000",
         "-DOPENA8DJ_PUBLIC_API_TEST_ESCAPE=1",
         "-framework",
         "CoreAudio",
@@ -223,6 +247,35 @@ def compile_harness(source, output, socket_path, lock_path):
         str(source),
     ]
     subprocess.run(command, check=True, timeout=30)
+
+
+def compile_and_run_peer_policy(repo, output):
+    command = [
+        "xcrun",
+        "clang",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-I",
+        str(repo / "src/hal"),
+        "-o",
+        str(output),
+        str(repo / "tests/public_api_peer_policy_test.c"),
+    ]
+    subprocess.run(command, check=True, timeout=30)
+    result = subprocess.run(
+        [str(output)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=4,
+        check=False,
+    )
+    check(result.returncode == 0, f"peer policy executable failed: {result.stderr}")
+    check("PASS" in result.stdout, "peer policy executable did not report success")
+    print(result.stdout.strip())
 
 
 def assert_error(binary, expected_exit, expected_operation, expected_code, *args):
@@ -237,6 +290,7 @@ def assert_error(binary, expected_exit, expected_operation, expected_code, *args
 def run_tests(repo, shipping_binary):
     source = repo / "src/tools/opena8dj-control.c"
     hal_source = repo / "src/hal/OpenA8DJUSB.m"
+    auth_header = repo / "src/hal/OpenA8DJIPCAuth.h"
 
     result, document = invoke(shipping_binary, "api", "version")
     check(result.returncode == 0, "shipping version failed")
@@ -259,7 +313,9 @@ def run_tests(repo, shipping_binary):
         socket_path = temporary_path / "control.sock"
         lock_path = temporary_path / "mutation.lock"
         harness = temporary_path / "opena8dj-control-test"
+        peer_policy_harness = temporary_path / "peer-policy-test"
         compile_harness(source, harness, socket_path, lock_path)
+        compile_and_run_peer_policy(repo, peer_policy_harness)
 
         escaped = 'quote" slash\\ newline\n tab\t control\x01'
         escaped_result, escaped_document = invoke(
@@ -294,6 +350,16 @@ def run_tests(repo, shipping_binary):
             harness, 4, "profile.get", "backend_permission_denied", "api", "profile"
         )
         socket_path.unlink()
+
+        with MockIPC(socket_path, initial_state, replace_path_on_accept=True) as server:
+            assert_error(
+                harness, 4, "profile.get", "backend_permission_denied", "api", "profile"
+            )
+            check(server.replacement_inode is not None, "mock did not replace the socket path")
+            check(server.replacement_inode != server.original_inode,
+                  "mock socket replacement reused the original inode")
+        print("public API socket inode replacement rejection: PASS")
+        socket_path.unlink(missing_ok=True)
 
         with MockIPC(socket_path, initial_state, malformed=True):
             assert_error(
@@ -437,11 +503,13 @@ def run_tests(repo, shipping_binary):
           "HAL socket policy is not cross-UID connectable")
     check("getpeereid(fd, &peerUID, &peerGID)" in hal_text,
           "HAL does not obtain accepted peer credentials")
-    check("peerUID == 0 || peerUID == geteuid()" in hal_text,
-          "HAL peer policy is missing root or host UID")
     check('stat("/dev/console", &consoleState)' in hal_text and
-          "peerUID == consoleState.st_uid" in hal_text,
+          "OpenA8DJIPCPeerUIDIsAuthorized(peerUID, geteuid(), consoleUID)" in hal_text,
           "HAL peer policy is missing current console UID")
+    auth_text = auth_header.read_text()
+    check("peerUID == 0" in auth_text and "peerUID == hostUID" in auth_text and
+          "peerUID == consoleUID" in auth_text,
+          "factored peer policy is missing an allowed UID class")
     accept_policy = hal_text[hal_text.index("int client = accept"):]
     authorize_index = accept_policy.index("IPCPeerIsAuthorized(client)")
     add_index = accept_policy.index("[strongSelf addIPCClient:client]")

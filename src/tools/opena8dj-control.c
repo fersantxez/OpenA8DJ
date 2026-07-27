@@ -1733,6 +1733,9 @@ static OpenA8DJPublicBackendResult ConnectPublicSocket(int *outFD)
         return kPublicBackendUnavailable;
     }
 
+#ifdef OPENA8DJ_PUBLIC_API_TEST_POST_CONNECT_DELAY_USEC
+    usleep(OPENA8DJ_PUBLIC_API_TEST_POST_CONNECT_DELAY_USEC);
+#endif
     uid_t peerUID = (uid_t)-1;
     gid_t peerGID = (gid_t)-1;
     struct stat verifiedPathState;
