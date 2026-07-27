@@ -1944,6 +1944,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         if (!IsSupportedRate(newRate)) {
             return kAudioHardwareUnsupportedOperationError;
         }
+        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+            return kAudioHardwareIllegalOperationError;
+        }
         pthread_mutex_lock(&gClockMutex);
         bool sameRate = (gSampleRate == newRate);
         if (!sameRate) {
@@ -1952,12 +1955,6 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         pthread_mutex_unlock(&gClockMutex);
         if (sameRate) {
             return kAudioHardwareNoError;
-        }
-        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
-            pthread_mutex_lock(&gClockMutex);
-            gPendingSampleRate = 0.0;
-            pthread_mutex_unlock(&gClockMutex);
-            return kAudioHardwareIllegalOperationError;
         }
         if (gHost != NULL) {
             return gHost->RequestDeviceConfigurationChange(gHost,
@@ -1981,6 +1978,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         if (requestedSize == 0 || requestedSize > kOpenA8DJMaxAdvertisedBufferFrames) {
             return kAudioHardwareUnsupportedOperationError;
         }
+        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
+            return kAudioHardwareIllegalOperationError;
+        }
         newSize = NormalizeBufferFrames(requestedSize);
         Trace("Set buffer frames requested %u normalized %u current %u", requestedSize, newSize, gBufferFrames);
         pthread_mutex_lock(&gClockMutex);
@@ -1991,12 +1991,6 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         pthread_mutex_unlock(&gClockMutex);
         if (sameSize) {
             return kAudioHardwareNoError;
-        }
-        if (!OpenA8DJUSBDriverModeAllowsConfigurationChange()) {
-            pthread_mutex_lock(&gClockMutex);
-            gPendingBufferFrames = 0;
-            pthread_mutex_unlock(&gClockMutex);
-            return kAudioHardwareIllegalOperationError;
         }
         if (gHost != NULL) {
             return gHost->RequestDeviceConfigurationChange(gHost,

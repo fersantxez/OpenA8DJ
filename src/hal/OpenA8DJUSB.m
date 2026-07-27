@@ -477,6 +477,8 @@ static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
         if (!result.mandatoryPassed) {
             gVintagePreflight.reasons |=
                 kOpenA8DJVintageReasonApplyFailed;
+            gVintageTransientReasons =
+                gVintagePreflight.reasons;
             gDriverModeState.requestedMode =
                 kOpenA8DJDriverModeBalanced;
             gDriverModeState.effectiveMode =
@@ -485,7 +487,6 @@ static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
             gDriverModeState.lastResult =
                 kOpenA8DJDriverModeResultApplyFailed;
             gDriverModeState.applyFailures++;
-            gDriverModeState.appliedTransitions++;
             gDriverModeState.generation++;
         }
     }
@@ -4159,8 +4160,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
             } else {
                 OpenA8DJVintageStatePayload vintage =
                     VintageStateSnapshot();
-                vintage.reasons |=
-                    kOpenA8DJVintageReasonApplyFailed;
+                vintage.rejectionReason =
+                    kOpenA8DJVintageRejectionBadLength;
                 (void)IPCSend(fd,
                               kIPCTypeVintageCompatibleState,
                               &vintage,

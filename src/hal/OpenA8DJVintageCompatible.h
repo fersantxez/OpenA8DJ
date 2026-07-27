@@ -41,6 +41,11 @@ typedef enum OpenA8DJVintageClientSampleFormat {
     kOpenA8DJVintageClientSampleFormatInt24 = 2
 } OpenA8DJVintageClientSampleFormat;
 
+typedef enum OpenA8DJVintageRejection {
+    kOpenA8DJVintageRejectionNone = 0,
+    kOpenA8DJVintageRejectionBadLength = 1
+} OpenA8DJVintageRejection;
+
 typedef enum OpenA8DJVintageReason {
     kOpenA8DJVintageReasonNotRequested = 1ull << 0,
     kOpenA8DJVintageReasonPreflightNotRun = 1ull << 1,
@@ -135,7 +140,8 @@ typedef struct OpenA8DJVintageStatePayload {
     uint64_t failureCounter;
     OpenA8DJVintageBuildDescriptor descriptor;
     uint8_t bufferNormalization;
-    uint8_t reserved0[3];
+    uint8_t rejectionReason;
+    uint8_t reserved0[2];
     uint32_t normalizedBufferFrames;
     OpenA8DJDriverModeStatePayload driverMode;
     uint8_t reserved[8];
@@ -304,6 +310,8 @@ static inline bool OpenA8DJVintageValidateStatePayload(
         payload->schemaVersion != kOpenA8DJVintageSchemaVersion ||
         payload->status > kOpenA8DJVintageConformanceCompatible ||
         payload->experimental != 1 ||
+        payload->rejectionReason !=
+            kOpenA8DJVintageRejectionNone ||
         payload->knownCapabilities !=
             OPENA8DJ_VINTAGE_KNOWN_CAPABILITY_MASK ||
         (payload->capabilities & ~payload->knownCapabilities) != 0 ||
