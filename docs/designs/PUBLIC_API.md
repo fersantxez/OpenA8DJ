@@ -217,6 +217,7 @@ compares the read-back payload with the expected payload. It returns
 
 On success, `data` contains:
 
+- `requestedProfile`: the canonical requested ID;
 - `activeProfile`: the truthfully inferred ID or `"custom"`;
 - `applied`: `true`; and
 - the same control state fields as `profile.get`.
