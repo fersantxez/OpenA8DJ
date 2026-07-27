@@ -69,6 +69,9 @@ opena8dj-control api driver-modes
 opena8dj-control api driver-mode
 opena8dj-control api driver-mode set balanced
 opena8dj-control api driver-mode set performance
+opena8dj-control api loopback get
+opena8dj-control api loopback enable A
+opena8dj-control api loopback disable
 ```
 
 Exactly one UTF-8 JSON object, terminated by a newline, is written to standard
@@ -87,7 +90,7 @@ stream. Existing non-API CLI commands retain their current wake behavior.
 ```json
 {
   "schema": "org.opena8dj.public-api.response.v1",
-  "apiVersion": "1.0",
+  "apiVersion": "1.1",
   "ok": true,
   "operation": "profiles.list",
   "data": {}
@@ -97,11 +100,12 @@ stream. Existing non-API CLI commands retain their current wake behavior.
 Required top-level members and their types are stable for API major version 1:
 
 - `schema`: the exact string above;
-- `apiVersion`: semantic API version string, initially `1.0`;
+- `apiVersion`: semantic API version string, currently `1.1`;
 - `ok`: boolean;
 - `operation`: one of `version.get`, `stats.get`, `hardware.get`,
   `profiles.list`, `profile.get`, `profile.set`, `driver_modes.list`,
-  `driver_mode.get`, or `driver_mode.set`; and
+  `driver_mode.get`, `driver_mode.set`, `loopback.get`,
+  `loopback.enable`, or `loopback.disable`; and
 - `data`: an object on success.
 
 Minor releases may add object members and new operations. They must not remove
@@ -115,7 +119,7 @@ the contract.
 ```json
 {
   "schema": "org.opena8dj.public-api.response.v1",
-  "apiVersion": "1.0",
+  "apiVersion": "1.1",
   "ok": false,
   "operation": "profile.set",
   "error": {
@@ -139,6 +143,8 @@ The stable v1 error codes are:
 | `driver_mode_not_allowed` | Driver mode is not an exact public allowlist ID | false | 2 |
 | `driver_mode_busy` | Reserved for an explicit future caller that disallows pending; normal v1 set does not emit it | true | 3 |
 | `driver_mode_apply_failed` | HAL preflight/apply kept the previous effective policy | true | 5 |
+| `loopback_source_not_allowed` | Source is not exact `A`, `B`, `C`, or `D` | false | 2 |
+| `loopback_apply_failed` | Session-only set/read-back verification failed | true | 5 |
 
 Messages are for people and may be clarified; clients branch only on `code`.
 Unknown operations use the literal operation value `unknown`.
@@ -153,15 +159,25 @@ to these sets but must not remove or redefine existing entries.
 
 `data` contains:
 
-- `apiVersion`: `"1.0"`;
+- `apiVersion`: `"1.1"`;
 - `schema`: `"org.opena8dj.public-api.response.v1"`;
 - `transport`: `"process-json"`;
 - `privateIPCVersion`: `1` (diagnostic only; not a promise that clients may use
   the private IPC); and
 - `capabilities`: an array containing `stats.read`, `usb-quality.read`,
   `hardware.read`, `profiles.list`, `profile.read`, and `profile.write`.
-  It also contains `driver-mode.read` and `driver-mode.write`, for a total of
-  eight v1 capabilities.
+  It also contains the existing driver-mode capabilities and the additive
+  `loopback.read` and `loopback.write` capabilities.
+
+### `loopback.get`, `loopback.enable`, and `loopback.disable`
+
+Loopback is disabled by default and session-only. Enable accepts only an exact
+source pair `A`, `B`, `C`, or `D`; disable retains the selected pair. Mutations
+use the public mutation lock and an authenticated same-connection private
+set/get transaction. The response reports `sourcePair` (never “master”),
+generation, reader count, publishing state, ring capacity, and the independent
+published/delivered/silence/gap/overrun counters. `stats.get` exposes the same
+object as `data.loopback`, or JSON `null` with an older HAL tail.
 
 ### `hardware.get`
 

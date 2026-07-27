@@ -60,6 +60,7 @@ TIMECODE_API_TEST := tests/timecode_api_offline_test.py
 VINTAGE_STATE_TEST := tests/vintage_compatible_state_test.c
 VINTAGE_API_TEST := tests/vintage_compatible_offline_test.py
 VINTAGE_FIXTURE := tests/vintage_state_fixture.c
+VIRTUAL_LOOPBACK_TEST := tests/virtual_loopback_state_test.c
 USB_QUALITY_CLI_TEST := tests/usb_quality_cli_test.py
 HARDWARE_PROFILER := build/opena8dj-hardware-profiler
 HARDWARE_PROFILER_TEST := build/opena8dj-hardware-profiler-test
@@ -229,7 +230,7 @@ FRAMEWORKS := -framework Foundation -framework IOKit -framework IOUSBHost
 HAL_FRAMEWORKS := -framework CoreAudio -framework CoreFoundation -framework AudioToolbox -framework CoreMIDI -framework Foundation -framework IOKit -framework IOUSBHost
 MIDI_FRAMEWORKS := -framework Foundation -framework CoreMIDI -framework CoreAudio -framework CoreFoundation
 
-.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center driver-mode-offline-test vintage-compatible-offline-test public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
+.PHONY: all clean probe claim hal sign-hal install-hal install-midid install-tools install-control-surfaces control-center driver-mode-offline-test vintage-compatible-offline-test virtual-loopback-offline-test virtual-loopback-tsan-test virtual-loopback-smoke-locked public-api-offline-test usb-quality-offline-test hardware-profiler-offline-test smoke-hal parity-smoke-hal audio-list audio-inspect audio-io-test audio-wav-play audio-record audio-config audio-default audio-pair-tone audio-route audio-device-controls audio-input-meter macbook-mic-record audio-stack-health audio-stack-guard audio-stack-recover audio-stack-reset soundcheck-preflight soundcheck simulated-output-soundcheck playback-cpu-gate no-irig-click-risk-gate digital-audio-quality-gate output-pair-smoke-gate capture-device-diagnose capture-device-diagnose-selftest physical-bench-sanity-gate physical-music-quality-gate-selftest timecode-smoke-gate irig-recovery-gate irig-isolation-diagnose irig-usb-recovery-diagnose candidate-preflight candidate-watch candidate-status candidate-ready-email-gate candidate-watch-ready-email-gate safe-replug-watch-start safe-replug-watch-status safe-replug-watch-stop autonomous-audio-qa-start autonomous-audio-qa-status autonomous-audio-qa-stop shared-hardware-lock-status quality-window-internal quality-window-candidate usb-play usb-input-meter usb-reset-device midi-list package control-surfaces-package tools-package dmg control-surfaces-dmg tools-dmg checksums dist FORCE
 
 all: $(TOOL) hal $(AUDIO_LIST) $(AUDIO_INSPECT) $(AUDIO_IO_TEST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(AUDIO_CONFIG) $(AUDIO_DEFAULT) $(AUDIO_PAIR_TONE) $(AUDIO_ROUTE) $(AUDIO_DEVICE_CONTROLS) $(INPUT_METER) $(MACBOOK_MIC_RECORD) $(USB_PLAY) $(USB_INPUT_METER) $(USB_RESET_DEVICE) $(MIDI_BRIDGE) $(CONTROL_TOOL) $(HARDWARE_PROFILER) $(MIDI_LIST)
 
@@ -587,6 +588,17 @@ $(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(
 
 public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST) $(PUBLIC_API_PEER_POLICY_TEST) $(HAL_IPC_AUTH)
 	python3 $(PUBLIC_API_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
+
+virtual-loopback-offline-test: public-api-offline-test $(VIRTUAL_LOOPBACK_TEST) $(VIRTUAL_LOOPBACK_HEADER) src/hal/OpenA8DJVirtualLoopback.c
+	xcrun clang -std=c11 -Wall -Wextra -Wpedantic -Werror -Isrc/hal -o build/virtual-loopback-state-test src/hal/OpenA8DJVirtualLoopback.c $(VIRTUAL_LOOPBACK_TEST)
+	./build/virtual-loopback-state-test
+
+virtual-loopback-tsan-test: $(VIRTUAL_LOOPBACK_TEST) $(VIRTUAL_LOOPBACK_HEADER) src/hal/OpenA8DJVirtualLoopback.c
+	xcrun clang -std=c11 -Wall -Wextra -Wpedantic -Werror -fsanitize=thread -g -Isrc/hal -o build/virtual-loopback-tsan-test src/hal/OpenA8DJVirtualLoopback.c $(VIRTUAL_LOOPBACK_TEST)
+	./build/virtual-loopback-tsan-test
+
+virtual-loopback-smoke-locked: $(HAL_BIN) $(HAL_SMOKE) $(HAL_PARITY_SMOKE)
+	./scripts/shared-hardware-lock-run --gate virtual-loopback --run-dir local-analysis/shared-hardware-lock-run/virtual-loopback-$$(date +%Y%m%d-%H%M%S) -- /bin/sh -c './$(HAL_SMOKE) $(HAL_BUNDLE) && ./$(HAL_PARITY_SMOKE) $(HAL_BUNDLE)'
 
 driver-mode-offline-test: vintage-compatible-offline-test $(CONTROL_TOOL) $(DRIVER_MODE_TEST) $(DRIVER_MODE_STATE_TEST) $(TIMECODE_STATE_TEST) $(TIMECODE_RESTORE_TEST) $(TIMECODE_API_TEST) $(DRIVER_MODE_HEADER)
 	python3 $(DRIVER_MODE_TEST) --repo . --shipping-binary $(CONTROL_TOOL)

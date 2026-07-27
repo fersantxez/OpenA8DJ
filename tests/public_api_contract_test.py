@@ -204,6 +204,10 @@ class MockIPC:
         mode=0o666,
         replace_path_on_accept=False,
         loopback_state=None,
+        loopback_reply=None,
+        loopback_reply_type=LOOPBACK_STATE,
+        loopback_ignore_set=False,
+        loopback_disagree_get=False,
     ):
         self.path = str(path)
         self.state = bytearray(state)
@@ -215,6 +219,11 @@ class MockIPC:
         self.loopback_state = list(loopback_state or (
             1, 0, 0, 1, 0, 32768, 0, 1, 0, 0, 0, 0, 0, 0
         ))
+        self.loopback_reply = loopback_reply
+        self.loopback_reply_type = loopback_reply_type
+        self.loopback_ignore_set = loopback_ignore_set
+        self.loopback_disagree_get = loopback_disagree_get
+        self.loopback_set_seen = False
         self.requests = []
         self.error = None
         self.replacement = None
@@ -282,12 +291,22 @@ class MockIPC:
                     elif message_type == STREAM_STATS_GET:
                         self._send(connection, STREAM_STATS, self.stats)
                     elif message_type == LOOPBACK_GET:
+                        loopback_payload = (
+                            self.loopback_reply if self.loopback_reply is not None
+                            else LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
+                        )
+                        if self.loopback_disagree_get and self.loopback_set_seen:
+                            disagree = list(self.loopback_state)
+                            disagree[2] = (disagree[2] + 1) % 4
+                            loopback_payload = LOOPBACK_STATE_PAYLOAD.pack(*disagree)
                         self._send(
-                            connection, LOOPBACK_STATE,
-                            LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
+                            connection, self.loopback_reply_type,
+                            loopback_payload
                         )
                     elif message_type == LOOPBACK_SET:
-                        if len(payload) == LOOPBACK_SET_PAYLOAD.size:
+                        self.loopback_set_seen = True
+                        if (not self.loopback_ignore_set and
+                                len(payload) == LOOPBACK_SET_PAYLOAD.size):
                             schema, enabled, source, r0, r1 = (
                                 LOOPBACK_SET_PAYLOAD.unpack(payload)
                             )
@@ -299,8 +318,9 @@ class MockIPC:
                                 self.loopback_state[1] = enabled
                                 self.loopback_state[2] = source
                         self._send(
-                            connection, LOOPBACK_STATE,
-                            LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
+                            connection, self.loopback_reply_type,
+                            self.loopback_reply if self.loopback_reply is not None
+                            else LOOPBACK_STATE_PAYLOAD.pack(*self.loopback_state)
                         )
         except (BrokenPipeError, ConnectionResetError, OSError) as error:
             if self.listener.fileno() != -1:
@@ -403,8 +423,19 @@ def run_tests(repo, shipping_binary):
         lock_path = temporary_path / "mutation.lock"
         harness = temporary_path / "opena8dj-control-test"
         peer_policy_harness = temporary_path / "peer-policy-test"
+        timecode_fixture = temporary_path / "timecode-fixture"
+        vintage_fixture = temporary_path / "vintage-fixture"
         compile_harness(source, harness, socket_path, lock_path)
         compile_and_run_peer_policy(repo, peer_policy_harness)
+        for fixture_source, fixture_binary in [
+            (repo / "tests/timecode_state_fixture.c", timecode_fixture),
+            (repo / "tests/vintage_state_fixture.c", vintage_fixture),
+        ]:
+            subprocess.run([
+                "xcrun", "clang", "-std=c11", "-Wall", "-Wextra",
+                "-Wpedantic", "-Werror", "-I", str(repo / "src/hal"),
+                "-o", str(fixture_binary), str(fixture_source),
+            ], check=True, timeout=30)
 
         escaped = 'quote" slash\\ newline\n tab\t control\x01'
         escaped_result, escaped_document = invoke(
@@ -473,7 +504,53 @@ def run_tests(repo, shipping_binary):
                   "disable did not retain source pair")
             check([request[2] for request in server.requests] ==
                   [LOOPBACK_GET, LOOPBACK_SET, LOOPBACK_GET],
-                  "disable transaction sequence wrong")
+                      "disable transaction sequence wrong")
+        socket_path.unlink(missing_ok=True)
+
+        invalid_loopback_states = []
+        for index, invalid_value in [
+            (0, 2), (1, 2), (2, 4), (3, 0), (4, 2),
+            (5, 1), (6, 33), (7, 0),
+        ]:
+            invalid = list((
+                1, 0, 0, 1, 0, 32768, 0, 1, 0, 0, 0, 0, 0, 0
+            ))
+            invalid[index] = invalid_value
+            invalid_loopback_states.append(LOOPBACK_STATE_PAYLOAD.pack(*invalid))
+        invalid_loopback_states.append(b"\0")
+        for reply in invalid_loopback_states:
+            with MockIPC(
+                socket_path, initial_state, loopback_reply=reply
+            ):
+                assert_error(
+                    harness, 4, "loopback.get", "backend_protocol_error",
+                    "api", "loopback", "get"
+                )
+            socket_path.unlink(missing_ok=True)
+        with MockIPC(
+            socket_path, initial_state,
+            loopback_reply=b"", loopback_reply_type=CONTROL_STATE
+        ):
+            assert_error(
+                harness, 4, "loopback.get", "backend_protocol_error",
+                "api", "loopback", "get"
+            )
+        socket_path.unlink(missing_ok=True)
+        with MockIPC(
+            socket_path, initial_state, loopback_ignore_set=True
+        ):
+            assert_error(
+                harness, 5, "loopback.enable", "loopback_apply_failed",
+                "api", "loopback", "enable", "B"
+            )
+        socket_path.unlink(missing_ok=True)
+        with MockIPC(
+            socket_path, initial_state, loopback_disagree_get=True
+        ):
+            assert_error(
+                harness, 5, "loopback.enable", "loopback_apply_failed",
+                "api", "loopback", "enable", "C"
+            )
         socket_path.unlink(missing_ok=True)
 
         with MockIPC(socket_path, initial_state, mode=0o777):
@@ -538,6 +615,16 @@ def run_tests(repo, shipping_binary):
 
         (stats_payload, expected_stats, stats_base_length,
          stats_old_tail_length, stats_offsets) = stream_payload(source)
+        layout_result = subprocess.run(
+            [str(harness), "--public-api-test-loopback-layout"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=4, check=False,
+        )
+        check(layout_result.returncode == 0, "loopback layout probe failed")
+        (timecode_offset, vintage_offset,
+         loopback_offset, full_stats_size) = (
+            int(value) for value in layout_result.stdout.strip().split(",")
+        )
         with MockIPC(socket_path, initial_state, stats=stats_payload) as server:
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "stats query failed")
@@ -649,6 +736,73 @@ def run_tests(repo, shipping_binary):
                   "legacy stats fabricated loopback state")
             check([request[2] for request in server.requests] == [STREAM_STATS_GET],
                   "stats request was not a single non-destructive stream snapshot")
+        socket_path.unlink(missing_ok=True)
+
+        full_stats = bytearray(full_stats_size)
+        full_stats[:len(stats_payload)] = stats_payload
+        timecode_state = subprocess.check_output(
+            [str(timecode_fixture), "disarmed"]
+        )
+        vintage_state = subprocess.check_output(
+            [str(vintage_fixture), "vintage-pending"]
+        )
+        driver_state = subprocess.check_output(
+            [str(vintage_fixture), "driver-pending"]
+        )
+        full_stats[
+            timecode_offset:timecode_offset + len(timecode_state)
+        ] = timecode_state
+        full_stats[
+            vintage_offset:vintage_offset + len(vintage_state)
+        ] = vintage_state
+        driver_values = {
+            "driverModeSchemaVersion": struct.unpack_from("=H", driver_state, 0)[0],
+            "driverModeRequested": struct.unpack_from("=I", driver_state, 4)[0],
+            "driverModeEffective": struct.unpack_from("=I", driver_state, 8)[0],
+            "driverModePending": driver_state[12],
+            "driverModeLastResult": driver_state[14],
+            "driverModeRejectionReason": driver_state[15],
+            "driverModeGeneration": struct.unpack_from("=Q", driver_state, 16)[0],
+            "driverModeAcceptedRequests": struct.unpack_from("=Q", driver_state, 24)[0],
+            "driverModeRejectedRequests": struct.unpack_from("=Q", driver_state, 32)[0],
+            "driverModeAppliedTransitions": struct.unpack_from("=Q", driver_state, 40)[0],
+            "driverModeApplyFailures": struct.unpack_from("=Q", driver_state, 48)[0],
+            "driverModePendingTransitions": struct.unpack_from("=Q", driver_state, 56)[0],
+            "driverModeOutputStartLatencyFrames": struct.unpack_from("=I", driver_state, 64)[0],
+            "driverModeOutputRestartLatencyFrames": struct.unpack_from("=I", driver_state, 68)[0],
+            "driverModeOutputTargetLatencyFrames": struct.unpack_from("=I", driver_state, 72)[0],
+            "driverModeWorkerQoS": struct.unpack_from("=I", driver_state, 76)[0],
+        }
+        for name, value in driver_values.items():
+            offset, fmt = stats_offsets[name]
+            struct.pack_into("=" + fmt, full_stats, offset, value)
+        loopback_metrics = (
+            1, 1, 2, 1, 1, 32768, 2, 17,
+            101, 89, 12, 3, 4, 5,
+        )
+        full_stats[
+            loopback_offset:loopback_offset + LOOPBACK_STATE_PAYLOAD.size
+        ] = LOOPBACK_STATE_PAYLOAD.pack(*loopback_metrics)
+        with MockIPC(socket_path, initial_state, stats=bytes(full_stats)):
+            result, document = invoke(harness, "api", "stats")
+            check(result.returncode == 0, "stats loopback tail failed")
+            validate_envelope(document, "stats.get", True)
+            loopback = document["data"]["loopback"]
+            check(loopback == {
+                "enabled": True,
+                "sourcePair": "C",
+                "sessionOnly": True,
+                "physicalPlaybackPublishing": True,
+                "ringCapacity": 32768,
+                "generation": 17,
+                "registeredReaderCount": 2,
+                "sourceFramesPublished": 101,
+                "framesDelivered": 89,
+                "silenceFrames": 12,
+                "gapFrames": 3,
+                "overrunEvents": 4,
+                "overrunFrames": 5,
+            }, "loopback stats tail values/types mismatch")
         socket_path.unlink(missing_ok=True)
 
         with MockIPC(socket_path, initial_state, stats=stats_payload) as server:

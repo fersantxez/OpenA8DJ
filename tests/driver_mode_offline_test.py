@@ -51,7 +51,7 @@ def invoke(binary, *args, timeout=5):
 
 def validate_envelope(document, operation, ok=True):
     check(document["schema"] == SCHEMA, "wrong public schema")
-    check(document["apiVersion"] == "1.0", "wrong public API version")
+    check(document["apiVersion"] == "1.1", "wrong public API version")
     check(document["operation"] == operation, "wrong operation")
     check(document["ok"] is ok, "wrong success flag")
 

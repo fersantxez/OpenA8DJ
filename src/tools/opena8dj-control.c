@@ -4353,6 +4353,15 @@ static void Usage(const char *argv0)
 int main(int argc, char **argv)
 {
 #ifdef OPENA8DJ_PUBLIC_API_TEST_ESCAPE
+    if (argc == 2 &&
+        strcmp(argv[1], "--public-api-test-loopback-layout") == 0) {
+        printf("%zu,%zu,%zu,%zu\n",
+               offsetof(OpenA8DJStreamStatsPayload, timecodeOptimized),
+               offsetof(OpenA8DJStreamStatsPayload, vintageCompatible),
+               offsetof(OpenA8DJStreamStatsPayload, loopback),
+               sizeof(OpenA8DJStreamStatsPayload));
+        return 0;
+    }
     if (argc == 3 && strcmp(argv[1], "--public-api-test-escape") == 0) {
         PrintJSONString(stdout, argv[2]);
         fputc('\n', stdout);
