@@ -219,8 +219,15 @@ struct ProfilerCheck: Identifiable, Equatable, Sendable {
     let status: String
     let code: String
     let summary: String
-    let remediation: String?
-    let evidence: [String: String]
+    let remediations: [String]
+    let evidence: [ProfilerEvidence]
+}
+
+struct ProfilerEvidence: Equatable, Sendable {
+    let key: String
+    let available: Bool
+    let value: String?
+    let reasonCode: String?
 }
 
 struct ProfilerSnapshot: Equatable, Sendable {

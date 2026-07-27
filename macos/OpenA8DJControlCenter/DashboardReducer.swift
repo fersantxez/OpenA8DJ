@@ -29,35 +29,45 @@ struct DashboardReducer {
     }
 
     mutating func loopbackDeltas(_ current: LoopbackSnapshot) -> LoopbackDeltas {
-        let sameGeneration = previousLoopback.map { current.generation >= $0.generation } ?? true
+        let relation: Int
+        if let previous = previousLoopback {
+            relation = current.generation == previous.generation ? 0 :
+                (current.generation > previous.generation ? 1 : -1)
+        } else {
+            relation = 1
+        }
+        func delta(_ previous: UInt64?, _ current: UInt64) -> DeltaValue {
+            if relation < 0 { return .backendMismatch }
+            if relation > 0 { return .baseline }
+            guard let previous else { return .baseline }
+            return current >= previous ? .value(current - previous) : .counterReset
+        }
         let result = LoopbackDeltas(
-            gaps: counterDelta(
-                previous: previousLoopback?.gapFrames,
-                current: current.gapFrames,
-                sameGeneration: sameGeneration
-            ),
-            overrunEvents: counterDelta(
-                previous: previousLoopback?.overrunEvents,
-                current: current.overrunEvents,
-                sameGeneration: sameGeneration
-            ),
-            overrunFrames: counterDelta(
-                previous: previousLoopback?.overrunFrames,
-                current: current.overrunFrames,
-                sameGeneration: sameGeneration
-            )
+            gaps: delta(previousLoopback?.gapFrames, current.gapFrames),
+            overrunEvents: delta(previousLoopback?.overrunEvents, current.overrunEvents),
+            overrunFrames: delta(previousLoopback?.overrunFrames, current.overrunFrames)
         )
         previousLoopback = current
         return result
     }
 
     mutating func qualityDelta(_ current: USBQualitySnapshot, generation: UInt64?) -> DeltaValue {
-        let sameGeneration = previousGeneration == nil || generation == nil || generation! >= previousGeneration!
-        let result = counterDelta(
-            previous: previousQuality?.xruns.totalHardXruns,
-            current: current.xruns.totalHardXruns,
-            sameGeneration: sameGeneration
-        )
+        let result: DeltaValue
+        if let previousGeneration, let generation {
+            if generation < previousGeneration {
+                result = .backendMismatch
+            } else if generation > previousGeneration {
+                result = .baseline
+            } else {
+                result = counterDelta(
+                    previous: previousQuality?.xruns.totalHardXruns,
+                    current: current.xruns.totalHardXruns,
+                    sameGeneration: true
+                )
+            }
+        } else {
+            result = .baseline
+        }
         previousQuality = current
         previousGeneration = generation
         return result
@@ -87,9 +97,6 @@ struct DashboardReducer {
         }
         if stream.outputTargetLatencyFrames != mode.effectivePolicy.outputTargetLatencyFrames {
             reasons.append("stats/mode latency-policy disagreement")
-        }
-        if loopback.physicalPlaybackPublishing && !loopback.enabled {
-            reasons.append("loopback publishing while disabled")
         }
         if case .known(let timecode) = mode.timecode,
            timecode.profileVerified &&

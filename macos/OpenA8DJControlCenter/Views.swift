@@ -164,7 +164,7 @@ struct OverviewView: View {
                             label: check.id,
                             value: check.status,
                             detail: "\(check.code) · \(check.summary)" +
-                                (check.remediation.map { " · \($0)" } ?? "")
+                                (check.remediations.isEmpty ? "" : " · \(check.remediations.joined(separator: " · "))")
                         )
                     }
                 case .unavailable(let reason):

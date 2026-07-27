@@ -41,6 +41,37 @@ final class ControlCenterStore: ObservableObject {
         self.coordinator = coordinator
     }
 
+#if OPENA8DJ_CONTROL_CENTER_TESTING
+    func loadOfflineFixtures(from directory: URL) throws {
+        func output(_ name: String, status: Int32 = 0) throws -> ProcessOutput {
+            ProcessOutput(
+                status: status,
+                stdout: try Data(contentsOf: directory.appendingPathComponent(name)),
+                stderr: Data()
+            )
+        }
+        backend = .known(try DashboardDecoder.version(output("good_version.json")))
+        profiles = .known(try DashboardDecoder.profiles(output("good_profiles.json")))
+        modeChoices = .known(try DashboardDecoder.modeChoices(output("good_modes.json")))
+        profile = .known(try DashboardDecoder.profile(output("good_profile.json")))
+        stream = .known(try DashboardDecoder.stream(output("good_stats.json")))
+        quality = .known(try DashboardDecoder.quality(output("good_quality.ndjson")))
+        driverMode = .known(try DashboardDecoder.driverMode(output("good_driver_mode.json")))
+        loopback = .known(try DashboardDecoder.loopback(output("good_loopback.json")))
+        profiler = .known(try DashboardDecoder.profiler(output("good_profiler.json")))
+        let now = clock.now
+        for source in [
+            "backend", "profiles", "modeChoices", "profile", "stream",
+            "quality", "driverMode", "loopback", "profiler"
+        ] {
+            captures[source] = now
+        }
+        bootstrapped = true
+        sourceErrors = [:]
+        reduceCurrentSnapshot()
+    }
+#endif
+
     func setSceneActive(_ active: Bool) {
         isSceneActive = active
         updateVisibility()
@@ -167,12 +198,17 @@ final class ControlCenterStore: ObservableObject {
         }
         if shouldProfile {
             await readProfiler(errors: &errors)
+            if Task.isCancelled { return }
         }
 
         await readQuality(errors: &errors)
+        if Task.isCancelled { return }
         await readStats(errors: &errors)
+        if Task.isCancelled { return }
         await readProfile(errors: &errors)
+        if Task.isCancelled { return }
         await readMode(errors: &errors)
+        if Task.isCancelled { return }
         await readLoopback(errors: &errors)
         if Task.isCancelled { return }
 
@@ -279,7 +315,10 @@ final class ControlCenterStore: ObservableObject {
         )
         if !mismatchReasons.isEmpty {
             phase = .mismatch
-        } else if backendValue.newerMinor || profilerValue == nil || !sourceErrors.isEmpty {
+        } else if !sourceErrors.isEmpty {
+            let first = sourceErrors.values.sorted { $0.phase < $1.phase }.first!
+            phase = .stale(lastUpdatedDescription: "last validated values retained", reason: first.code)
+        } else if backendValue.newerMinor || profilerValue == nil {
             phase = .partial
         } else {
             phase = .online

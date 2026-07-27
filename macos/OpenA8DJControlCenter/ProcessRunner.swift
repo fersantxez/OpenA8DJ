@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 private final class LockedCapture: @unchecked Sendable {
     private let lock = NSLock()
@@ -79,7 +80,6 @@ actor BoundedProcessRunner {
 
     private let resolver: Resolver
     private var active = false
-    private var waiters: [CheckedContinuation<Void, Never>] = []
     private var launchCount = 0
     private var maximumConcurrent = 0
     private var concurrent = 0
@@ -93,25 +93,37 @@ actor BoundedProcessRunner {
             throw ProcessRunnerError.missingTool(tool.rawValue)
         }
         let url = resourceURL.appendingPathComponent(tool.rawValue, isDirectory: false)
+        return try trustedTool(at: url, expectedName: tool.rawValue)
+    }
+
+    static func trustedTool(at url: URL, expectedName: String) throws -> URL {
+        guard url.lastPathComponent == expectedName else {
+            throw ProcessRunnerError.untrustedTool(expectedName)
+        }
         let values: URLResourceValues
         do {
             values = try url.resourceValues(forKeys: [
                 .isRegularFileKey, .isSymbolicLinkKey, .isExecutableKey
             ])
         } catch {
-            throw ProcessRunnerError.missingTool(tool.rawValue)
+            throw ProcessRunnerError.missingTool(expectedName)
         }
         guard values.isRegularFile == true,
               values.isSymbolicLink != true,
               values.isExecutable == true else {
-            throw ProcessRunnerError.untrustedTool(tool.rawValue)
+            throw ProcessRunnerError.untrustedTool(expectedName)
         }
         return url
     }
 
     func run(_ operation: ControlOperation) async throws -> ProcessOutput {
-        await acquire()
+        do {
+            try await acquire()
+        } catch is CancellationError {
+            throw ProcessRunnerError.cancelled
+        }
         defer { release() }
+        try Task.checkCancellation()
         let executable = try resolver(operation.tool)
         launchCount += 1
         concurrent += 1
@@ -128,7 +140,9 @@ actor BoundedProcessRunner {
         }
         return try await withTaskCancellationHandler {
             do {
-                return try await task.value
+                let result = try await task.value
+                try Task.checkCancellation()
+                return result
             } catch is CancellationError {
                 throw ProcessRunnerError.cancelled
             }
@@ -142,20 +156,17 @@ actor BoundedProcessRunner {
         (launchCount, maximumConcurrent)
     }
 
-    private func acquire() async {
-        if !active {
-            active = true
-            return
+    private func acquire() async throws {
+        while active {
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(10))
         }
-        await withCheckedContinuation { waiters.append($0) }
+        try Task.checkCancellation()
+        active = true
     }
 
     private func release() {
-        if waiters.isEmpty {
-            active = false
-        } else {
-            waiters.removeFirst().resume()
-        }
+        active = false
     }
 
     private nonisolated static func execute(
@@ -221,12 +232,15 @@ actor BoundedProcessRunner {
             }
         }
 
-        if process.isRunning {
-            if completed.wait(timeout: .now() + .milliseconds(250)) == .timedOut,
-               process.isRunning {
-                process.interrupt()
-                _ = completed.wait(timeout: .now() + .milliseconds(250))
-            }
+        if process.isRunning,
+           completed.wait(timeout: .now() + .milliseconds(250)) == .timedOut,
+           process.isRunning {
+            process.interrupt()
+        }
+        if process.isRunning,
+           completed.wait(timeout: .now() + .milliseconds(250)) == .timedOut,
+           process.isRunning {
+            _ = Darwin.kill(process.processIdentifier, SIGKILL)
         }
         process.waitUntilExit()
 
@@ -238,7 +252,6 @@ actor BoundedProcessRunner {
         if stderr.append(stderrTail) { wasTruncated = true }
         processBox.clear()
 
-        if Thread.current.isCancelled { throw ProcessRunnerError.cancelled }
         if timedOut { throw ProcessRunnerError.timedOut }
         let (outData, outOverflow) = stdout.snapshot()
         let (errData, errOverflow) = stderr.snapshot()

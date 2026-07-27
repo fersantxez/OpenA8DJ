@@ -165,7 +165,7 @@ enum DashboardDecoder {
         let object = try StrictJSON.object(from: output.stdout)
         guard string(object, "schema") == apiSchema,
               let version = string(object, "apiVersion").flatMap(parseVersion),
-              version.major == 1,
+              version.major == 1, version.minor >= 1,
               string(object, "operation") == expected,
               let ok = bool(object, "ok") else {
             throw DecodeFailure.protocolViolation("API schema, major, operation, or ok mismatch")
@@ -246,7 +246,7 @@ enum DashboardDecoder {
 
     static func decodeProfile(_ data: JSONObject) throws -> ProfileSnapshot {
         let mode = try requiredString(data, "inputMode")
-        guard ["playback", "vinyl", "cd-line", "microphone", "custom"].contains(mode) else {
+        guard ["timecode-vinyl", "timecode-cd-line", "phono", "unknown"].contains(mode) else {
             throw DecodeFailure.protocolViolation("unknown input mode")
         }
         return ProfileSnapshot(
@@ -288,8 +288,9 @@ enum DashboardDecoder {
         guard try requiredUInt(data, "schemaVersion") == 1 else {
             throw DecodeFailure.protocolViolation("driver mode schema mismatch")
         }
-        let requested = try requiredEnum(data, "requestedMode", ["balanced", "performance", "vintage-compatible"])
-        let effective = try requiredEnum(data, "effectiveMode", ["balanced", "performance", "vintage-compatible"])
+        let validModes: Set<String> = ["balanced", "performance", "timecode-optimized", "vintage-compatible"]
+        let requested = try requiredEnum(data, "requestedMode", validModes)
+        let effective = try requiredEnum(data, "effectiveMode", validModes)
         let pending = try requiredBool(data, "pending")
         guard pending == (requested != effective) else {
             throw DecodeFailure.protocolViolation("pending/requested/effective invariant mismatch")
@@ -338,7 +339,7 @@ enum DashboardDecoder {
         let source = try requiredEnum(data, "sourcePair", ["A", "B", "C", "D"])
         let enabled = try requiredBool(data, "enabled")
         let publishing = try requiredBool(data, "physicalPlaybackPublishing")
-        guard try requiredBool(data, "sessionOnly"), !publishing || enabled else {
+        guard try requiredBool(data, "sessionOnly") else {
             throw DecodeFailure.protocolViolation("loopback privacy/state invariant mismatch")
         }
         return LoopbackSnapshot(
@@ -360,6 +361,11 @@ enum DashboardDecoder {
 
     static func quality(_ output: ProcessOutput) throws -> USBQualitySnapshot {
         let objects = try StrictJSON.ndjsonPair(from: output.stdout)
+        guard objects.allSatisfy({
+            string($0, "schema") == "org.opena8dj.usb-quality.sample.v1"
+        }) else {
+            throw DecodeFailure.protocolViolation("quality schema mismatch")
+        }
         let second = objects[1]
         let stability = try dictionary(second, "stability")
         let classification = try requiredEnum(
@@ -367,7 +373,7 @@ enum DashboardDecoder {
             ["stable", "degraded", "unstable", "not-streaming", "insufficient-data", "warming-up"]
         )
         let jitter = try dictionary(second, "jitter")
-        let iso = try dictionary(second, "isochronousErrors")
+        let iso = try dictionary(second, "isoErrors")
         let xruns = try dictionary(second, "xruns")
         let captureISO = try dictionary(iso, "capture")
         let playbackISO = try dictionary(iso, "playback")
@@ -414,6 +420,9 @@ enum DashboardDecoder {
         }
         let overall = try dictionary(root, "overall")
         let status = try requiredEnum(overall, "status", ["PASS", "WARN", "FAIL", "UNKNOWN"])
+        guard try requiredUInt(overall, "exitStatus") == UInt64(bitPattern: Int64(output.status)) else {
+            throw DecodeFailure.protocolViolation("profiler exit/report mismatch")
+        }
         let checks = try objectArray(root, "checks").map { check -> ProfilerCheck in
             let checkStatus = try requiredEnum(check, "status", ["PASS", "WARN", "FAIL", "UNKNOWN"])
             return ProfilerCheck(
@@ -421,8 +430,8 @@ enum DashboardDecoder {
                 status: checkStatus,
                 code: try requiredString(check, "code"),
                 summary: try requiredString(check, "summary"),
-                remediation: string(check, "remediation"),
-                evidence: stringMapLoose(check["evidence"])
+                remediations: optionalStringArray(check["remediation"]),
+                evidence: try optionalEvidenceArray(check["evidence"])
             )
         }
         let required = Set([
@@ -646,9 +655,30 @@ enum DashboardDecoder {
             return String(describing: $0)
         }
     }
-    private static func stringMapLoose(_ value: Any?) -> [String: String] {
-        guard let object = value as? JSONObject else { return [:] }
-        return stringifyMap(object)
+    private static func optionalStringArray(_ value: Any?) -> [String] {
+        guard let values = value as? [Any] else { return [] }
+        return values.compactMap { $0 as? String }
+    }
+    private static func optionalEvidenceArray(_ value: Any?) throws -> [ProfilerEvidence] {
+        guard let values = value else { return [] }
+        guard let rows = values as? [Any], rows.allSatisfy({ $0 is JSONObject }) else {
+            throw DecodeFailure.protocolViolation("invalid profiler evidence")
+        }
+        return try rows.compactMap { $0 as? JSONObject }.map { row in
+            let available = try requiredBool(row, "available")
+            let evidenceValue: String?
+            if let raw = row["value"], !(raw is NSNull) {
+                evidenceValue = String(describing: raw)
+            } else {
+                evidenceValue = nil
+            }
+            return ProfilerEvidence(
+                key: try requiredString(row, "key"),
+                available: available,
+                value: evidenceValue,
+                reasonCode: string(row, "reasonCode")
+            )
+        }
     }
 }
 
