@@ -207,8 +207,9 @@ subset is grouped as follows:
   classes as specified in [USB_QUALITY_METER.md](USB_QUALITY_METER.md).
 
 `quality.instrumentationAvailable` is `false` when the connected HAL predates
-the complete append-only quality tail. In that case its counters are zero only
-as placeholders and must not be interpreted as a healthy link.
+the complete append-only quality tail or explicitly reports that the build-time
+instrumentation is disabled. In that case its counters are zero only as
+placeholders and must not be interpreted as a healthy link.
 
 All counters and frame values are JSON integers. The private payload must
 contain its base through `sampleRate`; an empty or shorter payload is a

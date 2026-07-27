@@ -147,8 +147,8 @@ The meter emits a category, never an unexplained percentage:
 
 - `not-streaming`: the driver reports no active stream;
 - `warming-up`: no previous compatible snapshot exists;
-- `insufficient-data`: an active direction has fewer than 20 completion
-  intervals in the window;
+- `insufficient-data`: no direction was active in the window, or an active
+  direction has fewer than 20 completion intervals in the window;
 - `stable`: all active directions have enough samples, no isochronous error
   event or hard xrun occurred, each direction has p95 at most 250 us and p99 at
   most 500 us, and at most 0.1% of its samples are in `gt1000`;
@@ -236,6 +236,11 @@ The existing top-level exact-member contract test must be deliberately updated
 for the additive v1 member while retaining assertions for every pre-existing
 group and legacy shortened-payload behavior. No public field is removed,
 renamed, retyped, or given new side effects.
+
+The private tail ends with an append-only `qualityInstrumentationEnabled`
+marker. Consumers require the complete tail and the exact marker value `1`;
+builds with hot stream statistics disabled set it to `0`, so the mere presence
+of zero-valued counters cannot be mistaken for healthy instrumentation.
 
 ## Real-time CLI
 

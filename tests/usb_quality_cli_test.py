@@ -50,6 +50,7 @@ def payload_layout(source):
 def make_payload(layout, size, **values):
     values.setdefault("streaming", 1)
     values.setdefault("sampleRate", 48000.0)
+    values.setdefault("qualityInstrumentationEnabled", 1)
     payload = bytearray(size)
     for name, value in values.items():
         offset, field_format = layout[name]
@@ -185,6 +186,15 @@ def run_tests(repo):
               len(server.requests) == 2,
               "meter did not use one non-destructive snapshot per connection")
 
+        result, _ = invoke_sequence(
+            harness, socket_path, [baseline, baseline],
+            "--json", "--interval-ms", "100", "--count", "2",
+        )
+        inactive_doc = json.loads(result.stdout.splitlines()[1])
+        check(inactive_doc["stability"]["classification"] == "insufficient-data" and
+              "no_active_directions" in inactive_doc["stability"]["reasons"],
+              "window without active directions was presented as stable")
+
         stable_boundary = delta_payload(
             layout, payload_size,
             captureCompletionJitterLe50=18,
@@ -215,6 +225,57 @@ def run_tests(repo):
               "degraded jitter boundary was misclassified")
         check("capture.p95_gt_250us" in degraded_doc["stability"]["reasons"],
               "degraded reason missing")
+
+        inconsistent = delta_payload(
+            layout, payload_size,
+            captureCompletionJitterLe50=19,
+        )
+        result, _ = invoke_sequence(
+            harness, socket_path, [baseline, inconsistent],
+            "--json", "--interval-ms", "100", "--count", "2",
+        )
+        inconsistent_doc = json.loads(result.stdout.splitlines()[1])
+        check(inconsistent_doc["stability"]["classification"] == "insufficient-data" and
+              "instrumentation_inconsistent" in
+              inconsistent_doc["stability"]["reasons"],
+              "inconsistent histogram was treated as valid evidence")
+
+        iso_fields = {
+            "capture": [
+                "captureQueueFailures",
+                "captureISOCompletionStatusFailures",
+                "captureISOTransactionStatusFailures",
+                "captureISOZeroLengthTransactions",
+                "captureISOShortTransactions",
+            ],
+            "playback": [
+                "playbackQueueFailures",
+                "playbackISOCompletionStatusFailures",
+                "playbackISOTransactionStatusFailures",
+                "playbackISOZeroLengthTransactions",
+                "playbackISOShortTransactions",
+            ],
+        }
+        other_direction = {"capture": "playback", "playback": "capture"}
+        for direction, fields in iso_fields.items():
+            for field in fields:
+                individual_error = delta_payload(
+                    layout, payload_size, **{field: 1}
+                )
+                result, _ = invoke_sequence(
+                    harness, socket_path, [baseline, individual_error],
+                    "--json", "--interval-ms", "100", "--count", "2",
+                )
+                error_doc = json.loads(result.stdout.splitlines()[1])
+                check(error_doc["stability"]["classification"] == "unstable",
+                      f"{field} did not cause unstable")
+                check(error_doc["isoErrors"][direction]["totalEvents"] == 1,
+                      f"{field} was not mapped to {direction}")
+                check(error_doc["isoErrors"][other_direction[direction]]["totalEvents"] == 0,
+                      f"{field} leaked to the opposite direction")
+                check(f"{direction}.iso_errors" in
+                      error_doc["stability"]["reasons"],
+                      f"{field} reason has wrong direction")
 
         unstable = delta_payload(
             layout, payload_size,
@@ -315,6 +376,18 @@ def run_tests(repo):
               legacy["stability"]["classification"] == "insufficient-data" and
               "instrumentation_unavailable" in legacy["stability"]["reasons"],
               "legacy HAL was presented as healthy")
+
+        marker_disabled = make_payload(
+            layout, payload_size, qualityInstrumentationEnabled=0
+        )
+        result, _ = invoke_sequence(
+            harness, socket_path, [marker_disabled], "--json", "--count", "1",
+        )
+        disabled = json.loads(result.stdout)
+        check(disabled["instrumentationAvailable"] is False and
+              disabled["stability"]["classification"] == "insufficient-data" and
+              "instrumentation_unavailable" in disabled["stability"]["reasons"],
+              "disabled instrumentation marker was presented as healthy")
 
         not_streaming = make_payload(layout, payload_size, streaming=0)
         result, _ = invoke_sequence(

@@ -250,6 +250,7 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackISOTransactionStatusFailures;
     uint64_t playbackISOZeroLengthTransactions;
     uint64_t playbackISOShortTransactions;
+    uint64_t qualityInstrumentationEnabled;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -1640,12 +1641,14 @@ static uint64_t PublicStreamField(const OpenA8DJStreamStatsPayload *stats,
     PublicStreamField((stats), (length), offsetof(OpenA8DJStreamStatsPayload, field), \
                       sizeof((stats)->field), (uint64_t)((stats)->field))
 
-static bool QualityInstrumentationAvailable(size_t payloadLength)
+static bool QualityInstrumentationAvailable(const OpenA8DJStreamStatsPayload *stats,
+                                            size_t payloadLength)
 {
     return StreamStatsHasField(
-        payloadLength,
-        offsetof(OpenA8DJStreamStatsPayload, playbackISOShortTransactions),
-        sizeof(((OpenA8DJStreamStatsPayload *)0)->playbackISOShortTransactions));
+               payloadLength,
+               offsetof(OpenA8DJStreamStatsPayload, qualityInstrumentationEnabled),
+               sizeof(stats->qualityInstrumentationEnabled)) &&
+           stats->qualityInstrumentationEnabled == 1;
 }
 
 static void PrintCumulativeJitterDirectionJSON(
@@ -1726,7 +1729,7 @@ static void PrintCumulativeQualityJSON(const OpenA8DJStreamStatsPayload *stats,
                                        size_t payloadLength)
 {
     fputs("{\"instrumentationAvailable\":", stdout);
-    fputs(QualityInstrumentationAvailable(payloadLength) ? "true" : "false", stdout);
+    fputs(QualityInstrumentationAvailable(stats, payloadLength) ? "true" : "false", stdout);
     fputs(",\"completionJitter\":{\"unit\":\"microseconds\","
           "\"binUpperBoundsUs\":[50,100,250,500,1000,null],\"capture\":",
           stdout);
@@ -1966,7 +1969,8 @@ static OpenA8DJQualityWindow CalculateQualityWindow(
     memset(&window, 0, sizeof(window));
     window.classification = "warming-up";
     window.streaming = current->streaming != 0;
-    window.instrumentationAvailable = QualityInstrumentationAvailable(currentLength);
+    window.instrumentationAvailable =
+        QualityInstrumentationAvailable(current, currentLength);
     window.sampleRate = isfinite(current->sampleRate) ? current->sampleRate : 0.0;
     window.windowMilliseconds = windowMilliseconds;
 
@@ -1980,7 +1984,7 @@ static OpenA8DJQualityWindow CalculateQualityWindow(
         return window;
     }
     if (!hasPrevious ||
-        !QualityInstrumentationAvailable(previousLength) ||
+        !QualityInstrumentationAvailable(previous, previousLength) ||
         (!previous->streaming && current->streaming)) {
         return window;
     }
@@ -2100,6 +2104,12 @@ static OpenA8DJQualityWindow CalculateQualityWindow(
     }
     if (unstable) {
         window.classification = "unstable";
+        return window;
+    }
+
+    if (!window.captureActive && !window.playbackActive) {
+        window.classification = "insufficient-data";
+        QualityAddReason(&window, "no_active_directions");
         return window;
     }
 

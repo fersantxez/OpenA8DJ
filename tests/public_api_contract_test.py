@@ -150,6 +150,7 @@ def stream_payload(source_path):
         "playbackISOTransactionStatusFailures": 92,
         "playbackISOZeroLengthTransactions": 93,
         "playbackISOShortTransactions": 94,
+        "qualityInstrumentationEnabled": 1,
     }
     for name, value in values.items():
         field_offset, fmt = offsets[name]
@@ -552,6 +553,14 @@ def run_tests(repo, shipping_binary):
                   "legacy payload fabricated jitter")
         socket_path.unlink(missing_ok=True)
 
+        marker_disabled_payload = stats_payload[:-8] + struct.pack("=Q", 0)
+        with MockIPC(socket_path, initial_state, stats=marker_disabled_payload):
+            result, document = invoke(harness, "api", "stats")
+            check(result.returncode == 0, "disabled instrumentation stats failed")
+            check(document["data"]["quality"]["instrumentationAvailable"] is False,
+                  "disabled instrumentation marker was ignored")
+        socket_path.unlink(missing_ok=True)
+
         with MockIPC(socket_path, initial_state, stats=stats_payload + b"future-tail"):
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "future append-compatible stats failed")
@@ -613,8 +622,18 @@ def run_tests(repo, shipping_binary):
     check(field_names[field_names.index("outputLateWriteBatches") + 1] ==
           "captureCompletionJitterSamples",
           "quality fields were not appended after the former tail")
-    check(field_names[-1] == "playbackISOShortTransactions",
+    check(field_names[-2:] == [
+        "playbackISOShortTransactions", "qualityInstrumentationEnabled"
+    ],
           "instrumentation availability does not require the complete quality tail")
+    payload_size = sum(
+        struct.calcsize("=" + {
+            "uint8_t": "B", "uint32_t": "I", "uint64_t": "Q", "double": "d"
+        }[type_name])
+        for type_name, _ in cli_payload_fields
+    )
+    check(payload_size <= 4096 and payload_size <= 0xFFFF,
+          "private stream payload exceeds IPC buffer or uint16 framing")
     check("_lastCaptureCompletionHostTime = 0;" in hal_text and
           "_lastPlaybackCompletionHostTime = 0;" in hal_text,
           "stream restart does not clear completion baselines")
