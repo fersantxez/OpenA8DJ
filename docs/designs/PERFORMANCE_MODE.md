@@ -385,4 +385,3 @@ performance as an experimental session policy and make no marketing claim.
   sample rate, routing, or electrical controls.
 - Offline transition, IPC/API, concurrency, compatibility, build, and smoke
   evidence passes; any live evidence is lock-serialized and honestly reported.
-
