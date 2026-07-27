@@ -525,6 +525,16 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackISOZeroLengthTransactions;
     uint64_t playbackISOShortTransactions;
     uint64_t qualityInstrumentationEnabled;
+    uint64_t deviceInfoAvailable;
+    uint64_t deviceFirmwareVersion;
+    uint64_t deviceHardwareSubtype;
+    uint64_t deviceNumAnalogAudioOut;
+    uint64_t deviceNumAnalogAudioIn;
+    uint64_t deviceNumDigitalAudioOut;
+    uint64_t deviceNumDigitalAudioIn;
+    uint64_t deviceNumMidiOut;
+    uint64_t deviceNumMidiIn;
+    uint64_t deviceDataAlignment;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1714,6 +1724,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     IOUSBHostPipe *_capturePipe;
     IOUSBHostPipe *_playbackPipe;
     CaiaqDeviceSpec _spec;
+    bool _deviceInfoAvailable;
     FloatRing _inputRing;
     OutputTimelineRing _outputTimeline;
     OpenA8DJStreamStatsPayload _streamStats;
@@ -2318,6 +2329,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 
 - (BOOL)getDeviceInfo
 {
+    _deviceInfoAvailable = false;
+    memset(&_spec, 0, sizeof(_spec));
     NSMutableData *reply = nil;
     NSUInteger replyLength = 0;
     if (![self sendCommand:kCommandGetDeviceInfo payload:NULL payloadLength:0 reply:&reply replyLength:&replyLength]) {
@@ -2334,6 +2347,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     }
     memcpy(&_spec, bytes + 1, sizeof(_spec));
     _spec.fwVersion = le16(_spec.fwVersion);
+    _deviceInfoAvailable = true;
     USBTrace("device info fw=%u in=%u out=%u midi=%u/%u align=%u",
              _spec.fwVersion,
              _spec.numAnalogAudioIn,
@@ -2937,6 +2951,20 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #else
     stats.qualityInstrumentationEnabled = 0;
 #endif
+    if (_deviceInfoAvailable) {
+        stats.deviceFirmwareVersion = _spec.fwVersion;
+        stats.deviceHardwareSubtype = _spec.hwSubtype;
+        stats.deviceNumAnalogAudioOut = _spec.numAnalogAudioOut;
+        stats.deviceNumAnalogAudioIn = _spec.numAnalogAudioIn;
+        stats.deviceNumDigitalAudioOut = _spec.numDigitalAudioOut;
+        stats.deviceNumDigitalAudioIn = _spec.numDigitalAudioIn;
+        stats.deviceNumMidiOut = _spec.numMidiOut;
+        stats.deviceNumMidiIn = _spec.numMidiIn;
+        stats.deviceDataAlignment = _spec.dataAlignment;
+        stats.deviceInfoAvailable = 1;
+    } else {
+        stats.deviceInfoAvailable = 0;
+    }
 
     pthread_mutex_lock(&_clockAnchorMutex);
     stats.clockAnchorValid = _clockAnchor.valid ? 1 : 0;

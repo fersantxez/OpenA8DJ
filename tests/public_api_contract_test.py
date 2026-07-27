@@ -151,6 +151,16 @@ def stream_payload(source_path):
         "playbackISOZeroLengthTransactions": 93,
         "playbackISOShortTransactions": 94,
         "qualityInstrumentationEnabled": 1,
+        "deviceInfoAvailable": 1,
+        "deviceFirmwareVersion": 31,
+        "deviceHardwareSubtype": 0,
+        "deviceNumAnalogAudioOut": 8,
+        "deviceNumAnalogAudioIn": 8,
+        "deviceNumDigitalAudioOut": 0,
+        "deviceNumDigitalAudioIn": 0,
+        "deviceNumMidiOut": 1,
+        "deviceNumMidiIn": 1,
+        "deviceDataAlignment": 2,
     }
     for name, value in values.items():
         field_offset, fmt = offsets[name]
@@ -323,7 +333,8 @@ def run_tests(repo, shipping_binary):
     check(result.returncode == 0, "shipping version failed")
     validate_envelope(document, "version.get", True)
     check(document["data"]["capabilities"] == [
-        "stats.read", "usb-quality.read", "profiles.list", "profile.read", "profile.write"
+        "stats.read", "usb-quality.read", "hardware.read",
+        "profiles.list", "profile.read", "profile.write"
     ], "wrong capabilities")
 
     result, document = invoke(shipping_binary, "api", "profiles")
@@ -519,6 +530,36 @@ def run_tests(repo, shipping_binary):
                   "stats request was not a single non-destructive stream snapshot")
         socket_path.unlink(missing_ok=True)
 
+        with MockIPC(socket_path, initial_state, stats=stats_payload) as server:
+            result, document = invoke(harness, "api", "hardware")
+            check(result.returncode == 0, "hardware query failed")
+            validate_envelope(document, "hardware.get", True)
+            check(document["data"] == {
+                "deviceInfoAvailable": True,
+                "firmwareVersion": 31,
+                "hardwareSubtype": 0,
+                "capabilities": {
+                    "analogAudioOutputs": 8, "analogAudioInputs": 8,
+                    "digitalAudioOutputs": 0, "digitalAudioInputs": 0,
+                    "midiOutputs": 1, "midiInputs": 1, "dataAlignment": 2,
+                },
+            }, "hardware cache was not exposed exactly")
+            check([request[2] for request in server.requests] == [STREAM_STATS_GET],
+                  "hardware API did not use one cached stream snapshot")
+        socket_path.unlink(missing_ok=True)
+
+        with MockIPC(socket_path, initial_state, stats=stats_payload[:-80]):
+            result, document = invoke(harness, "api", "hardware")
+            check(result.returncode == 0, "legacy hardware tail failed")
+            validate_envelope(document, "hardware.get", True)
+            check(document["data"]["deviceInfoAvailable"] is False,
+                  "legacy tail fabricated device info")
+            check(document["data"]["firmwareVersion"] is None and
+                  all(value is None for value in
+                      document["data"]["capabilities"].values()),
+                  "legacy tail fabricated hardware values")
+        socket_path.unlink(missing_ok=True)
+
         with MockIPC(socket_path, initial_state, stats=b""):
             assert_error(
                 harness, 4, "stats.get", "backend_protocol_error", "api", "stats"
@@ -553,7 +594,9 @@ def run_tests(repo, shipping_binary):
                   "legacy payload fabricated jitter")
         socket_path.unlink(missing_ok=True)
 
-        marker_disabled_payload = stats_payload[:-8] + struct.pack("=Q", 0)
+        marker_disabled_payload = (
+            stats_payload[:-88] + struct.pack("=Q", 0) + stats_payload[-80:]
+        )
         with MockIPC(socket_path, initial_state, stats=marker_disabled_payload):
             result, document = invoke(harness, "api", "stats")
             check(result.returncode == 0, "disabled instrumentation stats failed")
@@ -622,10 +665,15 @@ def run_tests(repo, shipping_binary):
     check(field_names[field_names.index("outputLateWriteBatches") + 1] ==
           "captureCompletionJitterSamples",
           "quality fields were not appended after the former tail")
-    check(field_names[-2:] == [
+    check(field_names[-12:-10] == [
         "playbackISOShortTransactions", "qualityInstrumentationEnabled"
-    ],
-          "instrumentation availability does not require the complete quality tail")
+    ], "instrumentation availability moved within the existing quality group")
+    check(field_names[-10:] == [
+        "deviceInfoAvailable", "deviceFirmwareVersion", "deviceHardwareSubtype",
+        "deviceNumAnalogAudioOut", "deviceNumAnalogAudioIn",
+        "deviceNumDigitalAudioOut", "deviceNumDigitalAudioIn",
+        "deviceNumMidiOut", "deviceNumMidiIn", "deviceDataAlignment",
+    ], "device-information fields are not the exact append-only tail")
     payload_size = sum(
         struct.calcsize("=" + {
             "uint8_t": "B", "uint32_t": "I", "uint64_t": "Q", "double": "d"

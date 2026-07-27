@@ -251,6 +251,16 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t playbackISOZeroLengthTransactions;
     uint64_t playbackISOShortTransactions;
     uint64_t qualityInstrumentationEnabled;
+    uint64_t deviceInfoAvailable;
+    uint64_t deviceFirmwareVersion;
+    uint64_t deviceHardwareSubtype;
+    uint64_t deviceNumAnalogAudioOut;
+    uint64_t deviceNumAnalogAudioIn;
+    uint64_t deviceNumDigitalAudioOut;
+    uint64_t deviceNumDigitalAudioIn;
+    uint64_t deviceNumMidiOut;
+    uint64_t deviceNumMidiIn;
+    uint64_t deviceDataAlignment;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -1602,9 +1612,70 @@ static void PrintPublicVersion(void)
     fputs(",\"schema\":", stdout);
     PrintJSONString(stdout, kPublicAPISchema);
     fputs(",\"transport\":\"process-json\",\"privateIPCVersion\":1,"
-          "\"capabilities\":[\"stats.read\",\"usb-quality.read\",\"profiles.list\","
+          "\"capabilities\":[\"stats.read\",\"usb-quality.read\",\"hardware.read\",\"profiles.list\","
           "\"profile.read\",\"profile.write\"]}}\n",
           stdout);
+}
+
+static void PrintPublicNullableDeviceField(size_t payloadLength,
+                                           size_t offset,
+                                           uint64_t value,
+                                           bool available)
+{
+    if (!available || !StreamStatsHasField(payloadLength, offset, sizeof(value))) {
+        fputs("null", stdout);
+        return;
+    }
+    fprintf(stdout, "%llu", (unsigned long long)value);
+}
+
+static void PrintPublicHardware(const OpenA8DJStreamStatsPayload *stats,
+                                size_t payloadLength)
+{
+    bool hasTail = StreamStatsHasField(
+        payloadLength,
+        offsetof(OpenA8DJStreamStatsPayload, deviceDataAlignment),
+        sizeof(stats->deviceDataAlignment));
+    bool available = hasTail && stats->deviceInfoAvailable == 1;
+    PrintPublicEnvelopePrefix("hardware.get", true);
+    fprintf(stdout, ",\"data\":{\"deviceInfoAvailable\":%s,\"firmwareVersion\":",
+            available ? "true" : "false");
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceFirmwareVersion),
+                                   stats->deviceFirmwareVersion, available);
+    fputs(",\"hardwareSubtype\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceHardwareSubtype),
+                                   stats->deviceHardwareSubtype, available);
+    fputs(",\"capabilities\":{\"analogAudioOutputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumAnalogAudioOut),
+                                   stats->deviceNumAnalogAudioOut, available);
+    fputs(",\"analogAudioInputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumAnalogAudioIn),
+                                   stats->deviceNumAnalogAudioIn, available);
+    fputs(",\"digitalAudioOutputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumDigitalAudioOut),
+                                   stats->deviceNumDigitalAudioOut, available);
+    fputs(",\"digitalAudioInputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumDigitalAudioIn),
+                                   stats->deviceNumDigitalAudioIn, available);
+    fputs(",\"midiOutputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumMidiOut),
+                                   stats->deviceNumMidiOut, available);
+    fputs(",\"midiInputs\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceNumMidiIn),
+                                   stats->deviceNumMidiIn, available);
+    fputs(",\"dataAlignment\":", stdout);
+    PrintPublicNullableDeviceField(payloadLength,
+                                   offsetof(OpenA8DJStreamStatsPayload, deviceDataAlignment),
+                                   stats->deviceDataAlignment, available);
+    fputs("}}}\n", stdout);
 }
 
 static void PrintPublicProfiles(void)
@@ -2678,6 +2749,7 @@ static int RunPublicAPI(int argc, char **argv)
     const char *operation = "unknown";
     if (argc >= 3 && strcmp(argv[2], "version") == 0) operation = "version.get";
     if (argc >= 3 && strcmp(argv[2], "stats") == 0) operation = "stats.get";
+    if (argc >= 3 && strcmp(argv[2], "hardware") == 0) operation = "hardware.get";
     if (argc >= 3 && strcmp(argv[2], "profiles") == 0) operation = "profiles.list";
     if (argc >= 3 && strcmp(argv[2], "profile") == 0) {
         operation = argc >= 4 && strcmp(argv[3], "set") == 0 ? "profile.set" : "profile.get";
@@ -2694,10 +2766,11 @@ static int RunPublicAPI(int argc, char **argv)
 
     bool profileRead = argc == 3 && strcmp(argv[2], "profile") == 0;
     bool statsRead = argc == 3 && strcmp(argv[2], "stats") == 0;
+    bool hardwareRead = argc == 3 && strcmp(argv[2], "hardware") == 0;
     bool profileWrite = argc == 5 &&
                         strcmp(argv[2], "profile") == 0 &&
                         strcmp(argv[3], "set") == 0;
-    if (!profileRead && !statsRead && !profileWrite) {
+    if (!profileRead && !statsRead && !hardwareRead && !profileWrite) {
         return PrintPublicError(operation,
                                 "invalid_request",
                                 "The public API request has an unknown operation or wrong arity.",
@@ -2734,7 +2807,7 @@ static int RunPublicAPI(int argc, char **argv)
         return PublicBackendError(operation, backend);
     }
 
-    if (statsRead) {
+    if (statsRead || hardwareRead) {
         OpenA8DJStreamStatsPayload stats;
         size_t payloadLength = 0;
         size_t minimumPayloadLength =
@@ -2749,7 +2822,11 @@ static int RunPublicAPI(int argc, char **argv)
                                     4);
         }
         close(fd);
-        PrintPublicStats(&stats, payloadLength);
+        if (hardwareRead) {
+            PrintPublicHardware(&stats, payloadLength);
+        } else {
+            PrintPublicStats(&stats, payloadLength);
+        }
         return 0;
     }
 
@@ -2816,7 +2893,7 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
-    fprintf(stderr, "  %s api version|stats|profiles|profile\n", argv0);
+    fprintf(stderr, "  %s api version|stats|hardware|profiles|profile\n", argv0);
     fprintf(stderr, "  %s api profile set canonical-profile-id\n", argv0);
     fprintf(stderr, "  %s usb-quality [--json] [--interval-ms 100..60000] [--count 1..86400]\n",
             argv0);
