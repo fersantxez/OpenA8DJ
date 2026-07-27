@@ -19,7 +19,7 @@ Runs a non-destructive Traktor/timecode surface smoke test:
   3. Verify the profile enables input decode.
   4. Run a short Core Audio duplex I/O test.
   5. Verify input/output callbacks advanced.
-  6. Restore playback profile and verify input decode is off.
+  6. Restore and byte-verify the exact pre-gate control configuration.
 
 This does not replace physical Traktor vinyl/scope validation.
 
@@ -57,11 +57,39 @@ capture_final_state() {
   ioreg -p IOUSB -w 0 >"$run_dir/usb-ioreg-final.txt" 2>&1 || true
   OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control >"$run_dir/control-final.txt" 2>&1 || true
 }
+baseline_config="$run_dir/control-baseline.json"
+restored_config="$run_dir/control-restored.json"
+restoration_required=false
+
+restore_baseline() {
+  if [ "$restoration_required" != "true" ]; then
+    return 0
+  fi
+  if ! ./scripts/timecode-control-restore \
+      ./build/opena8dj-control "$baseline_config" \
+      "$restored_config" "$run_dir"; then
+    return 1
+  fi
+  restoration_required=false
+  return 0
+}
+
 on_exit() {
+  local status="$?"
+  trap - EXIT
+  set +e
+  if ! restore_baseline; then
+    write_result "FAIL" "exact_control_restore_failed"
+    status=1
+  fi
   capture_final_state
   audio_gate_release_lock
+  exit "$status"
 }
 trap on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 write_result() {
   local status="$1"
@@ -91,6 +119,18 @@ if ! grep -Fq "uid=org.opena8dj.Audio8DJ" "$run_dir/audio-list-before.txt"; then
   write_result "FAIL" "open_audio8dj_uid_missing"
   exit 1
 fi
+
+if ! OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control \
+    export-config "$baseline_config" \
+    >"$run_dir/control-baseline-export.txt" 2>&1; then
+  write_result "FAIL" "control_baseline_export_failed"
+  exit 1
+fi
+if [ ! -s "$baseline_config" ]; then
+  write_result "FAIL" "control_baseline_empty"
+  exit 1
+fi
+restoration_required=true
 
 ./build/opena8dj-control profile timecode-vinyl >"$run_dir/control-timecode-vinyl.txt" 2>&1
 if ! grep -Fq "input-mode:        0 (timecode-vinyl)" "$run_dir/control-timecode-vinyl.txt"; then
@@ -139,9 +179,8 @@ PY
 
 OPENA8DJ_CONTROL_NO_WAKE=1 ./build/opena8dj-control input-stats >"$run_dir/input-stats-after-io.txt" 2>&1 || true
 
-./build/opena8dj-control profile playback >"$run_dir/control-playback-restore.txt" 2>&1
-if ! grep -Fq "input-decode:      off" "$run_dir/control-playback-restore.txt"; then
-  write_result "FAIL" "playback_profile_not_restored"
+if ! restore_baseline; then
+  write_result "FAIL" "exact_control_restore_failed"
   exit 1
 fi
 

@@ -372,8 +372,20 @@ def run_tests(repo, shipping_binary):
     check(result.returncode == 0, "offline mode list failed")
     validate_envelope(document, "driver_modes.list")
     check([entry["id"] for entry in document["data"]["driverModes"]] == [
-        "balanced", "performance"
+        "balanced", "performance", "timecode-optimized"
     ], "mode allowlist/order changed")
+    check(document["data"]["driverModes"][2]["requiresArm"] is True,
+          "timecode mode is not explicitly armed")
+    expect_error(
+        shipping_binary,
+        2,
+        "driver_mode.set",
+        "driver_mode_arm_required",
+        "api",
+        "driver-mode",
+        "set",
+        "timecode-optimized",
+    )
     expect_error(
         shipping_binary,
         2,
@@ -402,6 +414,9 @@ def run_tests(repo, shipping_binary):
                 "outputRestartLatencyFrames": 4096,
                 "outputTargetLatencyFrames": 8192,
                 "workerQoS": "default",
+                "inputLeadGuardEnabled": False,
+                "inputLeadCeilingFrames": 32768,
+                "timecodeEvidenceRequired": False,
             }, "balanced policy differs from shipping defaults")
             check([request[3] for request in server.requests] == [DRIVER_MODE_GET],
                   "mode get performed extra IPC")
@@ -613,6 +628,23 @@ def run_tests(repo, shipping_binary):
           "RingInit(&_inputRing, kRingFrames, kChannels)" in hal and
           "OutputTimelineInit(&_outputTimeline, kRingFrames, kChannels)" in hal,
           "driver mode introduced dynamic ring capacity")
+    first_timecode_feed = hal.index(
+        "[self addTimecodePhysicalFrame:_pendingPhysicalInput];"
+    )
+    first_input_write = hal.index(
+        "RingWriteWithDropped(&_inputRing, routedInput, 1,",
+        first_timecode_feed,
+    )
+    read_input_handler = hal[
+        hal.rindex("- (uint32_t)readInput:"):
+        hal.rindex("- (void)setInputDecodeEnabled:")
+    ]
+    check(first_timecode_feed < first_input_write and
+          "RingTrimToLatest(&_inputRing" not in hal and
+          "TimecodeFailOpenLocked" in read_input_handler and
+          "RingRead(" in read_input_handler and
+          "_inputRing, outInterleaved" in read_input_handler,
+          "C/D/lead decisions can trim or drop optimized input samples")
     mode_header = (repo / "src/hal/OpenA8DJDriverMode.h").read_text()
     check("malloc(" not in mode_header and "calloc(" not in mode_header and
           "realloc(" not in mode_header,
@@ -642,8 +674,14 @@ def run_tests(repo, shipping_binary):
             "case kIPCTypeDriverModeSet:"
         ))
     ]
-    check("DriverMode" not in control_set_handler and
-          "storeControlPayload" not in mode_set_handler,
+    timecode_arm_handler = hal[
+        hal.index("case kIPCTypeTimecodeOptimizedArm:"):
+        hal.index("case kIPCTypeTimecodeOptimizedDisarm:")
+    ]
+    check("storeControlPayload" not in mode_set_handler and
+          "storeControlPayload" not in timecode_arm_handler and
+          "writeControls" not in timecode_arm_handler and
+          "TimecodeFailOpenLocked" in control_set_handler,
           "hardware profile/control and driver mode are not independent axes")
     control_source = source.read_text()
     check("OPENA8DJ_ERROR_DRIVER_MODE_BUSY" in control_source and

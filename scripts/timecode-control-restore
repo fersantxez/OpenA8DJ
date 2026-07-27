@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$#" -ne 4 ]; then
+  echo "usage: $0 CONTROL BINARY_BASELINE RESTORED_OUTPUT LOG_DIR" >&2
+  exit 2
+fi
+
+control="$1"
+baseline="$2"
+restored="$3"
+log_dir="$4"
+
+test -s "$baseline"
+mkdir -p "$log_dir"
+OPENA8DJ_CONTROL_NO_WAKE=1 "$control" import-config "$baseline" \
+  >"$log_dir/control-restore-import.txt" 2>&1
+OPENA8DJ_CONTROL_NO_WAKE=1 "$control" export-config "$restored" \
+  >"$log_dir/control-restore-export.txt" 2>&1
+cmp -s "$baseline" "$restored"

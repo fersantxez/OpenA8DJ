@@ -351,7 +351,8 @@ def run_tests(repo, shipping_binary):
     check(document["data"]["capabilities"] == [
         "stats.read", "usb-quality.read", "hardware.read",
         "profiles.list", "profile.read", "profile.write",
-        "driver-mode.read", "driver-mode.write"
+        "driver-mode.read", "driver-mode.write",
+        "timecode-optimized.read", "timecode-optimized.arm"
     ], "wrong capabilities")
 
     result, document = invoke(shipping_binary, "api", "profiles")
@@ -457,7 +458,7 @@ def run_tests(repo, shipping_binary):
             data = document["data"]
             check(set(data) == {
                 "stream", "clock", "capture", "playback", "output", "health",
-                "quality", "driverMode"
+                "quality", "driverMode", "timecodeOptimized"
             },
                   "wrong stats group set")
             check(set(data["stream"]) == {
@@ -552,6 +553,8 @@ def run_tests(repo, shipping_binary):
             check(data["driverMode"]["counters"]["rejectedRequests"] == 2 and
                   data["driverMode"]["effectivePolicy"]["workerQoS"] == "default",
                   "driver mode counters or policy missing")
+            check(data["timecodeOptimized"] is None,
+                  "legacy stats fabricated timecode state")
             check([request[2] for request in server.requests] == [STREAM_STATS_GET],
                   "stats request was not a single non-destructive stream snapshot")
         socket_path.unlink(missing_ok=True)

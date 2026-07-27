@@ -8,6 +8,7 @@ HAL_CONFIG := build/hal-build-config.txt
 HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
 HAL_IPC_AUTH := src/hal/OpenA8DJIPCAuth.h
 DRIVER_MODE_HEADER := src/hal/OpenA8DJDriverMode.h
+TIMECODE_HEADER := src/hal/OpenA8DJTimecodeOptimized.h
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
@@ -51,6 +52,9 @@ PUBLIC_API_TEST := tests/public_api_contract_test.py
 PUBLIC_API_PEER_POLICY_TEST := tests/public_api_peer_policy_test.c
 DRIVER_MODE_TEST := tests/driver_mode_offline_test.py
 DRIVER_MODE_STATE_TEST := tests/driver_mode_state_test.c
+TIMECODE_STATE_TEST := tests/timecode_optimized_state_test.c
+TIMECODE_RESTORE_TEST := tests/timecode_restore_offline_test.py
+TIMECODE_API_TEST := tests/timecode_api_offline_test.py
 USB_QUALITY_CLI_TEST := tests/usb_quality_cli_test.py
 HARDWARE_PROFILER := build/opena8dj-hardware-profiler
 HARDWARE_PROFILER_TEST := build/opena8dj-hardware-profiler-test
@@ -243,7 +247,7 @@ $(HAL_CONFIG): FORCE
 		rm -f "$$tmp"; \
 	fi
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(DRIVER_MODE_HEADER) $(HAL_PLIST) $(HAL_CONFIG)
+$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(HAL_PLIST) $(HAL_CONFIG)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
@@ -572,15 +576,19 @@ $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build
 	xcrun clang $(CFLAGS) $(MIDI_FRAMEWORKS) -o $@ $<
 
-$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER)
+$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 
 public-api-offline-test: $(CONTROL_TOOL) $(PUBLIC_API_TEST) $(PUBLIC_API_PEER_POLICY_TEST) $(HAL_IPC_AUTH)
 	python3 $(PUBLIC_API_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
 
-driver-mode-offline-test: $(CONTROL_TOOL) $(DRIVER_MODE_TEST) $(DRIVER_MODE_STATE_TEST) $(DRIVER_MODE_HEADER)
+driver-mode-offline-test: $(CONTROL_TOOL) $(DRIVER_MODE_TEST) $(DRIVER_MODE_STATE_TEST) $(TIMECODE_STATE_TEST) $(TIMECODE_RESTORE_TEST) $(TIMECODE_API_TEST) $(DRIVER_MODE_HEADER)
 	python3 $(DRIVER_MODE_TEST) --repo . --shipping-binary $(CONTROL_TOOL)
+	xcrun clang -std=c11 -Wall -Wextra -Wpedantic -Werror -Isrc/hal -o build/timecode-optimized-state-test $(TIMECODE_STATE_TEST)
+	./build/timecode-optimized-state-test
+	python3 $(TIMECODE_RESTORE_TEST)
+	python3 $(TIMECODE_API_TEST) --repo .
 
 usb-quality-offline-test: $(CONTROL_TOOL) $(USB_QUALITY_CLI_TEST)
 	python3 $(USB_QUALITY_CLI_TEST) --repo .
