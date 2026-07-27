@@ -615,7 +615,12 @@ private struct WindowVisibilityProbe: NSViewRepresentable {
                 NSWindow.willCloseNotification
             ]
             tokens = names.map { name in
-                NotificationCenter.default.addObserver(
+                if name == NSWindow.willCloseNotification {
+                    return NotificationCenter.default.addObserver(
+                        forName: name, object: window, queue: .main
+                    ) { [weak self] _ in self?.changed(false) }
+                }
+                return NotificationCenter.default.addObserver(
                     forName: name, object: window, queue: .main
                 ) { [weak self] _ in self?.report() }
             }

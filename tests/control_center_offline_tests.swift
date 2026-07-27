@@ -389,6 +389,19 @@ private func reducerTests(_ fixtures: Fixtures) throws {
     reducer.resumeForeground()
     try check(reducer.counterDelta(previous: nil, current: 9, sameGeneration: true) == .baseline, "foreground resume retained baseline")
 
+    let cycleQuality = try DashboardDecoder.quality(
+        fixtures.output("good_quality.ndjson")
+    )
+    var generationReducer = DashboardReducer()
+    try check(
+        generationReducer.qualityDelta(cycleQuality, generation: 9) == .baseline,
+        "first quality generation did not establish baseline"
+    )
+    try check(
+        generationReducer.qualityDelta(cycleQuality, generation: 10) == .baseline,
+        "new-cycle generation reused previous quality counters"
+    )
+
     var disabled = try DashboardDecoder.loopback(fixtures.output("good_loopback.json"))
     let baseline = reducer.loopbackDeltas(disabled)
     try check(baseline.gaps == .baseline && baseline.overrunEvents == .baseline, "loopback first values not baseline")

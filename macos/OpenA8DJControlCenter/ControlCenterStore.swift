@@ -120,7 +120,7 @@ final class ControlCenterStore: ObservableObject {
         pendingConfirmation = PendingConfirmation(
             operation: .setProfile(canonical),
             title: "Apply electrical profile?",
-            message: "The requested profile may remain pending until a safe boundary. The panel will read the active profile back separately."
+            message: "The panel will validate the apply response and then read the complete active electrical state back separately. The inferred active profile may truthfully be custom."
         )
     }
 
@@ -220,10 +220,17 @@ final class ControlCenterStore: ObservableObject {
             if Task.isCancelled { return }
         }
 
-        await readQuality(errors: &errors)
+        let refreshedQuality = await readQuality(errors: &errors)
         if Task.isCancelled { return }
         await readStats(errors: &errors)
         if Task.isCancelled { return }
+        if let refreshedQuality, case .known(let refreshedStream) = stream {
+            qualityXrunDelta = reducer.qualityDelta(
+                refreshedQuality, generation: refreshedStream.generation
+            )
+        } else if refreshedQuality != nil {
+            qualityXrunDelta = .baseline
+        }
         await readProfile(errors: &errors)
         if Task.isCancelled { return }
         await readMode(errors: &errors)
@@ -285,19 +292,22 @@ final class ControlCenterStore: ObservableObject {
         if case .known = backend { bootstrapped = true } else { bootstrapped = false }
     }
 
-    private func readQuality(errors: inout [String: DashboardError]) async {
+    private func readQuality(
+        errors: inout [String: DashboardError]
+    ) async -> USBQualitySnapshot? {
         guard supports(.quality) else {
             quality = .unavailable(reason: .unsupportedTail)
-            return
+            return nil
         }
         do {
             let value = try DashboardDecoder.quality(try await runner.run(.quality))
-            let generation: UInt64?
-            if case .known(let stream) = stream { generation = stream.generation } else { generation = nil }
-            qualityXrunDelta = reducer.qualityDelta(value, generation: generation)
             quality = .known(value)
             captures["quality"] = clock.now
-        } catch { record(error, source: "quality", into: &errors) }
+            return value
+        } catch {
+            record(error, source: "quality", into: &errors)
+            return nil
+        }
     }
 
     private func readStats(errors: inout [String: DashboardError]) async {

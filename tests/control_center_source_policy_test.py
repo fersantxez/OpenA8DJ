@@ -102,6 +102,14 @@ def run(repo):
           "mutation response is not carried into a separate read-back comparison")
     check(not re.search(r"Timer\.scheduledTimer|DispatchSourceTimer", text),
           "unbounded background timer present")
+    check("let refreshedQuality = await readQuality" in store and
+          "generation: refreshedStream.generation" in store,
+          "quality deltas are not paired with stats from the same cycle")
+    check("NSWindow.willCloseNotification" in views and
+          "self?.changed(false)" in views,
+          "window close does not force foreground visibility false")
+    check("profile may remain pending" not in store.lower(),
+          "profile confirmation incorrectly claims pending semantics")
 
     makefile = (repo / "Makefile").read_text(encoding="utf-8")
     for token in [
