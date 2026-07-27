@@ -21,6 +21,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "../hal/OpenA8DJDriverMode.h"
+
 #ifndef OPENA8DJ_PUBLIC_API_SOCKET_PATH
 #define OPENA8DJ_PUBLIC_API_SOCKET_PATH "/tmp/opena8dj-control.sock"
 #endif
@@ -33,6 +35,10 @@ static const char *kPublicAPILockPath = OPENA8DJ_PUBLIC_API_LOCK_PATH;
 
 static const char *kPublicAPISchema = "org.opena8dj.public-api.response.v1";
 static const char *kPublicAPIVersion = "1.0";
+
+#define OPENA8DJ_ERROR_DRIVER_MODE_NOT_ALLOWED "driver_mode_not_allowed"
+#define OPENA8DJ_ERROR_DRIVER_MODE_BUSY "driver_mode_busy"
+#define OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED "driver_mode_apply_failed"
 
 enum {
     kIPCVersion = 1,
@@ -47,7 +53,10 @@ enum {
     kIPCTypeInputStatsGet = 8,
     kIPCTypeInputStats = 9,
     kIPCTypeStreamStatsGet = 10,
-    kIPCTypeStreamStats = 11
+    kIPCTypeStreamStats = 11,
+    kIPCTypeDriverModeGet = 12,
+    kIPCTypeDriverModeSet = 13,
+    kIPCTypeDriverModeState = 14
 };
 
 enum {
@@ -261,6 +270,22 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t deviceNumMidiOut;
     uint64_t deviceNumMidiIn;
     uint64_t deviceDataAlignment;
+    uint64_t driverModeSchemaVersion;
+    uint64_t driverModeRequested;
+    uint64_t driverModeEffective;
+    uint64_t driverModePending;
+    uint64_t driverModeLastResult;
+    uint64_t driverModeRejectionReason;
+    uint64_t driverModeGeneration;
+    uint64_t driverModeAcceptedRequests;
+    uint64_t driverModeRejectedRequests;
+    uint64_t driverModeAppliedTransitions;
+    uint64_t driverModeApplyFailures;
+    uint64_t driverModePendingTransitions;
+    uint64_t driverModeOutputStartLatencyFrames;
+    uint64_t driverModeOutputRestartLatencyFrames;
+    uint64_t driverModeOutputTargetLatencyFrames;
+    uint64_t driverModeWorkerQoS;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJWakeState {
@@ -612,6 +637,81 @@ static void PrintProfiles(void)
 static const char *BoolJSON(uint8_t value)
 {
     return value ? "true" : "false";
+}
+
+static const char *DriverModeName(uint32_t modeID)
+{
+    switch (modeID) {
+        case kOpenA8DJDriverModeBalanced:
+            return "balanced";
+        case kOpenA8DJDriverModePerformance:
+            return "performance";
+        default:
+            return NULL;
+    }
+}
+
+static bool ParseDriverMode(const char *text, uint32_t *outModeID)
+{
+    if (strcmp(text, "balanced") == 0) {
+        *outModeID = kOpenA8DJDriverModeBalanced;
+        return true;
+    }
+    if (strcmp(text, "performance") == 0) {
+        *outModeID = kOpenA8DJDriverModePerformance;
+        return true;
+    }
+    return false;
+}
+
+static const char *DriverModeResultName(uint8_t result)
+{
+    switch (result) {
+        case kOpenA8DJDriverModeResultUnchanged:
+            return "unchanged";
+        case kOpenA8DJDriverModeResultApplied:
+            return "applied";
+        case kOpenA8DJDriverModeResultPending:
+            return "pending";
+        case kOpenA8DJDriverModeResultCancelled:
+            return "cancelled";
+        case kOpenA8DJDriverModeResultInvalid:
+            return "invalid";
+        case kOpenA8DJDriverModeResultApplyFailed:
+            return "apply_failed";
+        default:
+            return NULL;
+    }
+}
+
+static const char *DriverModeRejectionName(uint8_t rejection)
+{
+    switch (rejection) {
+        case kOpenA8DJDriverModeRejectionNone:
+            return "none";
+        case kOpenA8DJDriverModeRejectionBadLength:
+            return "bad_length";
+        case kOpenA8DJDriverModeRejectionUnsupportedSchema:
+            return "unsupported_schema";
+        case kOpenA8DJDriverModeRejectionReservedNonzero:
+            return "reserved_nonzero";
+        case kOpenA8DJDriverModeRejectionUnknownMode:
+            return "unknown_mode";
+        default:
+            return NULL;
+    }
+}
+
+static const char *DriverModeQoSName(uint32_t qos)
+{
+    switch (qos) {
+        case kOpenA8DJDriverModeWorkerQoSDefault:
+            return "default";
+        case kOpenA8DJDriverModeWorkerQoSUserInteractive:
+            return "user-interactive";
+        default:
+            return NULL;
+    }
 }
 
 static char PairLetter(uint8_t value, int fallback)
@@ -1195,6 +1295,121 @@ static bool ReadStreamStats(int fd, OpenA8DJStreamStatsPayload *stats, size_t *p
     return false;
 }
 
+static bool ValidateDriverModeState(const OpenA8DJDriverModeStatePayload *state)
+{
+    if (state->schemaVersion != kOpenA8DJDriverModeSchemaVersion ||
+        state->pending > 1 ||
+        state->streaming > 1 ||
+        DriverModeName(state->requestedMode) == NULL ||
+        DriverModeName(state->effectiveMode) == NULL ||
+        DriverModeResultName(state->lastResult) == NULL ||
+        DriverModeRejectionName(state->rejectionReason) == NULL ||
+        DriverModeQoSName(state->workerQoS) == NULL ||
+        ((state->requestedMode != state->effectiveMode) != (state->pending != 0))) {
+        return false;
+    }
+    if ((state->lastResult == kOpenA8DJDriverModeResultInvalid) !=
+        (state->rejectionReason != kOpenA8DJDriverModeRejectionNone)) {
+        return false;
+    }
+    OpenA8DJDriverModePolicy policy;
+    return OpenA8DJDriverModeLookup(state->effectiveMode, &policy) &&
+           state->outputStartLatencyFrames == policy.outputStartLatencyFrames &&
+           state->outputRestartLatencyFrames == policy.outputRestartLatencyFrames &&
+           state->outputTargetLatencyFrames == policy.outputTargetLatencyFrames &&
+           state->workerQoS == policy.workerQoS;
+}
+
+static bool DriverModeStatesEqual(const OpenA8DJDriverModeStatePayload *left,
+                                  const OpenA8DJDriverModeStatePayload *right)
+{
+    return left->schemaVersion == right->schemaVersion &&
+           left->requestedMode == right->requestedMode &&
+           left->effectiveMode == right->effectiveMode &&
+           left->pending == right->pending &&
+           left->streaming == right->streaming &&
+           left->lastResult == right->lastResult &&
+           left->rejectionReason == right->rejectionReason &&
+           left->generation == right->generation &&
+           left->acceptedRequests == right->acceptedRequests &&
+           left->rejectedRequests == right->rejectedRequests &&
+           left->appliedTransitions == right->appliedTransitions &&
+           left->applyFailures == right->applyFailures &&
+           left->pendingTransitions == right->pendingTransitions &&
+           left->outputStartLatencyFrames == right->outputStartLatencyFrames &&
+           left->outputRestartLatencyFrames == right->outputRestartLatencyFrames &&
+           left->outputTargetLatencyFrames == right->outputTargetLatencyFrames &&
+           left->workerQoS == right->workerQoS;
+}
+
+static bool ReadOneDriverModeState(int fd, OpenA8DJDriverModeStatePayload *state)
+{
+    for (int message = 0; message < 64; message++) {
+        OpenA8DJIPCHeader header;
+        if (!ReadFull(fd, &header, sizeof(header))) {
+            return false;
+        }
+        if (header.magic != kIPCMagic ||
+            header.version != kIPCVersion ||
+            header.length > 4096) {
+            return false;
+        }
+        uint8_t payload[4096];
+        if (header.length > 0 && !ReadFull(fd, payload, header.length)) {
+            return false;
+        }
+        if (header.type == kIPCTypeDriverModeState) {
+            if (header.length < sizeof(*state)) {
+                return false;
+            }
+            memcpy(state, payload, sizeof(*state));
+            return ValidateDriverModeState(state);
+        }
+    }
+    return false;
+}
+
+static bool ReadDriverModeState(int fd, OpenA8DJDriverModeStatePayload *state)
+{
+    return SendIPC(fd, kIPCTypeDriverModeGet, NULL, 0) &&
+           ReadOneDriverModeState(fd, state);
+}
+
+typedef enum OpenA8DJDriverModeTransactionResult {
+    kDriverModeTransactionOK = 0,
+    kDriverModeTransactionProtocolError,
+    kDriverModeTransactionApplyFailed
+} OpenA8DJDriverModeTransactionResult;
+
+static OpenA8DJDriverModeTransactionResult SetDriverModeAndReadBack(
+    int fd,
+    uint32_t requestedMode,
+    OpenA8DJDriverModeStatePayload *outState)
+{
+    OpenA8DJDriverModeSetPayload request;
+    memset(&request, 0, sizeof(request));
+    request.schemaVersion = kOpenA8DJDriverModeSchemaVersion;
+    request.modeID = requestedMode;
+    OpenA8DJDriverModeStatePayload setState;
+    OpenA8DJDriverModeStatePayload readBack;
+    if (!SendIPC(fd, kIPCTypeDriverModeSet, &request, sizeof(request)) ||
+        !ReadOneDriverModeState(fd, &setState) ||
+        !ReadDriverModeState(fd, &readBack) ||
+        !DriverModeStatesEqual(&setState, &readBack)) {
+        return kDriverModeTransactionProtocolError;
+    }
+    *outState = readBack;
+    if (readBack.lastResult == kOpenA8DJDriverModeResultApplyFailed) {
+        return kDriverModeTransactionApplyFailed;
+    }
+    if (readBack.requestedMode != requestedMode ||
+        (!readBack.pending && readBack.effectiveMode != requestedMode) ||
+        (readBack.pending && readBack.effectiveMode == requestedMode)) {
+        return kDriverModeTransactionProtocolError;
+    }
+    return kDriverModeTransactionOK;
+}
+
 static void PrintState(const OpenA8DJControlPayload *state)
 {
     printf("Audio 8 DJ controls\n");
@@ -1613,7 +1828,7 @@ static void PrintPublicVersion(void)
     PrintJSONString(stdout, kPublicAPISchema);
     fputs(",\"transport\":\"process-json\",\"privateIPCVersion\":1,"
           "\"capabilities\":[\"stats.read\",\"usb-quality.read\",\"hardware.read\",\"profiles.list\","
-          "\"profile.read\",\"profile.write\"]}}\n",
+          "\"profile.read\",\"profile.write\",\"driver-mode.read\",\"driver-mode.write\"]}}\n",
           stdout);
 }
 
@@ -1696,6 +1911,114 @@ static void PrintPublicProfiles(void)
         fputc('}', stdout);
     }
     fputs("]}}\n", stdout);
+}
+
+static void PrintPublicDriverModes(void)
+{
+    PrintPublicEnvelopePrefix("driver_modes.list", true);
+    fputs(",\"data\":{\"schemaVersion\":1,\"driverModes\":["
+          "{\"id\":\"balanced\",\"name\":\"Balanced\",\"default\":true,"
+          "\"requiresIdleBoundary\":true},"
+          "{\"id\":\"performance\",\"name\":\"Performance\",\"default\":false,"
+          "\"requiresIdleBoundary\":true}]}}\n",
+          stdout);
+}
+
+static void PrintPublicDriverModeMembers(const OpenA8DJDriverModeStatePayload *state)
+{
+    fprintf(stdout, "\"schemaVersion\":%u,\"requestedMode\":",
+            (unsigned)state->schemaVersion);
+    PrintJSONString(stdout, DriverModeName(state->requestedMode));
+    fputs(",\"effectiveMode\":", stdout);
+    PrintJSONString(stdout, DriverModeName(state->effectiveMode));
+    fprintf(stdout,
+            ",\"pending\":%s,\"streaming\":%s,\"lastResult\":",
+            state->pending ? "true" : "false",
+            state->streaming ? "true" : "false");
+    PrintJSONString(stdout, DriverModeResultName(state->lastResult));
+    fputs(",\"rejectionReason\":", stdout);
+    PrintJSONString(stdout, DriverModeRejectionName(state->rejectionReason));
+    fprintf(stdout,
+            ",\"generation\":%llu,\"counters\":{\"acceptedRequests\":%llu,"
+            "\"rejectedRequests\":%llu,\"appliedTransitions\":%llu,"
+            "\"applyFailures\":%llu,\"pendingTransitions\":%llu},"
+            "\"effectivePolicy\":{\"outputStartLatencyFrames\":%u,"
+            "\"outputRestartLatencyFrames\":%u,\"outputTargetLatencyFrames\":%u,"
+            "\"workerQoS\":",
+            (unsigned long long)state->generation,
+            (unsigned long long)state->acceptedRequests,
+            (unsigned long long)state->rejectedRequests,
+            (unsigned long long)state->appliedTransitions,
+            (unsigned long long)state->applyFailures,
+            (unsigned long long)state->pendingTransitions,
+            state->outputStartLatencyFrames,
+            state->outputRestartLatencyFrames,
+            state->outputTargetLatencyFrames);
+    PrintJSONString(stdout, DriverModeQoSName(state->workerQoS));
+    fputs("}", stdout);
+}
+
+static void PrintPublicDriverMode(const char *operation,
+                                  const OpenA8DJDriverModeStatePayload *state)
+{
+    PrintPublicEnvelopePrefix(operation, true);
+    fputs(",\"data\":{", stdout);
+    PrintPublicDriverModeMembers(state);
+    fputs("}}\n", stdout);
+}
+
+typedef enum OpenA8DJStatsDriverModeResult {
+    kStatsDriverModeUnavailable = 0,
+    kStatsDriverModeValid,
+    kStatsDriverModeInvalid
+} OpenA8DJStatsDriverModeResult;
+
+static OpenA8DJStatsDriverModeResult DriverModeFromStreamStats(
+    const OpenA8DJStreamStatsPayload *stats,
+    size_t payloadLength,
+    OpenA8DJDriverModeStatePayload *outState)
+{
+    if (!StreamStatsHasField(
+            payloadLength,
+            offsetof(OpenA8DJStreamStatsPayload, driverModeWorkerQoS),
+            sizeof(stats->driverModeWorkerQoS))) {
+        return kStatsDriverModeUnavailable;
+    }
+    if (stats->driverModeSchemaVersion > UINT16_MAX ||
+        stats->driverModeRequested > UINT32_MAX ||
+        stats->driverModeEffective > UINT32_MAX ||
+        stats->driverModePending > UINT8_MAX ||
+        stats->driverModeLastResult > UINT8_MAX ||
+        stats->driverModeRejectionReason > UINT8_MAX ||
+        stats->driverModeOutputStartLatencyFrames > UINT32_MAX ||
+        stats->driverModeOutputRestartLatencyFrames > UINT32_MAX ||
+        stats->driverModeOutputTargetLatencyFrames > UINT32_MAX ||
+        stats->driverModeWorkerQoS > UINT32_MAX) {
+        return kStatsDriverModeInvalid;
+    }
+    memset(outState, 0, sizeof(*outState));
+    outState->schemaVersion = (uint16_t)stats->driverModeSchemaVersion;
+    outState->requestedMode = (uint32_t)stats->driverModeRequested;
+    outState->effectiveMode = (uint32_t)stats->driverModeEffective;
+    outState->pending = (uint8_t)stats->driverModePending;
+    outState->streaming = stats->streaming;
+    outState->lastResult = (uint8_t)stats->driverModeLastResult;
+    outState->rejectionReason = (uint8_t)stats->driverModeRejectionReason;
+    outState->generation = stats->driverModeGeneration;
+    outState->acceptedRequests = stats->driverModeAcceptedRequests;
+    outState->rejectedRequests = stats->driverModeRejectedRequests;
+    outState->appliedTransitions = stats->driverModeAppliedTransitions;
+    outState->applyFailures = stats->driverModeApplyFailures;
+    outState->pendingTransitions = stats->driverModePendingTransitions;
+    outState->outputStartLatencyFrames =
+        (uint32_t)stats->driverModeOutputStartLatencyFrames;
+    outState->outputRestartLatencyFrames =
+        (uint32_t)stats->driverModeOutputRestartLatencyFrames;
+    outState->outputTargetLatencyFrames =
+        (uint32_t)stats->driverModeOutputTargetLatencyFrames;
+    outState->workerQoS = (uint32_t)stats->driverModeWorkerQoS;
+    return ValidateDriverModeState(outState) ?
+        kStatsDriverModeValid : kStatsDriverModeInvalid;
 }
 
 static uint64_t PublicStreamField(const OpenA8DJStreamStatsPayload *stats,
@@ -1814,7 +2137,9 @@ static void PrintCumulativeQualityJSON(const OpenA8DJStreamStatsPayload *stats,
     fputs("}}", stdout);
 }
 
-static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t payloadLength)
+static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats,
+                             size_t payloadLength,
+                             const OpenA8DJDriverModeStatePayload *driverMode)
 {
     bool hasStreaming = StreamStatsHasField(payloadLength,
                                              offsetof(OpenA8DJStreamStatsPayload, streaming),
@@ -1871,6 +2196,14 @@ static void PrintPublicStats(const OpenA8DJStreamStatsPayload *stats, size_t pay
             (unsigned long long)PUBLIC_STREAM_FIELD(stats, payloadLength, outputPanicFlags));
     fputs(",\"quality\":", stdout);
     PrintCumulativeQualityJSON(stats, payloadLength);
+    fputs(",\"driverMode\":", stdout);
+    if (driverMode == NULL) {
+        fputs("null", stdout);
+    } else {
+        fputc('{', stdout);
+        PrintPublicDriverModeMembers(driverMode);
+        fputc('}', stdout);
+    }
     fputs("}}\n", stdout);
 }
 
@@ -2751,6 +3084,11 @@ static int RunPublicAPI(int argc, char **argv)
     if (argc >= 3 && strcmp(argv[2], "stats") == 0) operation = "stats.get";
     if (argc >= 3 && strcmp(argv[2], "hardware") == 0) operation = "hardware.get";
     if (argc >= 3 && strcmp(argv[2], "profiles") == 0) operation = "profiles.list";
+    if (argc >= 3 && strcmp(argv[2], "driver-modes") == 0) operation = "driver_modes.list";
+    if (argc >= 3 && strcmp(argv[2], "driver-mode") == 0) {
+        operation = argc >= 4 && strcmp(argv[3], "set") == 0 ?
+            "driver_mode.set" : "driver_mode.get";
+    }
     if (argc >= 3 && strcmp(argv[2], "profile") == 0) {
         operation = argc >= 4 && strcmp(argv[3], "set") == 0 ? "profile.set" : "profile.get";
     }
@@ -2763,14 +3101,23 @@ static int RunPublicAPI(int argc, char **argv)
         PrintPublicProfiles();
         return 0;
     }
+    if (argc == 3 && strcmp(argv[2], "driver-modes") == 0) {
+        PrintPublicDriverModes();
+        return 0;
+    }
 
     bool profileRead = argc == 3 && strcmp(argv[2], "profile") == 0;
+    bool driverModeRead = argc == 3 && strcmp(argv[2], "driver-mode") == 0;
     bool statsRead = argc == 3 && strcmp(argv[2], "stats") == 0;
     bool hardwareRead = argc == 3 && strcmp(argv[2], "hardware") == 0;
     bool profileWrite = argc == 5 &&
                         strcmp(argv[2], "profile") == 0 &&
                         strcmp(argv[3], "set") == 0;
-    if (!profileRead && !statsRead && !hardwareRead && !profileWrite) {
+    bool driverModeWrite = argc == 5 &&
+                           strcmp(argv[2], "driver-mode") == 0 &&
+                           strcmp(argv[3], "set") == 0;
+    if (!profileRead && !driverModeRead && !statsRead && !hardwareRead &&
+        !profileWrite && !driverModeWrite) {
         return PrintPublicError(operation,
                                 "invalid_request",
                                 "The public API request has an unknown operation or wrong arity.",
@@ -2779,6 +3126,7 @@ static int RunPublicAPI(int argc, char **argv)
     }
 
     const char *requestedProfile = profileWrite ? argv[4] : NULL;
+    uint32_t requestedDriverMode = kOpenA8DJDriverModeInvalid;
     if (profileWrite &&
         (strlen(requestedProfile) > 64 || FindCanonicalPreset(requestedProfile) == NULL)) {
         return PrintPublicError("profile.set",
@@ -2787,14 +3135,26 @@ static int RunPublicAPI(int argc, char **argv)
                                 false,
                                 2);
     }
+    if (driverModeWrite &&
+        (strlen(argv[4]) > 64 || !ParseDriverMode(argv[4], &requestedDriverMode))) {
+        return PrintPublicError("driver_mode.set",
+                                OPENA8DJ_ERROR_DRIVER_MODE_NOT_ALLOWED,
+                                "The requested driver mode is not in the public allowlist.",
+                                false,
+                                2);
+    }
 
     int lockFD = -1;
-    if (profileWrite) {
+    if (profileWrite || driverModeWrite) {
         lockFD = AcquirePublicMutationLock();
         if (lockFD < 0) {
-            return PrintPublicError("profile.set",
-                                    "profile_apply_failed",
-                                    "The profile mutation lock could not be acquired safely.",
+            return PrintPublicError(operation,
+                                    driverModeWrite ?
+                                        OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED :
+                                        "profile_apply_failed",
+                                    driverModeWrite ?
+                                        "The driver-mode mutation lock could not be acquired safely." :
+                                        "The profile mutation lock could not be acquired safely.",
                                     true,
                                     5);
         }
@@ -2815,9 +3175,24 @@ static int RunPublicAPI(int argc, char **argv)
         if (!ReadStreamStats(fd, &stats, &payloadLength) ||
             payloadLength < minimumPayloadLength) {
             close(fd);
-            return PrintPublicError("stats.get",
+            return PrintPublicError(operation,
                                     "backend_protocol_error",
                                     "The HAL bridge returned an invalid statistics reply.",
+                                    true,
+                                    4);
+        }
+        OpenA8DJDriverModeStatePayload statsDriverMode;
+        OpenA8DJStatsDriverModeResult modeResult = kStatsDriverModeUnavailable;
+        if (statsRead) {
+            modeResult = DriverModeFromStreamStats(&stats,
+                                                   payloadLength,
+                                                   &statsDriverMode);
+        }
+        if (statsRead && modeResult == kStatsDriverModeInvalid) {
+            close(fd);
+            return PrintPublicError(operation,
+                                    "backend_protocol_error",
+                                    "The HAL bridge returned invalid driver-mode statistics.",
                                     true,
                                     4);
         }
@@ -2825,8 +3200,48 @@ static int RunPublicAPI(int argc, char **argv)
         if (hardwareRead) {
             PrintPublicHardware(&stats, payloadLength);
         } else {
-            PrintPublicStats(&stats, payloadLength);
+            PrintPublicStats(&stats,
+                             payloadLength,
+                             modeResult == kStatsDriverModeValid ?
+                                 &statsDriverMode : NULL);
         }
+        return 0;
+    }
+
+    if (driverModeRead || driverModeWrite) {
+        OpenA8DJDriverModeStatePayload driverModeState;
+        if (driverModeRead) {
+            if (!ReadDriverModeState(fd, &driverModeState)) {
+                close(fd);
+                return PrintPublicError(operation,
+                                        "backend_protocol_error",
+                                        "The HAL bridge returned an invalid driver-mode reply.",
+                                        true,
+                                        4);
+            }
+            close(fd);
+            PrintPublicDriverMode("driver_mode.get", &driverModeState);
+            return 0;
+        }
+        OpenA8DJDriverModeTransactionResult transaction =
+            SetDriverModeAndReadBack(fd, requestedDriverMode, &driverModeState);
+        close(fd);
+        close(lockFD);
+        if (transaction == kDriverModeTransactionApplyFailed) {
+            return PrintPublicError("driver_mode.set",
+                                    OPENA8DJ_ERROR_DRIVER_MODE_APPLY_FAILED,
+                                    "The HAL kept the previous effective driver-mode policy.",
+                                    true,
+                                    5);
+        }
+        if (transaction != kDriverModeTransactionOK) {
+            return PrintPublicError("driver_mode.set",
+                                    "backend_protocol_error",
+                                    "The HAL driver-mode set/read-back transaction disagreed.",
+                                    true,
+                                    4);
+        }
+        PrintPublicDriverMode("driver_mode.set", &driverModeState);
         return 0;
     }
 
@@ -2893,8 +3308,12 @@ static void Usage(const char *argv0)
     fprintf(stderr, "  %s input-stats\n", argv0);
     fprintf(stderr, "  %s stream-stats\n", argv0);
     fprintf(stderr, "    Set OPENA8DJ_CONTROL_NO_WAKE=1 to read without starting Core Audio.\n");
-    fprintf(stderr, "  %s api version|stats|hardware|profiles|profile\n", argv0);
+    fprintf(stderr, "  %s api version|stats|hardware|profiles|profile|driver-modes|driver-mode\n",
+            argv0);
     fprintf(stderr, "  %s api profile set canonical-profile-id\n", argv0);
+    fprintf(stderr, "  %s api driver-mode set balanced|performance\n", argv0);
+    fprintf(stderr, "    Driver modes are session-only; performance is experimental.\n");
+    fprintf(stderr, "    A change while streaming may be accepted as pending until a safe boundary.\n");
     fprintf(stderr, "  %s usb-quality [--json] [--interval-ms 100..60000] [--count 1..86400]\n",
             argv0);
     fprintf(stderr, "  %s list-profiles\n", argv0);

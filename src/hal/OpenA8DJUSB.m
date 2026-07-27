@@ -1,4 +1,5 @@
 #import "OpenA8DJUSB.h"
+#import "OpenA8DJDriverMode.h"
 #import "OpenA8DJIPCAuth.h"
 
 #import <Foundation/Foundation.h>
@@ -211,9 +212,6 @@ enum {
     kCapturePacedOutputLead = OPENA8DJ_CAPTURE_PACED_OUT_LEAD,
     kRingFrames = 32768,
     kOutputPrefetchFrames = OPENA8DJ_OUTPUT_PREFETCH_FRAMES,
-    kOutputStartLatencyFrames = 8192,
-    kOutputRestartLatencyFrames = 4096,
-    kOutputTargetLatencyFrames = 8192,
     kOutputElasticHighWaterFrames = 24576,
     kOutputReplayHoldFrames = 8,
     kOutputMaxReplayFrames = 192,
@@ -275,10 +273,94 @@ enum {
     kIPCTypeInputStatsGet = 8,
     kIPCTypeInputStats = 9,
     kIPCTypeStreamStatsGet = 10,
-    kIPCTypeStreamStats = 11
+    kIPCTypeStreamStats = 11,
+    kIPCTypeDriverModeGet = 12,
+    kIPCTypeDriverModeSet = 13,
+    kIPCTypeDriverModeState = 14
 };
 
 static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(false);
+static pthread_mutex_t gDriverModeMutex = PTHREAD_MUTEX_INITIALIZER;
+static OpenA8DJDriverModeState gDriverModeState = {
+    .requestedMode = kOpenA8DJDriverModeBalanced,
+    .effectiveMode = kOpenA8DJDriverModeBalanced,
+    .lastResult = kOpenA8DJDriverModeResultUnchanged
+};
+static bool gDriverModeStreaming = false;
+
+static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy,
+                                          void *context)
+{
+    (void)context;
+    return policy != NULL &&
+           policy->outputStartLatencyFrames >= 4096 &&
+           policy->outputRestartLatencyFrames >= 4096 &&
+           policy->outputTargetLatencyFrames >= 4096 &&
+           (policy->workerQoS == kOpenA8DJDriverModeWorkerQoSDefault ||
+            policy->workerQoS == kOpenA8DJDriverModeWorkerQoSUserInteractive);
+}
+
+static OpenA8DJDriverModePolicy DriverModeBeginStream(void)
+{
+    OpenA8DJDriverModePolicy policy;
+    pthread_mutex_lock(&gDriverModeMutex);
+    (void)OpenA8DJDriverModePromotePending(&gDriverModeState,
+                                           DriverModeProductionPreflight,
+                                           NULL);
+    (void)OpenA8DJDriverModeLookup(gDriverModeState.effectiveMode, &policy);
+    gDriverModeStreaming = true;
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return policy;
+}
+
+static void DriverModeEndStream(void)
+{
+    pthread_mutex_lock(&gDriverModeMutex);
+    gDriverModeStreaming = false;
+    (void)OpenA8DJDriverModePromotePending(&gDriverModeState,
+                                           DriverModeProductionPreflight,
+                                           NULL);
+    pthread_mutex_unlock(&gDriverModeMutex);
+}
+
+static OpenA8DJDriverModeStatePayload DriverModeStateSnapshot(void)
+{
+    OpenA8DJDriverModeStatePayload payload;
+    pthread_mutex_lock(&gDriverModeMutex);
+    OpenA8DJDriverModeMakeStatePayload(&gDriverModeState,
+                                       gDriverModeStreaming,
+                                       &payload);
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return payload;
+}
+
+static OpenA8DJDriverModeStatePayload DriverModeRejectRequest(uint8_t rejection)
+{
+    OpenA8DJDriverModeStatePayload payload;
+    pthread_mutex_lock(&gDriverModeMutex);
+    OpenA8DJDriverModeReject(&gDriverModeState, rejection);
+    OpenA8DJDriverModeMakeStatePayload(&gDriverModeState,
+                                       gDriverModeStreaming,
+                                       &payload);
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return payload;
+}
+
+static OpenA8DJDriverModeStatePayload DriverModeSetRequested(uint32_t modeID)
+{
+    OpenA8DJDriverModeStatePayload payload;
+    pthread_mutex_lock(&gDriverModeMutex);
+    (void)OpenA8DJDriverModeSet(&gDriverModeState,
+                                modeID,
+                                gDriverModeStreaming,
+                                DriverModeProductionPreflight,
+                                NULL);
+    OpenA8DJDriverModeMakeStatePayload(&gDriverModeState,
+                                       gDriverModeStreaming,
+                                       &payload);
+    pthread_mutex_unlock(&gDriverModeMutex);
+    return payload;
+}
 
 static dispatch_queue_attr_t OpenA8DJUSBQueueAttributes(void)
 {
@@ -535,6 +617,22 @@ typedef struct OpenA8DJStreamStatsPayload {
     uint64_t deviceNumMidiOut;
     uint64_t deviceNumMidiIn;
     uint64_t deviceDataAlignment;
+    uint64_t driverModeSchemaVersion;
+    uint64_t driverModeRequested;
+    uint64_t driverModeEffective;
+    uint64_t driverModePending;
+    uint64_t driverModeLastResult;
+    uint64_t driverModeRejectionReason;
+    uint64_t driverModeGeneration;
+    uint64_t driverModeAcceptedRequests;
+    uint64_t driverModeRejectedRequests;
+    uint64_t driverModeAppliedTransitions;
+    uint64_t driverModeApplyFailures;
+    uint64_t driverModePendingTransitions;
+    uint64_t driverModeOutputStartLatencyFrames;
+    uint64_t driverModeOutputRestartLatencyFrames;
+    uint64_t driverModeOutputTargetLatencyFrames;
+    uint64_t driverModeWorkerQoS;
 } __attribute__((packed)) OpenA8DJStreamStatsPayload;
 
 typedef struct OpenA8DJOutputFillStats {
@@ -1204,6 +1302,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
                                          float *frames,
                                          uint32_t frameCount,
                                          uint32_t channels,
+                                         uint32_t targetLatencyFrames,
                                          bool *outHaveFrame,
                                          bool *outStartupSilence,
                                          uint32_t *outElasticDropFrames)
@@ -1236,7 +1335,7 @@ static uint32_t OutputTimelineReadFrames(OutputTimelineRing *ring,
             startupSilence = true;
         } else {
             if (ring->maxWrittenFrame - ring->readFrame > (int64_t)kOutputElasticHighWaterFrames) {
-                int64_t newReadFrame = ring->maxWrittenFrame - (int64_t)kOutputTargetLatencyFrames;
+                int64_t newReadFrame = ring->maxWrittenFrame - (int64_t)targetLatencyFrames;
                 if (newReadFrame > ring->readFrame) {
                     elasticDrops = (uint32_t)(newReadFrame - ring->readFrame);
                     ring->readFrame = newReadFrame;
@@ -1727,6 +1826,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     bool _deviceInfoAvailable;
     FloatRing _inputRing;
     OutputTimelineRing _outputTimeline;
+    OpenA8DJDriverModePolicy _streamDriverModePolicy;
     OpenA8DJStreamStatsPayload _streamStats;
     pthread_mutex_t _streamStatsMutex;
     atomic_uint_fast64_t _outputFramesWrittenAtomic;
@@ -1860,6 +1960,8 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         atomic_init(&_outputFramesWrittenAtomic, 0);
         atomic_init(&_captureHotStreamStatsCounter, 0);
         atomic_init(&_playbackHotStreamStatsCounter, 0);
+        (void)OpenA8DJDriverModeLookup(kOpenA8DJDriverModeBalanced,
+                                       &_streamDriverModePolicy);
         _ticksPerUSBMicroframe = MachTicksForNanoseconds(125000);
         _completionJitterBinThresholdTicks[0] = MachTicksForNanoseconds(50000);
         _completionJitterBinThresholdTicks[1] = MachTicksForNanoseconds(100000);
@@ -2931,6 +3033,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 - (OpenA8DJStreamStatsPayload)streamStatsSnapshot
 {
     OpenA8DJStreamStatsPayload stats;
+    OpenA8DJDriverModeStatePayload driverMode = DriverModeStateSnapshot();
     pthread_mutex_lock(&_streamStatsMutex);
     stats = _streamStats;
     pthread_mutex_unlock(&_streamStatsMutex);
@@ -2938,7 +3041,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     stats.outputFramesWritten = atomic_load(&_outputFramesWrittenAtomic);
     stats.streaming = atomic_load(&_streaming) ? 1 : 0;
     stats.outputRingFrames = OutputTimelineAvailable(&_outputTimeline);
-    stats.outputTargetLatencyFrames = kOutputTargetLatencyFrames;
+    stats.outputTargetLatencyFrames = driverMode.outputTargetLatencyFrames;
     stats.outputByteInFrame = _outputByteInFrame;
     stats.playbackLeadFrames = kPlaybackScheduleLeadFrames;
     stats.playbackQueueTarget = kPlaybackQueueTarget;
@@ -2965,6 +3068,22 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     } else {
         stats.deviceInfoAvailable = 0;
     }
+    stats.driverModeSchemaVersion = driverMode.schemaVersion;
+    stats.driverModeRequested = driverMode.requestedMode;
+    stats.driverModeEffective = driverMode.effectiveMode;
+    stats.driverModePending = driverMode.pending;
+    stats.driverModeLastResult = driverMode.lastResult;
+    stats.driverModeRejectionReason = driverMode.rejectionReason;
+    stats.driverModeGeneration = driverMode.generation;
+    stats.driverModeAcceptedRequests = driverMode.acceptedRequests;
+    stats.driverModeRejectedRequests = driverMode.rejectedRequests;
+    stats.driverModeAppliedTransitions = driverMode.appliedTransitions;
+    stats.driverModeApplyFailures = driverMode.applyFailures;
+    stats.driverModePendingTransitions = driverMode.pendingTransitions;
+    stats.driverModeOutputStartLatencyFrames = driverMode.outputStartLatencyFrames;
+    stats.driverModeOutputRestartLatencyFrames = driverMode.outputRestartLatencyFrames;
+    stats.driverModeOutputTargetLatencyFrames = driverMode.outputTargetLatencyFrames;
+    stats.driverModeWorkerQoS = driverMode.workerQoS;
 
     pthread_mutex_lock(&_clockAnchorMutex);
     stats.clockAnchorValid = _clockAnchor.valid ? 1 : 0;
@@ -3333,6 +3452,18 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     (void)IPCSend(fd, kIPCTypeInputStats, &stats, sizeof(stats));
 }
 
+- (void)sendDriverModeStateToClient:(int)fd
+{
+    OpenA8DJDriverModeStatePayload state = DriverModeStateSnapshot();
+    (void)IPCSend(fd, kIPCTypeDriverModeState, &state, sizeof(state));
+}
+
+- (void)rejectDriverModeRequestForClient:(int)fd reason:(uint8_t)reason
+{
+    OpenA8DJDriverModeStatePayload state = DriverModeRejectRequest(reason);
+    (void)IPCSend(fd, kIPCTypeDriverModeState, &state, sizeof(state));
+}
+
 - (void)handleIPCMessageType:(uint8_t)type payload:(const uint8_t *)payload length:(NSUInteger)length client:(int)fd
 {
     switch (type) {
@@ -3365,6 +3496,29 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         case kIPCTypeStreamStatsGet:
             [self sendStreamStatsToClient:fd];
             break;
+        case kIPCTypeDriverModeGet:
+            if (length == 0) {
+                [self sendDriverModeStateToClient:fd];
+            } else {
+                [self rejectDriverModeRequestForClient:fd
+                                                reason:kOpenA8DJDriverModeRejectionBadLength];
+            }
+            break;
+        case kIPCTypeDriverModeSet: {
+            OpenA8DJDriverModeSetPayload request;
+            uint8_t rejection = kOpenA8DJDriverModeRejectionNone;
+            if (!OpenA8DJDriverModeValidateSetPayload(payload,
+                                                       length,
+                                                       &request,
+                                                       &rejection)) {
+                [self rejectDriverModeRequestForClient:fd reason:rejection];
+                break;
+            }
+            OpenA8DJDriverModeStatePayload state =
+                DriverModeSetRequested(request.modeID);
+            (void)IPCSend(fd, kIPCTypeDriverModeState, &state, sizeof(state));
+            break;
+        }
         default:
             break;
     }
@@ -3502,6 +3656,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     if (![self setAudioParams]) {
         return NO;
     }
+    _streamDriverModePolicy = DriverModeBeginStream();
     [self resetStreamStats];
     [self resetClockAnchorForNewStream];
     RingClear(&_inputRing);
@@ -3575,9 +3730,15 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
     atomic_store(&_streaming, true);
     [self startStreamKeepalive];
     __weak OpenA8DJUSBEngine *weakSelf = self;
-    dispatch_async(_queue, ^{
+    dispatch_block_t workerBlock = ^{
         [weakSelf workerLoop];
-    });
+    };
+    if (_streamDriverModePolicy.workerQoS ==
+        kOpenA8DJDriverModeWorkerQoSUserInteractive) {
+        workerBlock = dispatch_block_create_with_qos_class(
+            0, QOS_CLASS_USER_INTERACTIVE, 0, workerBlock);
+    }
+    dispatch_async(_queue, workerBlock);
     USBTrace("USB engine started");
     return YES;
 }
@@ -3613,6 +3774,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
 #if OPENA8DJ_ENABLE_DIAGNOSTIC_CAPTURE
     [self closeDiagnosticCapture];
 #endif
+    DriverModeEndStream();
     USBTrace("USB engine stopped");
 }
 
@@ -3969,6 +4131,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                                     _outputPrefetch,
                                                     kOutputPrefetchFrames,
                                                     kChannels,
+                                                    _streamDriverModePolicy.outputTargetLatencyFrames,
                                                     _outputPrefetchHaveFrame,
                                                     _outputPrefetchStartupSilence,
                                                     _outputPrefetchElasticDrops);
@@ -5073,7 +5236,7 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
         if (_outputTimeline.hasWritten) {
             startFrame = _outputTimeline.maxWrittenFrame + 1;
         } else {
-            startFrame = (int64_t)kOutputStartLatencyFrames;
+            startFrame = (int64_t)_streamDriverModePolicy.outputStartLatencyFrames;
         }
         pthread_mutex_unlock(&_outputTimeline.mutex);
     }
@@ -5084,9 +5247,9 @@ static OpenA8DJIsoTransfer *CreateIsoTransfer(const uint32_t *requests, NSUInteg
                                            inInterleaved,
                                            frames,
                                            startFrame,
-                                           kOutputStartLatencyFrames,
-                                           kOutputRestartLatencyFrames,
-                                           kOutputTargetLatencyFrames,
+                                           _streamDriverModePolicy.outputStartLatencyFrames,
+                                           _streamDriverModePolicy.outputRestartLatencyFrames,
+                                           _streamDriverModePolicy.outputTargetLatencyFrames,
                                            &timelineResets,
                                            &lateWriteFrames);
     if (timelineResets > 0) {
