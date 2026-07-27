@@ -621,6 +621,15 @@ def run_tests(repo, shipping_binary):
           "_streamDriverModePolicy = DriverModeBeginStream();" in hal and
           "DriverModeEndStream();" in hal,
           "one mode mutex does not cover IPC state and stream boundaries")
+    check("OpenA8DJDriverModePolicyIsSafe(policy, kRingFrames)" in hal and
+          "outputStartLatencyFrames >= outputRingCapacityFrames" in mode_header and
+          "outputRestartLatencyFrames > policy->outputStartLatencyFrames" in
+          mode_header and
+          "outputTargetLatencyFrames < policy->outputRestartLatencyFrames" in
+          mode_header and
+          "outputTargetLatencyFrames > policy->outputStartLatencyFrames" in
+          mode_header,
+          "production preflight does not enforce ring and watermark invariants")
     check('_queue = dispatch_queue_create("org.opena8dj.driver.usb",' in hal and
           "OpenA8DJUSBQueueAttributes());" in hal and
           "dispatch_block_create_with_qos_class" in hal,

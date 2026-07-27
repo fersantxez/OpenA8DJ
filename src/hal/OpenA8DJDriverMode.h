@@ -121,6 +121,30 @@ static inline bool OpenA8DJDriverModeLookup(uint32_t modeID,
     return true;
 }
 
+static inline bool OpenA8DJDriverModePolicyIsSafe(
+    const OpenA8DJDriverModePolicy *policy,
+    uint32_t outputRingCapacityFrames)
+{
+    if (policy == NULL || outputRingCapacityFrames <= 4096) {
+        return false;
+    }
+    if (policy->outputStartLatencyFrames < 4096 ||
+        policy->outputRestartLatencyFrames < 4096 ||
+        policy->outputTargetLatencyFrames < 4096 ||
+        policy->outputStartLatencyFrames >= outputRingCapacityFrames ||
+        policy->outputRestartLatencyFrames >= outputRingCapacityFrames ||
+        policy->outputTargetLatencyFrames >= outputRingCapacityFrames) {
+        return false;
+    }
+    if (policy->outputRestartLatencyFrames > policy->outputStartLatencyFrames ||
+        policy->outputTargetLatencyFrames < policy->outputRestartLatencyFrames ||
+        policy->outputTargetLatencyFrames > policy->outputStartLatencyFrames) {
+        return false;
+    }
+    return policy->workerQoS == kOpenA8DJDriverModeWorkerQoSDefault ||
+           policy->workerQoS == kOpenA8DJDriverModeWorkerQoSUserInteractive;
+}
+
 static inline void OpenA8DJDriverModeStateInit(OpenA8DJDriverModeState *state)
 {
     memset(state, 0, sizeof(*state));

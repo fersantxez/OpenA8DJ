@@ -19,6 +19,45 @@ static void CheckBalancedPolicy(void)
     assert(policy.outputRestartLatencyFrames == 4096);
     assert(policy.outputTargetLatencyFrames == 8192);
     assert(policy.workerQoS == kOpenA8DJDriverModeWorkerQoSDefault);
+    assert(OpenA8DJDriverModePolicyIsSafe(&policy, 32768));
+}
+
+static void CheckPolicySafetyInvariants(void)
+{
+    OpenA8DJDriverModePolicy policy;
+    assert(OpenA8DJDriverModeLookup(kOpenA8DJDriverModePerformance, &policy));
+    assert(OpenA8DJDriverModePolicyIsSafe(&policy, 32768));
+
+    OpenA8DJDriverModePolicy invalid = policy;
+    invalid.outputStartLatencyFrames = 32768;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputRestartLatencyFrames = 32768;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputTargetLatencyFrames = 32768;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+
+    invalid = policy;
+    invalid.outputStartLatencyFrames = 4095;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputRestartLatencyFrames = 4095;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputRestartLatencyFrames = 8192;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputTargetLatencyFrames = 4095;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.outputStartLatencyFrames = 8192;
+    invalid.outputTargetLatencyFrames = 12288;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    invalid = policy;
+    invalid.workerQoS = 99;
+    assert(!OpenA8DJDriverModePolicyIsSafe(&invalid, 32768));
+    assert(!OpenA8DJDriverModePolicyIsSafe(&policy, 4096));
 }
 
 static void CheckDefaultAndIdleApply(void)
@@ -196,6 +235,7 @@ static void CheckTransactionalFailures(void)
 int main(void)
 {
     CheckDefaultAndIdleApply();
+    CheckPolicySafetyInvariants();
     CheckRequestValidation();
     CheckPendingCancelAndPromote();
     CheckTransactionalFailures();

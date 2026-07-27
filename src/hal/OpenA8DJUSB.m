@@ -292,12 +292,7 @@ static bool DriverModeProductionPreflight(const OpenA8DJDriverModePolicy *policy
                                           void *context)
 {
     (void)context;
-    return policy != NULL &&
-           policy->outputStartLatencyFrames >= 4096 &&
-           policy->outputRestartLatencyFrames >= 4096 &&
-           policy->outputTargetLatencyFrames >= 4096 &&
-           (policy->workerQoS == kOpenA8DJDriverModeWorkerQoSDefault ||
-            policy->workerQoS == kOpenA8DJDriverModeWorkerQoSUserInteractive);
+    return OpenA8DJDriverModePolicyIsSafe(policy, kRingFrames);
 }
 
 static OpenA8DJDriverModePolicy DriverModeBeginStream(void)

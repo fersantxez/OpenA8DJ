@@ -12,7 +12,10 @@ Give local third-party applications a stable, machine-readable way to:
 - read marker-qualified device information already cached by the HAL;
 - enumerate the built-in profiles;
 - query the active profile and control state; and
-- apply one built-in profile dynamically.
+- apply one built-in profile dynamically;
+- enumerate the allowlisted driver modes;
+- read requested/effective driver-mode state and policy; and
+- request an allowlisted session driver mode dynamically.
 
 The MVP is a JSON command API exposed by `opena8dj-control`. It is deliberately
 not a network service, SDK ABI, or new resident daemon. A client launches the
@@ -62,6 +65,10 @@ opena8dj-control api hardware
 opena8dj-control api profiles
 opena8dj-control api profile
 opena8dj-control api profile set <canonical-profile-id>
+opena8dj-control api driver-modes
+opena8dj-control api driver-mode
+opena8dj-control api driver-mode set balanced
+opena8dj-control api driver-mode set performance
 ```
 
 Exactly one UTF-8 JSON object, terminated by a newline, is written to standard
@@ -69,11 +76,11 @@ output for every `api` invocation, including errors. Public API commands must
 not write human prose to standard output. Diagnostic text may go to standard
 error only when it cannot leak control payloads or private paths.
 
-`api version` and `api profiles` are offline operations. The other reads do not
-wake or start Core Audio. `api profile set` also operates only when the matching
-HAL bridge is already available; the MVP does not let a third-party call
-silently start an audio stream. Existing non-API CLI commands retain their
-current wake behavior.
+`api version`, `api profiles`, and `api driver-modes` are offline operations.
+The other reads do not wake or start Core Audio. `api profile set` and
+`api driver-mode set` also operate only when the matching HAL bridge is already
+available; the MVP does not let a third-party call silently start an audio
+stream. Existing non-API CLI commands retain their current wake behavior.
 
 ### Success envelope
 
@@ -93,7 +100,8 @@ Required top-level members and their types are stable for API major version 1:
 - `apiVersion`: semantic API version string, initially `1.0`;
 - `ok`: boolean;
 - `operation`: one of `version.get`, `stats.get`, `hardware.get`,
-  `profiles.list`, `profile.get`, or `profile.set`; and
+  `profiles.list`, `profile.get`, `profile.set`, `driver_modes.list`,
+  `driver_mode.get`, or `driver_mode.set`; and
 - `data`: an object on success.
 
 Minor releases may add object members and new operations. They must not remove
@@ -128,9 +136,16 @@ The stable v1 error codes are:
 | `backend_permission_denied` | Socket path, owner, or peer credentials failed local authentication | false | 4 |
 | `backend_protocol_error` | Private IPC reply is invalid, truncated, or incompatible | true | 4 |
 | `profile_apply_failed` | Set or read-back verification failed | true | 5 |
+| `driver_mode_not_allowed` | Driver mode is not an exact public allowlist ID | false | 2 |
+| `driver_mode_busy` | Reserved for an explicit future caller that disallows pending; normal v1 set does not emit it | true | 3 |
+| `driver_mode_apply_failed` | HAL preflight/apply kept the previous effective policy | true | 5 |
 
 Messages are for people and may be clarified; clients branch only on `code`.
 Unknown operations use the literal operation value `unknown`.
+
+Public API v1 therefore currently defines exactly nine operations, eight
+capabilities, and nine stable error codes. Compatible minor releases may add
+to these sets but must not remove or redefine existing entries.
 
 ## Response data
 
@@ -145,6 +160,8 @@ Unknown operations use the literal operation value `unknown`.
   the private IPC); and
 - `capabilities`: an array containing `stats.read`, `usb-quality.read`,
   `hardware.read`, `profiles.list`, `profile.read`, and `profile.write`.
+  It also contains `driver-mode.read` and `driver-mode.write`, for a total of
+  eight v1 capabilities.
 
 ### `hardware.get`
 
@@ -209,6 +226,62 @@ Because some catalog entries intentionally produce indistinguishable hardware
 states, `requestedProfile` and `activeProfile` may differ. The API must not
 persist a cosmetic active name or claim that an ambiguous state is identifiable.
 
+### `driver_modes.list`
+
+This offline operation returns `data.schemaVersion: 1` and
+`data.driverModes` in stable catalog order. The MVP allowlist contains exactly:
+
+1. `balanced`, display name `Balanced`, `default: true`;
+2. `performance`, display name `Performance`, `default: false`.
+
+Every entry also has `requiresIdleBoundary: true`: requesting a different mode
+while a stream is active is accepted as pending, not applied to that stream.
+The catalog exposes named immutable policies, never free-form latency, QoS,
+USB, routing, sample-rate, or hardware-control knobs.
+
+### `driver_mode.get` and `driver_mode.set`
+
+Every successful response has `data.schemaVersion: 1` and:
+
+- `requestedMode` and `effectiveMode`: canonical `balanced` or `performance`;
+- `pending` and `streaming`: booleans;
+- `lastResult`: `unchanged`, `applied`, `pending`, `cancelled`, `invalid`, or
+  `apply_failed`;
+- `rejectionReason`: `none`, `bad_length`, `unsupported_schema`,
+  `reserved_nonzero`, or `unknown_mode`;
+- `generation`: effective-policy generation;
+- `counters`: `acceptedRequests`, `rejectedRequests`, `appliedTransitions`,
+  `applyFailures`, and `pendingTransitions`; and
+- `effectivePolicy`: `outputStartLatencyFrames`,
+  `outputRestartLatencyFrames`, `outputTargetLatencyFrames`, and string
+  `workerQoS`.
+
+`balanced` is the session default and reports policy
+`8192 / 4096 / 8192 / default`. `performance` reports
+`4096 / 4096 / 4096 / user-interactive`. The selection is process-session
+state only: it is not persisted, does not change the 512-frame Core Audio
+minimum, and is independent of the electrical/routing hardware `profile`.
+Production preflight requires every output watermark to be at least 4096 and
+strictly below the fixed 32768-frame output ring capacity, with
+`restart <= target <= start` and a known worker QoS. This keeps future catalog
+entries from turning an immutable descriptor into an unsafe ring policy.
+
+`driver_mode.set` accepts only the exact strings `balanced` and `performance`.
+When idle, a valid different policy is committed atomically after preflight.
+While streaming, it changes only `requestedMode`; `effectiveMode` and the
+current stream policy remain unchanged and `pending` is true until a safe
+stop/next-start boundary. Requesting the effective mode cancels a pending
+request. A preflight/apply failure preserves the previous effective descriptor
+and returns `driver_mode_apply_failed`.
+
+The client sends the versioned private set request, validates the HAL state
+response, then performs a getter/read-back on the same authenticated
+connection. Success requires exact agreement between set response and
+read-back, with the requested mode either effective or truthfully pending.
+Unknown schemas/enums, truncation, contradictory pending/effective state, or
+set/get disagreement produce `backend_protocol_error`; the client never
+rewrites `effectiveMode`.
+
 ### `stats.get`
 
 The response is a non-resetting snapshot. Existing counters reset at stream
@@ -229,6 +302,8 @@ subset is grouped as follows:
 - `health`: `inputCheckErrors` and `outputPanicFlags`.
 - `quality`: additive USB completion-cadence histograms and isochronous error
   classes as specified in [USB_QUALITY_METER.md](USB_QUALITY_METER.md).
+- `driverMode`: the same schema version, requested/effective/pending/result,
+  generation, counters, and effective policy exposed by `driver_mode.get`.
 
 `quality.instrumentationAvailable` is `false` when the connected HAL predates
 the complete append-only quality tail or explicitly reports that the build-time
@@ -243,6 +318,11 @@ fabricated from a different metric.
 
 The destructive input meter statistics are intentionally excluded from v1.
 Reading public statistics must never change later observations.
+
+When the private stream payload predates the complete append-only driver-mode
+tail, `stats.get` remains readable and reports `data.driverMode: null`. It must
+not fabricate a balanced state. A complete but invalid driver-mode tail is a
+`backend_protocol_error`.
 
 ## Security and concurrency
 
@@ -266,15 +346,18 @@ Reading public statistics must never change later observations.
    redirects control traffic.
 4. API reads and writes never wake Core Audio. They have bounded connect/read
    behavior and must not wait indefinitely.
-5. A profile write uses a per-user advisory mutation lock created with mode
-   `0600`, owner/type validation, and a bounded wait. This prevents compliant
-   concurrent API writers from interleaving read-modify-write operations.
-   The read-back remains authoritative because legacy CLI clients do not take
-   this new lock.
+5. Profile and driver-mode writes share the same per-user advisory mutation
+   lock created with mode `0600`, owner/type validation, and a bounded wait.
+   This prevents compliant concurrent API writers of either kind from
+   interleaving mutation/read-back transactions. Driver-mode set/get state is
+   additionally serialized in the HAL by one process-wide mode mutex covering
+   raw IPC mutation and stream start/stop boundaries. Read-back remains
+   authoritative because legacy/private clients do not take the public lock.
 6. JSON strings are emitted through a real escaping helper. Catalog fields and
    error strings must not be inserted unescaped.
-7. Requests are argument-vector tokens, not shell strings. The profile ID has a
-   maximum length of 64 bytes and must exactly equal a catalog ID.
+7. Requests are argument-vector tokens, not shell strings. Profile and
+   driver-mode IDs have a maximum length of 64 bytes and must exactly equal
+   their respective catalog IDs.
 8. The public API has no raw IPC, arbitrary file import, arbitrary state patch,
    firmware, USB, MIDI, installation, reload, or privilege-elevation operation.
 9. Statistics can reveal device activity to the logged-in user but are not
@@ -290,8 +373,10 @@ Reading public statistics must never change later observations.
 - Keep existing human CLI output and command behavior backward compatible.
 - Factor JSON envelope/state/stats emitters enough to test them without
   hardware. Do not make the packed private structs a public installed header.
-- The HAL change is limited to authenticating accepted local peers and
-  preserving the cross-UID socket mode required by the Core Audio host.
+- HAL additions preserve authentication and cross-UID socket policy, append
+  versioned driver-mode IPC IDs/payloads, serialize session mode state, and
+  append mode observability to stream stats. They do not expose JSON inside the
+  driver or change existing private IDs/payload prefixes.
 - Add the public API usage to the control-surfaces user guide and CLI help.
 - Add an offline contract test target to `Makefile`; it must not connect to
   Core Audio, USB, `/tmp/opena8dj-control.sock`, or installed components.
@@ -325,6 +410,18 @@ factored functions linked into a harness), not just grep source:
    between connect and the client's second `lstat`.
 10. Run the existing control tool build with warnings enabled and the new
    contract test through a single documented offline command.
+11. Verify the two-entry driver-mode catalog and eight version capabilities
+    without a backend.
+12. Exercise driver-mode default, idle set/read-back, pending/cancel/promote,
+    preflight rollback, malformed schema/enum/truncation/contradiction,
+    set/get disagreement, the active `driver_mode_not_allowed` and
+    `driver_mode_apply_failed` paths, and the reserved `driver_mode_busy`
+    definition.
+13. Run two concurrent public mode writers and prove the shared mutation lock
+    yields complete set/get transactions rather than torn state.
+14. Verify `stats.driverMode` counters/policy and legacy `null`, profile/mode
+    independence, fixed ring capacity, safe policy invariants, and worker-block
+    QoS scope.
 
 No hardware lock is required for compilation or the mock contract suite. Any
 manual call to a live control command, Core Audio, USB, installation/reload, or
@@ -339,16 +436,25 @@ performance measurement must instead run through:
 
 ## Acceptance criteria
 
-- All six public operations return the documented v1 JSON envelopes.
+- All nine public operations return the documented v1 JSON envelopes.
+- `version.get` reports the documented eight capabilities and the error table
+  defines all nine stable codes.
 - Existing non-API commands remain behaviorally compatible.
-- A caller cannot use the public API to apply anything except a canonical
-  built-in preset.
+- A caller can mutate only a canonical built-in profile or one of the two
+  allowlisted driver modes.
 - A successful mutation is backed by exact state read-back.
+- Streaming driver-mode mutation is truthfully pending; safe-boundary
+  promotion is atomic and a failed preflight preserves the old effective
+  policy.
+- Driver mode and hardware profile remain independently readable and writable.
 - The public path does not wake audio or perform destructive stats reads.
 - Unsafe socket ownership/type/mode or mismatched peer credentials are
   rejected, and the HAL authenticates every accepted client.
-- Contract tests cover success, all stable errors, hostile inputs, mock private
-  IPC, schema/types, and socket-mode policy without hardware.
+- Contract tests cover success, every active stable error path, reserved error
+  definitions, hostile inputs, mock private IPC, schema/types, and socket-mode
+  policy without hardware.
+- Driver-mode tests cover policy invariants, rollback, concurrency, stats
+  compatibility, and fixed-capacity/no-allocation safety without hardware.
 - The user guide contains a copy/paste integration example and compatibility
   guidance.
 - Build and contract tests pass offline with no warnings introduced.
@@ -363,5 +469,7 @@ performance measurement must instead run through:
 - Raw controls, USB commands, firmware operations, arbitrary imported configs,
   or profile creation.
 - Solving concurrent writes made through legacy CLI versions.
+- Persisting driver mode across Core Audio host process restarts.
+- User-supplied latency/QoS/ring/USB/sample-rate/routing policy knobs.
 - Windows/Linux parity in this macOS MVP; those platforms may implement the
   same public JSON schema over their native backends later.

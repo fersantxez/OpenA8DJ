@@ -160,7 +160,64 @@ opena8dj-control api profiles
 opena8dj-control api profile
 opena8dj-control api stats
 opena8dj-control api profile set traktor-dvs-vinyl
+opena8dj-control api driver-modes
+opena8dj-control api driver-mode
+opena8dj-control api driver-mode set performance
+opena8dj-control api driver-mode set balanced
 ```
+
+### Driver modes are separate from hardware profiles
+
+A hardware `profile` configures input/electrical and routing-related state such
+as `timecode-vinyl`, phono grounding, input mapping, decode, and software lock.
+A `driver-mode` selects a safe runtime scheduling/buffering policy. These are
+independent axes: selecting `traktor-dvs-vinyl` does not select performance
+mode, and selecting performance mode does not alter the input profile, sample
+rate, routing, or Core Audio buffer minimum.
+
+Copy/paste discovery and read-back:
+
+```sh
+opena8dj-control api driver-modes | python3 -m json.tool
+opena8dj-control api driver-mode | python3 -m json.tool
+```
+
+Request the experimental performance policy for this Core Audio host process:
+
+```sh
+opena8dj-control api driver-mode set performance | python3 -m json.tool
+opena8dj-control api driver-mode | python3 -m json.tool
+```
+
+Return to the shipping balanced policy:
+
+```sh
+opena8dj-control api driver-mode set balanced | python3 -m json.tool
+```
+
+Driver-mode selection is session-only. A Core Audio host process restart
+restores `balanced`; no plist or defaults entry is written. If a stream is
+active, a different valid request is accepted with `pending: true` while
+`effectiveMode` continues to describe the current stream. It is promoted only
+at a safe stop/next-start boundary. Requesting the current effective mode
+cancels a pending change.
+
+`performance` currently means the internal 4096-frame output policy plus
+user-interactive QoS on the USB worker block. It is an experimental candidate,
+not a claim of lower measured latency or equivalent stability. Keep using
+`balanced` unless you are deliberately evaluating it.
+
+Read the same mode state and counters inside the non-destructive stats API:
+
+```sh
+opena8dj-control api stats |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["driverMode"])'
+```
+
+An older compatible HAL without the append-only mode tail returns
+`"driverMode": null`; clients must not interpret that as balanced. Driver-mode
+writes share the same authenticated per-user mutation lock as profile writes,
+and successful sets are verified by a same-connection read-back.
 
 ### USB link quality meter
 
@@ -199,14 +256,15 @@ if result.returncode != 0 or not response["ok"]:
 print(response["data"]["output"]["underruns"])
 ```
 
-`api version` and `api profiles` work without a running driver. API reads and
-writes never start Core Audio; they return `backend_unavailable` when the
-authenticated local HAL bridge is not already running. The bridge is hosted by
-the `_coreaudiod` system account, authenticates every connecting process using
-Unix peer credentials, and permits only root, its own host UID, or the current
-console user. The client independently verifies the server peer and socket
-identity. Profile writes accept only an exact ID returned by `api profiles` and
-verify the complete state by reading it back.
+`api version`, `api profiles`, and `api driver-modes` work without a running
+driver. API reads and writes never start Core Audio; they return
+`backend_unavailable` when the authenticated local HAL bridge is not already
+running. The bridge is hosted by the `_coreaudiod` system account,
+authenticates every connecting process using Unix peer credentials, and
+permits only root, its own host UID, or the current console user. The client
+independently verifies the server peer and socket identity. Profile and
+driver-mode writes accept only exact IDs returned by their respective list
+operations and verify state by reading it back.
 
 Peer enforcement on the server requires the matching updated OpenA8DJ HAL
 driver. Installing only a newer control tool cannot add server-side
@@ -223,6 +281,7 @@ interface.
 Build the CLI and run the complete mock-backed contract suite without hardware:
 
 ```sh
+make driver-mode-offline-test
 make public-api-offline-test
 make usb-quality-offline-test
 ```
