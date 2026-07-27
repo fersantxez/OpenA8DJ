@@ -172,6 +172,8 @@ struct TimecodeSnapshot: Equatable, Sendable {
     let dropoutWindows: UInt64
     let pairWindows: [String: Evidence<PairWindow>]
     let lastFailOpenReason: String
+    let inputLeadFrames: UInt64
+    let inputLeadCeilingFrames: UInt64
     let counters: [String: UInt64]
 }
 
@@ -424,6 +426,18 @@ enum ControlOperation: Equatable, Sendable {
         default: return false
         }
     }
+
+    var requiredReadCapability: String? {
+        switch self {
+        case .profiles: return "profiles.list"
+        case .profile: return "profile.read"
+        case .driverModes, .driverMode: return "driver-mode.read"
+        case .stats: return "stats.read"
+        case .loopbackGet: return "loopback.read"
+        case .quality: return "usb-quality.read"
+        default: return nil
+        }
+    }
 }
 
 enum BundledTool: String, Sendable {
@@ -442,4 +456,10 @@ struct PendingConfirmation: Identifiable, Equatable {
     let operation: ControlOperation
     let title: String
     let message: String
+}
+
+enum MutationExpectation: Equatable, Sendable {
+    case profile(ProfileSnapshot)
+    case driverMode(DriverModeSnapshot)
+    case loopback(LoopbackSnapshot)
 }

@@ -360,6 +360,9 @@ enum DashboardDecoder {
     }
 
     static func quality(_ output: ProcessOutput) throws -> USBQualitySnapshot {
+        guard output.status == 0 else {
+            throw DecodeFailure.protocolViolation("quality process failed")
+        }
         let objects = try StrictJSON.ndjsonPair(from: output.stdout)
         guard objects.allSatisfy({
             string($0, "schema") == "org.opena8dj.usb-quality.sample.v1"
@@ -420,7 +423,16 @@ enum DashboardDecoder {
         }
         let overall = try dictionary(root, "overall")
         let status = try requiredEnum(overall, "status", ["PASS", "WARN", "FAIL", "UNKNOWN"])
-        guard try requiredUInt(overall, "exitStatus") == UInt64(bitPattern: Int64(output.status)) else {
+        let expectedStatus: Int32
+        switch status {
+        case "PASS": expectedStatus = 0
+        case "WARN": expectedStatus = 1
+        case "FAIL": expectedStatus = 2
+        case "UNKNOWN": expectedStatus = 3
+        default: throw DecodeFailure.protocolViolation("profiler status mismatch")
+        }
+        guard output.status == expectedStatus,
+              try requiredUInt(overall, "exitStatus") == UInt64(expectedStatus) else {
             throw DecodeFailure.protocolViolation("profiler exit/report mismatch")
         }
         let checks = try objectArray(root, "checks").map { check -> ProfilerCheck in
@@ -509,6 +521,8 @@ enum DashboardDecoder {
             dropoutWindows: try requiredUInt(data, "dropoutWindows"),
             pairWindows: pairs,
             lastFailOpenReason: try requiredString(data, "lastFailOpenReason"),
+            inputLeadFrames: try requiredUInt(data, "inputLeadFrames"),
+            inputLeadCeilingFrames: try requiredUInt(data, "inputLeadCeilingFrames"),
             counters: (try? uintMap(try dictionary(data, "counters"))) ?? [:]
         )
     }

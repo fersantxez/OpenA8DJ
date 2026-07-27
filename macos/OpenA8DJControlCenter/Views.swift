@@ -164,6 +164,7 @@ struct OverviewView: View {
                             label: check.id,
                             value: check.status,
                             detail: "\(check.code) · \(check.summary)" +
+                                evidenceDetail(check) +
                                 (check.remediations.isEmpty ? "" : " · \(check.remediations.joined(separator: " · "))")
                         )
                     }
@@ -180,6 +181,7 @@ struct OverviewView: View {
                     MetricRow(label: "Ground lifts", value: "Vinyl \(yesNo(value.groundLiftVinyl)) · CD/Line \(yesNo(value.groundLiftCDLine)) · Phono \(yesNo(value.groundLiftPhono))")
                     Text("Sources: \(mapLabel(value.inputSources))")
                     Text("Transforms: \(mapLabel(value.inputTransforms))")
+                    activeProfileGuidance(value.activeProfile)
                     profileMenu
                 case .unavailable(let reason): UnknownView(reason: reason)
                 }
@@ -213,6 +215,16 @@ struct OverviewView: View {
         }
     }
 
+    @ViewBuilder private func activeProfileGuidance(_ id: String) -> some View {
+        if case .known(let choices) = store.profiles,
+           let choice = choices.first(where: { $0.id == id }) {
+            Text("\(choice.surface) · \(choice.summary)")
+                .font(.caption).foregroundStyle(.secondary)
+            Text(cablingGuidance(id))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
     private var canWriteProfile: Bool {
         if case .known(let backend) = store.backend {
             return backend.capabilities.contains("profile.write")
@@ -226,6 +238,33 @@ struct OverviewView: View {
             "device.firmware", "coreaudio.device", "driver.api-pairing", "usb.stream-quality"
         ]
         return order.compactMap { id in report.checks.first { $0.id == id } }
+    }
+
+    private func evidenceDetail(_ check: ProfilerCheck) -> String {
+        guard !check.evidence.isEmpty else { return "" }
+        return " · " + check.evidence.map {
+            if $0.available {
+                return "\($0.key)=\($0.value ?? "available")"
+            }
+            return "\($0.key)=UNKNOWN(\($0.reasonCode ?? "unavailable"))"
+        }.joined(separator: ", ")
+    }
+
+    private func cablingGuidance(_ id: String) -> String {
+        switch id {
+        case "traktor-dvs-vinyl", "vinyl-recording":
+            return "Use A/B for phono cartridges; C/D are line-level inputs."
+        case "traktor-dvs-cd-line":
+            return "Use A/B for timecode CD or line players."
+        case "dj-set-recording":
+            return "Feed a mixer recording or booth output to C/D."
+        case "effects-loop":
+            return "Start sends low and check for feedback."
+        case "microphone":
+            return "Use the front XLR path; phantom power is unavailable."
+        default:
+            return "Verify cabling before applying an electrical profile."
+        }
     }
 }
 
@@ -247,8 +286,14 @@ struct USBQualityView: View {
                 MetricRow(label: "Playback jitter", value: "p95 \(value.playbackJitter.p95.label) · p99 \(value.playbackJitter.p99.label)", detail: "\(value.playbackJitter.samples) samples")
                 MetricRow(label: "Isochronous errors", value: "capture \(value.isoErrors.captureTotal) · playback \(value.isoErrors.playbackTotal)")
                 MetricRow(label: "Hard xruns", value: "\(value.xruns.totalHardXruns)", detail: "active underruns \(value.xruns.activeUnderruns); ring overruns \(value.xruns.ringOverruns)")
+                MetricRow(label: "Hard-xrun delta", value: DashboardReducer.deltaLabel(store.qualityXrunDelta))
                 MetricRow(label: "Late writes", value: "\(value.xruns.lateWriteBatches) batches · \(value.xruns.lateWriteFrames) frames")
                 MetricRow(label: "Sampling context", value: "\(value.windowMilliseconds) ms", detail: "streaming \(yesNo(value.streaming)); \(value.sampleRateHz.formatted()) Hz; instrumentation \(yesNo(value.instrumentationAvailable))")
+                DisclosureGroup("Isochronous component deltas") {
+                    ForEach(value.isoErrors.components.keys.sorted(), id: \.self) { key in
+                        MetricRow(label: key, value: "\(value.isoErrors.components[key] ?? 0)")
+                    }
+                }
             case .unavailable(let reason): UnknownView(reason: reason)
             }
         }
@@ -307,6 +352,7 @@ struct DriverModesView: View {
                     MetricRow(label: "Profile", value: value.electricalProfile, detail: "verified \(yesNo(value.profileVerified))")
                     MetricRow(label: "Evidence", value: value.evidenceKind, detail: "fresh \(yesNo(value.windowFresh)); qualified \(yesNo(value.qualified))")
                     MetricRow(label: "Eligible windows", value: "\(value.eligibleWindows) / \(value.requiredEligibleWindows)", detail: "dropouts \(value.dropoutWindows)")
+                    MetricRow(label: "Input lead", value: "\(value.inputLeadFrames) / \(value.inputLeadCeilingFrames) frames")
                     ForEach(["A", "B", "C", "D"], id: \.self) { pair in
                         if let evidence = value.pairWindows[pair] {
                             switch evidence {
@@ -315,6 +361,11 @@ struct DriverModesView: View {
                             case .unavailable(let reason):
                                 MetricRow(label: "Pair \(pair)", value: reason.description)
                             }
+                        }
+                    }
+                    DisclosureGroup("Timecode counters") {
+                        ForEach(value.counters.keys.sorted(), id: \.self) { key in
+                            MetricRow(label: key, value: "\(value.counters[key] ?? 0)")
                         }
                     }
                     Button(value.armed ? "Disarm" : "Arm for A,B") {
@@ -383,6 +434,11 @@ struct LoopbackView: View {
                 MetricRow(label: "Readers", value: "\(value.registeredReaderCount)", detail: "generation \(value.generation)")
                 MetricRow(label: "Frames", value: "published \(value.sourceFramesPublished) · delivered \(value.framesDelivered)", detail: "silence \(value.silenceFrames)")
                 MetricRow(label: "Gaps / overruns", value: "\(value.gapFrames) gaps · \(value.overrunEvents) events", detail: "\(value.overrunFrames) overrun frames")
+                MetricRow(
+                    label: "Gap / overrun deltas",
+                    value: "\(DashboardReducer.deltaLabel(store.loopbackDeltas.gaps)) gaps · \(DashboardReducer.deltaLabel(store.loopbackDeltas.overrunEvents)) events",
+                    detail: "\(DashboardReducer.deltaLabel(store.loopbackDeltas.overrunFrames)) frames"
+                )
                 Picker("Output pair", selection: $store.selectedLoopbackPair) {
                     ForEach(OutputPair.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }

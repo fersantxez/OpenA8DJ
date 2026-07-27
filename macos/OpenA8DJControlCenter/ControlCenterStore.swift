@@ -17,6 +17,10 @@ final class ControlCenterStore: ObservableObject {
     @Published private(set) var sourceErrors: [String: DashboardError] = [:]
     @Published private(set) var mismatchReasons: [String] = []
     @Published private(set) var actionOutcome: ActionOutcome = .idle
+    @Published private(set) var loopbackDeltas = LoopbackDeltas(
+        gaps: .baseline, overrunEvents: .baseline, overrunFrames: .baseline
+    )
+    @Published private(set) var qualityXrunDelta: DeltaValue = .baseline
     @Published private(set) var isBusy = false
     @Published var selectedSection: DashboardSection? = .overview
     @Published var pendingConfirmation: PendingConfirmation?
@@ -32,6 +36,7 @@ final class ControlCenterStore: ObservableObject {
     private var isWindowVisible = false
     private var profilerCapturedAt: ContinuousClock.Instant?
     private var cadenceTask: Task<Void, Never>?
+    private var profilerRefreshRequested = false
 
     init(
         runner: BoundedProcessRunner = BoundedProcessRunner(),
@@ -70,6 +75,14 @@ final class ControlCenterStore: ObservableObject {
         sourceErrors = [:]
         reduceCurrentSnapshot()
     }
+
+    func runRefreshCycleForTesting() async {
+        await refreshCycle(explicitProfiler: false)
+    }
+
+    func processStatisticsForTesting() async -> (launches: Int, maximumConcurrent: Int) {
+        await runner.policyStatistics()
+    }
 #endif
 
     func setSceneActive(_ active: Bool) {
@@ -83,6 +96,7 @@ final class ControlCenterStore: ObservableObject {
     }
 
     func manualRefresh() {
+        profilerRefreshRequested = true
         Task {
             await coordinator.requestRefresh { [weak self] in
                 await self?.refreshCycle(explicitProfiler: true)
@@ -157,6 +171,10 @@ final class ControlCenterStore: ObservableObject {
         let visible = isSceneActive && isWindowVisible && selectedSection != nil
         if visible {
             reducer.resumeForeground()
+            loopbackDeltas = LoopbackDeltas(
+                gaps: .baseline, overrunEvents: .baseline, overrunFrames: .baseline
+            )
+            qualityXrunDelta = .baseline
             cadenceTask?.cancel()
             Task {
                 await coordinator.setVisible(true) { [weak self] in
@@ -191,12 +209,13 @@ final class ControlCenterStore: ObservableObject {
         }
 
         let shouldProfile: Bool
-        if explicitProfiler || profilerCapturedAt == nil {
+        if explicitProfiler || profilerRefreshRequested || profilerCapturedAt == nil {
             shouldProfile = true
         } else {
             shouldProfile = profilerCapturedAt!.duration(to: cycleStart) >= .seconds(60)
         }
         if shouldProfile {
+            profilerRefreshRequested = false
             await readProfiler(errors: &errors)
             if Task.isCancelled { return }
         }
@@ -213,8 +232,20 @@ final class ControlCenterStore: ObservableObject {
         if Task.isCancelled { return }
 
         sourceErrors = errors
-        let backendContact = !errors.values.contains(where: { $0.code == "backend_unavailable" })
-        _ = await coordinator.noteBackendContact(success: backendContact)
+        if let actionError = reducer.lastActionError {
+            sourceErrors["action"] = actionError
+        }
+        if errors.values.contains(where: {
+            $0.evidenceReason == .permissionDenied ||
+                $0.evidenceReason == .protocolMismatch
+        }) {
+            _ = await coordinator.pauseAutomaticRetries()
+        } else {
+            let backendContact = !errors.values.contains(where: {
+                $0.code == "backend_unavailable"
+            })
+            _ = await coordinator.noteBackendContact(success: backendContact)
+        }
         reduceCurrentSnapshot()
     }
 
@@ -226,31 +257,54 @@ final class ControlCenterStore: ObservableObject {
         } catch {
             record(error, source: "version", into: &errors)
         }
-        do {
-            let output = try await runner.run(.profiles)
-            profiles = .known(try DashboardDecoder.profiles(output))
-            captures["profiles"] = clock.now
-        } catch {
-            record(error, source: "profiles", into: &errors)
+        if Task.isCancelled { return }
+        if supports(.profiles) {
+            do {
+                let output = try await runner.run(.profiles)
+                profiles = .known(try DashboardDecoder.profiles(output))
+                captures["profiles"] = clock.now
+            } catch {
+                record(error, source: "profiles", into: &errors)
+            }
+        } else {
+            profiles = .unavailable(reason: .unsupportedTail)
         }
-        do {
-            let output = try await runner.run(.driverModes)
-            modeChoices = .known(try DashboardDecoder.modeChoices(output))
-            captures["modeChoices"] = clock.now
-        } catch {
-            record(error, source: "driverModes", into: &errors)
+        if Task.isCancelled { return }
+        if supports(.driverModes) {
+            do {
+                let output = try await runner.run(.driverModes)
+                modeChoices = .known(try DashboardDecoder.modeChoices(output))
+                captures["modeChoices"] = clock.now
+            } catch {
+                record(error, source: "driverModes", into: &errors)
+            }
+        } else {
+            modeChoices = .unavailable(reason: .unsupportedTail)
         }
-        bootstrapped = true
+        if Task.isCancelled { return }
+        if case .known = backend { bootstrapped = true } else { bootstrapped = false }
     }
 
     private func readQuality(errors: inout [String: DashboardError]) async {
+        guard supports(.quality) else {
+            quality = .unavailable(reason: .unsupportedTail)
+            return
+        }
         do {
-            quality = .known(try DashboardDecoder.quality(try await runner.run(.quality)))
+            let value = try DashboardDecoder.quality(try await runner.run(.quality))
+            let generation: UInt64?
+            if case .known(let stream) = stream { generation = stream.generation } else { generation = nil }
+            qualityXrunDelta = reducer.qualityDelta(value, generation: generation)
+            quality = .known(value)
             captures["quality"] = clock.now
         } catch { record(error, source: "quality", into: &errors) }
     }
 
     private func readStats(errors: inout [String: DashboardError]) async {
+        guard supports(.stats) else {
+            stream = .unavailable(reason: .unsupportedTail)
+            return
+        }
         do {
             stream = .known(try DashboardDecoder.stream(try await runner.run(.stats)))
             captures["stream"] = clock.now
@@ -258,6 +312,10 @@ final class ControlCenterStore: ObservableObject {
     }
 
     private func readProfile(errors: inout [String: DashboardError]) async {
+        guard supports(.profile) else {
+            profile = .unavailable(reason: .unsupportedTail)
+            return
+        }
         do {
             profile = .known(try DashboardDecoder.profile(try await runner.run(.profile)))
             captures["profile"] = clock.now
@@ -265,6 +323,10 @@ final class ControlCenterStore: ObservableObject {
     }
 
     private func readMode(errors: inout [String: DashboardError]) async {
+        guard supports(.driverMode) else {
+            driverMode = .unavailable(reason: .unsupportedTail)
+            return
+        }
         do {
             driverMode = .known(try DashboardDecoder.driverMode(try await runner.run(.driverMode)))
             captures["driverMode"] = clock.now
@@ -272,8 +334,14 @@ final class ControlCenterStore: ObservableObject {
     }
 
     private func readLoopback(errors: inout [String: DashboardError]) async {
+        guard supports(.loopbackGet) else {
+            loopback = .unavailable(reason: .unsupportedTail)
+            return
+        }
         do {
-            loopback = .known(try DashboardDecoder.loopback(try await runner.run(.loopbackGet)))
+            let value = try DashboardDecoder.loopback(try await runner.run(.loopbackGet))
+            loopbackDeltas = reducer.loopbackDeltas(value)
+            loopback = .known(value)
             captures["loopback"] = clock.now
         } catch { record(error, source: "loopback", into: &errors) }
     }
@@ -293,7 +361,9 @@ final class ControlCenterStore: ObservableObject {
               case .known(let qualityValue) = quality,
               case .known(let modeValue) = driverMode,
               case .known(let loopbackValue) = loopback else {
-            if sourceErrors.values.contains(where: { $0.code == "backend_permission_denied" }) {
+            if sourceErrors.isEmpty, hasUnsupportedReadEvidence {
+                phase = .partial
+            } else if sourceErrors.values.contains(where: { $0.code == "backend_permission_denied" }) {
                 phase = .permissionDenied
             } else if sourceErrors.values.contains(where: { $0.evidenceReason == .protocolMismatch }) {
                 phase = .mismatch
@@ -353,8 +423,10 @@ final class ControlCenterStore: ObservableObject {
         let previousLoopback = loopback
         do {
             let output = try await runner.run(operation)
-            try validateMutation(output, operation: operation)
-            let verified = try await readBackMatches(operation)
+            let expectation = try validateMutation(output, operation: operation)
+            let verified = try await readBackMatches(
+                operation, expectation: expectation
+            )
             if verified {
                 actionOutcome = pendingResult(operation)
                 reducer.clearActionErrorAfterNewSuccess()
@@ -377,51 +449,54 @@ final class ControlCenterStore: ObservableObject {
         updateVisibility()
     }
 
-    private func validateMutation(_ output: ProcessOutput, operation: ControlOperation) throws {
+    private func validateMutation(
+        _ output: ProcessOutput,
+        operation: ControlOperation
+    ) throws -> MutationExpectation {
         guard let expected = operation.expectedOperation else {
             throw DecodeFailure.protocolViolation("read operation used as mutation")
         }
         switch operation {
         case .setProfile:
-            _ = try DashboardDecoder.profile(output, expectedOperation: expected)
+            return .profile(
+                try DashboardDecoder.profile(output, expectedOperation: expected)
+            )
         case .setDriverMode, .armTimecode, .disarmTimecode:
-            _ = try DashboardDecoder.driverMode(output, expectedOperation: expected)
+            return .driverMode(
+                try DashboardDecoder.driverMode(output, expectedOperation: expected)
+            )
         case .enableLoopback, .disableLoopback:
-            _ = try DashboardDecoder.loopback(output, expectedOperation: expected)
+            return .loopback(
+                try DashboardDecoder.loopback(output, expectedOperation: expected)
+            )
         default:
             throw DecodeFailure.protocolViolation("operation is not mutable")
         }
     }
 
-    private func readBackMatches(_ operation: ControlOperation) async throws -> Bool {
+    private func readBackMatches(
+        _ operation: ControlOperation,
+        expectation: MutationExpectation
+    ) async throws -> Bool {
         switch operation {
-        case .setProfile(let requested):
+        case .setProfile:
             let value = try DashboardDecoder.profile(try await runner.run(.profile))
             profile = .known(value)
-            return value.activeProfile == requested.rawValue
-        case .setDriverMode(let requested):
+            return DashboardReducer.mutationMatches(
+                expectation: expectation, profile: value
+            )
+        case .setDriverMode, .armTimecode, .disarmTimecode:
             let value = try DashboardDecoder.driverMode(try await runner.run(.driverMode))
             driverMode = .known(value)
-            return value.requestedMode == requested.rawValue &&
-                (value.pending || value.effectiveMode == requested.rawValue)
-        case .armTimecode:
-            let value = try DashboardDecoder.driverMode(try await runner.run(.driverMode))
-            driverMode = .known(value)
-            if case .known(let timecode) = value.timecode { return timecode.armed }
-            return false
-        case .disarmTimecode:
-            let value = try DashboardDecoder.driverMode(try await runner.run(.driverMode))
-            driverMode = .known(value)
-            if case .known(let timecode) = value.timecode { return !timecode.armed }
-            return false
-        case .enableLoopback(let pair):
+            return DashboardReducer.mutationMatches(
+                expectation: expectation, driverMode: value
+            )
+        case .enableLoopback, .disableLoopback:
             let value = try DashboardDecoder.loopback(try await runner.run(.loopbackGet))
             loopback = .known(value)
-            return value.enabled && value.sourcePair == pair.rawValue
-        case .disableLoopback:
-            let value = try DashboardDecoder.loopback(try await runner.run(.loopbackGet))
-            loopback = .known(value)
-            return !value.enabled
+            return DashboardReducer.mutationMatches(
+                expectation: expectation, loopback: value
+            )
         default: return false
         }
     }
@@ -471,8 +546,8 @@ final class ControlCenterStore: ObservableObject {
         }
         do {
             let output = try await runner.run(rollback)
-            try validateMutation(output, operation: rollback)
-            if try await readBackMatches(rollback) {
+            let expectation = try validateMutation(output, operation: rollback)
+            if try await readBackMatches(rollback, expectation: expectation) {
                 reducer.preserveActionError(disagreement)
                 return .rolledBack(disagreement)
             }
@@ -551,5 +626,23 @@ final class ControlCenterStore: ObservableObject {
             retryable: false,
             phase: phase
         )
+    }
+
+    private func supports(_ operation: ControlOperation) -> Bool {
+        guard let capability = operation.requiredReadCapability else { return true }
+        guard case .known(let identity) = backend else { return false }
+        return identity.capabilities.contains(capability)
+    }
+
+    private var hasUnsupportedReadEvidence: Bool {
+        func unsupported<T>(_ evidence: Evidence<T>) -> Bool {
+            if case .unavailable(reason: .unsupportedTail) = evidence {
+                return true
+            }
+            return false
+        }
+        return unsupported(profiles) || unsupported(modeChoices) ||
+            unsupported(profile) || unsupported(stream) || unsupported(quality) ||
+            unsupported(driverMode) || unsupported(loopback)
     }
 }

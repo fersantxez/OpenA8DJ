@@ -106,12 +106,110 @@ private func decoderTests(_ fixtures: Fixtures) throws {
         throw TestFailure.failed("Vintage tail unavailable")
     }
 
+    func timecodeVariant(
+        _ mutate: (inout [String: Any], inout [String: Any]) -> Void
+    ) throws -> (DriverModeSnapshot, TimecodeSnapshot) {
+        let decoded = try DashboardDecoder.driverMode(
+            fixtures.output(modifying: "good_driver_mode.json") { root in
+                var data = root["data"] as! [String: Any]
+                var timecode = data["timecodeOptimized"] as! [String: Any]
+                mutate(&data, &timecode)
+                data["timecodeOptimized"] = timecode
+                root["data"] = data
+            }
+        )
+        guard case .known(let timecode) = decoded.timecode else {
+            throw TestFailure.failed("timecode variant became unavailable")
+        }
+        return (decoded, timecode)
+    }
+    let wrongProfile = try timecodeVariant { _, timecode in
+        timecode["profileVerified"] = false
+        timecode["armState"] = "waiting_profile"
+    }
+    try check(
+        DashboardReducer.timecodeWaitReason(wrongProfile.1, pending: wrongProfile.0.pending)
+            == "wrong or unverified electrical profile",
+        "wrong-profile wait reason hidden"
+    )
+    let staleEvidence = try timecodeVariant { _, timecode in
+        timecode["windowFresh"] = false
+        timecode["qualified"] = false
+        timecode["eligibleWindows"] = 0
+        timecode["armState"] = "qualifying"
+    }
+    try check(
+        DashboardReducer.timecodeWaitReason(staleEvidence.1, pending: staleEvidence.0.pending)
+            == "stale or missing evidence",
+        "stale-evidence wait reason hidden"
+    )
+    let insufficient = try timecodeVariant { _, timecode in
+        timecode["qualified"] = false
+        timecode["eligibleWindows"] = 1
+        timecode["armState"] = "qualifying"
+    }
+    try check(
+        DashboardReducer.timecodeWaitReason(insufficient.1, pending: insufficient.0.pending)
+            == "insufficient qualifying windows",
+        "insufficient-window wait reason hidden"
+    )
+    let active = try timecodeVariant { data, timecode in
+        data["requestedMode"] = "timecode-optimized"
+        data["effectiveMode"] = "timecode-optimized"
+        data["pending"] = false
+        timecode["optimizedActive"] = true
+        timecode["armState"] = "active"
+    }
+    try check(
+        active.1.optimizedActive &&
+            DashboardReducer.timecodeWaitReason(active.1, pending: false) == "active",
+        "active Timecode state hidden"
+    )
+    let failOpen = try timecodeVariant { _, timecode in
+        timecode["lastFailOpenReason"] = "xrun_or_transport_error"
+    }
+    try check(
+        DashboardReducer.timecodeWaitReason(failOpen.1, pending: false)
+            == "xrun_or_transport_error",
+        "fail-open reason hidden"
+    )
+
     let loopback = try DashboardDecoder.loopback(fixtures.output("good_loopback.json"))
     try check(!loopback.enabled && loopback.sourcePair == "A", "loopback default is not disabled")
+    let enabledLoopback = try DashboardDecoder.loopback(
+        fixtures.output(modifying: "good_loopback.json") {
+            var data = $0["data"] as! [String: Any]
+            data["enabled"] = true
+            data["sourcePair"] = "C"
+            data["physicalPlaybackPublishing"] = true
+            $0["data"] = data
+        }
+    )
+    try check(
+        enabledLoopback.enabled && enabledLoopback.sourcePair == "C",
+        "explicit loopback source not decoded"
+    )
+    let physicalOnly = try DashboardDecoder.loopback(
+        fixtures.output(modifying: "good_loopback.json") {
+            var data = $0["data"] as! [String: Any]
+            data["physicalPlaybackPublishing"] = true
+            $0["data"] = data
+        }
+    )
+    try check(
+        !physicalOnly.enabled && physicalOnly.physicalPlaybackPublishing,
+        "physical publishing was falsely coupled to loopback"
+    )
 
     let quality = try DashboardDecoder.quality(fixtures.output("good_quality.ndjson"))
     try check(quality.classification == "stable", "quality second sample not used")
     try check(quality.captureJitter.p95.label == "≤ 50 µs", "jitter upper bound fabricated")
+    do {
+        _ = try DashboardDecoder.quality(
+            fixtures.output("good_quality.ndjson", status: 1)
+        )
+        throw TestFailure.failed("nonzero quality process accepted")
+    } catch DecodeFailure.protocolViolation { }
 
     let profiler = try DashboardDecoder.profiler(fixtures.output("good_profiler.json"))
     try check(profiler.overallStatus == "PASS" && profiler.checks.count == 8, "profiler required checks missing")
@@ -122,8 +220,32 @@ private func decoderTests(_ fixtures: Fixtures) throws {
             firmwareEvidence?.value == "31",
         "typed firmware evidence was discarded or reinterpreted"
     )
-    let unknown = try DashboardDecoder.profiler(fixtures.output("profiler_unknown.json", status: 70))
+    let unknown = try DashboardDecoder.profiler(fixtures.output("profiler_unknown.json", status: 3))
     try check(unknown.overallStatus == "UNKNOWN", "profiler UNKNOWN collapsed")
+    do {
+        _ = try DashboardDecoder.profiler(
+            fixtures.output("profiler_unknown.json", status: 70)
+        )
+        throw TestFailure.failed("profiler status 70 accepted")
+    } catch DecodeFailure.protocolViolation { }
+
+    let mutationProfile = try DashboardDecoder.profile(
+        fixtures.output("profile_set_custom.json"),
+        expectedOperation: "profile.set"
+    )
+    let readBackProfile = try DashboardDecoder.profile(
+        fixtures.output("profile_get_custom.json")
+    )
+    try check(
+        DashboardReducer.mutationMatches(
+            expectation: .profile(mutationProfile), profile: readBackProfile
+        ),
+        "profile.set custom state falsely disagreed with identical GET"
+    )
+    try check(
+        mutationProfile.activeProfile == "custom",
+        "requestedProfile was substituted for activeProfile"
+    )
 
     do {
         _ = try DashboardDecoder.profile(fixtures.output("action_error.json", status: 5), expectedOperation: "profile.set")
@@ -311,6 +433,17 @@ private func operationPolicyTests() throws {
     ], "loopback allowlist drift")
     try check(ControlOperation.quality.timeout == 7 && ControlOperation.profiler.timeout == 8, "timeout policy drift")
     try check(ControlOperation.version.isRead && !ControlOperation.disableLoopback.isRead, "NO_WAKE read policy wrong")
+    let advertised = Set(["stats.read", "profile.read"])
+    let reads: [ControlOperation] = [
+        .stats, .quality, .profile, .driverMode, .loopbackGet
+    ]
+    let allowed = reads.filter {
+        $0.requiredReadCapability.map(advertised.contains) ?? true
+    }
+    try check(
+        allowed == [.stats, .profile],
+        "missing read capabilities did not suppress unsupported operations"
+    )
 }
 
 private func makeHelper(_ name: String, in directory: URL) throws -> URL {
@@ -441,6 +574,12 @@ private func coordinatorTests() async throws {
     try check(backoff8 == .seconds(8), "backoff 8s wrong")
     try check(backoff15 == .seconds(15), "backoff cap wrong")
     try check(reset == .seconds(1), "backoff did not reset")
+    let paused = await foreground.pauseAutomaticRetries()
+    let pausedCurrent = await foreground.currentBackoff()
+    try check(
+        paused == .seconds(15) && pausedCurrent == .seconds(15),
+        "permission/protocol pause can spin faster than 15 seconds"
+    )
 }
 
 @main

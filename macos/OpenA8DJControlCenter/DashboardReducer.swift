@@ -166,4 +166,28 @@ struct DashboardReducer {
         case .backendMismatch: return "backend mismatch"
         }
     }
+
+    static func mutationMatches(
+        expectation: MutationExpectation,
+        profile: ProfileSnapshot? = nil,
+        driverMode: DriverModeSnapshot? = nil,
+        loopback: LoopbackSnapshot? = nil
+    ) -> Bool {
+        switch expectation {
+        case .profile(let expected):
+            return profile == expected
+        case .driverMode(let expected):
+            guard let actual = driverMode else { return false }
+            return actual.requestedMode == expected.requestedMode &&
+                actual.effectiveMode == expected.effectiveMode &&
+                actual.pending == expected.pending &&
+                actual.generation == expected.generation
+        case .loopback(let expected):
+            guard let actual = loopback else { return false }
+            return actual.enabled == expected.enabled &&
+                actual.sourcePair == expected.sourcePair &&
+                actual.sessionOnly == expected.sessionOnly &&
+                actual.generation == expected.generation
+        }
+    }
 }

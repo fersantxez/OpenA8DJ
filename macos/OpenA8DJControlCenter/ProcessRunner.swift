@@ -315,6 +315,11 @@ actor RefreshCoordinator {
         return .seconds(sequence[min(backendFailures - 1, sequence.count - 1)])
     }
 
+    func pauseAutomaticRetries() -> Duration {
+        backendFailures = 4
+        return .seconds(15)
+    }
+
     func currentBackoff() -> Duration {
         guard backendFailures > 0 else { return .seconds(1) }
         let sequence = [2, 4, 8, 15]
