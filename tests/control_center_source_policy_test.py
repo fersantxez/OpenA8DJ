@@ -97,6 +97,9 @@ def run(repo):
           "mutations do not suspend polling")
     check("readBackMatches" in store and "compensate(" in store,
           "mutation read-back/compensation missing")
+    check("let expectation = try validateMutation(output, operation: operation)" in store and
+          "operation, expectation: expectation" in store,
+          "mutation response is not carried into a separate read-back comparison")
     check(not re.search(r"Timer\.scheduledTimer|DispatchSourceTimer", text),
           "unbounded background timer present")
 

@@ -246,6 +246,66 @@ private func decoderTests(_ fixtures: Fixtures) throws {
         mutationProfile.activeProfile == "custom",
         "requestedProfile was substituted for activeProfile"
     )
+    let sameMode = try DashboardDecoder.driverMode(
+        fixtures.output("good_driver_mode.json")
+    )
+    try check(
+        DashboardReducer.mutationMatches(
+            expectation: .driverMode(sameMode), driverMode: sameMode
+        ),
+        "identical fresh mode read-back disagreed"
+    )
+    let changedModeGeneration = DriverModeSnapshot(
+        requestedMode: sameMode.requestedMode,
+        effectiveMode: sameMode.effectiveMode,
+        pending: sameMode.pending,
+        streaming: sameMode.streaming,
+        lastResult: sameMode.lastResult,
+        rejectionReason: sameMode.rejectionReason,
+        generation: sameMode.generation + 1,
+        counters: sameMode.counters,
+        effectivePolicy: sameMode.effectivePolicy,
+        timecode: sameMode.timecode,
+        vintage: sameMode.vintage
+    )
+    try check(
+        !DashboardReducer.mutationMatches(
+            expectation: .driverMode(sameMode),
+            driverMode: changedModeGeneration
+        ),
+        "mode generation disagreement was accepted"
+    )
+    let sameLoopback = try DashboardDecoder.loopback(
+        fixtures.output("good_loopback.json")
+    )
+    try check(
+        DashboardReducer.mutationMatches(
+            expectation: .loopback(sameLoopback), loopback: sameLoopback
+        ),
+        "identical fresh loopback read-back disagreed"
+    )
+    let changedLoopbackGeneration = LoopbackSnapshot(
+        enabled: sameLoopback.enabled,
+        sourcePair: sameLoopback.sourcePair,
+        sessionOnly: sameLoopback.sessionOnly,
+        physicalPlaybackPublishing: sameLoopback.physicalPlaybackPublishing,
+        ringCapacity: sameLoopback.ringCapacity,
+        generation: sameLoopback.generation + 1,
+        registeredReaderCount: sameLoopback.registeredReaderCount,
+        sourceFramesPublished: sameLoopback.sourceFramesPublished,
+        framesDelivered: sameLoopback.framesDelivered,
+        silenceFrames: sameLoopback.silenceFrames,
+        gapFrames: sameLoopback.gapFrames,
+        overrunEvents: sameLoopback.overrunEvents,
+        overrunFrames: sameLoopback.overrunFrames
+    )
+    try check(
+        !DashboardReducer.mutationMatches(
+            expectation: .loopback(sameLoopback),
+            loopback: changedLoopbackGeneration
+        ),
+        "loopback generation disagreement was accepted"
+    )
 
     do {
         _ = try DashboardDecoder.profile(fixtures.output("action_error.json", status: 5), expectedOperation: "profile.set")
