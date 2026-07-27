@@ -2508,10 +2508,12 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inD
         return kAudioHardwareBadDeviceError;
     }
     pthread_mutex_lock(&gIOMutex);
+    bool finalStop = false;
     if (gRunningClients > 0) {
         gRunningClients--;
+        finalStop = gRunningClients == 0;
     }
-    if (gRunningClients == 0) {
+    if (finalStop) {
         FlushOutputCycle();
         OpenA8DJVirtualLoopbackSetPhysicalPublishing(&gVirtualLoopback,
                                                      false);

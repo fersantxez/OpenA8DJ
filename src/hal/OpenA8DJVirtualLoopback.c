@@ -31,18 +31,13 @@ static float BitsFloat(uint32_t bits)
     return value;
 }
 
-static void SaturatingAdd(atomic_uint_fast64_t *value, uint64_t amount)
+static void CounterAdd(atomic_uint_fast64_t *value, uint64_t amount)
 {
-    uint64_t current = atomic_load_explicit(value, memory_order_relaxed);
-    while (current != UINT64_MAX) {
-        uint64_t next = amount > UINT64_MAX - current ?
-            UINT64_MAX : current + amount;
-        if (atomic_compare_exchange_weak_explicit(value, &current, next,
-                                                  memory_order_relaxed,
-                                                  memory_order_relaxed)) {
-            return;
-        }
-    }
+    /*
+     * Exact, lock-free and wait-free. At 96 kHz, a frame counter needs over
+     * six million years to roll over; HAL reload resets the session first.
+     */
+    (void)atomic_fetch_add_explicit(value, amount, memory_order_relaxed);
 }
 
 static uint64_t AdvanceGeneration(OpenA8DJVirtualLoopback *state)
@@ -96,6 +91,7 @@ void OpenA8DJVirtualLoopbackInitialize(OpenA8DJVirtualLoopback *state)
     atomic_init(&state->overrunFrames, 0);
     for (size_t i = 0; i < kOpenA8DJLoopbackMaxClients; ++i) {
         atomic_init(&state->clients[i].clientID, 0);
+        atomic_init(&state->clients[i].startCount, 0);
         atomic_init(&state->clients[i].generation, 1);
         atomic_init(&state->clients[i].cursor, 0);
     }
@@ -169,6 +165,8 @@ bool OpenA8DJVirtualLoopbackRegisterClient(OpenA8DJVirtualLoopback *state,
     for (size_t i = 0; i < kOpenA8DJLoopbackMaxClients; ++i) {
         if (atomic_load_explicit(&state->clients[i].clientID,
                                  memory_order_acquire) == clientID) {
+            atomic_fetch_add_explicit(&state->clients[i].startCount, 1,
+                                      memory_order_relaxed);
             return true;
         }
     }
@@ -184,6 +182,8 @@ bool OpenA8DJVirtualLoopbackRegisterClient(OpenA8DJVirtualLoopback *state,
             atomic_store_explicit(&state->clients[i].cursor, head,
                                   memory_order_relaxed);
             atomic_store_explicit(&state->clients[i].generation, generation,
+                                  memory_order_relaxed);
+            atomic_store_explicit(&state->clients[i].startCount, 1,
                                   memory_order_relaxed);
             atomic_store_explicit(&state->clients[i].clientID, clientID,
                                   memory_order_release);
@@ -202,10 +202,23 @@ void OpenA8DJVirtualLoopbackUnregisterClient(OpenA8DJVirtualLoopback *state,
         return;
     }
     for (size_t i = 0; i < kOpenA8DJLoopbackMaxClients; ++i) {
+        if (atomic_load_explicit(&state->clients[i].clientID,
+                                 memory_order_acquire) != clientID) {
+            continue;
+        }
+        unsigned starts = atomic_load_explicit(&state->clients[i].startCount,
+                                               memory_order_relaxed);
+        if (starts > 1) {
+            atomic_fetch_sub_explicit(&state->clients[i].startCount, 1,
+                                      memory_order_relaxed);
+            return;
+        }
         uint_fast32_t expected = clientID;
         if (atomic_compare_exchange_strong_explicit(
                 &state->clients[i].clientID, &expected, 0,
                 memory_order_acq_rel, memory_order_relaxed)) {
+            atomic_store_explicit(&state->clients[i].startCount, 0,
+                                  memory_order_relaxed);
             atomic_fetch_sub_explicit(&state->registeredReaderCount, 1,
                                       memory_order_relaxed);
             return;
@@ -268,7 +281,7 @@ uint32_t OpenA8DJVirtualLoopbackPublish8(
     }
     atomic_store_explicit(&state->writeHead, head + frameCount,
                           memory_order_release);
-    SaturatingAdd(&state->sourceFramesPublished, frameCount);
+    CounterAdd(&state->sourceFramesPublished, frameCount);
     return frameCount;
 }
 
@@ -302,7 +315,7 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
         !atomic_load_explicit(&state->enabled, memory_order_acquire) ||
         !atomic_load_explicit(&state->physicalPlaybackPublishing,
                               memory_order_acquire)) {
-        SaturatingAdd(&state->silenceFrames, frameCount);
+        CounterAdd(&state->silenceFrames, frameCount);
         return 0;
     }
     uint64_t generation = atomic_load_explicit(&state->generation,
@@ -315,7 +328,7 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
         atomic_store_explicit(&client->cursor, head, memory_order_relaxed);
         atomic_store_explicit(&client->generation, generation,
                               memory_order_release);
-        SaturatingAdd(&state->silenceFrames, frameCount);
+        CounterAdd(&state->silenceFrames, frameCount);
         return 0;
     }
 
@@ -328,8 +341,8 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
         if (head < cursor) {
             atomic_store_explicit(&client->cursor, head,
                                   memory_order_release);
-            SaturatingAdd(&state->gapFrames, frameCount);
-            SaturatingAdd(&state->silenceFrames, frameCount);
+            CounterAdd(&state->gapFrames, frameCount);
+            CounterAdd(&state->silenceFrames, frameCount);
             return 0;
         }
         uint64_t available = head - cursor;
@@ -337,16 +350,16 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
             uint64_t lost = available - kOpenA8DJLoopbackRingCapacity;
             atomic_store_explicit(&client->cursor, head,
                                   memory_order_release);
-            SaturatingAdd(&state->overrunEvents, 1);
-            SaturatingAdd(&state->overrunFrames, lost);
-            SaturatingAdd(&state->gapFrames, lost);
-            SaturatingAdd(&state->silenceFrames, frameCount);
+            CounterAdd(&state->overrunEvents, 1);
+            CounterAdd(&state->overrunFrames, lost);
+            CounterAdd(&state->gapFrames, lost);
+            CounterAdd(&state->silenceFrames, frameCount);
             return 0;
         }
         reserved = available < frameCount ?
             (uint32_t)available : frameCount;
         if (reserved == 0) {
-            SaturatingAdd(&state->silenceFrames, frameCount);
+            CounterAdd(&state->silenceFrames, frameCount);
             return 0;
         }
         uint64_t expected = cursor;
@@ -358,7 +371,7 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
         }
     }
     if (!didReserve) {
-        SaturatingAdd(&state->silenceFrames, frameCount);
+        CounterAdd(&state->silenceFrames, frameCount);
         return 0;
     }
 
@@ -383,11 +396,11 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
             outInterleavedStereo[(size_t)frame * 2 + 1] = BitsFloat(right);
             delivered++;
         } else {
-            SaturatingAdd(&state->gapFrames, 1);
+            CounterAdd(&state->gapFrames, 1);
         }
     }
-    SaturatingAdd(&state->framesDelivered, delivered);
-    SaturatingAdd(&state->silenceFrames, frameCount - delivered);
+    CounterAdd(&state->framesDelivered, delivered);
+    CounterAdd(&state->silenceFrames, frameCount - delivered);
     return delivered;
 }
 

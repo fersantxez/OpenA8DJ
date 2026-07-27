@@ -53,6 +53,7 @@ typedef struct OpenA8DJLoopbackSlot {
 
 typedef struct OpenA8DJLoopbackClient {
     atomic_uint_fast32_t clientID;
+    atomic_uint startCount;
     atomic_uint_fast64_t generation;
     atomic_uint_fast64_t cursor;
 } OpenA8DJLoopbackClient;
@@ -81,7 +82,9 @@ extern OpenA8DJVirtualLoopback gOpenA8DJVirtualLoopback;
  * that entire callback is silence. Its cursor advances to the current head;
  * the exact lost range is charged to gap/overrun counters. The next callback
  * resumes with newly published audio. Partial availability is delivered first
- * and the remainder of the requested buffer is silence.
+ * and the remainder of the requested buffer is silence. Session counters use
+ * exact relaxed fetch-add operations; theoretical UInt64 rollover is the
+ * documented boundary and is operationally unreachable before HAL reload.
  */
 void OpenA8DJVirtualLoopbackInitialize(OpenA8DJVirtualLoopback *state);
 bool OpenA8DJVirtualLoopbackValidateSetRequest(

@@ -1,6 +1,8 @@
 #include "OpenA8DJVirtualLoopback.h"
 
 #include <assert.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +19,114 @@ static void Fill8(float *buffer, uint32_t frames, float base)
 static void ExpectZero(const float *buffer, uint32_t frames)
 {
     for (uint32_t i = 0; i < frames * 2; ++i) assert(buffer[i] == 0.0f);
+}
+
+typedef struct StressContext {
+    OpenA8DJVirtualLoopback *state;
+    atomic_bool failed;
+    atomic_uint_fast64_t expectedPublished;
+} StressContext;
+
+typedef struct ReaderContext {
+    StressContext *stress;
+    uint32_t clientID;
+} ReaderContext;
+
+static void *StressWriter(void *opaque)
+{
+    StressContext *context = opaque;
+    float source[16 * 8];
+    for (uint32_t frame = 0; frame < 16; ++frame) {
+        for (uint32_t channel = 0; channel < 8; ++channel) {
+            source[frame * 8 + channel] = (float)(channel + 1);
+        }
+    }
+    for (unsigned iteration = 0; iteration < 5000; ++iteration) {
+        uint32_t published = OpenA8DJVirtualLoopbackPublish8(
+            context->state, source, 16);
+        atomic_fetch_add(&context->expectedPublished, published);
+    }
+    return NULL;
+}
+
+static void *StressMutator(void *opaque)
+{
+    StressContext *context = opaque;
+    for (unsigned iteration = 0; iteration < 1000; ++iteration) {
+        (void)OpenA8DJVirtualLoopbackSet(
+            context->state, true,
+            (OpenA8DJLoopbackSourcePair)(iteration & 3));
+        if ((iteration % 17) == 0) {
+            OpenA8DJVirtualLoopbackResetContent(context->state);
+        }
+    }
+    return NULL;
+}
+
+static void *StressReader(void *opaque)
+{
+    ReaderContext *reader = opaque;
+    float output[8 * 2];
+    for (unsigned iteration = 0; iteration < 5000; ++iteration) {
+        (void)OpenA8DJVirtualLoopbackRead(
+            reader->stress->state, reader->clientID, output, 8);
+        for (unsigned frame = 0; frame < 8; ++frame) {
+            float left = output[frame * 2];
+            float right = output[frame * 2 + 1];
+            bool zero = left == 0.0f && right == 0.0f;
+            bool validPair =
+                (left == 1.0f && right == 2.0f) ||
+                (left == 3.0f && right == 4.0f) ||
+                (left == 5.0f && right == 6.0f) ||
+                (left == 7.0f && right == 8.0f);
+            if (!zero && !validPair) {
+                atomic_store(&reader->stress->failed, true);
+            }
+        }
+    }
+    return NULL;
+}
+
+static void RunStressTest(void)
+{
+    OpenA8DJVirtualLoopback *state = calloc(1, sizeof(*state));
+    assert(state != NULL);
+    OpenA8DJVirtualLoopbackInitialize(state);
+    assert(OpenA8DJVirtualLoopbackSet(
+        state, true, kOpenA8DJLoopbackSourcePairA));
+    OpenA8DJVirtualLoopbackSetPhysicalPublishing(state, true);
+    assert(OpenA8DJVirtualLoopbackRegisterClient(state, 101));
+    assert(OpenA8DJVirtualLoopbackRegisterClient(state, 102));
+    StressContext stress = {
+        .state = state,
+        .failed = ATOMIC_VAR_INIT(false),
+        .expectedPublished = ATOMIC_VAR_INIT(0)
+    };
+    ReaderContext readers[] = {
+        {.stress = &stress, .clientID = 101},
+        {.stress = &stress, .clientID = 102}
+    };
+    pthread_t writer;
+    pthread_t mutator;
+    pthread_t readerThreads[2];
+    assert(pthread_create(&writer, NULL, StressWriter, &stress) == 0);
+    assert(pthread_create(&mutator, NULL, StressMutator, &stress) == 0);
+    assert(pthread_create(&readerThreads[0], NULL, StressReader,
+                          &readers[0]) == 0);
+    assert(pthread_create(&readerThreads[1], NULL, StressReader,
+                          &readers[1]) == 0);
+    assert(pthread_join(writer, NULL) == 0);
+    assert(pthread_join(mutator, NULL) == 0);
+    assert(pthread_join(readerThreads[0], NULL) == 0);
+    assert(pthread_join(readerThreads[1], NULL) == 0);
+    assert(!atomic_load(&stress.failed));
+    OpenA8DJLoopbackStatePayload snapshot;
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.sourceFramesPublished ==
+           atomic_load(&stress.expectedPublished));
+    assert(snapshot.framesDelivered + snapshot.silenceFrames ==
+           2ull * 5000ull * 8ull);
+    free(state);
 }
 
 int main(void)
@@ -58,6 +168,9 @@ int main(void)
     }
 
     assert(OpenA8DJVirtualLoopbackRegisterClient(state, 42));
+    assert(OpenA8DJVirtualLoopbackRegisterClient(state, 42));
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.registeredReaderCount == 2);
     Fill8(source, 8, 500.0f);
     assert(OpenA8DJVirtualLoopbackPublish8(state, source, 8) == 8);
     assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 3) == 3);
@@ -144,6 +257,9 @@ int main(void)
     ExpectZero(output, 8);
     OpenA8DJVirtualLoopbackUnregisterClient(state, 41);
     OpenA8DJVirtualLoopbackUnregisterClient(state, 42);
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.registeredReaderCount == 1);
+    OpenA8DJVirtualLoopbackUnregisterClient(state, 42);
     memset(output, 1, sizeof(output));
     assert(OpenA8DJVirtualLoopbackRead(state, 9999, output, 2) == 0);
     ExpectZero(output, 2);
@@ -172,6 +288,7 @@ int main(void)
 
     free(large);
     free(state);
+    RunStressTest();
     puts("virtual loopback state tests: PASS");
     return 0;
 }

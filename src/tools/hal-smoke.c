@@ -6,6 +6,10 @@
 
 typedef void *(*OpenA8DJFactory)(CFAllocatorRef allocator, CFUUIDRef requestedTypeUUID);
 
+static UInt32 gConfigurationChangeRequests = 0;
+static AudioObjectID gLastConfigurationDevice = kAudioObjectUnknown;
+static UInt64 gLastConfigurationAction = 0;
+
 static OSStatus HostPropertiesChanged(AudioServerPlugInHostRef inHost,
                                       AudioObjectID inObjectID,
                                       UInt32 inNumberAddresses,
@@ -51,9 +55,10 @@ static OSStatus HostRequestDeviceConfigurationChange(AudioServerPlugInHostRef in
                                                      void *inChangeInfo)
 {
     (void)inHost;
-    (void)inDeviceObjectID;
-    (void)inChangeAction;
     (void)inChangeInfo;
+    gConfigurationChangeRequests++;
+    gLastConfigurationDevice = inDeviceObjectID;
+    gLastConfigurationAction = inChangeAction;
     return kAudioHardwareNoError;
 }
 
@@ -187,6 +192,35 @@ int main(int argc, char **argv)
                 physicalDevice, loopbackDevice);
         CFRelease(bundle);
         return 16;
+    }
+    AudioObjectPropertyAddress translateAddress = {
+        kAudioPlugInPropertyTranslateUIDToDevice,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+    CFStringRef translateUID = CFSTR("org.opena8dj.Audio8DJ");
+    AudioObjectID translated = kAudioObjectUnknown;
+    dataSize = 0;
+    status = (*driver)->GetPropertyData(
+        driver, kAudioObjectPlugInObject, 0, &translateAddress,
+        sizeof(translateUID), &translateUID, sizeof(translated),
+        &dataSize, &translated);
+    if (status != kAudioHardwareNoError || translated != physicalDevice) {
+        fprintf(stderr, "Physical UID translation failed: %u\n", translated);
+        CFRelease(bundle);
+        return 21;
+    }
+    translateUID = CFSTR("org.opena8dj.Audio8DJ.loopback");
+    translated = kAudioObjectUnknown;
+    dataSize = 0;
+    status = (*driver)->GetPropertyData(
+        driver, kAudioObjectPlugInObject, 0, &translateAddress,
+        sizeof(translateUID), &translateUID, sizeof(translated),
+        &dataSize, &translated);
+    if (status != kAudioHardwareNoError || translated != loopbackDevice) {
+        fprintf(stderr, "Loopback UID translation failed: %u\n", translated);
+        CFRelease(bundle);
+        return 22;
     }
 
     CFStringRef name = NULL;
@@ -337,6 +371,157 @@ int main(int argc, char **argv)
         CFRelease(name);
         CFRelease(bundle);
         return 18;
+    }
+
+    UInt32 physicalRunningBefore = 0;
+    UInt32 virtualRunning = 0;
+    dataSize = 0;
+    status = GetProperty(driver, physicalDevice,
+                         kAudioDevicePropertyDeviceIsRunning,
+                         kAudioObjectPropertyScopeGlobal,
+                         sizeof(physicalRunningBefore), &dataSize,
+                         &physicalRunningBefore);
+    if (status != kAudioHardwareNoError ||
+        (*driver)->StartIO(driver, loopbackDevice, 9001) !=
+            kAudioHardwareNoError ||
+        (*driver)->StartIO(driver, loopbackDevice, 9001) !=
+            kAudioHardwareNoError) {
+        fprintf(stderr, "Loopback StartIO failed without physical playback\n");
+        CFRelease(name);
+        CFRelease(bundle);
+        return 19;
+    }
+    dataSize = 0;
+    status = GetProperty(driver, loopbackDevice,
+                         kAudioDevicePropertyDeviceIsRunning,
+                         kAudioObjectPropertyScopeGlobal,
+                         sizeof(virtualRunning), &dataSize, &virtualRunning);
+    UInt32 physicalRunningAfter = UINT32_MAX;
+    dataSize = 0;
+    (void)GetProperty(driver, physicalDevice,
+                      kAudioDevicePropertyDeviceIsRunning,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(physicalRunningAfter), &dataSize,
+                      &physicalRunningAfter);
+    Boolean willRead = false;
+    Boolean inPlace = false;
+    (void)(*driver)->WillDoIOOperation(
+        driver, loopbackDevice, 9001,
+        kAudioServerPlugInIOOperationReadInput, &willRead, &inPlace);
+    Float32 silence[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+    AudioServerPlugInIOCycleInfo cycle = {0};
+    status = (*driver)->DoIOOperation(
+        driver, loopbackDevice, 12, 9001,
+        kAudioServerPlugInIOOperationReadInput, 4, &cycle, silence, NULL);
+    bool exactSilence = true;
+    for (UInt32 i = 0; i < 8; ++i) {
+        exactSilence = exactSilence && silence[i] == 0.0f;
+    }
+    Float64 virtualSample1 = -1.0;
+    Float64 virtualSample2 = -1.0;
+    UInt64 virtualHost1 = 0;
+    UInt64 virtualHost2 = 0;
+    UInt64 virtualSeed1 = 0;
+    UInt64 virtualSeed2 = 0;
+    (void)(*driver)->GetZeroTimeStamp(
+        driver, loopbackDevice, 9001, &virtualSample1,
+        &virtualHost1, &virtualSeed1);
+    (void)(*driver)->GetZeroTimeStamp(
+        driver, loopbackDevice, 9001, &virtualSample2,
+        &virtualHost2, &virtualSeed2);
+    (void)(*driver)->StopIO(driver, loopbackDevice, 9001);
+    UInt32 virtualAfterOneStop = UINT32_MAX;
+    dataSize = 0;
+    (void)GetProperty(driver, loopbackDevice,
+                      kAudioDevicePropertyDeviceIsRunning,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(virtualAfterOneStop), &dataSize,
+                      &virtualAfterOneStop);
+    (void)(*driver)->StopIO(driver, loopbackDevice, 9001);
+    UInt32 virtualStopped = UINT32_MAX;
+    dataSize = 0;
+    (void)GetProperty(driver, loopbackDevice,
+                      kAudioDevicePropertyDeviceIsRunning,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(virtualStopped), &dataSize, &virtualStopped);
+    (void)(*driver)->StartIO(driver, loopbackDevice, 9001);
+    UInt64 virtualRestartSeed = 0;
+    Float64 virtualRestartSample = -1.0;
+    UInt64 virtualRestartHost = 0;
+    (void)(*driver)->GetZeroTimeStamp(
+        driver, loopbackDevice, 9001, &virtualRestartSample,
+        &virtualRestartHost, &virtualRestartSeed);
+    (void)(*driver)->StopIO(driver, loopbackDevice, 9001);
+    if (status != kAudioHardwareNoError || virtualRunning != 1 ||
+        virtualAfterOneStop != 1 || virtualStopped != 0 ||
+        physicalRunningAfter != physicalRunningBefore ||
+        !willRead || !inPlace || !exactSilence ||
+        virtualSample1 < 0.0 || virtualSample2 < virtualSample1 ||
+        virtualHost1 == 0 || virtualHost2 < virtualHost1 ||
+        virtualSeed1 == 0 || virtualSeed2 != virtualSeed1 ||
+        virtualRestartSeed <= virtualSeed1 ||
+        virtualRestartSample < 0.0 || virtualRestartHost == 0) {
+        fprintf(stderr,
+                "Loopback lifecycle/read invalid virtual=%u stopped=%u "
+                "physical=%u/%u willRead=%u inPlace=%u silence=%d\n",
+                virtualRunning, virtualStopped, physicalRunningBefore,
+                physicalRunningAfter, willRead, inPlace, exactSilence);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 20;
+    }
+
+    UInt32 physicalBufferBefore = 0;
+    dataSize = 0;
+    (void)GetProperty(driver, physicalDevice,
+                      kAudioDevicePropertyBufferFrameSize,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(physicalBufferBefore), &dataSize,
+                      &physicalBufferBefore);
+    AudioObjectPropertyAddress bufferAddress = {
+        kAudioDevicePropertyBufferFrameSize,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+    UInt32 newLoopbackBuffer = 256;
+    UInt32 requestsBefore = gConfigurationChangeRequests;
+    status = (*driver)->SetPropertyData(
+        driver, loopbackDevice, 0, &bufferAddress, 0, NULL,
+        sizeof(newLoopbackBuffer), &newLoopbackBuffer);
+    if (status != kAudioHardwareNoError ||
+        gConfigurationChangeRequests != requestsBefore + 1 ||
+        gLastConfigurationDevice != loopbackDevice ||
+        gLastConfigurationAction != 3 ||
+        (*driver)->PerformDeviceConfigurationChange(
+            driver, loopbackDevice, 3, NULL) != kAudioHardwareNoError) {
+        fprintf(stderr, "Loopback buffer configuration request invalid\n");
+        CFRelease(name);
+        CFRelease(bundle);
+        return 23;
+    }
+    UInt32 loopbackBufferAfter = 0;
+    UInt32 physicalBufferAfter = 0;
+    dataSize = 0;
+    (void)GetProperty(driver, loopbackDevice,
+                      kAudioDevicePropertyBufferFrameSize,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(loopbackBufferAfter), &dataSize,
+                      &loopbackBufferAfter);
+    dataSize = 0;
+    (void)GetProperty(driver, physicalDevice,
+                      kAudioDevicePropertyBufferFrameSize,
+                      kAudioObjectPropertyScopeGlobal,
+                      sizeof(physicalBufferAfter), &dataSize,
+                      &physicalBufferAfter);
+    if (loopbackBufferAfter != newLoopbackBuffer ||
+        physicalBufferAfter != physicalBufferBefore) {
+        fprintf(stderr,
+                "Loopback buffer changed physical geometry: loop=%u phys=%u/%u\n",
+                loopbackBufferAfter, physicalBufferBefore,
+                physicalBufferAfter);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 24;
     }
 
     CFRelease(name);
