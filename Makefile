@@ -5,11 +5,12 @@ SRC := src/opena8dj-probe.m
 HAL_BUNDLE := build/OpenA8DJ.driver
 HAL_BIN := $(HAL_BUNDLE)/Contents/MacOS/OpenA8DJHAL
 HAL_CONFIG := build/hal-build-config.txt
-HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m
+HAL_SRC := src/hal/OpenA8DJHAL.c src/hal/OpenA8DJUSB.m src/hal/OpenA8DJVirtualLoopback.c
 HAL_IPC_AUTH := src/hal/OpenA8DJIPCAuth.h
 DRIVER_MODE_HEADER := src/hal/OpenA8DJDriverMode.h
 TIMECODE_HEADER := src/hal/OpenA8DJTimecodeOptimized.h
 VINTAGE_HEADER := src/hal/OpenA8DJVintageCompatible.h
+VIRTUAL_LOOPBACK_HEADER := src/hal/OpenA8DJVirtualLoopback.h
 HAL_PLIST := resources/OpenA8DJ.driver/Contents/Info.plist
 HAL_SMOKE := build/hal-smoke
 HAL_SMOKE_SRC := src/tools/hal-smoke.c
@@ -251,7 +252,7 @@ $(HAL_CONFIG): FORCE
 		rm -f "$$tmp"; \
 	fi
 
-$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(VINTAGE_HEADER) $(HAL_PLIST) $(HAL_CONFIG)
+$(HAL_BIN): $(HAL_SRC) $(HAL_IPC_AUTH) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(VINTAGE_HEADER) $(VIRTUAL_LOOPBACK_HEADER) $(HAL_PLIST) $(HAL_CONFIG)
 	@mkdir -p $(HAL_BUNDLE)/Contents/MacOS
 	@cp $(HAL_PLIST) $(HAL_BUNDLE)/Contents/Info.plist
 	@/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $(VERSION)" $(HAL_BUNDLE)/Contents/Info.plist
@@ -552,15 +553,15 @@ quality-window-candidate: $(AUDIO_LIST) $(AUDIO_WAV_PLAY) $(AUDIO_RECORD) $(CONT
 		--music-file "$(CANDIDATE_PREFLIGHT_MUSIC)" \
 		--physical-baseline-json "$(CANDIDATE_PREFLIGHT_BASELINE_JSON)"
 
-$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
+$(USB_PLAY): $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h src/hal/OpenA8DJVirtualLoopback.c $(VIRTUAL_LOOPBACK_HEADER)
 	@mkdir -p build
-	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m
+	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_PLAY_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJVirtualLoopback.c
 
 usb-play: $(USB_PLAY)
 
-$(USB_INPUT_METER): $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h
+$(USB_INPUT_METER): $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJUSB.h src/hal/OpenA8DJVirtualLoopback.c $(VIRTUAL_LOOPBACK_HEADER)
 	@mkdir -p build
-	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m
+	$(CC) $(CFLAGS) -framework Foundation -framework IOKit -framework IOUSBHost -framework CoreMIDI -framework CoreAudio -framework CoreFoundation -o $@ $(USB_INPUT_METER_SRC) src/hal/OpenA8DJUSB.m src/hal/OpenA8DJVirtualLoopback.c
 
 usb-input-meter: $(USB_INPUT_METER)
 	./$(USB_INPUT_METER) 6 48000
@@ -580,7 +581,7 @@ $(MIDI_BRIDGE): $(MIDI_BRIDGE_SRC)
 	@mkdir -p build
 	xcrun clang $(CFLAGS) $(MIDI_FRAMEWORKS) -o $@ $<
 
-$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(VINTAGE_HEADER)
+$(CONTROL_TOOL): $(CONTROL_TOOL_SRC) $(DRIVER_MODE_HEADER) $(TIMECODE_HEADER) $(VINTAGE_HEADER) $(VIRTUAL_LOOPBACK_HEADER)
 	@mkdir -p build
 	xcrun clang -Wall -Wextra -Wpedantic -O2 -framework CoreAudio -framework CoreFoundation -o $@ $<
 

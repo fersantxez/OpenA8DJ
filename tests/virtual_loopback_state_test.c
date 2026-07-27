@@ -28,19 +28,28 @@ int main(void)
     OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
     assert(snapshot.enabled == 0 && snapshot.sourcePair == 0);
     assert(snapshot.sessionOnly == 1 && snapshot.generation != 0);
+    uint64_t generation = snapshot.generation;
 
     float source[8 * 8];
     float output[8 * 2];
     Fill8(source, 8, 100.0f);
     memset(output, 1, sizeof(output));
     assert(OpenA8DJVirtualLoopbackPublish8(state, source, 8) == 0);
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.sourceFramesPublished == 0);
     assert(OpenA8DJVirtualLoopbackRegisterClient(state, 41));
     assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 8) == 0);
     ExpectZero(output, 8);
 
     assert(OpenA8DJVirtualLoopbackSet(state, true,
                                      kOpenA8DJLoopbackSourcePairA));
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.generation == generation + 1);
+    generation = snapshot.generation;
     OpenA8DJVirtualLoopbackSetPhysicalPublishing(state, true);
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.generation == generation + 1);
+    generation = snapshot.generation;
     assert(OpenA8DJVirtualLoopbackPublish8(state, source, 8) == 8);
     assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 8) == 8);
     for (uint32_t f = 0; f < 8; ++f) {
@@ -67,6 +76,41 @@ int main(void)
         assert(output[0] == source[pair * 2]);
         assert(output[1] == source[pair * 2 + 1]);
     }
+
+    Fill8(source, 2, 1500.0f);
+    assert(OpenA8DJVirtualLoopbackPublish8(state, source, 2) == 2);
+    memset(output, 1, sizeof(output));
+    assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 4) == 2);
+    assert(output[0] == source[6] && output[1] == source[7]);
+    assert(output[4] == 0.0f && output[7] == 0.0f);
+
+    atomic_store(&state->writeHead, kOpenA8DJLoopbackRingCapacity - 2);
+    for (size_t i = 0; i < kOpenA8DJLoopbackMaxClients; ++i) {
+        if (atomic_load(&state->clients[i].clientID) == 41) {
+            atomic_store(&state->clients[i].cursor,
+                         kOpenA8DJLoopbackRingCapacity - 2);
+        }
+    }
+    Fill8(source, 4, 1700.0f);
+    assert(OpenA8DJVirtualLoopbackPublish8(state, source, 4) == 4);
+    assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 4) == 4);
+    assert(output[0] == source[6] && output[6] == source[30]);
+
+    atomic_store(&state->writeHead, UINT64_MAX - 2);
+    for (size_t i = 0; i < kOpenA8DJLoopbackMaxClients; ++i) {
+        if (atomic_load(&state->clients[i].clientID) != 0) {
+            atomic_store(&state->clients[i].cursor, UINT64_MAX - 2);
+        }
+    }
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    generation = snapshot.generation;
+    Fill8(source, 4, 1800.0f);
+    assert(OpenA8DJVirtualLoopbackPublish8(state, source, 4) == 4);
+    OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
+    assert(snapshot.generation == generation + 1);
+    assert(atomic_load(&state->writeHead) == 4);
+    assert(OpenA8DJVirtualLoopbackRead(state, 41, output, 4) == 4);
+    assert(output[0] == source[6] && output[6] == source[30]);
 
     Fill8(source, 4, 2000.0f);
     assert(OpenA8DJVirtualLoopbackPublish8(state, source, 4) == 4);
@@ -100,6 +144,10 @@ int main(void)
     ExpectZero(output, 8);
     OpenA8DJVirtualLoopbackUnregisterClient(state, 41);
     OpenA8DJVirtualLoopbackUnregisterClient(state, 42);
+    memset(output, 1, sizeof(output));
+    assert(OpenA8DJVirtualLoopbackRead(state, 9999, output, 2) == 0);
+    ExpectZero(output, 2);
+    assert(!OpenA8DJVirtualLoopbackRegisterClient(state, 0));
     OpenA8DJVirtualLoopbackSnapshot(state, &snapshot);
     assert(snapshot.registeredReaderCount == 0);
 
@@ -112,6 +160,15 @@ int main(void)
     request.enabled = 1;
     request.reserved[0] = 1;
     assert(!OpenA8DJVirtualLoopbackValidateSetRequest(&request, sizeof(request)));
+    request.reserved[0] = 0;
+    request.sourcePair = 4;
+    assert(!OpenA8DJVirtualLoopbackValidateSetRequest(&request, sizeof(request)));
+    request.sourcePair = 3;
+    request.schemaVersion = 2;
+    assert(!OpenA8DJVirtualLoopbackValidateSetRequest(&request, sizeof(request)));
+    request.schemaVersion = 1;
+    assert(!OpenA8DJVirtualLoopbackValidateSetRequest(
+        &request, sizeof(request) - 1));
 
     free(large);
     free(state);

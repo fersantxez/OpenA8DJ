@@ -74,6 +74,8 @@ typedef struct OpenA8DJVirtualLoopback {
     OpenA8DJLoopbackSlot ring[kOpenA8DJLoopbackRingCapacity];
 } OpenA8DJVirtualLoopback;
 
+extern OpenA8DJVirtualLoopback gOpenA8DJVirtualLoopback;
+
 /*
  * Reader lag rule: if a client has fallen behind by more than ring capacity,
  * that entire callback is silence. Its cursor advances to the current head;
@@ -106,6 +108,14 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
                                     uint32_t frameCount);
 void OpenA8DJVirtualLoopbackSnapshot(
     const OpenA8DJVirtualLoopback *state,
+    OpenA8DJLoopbackStatePayload *outPayload);
+
+/* HAL-owned session singleton accessors used by the authenticated IPC server. */
+bool OpenA8DJHALVirtualLoopbackApply(
+    const OpenA8DJLoopbackSetRequest *request,
+    size_t requestLength,
+    OpenA8DJLoopbackStatePayload *outPayload);
+void OpenA8DJHALVirtualLoopbackSnapshot(
     OpenA8DJLoopbackStatePayload *outPayload);
 
 #endif

@@ -15,6 +15,7 @@
 #include <mach/mach_time.h>
 
 #include "OpenA8DJUSB.h"
+#include "OpenA8DJVirtualLoopback.h"
 #include "OpenA8DJVintageCompatible.h"
 
 #ifndef OPENA8DJ_ENABLE_TRACE
@@ -91,6 +92,8 @@ enum {
     kOpenA8DJOutputStreamBObjectID = 8,
     kOpenA8DJOutputStreamCObjectID = 9,
     kOpenA8DJOutputStreamDObjectID = 10,
+    kOpenA8DJLoopbackDeviceObjectID = 11,
+    kOpenA8DJLoopbackStreamObjectID = 12,
     kOpenA8DJStreamCount = 4,
     kOpenA8DJInputStreamCount = OPENA8DJ_INPUT_STREAM_COUNT,
     kOpenA8DJOutputStreamCount = OPENA8DJ_OUTPUT_STREAM_COUNT,
@@ -99,12 +102,15 @@ enum {
     kOpenA8DJSupportedRateCount = 4,
     kOpenA8DJConfigChangeSampleRate = 1,
     kOpenA8DJConfigChangeBufferFrames = 2,
+    kOpenA8DJConfigChangeLoopbackBufferFrames = 3,
     kOpenA8DJPreferredBufferFrames = 512,
     kOpenA8DJMinBufferFrames = 512,
     kOpenA8DJMaxAdvertisedBufferFrames = 4096,
     kOpenA8DJMaxBufferFrames = 4096,
     kOpenA8DJZeroTimeStampPeriodFrames = 16384,
-    kOpenA8DJStopGraceUsec = OPENA8DJ_STOP_GRACE_USEC
+    kOpenA8DJStopGraceUsec = OPENA8DJ_STOP_GRACE_USEC,
+    kOpenA8DJLoopbackMinBufferFrames = 64,
+    kOpenA8DJLoopbackMaxBufferFrames = 4096
 };
 
 static const CFStringRef kDriverBundleID = CFSTR("org.opena8dj.driver.hal");
@@ -112,6 +118,11 @@ static const CFStringRef kDeviceUID = CFSTR("org.opena8dj.Audio8DJ");
 static const CFStringRef kModelUID = CFSTR("org.opena8dj.Audio8DJ.model");
 static const CFStringRef kDeviceName = CFSTR("Open Audio 8 DJ");
 static const CFStringRef kManufacturer = CFSTR("OpenA8DJ");
+static const CFStringRef kLoopbackDeviceUID =
+    CFSTR("org.opena8dj.Audio8DJ.loopback");
+static const CFStringRef kLoopbackModelUID =
+    CFSTR("org.opena8dj.Audio8DJ.loopback.model");
+static const CFStringRef kLoopbackDeviceName = CFSTR("OpenA8DJ Loopback");
 
 static AudioServerPlugInHostRef gHost = NULL;
 static atomic_uint gRefCount = 1;
@@ -124,10 +135,20 @@ static Float64 gSampleTime = 0.0;
 static UInt64 gHostTime = 0;
 static Float64 gPendingSampleRate = 0.0;
 static UInt32 gPendingBufferFrames = 0;
+static UInt32 gLoopbackBufferFrames = 512;
+static UInt32 gPendingLoopbackBufferFrames = 0;
 static atomic_bool gDevicePresent = false;
 static atomic_bool gClockRunning = false;
 static pthread_mutex_t gClockMutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t gIOMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t gLoopbackClockMutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t gLoopbackIOMutex = PTHREAD_MUTEX_INITIALIZER;
+static atomic_uint gLoopbackRunningClients = 0;
+static atomic_bool gLoopbackClockRunning = false;
+static UInt64 gLoopbackZeroTimeStampSeed = 1;
+static Float64 gLoopbackSampleTime = 0.0;
+static UInt64 gLoopbackHostTime = 0;
+#define gVirtualLoopback gOpenA8DJVirtualLoopback
 static Float32 gOutputCycleBuffer[kOpenA8DJMaxBufferFrames * kOpenA8DJChannels];
 static UInt32 gOutputCycleFrames = 0;
 static UInt64 gOutputCycleCounter = 0;
@@ -441,7 +462,8 @@ static bool IsOutputStreamObject(AudioObjectID objectID)
 
 static bool IsStreamObject(AudioObjectID objectID)
 {
-    return IsInputStreamObject(objectID) || IsOutputStreamObject(objectID);
+    return IsInputStreamObject(objectID) || IsOutputStreamObject(objectID) ||
+           objectID == kOpenA8DJLoopbackStreamObjectID;
 }
 
 static UInt32 StreamIndex(AudioObjectID objectID)
@@ -466,7 +488,8 @@ static UInt32 StreamDirection(AudioObjectID objectID)
     if (IsOutputStreamObject(objectID)) {
         return 0;
     }
-    return IsInputStreamObject(objectID) ? 1 : 0;
+    return (IsInputStreamObject(objectID) ||
+            objectID == kOpenA8DJLoopbackStreamObjectID) ? 1 : 0;
 }
 
 static UInt32 ActiveInputStreamCount(void)
@@ -498,6 +521,7 @@ static bool IsKnownObject(AudioObjectID objectID)
 {
     return objectID == kAudioObjectPlugInObject ||
            objectID == kOpenA8DJDeviceObjectID ||
+           objectID == kOpenA8DJLoopbackDeviceObjectID ||
            IsStreamObject(objectID);
 }
 
@@ -507,6 +531,7 @@ static AudioClassID ClassForObject(AudioObjectID objectID)
         case kAudioObjectPlugInObject:
             return kAudioPlugInClassID;
         case kOpenA8DJDeviceObjectID:
+        case kOpenA8DJLoopbackDeviceObjectID:
             return kAudioDeviceClassID;
         default:
             return IsStreamObject(objectID) ? kAudioStreamClassID : kAudioObjectClassID;
@@ -519,9 +544,14 @@ static AudioObjectID OwnerForObject(AudioObjectID objectID)
         case kAudioObjectPlugInObject:
             return kAudioObjectUnknown;
         case kOpenA8DJDeviceObjectID:
+        case kOpenA8DJLoopbackDeviceObjectID:
             return kAudioObjectPlugInObject;
         default:
-            return IsStreamObject(objectID) ? kOpenA8DJDeviceObjectID : kAudioObjectUnknown;
+            if (objectID == kOpenA8DJLoopbackStreamObjectID) {
+                return kOpenA8DJLoopbackDeviceObjectID;
+            }
+            return IsStreamObject(objectID) ?
+                kOpenA8DJDeviceObjectID : kAudioObjectUnknown;
     }
 }
 
@@ -537,7 +567,8 @@ static bool HasObjectProperty(AudioObjectID objectID, const AudioObjectPropertyA
         case kAudioObjectPropertyName:
             return true;
         case kAudioObjectPropertyModelName:
-            return objectID == kOpenA8DJDeviceObjectID;
+            return objectID == kOpenA8DJDeviceObjectID ||
+                   objectID == kOpenA8DJLoopbackDeviceObjectID;
         case kAudioObjectPropertyManufacturer:
             return true;
         case kAudioObjectPropertyElementName:
@@ -546,7 +577,8 @@ static bool HasObjectProperty(AudioObjectID objectID, const AudioObjectPropertyA
             return objectID == kOpenA8DJDeviceObjectID && IsChannelElement(address);
         case kAudioObjectPropertyOwnedObjects:
             return objectID == kAudioObjectPlugInObject ||
-                   objectID == kOpenA8DJDeviceObjectID;
+                   objectID == kOpenA8DJDeviceObjectID ||
+                   objectID == kOpenA8DJLoopbackDeviceObjectID;
         case kAudioObjectPropertySerialNumber:
         case kAudioObjectPropertyFirmwareVersion:
             return objectID == kOpenA8DJDeviceObjectID;
@@ -615,6 +647,23 @@ static bool HasDeviceProperty(const AudioObjectPropertyAddress *address)
         default:
             return false;
     }
+}
+
+static bool HasLoopbackDeviceProperty(
+    const AudioObjectPropertyAddress *address)
+{
+    if (!HasDeviceProperty(address)) {
+        return false;
+    }
+    if (address->mSelector == kAudioDevicePropertyPreferredChannelLayout) {
+        return false;
+    }
+#if OPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY
+    if (address->mSelector == kAudioDevicePropertyIOProcStreamUsage) {
+        return false;
+    }
+#endif
+    return true;
 }
 
 static bool HasStreamProperty(AudioObjectID objectID, const AudioObjectPropertyAddress *address)
@@ -873,9 +922,11 @@ static OSStatus GetObjectPropertyDataSize(AudioObjectID objectID, const AudioObj
             return kAudioHardwareNoError;
         case kAudioObjectPropertyOwnedObjects:
             if (objectID == kAudioObjectPlugInObject) {
-                *outDataSize = sizeof(AudioObjectID);
+                *outDataSize = sizeof(AudioObjectID) * 2;
             } else if (objectID == kOpenA8DJDeviceObjectID) {
                 *outDataSize = sizeof(AudioObjectID) * ActiveOwnedStreamCount();
+            } else if (objectID == kOpenA8DJLoopbackDeviceObjectID) {
+                *outDataSize = sizeof(AudioObjectID);
             } else {
                 *outDataSize = 0;
             }
@@ -892,7 +943,7 @@ static OSStatus GetPluginPropertyDataSize(const AudioObjectPropertyAddress *addr
             *outDataSize = sizeof(CFStringRef);
             return kAudioHardwareNoError;
         case kAudioPlugInPropertyDeviceList:
-            *outDataSize = sizeof(AudioObjectID);
+            *outDataSize = sizeof(AudioObjectID) * 2;
             return kAudioHardwareNoError;
         case kAudioPlugInPropertyTranslateUIDToDevice:
             *outDataSize = sizeof(AudioObjectID);
@@ -904,6 +955,84 @@ static OSStatus GetPluginPropertyDataSize(const AudioObjectPropertyAddress *addr
         default:
             return kAudioHardwareUnknownPropertyError;
     }
+}
+
+static UInt32 LoopbackStreamConfigurationSize(
+    AudioObjectPropertyScope scope)
+{
+    UInt32 count = (scope == kAudioObjectPropertyScopeInput ||
+                    scope == kAudioObjectPropertyScopeGlobal) ? 1 : 0;
+    return (UInt32)offsetof(AudioBufferList, mBuffers) +
+           count * (UInt32)sizeof(AudioBuffer);
+}
+
+static OSStatus GetLoopbackDevicePropertyDataSize(
+    const AudioObjectPropertyAddress *address,
+    UInt32 *outDataSize)
+{
+    switch (address->mSelector) {
+        case kAudioDevicePropertyDeviceUID:
+        case kAudioDevicePropertyModelUID:
+            *outDataSize = sizeof(CFStringRef);
+            break;
+        case kAudioDevicePropertyRelatedDevices:
+            *outDataSize = sizeof(AudioObjectID);
+            break;
+        case kAudioDevicePropertyStreams:
+            *outDataSize =
+                address->mScope == kAudioObjectPropertyScopeOutput ?
+                0 : sizeof(AudioObjectID);
+            break;
+        case kAudioDevicePropertyAvailableNominalSampleRates:
+            *outDataSize = sizeof(AudioValueRange) *
+                           kOpenA8DJSupportedRateCount;
+            break;
+        case kAudioDevicePropertyStreamConfiguration:
+            *outDataSize = LoopbackStreamConfigurationSize(address->mScope);
+            break;
+        case kAudioDevicePropertyPreferredChannelsForStereo:
+            *outDataSize = sizeof(UInt32) * 2;
+            break;
+        case kAudioObjectPropertyControlList:
+            *outDataSize = 0;
+            break;
+        case kAudioDevicePropertyPreferredChannelLayout:
+            return kAudioHardwareUnknownPropertyError;
+        default:
+            *outDataSize = sizeof(UInt32);
+            if (address->mSelector == kAudioDevicePropertyNominalSampleRate ||
+                address->mSelector == kAudioDevicePropertyActualSampleRate) {
+                *outDataSize = sizeof(Float64);
+            } else if (
+                address->mSelector == kAudioDevicePropertyBufferFrameSizeRange ||
+                address->mSelector == kAudioDevicePropertyBufferSizeRange) {
+                *outDataSize = sizeof(AudioValueRange);
+            }
+            break;
+    }
+    return kAudioHardwareNoError;
+}
+
+static OSStatus WriteLoopbackStreamConfiguration(
+    const AudioObjectPropertyAddress *address,
+    UInt32 inDataSize,
+    UInt32 *outDataSize,
+    void *outData)
+{
+    UInt32 size = LoopbackStreamConfigurationSize(address->mScope);
+    if (inDataSize < size) {
+        return kAudioHardwareBadPropertySizeError;
+    }
+    AudioBufferList *list = outData;
+    list->mNumberBuffers =
+        address->mScope == kAudioObjectPropertyScopeOutput ? 0 : 1;
+    if (list->mNumberBuffers == 1) {
+        list->mBuffers[0].mNumberChannels = 2;
+        list->mBuffers[0].mDataByteSize = 0;
+        list->mBuffers[0].mData = NULL;
+    }
+    *outDataSize = size;
+    return kAudioHardwareNoError;
 }
 
 static OSStatus GetDevicePropertyDataSize(const AudioObjectPropertyAddress *address, UInt32 *outDataSize)
@@ -1146,6 +1275,9 @@ static void FlushOutputCycle(void)
     if (!gOutputCycleTouched || gOutputCycleFrames == 0) {
         return;
     }
+    (void)OpenA8DJVirtualLoopbackPublish8(&gVirtualLoopback,
+                                          gOutputCycleBuffer,
+                                          gOutputCycleFrames);
     OpenA8DJUSBWriteOutputAtSampleTime(gOutputCycleBuffer,
                                        gOutputCycleFrames,
                                        kOpenA8DJChannels,
@@ -1200,6 +1332,33 @@ static void StartClock(void)
 static void StopClock(void)
 {
     atomic_store(&gClockRunning, false);
+}
+
+static void StartLoopbackClock(void)
+{
+    if (atomic_exchange(&gLoopbackClockRunning, true)) {
+        return;
+    }
+    pthread_mutex_lock(&gLoopbackClockMutex);
+    gLoopbackSampleTime = 0.0;
+    gLoopbackHostTime = mach_absolute_time();
+    gLoopbackZeroTimeStampSeed++;
+    pthread_mutex_unlock(&gLoopbackClockMutex);
+}
+
+static void StopLoopbackClock(void)
+{
+    atomic_store(&gLoopbackClockRunning, false);
+}
+
+static void ResetLoopbackClock(void)
+{
+    pthread_mutex_lock(&gLoopbackClockMutex);
+    gLoopbackSampleTime = 0.0;
+    gLoopbackHostTime = atomic_load(&gLoopbackClockRunning) ?
+        mach_absolute_time() : 0;
+    gLoopbackZeroTimeStampSeed++;
+    pthread_mutex_unlock(&gLoopbackClockMutex);
 }
 
 #if OPENA8DJ_BACKGROUND_WARM_OPEN
@@ -1312,7 +1471,6 @@ static void ScheduleBackgroundPreopen(void)
 
 static void NotifySampleRateChanged(void)
 {
-    return;
     if (gHost == NULL) {
         return;
     }
@@ -1325,6 +1483,10 @@ static void NotifySampleRateChanged(void)
         {kAudioStreamPropertyPhysicalFormat, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain}
     };
     gHost->PropertiesChanged(gHost, kOpenA8DJDeviceObjectID, 2, deviceChanged);
+    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackDeviceObjectID, 2,
+                             deviceChanged);
+    gHost->PropertiesChanged(gHost, kOpenA8DJLoopbackStreamObjectID, 2,
+                             streamChanged);
     for (UInt32 i = 0; i < kOpenA8DJOutputStreamCount; i++) {
         gHost->PropertiesChanged(gHost, kOutputStreamIDs[i], 2, streamChanged);
     }
@@ -1349,6 +1511,8 @@ static void ApplySampleRate(Float64 newRate)
     }
     pthread_mutex_unlock(&gClockMutex);
     if (changed) {
+        OpenA8DJVirtualLoopbackResetContent(&gVirtualLoopback);
+        ResetLoopbackClock();
         OpenA8DJUSBSetHALRuntimeDescriptor(
             OPENA8DJ_ENABLE_USB_ZERO_TIMESTAMP != 0,
             kOpenA8DJZeroTimeStampPeriodFrames,
@@ -1366,7 +1530,6 @@ static void ApplySampleRate(Float64 newRate)
 
 static void NotifyBufferFrameSizeChanged(void)
 {
-    return;
     if (gHost == NULL) {
         return;
     }
@@ -1388,8 +1551,40 @@ static void ApplyBufferFrameSize(UInt32 newSize)
     }
     pthread_mutex_unlock(&gClockMutex);
     if (changed) {
+        OpenA8DJVirtualLoopbackResetContent(&gVirtualLoopback);
         OpenA8DJUSBSetCoreAudioBufferFrames(newSize);
         NotifyBufferFrameSizeChanged();
+    }
+}
+
+static void ApplyLoopbackBufferFrameSize(UInt32 newSize)
+{
+    bool changed = false;
+    pthread_mutex_lock(&gLoopbackClockMutex);
+    if (gLoopbackBufferFrames != newSize) {
+        gLoopbackBufferFrames = newSize;
+        gLoopbackZeroTimeStampSeed++;
+        gLoopbackSampleTime = 0.0;
+        gLoopbackHostTime = atomic_load(&gLoopbackClockRunning) ?
+            mach_absolute_time() : 0;
+        changed = true;
+    }
+    pthread_mutex_unlock(&gLoopbackClockMutex);
+    if (changed) {
+        OpenA8DJVirtualLoopbackResetContent(&gVirtualLoopback);
+        if (gHost != NULL) {
+            AudioObjectPropertyAddress properties[] = {
+                {kAudioDevicePropertyBufferFrameSize,
+                 kAudioObjectPropertyScopeGlobal,
+                 kAudioObjectPropertyElementMain},
+                {kAudioDevicePropertyZeroTimeStampPeriod,
+                 kAudioObjectPropertyScopeGlobal,
+                 kAudioObjectPropertyElementMain}
+            };
+            gHost->PropertiesChanged(gHost,
+                                     kOpenA8DJLoopbackDeviceObjectID,
+                                     2, properties);
+        }
     }
 }
 
@@ -1431,6 +1626,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_Initialize(AudioServerPlugInDriverRef
     (void)inDriver;
     Trace("Initialize host=%p", inHost);
     gHost = inHost;
+    OpenA8DJVirtualLoopbackInitialize(&gVirtualLoopback);
+    atomic_store(&gLoopbackRunningClients, 0);
+    atomic_store(&gLoopbackClockRunning, false);
     pthread_mutex_lock(&gClockMutex);
     gSampleTime = 0.0;
     gHostTime = mach_absolute_time();
@@ -1470,30 +1668,35 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_CreateDevice(AudioServerPlugInDriverR
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_DestroyDevice(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID)
 {
     (void)inDriver;
-    return inDeviceObjectID == kOpenA8DJDeviceObjectID ? kAudioHardwareNoError : kAudioHardwareBadDeviceError;
+    return (inDeviceObjectID == kOpenA8DJDeviceObjectID ||
+            inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) ?
+        kAudioHardwareNoError : kAudioHardwareBadDeviceError;
 }
 
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_AddDeviceClient(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, const AudioServerPlugInClientInfo *inClientInfo)
 {
     (void)inDriver;
-    (void)inDeviceObjectID;
     (void)inClientInfo;
-    return kAudioHardwareNoError;
+    return (inDeviceObjectID == kOpenA8DJDeviceObjectID ||
+            inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) ?
+        kAudioHardwareNoError : kAudioHardwareBadDeviceError;
 }
 
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_RemoveDeviceClient(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, const AudioServerPlugInClientInfo *inClientInfo)
 {
     (void)inDriver;
-    (void)inDeviceObjectID;
     (void)inClientInfo;
-    return kAudioHardwareNoError;
+    return (inDeviceObjectID == kOpenA8DJDeviceObjectID ||
+            inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) ?
+        kAudioHardwareNoError : kAudioHardwareBadDeviceError;
 }
 
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, UInt64 inChangeAction, void *inChangeInfo)
 {
     (void)inDriver;
     (void)inChangeInfo;
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID &&
+        inDeviceObjectID != kOpenA8DJLoopbackDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
     if (inChangeAction == kOpenA8DJConfigChangeSampleRate) {
@@ -1514,6 +1717,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(Audi
         return kAudioHardwareNoError;
     }
     if (inChangeAction == kOpenA8DJConfigChangeBufferFrames) {
+        if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
+            return kAudioHardwareBadDeviceError;
+        }
         UInt32 newSize = 0;
         pthread_mutex_lock(&gClockMutex);
         newSize = gPendingBufferFrames;
@@ -1531,6 +1737,21 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_PerformDeviceConfigurationChange(Audi
         }
         return kAudioHardwareNoError;
     }
+    if (inChangeAction == kOpenA8DJConfigChangeLoopbackBufferFrames) {
+        if (inDeviceObjectID != kOpenA8DJLoopbackDeviceObjectID) {
+            return kAudioHardwareBadDeviceError;
+        }
+        UInt32 newSize;
+        pthread_mutex_lock(&gLoopbackClockMutex);
+        newSize = gPendingLoopbackBufferFrames;
+        gPendingLoopbackBufferFrames = 0;
+        pthread_mutex_unlock(&gLoopbackClockMutex);
+        if (newSize >= kOpenA8DJLoopbackMinBufferFrames &&
+            newSize <= kOpenA8DJLoopbackMaxBufferFrames) {
+            ApplyLoopbackBufferFrameSize(newSize);
+        }
+        return kAudioHardwareNoError;
+    }
     return kAudioHardwareNoError;
 }
 
@@ -1538,7 +1759,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_AbortDeviceConfigurationChange(AudioS
 {
     (void)inDriver;
     (void)inChangeInfo;
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID &&
+        inDeviceObjectID != kOpenA8DJLoopbackDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
     pthread_mutex_lock(&gClockMutex);
@@ -1548,6 +1770,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_AbortDeviceConfigurationChange(AudioS
         gPendingBufferFrames = 0;
     }
     pthread_mutex_unlock(&gClockMutex);
+    if (inChangeAction == kOpenA8DJConfigChangeLoopbackBufferFrames) {
+        pthread_mutex_lock(&gLoopbackClockMutex);
+        gPendingLoopbackBufferFrames = 0;
+        pthread_mutex_unlock(&gLoopbackClockMutex);
+    }
     return kAudioHardwareNoError;
 }
 
@@ -1561,7 +1788,10 @@ static Boolean STDMETHODCALLTYPE OpenA8DJ_HasProperty(AudioServerPlugInDriverRef
     }
     Boolean result = HasObjectProperty(inObjectID, inAddress) ||
                      (inObjectID == kAudioObjectPlugInObject && HasPluginProperty(inAddress)) ||
-                     (inObjectID == kOpenA8DJDeviceObjectID && HasDeviceProperty(inAddress)) ||
+                     (inObjectID == kOpenA8DJDeviceObjectID &&
+                      HasDeviceProperty(inAddress)) ||
+                     (inObjectID == kOpenA8DJLoopbackDeviceObjectID &&
+                      HasLoopbackDeviceProperty(inAddress)) ||
                      HasStreamProperty(inObjectID, inAddress);
     TraceProperty(result ? "HasProperty=yes" : "HasProperty=no", inObjectID, inAddress, 0);
     return result;
@@ -1581,6 +1811,12 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_IsPropertySettable(AudioServerPlugInD
                        (inAddress->mSelector == kAudioDevicePropertyNominalSampleRate ||
                         inAddress->mSelector == kAudioDevicePropertyBufferFrameSize ||
                         inAddress->mSelector == kAudioDevicePropertyBufferSize));
+    if (inObjectID == kOpenA8DJLoopbackDeviceObjectID &&
+        (inAddress->mSelector == kAudioDevicePropertyNominalSampleRate ||
+         inAddress->mSelector == kAudioDevicePropertyBufferFrameSize ||
+         inAddress->mSelector == kAudioDevicePropertyBufferSize)) {
+        isSettable = true;
+    }
 #if OPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY
     if (inObjectID == kOpenA8DJDeviceObjectID &&
         inAddress->mSelector == kAudioDevicePropertyIOProcStreamUsage &&
@@ -1615,6 +1851,10 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyDataSize(AudioServerPlugIn
     }
     if (inObjectID == kOpenA8DJDeviceObjectID && HasDeviceProperty(inAddress)) {
         return GetDevicePropertyDataSize(inAddress, outDataSize);
+    }
+    if (inObjectID == kOpenA8DJLoopbackDeviceObjectID &&
+        HasLoopbackDeviceProperty(inAddress)) {
+        return GetLoopbackDevicePropertyDataSize(inAddress, outDataSize);
     }
     if (HasStreamProperty(inObjectID, inAddress)) {
         return GetStreamPropertyDataSize(inAddress, outDataSize);
@@ -1653,6 +1893,12 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
             return CopyScalar(&owner, sizeof(owner), inDataSize, outDataSize, outData);
         }
         case kAudioObjectPropertyName:
+            if (inObjectID == kOpenA8DJLoopbackDeviceObjectID)
+                return CopyCFString(kLoopbackDeviceName, inDataSize,
+                                    outDataSize, outData);
+            if (inObjectID == kOpenA8DJLoopbackStreamObjectID)
+                return CopyCFString(CFSTR("OpenA8DJ Loopback Source Pair"),
+                                    inDataSize, outDataSize, outData);
             if (inObjectID == kOpenA8DJInputStreamAObjectID) return CopyCFString(CFSTR("Audio 8 DJ Input A"), inDataSize, outDataSize, outData);
             if (inObjectID == kOpenA8DJInputStreamBObjectID) return CopyCFString(CFSTR("Audio 8 DJ Input B"), inDataSize, outDataSize, outData);
             if (inObjectID == kOpenA8DJInputStreamCObjectID) return CopyCFString(CFSTR("Audio 8 DJ Input C"), inDataSize, outDataSize, outData);
@@ -1663,6 +1909,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
             if (inObjectID == kOpenA8DJOutputStreamDObjectID) return CopyCFString(CFSTR("Audio 8 DJ Output D"), inDataSize, outDataSize, outData);
             return CopyCFString(kDeviceName, inDataSize, outDataSize, outData);
         case kAudioObjectPropertyModelName:
+            if (inObjectID == kOpenA8DJLoopbackDeviceObjectID)
+                return CopyCFString(kLoopbackDeviceName, inDataSize,
+                                    outDataSize, outData);
             return CopyCFString(CFSTR("Audio 8 DJ"), inDataSize, outDataSize, outData);
         case kAudioObjectPropertyManufacturer:
             return CopyCFString(kManufacturer, inDataSize, outDataSize, outData);
@@ -1693,8 +1942,14 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
             return CopyCFString(CFSTR("14"), inDataSize, outDataSize, outData);
         case kAudioObjectPropertyOwnedObjects: {
             if (inObjectID == kAudioObjectPlugInObject) {
-                AudioObjectID ids[] = {kOpenA8DJDeviceObjectID};
+                AudioObjectID ids[] = {kOpenA8DJDeviceObjectID,
+                                       kOpenA8DJLoopbackDeviceObjectID};
                 return CopyScalar(ids, sizeof(ids), inDataSize, outDataSize, outData);
+            }
+            if (inObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+                AudioObjectID id = kOpenA8DJLoopbackStreamObjectID;
+                return CopyScalar(&id, sizeof(id), inDataSize, outDataSize,
+                                  outData);
             }
             if (inObjectID == kOpenA8DJDeviceObjectID) {
                 AudioObjectID ids[kOpenA8DJStreamCount + kOpenA8DJOutputStreamCount];
@@ -1722,7 +1977,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
                 return CopyCFString(kDriverBundleID, inDataSize, outDataSize, outData);
             case kAudioPlugInPropertyDeviceList: {
                 Trace("Get DeviceList");
-                AudioObjectID ids[] = {kOpenA8DJDeviceObjectID};
+                AudioObjectID ids[] = {kOpenA8DJDeviceObjectID,
+                                       kOpenA8DJLoopbackDeviceObjectID};
                 return CopyScalar(ids, sizeof(ids), inDataSize, outDataSize, outData);
             }
             case kAudioPlugInPropertyTranslateUIDToDevice: {
@@ -1731,12 +1987,127 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
                     CFStringRef requested = *((const CFStringRef *)inQualifierData);
                     if (requested != NULL && CFEqual(requested, kDeviceUID)) {
                         objectID = kOpenA8DJDeviceObjectID;
+                    } else if (requested != NULL &&
+                               CFEqual(requested, kLoopbackDeviceUID)) {
+                        objectID = kOpenA8DJLoopbackDeviceObjectID;
                     }
                 }
                 return CopyScalar(&objectID, sizeof(objectID), inDataSize, outDataSize, outData);
             }
             case kAudioPlugInPropertyBoxList:
             case kAudioPlugInPropertyClockDeviceList:
+                *outDataSize = 0;
+                return kAudioHardwareNoError;
+            default:
+                return kAudioHardwareUnknownPropertyError;
+        }
+    }
+
+    if (inObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        switch (inAddress->mSelector) {
+            case kAudioDevicePropertyDeviceUID:
+                return CopyCFString(kLoopbackDeviceUID, inDataSize,
+                                    outDataSize, outData);
+            case kAudioDevicePropertyModelUID:
+                return CopyCFString(kLoopbackModelUID, inDataSize,
+                                    outDataSize, outData);
+            case kAudioDevicePropertyTransportType: {
+                UInt32 value = kAudioDeviceTransportTypeVirtual;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyRelatedDevices: {
+                AudioObjectID id = kOpenA8DJLoopbackDeviceObjectID;
+                return CopyScalar(&id, sizeof(id), inDataSize, outDataSize,
+                                  outData);
+            }
+            case kAudioDevicePropertyClockDomain:
+            case kAudioDevicePropertyLatency:
+            case kAudioDevicePropertySafetyOffset:
+            case kAudioDevicePropertyUsesVariableBufferFrameSizes:
+            case kAudioDevicePropertyDeviceCanBeDefaultDevice:
+            case kAudioDevicePropertyDeviceCanBeDefaultSystemDevice:
+            case kAudioDevicePropertyIsHidden: {
+                UInt32 value = 0;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyClockIsStable:
+            case kAudioDevicePropertyDeviceIsAlive: {
+                UInt32 value = 1;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyClockAlgorithm: {
+                UInt32 value = kAudioDeviceClockAlgorithmRaw;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyDeviceIsRunning:
+            case kAudioDevicePropertyDeviceIsRunningSomewhere: {
+                UInt32 value =
+                    atomic_load(&gLoopbackRunningClients) > 0 ? 1 : 0;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyZeroTimeStampPeriod: {
+                UInt32 value = kOpenA8DJZeroTimeStampPeriodFrames;
+                return CopyScalar(&value, sizeof(value), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyStreams: {
+                if (inAddress->mScope == kAudioObjectPropertyScopeOutput) {
+                    *outDataSize = 0;
+                    return kAudioHardwareNoError;
+                }
+                AudioObjectID id = kOpenA8DJLoopbackStreamObjectID;
+                return CopyScalar(&id, sizeof(id), inDataSize, outDataSize,
+                                  outData);
+            }
+            case kAudioDevicePropertyNominalSampleRate:
+            case kAudioDevicePropertyActualSampleRate:
+                return CopyScalar(&gSampleRate, sizeof(gSampleRate),
+                                  inDataSize, outDataSize, outData);
+            case kAudioDevicePropertyAvailableNominalSampleRates: {
+                AudioValueRange rates[kOpenA8DJSupportedRateCount];
+                FillRates(rates);
+                return CopyScalar(rates, sizeof(rates), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyBufferFrameSize:
+                return CopyScalar(&gLoopbackBufferFrames,
+                                  sizeof(gLoopbackBufferFrames), inDataSize,
+                                  outDataSize, outData);
+            case kAudioDevicePropertyBufferSize: {
+                UInt32 bytes = gLoopbackBufferFrames * 2 * sizeof(Float32);
+                return CopyScalar(&bytes, sizeof(bytes), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyBufferFrameSizeRange: {
+                AudioValueRange range = {
+                    kOpenA8DJLoopbackMinBufferFrames,
+                    kOpenA8DJLoopbackMaxBufferFrames
+                };
+                return CopyScalar(&range, sizeof(range), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyBufferSizeRange: {
+                AudioValueRange range = {
+                    kOpenA8DJLoopbackMinBufferFrames * 2 * sizeof(Float32),
+                    kOpenA8DJLoopbackMaxBufferFrames * 2 * sizeof(Float32)
+                };
+                return CopyScalar(&range, sizeof(range), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioDevicePropertyStreamConfiguration:
+                return WriteLoopbackStreamConfiguration(
+                    inAddress, inDataSize, outDataSize, outData);
+            case kAudioDevicePropertyPreferredChannelsForStereo: {
+                UInt32 channels[] = {1, 2};
+                return CopyScalar(channels, sizeof(channels), inDataSize,
+                                  outDataSize, outData);
+            }
+            case kAudioObjectPropertyControlList:
                 *outDataSize = 0;
                 return kAudioHardwareNoError;
             default:
@@ -1897,6 +2268,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
                 return CopyScalar(&value, sizeof(value), inDataSize, outDataSize, outData);
             }
             case kAudioStreamPropertyStartingChannel: {
+                if (inObjectID == kOpenA8DJLoopbackStreamObjectID) {
+                    UInt32 value = 1;
+                    return CopyScalar(&value, sizeof(value), inDataSize,
+                                      outDataSize, outData);
+                }
                 UInt32 index = StreamIndex(inObjectID);
                 UInt32 channels = IsOutputStreamObject(inObjectID) ?
                     OutputChannelsPerStream() : InputChannelsPerStream();
@@ -1909,16 +2285,20 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetPropertyData(AudioServerPlugInDriv
             }
             case kAudioStreamPropertyVirtualFormat:
             case kAudioStreamPropertyPhysicalFormat: {
-                UInt32 channels = IsOutputStreamObject(inObjectID) ?
-                    OutputChannelsPerStream() : InputChannelsPerStream();
+                UInt32 channels =
+                    inObjectID == kOpenA8DJLoopbackStreamObjectID ? 2 :
+                    (IsOutputStreamObject(inObjectID) ?
+                     OutputChannelsPerStream() : InputChannelsPerStream());
                 AudioStreamBasicDescription asbd = MakeASBD(gSampleRate, channels);
                 return CopyScalar(&asbd, sizeof(asbd), inDataSize, outDataSize, outData);
             }
             case kAudioStreamPropertyAvailableVirtualFormats:
             case kAudioStreamPropertyAvailablePhysicalFormats: {
                 AudioStreamRangedDescription formats[kOpenA8DJSupportedRateCount];
-                UInt32 channels = IsOutputStreamObject(inObjectID) ?
-                    OutputChannelsPerStream() : InputChannelsPerStream();
+                UInt32 channels =
+                    inObjectID == kOpenA8DJLoopbackStreamObjectID ? 2 :
+                    (IsOutputStreamObject(inObjectID) ?
+                     OutputChannelsPerStream() : InputChannelsPerStream());
                 FillFormats(formats, channels);
                 return CopyScalar(formats, sizeof(formats), inDataSize, outDataSize, outData);
             }
@@ -1936,7 +2316,9 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
     (void)inClientProcessID;
     (void)inQualifierDataSize;
     (void)inQualifierData;
-    if (inObjectID != kOpenA8DJDeviceObjectID || inAddress == NULL || inData == NULL) {
+    if ((inObjectID != kOpenA8DJDeviceObjectID &&
+         inObjectID != kOpenA8DJLoopbackDeviceObjectID) ||
+        inAddress == NULL || inData == NULL) {
         return kAudioHardwareIllegalOperationError;
     }
     if (inAddress->mSelector == kAudioDevicePropertyNominalSampleRate) {
@@ -1962,7 +2344,7 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         }
         if (gHost != NULL) {
             return gHost->RequestDeviceConfigurationChange(gHost,
-                                                           kOpenA8DJDeviceObjectID,
+                                                           inObjectID,
                                                            kOpenA8DJConfigChangeSampleRate,
                                                            NULL);
         }
@@ -1975,6 +2357,32 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
             return kAudioHardwareBadPropertySizeError;
         }
         UInt32 newSize = *((const UInt32 *)inData);
+        if (inObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+            if (inAddress->mSelector == kAudioDevicePropertyBufferSize) {
+                UInt32 bytesPerFrame = 2 * sizeof(Float32);
+                newSize = (newSize + bytesPerFrame - 1) / bytesPerFrame;
+            }
+            if (newSize < kOpenA8DJLoopbackMinBufferFrames ||
+                newSize > kOpenA8DJLoopbackMaxBufferFrames) {
+                return kAudioHardwareUnsupportedOperationError;
+            }
+            pthread_mutex_lock(&gLoopbackClockMutex);
+            bool sameSize = gLoopbackBufferFrames == newSize;
+            if (!sameSize) {
+                gPendingLoopbackBufferFrames = newSize;
+            }
+            pthread_mutex_unlock(&gLoopbackClockMutex);
+            if (sameSize) {
+                return kAudioHardwareNoError;
+            }
+            if (gHost != NULL) {
+                return gHost->RequestDeviceConfigurationChange(
+                    gHost, kOpenA8DJLoopbackDeviceObjectID,
+                    kOpenA8DJConfigChangeLoopbackBufferFrames, NULL);
+            }
+            ApplyLoopbackBufferFrameSize(newSize);
+            return kAudioHardwareNoError;
+        }
         if (inAddress->mSelector == kAudioDevicePropertyBufferSize) {
             newSize = BufferFramesForBytes(newSize);
         }
@@ -2006,7 +2414,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
         return kAudioHardwareNoError;
     }
 #if OPENA8DJ_ENABLE_STREAM_USAGE_PROPERTY
-    if (inAddress->mSelector == kAudioDevicePropertyIOProcStreamUsage) {
+    if (inObjectID == kOpenA8DJDeviceObjectID &&
+        inAddress->mSelector == kAudioDevicePropertyIOProcStreamUsage) {
         UInt32 minSize = offsetof(AudioHardwareIOProcStreamUsage, mStreamIsOn);
         if (inDataSize < minSize) {
             return kAudioHardwareBadPropertySizeError;
@@ -2034,8 +2443,22 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, UInt32 inClientID)
 {
     (void)inDriver;
-    (void)inClientID;
     Trace("StartIO device=%u client=%u", inDeviceObjectID, inClientID);
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        pthread_mutex_lock(&gLoopbackIOMutex);
+        UInt32 oldCount = atomic_load(&gLoopbackRunningClients);
+        bool registered = OpenA8DJVirtualLoopbackRegisterClient(
+            &gVirtualLoopback, inClientID);
+        UInt32 newCount = atomic_load_explicit(
+            &gVirtualLoopback.registeredReaderCount, memory_order_relaxed);
+        atomic_store(&gLoopbackRunningClients, newCount);
+        if (registered && oldCount == 0 && newCount > 0) {
+            StartLoopbackClock();
+        }
+        pthread_mutex_unlock(&gLoopbackIOMutex);
+        return registered ? kAudioHardwareNoError :
+            kAudioHardwareIllegalOperationError;
+    }
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
@@ -2048,10 +2471,14 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
             Trace("StartIO USB start failed");
             atomic_store(&gDevicePresent, false);
             StopClock();
+            OpenA8DJVirtualLoopbackSetPhysicalPublishing(
+                &gVirtualLoopback, false);
             pthread_mutex_unlock(&gIOMutex);
             return kAudioHardwareUnspecifiedError;
         } else {
             atomic_store(&gDevicePresent, true);
+            OpenA8DJVirtualLoopbackSetPhysicalPublishing(
+                &gVirtualLoopback, true);
             Trace("StartIO USB started");
         }
     }
@@ -2063,8 +2490,20 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, UInt32 inClientID)
 {
     (void)inDriver;
-    (void)inClientID;
     Trace("StopIO device=%u client=%u", inDeviceObjectID, inClientID);
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        pthread_mutex_lock(&gLoopbackIOMutex);
+        OpenA8DJVirtualLoopbackUnregisterClient(&gVirtualLoopback,
+                                                inClientID);
+        UInt32 newCount = atomic_load_explicit(
+            &gVirtualLoopback.registeredReaderCount, memory_order_relaxed);
+        atomic_store(&gLoopbackRunningClients, newCount);
+        if (newCount == 0) {
+            StopLoopbackClock();
+        }
+        pthread_mutex_unlock(&gLoopbackIOMutex);
+        return kAudioHardwareNoError;
+    }
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
@@ -2074,6 +2513,8 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inD
     }
     if (gRunningClients == 0) {
         FlushOutputCycle();
+        OpenA8DJVirtualLoopbackSetPhysicalPublishing(&gVirtualLoopback,
+                                                     false);
         OpenA8DJUSBSetInputDecodeActive(false);
 #if OPENA8DJ_STOP_ISOC_ON_STOP
         OpenA8DJUSBStop();
@@ -2097,11 +2538,41 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_GetZeroTimeStamp(AudioServerPlugInDri
 {
     (void)inDriver;
     (void)inClientID;
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID &&
+        inDeviceObjectID != kOpenA8DJLoopbackDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
     if (outSampleTime == NULL || outHostTime == NULL || outSeed == NULL) {
         return kAudioHardwareBadPropertySizeError;
+    }
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        pthread_mutex_lock(&gLoopbackClockMutex);
+        Float64 sampleTime = gLoopbackSampleTime;
+        UInt64 hostTime = gLoopbackHostTime;
+        UInt64 seed = gLoopbackZeroTimeStampSeed;
+        pthread_mutex_unlock(&gLoopbackClockMutex);
+        pthread_mutex_lock(&gClockMutex);
+        Float64 sampleRate = gSampleRate;
+        pthread_mutex_unlock(&gClockMutex);
+        if (hostTime == 0) {
+            hostTime = mach_absolute_time();
+        }
+        Float64 ticksPerFrame = HostTicksPerFrame(sampleRate);
+        if (ticksPerFrame > 0.0) {
+            UInt64 now = mach_absolute_time();
+            Float64 elapsed = now > hostTime ?
+                floor((Float64)(now - hostTime) / ticksPerFrame) : 0.0;
+            Float64 periods = floor(
+                elapsed / (Float64)kOpenA8DJZeroTimeStampPeriodFrames);
+            Float64 advanced =
+                periods * (Float64)kOpenA8DJZeroTimeStampPeriodFrames;
+            sampleTime += advanced;
+            hostTime += (UInt64)llround(advanced * ticksPerFrame);
+        }
+        *outSampleTime = sampleTime;
+        *outHostTime = hostTime;
+        *outSeed = seed;
+        return kAudioHardwareNoError;
     }
     pthread_mutex_lock(&gClockMutex);
     Float64 anchorSampleTime = gSampleTime;
@@ -2155,11 +2626,18 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_WillDoIOOperation(AudioServerPlugInDr
 {
     (void)inDriver;
     (void)inClientID;
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID &&
+        inDeviceObjectID != kOpenA8DJLoopbackDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
     if (outWillDo == NULL || outWillDoInPlace == NULL) {
         return kAudioHardwareBadPropertySizeError;
+    }
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        *outWillDo =
+            inOperationID == kAudioServerPlugInIOOperationReadInput;
+        *outWillDoInPlace = true;
+        return kAudioHardwareNoError;
     }
     *outWillDo = inOperationID == kAudioServerPlugInIOOperationWriteMix;
 #if OPENA8DJ_ENABLE_INPUT_IO && OPENA8DJ_INPUT_STREAM_COUNT > 0
@@ -2176,6 +2654,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_BeginIOOperation(AudioServerPlugInDri
     (void)inDriver;
     (void)inClientID;
     (void)inIOCycleInfo;
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        return inOperationID == kAudioServerPlugInIOOperationReadInput &&
+               inIOBufferFrameSize <= kOpenA8DJLoopbackMaxBufferFrames ?
+            kAudioHardwareNoError : kAudioHardwareUnsupportedOperationError;
+    }
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
@@ -2197,9 +2680,23 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_BeginIOOperation(AudioServerPlugInDri
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_DoIOOperation(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, AudioObjectID inStreamObjectID, UInt32 inClientID, UInt32 inOperationID, UInt32 inIOBufferFrameSize, const AudioServerPlugInIOCycleInfo *inIOCycleInfo, void *ioMainBuffer, void *ioSecondaryBuffer)
 {
     (void)inDriver;
-    (void)inClientID;
     (void)inIOCycleInfo;
     (void)ioSecondaryBuffer;
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        if (inStreamObjectID != kOpenA8DJLoopbackStreamObjectID ||
+            inOperationID != kAudioServerPlugInIOOperationReadInput) {
+            return kAudioHardwareUnsupportedOperationError;
+        }
+        if (inIOBufferFrameSize > kOpenA8DJLoopbackMaxBufferFrames) {
+            return kAudioHardwareUnsupportedOperationError;
+        }
+        if (ioMainBuffer != NULL) {
+            (void)OpenA8DJVirtualLoopbackRead(
+                &gVirtualLoopback, inClientID, ioMainBuffer,
+                inIOBufferFrameSize);
+        }
+        return kAudioHardwareNoError;
+    }
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }
@@ -2241,6 +2738,10 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_EndIOOperation(AudioServerPlugInDrive
     (void)inOperationID;
     (void)inIOBufferFrameSize;
     (void)inIOCycleInfo;
+    if (inDeviceObjectID == kOpenA8DJLoopbackDeviceObjectID) {
+        return inOperationID == kAudioServerPlugInIOOperationReadInput ?
+            kAudioHardwareNoError : kAudioHardwareUnsupportedOperationError;
+    }
     if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
         return kAudioHardwareBadDeviceError;
     }

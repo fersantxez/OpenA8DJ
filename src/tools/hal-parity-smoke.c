@@ -322,6 +322,29 @@ static int QueryScalarFloat64(AudioServerPlugInDriverRef driver,
     return 0;
 }
 
+static AudioObjectID FindDeviceByUID(AudioServerPlugInDriverRef driver,
+                                    const AudioObjectID *devices,
+                                    UInt32 count,
+                                    CFStringRef expectedUID)
+{
+    for (UInt32 i = 0; i < count; ++i) {
+        void *data = NULL;
+        UInt32 size = 0;
+        if (QueryProperty(driver, devices[i], kAudioDevicePropertyDeviceUID,
+                          kAudioObjectPropertyScopeGlobal, &data, &size) == 0 &&
+            size == sizeof(CFStringRef) && data != NULL) {
+            CFStringRef uid = *(CFStringRef *)data;
+            Boolean matches = uid != NULL && CFEqual(uid, expectedUID);
+            if (uid != NULL) CFRelease(uid);
+            free(data);
+            if (matches) return devices[i];
+        } else {
+            free(data);
+        }
+    }
+    return kAudioObjectUnknown;
+}
+
 int main(int argc, char **argv)
 {
     const char *bundlePath = argc > 1 ? argv[1] : "build/OpenA8DJ.driver";
@@ -374,15 +397,25 @@ int main(int argc, char **argv)
                                          kAudioPlugInPropertyDeviceList,
                                          kAudioObjectPropertyScopeGlobal,
                                          &devices);
-    if (deviceCount != 1 || devices == NULL) {
-        fprintf(stderr, "expected one device, got %u\n", deviceCount);
+    if (deviceCount != 2 || devices == NULL) {
+        fprintf(stderr, "expected two devices, got %u\n", deviceCount);
         failures++;
         free(devices);
         CFRelease(bundle);
         return 8;
     }
-    AudioObjectID deviceID = devices[0];
+    AudioObjectID deviceID = FindDeviceByUID(
+        driver, devices, deviceCount, CFSTR("org.opena8dj.Audio8DJ"));
+    AudioObjectID loopbackDeviceID = FindDeviceByUID(
+        driver, devices, deviceCount,
+        CFSTR("org.opena8dj.Audio8DJ.loopback"));
     free(devices);
+    if (deviceID != 2 || loopbackDeviceID != 11) {
+        fprintf(stderr, "UID lookup mismatch physical=%u loopback=%u\n",
+                deviceID, loopbackDeviceID);
+        CFRelease(bundle);
+        return 9;
+    }
 
     AudioObjectID *ownedObjects = NULL;
     UInt32 ownedCount = QueryObjectList(driver,
@@ -504,6 +537,44 @@ int main(int argc, char **argv)
                 canDefaultInput, canDefaultOutput);
         failures++;
     }
+
+    AudioObjectID *loopbackInputStreams = NULL;
+    UInt32 loopbackInputCount = QueryObjectList(
+        driver, loopbackDeviceID, kAudioDevicePropertyStreams,
+        kAudioObjectPropertyScopeInput, &loopbackInputStreams);
+    UInt32 loopbackOutputCount = QueryObjectList(
+        driver, loopbackDeviceID, kAudioDevicePropertyStreams,
+        kAudioObjectPropertyScopeOutput, NULL);
+    UInt32 loopbackInputChannels = 0;
+    UInt32 loopbackOutputChannels = 0;
+    UInt32 loopbackInputBuffers = QueryStreamConfiguration(
+        driver, loopbackDeviceID, kAudioObjectPropertyScopeInput,
+        &loopbackInputChannels);
+    UInt32 loopbackOutputBuffers = QueryStreamConfiguration(
+        driver, loopbackDeviceID, kAudioObjectPropertyScopeOutput,
+        &loopbackOutputChannels);
+    UInt32 loopbackCanDefaultInput = 1;
+    (void)QueryBoolean(driver, loopbackDeviceID,
+                       kAudioDevicePropertyDeviceCanBeDefaultDevice,
+                       kAudioObjectPropertyScopeInput,
+                       &loopbackCanDefaultInput);
+    if (loopbackInputCount != 1 || loopbackInputStreams == NULL ||
+        loopbackInputStreams[0] != 12 || loopbackOutputCount != 0 ||
+        loopbackInputBuffers != 1 || loopbackInputChannels != 2 ||
+        loopbackOutputBuffers != 0 || loopbackOutputChannels != 0 ||
+        loopbackCanDefaultInput != 0) {
+        fprintf(stderr,
+                "invalid loopback topology: in=%u out=%u stream=%u "
+                "inBuffers=%u inChannels=%u outBuffers=%u outChannels=%u "
+                "default=%u\n",
+                loopbackInputCount, loopbackOutputCount,
+                loopbackInputStreams != NULL ? loopbackInputStreams[0] : 0,
+                loopbackInputBuffers, loopbackInputChannels,
+                loopbackOutputBuffers, loopbackOutputChannels,
+                loopbackCanDefaultInput);
+        failures++;
+    }
+    free(loopbackInputStreams);
 
     CFRelease(bundle);
     if (failures == 0) {

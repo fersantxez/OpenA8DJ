@@ -100,6 +100,25 @@ static OSStatus GetProperty(AudioServerPlugInDriverRef driver,
                                       outData);
 }
 
+static AudioObjectID FindDeviceByUID(AudioServerPlugInDriverRef driver,
+                                    const AudioObjectID *devices,
+                                    UInt32 count,
+                                    CFStringRef expectedUID)
+{
+    for (UInt32 i = 0; i < count; ++i) {
+        CFStringRef uid = NULL;
+        UInt32 size = 0;
+        if (GetProperty(driver, devices[i], kAudioDevicePropertyDeviceUID,
+                        kAudioObjectPropertyScopeGlobal, sizeof(uid), &size,
+                        &uid) == kAudioHardwareNoError && uid != NULL) {
+            Boolean matches = CFEqual(uid, expectedUID);
+            CFRelease(uid);
+            if (matches) return devices[i];
+        }
+    }
+    return kAudioObjectUnknown;
+}
+
 int main(int argc, char **argv)
 {
     const char *bundlePath = argc > 1 ? argv[1] : "build/OpenA8DJ.driver";
@@ -153,16 +172,27 @@ int main(int argc, char **argv)
                          sizeof(devices),
                          &dataSize,
                          devices);
-    if (status != kAudioHardwareNoError || dataSize < sizeof(AudioObjectID)) {
+    if (status != kAudioHardwareNoError ||
+        dataSize != 2 * sizeof(AudioObjectID)) {
         fprintf(stderr, "DeviceList fallo: status=%d size=%u\n", (int)status, dataSize);
         CFRelease(bundle);
         return 8;
+    }
+    AudioObjectID physicalDevice = FindDeviceByUID(
+        driver, devices, 2, CFSTR("org.opena8dj.Audio8DJ"));
+    AudioObjectID loopbackDevice = FindDeviceByUID(
+        driver, devices, 2, CFSTR("org.opena8dj.Audio8DJ.loopback"));
+    if (physicalDevice != 2 || loopbackDevice != 11) {
+        fprintf(stderr, "UID/device mapping invalid: physical=%u loopback=%u\n",
+                physicalDevice, loopbackDevice);
+        CFRelease(bundle);
+        return 16;
     }
 
     CFStringRef name = NULL;
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioObjectPropertyName,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(name),
@@ -177,7 +207,7 @@ int main(int argc, char **argv)
     Float64 sampleRate = 0;
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioDevicePropertyNominalSampleRate,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(sampleRate),
@@ -193,7 +223,7 @@ int main(int argc, char **argv)
     AudioObjectID streams[16] = {0};
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioDevicePropertyStreams,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(streams),
@@ -210,7 +240,7 @@ int main(int argc, char **argv)
     UInt32 bufferFrames = 0;
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioDevicePropertyBufferFrameSize,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(bufferFrames),
@@ -226,7 +256,7 @@ int main(int argc, char **argv)
     UInt32 bufferBytes = 0;
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioDevicePropertyBufferSize,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(bufferBytes),
@@ -242,7 +272,7 @@ int main(int argc, char **argv)
     AudioValueRange bufferRange = {0};
     dataSize = 0;
     status = GetProperty(driver,
-                         devices[0],
+                         physicalDevice,
                          kAudioDevicePropertyBufferFrameSizeRange,
                          kAudioObjectPropertyScopeGlobal,
                          sizeof(bufferRange),
@@ -255,7 +285,7 @@ int main(int argc, char **argv)
         return 14;
     }
 
-    printf("HAL smoke OK: deviceID=%u name=", devices[0]);
+    printf("HAL smoke OK: deviceID=%u name=", physicalDevice);
     PrintCFString(name);
     printf(" sampleRate=%.0f streams=%u buffer=%u bufferBytes=%u bufferRange=%.0f-%.0f\n",
            sampleRate,
@@ -279,6 +309,34 @@ int main(int argc, char **argv)
         CFRelease(name);
         CFRelease(bundle);
         return 15;
+    }
+
+    AudioObjectID loopbackStreams[2] = {0};
+    dataSize = 0;
+    status = GetProperty(driver, loopbackDevice,
+                         kAudioDevicePropertyStreams,
+                         kAudioObjectPropertyScopeInput,
+                         sizeof(loopbackStreams), &dataSize,
+                         loopbackStreams);
+    if (status != kAudioHardwareNoError ||
+        dataSize != sizeof(AudioObjectID) || loopbackStreams[0] != 12) {
+        fprintf(stderr, "Loopback input stream invalid status=%d size=%u id=%u\n",
+                (int)status, dataSize, loopbackStreams[0]);
+        CFRelease(name);
+        CFRelease(bundle);
+        return 17;
+    }
+    dataSize = 0;
+    status = GetProperty(driver, loopbackDevice,
+                         kAudioDevicePropertyStreams,
+                         kAudioObjectPropertyScopeOutput,
+                         sizeof(loopbackStreams), &dataSize,
+                         loopbackStreams);
+    if (status != kAudioHardwareNoError || dataSize != 0) {
+        fprintf(stderr, "Loopback unexpectedly has output streams\n");
+        CFRelease(name);
+        CFRelease(bundle);
+        return 18;
     }
 
     CFRelease(name);

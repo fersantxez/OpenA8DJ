@@ -1,7 +1,21 @@
 #include "OpenA8DJVirtualLoopback.h"
 
 #include <limits.h>
+#include <pthread.h>
 #include <string.h>
+
+_Static_assert(ATOMIC_INT_LOCK_FREE == 2,
+               "32-bit atomics must always be lock-free");
+_Static_assert(ATOMIC_LONG_LOCK_FREE == 2,
+               "long atomics must always be lock-free");
+_Static_assert(ATOMIC_LLONG_LOCK_FREE == 2,
+               "64-bit atomics must always be lock-free");
+_Static_assert((kOpenA8DJLoopbackRingCapacity &
+                (kOpenA8DJLoopbackRingCapacity - 1)) == 0,
+               "loopback ring capacity must be a power of two");
+
+OpenA8DJVirtualLoopback gOpenA8DJVirtualLoopback;
+static pthread_mutex_t gSharedMutationMutex = PTHREAD_MUTEX_INITIALIZER;
 
 static uint32_t FloatBits(float value)
 {
@@ -55,6 +69,14 @@ static void ResetReadersAtHead(OpenA8DJVirtualLoopback *state,
                                   memory_order_release);
         }
     }
+}
+
+static uint64_t ResetSequence(OpenA8DJVirtualLoopback *state)
+{
+    uint64_t generation = AdvanceGeneration(state);
+    atomic_store_explicit(&state->writeHead, 0, memory_order_release);
+    ResetReadersAtHead(state, generation, 0);
+    return generation;
 }
 
 void OpenA8DJVirtualLoopbackInitialize(OpenA8DJVirtualLoopback *state)
@@ -210,16 +232,14 @@ uint32_t OpenA8DJVirtualLoopbackPublish8(
                                          memory_order_relaxed);
     if (frameCount > kOpenA8DJLoopbackRingCapacity ||
         head > UINT64_MAX - frameCount - 1) {
-        OpenA8DJVirtualLoopbackResetContent(state);
-        head = atomic_load_explicit(&state->writeHead, memory_order_relaxed);
+        generation = ResetSequence(state);
+        head = 0;
         if (frameCount > kOpenA8DJLoopbackRingCapacity) {
             interleavedEightChannels +=
                 (size_t)(frameCount - kOpenA8DJLoopbackRingCapacity) *
                 kOpenA8DJLoopbackPhysicalChannelCount;
             frameCount = kOpenA8DJLoopbackRingCapacity;
         }
-        generation = atomic_load_explicit(&state->generation,
-                                          memory_order_acquire);
     }
     unsigned pair = atomic_load_explicit(&state->sourcePair,
                                          memory_order_acquire);
@@ -299,36 +319,46 @@ uint32_t OpenA8DJVirtualLoopbackRead(OpenA8DJVirtualLoopback *state,
         return 0;
     }
 
-    uint64_t cursor = atomic_load_explicit(&client->cursor,
-                                           memory_order_relaxed);
-    if (head < cursor) {
-        atomic_store_explicit(&client->cursor, head, memory_order_release);
-        SaturatingAdd(&state->gapFrames, frameCount);
-        SaturatingAdd(&state->silenceFrames, frameCount);
-        return 0;
+    uint64_t cursor = 0;
+    uint32_t reserved = 0;
+    bool didReserve = false;
+    for (unsigned attempt = 0; attempt < 4; ++attempt) {
+        head = atomic_load_explicit(&state->writeHead, memory_order_acquire);
+        cursor = atomic_load_explicit(&client->cursor, memory_order_relaxed);
+        if (head < cursor) {
+            atomic_store_explicit(&client->cursor, head,
+                                  memory_order_release);
+            SaturatingAdd(&state->gapFrames, frameCount);
+            SaturatingAdd(&state->silenceFrames, frameCount);
+            return 0;
+        }
+        uint64_t available = head - cursor;
+        if (available > kOpenA8DJLoopbackRingCapacity) {
+            uint64_t lost = available - kOpenA8DJLoopbackRingCapacity;
+            atomic_store_explicit(&client->cursor, head,
+                                  memory_order_release);
+            SaturatingAdd(&state->overrunEvents, 1);
+            SaturatingAdd(&state->overrunFrames, lost);
+            SaturatingAdd(&state->gapFrames, lost);
+            SaturatingAdd(&state->silenceFrames, frameCount);
+            return 0;
+        }
+        reserved = available < frameCount ?
+            (uint32_t)available : frameCount;
+        if (reserved == 0) {
+            SaturatingAdd(&state->silenceFrames, frameCount);
+            return 0;
+        }
+        uint64_t expected = cursor;
+        if (atomic_compare_exchange_weak_explicit(
+                &client->cursor, &expected, cursor + reserved,
+                memory_order_acq_rel, memory_order_relaxed)) {
+            didReserve = true;
+            break;
+        }
     }
-    uint64_t available = head - cursor;
-    if (available > kOpenA8DJLoopbackRingCapacity) {
-        uint64_t lost = available - kOpenA8DJLoopbackRingCapacity;
-        atomic_store_explicit(&client->cursor, head, memory_order_release);
-        SaturatingAdd(&state->overrunEvents, 1);
-        SaturatingAdd(&state->overrunFrames, lost);
-        SaturatingAdd(&state->gapFrames, lost);
+    if (!didReserve) {
         SaturatingAdd(&state->silenceFrames, frameCount);
-        return 0;
-    }
-    uint32_t reserved = available < frameCount ?
-        (uint32_t)available : frameCount;
-    if (reserved == 0) {
-        SaturatingAdd(&state->silenceFrames, frameCount);
-        return 0;
-    }
-    uint64_t expected = cursor;
-    if (!atomic_compare_exchange_strong_explicit(
-            &client->cursor, &expected, cursor + reserved,
-            memory_order_acq_rel, memory_order_relaxed)) {
-        SaturatingAdd(&state->silenceFrames, frameCount);
-        SaturatingAdd(&state->gapFrames, reserved);
         return 0;
     }
 
@@ -394,4 +424,30 @@ void OpenA8DJVirtualLoopbackSnapshot(
         atomic_load_explicit(&state->overrunEvents, memory_order_relaxed);
     outPayload->overrunFrames =
         atomic_load_explicit(&state->overrunFrames, memory_order_relaxed);
+}
+
+bool OpenA8DJHALVirtualLoopbackApply(
+    const OpenA8DJLoopbackSetRequest *request,
+    size_t requestLength,
+    OpenA8DJLoopbackStatePayload *outPayload)
+{
+    if (!OpenA8DJVirtualLoopbackValidateSetRequest(request, requestLength) ||
+        outPayload == NULL) {
+        return false;
+    }
+    pthread_mutex_lock(&gSharedMutationMutex);
+    bool applied = OpenA8DJVirtualLoopbackSet(
+        &gOpenA8DJVirtualLoopback, request->enabled != 0,
+        (OpenA8DJLoopbackSourcePair)request->sourcePair);
+    OpenA8DJVirtualLoopbackSnapshot(&gOpenA8DJVirtualLoopback, outPayload);
+    pthread_mutex_unlock(&gSharedMutationMutex);
+    return applied;
+}
+
+void OpenA8DJHALVirtualLoopbackSnapshot(
+    OpenA8DJLoopbackStatePayload *outPayload)
+{
+    if (outPayload != NULL) {
+        OpenA8DJVirtualLoopbackSnapshot(&gOpenA8DJVirtualLoopback, outPayload);
+    }
 }
