@@ -176,7 +176,7 @@ Gatekeeper can verify the package without extra user steps.
 
 Windows builds are distributed from
 [GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases) as
-experimental driver ZIP packages. They are not production MSIs yet.
-
-Use the Windows ZIPs only on test systems that can install test-signed or
-experimental drivers. See [Windows status](WINDOWS.md) before installing.
+experimental driver ZIP packages. The driver is not Microsoft-signed for
+production distribution yet, so Windows test-signing mode is required. See the
+[Windows installation guide](WINDOWS.md) for the complete setup and uninstall
+steps.

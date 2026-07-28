@@ -168,19 +168,14 @@ plan.
 
 ## Windows
 
-OpenA8DJ 0.3.25 is primarily a macOS release. The repository also contains
-an experimental Windows 10/11 WDK workstream under `windows/`.
+OpenA8DJ works with the Audio 8 DJ on Windows 10/11 through a separate
+experimental driver package. The package is not Microsoft-signed for production
+distribution yet, so Windows test-signing mode must be enabled during
+installation.
 
-The Windows package builds a test-signed KMDF driver, INF/catalog package, and
-`opena8djctl.exe` control tool. It exposes the OpenA8DJ 8-in/8-out capability
-contract and hardware-control API, but it has not been exhaustively validated on
-Windows with the physical interface. Treat Windows builds as experimental and
-send feedback/logs.
-
-Windows support is tracked separately in [docs/WINDOWS.md](docs/WINDOWS.md).
-Experimental Windows ZIPs from earlier previews remain available in
-[GitHub Releases](https://github.com/fersantxez/OpenA8DJ/releases), but Windows
-artifacts are rebuilt and validated separately from the macOS HAL releases.
+Start with the [Windows installation guide](docs/WINDOWS.md). The implementation
+and validation notes are in [Windows technical details](docs/WINDOWS_DETAILS.md).
+Windows artifacts are built and released separately from the macOS HAL.
 
 ## Architecture
 
@@ -214,7 +209,8 @@ original project test results.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Testing](docs/TESTING.md)
 - [Traktor timecode test plan](docs/TRAKTOR_TIMECODE.md)
-- [Windows status](docs/WINDOWS.md)
+- [Windows installation](docs/WINDOWS.md)
+- [Windows technical details](docs/WINDOWS_DETAILS.md)
 - [Roadmap to production quality](docs/ROADMAP_TO_PRO.md)
 - [Release process](docs/RELEASE.md)
 - [Legal and publication policy](docs/LEGAL.md)
