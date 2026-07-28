@@ -62,11 +62,4 @@ signature state, hashes, and driver diagnostics.
 
 ## Technical Details
 
-- [Windows technical details](WINDOWS_DETAILS.md)
-- [Windows installer design](WINDOWS_STANDALONE_INSTALLER_DESIGN_2026-06-19.md)
-- [Windows handoff and evidence](WINDOWS_HANDOFF_2026-07-25.md)
-- [Windows package directory](../windows/releases/README.md)
-
-Build requirements, offline tests, architecture notes, historical candidates,
-and raw validation evidence are kept on the technical-details page rather than
-in this installation guide.
+[Maintainer documentation index](WINDOWS_DETAILS.md)

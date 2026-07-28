@@ -4,9 +4,7 @@ For users, start with the [Windows installation guide](../docs/WINDOWS.md).
 It links directly to the current EXE, ZIP, checksums, installation steps, and
 verification commands.
 
-For maintainers, see [Windows technical details](../docs/WINDOWS_DETAILS.md).
-That page contains the architecture, build requirements, offline tests,
-historical candidates, and validation evidence.
+For maintainers, see the [Windows technical index](../docs/WINDOWS_DETAILS.md).
 
 ## Current Downloadable Files
 
