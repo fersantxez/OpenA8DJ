@@ -58,6 +58,24 @@ The release contains two files:
 You only need the DMG to install OpenA8DJ. Do not use packages copied from
 mirrors, forums, or GitHub Actions.
 
+## Windows (Experimental)
+
+The Windows line is separate from the macOS release and works with the Audio 8
+DJ on Windows 10/11 x64. The driver is test-signed, not Microsoft-signed, so
+Windows signature enforcement must be overridden for the installation boot.
+There is no MSI yet.
+
+Download the current Windows package:
+
+- [Windows installer EXE](windows/releases/OpenA8DJUsb-Release-x64-installer.exe)
+- [Windows installer ZIP](windows/releases/OpenA8DJUsb-Release-x64-installer.zip)
+- [Windows SHA-256 checksums](windows/releases/SHA256SUMS.txt)
+
+Follow the [Windows installation guide](docs/WINDOWS.md). It covers the
+one-boot setup, installation, verification, and removal. Architecture,
+builds, tests, and validation evidence are on the [Windows technical details
+page](docs/WINDOWS_DETAILS.md).
+
 ## Install
 
 1. Download `OpenA8DJ-0.5.1.dmg`.
@@ -148,8 +166,8 @@ the [uninstall guide](docs/user/uninstall.md) for the final check.
 - 44.1 kHz and 48 kHz are the primary supported rates.
 - The release has been used successfully with Traktor Timecode Vinyl, but it is
   not an official Native Instruments-certified driver.
-- Windows, Linux, Rust, and DriverKit development live in separate experimental
-  branches and are not user-ready alternatives to this macOS release.
+- Windows and Linux remain separate experimental lines. Windows downloads and
+  installation instructions are in [Windows (Experimental)](#windows-experimental).
 
 ## Help And Documentation
 
@@ -159,6 +177,8 @@ the [uninstall guide](docs/user/uninstall.md) for the final check.
 - [Control Center](docs/user/control-center.md)
 - [Troubleshooting](docs/user/troubleshooting.md)
 - [Uninstall](docs/user/uninstall.md)
+- [Windows installation](docs/WINDOWS.md)
+- [Windows technical details](docs/WINDOWS_DETAILS.md)
 - [Documentation index](docs/README.md)
 
 For a reproducible problem, include the macOS version, application and version,
