@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -85,14 +86,7 @@ std::string json_escape(const std::string& value) {
 
 int main(int argc, char** argv) {
   (void)argc;
-  const auto executable = std::filesystem::absolute(argv[0]);
-  std::filesystem::path root = executable.parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    root = "/Users/fer/dev/audio8djcpp";
-  }
+  const auto root = opena8dj::repo_root();
 
   const std::vector<std::filesystem::path> audited_files = {
       root / "CMakeLists.txt",
@@ -197,10 +191,10 @@ int main(int argc, char** argv) {
       {"HAL_OUTPUT_NATIVE", "0"},
       {"HAL_FAST_OUTPUT_PREFETCH_CLEAR", "1"},
       {"HAL_UNROLLED_OUTPUT_PACK", "1"},
-      {"HAL_TRANSFER_POOL_CURSOR", "0"},
+      {"HAL_TRANSFER_POOL_CURSOR", "1"},
       {"HAL_REUSE_ISOC_COMPLETIONS", "0"},
       {"HAL_RAW_ISOC_COMPLETIONS", "0"},
-      {"HAL_FAST_ISO_TRANSFER_CONFIG", "0"},
+      {"HAL_FAST_ISO_TRANSFER_CONFIG", "1"},
       {"HAL_PLAYBACK_PAYLOAD_GUARD", "0"},
       {"HAL_OUTPUT_SAMPLE_TIME_FOLLOWER", "0"},
       {"HAL_IGNORE_OUTPUT_SAMPLE_TIME", "1"},
@@ -223,7 +217,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  const bool path_policy = root == std::filesystem::path("/Users/fer/dev/audio8djcpp");
+  const bool path_policy = std::filesystem::is_regular_file(root / "CMakeLists.txt") &&
+                           std::filesystem::is_regular_file(root / "tools/repo_paths.hpp");
   const bool pass = hits.empty() && path_policy && default_failures.empty();
 
   std::cout << "{\n"

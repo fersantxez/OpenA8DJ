@@ -18,6 +18,7 @@
 #include <math.h>
 #include <errno.h>
 #include <pthread.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdint.h>
@@ -1934,6 +1935,9 @@ static bool ReadFull(int fd, void *buffer, size_t length)
     size_t offset = 0;
     while (offset < length) {
         ssize_t count = read(fd, bytes + offset, length - offset);
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
         if (count <= 0) {
             return false;
         }
@@ -1942,12 +1946,15 @@ static bool ReadFull(int fd, void *buffer, size_t length)
     return true;
 }
 
-static bool WriteFull(int fd, const void *buffer, size_t length)
+static bool SendNonblockingFull(int fd, const void *buffer, size_t length)
 {
     const uint8_t *bytes = buffer;
     size_t offset = 0;
     while (offset < length) {
-        ssize_t count = write(fd, bytes + offset, length - offset);
+        ssize_t count = send(fd, bytes + offset, length - offset, MSG_DONTWAIT);
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
         if (count <= 0) {
             return false;
         }
@@ -1956,7 +1963,44 @@ static bool WriteFull(int fd, const void *buffer, size_t length)
     return true;
 }
 
-static bool IPCSend(int fd, uint8_t type, const void *payload, uint16_t length)
+static bool SendBoundedFull(int fd, const void *buffer, size_t length)
+{
+    const uint8_t *bytes = buffer;
+    size_t offset = 0;
+    mach_timebase_info_data_t timebase;
+    if (mach_timebase_info(&timebase) != KERN_SUCCESS || timebase.denom == 0) {
+        return false;
+    }
+    const uint64_t deadline = mach_absolute_time() +
+        (50000000ULL * timebase.denom + timebase.numer - 1) / timebase.numer;
+    while (offset < length) {
+        uint64_t now = mach_absolute_time();
+        if (now >= deadline) {
+            return false;
+        }
+        uint64_t remainingNanos = (deadline - now) * timebase.numer / timebase.denom;
+        int timeoutMillis = (int)((remainingNanos + 999999ULL) / 1000000ULL);
+        struct pollfd writable = {.fd = fd, .events = POLLOUT};
+        int pollResult;
+        do {
+            pollResult = poll(&writable, 1, timeoutMillis);
+        } while (pollResult < 0 && errno == EINTR && mach_absolute_time() < deadline);
+        if (pollResult <= 0 || (writable.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+            return false;
+        }
+        ssize_t count = send(fd, bytes + offset, length - offset, MSG_DONTWAIT);
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
+        if (count <= 0) {
+            return false;
+        }
+        offset += (size_t)count;
+    }
+    return true;
+}
+
+static bool IPCSendNonblocking(int fd, uint8_t type, const void *payload, uint16_t length)
 {
     OpenA8DJIPCHeader header = {
         .magic = kIPCMagic,
@@ -1964,8 +2008,33 @@ static bool IPCSend(int fd, uint8_t type, const void *payload, uint16_t length)
         .type = type,
         .length = length
     };
-    return WriteFull(fd, &header, sizeof(header)) &&
-           (length == 0 || WriteFull(fd, payload, length));
+    return SendNonblockingFull(fd, &header, sizeof(header)) &&
+           (length == 0 || SendNonblockingFull(fd, payload, length));
+}
+
+static bool IPCSendBounded(int fd, uint8_t type, const void *payload, uint16_t length)
+{
+    OpenA8DJIPCHeader header = {
+        .magic = kIPCMagic,
+        .version = kIPCVersion,
+        .type = type,
+        .length = length
+    };
+    return SendBoundedFull(fd, &header, sizeof(header)) &&
+           (length == 0 || SendBoundedFull(fd, payload, length));
+}
+
+static bool UnlinkOwnedIPCSocketPath(const char *path, dev_t expectedDevice, ino_t expectedInode)
+{
+    struct stat current;
+    if (lstat(path, &current) != 0) {
+        return errno == ENOENT;
+    }
+    if (!S_ISSOCK(current.st_mode) || current.st_dev != expectedDevice ||
+        current.st_ino != expectedInode) {
+        return false;
+    }
+    return unlink(path) == 0 || errno == ENOENT;
 }
 
 static int AudioStreamCount(const CaiaqDeviceSpec *spec)
@@ -2101,8 +2170,8 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(true);
 - (BOOL)start;
 - (BOOL)isStreaming;
 - (BOOL)ensureOpen;
-- (void)stop;
-- (void)close;
+- (BOOL)stop;
+- (BOOL)close;
 - (uint32_t)readInput:(float *)outInterleaved frames:(uint32_t)frames channels:(uint32_t)channels;
 - (void)setInputDecodeEnabled:(BOOL)enabled;
 - (void)setInputDecodeActive:(BOOL)active;
@@ -2121,6 +2190,16 @@ static atomic_bool gInputDecodeEnabledPreference = ATOMIC_VAR_INIT(true);
 - (void)resetAudioParamsBeforeStream;
 - (void)startIPCServer;
 - (void)stopIPCServer;
+- (BOOL)addIPCClient:(int)fd generation:(uint64_t *)generation;
+- (BOOL)addAcceptedIPCClient:(int)fd generation:(uint64_t *)generation;
+- (BOOL)registerIPCClient:(int)fd generation:(uint64_t *)generation requireRunning:(BOOL)requireRunning;
+#if OPENA8DJ_LIFECYCLE_AUDIT
+- (void)setIPCAdmissionForAuditRunning:(BOOL)running;
+#endif
+- (void)removeIPCClient:(int)fd generation:(uint64_t)generation;
+- (void)handleIPCClient:(int)fd generation:(uint64_t)generation;
+- (BOOL)waitForQueueRetirement:(dispatch_queue_t)queue name:(const char *)name;
+- (BOOL)sendIPCType:(uint8_t)type bytes:(const void *)bytes length:(uint16_t)length clientFD:(int)fd;
 - (void)broadcastIPCType:(uint8_t)type bytes:(const uint8_t *)bytes length:(NSUInteger)length;
 - (BOOL)getClockAnchor:(OpenA8DJUSBClockAnchor *)outAnchor;
 - (BOOL)getDiagnostics:(OpenA8DJUSBDiagnostics *)outDiagnostics;
@@ -2477,12 +2556,15 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
 #endif
     atomic_bool _running;
     atomic_bool _streaming;
+    atomic_bool _retirementUnsafe;
+    atomic_uint _captureTransfersInFlight;
     pthread_mutex_t _bulkOutMutex;
     pthread_mutex_t _ep1Mutex;
     pthread_cond_t _ep1Cond;
     uint8_t _pendingCommand;
     bool _pendingActive;
     bool _pendingReady;
+    bool _ep1ChannelInvalid;
     NSData *_pendingReply;
     uint8_t _controlState[256];
     uint8_t _lastAudioParamsResetRateCode;
@@ -2494,9 +2576,16 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     uint16_t _lastAudioParamsResetBytesPerPacket;
     uint16_t _lastAudioParamsStreamBytesPerPacket;
     pthread_mutex_t _ipcClientsMutex;
+    pthread_mutex_t _ipcWriterMutex[16];
     int _ipcListenFd;
+    dev_t _ipcSocketPathDevice;
+    ino_t _ipcSocketPathInode;
+    BOOL _ipcSocketPathOwned;
     int _ipcClients[16];
+    uint64_t _ipcClientGenerations[16];
+    uint64_t _ipcNextGeneration;
     size_t _ipcClientCount;
+    atomic_uint _ipcActiveHandlers;
     dispatch_source_t _streamKeepaliveTimer;
     MIDIClientRef _midiClient;
     MIDIEndpointRef _midiSource;
@@ -2510,6 +2599,9 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         _sampleRate = sampleRate;
         atomic_init(&_running, false);
         atomic_init(&_streaming, false);
+        atomic_init(&_retirementUnsafe, false);
+        atomic_init(&_captureTransfersInFlight, 0);
+        atomic_init(&_ipcActiveHandlers, 0);
         atomic_init(&_inputSwapMask, 0);
         atomic_init(&_inputInvertLeftMask, 0);
         atomic_init(&_inputInvertRightMask, 0);
@@ -2573,9 +2665,15 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
         pthread_mutex_init(&_transferPoolMutex, NULL);
         pthread_mutex_init(&_ipcClientsMutex, NULL);
         _ipcListenFd = -1;
+        _ipcSocketPathDevice = 0;
+        _ipcSocketPathInode = 0;
+        _ipcSocketPathOwned = NO;
         for (size_t i = 0; i < sizeof(_ipcClients) / sizeof(_ipcClients[0]); i++) {
             _ipcClients[i] = -1;
+            _ipcClientGenerations[i] = 0;
+            pthread_mutex_init(&_ipcWriterMutex[i], NULL);
         }
+        _ipcNextGeneration = 1;
         RingInit(&_inputRing, kRingFrames, kChannels);
         RingInit(&_outputFifo, kRingFrames, kChannels);
         OutputTimelineInit(&_outputTimeline, kRingFrames, kChannels);
@@ -2674,6 +2772,9 @@ static uint64_t PlaybackPayloadDigest(const void *bytes, NSUInteger length)
     pthread_mutex_destroy(&_diagnosticMutex);
 #endif
     pthread_mutex_destroy(&_ipcClientsMutex);
+    for (size_t i = 0; i < sizeof(_ipcWriterMutex) / sizeof(_ipcWriterMutex[0]); i++) {
+        pthread_mutex_destroy(&_ipcWriterMutex[i]);
+    }
     pthread_mutex_destroy(&_clockAnchorMutex);
     pthread_mutex_destroy(&_streamStatsMutex);
     pthread_mutex_destroy(&_inputStatsMutex);
@@ -2985,6 +3086,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         replyLength:(NSUInteger *)replyLengthOut
 {
     for (int attempt = 0; attempt < 3; attempt++) {
+        struct timespec pendingDeadline;
+        clock_gettime(CLOCK_REALTIME, &pendingDeadline);
+        pendingDeadline.tv_sec += 2;
         NSMutableData *outData = [NSMutableData dataWithLength:1 + payloadLength];
         uint8_t *outBytes = outData.mutableBytes;
         outBytes[0] = command;
@@ -2997,8 +3101,19 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                             command == kCommandAudioParams ||
                             command == kCommandReadIO;
         pthread_mutex_lock(&_ep1Mutex);
-        while (_pendingActive) {
-            pthread_cond_wait(&_ep1Cond, &_ep1Mutex);
+        int pendingWaitStatus = 0;
+        while (_pendingActive && pendingWaitStatus == 0) {
+            pendingWaitStatus = pthread_cond_timedwait(&_ep1Cond, &_ep1Mutex, &pendingDeadline);
+        }
+        if (_pendingActive || _ep1ChannelInvalid) {
+            if (_pendingActive) {
+                // Replies have no transaction ID. Retire this command channel
+                // rather than allowing a late reply to complete a new request.
+                _ep1ChannelInvalid = true;
+            }
+            pthread_mutex_unlock(&_ep1Mutex);
+            USBTrace("bulk command channel unavailable command=0x%02x wait=%d", command, pendingWaitStatus);
+            return NO;
         }
         if (expectsReply) {
             _pendingCommand = command;
@@ -3044,6 +3159,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         }
         NSData *reply = _pendingReply;
         bool ok = _pendingReady && reply != nil;
+        if (!ok) {
+            _ep1ChannelInvalid = true;
+        }
         _pendingActive = false;
         _pendingReady = false;
         _pendingReply = nil;
@@ -3418,6 +3536,13 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         return NO;
     }
 
+    pthread_mutex_lock(&_ep1Mutex);
+    _ep1ChannelInvalid = false;
+    _pendingActive = false;
+    _pendingReady = false;
+    _pendingReply = nil;
+    pthread_cond_broadcast(&_ep1Cond);
+    pthread_mutex_unlock(&_ep1Mutex);
     atomic_store(&_running, true);
     __weak OpenA8DJUSBEngine *weakSelf = self;
     dispatch_async(_ep1Queue, ^{
@@ -3472,40 +3597,81 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
 }
 
-- (void)addIPCClient:(int)fd
+- (BOOL)addIPCClient:(int)fd generation:(uint64_t *)generation
 {
+    return [self registerIPCClient:fd generation:generation requireRunning:NO];
+}
+
+- (BOOL)addAcceptedIPCClient:(int)fd generation:(uint64_t *)generation
+{
+    return [self registerIPCClient:fd generation:generation requireRunning:YES];
+}
+
+- (BOOL)registerIPCClient:(int)fd generation:(uint64_t *)generation requireRunning:(BOOL)requireRunning
+{
+    int noSignal = 1;
+    (void)setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, sizeof(noSignal));
     pthread_mutex_lock(&_ipcClientsMutex);
     size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
-    if (_ipcClientCount >= capacity) {
+    // close publishes _running=false under this same lock. This makes the
+    // final accept-vs-close decision atomic with respect to client insertion.
+    if ((requireRunning && !atomic_load(&_running)) || _ipcClientCount >= capacity) {
         pthread_mutex_unlock(&_ipcClientsMutex);
         close(fd);
-        return;
+        return NO;
     }
     for (size_t i = 0; i < capacity; i++) {
         if (_ipcClients[i] < 0) {
             _ipcClients[i] = fd;
-            _ipcClientCount++;
-            break;
-        }
-    }
-    pthread_mutex_unlock(&_ipcClientsMutex);
-}
-
-- (void)removeIPCClient:(int)fd
-{
-    pthread_mutex_lock(&_ipcClientsMutex);
-    size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
-    for (size_t i = 0; i < capacity; i++) {
-        if (_ipcClients[i] == fd) {
-            _ipcClients[i] = -1;
-            if (_ipcClientCount > 0) {
-                _ipcClientCount--;
+            uint64_t assigned = _ipcNextGeneration++;
+            if (assigned == 0) {
+                assigned = _ipcNextGeneration++;
             }
-            break;
+            _ipcClientGenerations[i] = assigned;
+            if (generation != NULL) {
+                *generation = assigned;
+            }
+            _ipcClientCount++;
+            pthread_mutex_unlock(&_ipcClientsMutex);
+            return YES;
         }
     }
     pthread_mutex_unlock(&_ipcClientsMutex);
     close(fd);
+    return NO;
+}
+
+#if OPENA8DJ_LIFECYCLE_AUDIT
+- (void)setIPCAdmissionForAuditRunning:(BOOL)running
+{
+    pthread_mutex_lock(&_ipcClientsMutex);
+    atomic_store(&_running, running);
+    pthread_mutex_unlock(&_ipcClientsMutex);
+}
+#endif
+
+- (void)removeIPCClient:(int)fd generation:(uint64_t)generation
+{
+    BOOL wasRegistered = NO;
+    pthread_mutex_lock(&_ipcClientsMutex);
+    size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
+    for (size_t i = 0; i < capacity; i++) {
+        if (_ipcClients[i] == fd && _ipcClientGenerations[i] == generation) {
+            _ipcClients[i] = -1;
+            _ipcClientGenerations[i] = 0;
+            if (_ipcClientCount > 0) {
+                _ipcClientCount--;
+            }
+            wasRegistered = YES;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&_ipcClientsMutex);
+    // stopIPCServer shuts the descriptor down but leaves its unique owner to close it.
+    // A late handler must not close a descriptor number that the process has reused.
+    if (wasRegistered) {
+        close(fd);
+    }
 }
 
 - (void)broadcastIPCType:(uint8_t)type bytes:(const uint8_t *)bytes length:(NSUInteger)length
@@ -3513,6 +3679,9 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     if (length > UINT16_MAX) {
         length = UINT16_MAX;
     }
+    int clients[sizeof(_ipcClients) / sizeof(_ipcClients[0])];
+    size_t writerSlots[sizeof(_ipcClients) / sizeof(_ipcClients[0])];
+    size_t clientCount = 0;
     pthread_mutex_lock(&_ipcClientsMutex);
     size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
     for (size_t i = 0; i < capacity; i++) {
@@ -3520,22 +3689,65 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
         if (fd < 0) {
             continue;
         }
-        if (!IPCSend(fd, type, bytes, (uint16_t)length)) {
-            close(fd);
-            _ipcClients[i] = -1;
-            if (_ipcClientCount > 0) {
-                _ipcClientCount--;
-            }
+        int duplicate = dup(fd);
+        if (duplicate >= 0) {
+            clients[clientCount] = duplicate;
+            writerSlots[clientCount] = i;
+            clientCount++;
         }
     }
     pthread_mutex_unlock(&_ipcClientsMutex);
+
+    for (size_t i = 0; i < clientCount; i++) {
+        size_t slot = writerSlots[i];
+        pthread_mutex_lock(&_ipcWriterMutex[slot]);
+        if (!IPCSendNonblocking(clients[i], type, bytes, (uint16_t)length)) {
+            // A slow peer is retired instead of delaying the EP1/MIDI reader.
+            shutdown(clients[i], SHUT_RDWR);
+        }
+        pthread_mutex_unlock(&_ipcWriterMutex[slot]);
+        close(clients[i]);
+    }
+}
+
+- (BOOL)sendIPCType:(uint8_t)type bytes:(const void *)bytes length:(uint16_t)length clientFD:(int)fd
+{
+    int duplicate = -1;
+    size_t slot = 0;
+    pthread_mutex_lock(&_ipcClientsMutex);
+    size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
+    for (size_t i = 0; i < capacity; i++) {
+        if (_ipcClients[i] == fd) {
+            duplicate = dup(fd);
+            slot = i;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&_ipcClientsMutex);
+    if (duplicate < 0) {
+        return NO;
+    }
+
+    pthread_mutex_lock(&_ipcWriterMutex[slot]);
+    // A request handler must never wait for a slow reader. Control replies are
+    // small and ordered by the per-client writer lock; if the peer cannot
+    // accept the complete frame immediately, retire it and let the handler
+    // return. This keeps the 50 ms socket timeout from becoming a per-syscall
+    // delay multiplied across a partially written frame.
+    BOOL sent = IPCSendBounded(duplicate, type, bytes, length);
+    if (!sent) {
+        shutdown(duplicate, SHUT_RDWR);
+    }
+    pthread_mutex_unlock(&_ipcWriterMutex[slot]);
+    close(duplicate);
+    return sent;
 }
 
 - (void)sendControlStateToClient:(int)fd
 {
     OpenA8DJControlPayload state;
     [self loadControlPayload:&state];
-    (void)IPCSend(fd, kIPCTypeControlState, &state, sizeof(state));
+    (void)[self sendIPCType:kIPCTypeControlState bytes:&state length:(uint16_t)sizeof(state) clientFD:fd];
 }
 
 - (void)addStreamStatAtOffset:(size_t)offset value:(uint64_t)value
@@ -4365,7 +4577,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 - (void)sendStreamStatsToClient:(int)fd
 {
     OpenA8DJStreamStatsPayload stats = [self streamStatsSnapshot];
-    (void)IPCSend(fd, kIPCTypeStreamStats, &stats, sizeof(stats));
+    (void)[self sendIPCType:kIPCTypeStreamStats bytes:&stats length:(uint16_t)sizeof(stats) clientFD:fd];
 }
 
 - (void)sendTransferLedgerToClient:(int)fd
@@ -4375,7 +4587,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     uint16_t length = [self copyTransferLedgerDump:request
                                              bytes:payload
                                           capacity:sizeof(payload)];
-    (void)IPCSend(fd, kIPCTypeTransferLedger, payload, length);
+    (void)[self sendIPCType:kIPCTypeTransferLedger bytes:payload length:length clientFD:fd];
 }
 
 - (void)resetClockAnchorWithSeedBump:(BOOL)bumpSeed
@@ -4576,7 +4788,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     stats = _inputStats;
     memset(&_inputStats, 0, sizeof(_inputStats));
     pthread_mutex_unlock(&_inputStatsMutex);
-    (void)IPCSend(fd, kIPCTypeInputStats, &stats, sizeof(stats));
+    (void)[self sendIPCType:kIPCTypeInputStats bytes:&stats length:(uint16_t)sizeof(stats) clientFD:fd];
 }
 
 - (void)handleIPCMessageType:(uint8_t)type payload:(const uint8_t *)payload length:(NSUInteger)length client:(int)fd
@@ -4584,7 +4796,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     switch (type) {
         case kIPCTypeHello: {
             const char status[] = "OpenA8DJ HAL USB bridge ready";
-            (void)IPCSend(fd, kIPCTypeStatus, status, (uint16_t)(sizeof(status) - 1));
+            (void)[self sendIPCType:kIPCTypeStatus bytes:status length:(uint16_t)(sizeof(status) - 1) clientFD:fd];
             [self sendControlStateToClient:fd];
             break;
         }
@@ -4625,7 +4837,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     }
 }
 
-- (void)handleIPCClient:(int)fd
+- (void)handleIPCClient:(int)fd generation:(uint64_t)generation
 {
     @autoreleasepool {
         while (atomic_load(&_running)) {
@@ -4642,7 +4854,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
             }
             [self handleIPCMessageType:header.type payload:payload length:header.length client:fd];
         }
-        [self removeIPCClient:fd];
+        [self removeIPCClient:fd generation:generation];
     }
 }
 
@@ -4662,17 +4874,28 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;
     strlcpy(address.sun_path, kIPCSocketPath, sizeof(address.sun_path));
-    unlink(kIPCSocketPath);
     if (bind(fd, (struct sockaddr *)&address, sizeof(address)) != 0) {
         USBTrace("IPC bind failed errno=%d %s", errno, strerror(errno));
         close(fd);
         return;
     }
+    struct stat socketStatus;
+    if (lstat(kIPCSocketPath, &socketStatus) != 0 || !S_ISSOCK(socketStatus.st_mode)) {
+        USBTrace("IPC bound socket path identity unavailable");
+        close(fd);
+        return;
+    }
+    _ipcSocketPathDevice = socketStatus.st_dev;
+    _ipcSocketPathInode = socketStatus.st_ino;
+    _ipcSocketPathOwned = YES;
     chmod(kIPCSocketPath, 0666);
     if (listen(fd, 8) != 0) {
         USBTrace("IPC listen failed errno=%d %s", errno, strerror(errno));
         close(fd);
-        unlink(kIPCSocketPath);
+        (void)UnlinkOwnedIPCSocketPath(kIPCSocketPath,
+                                      _ipcSocketPathDevice,
+                                      _ipcSocketPathInode);
+        _ipcSocketPathOwned = NO;
         return;
     }
 
@@ -4692,10 +4915,15 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                 }
                 break;
             }
-            [strongSelf addIPCClient:client];
+            uint64_t generation = 0;
+            if (![strongSelf addAcceptedIPCClient:client generation:&generation]) {
+                continue;
+            }
             [strongSelf sendControlStateToClient:client];
+            atomic_fetch_add_explicit(&strongSelf->_ipcActiveHandlers, 1, memory_order_acq_rel);
             dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-                [strongSelf handleIPCClient:client];
+                [strongSelf handleIPCClient:client generation:generation];
+                atomic_fetch_sub_explicit(&strongSelf->_ipcActiveHandlers, 1, memory_order_acq_rel);
             });
         }
     });
@@ -4706,6 +4934,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     int fd = _ipcListenFd;
     _ipcListenFd = -1;
     if (fd >= 0) {
+        shutdown(fd, SHUT_RDWR);
         close(fd);
     }
 
@@ -4713,19 +4942,26 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     size_t capacity = sizeof(_ipcClients) / sizeof(_ipcClients[0]);
     for (size_t i = 0; i < capacity; i++) {
         if (_ipcClients[i] >= 0) {
-            close(_ipcClients[i]);
-            _ipcClients[i] = -1;
+            shutdown(_ipcClients[i], SHUT_RDWR);
         }
     }
-    _ipcClientCount = 0;
     pthread_mutex_unlock(&_ipcClientsMutex);
-    unlink(kIPCSocketPath);
+    if (fd >= 0 && _ipcSocketPathOwned) {
+        (void)UnlinkOwnedIPCSocketPath(kIPCSocketPath,
+                                      _ipcSocketPathDevice,
+                                      _ipcSocketPathInode);
+        _ipcSocketPathOwned = NO;
+    }
 }
 
 - (BOOL)ensureOpen
 {
     if (atomic_load(&_running)) {
         return YES;
+    }
+    if (atomic_load(&_retirementUnsafe)) {
+        USBTrace("USB reopen refused because an earlier session did not drain");
+        return NO;
     }
     if (![self openUSB]) {
         [self close];
@@ -4867,27 +5103,60 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     return atomic_load(&_streaming);
 }
 
-- (void)waitForPlaybackTransfersToDrain
+- (BOOL)waitForTransfersToDrain
 {
     for (uint32_t attempt = 0; attempt < 250; attempt++) {
-        if (atomic_load(&_playbackTransfersInFlight) == 0) {
-            return;
+        if (atomic_load(&_playbackTransfersInFlight) == 0 &&
+            atomic_load(&_captureTransfersInFlight) == 0) {
+            return YES;
         }
         usleep(1000);
     }
+    return atomic_load(&_playbackTransfersInFlight) == 0 &&
+           atomic_load(&_captureTransfersInFlight) == 0;
 }
 
-- (void)stop
+- (BOOL)waitForQueueRetirement:(dispatch_queue_t)queue name:(const char *)name
+{
+    if (queue == nil) {
+        return YES;
+    }
+    dispatch_semaphore_t retired = dispatch_semaphore_create(0);
+    dispatch_async(queue, ^{
+        dispatch_semaphore_signal(retired);
+    });
+    if (dispatch_semaphore_wait(retired, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC)) != 0) {
+        USBTrace("queue retirement deadline exceeded queue=%s", name != NULL ? name : "unknown");
+        return NO;
+    }
+    return YES;
+}
+
+- (BOOL)stop
 {
     if (!atomic_exchange(&_streaming, false)) {
-        return;
+        if (atomic_load(&_retirementUnsafe)) {
+            return NO;
+        }
+        BOOL drained = [self waitForTransfersToDrain];
+        if (!drained) {
+            atomic_store(&_retirementUnsafe, true);
+        }
+        return drained;
     }
     [self stopStreamKeepalive];
     [_capturePipe abortWithError:nil];
     [_playbackPipe abortWithError:nil];
-    dispatch_sync(_queue, ^{
-    });
-    [self waitForPlaybackTransfersToDrain];
+    if (![self waitForQueueRetirement:_queue name:"usb"]) {
+        atomic_store(&_retirementUnsafe, true);
+        USBTrace("USB stop retained resources because worker queue did not retire");
+        return NO;
+    }
+    if (![self waitForTransfersToDrain]) {
+        atomic_store(&_retirementUnsafe, true);
+        USBTrace("USB stop bounded out with transfers still in flight; retaining session resources");
+        return NO;
+    }
 #if OPENA8DJ_HAL_PREPARED_USB_SUBMIT_RUNTIME
     if (_preparedRuntimeBridge != NULL) {
         (void)OpenA8DJPreparedRuntimeBridgeCancelAll(_preparedRuntimeBridge);
@@ -4898,21 +5167,40 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     [self closeDiagnosticCapture];
 #endif
     USBTrace("USB engine stopped");
+    return YES;
 }
 
-- (void)close
+- (BOOL)close
 {
-    [self stop];
-    if (!atomic_exchange(&_running, false)) {
-        return;
+    if (![self stop]) {
+        return NO;
     }
+    pthread_mutex_lock(&_ipcClientsMutex);
+    atomic_store(&_running, false);
+    pthread_mutex_unlock(&_ipcClientsMutex);
     [self stopIPCServer];
     [_bulkInPipe abortWithError:nil];
     [_bulkOutPipe abortWithError:nil];
-    dispatch_sync(_ep1Queue, ^{
-    });
+    if (![self waitForQueueRetirement:_ipcQueue name:"ipc-server"] ||
+        ![self waitForQueueRetirement:_ep1Queue name:"ep1"]) {
+        atomic_store(&_retirementUnsafe, true);
+        USBTrace("USB close retained resources because an I/O queue did not retire");
+        return NO;
+    }
+    for (uint32_t attempt = 0; attempt < 2000; attempt++) {
+        if (atomic_load_explicit(&_ipcActiveHandlers, memory_order_acquire) == 0) {
+            break;
+        }
+        usleep(1000);
+    }
+    if (atomic_load_explicit(&_ipcActiveHandlers, memory_order_acquire) != 0) {
+        atomic_store(&_retirementUnsafe, true);
+        USBTrace("USB close retained IPC resources because client handlers did not retire");
+        return NO;
+    }
     [self closeUSB];
     USBTrace("USB engine closed");
+    return YES;
 }
 
 - (void)closeUSB
@@ -5055,7 +5343,20 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                 continue;
             }
 
-            dispatch_semaphore_wait(readDone, DISPATCH_TIME_FOREVER);
+            long waitStatus = dispatch_semaphore_wait(
+                readDone, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
+            if (waitStatus != 0) {
+                pthread_mutex_lock(&_ep1Mutex);
+                _ep1ChannelInvalid = true;
+                _pendingActive = false;
+                _pendingReady = false;
+                _pendingReply = nil;
+                pthread_cond_broadcast(&_ep1Cond);
+                pthread_mutex_unlock(&_ep1Mutex);
+                atomic_store(&_running, false);
+                USBTrace("EP1 completion deadline exceeded; retiring USB command channel");
+                break;
+            }
             if (readStatus == kIOReturnSuccess && readBytes > 0) {
                 [self handleEP1Bytes:inData.bytes length:readBytes];
             } else if (readStatus != kIOReturnTimeout &&
@@ -5588,6 +5889,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
                           outputStats:NULL];
 #endif
     atomic_fetch_add_explicit(&_captureSubmitAttemptsAtomic, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&_captureTransfersInFlight, 1, memory_order_acq_rel);
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
     uint64_t hotPathCaptureEnqueueStartTime = mach_absolute_time();
 #endif
@@ -5606,6 +5908,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
     }
 #endif
     if (!queued) {
+        atomic_fetch_sub_explicit(&_captureTransfersInFlight, 1, memory_order_acq_rel);
         [self releasePooledTransfer:transfer];
         [self addStreamStatAtOffset:offsetof(OpenA8DJStreamStatsPayload, captureQueueFailures)
                                value:1];
@@ -6038,6 +6341,7 @@ static bool OpenA8DJDiagnosticPath(char *buffer, size_t bufferSize, const char *
 #endif
 #endif
 
+    atomic_fetch_sub_explicit(&_captureTransfersInFlight, 1, memory_order_acq_rel);
     [self releasePooledTransfer:transfer];
     if (atomic_load(&_streaming) && [self captureISOEnabled]) {
 #if OPENA8DJ_ENABLE_HOT_PATH_TIMING
@@ -7004,7 +7308,11 @@ bool OpenA8DJUSBStart(double sampleRate)
     if (gEngine == nil) {
         gEngine = [[OpenA8DJUSBEngine alloc] initWithSampleRate:sampleRate];
     } else if (fabs(gEngine.sampleRate - sampleRate) > 0.5) {
-        [gEngine close];
+        if (![gEngine close]) {
+            pthread_mutex_unlock(&gEngineMutex);
+            return false;
+        }
+        gEngine = nil;
         gEngine = [[OpenA8DJUSBEngine alloc] initWithSampleRate:sampleRate];
     }
     gEngine.sampleRate = sampleRate;
@@ -7028,7 +7336,11 @@ bool OpenA8DJUSBSetSampleRate(double sampleRate)
     }
 
     BOOL wasStreaming = [gEngine isStreaming];
-    [gEngine close];
+    if (![gEngine close]) {
+        pthread_mutex_unlock(&gEngineMutex);
+        return false;
+    }
+    gEngine = nil;
     gEngine = [[OpenA8DJUSBEngine alloc] initWithSampleRate:sampleRate];
     BOOL ok = !wasStreaming || [gEngine start];
     pthread_mutex_unlock(&gEngineMutex);
@@ -7088,8 +7400,9 @@ void OpenA8DJUSBStop(void)
 void OpenA8DJUSBClose(void)
 {
     pthread_mutex_lock(&gEngineMutex);
-    [gEngine close];
-    gEngine = nil;
+    if ([gEngine close]) {
+        gEngine = nil;
+    }
     pthread_mutex_unlock(&gEngineMutex);
 }
 

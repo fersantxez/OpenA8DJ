@@ -139,6 +139,13 @@ static atomic_uint gRefCount = 1;
 static Float64 gSampleRate = 48000.0;
 static UInt32 gBufferFrames = kOpenA8DJPreferredBufferFrames;
 static UInt32 gRunningClients = 0;
+enum { kOpenA8DJMaxClients = 64 };
+typedef struct {
+    UInt32 clientID;
+    UInt32 startDepth;
+    bool active;
+} OpenA8DJClientState;
+static OpenA8DJClientState gClients[kOpenA8DJMaxClients];
 static UInt64 gZeroTimeStampSeed = 1;
 static Float64 gSampleTime = 0.0;
 static UInt64 gHostTime = 0;
@@ -1498,19 +1505,63 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_DestroyDevice(AudioServerPlugInDriver
     return inDeviceObjectID == kOpenA8DJDeviceObjectID ? kAudioHardwareNoError : kAudioHardwareBadDeviceError;
 }
 
+static OpenA8DJClientState *ClientStateForID(UInt32 clientID, bool create)
+{
+    OpenA8DJClientState *freeSlot = NULL;
+    for (UInt32 index = 0; index < kOpenA8DJMaxClients; ++index) {
+        if (gClients[index].active && gClients[index].clientID == clientID) return &gClients[index];
+        if (!gClients[index].active && freeSlot == NULL) freeSlot = &gClients[index];
+    }
+    if (create && freeSlot != NULL) {
+        freeSlot->clientID = clientID;
+        freeSlot->startDepth = 0;
+        freeSlot->active = true;
+        return freeSlot;
+    }
+    return NULL;
+}
+
+static void StopAfterLastClientLocked(void)
+{
+    FlushOutputCycle();
+    OpenA8DJUSBSetInputDecodeActive(false);
+#if OPENA8DJ_STOP_ISOC_ON_STOP
+    OpenA8DJUSBStop();
+#endif
+    StopClock();
+#if OPENA8DJ_BACKGROUND_WARM_OPEN
+    OpenA8DJUSBClose();
+    atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
+    ScheduleBackgroundWarmOpen();
+#else
+    ScheduleDelayedClose();
+#endif
+}
+
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_AddDeviceClient(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, const AudioServerPlugInClientInfo *inClientInfo)
 {
     (void)inDriver;
-    (void)inDeviceObjectID;
-    (void)inClientInfo;
-    return kAudioHardwareNoError;
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID || inClientInfo == NULL) return kAudioHardwareBadDeviceError;
+    pthread_mutex_lock(&gIOMutex);
+    OpenA8DJClientState *client = ClientStateForID(inClientInfo->mClientID, true);
+    pthread_mutex_unlock(&gIOMutex);
+    return client != NULL ? kAudioHardwareNoError : kAudioHardwareIllegalOperationError;
 }
 
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_RemoveDeviceClient(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, const AudioServerPlugInClientInfo *inClientInfo)
 {
     (void)inDriver;
-    (void)inDeviceObjectID;
-    (void)inClientInfo;
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID || inClientInfo == NULL) return kAudioHardwareBadDeviceError;
+    pthread_mutex_lock(&gIOMutex);
+    OpenA8DJClientState *client = ClientStateForID(inClientInfo->mClientID, false);
+    if (client != NULL) {
+        UInt32 withdrawn = client->startDepth;
+        client->startDepth = 0;
+        client->active = false;
+        gRunningClients = withdrawn > gRunningClients ? 0 : gRunningClients - withdrawn;
+        if (gRunningClients == 0 && withdrawn > 0) StopAfterLastClientLocked();
+    }
+    pthread_mutex_unlock(&gIOMutex);
     return kAudioHardwareNoError;
 }
 
@@ -2043,12 +2094,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_SetPropertyData(AudioServerPlugInDriv
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, UInt32 inClientID)
 {
     (void)inDriver;
-    (void)inClientID;
     Trace("StartIO device=%u client=%u", inDeviceObjectID, inClientID);
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
-        return kAudioHardwareBadDeviceError;
-    }
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) return kAudioHardwareBadDeviceError;
     pthread_mutex_lock(&gIOMutex);
+    OpenA8DJClientState *client = ClientStateForID(inClientID, true);
+    if (client == NULL) { pthread_mutex_unlock(&gIOMutex); return kAudioHardwareIllegalOperationError; }
     atomic_fetch_add(&gStopGeneration, 1);
     if (gRunningClients == 0) {
         StartClock();
@@ -2058,11 +2108,11 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
             StopClock();
             pthread_mutex_unlock(&gIOMutex);
             return kAudioHardwareUnspecifiedError;
-        } else {
-            atomic_store(&gDevicePresent, true);
-            Trace("StartIO USB started");
         }
+        atomic_store(&gDevicePresent, true);
+        Trace("StartIO USB started");
     }
+    client->startDepth++;
     gRunningClients++;
     pthread_mutex_unlock(&gIOMutex);
     return kAudioHardwareNoError;
@@ -2071,31 +2121,17 @@ static OSStatus STDMETHODCALLTYPE OpenA8DJ_StartIO(AudioServerPlugInDriverRef in
 static OSStatus STDMETHODCALLTYPE OpenA8DJ_StopIO(AudioServerPlugInDriverRef inDriver, AudioObjectID inDeviceObjectID, UInt32 inClientID)
 {
     (void)inDriver;
-    (void)inClientID;
     Trace("StopIO device=%u client=%u", inDeviceObjectID, inClientID);
-    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) {
-        return kAudioHardwareBadDeviceError;
-    }
+    if (inDeviceObjectID != kOpenA8DJDeviceObjectID) return kAudioHardwareBadDeviceError;
     pthread_mutex_lock(&gIOMutex);
-    if (gRunningClients > 0) {
+    OpenA8DJClientState *client = ClientStateForID(inClientID, false);
+    if (client != NULL && client->startDepth > 0 && gRunningClients > 0) {
+        client->startDepth--;
         gRunningClients--;
-    }
-    if (gRunningClients == 0) {
-        FlushOutputCycle();
-        OpenA8DJUSBSetInputDecodeActive(false);
-#if OPENA8DJ_STOP_ISOC_ON_STOP
-        OpenA8DJUSBStop();
-#endif
-        StopClock();
-#if OPENA8DJ_BACKGROUND_WARM_OPEN
-        OpenA8DJUSBClose();
-        atomic_store(&gDevicePresent, OpenA8DJUSBDevicePresent());
-        ScheduleBackgroundWarmOpen();
-        Trace("StopIO USB closed; warm-open scheduled");
-#else
-        ScheduleDelayedClose();
-        Trace("StopIO USB close scheduled after grace");
-#endif
+        if (gRunningClients == 0) {
+            StopAfterLastClientLocked();
+            Trace("StopIO USB close scheduled after grace");
+        }
     }
     pthread_mutex_unlock(&gIOMutex);
     return kAudioHardwareNoError;

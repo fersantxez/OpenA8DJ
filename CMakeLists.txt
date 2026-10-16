@@ -3,7 +3,10 @@ cmake_minimum_required(VERSION 3.20)
 project(OpenA8DJ
   VERSION 0.5.1
   DESCRIPTION "Modern macOS C++ driver stack for Native Instruments Audio 8 DJ"
-  LANGUAGES CXX)
+  LANGUAGES C CXX)
+
+add_compile_definitions(OPENA8DJ_SOURCE_ROOT="${CMAKE_SOURCE_DIR}")
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -513,6 +516,14 @@ add_executable(opena8djcpp_static_policy_check
 add_executable(opena8djcpp_hardware_lock_policy_check
   tools/hardware_lock_policy_check.cpp)
 
+add_executable(opena8dj_audio_lifecycle_test tools/audio-lifecycle-test.c)
+target_link_libraries(opena8dj_audio_lifecycle_test "-framework CoreAudio" "-framework CoreFoundation")
+
+if(APPLE)
+  enable_language(OBJC)
+  include(tests/macos/audit-targets.cmake)
+endif()
+
 add_executable(opena8djcpp_packed_usb_audio_probe
   tools/packed_usb_audio_probe.cpp)
 
@@ -520,6 +531,100 @@ add_executable(opena8djcpp_evidence_schema_check
   tools/evidence_schema_check.cpp)
 
 enable_testing()
+add_test(NAME lifecycle_R00_manifest_identity
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R00_manifest_identity)
+add_test(NAME lifecycle_R00_evidence_inventory
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R00_evidence_inventory)
+add_test(NAME lifecycle_R01_exit_codes
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_exit_codes)
+add_test(NAME lifecycle_R01_no_mutation
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_no_mutation)
+add_test(NAME lifecycle_R01_probe_timeout
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_probe_timeout)
+add_test(NAME lifecycle_R01_health_probe_timeout
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_health_probe_timeout)
+add_test(NAME lifecycle_R01_health_windows
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_health_windows_and_pid_reuse)
+add_test(NAME lifecycle_R01_environment_busy
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_offline.py LifecycleOfflineTests.test_R01_environment_busy_classification)
+add_test(NAME lifecycle_R12_zero_callbacks_one_cycle
+  COMMAND opena8dj_audio_lifecycle_test --self-test)
+if(APPLE)
+  add_test(NAME lifecycle_R04_production_isolation
+    COMMAND opena8dj_macos_lifecycle_audit)
+  add_test(NAME lifecycle_R05_ipc_lifecycle
+    COMMAND opena8dj_macos_lifecycle_audit --ipc)
+  add_test(NAME lifecycle_R05_slow_reply
+    COMMAND opena8dj_macos_lifecycle_audit --slow-reply)
+  set_tests_properties(lifecycle_R04_production_isolation PROPERTIES
+    LABELS "offline;lifecycle" TIMEOUT 10)
+  set_tests_properties(lifecycle_R05_ipc_lifecycle PROPERTIES
+    LABELS "offline;lifecycle" TIMEOUT 10)
+  set_tests_properties(lifecycle_R05_slow_reply PROPERTIES
+    LABELS "offline;lifecycle" TIMEOUT 10)
+endif()
+add_test(NAME lifecycle_R02_lock_contention
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_lock_contention)
+add_test(NAME lifecycle_R02_fake_inheritance
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_fake_inheritance)
+add_test(NAME lifecycle_R02_pid_boot_reuse
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_pid_and_boot_identity)
+add_test(NAME lifecycle_R02_pid_birth_reuse
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_pid_reuse_rejected_even_with_inherited_lock_descriptor)
+add_test(NAME lifecycle_R02_old_owner_cleanup
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_old_owner_cleanup)
+add_test(NAME lifecycle_R02_installer_lease
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_installer_lease_denied_without_inherited_lock)
+add_test(NAME lifecycle_R02_supervisor_dies_with_child
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_supervisor_dies_with_child)
+add_test(NAME lifecycle_R02_mutator_entrypoint_lock
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_hardware_lock_supervisor.py HardwareLockSupervisorTests.test_mutating_entrypoint_uses_supervisor_before_work)
+add_test(NAME lifecycle_R03_fault_every_phase
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_transaction.py LifecycleTransactionTests.test_fault_every_precommit_phase_restores_baseline)
+add_test(NAME lifecycle_R03_exact_candidate_commit
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_transaction.py LifecycleTransactionTests.test_install_commits_exact_candidate_and_retains_baseline)
+add_test(NAME lifecycle_R03_invalid_paths
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_transaction.py LifecycleTransactionTests.test_invalid_and_symlink_paths_fail_before_mutation)
+add_test(NAME lifecycle_R03_resume_interrupted_rollback
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_transaction.py LifecycleTransactionTests.test_resume_after_interrupted_rollback)
+add_test(NAME lifecycle_R03_physical_installer_fail_closed
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/macos/test_lifecycle_transaction.py LifecycleTransactionTests.test_physical_installer_fails_closed)
+set_tests_properties(
+  lifecycle_R00_manifest_identity
+  lifecycle_R00_evidence_inventory
+  lifecycle_R01_exit_codes
+  lifecycle_R01_no_mutation
+  lifecycle_R01_probe_timeout
+  lifecycle_R01_health_probe_timeout
+  lifecycle_R01_health_windows
+  lifecycle_R01_environment_busy
+  lifecycle_R12_zero_callbacks_one_cycle
+  lifecycle_R02_lock_contention
+  lifecycle_R02_fake_inheritance
+  lifecycle_R02_pid_boot_reuse
+  lifecycle_R02_pid_birth_reuse
+  lifecycle_R02_old_owner_cleanup
+  lifecycle_R02_installer_lease
+  lifecycle_R02_supervisor_dies_with_child
+  lifecycle_R02_mutator_entrypoint_lock
+  lifecycle_R03_fault_every_phase
+  lifecycle_R03_exact_candidate_commit
+  lifecycle_R03_invalid_paths
+  lifecycle_R03_resume_interrupted_rollback
+  lifecycle_R03_physical_installer_fail_closed
+  PROPERTIES LABELS "offline;lifecycle")
+set_tests_properties(lifecycle_R01_exit_codes PROPERTIES TIMEOUT 240)
+set_tests_properties(lifecycle_R00_manifest_identity lifecycle_R00_evidence_inventory
+  lifecycle_R01_no_mutation lifecycle_R01_probe_timeout lifecycle_R01_health_windows
+  lifecycle_R01_environment_busy PROPERTIES TIMEOUT 180)
+set_tests_properties(lifecycle_R02_lock_contention lifecycle_R02_fake_inheritance
+  lifecycle_R02_pid_boot_reuse lifecycle_R02_pid_birth_reuse lifecycle_R02_old_owner_cleanup lifecycle_R02_installer_lease
+  PROPERTIES TIMEOUT 120)
+set_tests_properties(lifecycle_R02_supervisor_dies_with_child PROPERTIES TIMEOUT 120)
+set_tests_properties(lifecycle_R02_mutator_entrypoint_lock PROPERTIES TIMEOUT 120)
+set_tests_properties(lifecycle_R03_fault_every_phase lifecycle_R03_exact_candidate_commit
+  lifecycle_R03_invalid_paths lifecycle_R03_resume_interrupted_rollback
+  lifecycle_R03_physical_installer_fail_closed PROPERTIES TIMEOUT 120)
 add_test(NAME opena8djcpp_core_contract COMMAND opena8djcpp_core_tests)
 add_test(NAME opena8djcpp_packet_matrix COMMAND opena8djcpp_packet_matrix)
 add_test(NAME opena8djcpp_mode2_mainline_layout_parity COMMAND opena8djcpp_mode2_mainline_layout_parity)
@@ -618,3 +723,40 @@ add_test(NAME opena8djcpp_hardware_lock_policy_check COMMAND opena8djcpp_hardwar
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_test(NAME opena8djcpp_offline_bench COMMAND opena8djcpp_offline_bench)
 endif()
+
+add_executable(opena8djcpp_repo_path_probe tools/repo_path_probe.cpp)
+add_test(NAME repo_paths_current_checkout
+  COMMAND opena8djcpp_repo_path_probe)
+set_tests_properties(repo_paths_current_checkout PROPERTIES LABELS "offline;source_contract")
+add_test(NAME repo_paths_decoy_checkout
+  COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/scripts/test-repo-path-resolution.py
+          $<TARGET_FILE:opena8djcpp_repo_path_probe> ${CMAKE_SOURCE_DIR})
+set_tests_properties(repo_paths_decoy_checkout PROPERTIES LABELS "offline;source_contract")
+
+set(_local_evidence_tests
+  opena8djcpp_timecode_readiness_gate
+  opena8djcpp_prepared_transport_migration_gate
+  opena8djcpp_transport_budget_model
+  opena8djcpp_audiophile_tone_gate
+  opena8djcpp_audiophile_precision_claim_gate
+  opena8djcpp_human_test_rc_gate
+  opena8djcpp_physical_evidence_frontier
+  opena8djcpp_physical_capture_forensics
+  opena8djcpp_direct_usb_path_attribution
+  opena8djcpp_physical_window_readiness_gate
+  opena8djcpp_capture_readiness_contract
+  opena8djcpp_physical_route_matrix_contract
+  opena8djcpp_diagnostic_pass_semantics_gate
+  opena8djcpp_product_quality_claim_gate
+  opena8djcpp_hal_candidate_safety_gate
+  opena8djcpp_hal_transport_runtime_gate)
+get_property(_all_tests DIRECTORY PROPERTY TESTS)
+foreach(_test IN LISTS _all_tests)
+  if(_test IN_LIST _local_evidence_tests)
+    set_tests_properties(${_test} PROPERTIES LABELS "local_evidence")
+  else()
+    set_tests_properties(${_test} PROPERTIES LABELS "offline")
+  endif()
+endforeach()
+set_tests_properties(repo_paths_current_checkout repo_paths_decoy_checkout
+  PROPERTIES LABELS "offline;source_contract")

@@ -4,6 +4,14 @@ This directory is for maintainers and future LLM agents. It preserves continuity
 material that is useful for resuming work, auditing decisions, or reconstructing
 why a release was made.
 
+Current macOS stability work: [remediation plan after the physical results](investigations/macos-lifecycle-remediation-plan-2026-10-11.md)
+and [next execution status](investigations/macos-lifecycle-remediation-status-2026-10-11.json).
+Historical context: [audit](investigations/macos-lifecycle-stability-audit-2026-10-10.md),
+[original implementation plan](investigations/macos-lifecycle-implementation-plan-2026-10-10.md),
+[test specification](investigations/macos-lifecycle-test-spec-2026-10-10.md),
+[physical results](investigations/macos-lifecycle-physical-execution-2026-10-10.md), and
+[previous execution status](investigations/macos-lifecycle-implementation-status.json).
+
 It is intentionally not the public documentation path. If you are trying to use
 OpenA8DJ or understand the project for the first time, start here instead:
 

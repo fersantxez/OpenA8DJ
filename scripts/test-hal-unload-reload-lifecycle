@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/test-hal-unload-reload-lifecycle" \
+  "HAL unload reload lifecycle" "$ROOT/local-analysis/lifecycle" \
+  "move active HAL aside, restart CoreAudio, verify absent, restore the same candidate" \
+  "audio playback, Traktor launch, system reboot, delete rollback backups" "$@"
+cycles="${1:-3}"
+run_dir="${2:-$ROOT/local-analysis/lifecycle/unload-reload-$(date +%Y%m%dT%H%M%S)}"
+active="/Library/Audio/Plug-Ins/HAL/OpenA8DJ.driver"
+disabled="/Library/Audio/Plug-Ins/HAL.disabled"
+uid="org.opena8dj.Audio8DJ"
+mkdir -p "$run_dir"
+opena8dj_acquire_hardware_lock "$ROOT" "lifecycle-unload-reload" "$run_dir" \
+  "move active HAL aside, restart CoreAudio, verify absent, restore same candidate, restart and verify present" \
+  "audio playback, Traktor launch, system reboot, deletion of rollback backups" || exit $?
+trap opena8dj_release_hardware_lock EXIT
+
+hash_before="$(shasum -a 256 "$active/Contents/MacOS/OpenA8DJHAL" | awk '{print $1}')"
+echo "candidate_sha256=$hash_before" > "$run_dir/manifest.txt"
+echo "cycles=$cycles" >> "$run_dir/manifest.txt"
+
+restore_candidate() {
+  local parked="$1"
+  if [ ! -d "$active" ] && [ -d "$parked" ]; then sudo -n cp -R "$parked" "$active"; fi
+  sudo -n killall coreaudiod >/dev/null 2>&1 || true
+  sleep 10
+  "$ROOT/scripts/audio-stack-guard" --wait 1 --enumeration-timeout 8 --min-idle-pct 20 \
+    --wait 8 --run-dir "$run_dir/recovery" > "$run_dir/recovery.log" 2>&1 || true
+}
+
+for cycle in $(seq 1 "$cycles"); do
+  parked="$disabled/OpenA8DJ.driver.lifecycle-unload-test-$(date +%Y%m%dT%H%M%S)-$cycle"
+  cycle_dir="$run_dir/cycle-$cycle"
+  mkdir -p "$cycle_dir"
+  if ! "$ROOT/scripts/audio-stack-guard" --wait 1 --enumeration-timeout 8 --min-idle-pct 20 \
+    --run-dir "$cycle_dir/pre" > "$cycle_dir/pre.log" 2>&1; then
+    echo "cycle=$cycle preflight=FAIL" > "$cycle_dir/result.txt"; exit 1
+  fi
+  if ! sudo -n mv "$active" "$parked"; then echo "move_active=FAIL"; exit 1; fi
+  sudo -n killall coreaudiod
+  sleep 5
+  if ! "$ROOT/scripts/audio-stack-guard" --wait 1 --enumeration-timeout 8 --min-idle-pct 20 \
+    --wait 8 --run-dir "$cycle_dir/unloaded" > "$cycle_dir/unloaded.log" 2>&1; then
+    restore_candidate "$parked"; echo "cycle=$cycle unload_guard=FAIL"; exit 1
+  fi
+  if grep -Fq "uid=$uid" "$cycle_dir/unloaded/audio-list.txt"; then
+    restore_candidate "$parked"; echo "cycle=$cycle device_still_enumerated_after_unload"; exit 1
+  fi
+  if ps -axo command= | grep -Fq 'Core Audio Driver (OpenA8DJ.driver)'; then
+    restore_candidate "$parked"; echo "cycle=$cycle old_plugin_process_still_running"; exit 1
+  fi
+  if ! sudo -n cp -R "$parked" "$active"; then
+    restore_candidate "$parked"; echo "cycle=$cycle restore_candidate=FAIL"; exit 1
+  fi
+  sudo -n killall coreaudiod
+  sleep 10
+  if ! "$ROOT/scripts/audio-stack-guard" --wait 1 --enumeration-timeout 8 --min-idle-pct 20 \
+    --wait 8 --run-dir "$cycle_dir/reloaded" > "$cycle_dir/reloaded.log" 2>&1; then
+    restore_candidate "$parked"; echo "cycle=$cycle reload_guard=FAIL"; exit 1
+  fi
+  if ! grep -Fq "uid=$uid" "$cycle_dir/reloaded/audio-list.txt"; then
+    restore_candidate "$parked"; echo "cycle=$cycle device_missing_after_reload"; exit 1
+  fi
+  actual="$(shasum -a 256 "$active/Contents/MacOS/OpenA8DJHAL" | awk '{print $1}')"
+  if [ "$actual" != "$hash_before" ]; then
+    restore_candidate "$parked"; echo "cycle=$cycle candidate_hash_mismatch"; exit 1
+  fi
+  echo "cycle=$cycle unload=PASS reload=PASS sha256=$actual" | tee "$cycle_dir/result.txt"
+done
+printf 'result=PASS\ncycles=%s\ncandidate_sha256=%s\n' "$cycles" "$hash_before" > "$run_dir/summary.txt"
+cat "$run_dir/summary.txt"

@@ -4,67 +4,68 @@ opena8dj_lock_root() {
   printf '%s\n' "${AUDIO_GATE_LOCK_ROOT:-$HOME/.opena8dj/hardware-gate.lock}"
 }
 
+opena8dj_lock_supervisor() {
+  local root="$1" script_path="$2" purpose="$3" evidence="$4" actions="$5" forbidden="$6"
+  shift 6
+  /usr/bin/python3 "$(dirname "$script_path")/hardware-lock-supervisor.py" \
+    --lock-root "$root" \
+    --worktree "$root" \
+    --purpose "$purpose" \
+    --evidence "$evidence" \
+    --actions "$actions" \
+    --forbidden "$forbidden" \
+    -- "$script_path" "$@"
+}
+
+opena8dj_supervise_hardware_operation() {
+  local worktree="$1" script_path="$2" purpose="$3" evidence="$4" actions="$5" forbidden="$6"
+  shift 6
+  local lock_root
+  lock_root="$(opena8dj_lock_root)"
+  if OPENA8DJ_LOCK_ROOT="$lock_root" /usr/bin/python3 "$(dirname "$script_path")/hardware-lock-supervisor.py" \
+      --verify-inherited --lock-root "$lock_root" >/dev/null 2>&1; then
+    export OPENA8DJ_HARDWARE_LOCK_HELD=1
+    return 0
+  fi
+  exec /usr/bin/python3 "$(dirname "$script_path")/hardware-lock-supervisor.py" \
+    --lock-root "$lock_root" \
+    --worktree "$worktree" \
+    --purpose "$purpose" \
+    --evidence "$evidence" \
+    --actions "$actions" \
+    --forbidden "$forbidden" \
+    -- "$script_path" "$@"
+}
+
 opena8dj_pid_alive() {
   local pid="$1"
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
 opena8dj_cleanup_stale_lock() {
-  local lock_root="$1"
-  local owner_pid=""
-  if [ -f "$lock_root/owner" ]; then
-    owner_pid="$(awk -F= '/^pid=/{print $2; exit}' "$lock_root/owner" || true)"
-  fi
-  if [ -n "$owner_pid" ] && ! opena8dj_pid_alive "$owner_pid"; then
-    rm -rf "$lock_root"
-  fi
+  # A dead PID is not proof that the kernel lock is free: an inherited child
+  # may still hold it. The supervisor checks the stable flock inode instead.
+  return 0
 }
 
 opena8dj_acquire_hardware_lock() {
-  local worktree="$1"
-  local purpose="$2"
-  local evidence="$3"
-  local actions="$4"
-  local forbidden="$5"
+  local worktree="$1" purpose="$2" evidence="$3" actions="$4" forbidden="$5"
   local lock_root
   lock_root="$(opena8dj_lock_root)"
-
-  opena8dj_cleanup_stale_lock "$lock_root"
-
-  if [ "${OPENA8DJ_HARDWARE_LOCK_HELD:-0}" = "1" ]; then
-    local owner_pid=""
-    if [ -f "$lock_root/owner" ]; then
-      owner_pid="$(awk -F= '/^pid=/{print $2; exit}' "$lock_root/owner" || true)"
-    fi
-    if [ -n "$owner_pid" ] && opena8dj_pid_alive "$owner_pid"; then
-      _OPENA8DJ_LOCK_ACQUIRED=0
-      export OPENA8DJ_HARDWARE_LOCK_HELD=1
-      return 0
-    fi
-  fi
-
-  if ! mkdir "$lock_root" 2>/dev/null; then
-    echo "audio_gate_lock=BUSY"
-    cat "$lock_root/owner" 2>/dev/null || true
+  if ! OPENA8DJ_LOCK_ROOT="$lock_root" /usr/bin/python3 \
+      "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/hardware-lock-supervisor.py" \
+      --verify-inherited --lock-root "$lock_root"; then
+    echo "audio_gate_lock=DENIED"
+    echo "reason=kernel_lock_descriptor_not_inherited"
     return 75
   fi
-
-  _OPENA8DJ_LOCK_ACQUIRED=1
+  _OPENA8DJ_LOCK_ACQUIRED=0
   export OPENA8DJ_HARDWARE_LOCK_HELD=1
-  {
-    echo "pid=$$"
-    echo "owner=codex"
-    echo "worktree=$worktree"
-    echo "purpose=$purpose"
-    echo "started_at=$(date +%Y-%m-%dT%H:%M:%S%z)"
-    echo "actions_authorized=$actions"
-    echo "forbidden=$forbidden"
-    echo "evidence=$evidence"
-  } > "$lock_root/owner"
+  : "$worktree" "$purpose" "$evidence" "$actions" "$forbidden"
 }
 
 opena8dj_release_hardware_lock() {
-  if [ "${_OPENA8DJ_LOCK_ACQUIRED:-0}" = "1" ]; then
-    rm -rf "$(opena8dj_lock_root)"
-  fi
+  # The supervisor owns the kernel lock and releases it after every inherited
+  # mutator exits. A script must never unlink metadata or the lock inode.
+  return 0
 }

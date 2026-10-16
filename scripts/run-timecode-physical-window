@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/run-timecode-physical-window" \
+  "timecode physical evidence window" "$ROOT/local-analysis/timecode-physical" \
+  "execute the explicitly acknowledged physical timecode evidence window" \
+  "install or unload HAL, restart CoreAudio, reboot, delete rollback backups" "$@"
+
 usage() {
   cat <<'USAGE'
 usage: scripts/run-timecode-physical-window --run-dir DIR [options]

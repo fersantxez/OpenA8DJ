@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include <cctype>
 #include <array>
 #include <cstdio>
@@ -18,18 +19,8 @@ struct SafetyRun {
 };
 
 std::filesystem::path repo_root(char** argv) {
-  auto root = std::filesystem::absolute(argv[0]).parent_path();
-  while (!root.empty()) {
-    if (std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-      return root;
-    }
-    const auto parent = root.parent_path();
-    if (parent == root) {
-      break;
-    }
-    root = parent;
-  }
-  return std::filesystem::current_path();
+  (void)argv;
+  return opena8dj::repo_root();
 }
 
 std::string read_file(const std::filesystem::path& path) {

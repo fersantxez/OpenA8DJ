@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -13,14 +14,8 @@
 namespace {
 
 std::filesystem::path repo_root(char** argv) {
-  auto root = std::filesystem::absolute(argv[0]).parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    return "/Users/fer/dev/audio8djcpp";
-  }
-  return root;
+  (void)argv;
+  return opena8dj::repo_root();
 }
 
 std::string read_file(const std::filesystem::path& path) {

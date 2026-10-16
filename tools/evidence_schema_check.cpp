@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include "evidence_json.hpp"
 
 #include <filesystem>
@@ -60,14 +61,7 @@ bool string_array_has(std::string_view json, std::string_view key, std::string_v
 
 int main(int argc, char** argv) {
   (void)argc;
-  const auto executable = std::filesystem::absolute(argv[0]);
-  std::filesystem::path root = executable.parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    root = "/Users/fer/dev/audio8djcpp";
-  }
+  const auto root = opena8dj::repo_root();
 
   const std::vector<std::filesystem::path> required = {
       root / "docs/CANDIDATE_MANIFEST.json",
@@ -1754,7 +1748,7 @@ int main(int argc, char** argv) {
 
   const auto manifest = read_file(root / "docs/CANDIDATE_MANIFEST.json");
   const bool manifest_pass =
-      string_field_is(manifest, "worktree", "/Users/fer/dev/audio8djcpp") &&
+      string_field_is(manifest, "worktree", root.string()) &&
       string_field_is(manifest, "scope", "offline_only");
 
   const bool pass = missing == 0 && effective_summary_pass && manifest_pass;

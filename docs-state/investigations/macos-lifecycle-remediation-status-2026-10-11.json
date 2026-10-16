@@ -1,0 +1,630 @@
+{
+  "schema": "opena8dj.lifecycle-remediation-plan-status.v1",
+  "plan_date": "2026-10-11",
+  "plan": "macos-lifecycle-remediation-plan-2026-10-11.md",
+  "plan_status": "READY_FOR_IMPLEMENTATION",
+  "execution_status": "IN_PROGRESS",
+  "next_task": "R04: inyectar adaptador SDK USB y probar apertura, submit, abort y completions tardías con fakes de producción; seguir con R06–R12 y terminar el backend seguro del instalador R02–R03 antes de cualquier prueba física.",
+  "task_status_values": [
+    "TODO",
+    "IN_PROGRESS",
+    "DONE",
+    "BLOCKED"
+  ],
+  "test_result_values": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_RUN",
+    "ENVIRONMENT_BUSY",
+    "INFRA_ERROR",
+    "RUN_INTERRUPTED_BY_REBOOT"
+  ],
+  "historical_execution_status": "macos-lifecycle-implementation-status.json",
+  "historical_evidence_root": "local-analysis/lifecycle/20261010T173942",
+  "historical_baseline_sha256": "4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66",
+  "historical_rejected_candidate_sha256": "4b4cbba820373fc5da1be266d158bf0beda7a43dd62cf1b9a5f1b319173878b9",
+  "current_installation_verified_at": "2026-10-16; installed baseline executable SHA-256 4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66; Audio 8 Core Audio UID org.opena8dj.Audio8DJ observed.",
+  "candidate_manifest": "../../local-analysis/lifecycle/20261012-offline/manifest.json",
+  "controlled_physical_campaign_gate": "NOT_RUN",
+  "final_promotion_gate": "NOT_RUN",
+  "review_checks": [
+    {
+      "id": "enumeration_exit_loss",
+      "kind": "isolated_production_function_with_stub",
+      "hardware_access": false,
+      "observed": {
+        "injected_0": "PASS rc0",
+        "injected_7": "FAIL reported_rc0 function_rc1",
+        "injected_124": "FAIL reported_rc0 function_rc1"
+      }
+    }
+  ],
+  "notes": [
+    "Los hashes anteriores son históricos y no acreditan la instalación actual.",
+    "DONE requiere cumplir la aceptación de la tarjeta y enlazar sus pruebas. Los nombres de test son entregables nuevos.",
+    "R00-R12 no instalan HAL ni reinician servicios. R13-R15 siguen pendientes hasta superar la puerta offline.",
+    "Los gates dependientes de evidencia física no bloquean producirla en la campaña supervisada; sí bloquean promoción si son aplicables y faltan o fallan.",
+    "Las dependencias aquí serializan la secuencia recomendada; ninguna tarea permite saltar requisitos técnicos anteriores.",
+    "Ejecución offline 2026-10-11: Audio 8 reportada desenchufada; ningún HAL instalado ni reinicio CoreAudio realizado. R00-R03 dirigidos no equivalen a cerrar la puerta offline R12. Candidato firmado localmente, sin promover.",
+    "Directed lifecycle CTest: directed lifecycle gates pass in Debug and Release. The full non-local-evidence suite excluding offline_bench passed 95/95 in both Debug and Release; 16 local_evidence gates remain pending hardware artifacts. R00 identity/inventory pass in both configurations; full R04-R12 implementation and physical gate are not complete.",
+    "The physical installer frontend now fails closed before mutation because the privileged backend and host identity checks are incomplete; no install or Core Audio restart was attempted.",
+    "Current candidate identity: bundle SHA-256 9eea7bd1bfc88dcac3423dfac0f2bf5cf107c33487ee3fe1ffdceb7cb6b998cb, UUID AD7534A2-81FE-3F7C-BCA3-86B82BC71CC4 (arm64); ad-hoc signature verifies.",
+    "Ejecución offline 2026-10-12: carrera accept/close IPC serializada bajo _ipcClientsMutex; el harness prueba la intercalación y frames fragmentados. R04/R05 dirigidos pasan Debug, Release y ASan/UBSan. La suite sin evidencia física ni benchmark pasa 96/96 en Debug y Release antes de la última ampliación del caso de carrera; R04/R05 volvieron a pasar después. HAL local compilado y firmado, nunca instalado; tarjeta aún desconectada.",
+    "R05 ampliado el 2026-10-12: presión simultánea de 16 peers lentos pasa bajo 250 ms en las tres configuraciones de harness (Debug, Release, ASan/UBSan). La prueba no cubre propiedad/reemplazo del pathname UNIX del servidor.",
+    "R01 2026-10-12 real probe: per-process `ps time` deltas avoid EPERM from proc_pid_rusage on protected macOS audio processes. Three 10-second windows show coreaudiod about 4.7% and Spotify 115–118%; watched total ranges 120.71–123.09%, above the 120% preflight cap. The full guard classified ENVIRONMENT_BUSY and enumeration PASS; it made no recovery or system changes.",
+    "Ejecución final offline 2026-10-12: R00/R01/R04/R05 dirigida 10/10 Debug/Release; suite no-evidence/no-benchmark 99/99 Debug/Release tras recaptura del manifiesto. R04/R05 pasan ASan/UBSan. Guard integrado real PASS con tres ventanas y enumeración por ventana. Audio 8 desconectada y HAL no instalado.",
+    "R03 2026-10-12: added fault points and fixture tests for resuming interrupted rollback after candidate quarantine, baseline restoration and staging deletion; all resume to a hash-verified baseline. Real privileged installer and PKG metadata path intentionally remain blocked before system mutation.",
+    "Final non-evidence/non-benchmark CTest run after the R03 addition: 98/98 PASS in Debug and 98/98 PASS in Release. The previously observed intermittent Release R01 test was fixed by raising only the fake normal-failure subprocess deadline; the relevant test passed 10 consecutive runs and both final suites.",
+    "Physical continuation 2026-10-16: user reports Audio 8 connected. USB and Core Audio enumeration PASS; pre/post observational guards PASS 3x10; installed baseline 4af4b1… passes 200 Start/Stop cycles plus idle/reopen. This is explicitly baseline-only evidence; local candidate not installed. No CoreAudio restart or bundle mutation was done because R02/R03/R04-R12 are open and the legacy make target deletes the active bundle before copying."
+  ],
+  "tasks": [
+    {
+      "id": "R00",
+      "title": "Congelar evidencia y hacer trazable cada candidato",
+      "status": "DONE",
+      "mode": "offline",
+      "depends_on": [],
+      "legacy_tasks": [
+        "L00",
+        "L01",
+        "L02"
+      ],
+      "required_tests": [
+        "lifecycle_R00_manifest_identity",
+        "lifecycle_R00_evidence_inventory"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "docs-state/investigations/macos-lifecycle-offline-results-2026-10-11.md",
+        "local-analysis/lifecycle/20261012-offline/manifest.json",
+        "scripts/capture-lifecycle-manifest.py",
+        "scripts/verify-lifecycle-manifest.py",
+        "tests/macos/lifecycle_test_policy.json",
+        "tests/macos/test_lifecycle_offline.py",
+        "tools/audio-lifecycle-test.c",
+        "tools/audit_macos_lifecycle.m",
+        "tools/test_inventory.json"
+      ],
+      "commands": [
+        "python3 scripts/capture-lifecycle-manifest.py",
+        "python3 scripts/verify-lifecycle-manifest.py local-analysis/lifecycle/20261011-offline/manifest.json --require-bundle",
+        "make hal",
+        "make sign-hal",
+        "codesign --verify --deep --strict build/OpenA8DJ.driver",
+        "ctest --test-dir build/lifecycle-debug -R ^lifecycle_(R00|R01|R12)_ --output-on-failure"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261012-offline/manifest.json",
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-non-evidence-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-non-evidence-final.log"
+      ],
+      "result": "PASS: bundle SHA-256 d4bf8a8361a68c7e25c7b61f19fbf86a501c5c227c4cc347d3e7beb070f78490, UUID arm64 8DBD51A1-DA0F-38AA-8F30-5219D6F0578C, firma ad-hoc verificada; 116 tests inventariados. Suite no-evidence/no-benchmark 99/99 Debug/Release con manifiesto actualizado.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R01",
+      "title": "Reparar el guard y su supervisor",
+      "status": "DONE",
+      "mode": "offline",
+      "depends_on": [
+        "R00"
+      ],
+      "legacy_tasks": [
+        "L16",
+        "L18"
+      ],
+      "required_tests": [
+        "lifecycle_R01_exit_codes",
+        "lifecycle_R01_health_windows",
+        "lifecycle_R01_probe_timeout",
+        "lifecycle_R01_pid_reuse",
+        "lifecycle_R01_no_mutation",
+        "lifecycle_R01_environment_busy"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "CMakeLists.txt",
+        "scripts/audio-stack-guard",
+        "scripts/audio-stack-health",
+        "scripts/audio-stack-health.py",
+        "scripts/run-child-with-timeout.py",
+        "tests/macos/test_lifecycle_offline.py",
+        "tools/test_inventory.json"
+      ],
+      "commands": [
+        "bash -n scripts/audio-stack-guard scripts/audio-stack-health",
+        "ctest --test-dir build/lifecycle-debug -R ^lifecycle_R01_ --output-on-failure",
+        "scripts/audio-stack-guard --run-dir local-analysis/lifecycle/20261012-offline/audio-stack-guard-3x10-v2 --min-idle-pct 20 --threshold 25 --total-threshold 120 --enumeration-timeout 5"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/audio-stack-health-3x10.jsonl",
+        "local-analysis/lifecycle/20261012-offline/audio-stack-guard-3x10-v2-summary.txt",
+        "local-analysis/lifecycle/20261012-offline/audio-stack-guard-3x10-v2/"
+      ],
+      "result": "DONE: muestreo CPU por deltas de ps time, identidad pid+nacimiento+boot, timestamps civil/monotónico y UUID de boot por ventana, enumeración al terminar cada ventana; probe integrado real 3x10 PASS con todas las enumeraciones PASS. Una ejecución previa ENVIRONMENT_BUSY de Spotify se conserva como evidencia histórica.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R02",
+      "title": "Coordinar todos los actores con un lock real",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R01"
+      ],
+      "legacy_tasks": [
+        "L15",
+        "L16"
+      ],
+      "required_tests": [
+        "lifecycle_R02_lock_contention",
+        "lifecycle_R02_fake_inheritance",
+        "lifecycle_R02_pid_boot_reuse",
+        "lifecycle_R02_old_owner_cleanup",
+        "lifecycle_R02_installer_lease",
+        "lifecycle_R02_supervisor_dies_with_child"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "scripts/hardware-lock-supervisor.py",
+        "scripts/hardware-lock-lib.sh",
+        "scripts/run-direct-usb-soundcheck",
+        "scripts/run-physical-superiority-window",
+        "scripts/test-hal-candidate-safety",
+        "scripts/test-hal-unload-reload-lifecycle",
+        "scripts/install-hal-lifecycle-transaction",
+        "scripts/run-channel-matrix-gate",
+        "scripts/run-known-good-route-soundcheck",
+        "scripts/run-audio8dj-direct-gate",
+        "scripts/run-timecode-physical-window",
+        "tests/macos/test_hardware_lock_supervisor.py",
+        "CMakeLists.txt"
+      ],
+      "commands": [],
+      "evidence": [
+        "local-analysis/lifecycle/20261011-offline/ctest-debug-lifecycle.log",
+        "local-analysis/lifecycle/20261011-offline/ctest-release-lifecycle.log"
+      ],
+      "result": "PARTIAL: kernel flock supervisor, inherited descriptor verification, process birth/boot/token checks, contention, cleanup ownership, supervisor-death and mutator wrappers pass. Installer/PKG lease across privilege-separated hooks is not implemented; current lease test only verifies fake lease denial.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R03",
+      "title": "Sustituir los scripts de instalación por una transacción recuperable",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R02"
+      ],
+      "legacy_tasks": [
+        "L15",
+        "L16"
+      ],
+      "required_tests": [
+        "lifecycle_R03_backup_integrity",
+        "lifecycle_R03_failed_rollback",
+        "lifecycle_R03_fault_every_phase",
+        "lifecycle_R03_invalid_paths",
+        "lifecycle_R03_loaded_identity",
+        "lifecycle_R03_pkg_receipt",
+        "lifecycle_R03_restart_budget",
+        "lifecycle_R03_resume_interrupted_rollback",
+        "lifecycle_R03_signals_resume"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "CMakeLists.txt",
+        "scripts/install-hal-lifecycle-transaction",
+        "scripts/lifecycle-transaction.py",
+        "scripts/test-hal-unload-reload-lifecycle",
+        "tests/macos/test_lifecycle_transaction.py",
+        "tools/test_inventory.json"
+      ],
+      "commands": [],
+      "evidence": [
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-non-evidence-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-non-evidence-final.log"
+      ],
+      "result": "PARTIAL: temporary-fixture transaction commits the exact candidate, validates hashes/paths, rolls back every precommit fault and now resumes idempotently after interruption at candidate quarantine, baseline restore or staging cleanup. R03 directed tests pass 5/5 Debug/Release. Real privileged backend/host identity checks, PKG receipt coordination, validated rollback failure handling and system install remain incomplete; entrypoint continues to fail closed before mutation.",
+      "blocker": "Privileged backend, host-exclusive OpenA8DJ process identification, PKG receipts and real rollback verification are not implemented.",
+      "completion_source_identity": null
+    },
+    {
+      "id": "R04",
+      "title": "Hacer que las pruebas ejecuten producción de forma aislada",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R03"
+      ],
+      "legacy_tasks": [
+        "L03",
+        "L04"
+      ],
+      "required_tests": [
+        "lifecycle_R04_event_ring",
+        "lifecycle_R04_fixture_cleanup",
+        "lifecycle_R04_production_isolation",
+        "lifecycle_R04_release_checks",
+        "lifecycle_R04_snapshot_concurrency"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "CMakeLists.txt",
+        "src/hal/OpenA8DJUSB.m",
+        "tests/macos/audit-targets.cmake",
+        "tools/audit_macos_lifecycle.m",
+        "tools/test_inventory.json"
+      ],
+      "commands": [],
+      "evidence": [
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-directed-final.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-asan-r04-r05.log"
+      ],
+      "result": "PARTIAL: nine production Objective-C harness checks pass Debug/Release and ASan/UBSan. Includes partial-open cleanup plus the IPC cases in R05. It still does not inject the IOUSBHost platform adapter, test real open-stage unwind or submit/abort/late-completion races, or expose the required lifecycle event ring/snapshot/resource ledger.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R05",
+      "title": "Terminar la propiedad y el cierre no bloqueante de IPC",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R04"
+      ],
+      "legacy_tasks": [
+        "L05",
+        "L06"
+      ],
+      "required_tests": [
+        "lifecycle_R05_accept_stop",
+        "lifecycle_R05_bounded_shutdown",
+        "lifecycle_R05_capacity17",
+        "lifecycle_R05_fd_aba",
+        "lifecycle_R05_ipc_lifecycle",
+        "lifecycle_R05_partial_frames",
+        "lifecycle_R05_slow_peers16",
+        "lifecycle_R05_socket_owner",
+        "lifecycle_R05_writer_serialization"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "CMakeLists.txt",
+        "src/hal/OpenA8DJUSB.m",
+        "tools/audit_macos_lifecycle.m",
+        "tools/test_inventory.json"
+      ],
+      "commands": [
+        "cmake --build build/lifecycle-{debug,release,asan} --target opena8dj_macos_lifecycle_audit",
+        "ctest --test-dir build/lifecycle-{debug,release,asan} -R \"^lifecycle_R05_(ipc_lifecycle|slow_reply)$\" --output-on-failure"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261012-offline/ctest-debug-r05-slow-reply.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-release-r05-slow-reply.log",
+        "local-analysis/lifecycle/20261012-offline/ctest-asan-r05-slow-reply.log"
+      ],
+      "result": "PARTIAL: carreras accept/stop, ownership inode/dev del pathname, peers lentos, capacidad, fragmentos, fd ABA, serialización y shutdown acotado pasan. Las respuestas ahora esperan como máximo 50 ms con poll y desconectan un peer que no acepte el frame; el broadcast sigue siendo estrictamente inmediato. Debug/Release/ASan/UBSan pasan. Falta todavía cola bounded por conexión y completar el daemon MIDI R06.",
+      "blocker": "Arquitectura de escritor asíncrono con cola limitada por conexión y adaptación del daemon MIDI aún incompletas.",
+      "completion_source_identity": null
+    },
+    {
+      "id": "R06",
+      "title": "Llevar esas garantías al daemon MIDI",
+      "status": "TODO",
+      "mode": "offline",
+      "depends_on": [
+        "R05"
+      ],
+      "legacy_tasks": [
+        "L07"
+      ],
+      "required_tests": [
+        "lifecycle_R06_server_dies_during_send",
+        "lifecycle_R06_slow_server",
+        "lifecycle_R06_reconnect_endpoints",
+        "lifecycle_R06_sigterm_cleanup",
+        "lifecycle_R06_callback_budget"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R07",
+      "title": "Serializar apertura y control con resultados y deadlines",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R06"
+      ],
+      "legacy_tasks": [
+        "L08",
+        "L09",
+        "L10"
+      ],
+      "required_tests": [
+        "lifecycle_R07_open_stage_failures",
+        "lifecycle_R07_late_open",
+        "lifecycle_R07_sdk_never_returns",
+        "lifecycle_R07_ep1_no_completion",
+        "lifecycle_R07_late_opcode",
+        "lifecycle_R07_reentrant_snapshot"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "src/hal/OpenA8DJUSB.m"
+      ],
+      "commands": [],
+      "evidence": [],
+      "result": "PARTIAL: command-channel wait is bounded; an opcode timeout invalidates the uncorrelated EP1 channel, EP1 completion has a deadline, and reopen is rejected after unsafe retirement. Device SDK calls/open-stage rollback and late opcode tests remain.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R08",
+      "title": "Cancelar y drenar sesiones antes de reutilizar buffers",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R07"
+      ],
+      "legacy_tasks": [
+        "L11"
+      ],
+      "required_tests": [
+        "lifecycle_R08_submit_inline_completion",
+        "lifecycle_R08_abort_failure",
+        "lifecycle_R08_capture_and_playback_drain",
+        "lifecycle_R08_late_old_session",
+        "lifecycle_R08_missing_completion",
+        "lifecycle_R08_audio_reader_retirement",
+        "lifecycle_R08_prepared_runtime"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "src/hal/OpenA8DJUSB.m"
+      ],
+      "commands": [],
+      "evidence": [],
+      "result": "PARTIAL: capture and playback submissions are counted; stop waits boundedly and retains the engine/buffers if work or queue barriers do not retire. No isolated submit/abort/completion-race tests yet.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R09",
+      "title": "Hacer coherentes clientes, configuración y notificaciones HAL",
+      "status": "TODO",
+      "mode": "offline",
+      "depends_on": [
+        "R08"
+      ],
+      "legacy_tasks": [
+        "L12"
+      ],
+      "required_tests": [
+        "lifecycle_R09_remove_during_start",
+        "lifecycle_R09_two_clients",
+        "lifecycle_R09_unbalanced_stop",
+        "lifecycle_R09_rate_commit_failure",
+        "lifecycle_R09_stale_config_abort",
+        "lifecycle_R09_reentrant_properties",
+        "lifecycle_R09_noop_no_notifications"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R10",
+      "title": "Recuperar desconexión y suspensión sin acumular motores",
+      "status": "TODO",
+      "mode": "offline",
+      "depends_on": [
+        "R09"
+      ],
+      "legacy_tasks": [
+        "L13"
+      ],
+      "required_tests": [
+        "lifecycle_R10_duplicate_disconnect",
+        "lifecycle_R10_disconnect_during_open",
+        "lifecycle_R10_disconnect_during_stop",
+        "lifecycle_R10_retry_budget",
+        "lifecycle_R10_suspend_resume",
+        "lifecycle_R10_shutdown_forbids_reopen"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R11",
+      "title": "Retirar todo el trabajo y comprobar la descarga",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R10"
+      ],
+      "legacy_tasks": [
+        "L14"
+      ],
+      "required_tests": [
+        "lifecycle_R11_unload100",
+        "lifecycle_R11_cancel_each_timer",
+        "lifecycle_R11_no_safe_unload",
+        "lifecycle_R11_no_host_after_shutdown",
+        "lifecycle_R11_real_host_contract"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [
+        "src/hal/OpenA8DJUSB.m",
+        "tools/audio-lifecycle-test.c",
+        "Makefile",
+        "CMakeLists.txt"
+      ],
+      "commands": [
+        "cmake --build build/lifecycle-debug --target opena8dj_audio_lifecycle_test --parallel 2",
+        "ctest --test-dir build/lifecycle-debug -R ^lifecycle_R12_zero_callbacks_one_cycle$ --output-on-failure --timeout 15",
+        "make audio-lifecycle-test"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261011-offline/ctest-R00-R01.log"
+      ],
+      "result": "PARTIAL: bounded USB/EP1/IPC retirement barriers, in-flight accounting and zero-callback client predicate are present. Timer cancellation, every host callback/source and real unload contract still lack production-isolated proof.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R12",
+      "title": "Fortalecer el test de cliente y cerrar la puerta offline",
+      "status": "IN_PROGRESS",
+      "mode": "offline",
+      "depends_on": [
+        "R11"
+      ],
+      "legacy_tasks": [
+        "L17",
+        "L18"
+      ],
+      "required_tests": [
+        "lifecycle_R12_zero_callbacks_one_cycle",
+        "lifecycle_R12_cleanup_every_failure",
+        "lifecycle_R12_async_config",
+        "lifecycle_R12_hung_api_child",
+        "lifecycle_R12_stale_evidence",
+        "lifecycle_R12_physical_dry_run",
+        "lifecycle_R12_offline_gate"
+      ],
+      "required_physical_cases": [],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [
+        "local-analysis/lifecycle/20261011-offline/ctest-debug-lifecycle.log",
+        "local-analysis/lifecycle/20261011-offline/ctest-release-lifecycle.log"
+      ],
+      "result": "PARTIAL: lifecycle client checks per-cycle callback/frame progress, async buffer changes/restoration, IOProc destruction and zero callbacks after retirement. Full failure-path cleanup/watchdog/evidence freshness and offline release gate depend on R04-R11.",
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R13",
+      "title": "Distinguir fallo del host y fallo del candidato",
+      "status": "IN_PROGRESS",
+      "mode": "physical",
+      "depends_on": [
+        "R12"
+      ],
+      "legacy_tasks": [
+        "L19"
+      ],
+      "required_tests": [],
+      "required_physical_cases": [
+        "baseline_client",
+        "baseline_retirement",
+        "candidate_retirement",
+        "three_stable_cycles",
+        "bounded_recovery"
+      ],
+      "changed_files": [],
+      "commands": [
+        "ioreg -p IOUSB -w0 -l",
+        "build/audio-list",
+        "scripts/audio-stack-guard",
+        "build/audio-lifecycle-test --cycles-per-rate 100 --hold-ms 50 --idle-reopen-ms 11000 (under hardware-lock-supervisor.py)"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261016-physical/README.md",
+        "local-analysis/lifecycle/20261016-physical/start-stop.stdout",
+        "local-analysis/audio-stack-guard/guard-20261016-083113/",
+        "local-analysis/lifecycle/20261016-physical/post-start-stop-guard/"
+      ],
+      "result": "PARTIAL: Audio 8 enumerates 8-in/8-out. Pre/post physical guards PASS 3x10s; installed baseline 4af4b1… passes 200 start/stop cycles at 44.1/48 kHz plus 11s idle/reopen and restores 48k/512. Latest candidate was not installed or physically exercised; R12 and safe install backend remain open.",
+      "blocker": "R02/R03 privileged transaction backend and R04-R12 offline gates are incomplete; latest candidate must not be installed through legacy rm-before-copy recipe.",
+      "completion_source_identity": null
+    },
+    {
+      "id": "R14",
+      "title": "Validar uso real de Traktor y de audio",
+      "status": "TODO",
+      "mode": "physical",
+      "depends_on": [
+        "R13"
+      ],
+      "legacy_tasks": [
+        "L19"
+      ],
+      "required_tests": [],
+      "required_physical_cases": [
+        "client_100_each_rate",
+        "two_clients",
+        "grace_reopen",
+        "traktor_audio_and_quit",
+        "ipc_midi",
+        "usb_reconnect",
+        "sleep_wake",
+        "audio_quality",
+        "four_hour_soak"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_source_identity": null
+    },
+    {
+      "id": "R15",
+      "title": "Instalar el mismo artefacto validado y cerrar el informe",
+      "status": "TODO",
+      "mode": "physical",
+      "depends_on": [
+        "R14"
+      ],
+      "legacy_tasks": [
+        "L19"
+      ],
+      "required_tests": [],
+      "required_physical_cases": [
+        "relevant_local_gates",
+        "exact_signed_install",
+        "loaded_identity",
+        "final_smoke",
+        "rollback_reference",
+        "pkg_if_distributed"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_source_identity": null
+    }
+  ],
+  "candidate_bundle_sha256": "d4bf8a8361a68c7e25c7b61f19fbf86a501c5c227c4cc347d3e7beb070f78490",
+  "candidate_binary_uuid": "UUID: 8DBD51A1-DA0F-38AA-8F30-5219D6F0578C (arm64) /Users/fer/dev/opena8dj/build/OpenA8DJ.driver/Contents/MacOS/OpenA8DJHAL",
+  "candidate_signature_verified": true
+}

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/run-physical-superiority-window" \
+  "physical superiority evidence window" "$ROOT/local-analysis/physical-windows" \
+  "execute the explicitly requested physical comparison window" \
+  "reboot, delete rollback backups, change arbitrary default devices" "$@"
+
 usage() {
   cat <<'USAGE'
 usage: scripts/run-physical-superiority-window --run-dir DIR --capture-device NAME --reference-wav PATH [options]

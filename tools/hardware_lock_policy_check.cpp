@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -33,17 +34,11 @@ bool contains_all(const std::string& data,
 
 int main(int argc, char** argv) {
   (void)argc;
-  const auto executable = std::filesystem::absolute(argv[0]);
-  std::filesystem::path root = executable.parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    root = "/Users/fer/dev/audio8djcpp";
-  }
+  const auto root = opena8dj::repo_root();
 
   std::vector<std::string> missing;
   const auto lib = read_file(root / "scripts/hardware-lock-lib.sh");
+  const auto supervisor = read_file(root / "scripts/hardware-lock-supervisor.py");
   const auto safety = read_file(root / "scripts/test-hal-candidate-safety");
   const auto direct = read_file(root / "scripts/run-audio8dj-direct-gate");
   const auto direct_soundcheck = read_file(root / "scripts/run-direct-usb-soundcheck");
@@ -58,12 +53,15 @@ int main(int argc, char** argv) {
                                        "AUDIO_GATE_LOCK_ROOT",
                                        "opena8dj_acquire_hardware_lock()",
                                        "opena8dj_release_hardware_lock()",
-                                       "audio_gate_lock=BUSY",
-                                       "actions_authorized=",
                                        "forbidden=",
                                    },
                                    missing,
                                    "scripts/hardware-lock-lib.sh");
+  const bool supervisor_ok = contains_all(supervisor,
+                                            {"audio_gate_lock=BUSY", "actions_authorized",
+                                             "process_birth", "boot_uuid", "fcntl.flock"},
+                                            missing,
+                                            "scripts/hardware-lock-supervisor.py");
 
   const bool safety_ok = contains_all(safety,
                                       {
@@ -71,7 +69,7 @@ int main(int argc, char** argv) {
                                           "opena8dj_acquire_hardware_lock",
                                           "HAL install/reload",
                                           "coreaudiod restart",
-                                          "trap opena8dj_release_hardware_lock EXIT",
+                                          "opena8dj_release_hardware_lock",
                                       },
                                       missing,
                                       "scripts/test-hal-candidate-safety");
@@ -81,7 +79,7 @@ int main(int argc, char** argv) {
                                           "hardware-lock-lib.sh",
                                           "opena8dj_acquire_hardware_lock",
                                           "Audio 8 DJ direct CoreAudio I/O",
-                                          "trap opena8dj_release_hardware_lock EXIT",
+                                          "opena8dj_release_hardware_lock",
                                       },
                                       missing,
                                       "scripts/run-audio8dj-direct-gate");
@@ -92,7 +90,7 @@ int main(int argc, char** argv) {
                                                      "opena8dj_acquire_hardware_lock",
                                                      "physical-direct-usb-soundcheck",
                                                      "Audio 8 DJ direct USB playback, external capture",
-                                                     "trap opena8dj_release_hardware_lock EXIT",
+                                                     "opena8dj_release_hardware_lock",
                                                      "--capture-device is required",
                                                  },
                                                  missing,
@@ -118,7 +116,7 @@ int main(int argc, char** argv) {
                                           "physical-channel-matrix",
                                           "Open Audio 8 DJ playback, external capture",
                                           "no install, no unload, no USB reset, no service restart, no default-device change",
-                                          "trap opena8dj_release_hardware_lock EXIT",
+                                          "opena8dj_release_hardware_lock",
                                           "--run-physical",
                                           "--capture-device is required",
                                       },
@@ -131,7 +129,7 @@ int main(int argc, char** argv) {
                                               "opena8dj_acquire_hardware_lock",
                                               "known-good-route-soundcheck",
                                               "explicit non-Audio8 CoreAudio output playback, iRig Stream capture",
-                                              "trap opena8dj_release_hardware_lock EXIT",
+                                              "opena8dj_release_hardware_lock",
                                               "--output-device or --output-device-uid is required",
                                               "validate-known-good-route-request.py",
                                               "known-good-route-request.json",
@@ -172,7 +170,7 @@ int main(int argc, char** argv) {
                                                    "opena8dj_acquire_hardware_lock",
                                                    "traktor-timecode-physical-window",
                                                    "operator-acknowledge-manual-traktor-control",
-                                                   "trap opena8dj_release_hardware_lock EXIT",
+                                                   "opena8dj_release_hardware_lock",
                                                    "No hardware/audio action was run. Add --execute only inside an approved locked window.",
                                                    "default-device-change,sample-rate-change,buffer-change,USB-reset,system-reboot,driver-install,driver-uninstall,driver-reload,CoreAudio-restart",
                                                    "product_claim_allowed",
@@ -181,7 +179,7 @@ int main(int argc, char** argv) {
                                                missing,
                                                "scripts/run-timecode-physical-window");
 
-  const bool pass = lib_ok && safety_ok && direct_ok && direct_soundcheck_ok &&
+  const bool pass = lib_ok && supervisor_ok && safety_ok && direct_ok && direct_soundcheck_ok &&
                     soundcheck_ok && matrix_ok && known_good_ok && superiority_window_ok &&
                     timecode_window_ok;
   std::cout << "{\n"

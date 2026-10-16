@@ -2,6 +2,11 @@
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
+. "$repo/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$repo" "$repo/scripts/run-audio8dj-direct-gate" \
+  "Audio 8 direct input gate" "$repo/local-analysis/audio8dj-direct-gate" \
+  "capture explicit Audio 8 input presence evidence" \
+  "install or unload HAL, change default devices, restart CoreAudio, reboot" "$@"
 cd "$repo"
 . "$repo/scripts/hardware-lock-lib.sh"
 

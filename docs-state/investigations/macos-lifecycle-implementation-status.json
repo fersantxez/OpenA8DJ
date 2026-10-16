@@ -1,0 +1,612 @@
+{
+  "schema": "opena8dj.lifecycle-implementation-status.v1",
+  "plan_date": "2026-10-10",
+  "status": "IMPLEMENTATION_IN_PROGRESS",
+  "plan": "macos-lifecycle-implementation-plan-2026-10-10.md",
+  "test_spec": "macos-lifecycle-test-spec-2026-10-10.md",
+  "next_task": "L03",
+  "baseline_commit": "46a80ffdfa97469bea7f41f176c37dc5a9dab21f",
+  "baseline_installed_sha256": "4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66",
+  "execution_branch": "codex/macos-lifecycle-stability",
+  "offline_candidate_ready": false,
+  "physical_promotion_allowed": false,
+  "allowed_task_statuses": [
+    "TODO",
+    "IN_PROGRESS",
+    "DONE",
+    "BLOCKED",
+    "WAITING_PHYSICAL"
+  ],
+  "notes": [
+    "L00-L02 offline completadas: 74/74 tests offline PASS; 16 gates local_evidence siguen fallando por falta de su evidencia física específica.",
+    "Hay regresiones parciales de producción para rollback de apertura, cierre IPC y contrapresión; el servidor IPC sigue usando lectores bloqueantes y no satisface L05-L06.",
+    "El candidato 4b4cbba820373fc5da1be266d158bf0beda7a43dd62cf1b9a5f1b319173878b9 se compiló, firmó e instaló transaccionalmente; 100 start/stop a 44.1 kHz y 100 a 48 kHz pasaron (201 starts, 201 stops, 889 callbacks).",
+    "La campaña unload/reload del candidato no superó las comprobaciones repetidas: Core Audio llegó a ~110% CPU y la enumeración/salud falló durante una ventana; se recogió coreaudiod.sample sin símbolos OpenA8DJ.",
+    "Se restauró y verificó el bundle base 4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66, se aparcó el candidato y Core Audio volvió a enumerar. No promover el candidato.",
+    "Traktor abrió con el bundle base y cerró limpiamente tras almacenar su colección; el candidato no se probó en Traktor ni se declara validado.",
+    "No declarar seguras las descargas: el HAL aún conserva un hilo detached de cierre diferido; L09-L14 y la mayor parte de L15-L19 siguen sin implementar.",
+    "El host registra un arranque a las 18:02 y un informe shutdown_stall a las 18:02:18 durante la ventana de recuperación; ningún script de esta campaña contiene reboot/shutdown. Causa no atribuida. Se suspendieron más ciclos de Core Audio."
+  ],
+  "tasks": [
+    {
+      "id": "L00",
+      "title": "Fijar baseline y carpeta de trabajo",
+      "status": "DONE",
+      "depends_on": [],
+      "mode": "offline",
+      "required_tests": [],
+      "changed_files": [
+        "local-analysis/lifecycle/20261010T173942/baseline.json",
+        "scripts/audit-macos-lifecycle-offline.py"
+      ],
+      "commands": [
+        "sw_vers",
+        "clang --version",
+        "python3 scripts/audit-macos-lifecycle-offline.py"
+      ],
+      "evidence": [
+        "local-analysis/macos-lifecycle-audit/report.json"
+      ],
+      "result": "baseline fijo; defectos históricos reproducidos; hash instalado intacto",
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L01",
+      "title": "Corregir la raíz usada por los tests",
+      "status": "DONE",
+      "depends_on": [
+        "L00"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T01",
+        "T02",
+        "T03"
+      ],
+      "changed_files": [
+        "CMakeLists.txt",
+        "tools/repo_paths.hpp",
+        "tools/repo_path_probe.cpp",
+        "scripts/test-repo-path-resolution.py",
+        "tools/*.cpp",
+        "Makefile"
+      ],
+      "commands": [
+        "cmake -S . -B build/lifecycle-cmake -DCMAKE_BUILD_TYPE=Debug",
+        "ctest --test-dir build/lifecycle-cmake -R ^repo_paths_ --output-on-failure"
+      ],
+      "evidence": [
+        "build/lifecycle-cmake/Testing/Temporary/LastTest.log"
+      ],
+      "result": "raíz actual y checkout señuelo verificados; sin rutas personales en tools",
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L02",
+      "title": "Separar pruebas autocontenidas y evidencia local",
+      "status": "DONE",
+      "depends_on": [
+        "L01"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T04",
+        "T05"
+      ],
+      "changed_files": [
+        "tools/test_inventory.json",
+        "CMakeLists.txt",
+        "tools/static_policy_check.cpp",
+        "tools/hardware_lock_policy_check.cpp"
+      ],
+      "commands": [
+        "cmake --build build/lifecycle-cmake -j4",
+        "ctest --test-dir build/lifecycle-cmake -L offline --output-on-failure --timeout 15"
+      ],
+      "evidence": [
+        "local-analysis/lifecycle/20261010T173942/ctest-debug.txt"
+      ],
+      "result": "90 clasificados: 74 offline PASS, 16 local_evidence FAIL preservados y clasificados",
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L03",
+      "title": "Crear el harness de producción sin hardware",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "L02"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T06"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": "Cobertura parcial; faltan pruebas y diseño íntegro descritos en el plan.",
+      "completion_commit": null
+    },
+    {
+      "id": "L04",
+      "title": "Añadir eventos y resultados de lifecycle",
+      "status": "TODO",
+      "depends_on": [
+        "L03"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T07",
+        "T08",
+        "T09"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L05",
+      "title": "Dar propiedad única a conexiones IPC",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "L04"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": "Cobertura parcial; faltan pruebas y diseño íntegro descritos en el plan.",
+      "completion_commit": null
+    },
+    {
+      "id": "L06",
+      "title": "Hacer no bloqueante y acotado el servidor IPC",
+      "status": "TODO",
+      "depends_on": [
+        "L05"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L07",
+      "title": "Adaptar el daemon MIDI al nuevo cierre",
+      "status": "TODO",
+      "depends_on": [
+        "L06"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T24",
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L08",
+      "title": "Corregir rollback de apertura USB",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "L07"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": "Cobertura parcial; faltan pruebas y diseño íntegro descritos en el plan.",
+      "completion_commit": null
+    },
+    {
+      "id": "L09",
+      "title": "Serializar lifecycle y publicar referencias estables",
+      "status": "TODO",
+      "depends_on": [
+        "L08"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T35",
+        "T36",
+        "T37",
+        "T38",
+        "T39"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L10",
+      "title": "Convertir EP1 y órdenes de control en operaciones cancelables",
+      "status": "TODO",
+      "depends_on": [
+        "L09"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T40",
+        "T41",
+        "T42",
+        "T43",
+        "T44",
+        "T45"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L11",
+      "title": "Cancelar y drenar cada sesión de audio",
+      "status": "TODO",
+      "depends_on": [
+        "L10"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T46",
+        "T47",
+        "T48",
+        "T49",
+        "T50",
+        "T51",
+        "T52",
+        "T53"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L12",
+      "title": "Reconciliar clientes y propiedades HAL",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "L11"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T54",
+        "T55",
+        "T56",
+        "T57",
+        "T58",
+        "T59",
+        "T60",
+        "T61",
+        "T62"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": "Cobertura parcial; faltan pruebas y diseño íntegro descritos en el plan.",
+      "completion_commit": null
+    },
+    {
+      "id": "L13",
+      "title": "Recuperar desconexión y suspensión",
+      "status": "TODO",
+      "depends_on": [
+        "L12"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T63",
+        "T64",
+        "T65",
+        "T66",
+        "T67",
+        "T68"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L14",
+      "title": "Retirar timers y demostrar descarga segura",
+      "status": "TODO",
+      "depends_on": [
+        "L13"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T69",
+        "T70",
+        "T71",
+        "T72",
+        "T73"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L15",
+      "title": "Crear la transacción de instalación en un filesystem falso",
+      "status": "TODO",
+      "depends_on": [
+        "L14"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T74",
+        "T75",
+        "T76",
+        "T77",
+        "T78",
+        "T79",
+        "T80",
+        "T81",
+        "T82"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L16",
+      "title": "Conectar instalador real y hooks PKG",
+      "status": "TODO",
+      "depends_on": [
+        "L15"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T83",
+        "T84",
+        "T85",
+        "T86",
+        "T87",
+        "T88"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L17",
+      "title": "Integrar smoke seguro y puerta offline del candidato",
+      "status": "TODO",
+      "depends_on": [
+        "L16"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T01",
+        "T02",
+        "T03",
+        "T04",
+        "T05",
+        "T06",
+        "T07",
+        "T08",
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "T15",
+        "T16",
+        "T17",
+        "T18",
+        "T19",
+        "T20",
+        "T21",
+        "T22",
+        "T23",
+        "T24",
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T31",
+        "T32",
+        "T33",
+        "T34",
+        "T35",
+        "T36",
+        "T37",
+        "T38",
+        "T39",
+        "T40",
+        "T41",
+        "T42",
+        "T43",
+        "T44",
+        "T45",
+        "T46",
+        "T47",
+        "T48",
+        "T49",
+        "T50",
+        "T51",
+        "T52",
+        "T53",
+        "T54",
+        "T55",
+        "T56",
+        "T57",
+        "T58",
+        "T59",
+        "T60",
+        "T61",
+        "T62",
+        "T63",
+        "T64",
+        "T65",
+        "T66",
+        "T67",
+        "T68",
+        "T69",
+        "T70",
+        "T71",
+        "T72",
+        "T73",
+        "T74",
+        "T75",
+        "T76",
+        "T77",
+        "T78",
+        "T79",
+        "T80",
+        "T81",
+        "T82",
+        "T83",
+        "T84",
+        "T85",
+        "T86",
+        "T87",
+        "T88",
+        "T89",
+        "T90",
+        "T91",
+        "T92",
+        "T93",
+        "T94"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L18",
+      "title": "Preparar la campaña física sin ejecutarla todavía",
+      "status": "TODO",
+      "depends_on": [
+        "L17"
+      ],
+      "mode": "offline",
+      "required_tests": [
+        "T95",
+        "T96",
+        "T97",
+        "T98"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [],
+      "result": null,
+      "blocker": null,
+      "completion_commit": null
+    },
+    {
+      "id": "L19",
+      "title": "Ejecutar campaña física y decidir publicación",
+      "status": "IN_PROGRESS",
+      "depends_on": [
+        "L18"
+      ],
+      "mode": "physical",
+      "required_tests": [
+        "H01",
+        "H02",
+        "H03",
+        "H04",
+        "H05",
+        "H06",
+        "H07",
+        "H08",
+        "H09",
+        "H10",
+        "H11",
+        "H12"
+      ],
+      "changed_files": [],
+      "commands": [],
+      "evidence": [
+        "local-analysis/lifecycle/20261010T173942/physical-retry1/summary.txt",
+        "local-analysis/lifecycle/20261010T173942/physical-retry1/start-stop-stress.json",
+        "local-analysis/lifecycle/20261010T173942/unload-reload-final/coreaudiod.sample",
+        "local-analysis/lifecycle/20261010T173942/recovery-to-baseline/manifest.txt",
+        "local-analysis/lifecycle/20261010T173942/after-traktor-baseline-close/summary.txt",
+        "/Library/Logs/DiagnosticReports/shutdown_stall_2026-10-10-180218_basoa.shutdownStall"
+      ],
+      "result": "Stress start/stop PASS; unload/reload FAIL durante repetición. Bundle base restaurado y Traktor validado solo con baseline. El sistema registra además reinicio no solicitado a las 18:02 (shutdown_stall); no se atribuye causalidad sin analizar el informe.",
+      "blocker": "Descarga/reload repetidos fallaron las puertas de salud, y hubo un arranque no solicitado durante la ventana. No repetir reinicios de Core Audio hasta analizar el shutdown_stall y completar el drenaje/ownership.",
+      "completion_commit": null
+    }
+  ],
+  "candidate_sha256": "4b4cbba820373fc5da1be266d158bf0beda7a43dd62cf1b9a5f1b319173878b9",
+  "installed_sha256_after_recovery": "4af4b1207f81846208fd2fcc0b8f5a600c2e11346d523ee5fd8e4f55700b9f66"
+}

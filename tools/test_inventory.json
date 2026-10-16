@@ -1,0 +1,823 @@
+{
+  "schema": "opena8djcpp.test-inventory.v1",
+  "captured_at": "2026-10-11",
+  "test_count": 116,
+  "classification_policy": {
+    "offline": "self-contained or versioned fixture; safe without device",
+    "local_evidence": "requires dated, machine-local/physical evidence and must remain a failure when absent"
+  },
+  "tests": [
+    {
+      "name": "opena8djcpp_core_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_packet_matrix",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_mode2_mainline_layout_parity",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_mode2_cpp_oracle_dump",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_protocol_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_simulated_output_matrix",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_timecode_matrix",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_timecode_signal_analysis",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_timecode_readiness_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_realtime_audit",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_surface_model",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_shell_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_runtime_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_extension_scaffold_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_runtime_binding_gap_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_device_binding_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_sdk_preflight_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_prepared_transport_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_prepared_hotpath_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_usb_submit_binding_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_usb_request_lifecycle_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_usb_request_shutdown_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_usb_isochronous_schedule_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_driverkit_persistent_usb_transport_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_transport_packet_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_transport_routing_timecode_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_transport_recovery_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_slot_scheduler_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_playback_scheduler_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_playback_scheduler_runtime_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_runtime_adapter_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_usb_submit_plan_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_usb_submit_payload_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_usb_runtime_submit_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_usb_async_runtime_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_persistent_usb_transport_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_prepared_submit_adapter_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_prepared_runtime_source_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_prepared_runtime_binding_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_transport_pressure_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_transport_migration_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_dvs_signal_smoke",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_dvs_packet_input_decode",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_dvs_timecode_stress_margin",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_jitter_model",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_transfer_pool_model",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_transport_budget_model",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_hot_path_timing_analysis",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_quality_root_cause_analysis",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_loopback_quality_analysis",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_capture_matrix_quality_analysis",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_capture_route_health_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_soundcheck_wav_quality",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_soundcheck_alignment_guard",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_channel_leakage_tone_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_audiophile_tone_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_audiophile_precision_claim_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_audiophile_wav_analysis_self_test",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_audiophile_wav_analysis_degraded_self_test",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_audiophile_analysis_stack_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_lti_transfer_quality_self_test",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_lti_transfer_quality_parity_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_fractional_time_warp_self_test",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_fractional_time_warp_parity_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_runtime_discontinuity_analysis_self_test",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_runtime_discontinuity_parity_gate",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_physical_run_compare",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_physical_submit_comparison_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_prepared_runtime_physical_window_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_human_test_rc_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_physical_evidence_frontier",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_physical_capture_forensics",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_direct_usb_path_attribution",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_physical_window_readiness_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_capture_readiness_contract",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_physical_route_matrix_contract",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_evidence_json_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_diagnostic_pass_semantics_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_product_quality_claim_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_hal_candidate_safety_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_hal_transport_runtime_gate",
+      "classification": "local_evidence",
+      "hardware_touch": false,
+      "required_inputs": "captured local evidence bundle absent or stale",
+      "captured_result": "BLOCKED_LOCAL_EVIDENCE"
+    },
+    {
+      "name": "opena8djcpp_hal_cpu_pool_candidate_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_logical_capture_batching_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_input_spsc_ring_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_input_decode_snapshot_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hal_runtime_geometry_observability_contract",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_static_policy_check",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "opena8djcpp_hardware_lock_policy_check",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "repo_paths_current_checkout",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "repo_paths_decoy_checkout",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "generated fixture/source only",
+      "captured_result": "NOT_RUN_IN_THIS_INVENTORY"
+    },
+    {
+      "name": "lifecycle_R00_manifest_identity",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R00_evidence_inventory",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R01_exit_codes",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R01_no_mutation",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R01_probe_timeout",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R01_health_windows",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R01_environment_busy",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R12_zero_callbacks_one_cycle",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_lock_contention",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_fake_inheritance",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_pid_boot_reuse",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_pid_birth_reuse",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_old_owner_cleanup",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_installer_lease",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_supervisor_dies_with_child",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R02_mutator_entrypoint_lock",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R03_fault_every_phase",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R03_exact_candidate_commit",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R03_invalid_paths",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "opena8djcpp_offline_bench",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source, temporary fixtures, or generated offline data only",
+      "captured_result": "NOT_RUN_IN_THIS_CAMPAIGN"
+    },
+    {
+      "name": "lifecycle_R03_physical_installer_fail_closed",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "local source or temporary offline fixture only",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R04_production_isolation",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "production OpenA8DJUSB implementation, fake device and private socketpair fixtures",
+      "captured_result": "PASS_DEBUG_AND_RELEASE_FULL_OFFLINE_SUITE"
+    },
+    {
+      "name": "lifecycle_R05_ipc_lifecycle",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "production IPC functions and private socketpair fixtures",
+      "captured_result": "NOT_RUN"
+    },
+    {
+      "name": "lifecycle_R05_slow_reply",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "private saturated socketpair; production IPC reply path",
+      "captured_result": "PASS_DEBUG_RELEASE_ASAN_2026-10-12"
+    },
+    {
+      "name": "lifecycle_R01_health_probe_timeout",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "fake health child process and private run directory",
+      "captured_result": "NOT_RUN"
+    },
+    {
+      "name": "lifecycle_R03_resume_interrupted_rollback",
+      "classification": "offline",
+      "hardware_touch": false,
+      "required_inputs": "temporary fixture bundles and durable transaction journal",
+      "captured_result": "NOT_RUN"
+    }
+  ]
+}

@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/run-channel-matrix-gate" \
+  "channel matrix gate" "$ROOT/local-analysis/channel-matrix" \
+  "run explicitly requested physical channel matrix cases" \
+  "install or unload HAL, restart CoreAudio, reboot, delete rollback backups" "$@"
 LOCK_ROOT="$(opena8dj_lock_root)"
 
 RUN_ID=""

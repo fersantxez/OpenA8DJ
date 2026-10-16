@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+  cat <<'USAGE'
+usage: scripts/install-hal-lifecycle-transaction [--help|--offline-self-test]
+
+Physical install is disabled until the journaled transaction core has a
+privileged macOS backend, loaded-host identity checks, and rollback validation.
+The current filesystem backend only runs against explicit temporary fixtures.
+
+  --offline-self-test  Run the fixture-only transaction failure tests
+  --help               Show this message
+USAGE
+}
+
+case "${1:-}" in
+  --help|-h)
+    usage
+    exit 0
+    ;;
+  --offline-self-test)
+    exec /usr/bin/python3 "$ROOT/tests/macos/test_lifecycle_transaction.py"
+    ;;
+esac
+
+. "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/install-hal-lifecycle-transaction" \
+  "HAL lifecycle install blocked until privileged transaction backend is complete" \
+  "$ROOT/local-analysis/lifecycle" \
+  "none; this entrypoint is intentionally fail-closed" \
+  "HAL install, CoreAudio restart, USB access, Traktor launch" "$@"
+
+echo "hal_lifecycle_install=BLOCKED"
+echo "reason=privileged_transaction_backend_and_host_identity_checks_incomplete"
+exit 2

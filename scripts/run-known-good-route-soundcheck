@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/run-known-good-route-soundcheck" \
+  "known good route soundcheck" "$ROOT/local-analysis/known-good-route" \
+  "capture explicit output and input route evidence" \
+  "install or unload HAL, change defaults, restart CoreAudio, reboot" "$@"
+
 usage() {
   cat <<'USAGE'
 usage: scripts/run-known-good-route-soundcheck --output-device NAME --capture-device NAME --reference-wav PATH [options]

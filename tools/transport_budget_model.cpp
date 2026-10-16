@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include "evidence_json.hpp"
 
 #include <algorithm>
@@ -49,14 +50,8 @@ std::string read_file(const std::filesystem::path& path) {
 }
 
 std::filesystem::path repo_root(char** argv) {
-  auto root = std::filesystem::absolute(argv[0]).parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    return "/Users/fer/dev/audio8djcpp";
-  }
-  return root;
+  (void)argv;
+  return opena8dj::repo_root();
 }
 
 bool string_field_is(std::string_view json, std::string_view key, std::string_view expected) {

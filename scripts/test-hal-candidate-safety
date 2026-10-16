@@ -3,6 +3,10 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 . "$ROOT/scripts/hardware-lock-lib.sh"
+opena8dj_supervise_hardware_operation "$ROOT" "$ROOT/scripts/test-hal-candidate-safety" \
+  "HAL candidate safety test" "$ROOT/local-analysis/hal-safety" \
+  "replace and restore the active HAL with verified candidate evidence" \
+  "play audio, launch Traktor, reboot, delete rollback backups" "$@"
 candidate=""
 cycles="1"
 leave_loaded="0"

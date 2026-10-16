@@ -1,0 +1,48 @@
+{
+  "schema": "opena8dj.macos-lifecycle-test-policy.v1",
+  "time_identity": ["civil_time_with_zone", "monotonic_time", "boot_uuid"],
+  "cpu": {
+    "sample_interval_seconds": 1,
+    "scale": "100_percent_equals_one_core",
+    "deduplicate_process_identity": ["pid", "birth_time", "boot_uuid"]
+  },
+  "preflight": {
+    "windows": 3,
+    "window_seconds": 10,
+    "minimum_mean_global_idle_pct": 20,
+    "maximum_mean_coreaudiod_pct": 25,
+    "maximum_mean_opena8dj_host_pct": 25,
+    "maximum_mean_watched_total_pct": 120,
+    "enumeration_required_at_each_window_end": true,
+    "busy_result": "ENVIRONMENT_BUSY",
+    "mutations_when_busy": false
+  },
+  "stabilization": {
+    "deadline_seconds": 20,
+    "settle_seconds": 5,
+    "consecutive_healthy_windows": 3,
+    "window_seconds": 5,
+    "enumerate_during_observation": true
+  },
+  "enumeration": {
+    "deadline_seconds": 5,
+    "capture_stdout": true,
+    "capture_stderr": true,
+    "record_duration": true,
+    "record_exit_code": true,
+    "record_signal": true,
+    "missing_executable": "INFRA_ERROR"
+  },
+  "alarms": {
+    "coreaudiod_or_host_cpu_pct": 100,
+    "continuous_seconds": 10,
+    "unexpected_boot_change": "RUN_INTERRUPTED_BY_REBOOT",
+    "stop_new_mutations": true
+  },
+  "transactions": {
+    "normal_deadline_seconds": 90,
+    "rollback_deadline_seconds": 60,
+    "post_failure_diagnostics_seconds": 60,
+    "additional_service_restarts_after_failure": 0
+  }
+}

@@ -1,3 +1,4 @@
+#include "repo_paths.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -28,14 +29,7 @@ bool contains_all(const std::string& data, const std::vector<std::string>& needl
 
 int main(int argc, char** argv) {
   (void)argc;
-  const auto executable = std::filesystem::absolute(argv[0]);
-  std::filesystem::path root = executable.parent_path();
-  while (!root.empty() && !std::filesystem::is_regular_file(root / "CMakeLists.txt")) {
-    root = root.parent_path();
-  }
-  if (root.empty() || root.filename() != "audio8djcpp") {
-    root = "/Users/fer/dev/audio8djcpp";
-  }
+  const auto root = opena8dj::repo_root();
 
   const auto extension = root / "driverkit/extension";
   const auto info = read_file(extension / "Info.plist.template");
